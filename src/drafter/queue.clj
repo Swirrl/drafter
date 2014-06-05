@@ -23,12 +23,12 @@
 (defn contains-value? [queue value]
   (.contains queue value))
 
-(defn process-queue [queue f error-fn]
+(defn process-queue [queue f error-fn!]
   (future
      (loop []
        (try
          (let [arguments (take! queue)]
            (apply f arguments))
          (catch java.lang.Exception ex
-           (error-fn ex)))
+           (error-fn! ex)))
        (recur))))
