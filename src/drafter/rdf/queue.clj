@@ -1,4 +1,4 @@
-(ns drafter.queue
+(ns drafter.rdf.queue
   (:import [java.util.concurrent ArrayBlockingQueue]))
 
 (defn make-queue [capacity]

@@ -1,4 +1,4 @@
-(ns drafter.core
+(ns drafter.routes.api
   (:import [com.hp.hpl.jena.tdb TDBFactory]
            [com.hp.hpl.jena.query QueryExecutionFactory QueryExecution Syntax Query])
   (:require [compojure.core :refer [context defroutes routes routing let-request
@@ -13,10 +13,7 @@
 (def draft (TDBFactory/assembleDataset "drafter-draft.ttl"))
 
 
-(defroutes drafter-routes
+(defroutes sparql-routes
   (GET "/" [] "Hello World!!")
   (GET "/sparql" {params :query-params :as request}
-       (pr-str request))
-  (ANY "/*" [] (not-found "Not found")))
-
-(def drafter-app (-> drafter-routes api))
+       (pr-str request)))

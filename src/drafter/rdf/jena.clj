@@ -87,8 +87,9 @@ e.g. (doquery db1 [results \"SELECT * WHERE {?s ?p ?o} LIMIT 10\"] (doseq [resul
   `(let [dataset# (->jena-triple-store ~dataset)]
      (try
        (.begin ~dataset ReadWrite/WRITE)
-       ~@forms
-       (.commit ~dataset)
+       (let [result# ~@forms]
+         (.commit ~dataset)
+         result#)
        (finally
          (.end ~dataset)))))
 

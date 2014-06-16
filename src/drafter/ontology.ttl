@@ -1,0 +1,32 @@
+@prefix : <http://publishmydata.com/def/drafter/> .
+@prefix pmd: <http://publishmydata.com/def/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+
+    :Graph rdf:type rdfs:Class ;
+    rdfs:label "The URI of an RDF Graph." .
+
+    :ManagedGraph rdf:type rdfs:Class ;
+    rdfs:label "A drafter managed Graph. This entity represents the state of a single graph managed by drafter." .
+
+    :hasGraph rdf:type rdf:Property ;
+    rdfs:domain :ManagedGraph ;
+    rdfs:range :Graph ;
+    rdfs:label "Association between a drafter managed graph and the URI of the Graph itself." .
+
+    :State rdf:type rdfs:Class ;
+    rdfs:label "The state of a ManagedGraph." .
+
+    :hasState rdf:type rdf:Property ;
+    rdfs:domain :ManagedGraph ;
+    rdfs:range  :State ;
+    rdfs:label "The state of a ManagedGraph." .
+
+    :Live rdf:type :State ;
+    rdfs:label "A ManagedGraph in the Live state is published." .
+
+    :Draft rdf:type :State ;
+    rdfs:label "A ManagedGraph in the Draft state is considered to not yet be live." .

@@ -10,25 +10,7 @@
            [com.hp.hpl.jena.rdf.model ModelFactory]
            [org.apache.jena.riot Lang RDFDataMgr]))
 
-(def store-directory "MyDatabases/DB2")
-
-(defn ex-tdb-txn2 [store-directory val]
-  (let [dataset (TDBFactory/createDataset store-directory)]
-    (.begin dataset ReadWrite/WRITE)
-    (try
-      (let [graph-store (GraphStoreFactory/create dataset)
-            update-str (str "PREFIX : <http://example/>
-                             INSERT DATA { :s :p3 \"foobar\" . }")]
-
-        (let [update-req (UpdateFactory/create update-str)
-              proc (UpdateExecutionFactory/create update-req graph-store)]
-          (.execute proc))
-        (.commit dataset)
-        (println "commited"))
-      (finally
-        (println "ending")
-        (.end dataset)))))
-
+(def store-directory "MyDatabases/db")
 
 (defn create-dataset-with-data [ds]
   (let [dataset (->jena-triple-store ds)]
@@ -45,7 +27,49 @@
         (exec-update update-str2 graph-store)))
     (.close dataset)))
 
+(defn- make-model-from-triples [dataset triple-source]
+  "Creates a JENA model/graph from the supplied triples.  Attempts to
+  resolve the triple-source String as either a filename or URI to load
+  the triples from.  Doesn't name the graph of triples or explicitly
+  add them to the dataset."
+  (let [model (.getDefaultModel dataset)]
+    (RDFDataMgr/read model triple-source)
+    model))
+
+(defn load-triples-into-graph [dataset graph-uri triple-source]
+  (with-transaction :write dataset
+    (let [model (make-model-from-triples dataset triple-source)]
+      (.addNamedModel dataset graph-uri model))))
+
+
 
 (comment
-  (ex-tdb-txn2-2 store-directory)
-  (def db1 (TDBFactory/createDataset store-directory)))
+
+  (def db (TDBFactory/createDataset store-directory))
+
+  (with-transaction :write db
+    (let [triples (make-model-from-triples db "http://data.opendatascotland.org/resource.ttl?uri=http%3A%2F%2Fdata.opendatascotland.org%2Fdata%2Fgeography%2Fcouncil-areas")]
+      (println triples)
+      triples))
+
+  (load-triples-into-graph db "http://example.org/graph/eldis" "eldis.nt")
+  (future (load-triples-into-graph db "http://example.org/graph/eldis2" "eldis.nt"))
+
+  (def f1 (future (load-triples-into-graph db "http://example.org/graph/eldis10" "eldis.nt") :done1))
+
+  (defn query-loop []
+    (loop []
+      (query-seq db [result
+                  "SELECT (COUNT(?s) AS ?scount) ?g WHERE {
+                     GRAPH ?g {
+                       ?s ?p ?o .
+                     }
+                   } GROUP BY ?g"]
+
+                 (println result))
+      (Thread/sleep 1000)
+      (recur)))
+
+  (load-triples-into-graph db "http://example.org/graph/eldis6" "eldis.nt")
+
+  )
