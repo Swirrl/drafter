@@ -7,7 +7,8 @@
            [com.hp.hpl.jena.update GraphStore GraphStoreFactory UpdateExecutionFactory
             UpdateFactory UpdateProcessor UpdateRequest]
            [com.hp.hpl.jena.rdf.model ModelFactory]
-           [org.apache.jena.riot Lang RDFDataMgr]))
+           [org.apache.jena.riot Lang RDFDataMgr])
+  (:require [pandect.core :as digest]))
 
 (defprotocol ToJenaTripleStore
   (->jena-triple-store [this]))
@@ -108,53 +109,87 @@ e.g. (doquery db1 [results \"SELECT * WHERE {?s ?p ?o} LIMIT 10\"] (doseq [resul
         (.close model)))
     (.close dataset)))
 
-(defn migrate [from to]
-  (with-transaction :read from
-    (let [from-graphs (iterator-seq (.listNames from))]
 
-      (doseq [src-graph from-graphs]
-        (println src-graph)
-        (with-transaction :write to
-          (let [src-model  (-> from (.getNamedModel src-graph))
-                dest-model (-> to (.getNamedModel src-graph))
-                statements (.listStatements src-model)]
+(defn- make-model-from-triples [dataset triple-source]
+  "Creates a JENA model/graph from the supplied triples.  Attempts to
+  resolve the triple-source String as either a filename or URI to load
+  the triples from.  Doesn't name the graph of triples or explicitly
+  add them to the dataset."
+  (let [model (.getDefaultModel dataset)]
+    (RDFDataMgr/read model triple-source)
+    model))
 
-            (println "done list")
-            (.add dest-model statements)))))))
+(defn load-triples-into-graph [dataset graph-uri triple-source]
+  "Load the triples from the specified triple-source (either a
+  filename or a URI) into the given dataset and graph."
+  (with-transaction :write dataset
+    (let [model (make-model-from-triples dataset triple-source)]
+      (.addNamedModel dataset graph-uri model))))
+
 
 (defn exec-update [update-str graph-store]
   (let [update-req (UpdateFactory/create update-str)
         proc (UpdateExecutionFactory/create update-req graph-store)]
     (.execute proc)))
 
-(comment
 
-  (let [dataset (TDBFactory/assembleDataset "drafter-live.ttl")]
+(def staging-base "http://publishmydata.com/id/drafter/graphs/")
 
-    (.begin dataset ReadWrite/READ)
+(def drafter-state-graph "http://publishmydata.com/graphs/drafter-state")
 
-    (let [model (.getNamedModel dataset "http://data.digitalsocial.eu/graph/organizations-and-activities")
-          statements (take 10 (iterator-seq (.listStatements model)))]
-      (.close dataset)
+(defn ->staging-graph [graph]
+  (str staging-base (digest/sha1 graph)))
 
-      statements))
+(def rdf:a "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+(def drafter:Graph "http://publishmydata.com/def/drafter/Graph")
+(def drafter:hasGraph "http://publishmydata.com/def/drafter/hasGraph")
 
+(defn create-basic-management-graph [graph-uri]
+  (let [staging-graph (->staging-graph graph-uri)]
 
+    [staging-graph [rdf:a drafter:Graph
+                    drafter:hasGraph graph-uri]]))
+
+(defn import-graph [db graph triples]
+  (let [staging-graph (->staging-graph graph)]
+
+    (with-transaction :write db
+      (load-triples-into-graph db graph triples)
+
+      )
+    )
+
+  ;; 1. generate a unique graph id for staging graph.
+  ;; 2. Create graph in state staging add triples to it leave staging
+  ;; graph in place so we don't need to take a copy of it to build
+  ;; next version of staging graph.
   )
 
+(defn migrate-graph [db graph]
+  ;; 1. remove the destination graph
+  ;; 2. lookup staging graph
+  ;; 3. copy staging graph to "live graph name"
+  ;; 4. leave staging graph in place for future staging changes
+  )
+
+(defn delete-graph [db graph]
+  ;; 1. lookup staging graph
+  ;; 2. remove staging graph
+  )
+
+(defn rename-graph [db old-graph new-graph]
+  ;; lookup old-graph
+  ;; calculate new graph sha
+  ;; copy data/state to new graph name
+  ;; remove old graph name
+  ;; update subject name to new-graph uris in metadata graph.
+  )
+
+
+
 (comment
-  (do
-    (def live (TDBFactory/createDataset "/Users/rick/temp/drafterdestdata"))
-    (def draft (TDBFactory/createDataset "/Users/rick/temp/drafter-dest-data3"))
+  (def db (TDBFactory/createDataset "/Users/rick/temp/drafter-dest-data3"))
 
-    (with-transaction :read live (count (query live "SELECT * WHERE { ?s ?p ?o } LIMIT 10")))
+  (with-transaction :read live (count (query live "SELECT * WHERE { ?s ?p ?o } LIMIT 10")))
 
-    (def live (TDBFactory/createDataset "/tdb_data/digitalsocial_dev_data"))
-
-
-    (comment
-      ;; oldschool
-      (def live (TDBFactory/assembleDataset "drafter-live.ttl"))
-      (def draft (TDBFactory/assembleDataset "drafter-draft.ttl")))
-    )
 )

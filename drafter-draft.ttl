@@ -10,7 +10,7 @@ tdb:DatasetTDB  rdfs:subClassOf  ja:RDFDataset .
 tdb:GraphTDB    rdfs:subClassOf  ja:Model .
 
 <#draft> rdf:type      tdb:DatasetTDB ;
-     tdb:location "MyDatabases/draft" ;  # change to suit your local installation
+     tdb:location "MyDatabases/db" ;  # change to suit your local installation
      # Query timeout on this dataset (1s, 1000 milliseconds)
      #ja:context [ ja:cxtName "arq:queryTimeout" ;  ja:cxtValue "10000,10000" ] ;
      #tdb:unionDefaultGraph true ;

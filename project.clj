@@ -8,8 +8,9 @@
                  [org.apache.jena/jena-arq "2.11.2"]
                  [org.apache.jena/jena-tdb "1.0.2"]
                  [org.apache.jena/jena-iri "1.0.2"]
-
+                 [me.raynes/fs "1.4.4"] ; ;filesystem utils
                  [lib-noir "0.8.3"]
+                 [pandect "0.3.3"] ;; cryptographic digests
                  [ring-server "0.3.1"]
                  [selmer "0.6.6"]
                  [com.taoensso/timbre "3.2.1"]

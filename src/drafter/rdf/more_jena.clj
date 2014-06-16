@@ -27,35 +27,20 @@
         (exec-update update-str2 graph-store)))
     (.close dataset)))
 
-(defn- make-model-from-triples [dataset triple-source]
-  "Creates a JENA model/graph from the supplied triples.  Attempts to
-  resolve the triple-source String as either a filename or URI to load
-  the triples from.  Doesn't name the graph of triples or explicitly
-  add them to the dataset."
-  (let [model (.getDefaultModel dataset)]
-    (RDFDataMgr/read model triple-source)
-    model))
-
-(defn load-triples-into-graph [dataset graph-uri triple-source]
-  (with-transaction :write dataset
-    (let [model (make-model-from-triples dataset triple-source)]
-      (.addNamedModel dataset graph-uri model))))
-
 
 
 (comment
 
   (def db (TDBFactory/createDataset store-directory))
 
-  (with-transaction :write db
-    (let [triples (make-model-from-triples db "http://data.opendatascotland.org/resource.ttl?uri=http%3A%2F%2Fdata.opendatascotland.org%2Fdata%2Fgeography%2Fcouncil-areas")]
-      (println triples)
-      triples))
+  (def triples (with-transaction :write db
+                 (let [triples (make-model-from-triples db "http://data.opendatascotland.org/resource.ttl?uri=http%3A%2F%2Fdata.opendatascotland.org%2Fdata%2Fgeography%2Fcouncil-areas")]
+                   (println triples)
+                   triples)))
+
+  (with-transaction :write db (.addNamedModel db "http://fooobar.com/" triples))
 
   (load-triples-into-graph db "http://example.org/graph/eldis" "eldis.nt")
-  (future (load-triples-into-graph db "http://example.org/graph/eldis2" "eldis.nt"))
-
-  (def f1 (future (load-triples-into-graph db "http://example.org/graph/eldis10" "eldis.nt") :done1))
 
   (defn query-loop []
     (loop []
