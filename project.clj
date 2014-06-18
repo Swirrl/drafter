@@ -16,6 +16,7 @@
                  [com.taoensso/timbre "3.2.1"]
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
+                 [grafter "0.1.0-SNAPSHOT"]
                  [environ "0.5.0"]]
 
   :repl-options {:init-ns drafter.repl}
