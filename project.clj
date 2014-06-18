@@ -30,7 +30,9 @@
    :production {:ring {:open-browser? false
                        :stacktraces?  false
                        :auto-reload?  false}}
-   :dev {:dependencies [[ring-mock "0.1.5"]
+   :dev {:plugins [[com.aphyr/prism "0.1.1"]]  ;; autotest support simply run: lein prism
+         :dependencies [[ring-mock "0.1.5"]
+                        [com.aphyr/prism "0.1.1"]
                         [ring/ring-devel "1.2.2"]]
          :env {:dev true}}}
   :min-lein-version "2.0.0"
