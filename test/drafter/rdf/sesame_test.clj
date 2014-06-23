@@ -9,7 +9,7 @@
    [clojure.test :refer :all]
    [me.raynes.fs :as fs]))
 
-(def test-db-path "MyDatabases/test-db")
+(def test-db-path "MyDatabases/repositories/test-db")
 
 (def ^:dynamic *test-db* (repo (memory-store)))
 
@@ -22,7 +22,7 @@
 
 (defn ask? [& graphpatterns]
 
-  "Convenience function for ask queries"
+  "Bodgy convenience function for ask queries"
   (query *test-db* (str "ASK WHERE {"
 
                         (-> (apply str (interpose " " graphpatterns))
@@ -38,6 +38,15 @@
                             ["http://test.com/data/two"
                              ["http://test.com/hasProperty" "http://test.com/data/1"]
                              ["http://test.com/hasProperty" "http://test.com/data/2"]]))
+
+(def test-triples-2 (triplify ["http://test2.com/data/one"
+                             ["http://test2.com/hasProperty" "http://test2.com/data/1"]
+                             ["http://test2.com/hasProperty" "http://test2.com/data/2"]]
+
+                            ["http://test2.com/data/two"
+                             ["http://test2.com/hasProperty" "http://test2.com/data/1"]
+                             ["http://test2.com/hasProperty" "http://test2.com/data/2"]])
+  )
 
 (def test-graph-uri "http://example.org/my-graph")
 
@@ -91,16 +100,94 @@
       (is (not (ask? "<http://removed/triple>" "<http://is/>" "<http://gone/> .")))
       (is (ask? "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .")))))
 
-(comment
+(deftest lookup-live-graph-test
+  (testing "lookup-live-graph"
+    (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
+      (is (= test-graph-uri (lookup-live-graph *test-db* draft-graph-uri))))))
 
-  (deftest make-managed-graph
-    (testing "Making managed graph"
-      (testing "stores live graph data"
-        (let [staging-graph-uri (make-draft *test-db* test-graph-uri)]
-          (is (query *test-db*
-                     (str "ASK WHERE {
-                           <" staging-graph-uri "> <http://publishmydata.com/def/drafter/hasGraph> <" test-graph-uri "> .
-                        }")))))))
+(deftest set-isPublic!-test
+  (testing "set-isPublic!"
+    (create-managed-graph-with-draft! test-graph-uri)
+    (is (ask? "<" test-graph-uri "> <" drafter:isPublic "> " false " .")
+        "Graphs are initialsed as non-public")
+    (set-isPublic! *test-db* test-graph-uri true)
+    (is (ask? "<" test-graph-uri "> <" drafter:isPublic "> " true " .")
+        "should set the boolean value")))
+
+(deftest migrate-live!-test
+  (testing "migrate-live!"
+    (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
+          expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
+      (append-data! *test-db* draft-graph-uri test-triples)
+      (migrate-live! *test-db* draft-graph-uri)
+
+      (is (not (ask? "GRAPH <" draft-graph-uri "> {"
+                     expected-triple-pattern
+                     "}"))
+          "Draft graph no longer exists.")
+
+      (is (ask? "GRAPH <" test-graph-uri "> {"
+                expected-triple-pattern
+                "}")
+          "Live graph contains the migrated triples"))))
+
+(deftest graph-restricted-queries-test
+  (testing "query"
+    (testing "supports graph restriction"
+      (pr/add *test-db* "http://example.org/graph/1"
+              test-triples)
+
+      (pr/add *test-db* "http://example.org/graph/2"
+              test-triples-2)
+
+      (is (query *test-db*
+                 (str "ASK WHERE {
+                         GRAPH <http://example.org/graph/2> {
+                           ?s ?p ?o .
+                         }
+                      }") :named-graphs ["http://example.org/graph/2"])
+          "Can query triples in named graph 2")
+
+      (is (query *test-db*
+                 (str "ASK WHERE {
+                         GRAPH <http://example.org/graph/1> {
+                           <http://test.com/data/one>  ?p1 ?o1 .
+                         }
+                         GRAPH <http://example.org/graph/2> {
+                           <http://test2.com/data/one> ?p2 ?o2 .
+                         }
+                      }") :named-graphs ["http://example.org/graph/1" "http://example.org/graph/2"])
+          "Can specify many named graphs as a query restriction.")
+
+      (is (= false (query *test-db*
+                          (str "ASK WHERE {
+                                  GRAPH <http://example.org/graph/2> {
+                                    ?s ?p ?o .
+                                  }
+                                }")
+                          :named-graphs ["http://example.org/graph/1"]))
+          "Can't query triples in named graph 2")
+
+      (is (query *test-db*
+                 (str "ASK WHERE {
+                           ?s ?p ?o .
+                      }") :default-graph [])
+          "Can't query triples in union graph")
+
+      (is (query *test-db*
+                 (str "ASK WHERE {
+                           ?s ?p ?o .
+                      }") :default-graph ["http://example.org/graph/1"])
+          "Can query triples in union graph")
+
+      (is (query *test-db*
+                 (str "ASK WHERE {
+                           <http://test.com/data/one>  ?p1 ?o1 .
+                           <http://test2.com/data/one> ?p2 ?o2 .
+                      }") :default-graph ["http://example.org/graph/1" "http://example.org/graph/2"])
+          "Can set many graphs as union graph"))))
+
+(comment
 
   (deftest import-graph-test
            (testing "Importing graph"
@@ -116,3 +203,10 @@
              )))
 
 (use-fixtures :each wrap-with-clean-test-db)
+
+(comment
+  (pr/add *test-db* (rdf-serializer "test.ttl"))
+
+  (pr/add *test-db* (graph "http://foo.com/" ["http://foo.com/" ["http://foo.com/" "http://foo.com/"]]))
+
+  )

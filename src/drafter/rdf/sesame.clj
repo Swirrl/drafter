@@ -73,52 +73,55 @@
 
   (add db draft-graph-uri triples))
 
+(defn delete-graph! [db graph-uri]
+  (update! db (str "DROP GRAPH <" graph-uri ">")))
+
 (defn replace-data!
   [db draft-graph-uri triples]
-  (update! db (str "DROP GRAPH <" draft-graph-uri ">"))
+  (delete-graph! db draft-graph-uri)
   (add db draft-graph-uri triples))
 
-(comment
-  (defn has-management-graph? [db graph]
-    (let [staging-graph (->staging-graph graph)]
-      (query db (str "ASK WHERE {
-                      GRAPH <" drafter-state-graph "> {
-                         <" staging-graph "> ?p ?o .
-                      }
-                    }"))))
+(defn lookup-live-graph [db draft-graph-uri]
+  "Given a draft graph URI, lookup and return its live graph."
+  (let [live (-> (query db
+                        (str "SELECT ?live WHERE {"
+                               "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                                     "<" drafter:hasDraft "> <" draft-graph-uri "> ."
+                             "} LIMIT 1"))
+                 first
+                 (get "live")
+                 str)]
+    live))
 
-  (defn select-graphs [graph-type db]
-    (query db (str "SELECT ?graph WHERE {
-                     GRAPH <" drafter-state-graph "> {"
-                     "?graph " drafter:hasGraph " " graph-type " . "
-                     "}"
-                     "}")))
+(defn set-isPublic! [db live-graph-uri boolean-value]
+  (let [query-str (str "DELETE {"
+                  "GRAPH <" drafter-state-graph "> {"
+                  "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " ."
+                  "}"
+                "} INSERT {"
+                  "GRAPH <" drafter-state-graph "> {"
+                    "<" live-graph-uri "> <" drafter:isPublic  "> " boolean-value " ."
+                    "}"
+                  "} WHERE {"
+                    "GRAPH <" drafter-state-graph "> {"
+                      "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " ."
+                    "}"
+                  "}")]
 
-  (defn is-live? [db graph]
-    (let [staging-graph (->staging-graph graph)]
-      (query db (str "ASK WHERE {
-                      GRAPH <" drafter-state-graph "> {
-                         <" staging-graph "> <> ?o .
-                      }
-                    }"))))
+    (update! db
+             query-str)))
 
-  (def live-graphs (partial select-graphs drafter:Live))
-  (def draft-graphs (partial select-graphs drafter:Draft))
+(defn migrate-live! [db draft-graph-uri]
+  "Moves the triples from the draft graph to the draft graphs live destination."
+  (let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
+    (delete-graph! db live-graph-uri)
+    (add db live-graph-uri
+            (query db
+                   (str "CONSTRUCT { ?s ?p ?o } WHERE
+                         { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
+    (delete-graph! db draft-graph-uri)
 
-  (defn make-draft
-    ([db graf]
-       (make-draft db graf {}))
-
-    ([db graf metadata]
-       (with-transaction db
-         (let [graph-state (managed-graph graf metadata)
-               state-graph-uri (first graph-state)]
-
-           (add db (graph drafter-state-graph
-                          graph-state))
-           state-graph-uri)))))
-
-
+    (set-isPublic! db live-graph-uri true)))
 
 (defn import-data-to-draft [db graph triples]
 
@@ -150,9 +153,4 @@
   ;; copy data/state to new graph name
   ;; remove old graph name
   ;; update subject name to new-graph uris in metadata graph.
-  )
-
-(comment
-  (add (rdf-serializer "test.ttl")
-       (graph "http://foo.com/" ["http://foo.com/" ["http://foo.com/" "http://foo.com/"]]))
   )
