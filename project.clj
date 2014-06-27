@@ -10,6 +10,7 @@
                  [org.apache.jena/jena-iri "1.0.2"]
                  [me.raynes/fs "1.4.4"] ; ;filesystem utils
                  [lib-noir "0.8.3"]
+                 [liberator "0.11.0"]
                  [pandect "0.3.3"] ;; cryptographic digests
                  [ring-server "0.3.1"]
                  [selmer "0.6.6"]
@@ -19,7 +20,8 @@
                  [grafter "0.1.0-SNAPSHOT"]
                  [environ "0.5.0"]]
 
-  :repl-options {:init-ns drafter.repl}
+  :repl-options {:init-ns drafter.repl
+                 :port 5678}
   :plugins [[lein-ring "0.8.10"]
             [lein-environ "0.5.0"]]
   :ring {:handler drafter.handler/app
@@ -33,6 +35,7 @@
    :dev {:plugins [[com.aphyr/prism "0.1.1"]]  ;; autotest support simply run: lein prism
          :dependencies [[ring-mock "0.1.5"]
                         [com.aphyr/prism "0.1.1"]
+                        [org.clojure/data.json "0.2.5"]
                         [ring/ring-devel "1.2.2"]]
          :env {:dev true}}}
   :min-lein-version "2.0.0"
