@@ -28,13 +28,14 @@
         (is (map? output))))))
 
 (deftest sparql-end-point-test
-
   (let [end-point (sparql-end-point "/live/sparql" db)]
-
     (testing "Standard SPARQL query"
-      (is (= true (end-point {:request-method :get
-                              :uri "/live/sparql"
-                              :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
-                              :headers {"Accept" "text/csv"}})))))
+      (let [{:keys [status headers body] :as result}
+            (end-point {:request-method :get
+                        :uri "/live/sparql"
+                        :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
+                        :headers {"accept" "text/csv"}})]
 
-  )
+        (is (= 200 status))
+        (is (= "text/csv" (headers "Content-Type")))
+        ))))
