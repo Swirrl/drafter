@@ -1,6 +1,6 @@
 (ns drafter.routes.sparql-test
   (:require [drafter.test-common :refer [*test-db* test-triples wrap-with-clean-test-db
-                                         stream->string sparql-query-request select-all-in-graph]]
+                                         stream->string select-all-in-graph]]
             [clojure.test :refer :all]
             [clojure-csv.core :as csv]
             [grafter.rdf.sesame :as ses]
@@ -48,20 +48,48 @@
 
     (testing "Draft graphs are not exposed"
       (let [csv-result (->csv (endpoint
-                               (sparql-query-request "/sparql/live"
+                               (assoc-in default-sparql-query [:params :query]
                                                      (select-all-in-graph draft-graph-2))))]
         (is (empty? (second csv-result)))))
 
     (testing "Offline public graphs are not exposed"
       (set-isPublic! *test-db* "http://test.com/graph-1" false)
       (let [csv-result (->csv (endpoint
-                     (sparql-query-request "/sparql/live"
+                     (assoc-in default-sparql-query [:params :query]
                                            (select-all-in-graph "http://test.com/graph-1"))))]
 
         (is (not= graph-1-result (second csv-result)))))))
 
 (deftest state-sparql-routes-test
-  )
+  (let [drafts-request (-> default-sparql-query
+                           (assoc :uri "/sparql/state")
+                           (assoc-in [:headers "accept"] "text/plain"))
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-db*)
+        endpoint (state-sparql-routes *test-db*)]
+
+    (testing "The state graph should be accessible"
+      (let [result (endpoint
+                       (-> drafts-request
+                           (assoc-in [:params :query] (str "ASK WHERE {"
+                                                           "  GRAPH <" drafter-state-graph "> {"
+                                                           "    ?s ?p ?o ."
+                                                           "  }"
+                                                           "}"))))
+            body (-> result :body stream->string)]
+
+        (is (= "true" body))))
+
+    (testing "The data graphs (live and drafts) should be hidden"
+      (let [result (endpoint
+                       (-> drafts-request
+                           (assoc-in [:params :query] (str "ASK WHERE {"
+                                                           "  GRAPH <" draft-graph-2 "> {"
+                                                           "    ?s ?p ?o ."
+                                                           "  }"
+                                                           "}"))))
+            body (-> result :body stream->string)]
+
+        (is (= "false" body))))))
 
 (deftest drafts-sparql-routes-test
   (let [drafts-request (assoc default-sparql-query :uri "/sparql/draft")

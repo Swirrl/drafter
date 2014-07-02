@@ -81,7 +81,10 @@
   (.evaluate pquery (SPARQLResultsTSVWriter. output-stream)))
 
 (defmethod sparql-results! :txt [pquery output-stream format]
-  (.evaluate pquery (BooleanTextWriter. output-stream)))
+  (let [result (.evaluate pquery)]
+    (doto (BooleanTextWriter. output-stream)
+      (.handleBoolean result))
+    result))
 
 ;; graph formats
 
@@ -114,7 +117,7 @@
   (if (negotiate-content-type pquery response-mime-type)
     {:status 200
      :headers {"Content-Type" response-mime-type}
-     :body (rio/piped-input-stream (fn [ostream]
+     :body (rio/piped-input-stream (fn [^OutputStream ostream]
                                      (try
                                        (sparql-results! pquery ostream response-mime-type)
                                        (catch clojure.lang.ExceptionInfo ex
@@ -143,6 +146,7 @@
         media-type (-> (headers "accept")
                        parse-accept)]
 
+    (timbre/debug (str "Running query " query-str " with graph restriction: " (apply str (interpose "," graphs))))
     (make-streaming-sparql-response pquery media-type)))
 
 (defn sparql-end-point
