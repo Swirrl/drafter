@@ -1,7 +1,11 @@
 (ns drafter.repl
   (:use drafter.handler
         ring.server.standalone
-        [ring.middleware file-info file]))
+        [ring.middleware file-info file])
+  (:require [grafter.rdf.protocols :refer [add add-statement statements]]
+            [grafter.rdf.sesame :refer [query prepare-query evaluate]]
+            [drafter.rdf.sesame :refer :all])
+  (:import [org.openrdf.rio RDFFormat]))
 
 (defonce server (atom nil))
 

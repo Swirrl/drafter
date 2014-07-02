@@ -36,7 +36,9 @@
          :dependencies [[ring-mock "0.1.5"]
                         [com.aphyr/prism "0.1.1"]
                         [org.clojure/data.json "0.2.5"]
+                        [clojure-csv/clojure-csv "2.0.1"]
                         [ring/ring-devel "1.2.2"]]
+
          :env {:dev true}}}
   :min-lein-version "2.0.0"
   )

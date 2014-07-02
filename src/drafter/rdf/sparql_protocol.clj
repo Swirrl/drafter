@@ -104,7 +104,11 @@
   (.evaluate pquery (TurtleWriter. output-stream)))
 
 (defmethod sparql-results! :default [pquery output-stream format]
-  (throw (ex-info (str "Unsupported SPARQL response format for format: " format " with query-type " (class pquery) ". You must set an appropriate Accept header.") {:type :unsupported-media-type})))
+  (throw (ex-info
+          (str "Unsupported SPARQL response format for format: "
+               format " with query-type " (class pquery)
+               ". You must set an appropriate Accept header.")
+          {:type :unsupported-media-type})))
 
 (defn- make-streaming-sparql-response [pquery response-mime-type]
   (if (negotiate-content-type pquery response-mime-type)
@@ -128,18 +132,29 @@
                 first)]
     (or fst accept-str)))
 
-(defn process-sparql-query [db request]
-  (let [{:keys [headers params]} request
+(defn process-sparql-query [db request restriction-fn]
+  (let [graphs (restriction-fn db)
+        restriction (when graphs (ses/make-restricted-dataset :default-graph graphs
+                                                              :named-graphs graphs))
+
+        {:keys [headers params]} request
         query-str (:query params)
-        pquery (ses/prepare-query db query-str)
+        pquery (ses/prepare-query db query-str restriction)
         media-type (-> (headers "accept")
                        parse-accept)]
 
     (make-streaming-sparql-response pquery media-type)))
 
-(defn sparql-end-point [mount-path repo]
-  (routes
-   (GET mount-path request
-        (process-sparql-query repo request))
-   (POST mount-path request
-         (process-sparql-query repo request))))
+(defn sparql-end-point
+  "Builds a SPARQL end point from a mount-path a sesame repository and
+  an optional restriction function which returns a list of graph uris
+  to restrict both the union and named-graph queries too."
+
+  ([mount-path repo] (sparql-end-point mount-path repo (constantly nil)))
+
+  ([mount-path repo restriction-fn]
+     (routes
+      (GET mount-path request
+           (process-sparql-query repo request restriction-fn))
+      (POST mount-path request
+            (process-sparql-query repo request restriction-fn)))))

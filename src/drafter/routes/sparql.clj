@@ -10,12 +10,35 @@
             [grafter.rdf.sesame :as ses])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]))
 
-(defn live-sparql-routes [repo]
-  (sparql-end-point "/sparql/live" repo))
+(defn supplied-drafts
+  "Parses out the set of \"graph\"s supplied on the request.
 
-(defn drafts-sparql-routes [repo]
-  ;;(sparql-end-point "/sparql/drafts" repo)
+Returns a function that when called with a single argument (the
+  database which may be ignored) will return a set of named graphs.
+
+If no graphs are found in the request, a function that returns the set
+of live graphs is returned."
+  [request]
+  (let [graphs (-> request
+                  :query-params
+                  (get "graph"))]
+    (if graphs
+      (constantly
+       (if (instance? String graphs)
+         #{graphs}
+         graphs))
+
+      store/live-graphs)))
+
+(defn draft-sparql-routes [repo]
   (routes
-   (GET "/ring-params" request
-        (prn-str request)))
-  )
+   (GET "/sparql/draft" request
+        (process-sparql-query repo request (supplied-drafts request)))
+   (POST "/sparql/draft" request
+         (process-sparql-query repo request (supplied-drafts request)))))
+
+(defn live-sparql-routes [repo]
+  (sparql-end-point "/sparql/live" repo store/live-graphs))
+
+(defn state-sparql-routes [repo]
+  (sparql-end-point "/sparql/state" repo (constantly #{store/drafter-state-graph})))

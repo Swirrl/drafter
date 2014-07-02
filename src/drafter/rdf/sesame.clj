@@ -3,7 +3,7 @@
             [grafter.rdf.sesame :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [clojure.java.io :as io]
-            [grafter.rdf :refer [s graph graphify load-triples add-properties]]
+            [grafter.rdf :refer [graph graphify load-triples add-properties]]
             [grafter.rdf.protocols :refer [add subject predicate object context
                                            add-statement statements begin commit rollback]]
             [pandect.core :as digest])
@@ -93,6 +93,27 @@
                  str)]
     live))
 
+(defn draft-graphs [db]
+  "Get all draft graphs"
+  (->> (query db
+              (str "SELECT ?draft WHERE {"
+                     "?live <" drafter:hasDraft "> ?draft ."
+                     "}"))
+       (map #(str (% "draft")))
+       (into #{})))
+
+(defn live-graphs [db & {:keys [online] :or {online true}}]
+  "Get all live graph names.  Takes an optional boolean keyword
+  argument of :online to allow querying for all online/offline live
+  graphs."
+  (->> (query db
+              (str "SELECT ?live WHERE {"
+                   "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                         "<" drafter:isPublic  "> " online " ."
+                   "}"))
+       (map #(str (% "live")))
+       (into #{})))
+
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (let [query-str (str "DELETE {"
                   "GRAPH <" drafter-state-graph "> {"
@@ -111,8 +132,10 @@
     (update! db
              query-str)))
 
-(defn migrate-live! [db draft-graph-uri]
+(defn migrate-live!
   "Moves the triples from the draft graph to the draft graphs live destination."
+  [db draft-graph-uri]
+
   (let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (delete-graph! db live-graph-uri)
     (add db live-graph-uri
@@ -123,17 +146,20 @@
 
     (set-isPublic! db live-graph-uri true)))
 
-(defn import-data-to-draft [db graph triples]
+(defn import-data-to-draft!
+  "Imports the data from the triples into a draft graph associated
+  with the specified graph.  Returns the draft graph uri."
+  [db graph triples]
 
-  ;; 1. generate a unique graph id for staging graph.
-  ;; 2. Create graph in state staging add triples to it leave staging
-  ;; graph in place so we don't need to take a copy of it to build
-  ;; next version of staging graph.
+  (create-managed-graph! db graph)
+  (let [draft-graph (create-draft-graph! db graph)]
+    (add db draft-graph triples)
+    draft-graph))
 
-  (comment (let [staging-graph (->staging-graph graph)]
-             (with-transaction db
-               (add db (managed-graph graph))
-               (add db triples)))))
+(comment (let [staging-graph (->staging-graph graph)]
+           (with-transaction db
+             (add db (managed-graph graph))
+             (add db triples))))
 
 (defn migrate-graph [db graph]
   ;; 1. remove the destination graph

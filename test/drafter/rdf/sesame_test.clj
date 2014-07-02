@@ -1,27 +1,15 @@
 (ns drafter.rdf.sesame-test
   (:require
+   [drafter.test-common :refer [*test-db* wrap-with-clean-test-db]]
    [grafter.rdf.protocols :as pr]
-   [grafter.rdf :refer :all]
+   [grafter.rdf :refer [graph triplify]]
    [grafter.rdf.ontologies.rdf :refer :all]
    [grafter.rdf.sesame :refer :all]
    [drafter.rdf.sesame :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
-   [clojure.test :refer :all]
-   [me.raynes.fs :as fs]))
-
-(def test-db-path "MyDatabases/repositories/test-db")
-
-(def ^:dynamic *test-db* (repo (memory-store)))
-
-(defn wrap-with-clean-test-db [f]
-  (try
-    (binding [*test-db* (repo (native-store test-db-path))]
-      (f))
-    (finally
-        (fs/delete-dir test-db-path))))
+   [clojure.test :refer :all]))
 
 (defn ask? [& graphpatterns]
-
   "Bodgy convenience function for ask queries"
   (query *test-db* (str "ASK WHERE {"
 
@@ -187,6 +175,19 @@
                       }") :default-graph ["http://example.org/graph/1" "http://example.org/graph/2"])
           "Can set many graphs as union graph"))))
 
+(deftest draft-graphs-test
+  (let [draft-1 (create-managed-graph-with-draft! "http://real/graph/1")
+        draft-2 (create-managed-graph-with-draft! "http://real/graph/2")]
+
+       (testing "draft-graphs returns all draft graphs"
+         (is (= #{draft-1 draft-2} (draft-graphs *test-db*))))
+
+       (testing "live-graphs returns all live graphs"
+         (is (= #{"http://real/graph/1" "http://real/graph/2"}
+                (live-graphs *test-db* :online false))))))
+
+(use-fixtures :each wrap-with-clean-test-db)
+
 (comment
 
   (deftest import-graph-test
@@ -201,8 +202,6 @@
 
              ;;(import-graph test-db "http://example.org/my-graph" "drafter-live.ttl")
              )))
-
-(use-fixtures :each wrap-with-clean-test-db)
 
 (comment
   (pr/add *test-db* (rdf-serializer "test.ttl"))
