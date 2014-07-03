@@ -4,8 +4,8 @@
                                     ANY GET POST PUT DELETE HEAD]]
             [ring.util.io :as io]
             [compojure.route :refer [not-found]]
-            [compojure.handler :refer [api]])
-  (:require [drafter.rdf.draft-management :as mgmt]
+            [compojure.handler :refer [api]]
+            [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [grafter.rdf.sesame :as ses])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]))
