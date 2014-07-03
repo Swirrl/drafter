@@ -1,12 +1,11 @@
-(ns drafter.rdf.sesame
+(ns drafter.rdf.draft-management
   (:require [grafter.rdf.ontologies.rdf :refer :all]
             [grafter.rdf.sesame :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [clojure.java.io :as io]
             [grafter.rdf :refer [graph graphify load-triples add-properties]]
             [grafter.rdf.protocols :refer [add subject predicate object context
-                                           add-statement statements begin commit rollback]]
-            [pandect.core :as digest])
+                                           add-statement statements begin commit rollback]])
   (:import [java.util Date]))
 
 (def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")

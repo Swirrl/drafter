@@ -1,11 +1,11 @@
-(ns drafter.rdf.sesame-test
+(ns drafter.rdf.draft-management-test
   (:require
    [drafter.test-common :refer [*test-db* wrap-with-clean-test-db]]
    [grafter.rdf.protocols :as pr]
    [grafter.rdf :refer [graph triplify]]
    [grafter.rdf.ontologies.rdf :refer :all]
    [grafter.rdf.sesame :refer :all]
-   [drafter.rdf.sesame :refer :all]
+   [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
    [clojure.test :refer :all]))
 
@@ -156,10 +156,10 @@
                           :named-graphs ["http://example.org/graph/1"]))
           "Can't query triples in named graph 2")
 
-      (is (query *test-db*
-                 (str "ASK WHERE {
+      (is (= false (query *test-db*
+                          (str "ASK WHERE {
                            ?s ?p ?o .
-                      }") :default-graph [])
+                      }") :default-graph []))
           "Can't query triples in union graph")
 
       (is (query *test-db*

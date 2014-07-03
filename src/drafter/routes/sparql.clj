@@ -5,7 +5,7 @@
             [ring.util.io :as io]
             [compojure.route :refer [not-found]]
             [compojure.handler :refer [api]])
-  (:require [drafter.rdf.sesame :as store]
+  (:require [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [grafter.rdf.sesame :as ses])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]))
@@ -28,7 +28,7 @@ of live graphs is returned."
          #{graphs}
          graphs))
 
-      store/live-graphs)))
+      mgmt/live-graphs)))
 
 (defn draft-sparql-routes [repo]
   (routes
@@ -38,7 +38,7 @@ of live graphs is returned."
          (process-sparql-query repo request (supplied-drafts request)))))
 
 (defn live-sparql-routes [repo]
-  (sparql-end-point "/sparql/live" repo store/live-graphs))
+  (sparql-end-point "/sparql/live" repo mgmt/live-graphs))
 
 (defn state-sparql-routes [repo]
-  (sparql-end-point "/sparql/state" repo (constantly #{store/drafter-state-graph})))
+  (sparql-end-point "/sparql/state" repo (constantly #{mgmt/drafter-state-graph})))

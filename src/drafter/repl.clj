@@ -4,7 +4,7 @@
         [ring.middleware file-info file])
   (:require [grafter.rdf.protocols :refer [add add-statement statements]]
             [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
-            [drafter.rdf.sesame :refer :all])
+            [drafter.rdf.draft-management :refer :all])
   (:import [org.openrdf.rio RDFFormat]))
 
 (defonce server (atom nil))

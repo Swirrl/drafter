@@ -117,7 +117,7 @@
   (if (negotiate-content-type pquery response-mime-type)
     {:status 200
      :headers {"Content-Type" response-mime-type}
-     :body (rio/piped-input-stream (fn [^OutputStream ostream]
+     :body (rio/piped-input-stream (fn [ostream]
                                      (try
                                        (sparql-results! pquery ostream response-mime-type)
                                        (catch clojure.lang.ExceptionInfo ex

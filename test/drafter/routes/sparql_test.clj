@@ -5,7 +5,7 @@
             [clojure-csv.core :as csv]
             [grafter.rdf.sesame :as ses]
             [drafter.routes.sparql :refer :all]
-            [drafter.rdf.sesame :refer :all]))
+            [drafter.rdf.draft-management :refer :all]))
 
 (defn add-test-data!
   "Set the state of the database so that we have three managed graphs,
