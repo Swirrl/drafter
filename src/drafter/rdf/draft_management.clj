@@ -38,8 +38,6 @@
   ([db graph-uri] (create-managed-graph! db graph-uri {}))
   ([db graph-uri opts]
      (let [managed-graph-quads (to-quads (create-managed-graph graph-uri opts))]
-       (when (is-graph-managed? db graph-uri)
-         (throw (ex-info "This graph already exists" {:type :graph-exists})))
        (add db managed-graph-quads))))
 
 (defn create-draft-graph

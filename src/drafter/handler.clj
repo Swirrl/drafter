@@ -1,14 +1,17 @@
 (ns drafter.handler
-  (:require [compojure.core :refer [defroutes]]
+  (:require [compojure.core :refer [defroutes routes]]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes state-sparql-routes]]
+            [drafter.routes.api :refer [api-routes import-file!]]
             [drafter.middleware :as middleware]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
             [taoensso.timbre :as timbre]
             [taoensso.timbre.appenders.rotor :as rotor]
             [selmer.parser :as parser]
+            [drafter.rdf.queue :as q]
             [grafter.rdf.sesame :as sesame]
+            [compojure.handler :only [api]]
             [environ.core :refer [env]]))
 
 (def repo-path "MyDatabases/repositories/db")
@@ -16,6 +19,8 @@
 ;; Set these values later when we start the server
 (def repo)
 (def app)
+
+(def queue (q/make-queue 10))
 
 (defmacro set-var-root! [var form]
   `(alter-var-root ~var (fn [& _#]
@@ -34,6 +39,7 @@
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         [pages-routes
+                         (api-routes repo queue)
                          (live-sparql-routes repo)
                          (draft-sparql-routes repo)
                          (state-sparql-routes repo)
@@ -47,6 +53,15 @@
                         ;; available formats:
                         ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                         :formats [:json-kw :edn])))
+
+(defn attach-worker!
+  "Attach the import-file! worker to process the jobs queue for
+  requests to append/replace graphs with RDF files."
+  [queue]
+  (q/process-queue queue (partial import-file! repo)
+                   (fn [ex] (taoensso.timbre/error ex)))
+
+  (timbre/info "Attached import worker to job queue"))
 
 (defn init
   "init will be called once when
@@ -70,6 +85,8 @@
 
   (initialise-repo!)
   (initialise-app! repo)
+
+  (attach-worker! queue)
 
   (timbre/info "drafter started successfully"))
 

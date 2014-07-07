@@ -4,6 +4,7 @@
         [ring.middleware file-info file])
   (:require [grafter.rdf.protocols :refer [add add-statement statements]]
             [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
+            [drafter.rdf.queue :as q]
             [drafter.rdf.draft-management :refer :all])
   (:import [org.openrdf.rio RDFFormat]))
 
@@ -34,6 +35,7 @@
     (println (str "You can view the site at http://localhost:" port))))
 
 (defn stop-server []
+  (destroy)
   (.stop @server)
   (reset! server nil))
 

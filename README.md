@@ -45,6 +45,9 @@ Use `PUT` for replace, and `POST` for append semantics.
 
 Must contain the file of triples with a correct mime-type.
 
+The file must be supplied as multi-part-form data under the key
+`file`.
+
 **Add content from another graph to a draft**
 
 `PUT | POST /draft?graph=graph-uri?source-graph=GURI`
