@@ -1,7 +1,10 @@
 (ns drafter.rdf.queue
-  (:import [java.util.concurrent ArrayBlockingQueue]))
+  (:import [java.util.concurrent ArrayBlockingQueue]
+           [java.util UUID]))
 
-(defn make-queue [capacity]
+(defn make-queue
+  "Make a blocking queue object with a specified capacity."
+  [capacity]
   (let [fair true]
     (ArrayBlockingQueue. capacity fair)))
 
@@ -9,18 +12,23 @@
   "Returns true if value was accepted on the queue and false if it
   wasn't."
   [queue msg]
-  (let [uuid (java.util.UUID/randomUUID)
+  (let [uuid (UUID/randomUUID)
         job (with-meta {:id uuid} msg)]
     (if (.offer queue job)
       uuid
       false)))
 
-(defn peek-jobs [queue]
+(defn peek-jobs
+  "Peek at all the jobs on the queue without removing any."
+  [queue]
   (map (fn [m]
          (merge m (meta m)))
        (-> queue .toArray seq)))
 
-(defn take! [queue]
+(defn take!
+
+  "Take a job from the queue."
+  [queue]
   (let [v (.take queue)]
     (if (map? v)
       (meta v)
@@ -36,6 +44,22 @@
 (defn contains-value? [queue id]
   (let [job {:id id}]
     (.contains queue job)))
+
+(defn size
+  "Returns the size of the queue."
+  [queue]
+  (.size queue))
+
+(defn ->uuid [job-id]
+  (if (instance? UUID job-id)
+    job-id
+    (UUID/fromString job-id)))
+
+(defn find-job [queue job-id]
+  (let [job-id (->uuid job-id)]
+    (->> (peek-jobs queue)
+         (filter (fn [i] (= job-id (:id i))))
+         first)))
 
 (defn process-queue [queue f error-fn!]
   (future

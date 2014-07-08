@@ -46,11 +46,7 @@
   (testing "create-managed-graph!"
     (testing "stores the details of the managed graph"
       (create-managed-graph! *test-db* test-graph-uri)
-      (is (is-graph-managed? *test-db* test-graph-uri)))
-
-    (testing "protects against graphs being created twice"
-      (is (thrown? clojure.lang.ExceptionInfo
-                   (create-managed-graph! *test-db* test-graph-uri))))))
+      (is (is-graph-managed? *test-db* test-graph-uri)))))
 
 (deftest create-draft-graph!-test
   (testing "create-draft-graph!"

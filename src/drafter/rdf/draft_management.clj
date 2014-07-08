@@ -158,10 +158,6 @@
              (add db (managed-graph graph))
              (add db triples))))
 
-(defn delete-graph [db graph]
-  ;; 1. lookup staging graph
-  ;; 2. remove staging graph
-  )
 
 (defn rename-graph [db old-graph new-graph]
   ;; lookup old-graph
