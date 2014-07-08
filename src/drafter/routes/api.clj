@@ -77,7 +77,7 @@
 
 (defn api-routes [repo queue]
   (routes
-   (POST "/draft/create/" {{live-graph "live-graph"} :query-params}
+   (POST "/draft/create" {{live-graph "live-graph"} :query-params}
 
          (when-params [live-graph]
            (let [draft-graph-uri (ses/with-transaction repo
