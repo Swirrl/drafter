@@ -1,11 +1,14 @@
 (ns drafter.repl
-  (:use drafter.handler
-        ring.server.standalone
+  (:use
         [ring.middleware file-info file])
   (:require [grafter.rdf.protocols :refer [add add-statement statements]]
             [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
             [drafter.rdf.queue :as q]
-            [drafter.rdf.draft-management :refer :all])
+            [drafter.rdf.draft-management :refer :all]
+
+            [drafter.handler :as service]
+            [ring.server.standalone :refer [serve] ]
+            )
   (:import [org.openrdf.rio RDFFormat]))
 
 (defonce server (atom nil))
@@ -15,7 +18,7 @@
   ;; the server is forced to re-resolve the symbol in the var
   ;; rather than having its own copy. When the root binding
   ;; changes, the server picks it up without having to restart.
-  (-> #'app
+  (-> #'service/app
       ; Makes static assets in $PROJECT_DIR/resources/public/ available.
       (wrap-file "resources")
       ; Content-Type, Content-Length, and Last Modified headers for files in body
@@ -28,14 +31,14 @@
     (reset! server
             (serve (get-handler)
                    {:port port
-                    :init init
+                    :init service/init
                     :auto-reload? true
-                    :destroy destroy
+                    :destroy service/destroy
                     :join? false}))
     (println (str "You can view the site at http://localhost:" port))))
 
 (defn stop-server []
-  (destroy)
+  (service/destroy)
   (.stop @server)
   (reset! server nil))
 

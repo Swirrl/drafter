@@ -20,6 +20,7 @@
 (def repo)
 (def app)
 
+(def worker)
 (def queue (q/make-queue 10))
 
 (defmacro set-var-root! [var form]
@@ -27,15 +28,15 @@
                          ~form)))
 
 (defn initialise-repo! []
-  (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path ))]
-                          (timbre/info "Initialised repo in " repo-path)
+  (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path))]
+                          (timbre/info "Initialised repo" repo-path)
                           repo)))
 
 (defroutes app-routes
   (route/resources "/")
   (route/not-found "Not Found"))
 
-(defn initialise-app! [repo]
+(defn initialise-app! [repo queue]
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         [pages-routes
@@ -57,17 +58,24 @@
 (defn attach-worker!
   "Attach the import-file! worker to process the jobs queue for
   requests to append/replace graphs with RDF files."
-  [queue]
-  (q/process-queue queue (partial import-file! repo)
-                   (fn [ex] (taoensso.timbre/error ex)))
+  [queue worker-f]
+  (set-var-root! #'worker
+                 (q/process-queue queue
+                                  worker-f
+                                  (fn [ex]
+                                    (taoensso.timbre/error
+                                     (str "Import Worker Error.  Repo id is: " (System/identityHashCode repo)) ex))))
 
   (timbre/info "Attached import worker to job queue"))
 
+(defn initialise-services! []
+  (initialise-repo!)
+  (attach-worker! queue (partial import-file! repo))
+  (initialise-app! repo queue))
+
 (defn init
-  "init will be called once when
-   app is deployed as a servlet on
-   an app server such as Tomcat
-   put any initialization code here"
+  "init will be called once when app is deployed as a servlet on an
+  app server such as Tomcat put any initialization code here"
   []
   (timbre/set-config!
     [:appenders :rotor]
@@ -83,10 +91,7 @@
 
   (if (env :dev) (parser/cache-off!))
 
-  (initialise-repo!)
-  (initialise-app! repo)
-
-  (attach-worker! queue)
+  (initialise-services!)
 
   (timbre/info "drafter started successfully"))
 
@@ -94,6 +99,7 @@
   "destroy will be called when your application
    shuts down, put any clean up code here"
   []
-  (timbre/info "drafter is shutting down...")
+  (timbre/info "drafter is shutting down.  Please wait (this can take a minute)...")
   (sesame/shutdown repo)
+  (future-cancel worker)
   (timbre/info "drafter has shut down."))

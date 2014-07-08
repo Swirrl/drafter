@@ -10,9 +10,7 @@
   wasn't."
   [queue msg]
   (let [uuid (java.util.UUID/randomUUID)
-        job (with-meta
-              {:id uuid}
-              msg)]
+        job (with-meta {:id uuid} msg)]
     (if (.offer queue job)
       uuid
       false)))
@@ -41,10 +39,10 @@
 
 (defn process-queue [queue f error-fn!]
   (future
-     (loop []
-       (try
-         (let [arguments (take! queue)]
-           (f arguments))
-         (catch java.lang.Exception ex
-           (error-fn! ex)))
-       (recur))))
+    (try
+      (loop []
+        (let [arguments (take! queue)]
+          (f arguments)
+          (recur)))
+      (catch java.lang.Exception ex
+        (error-fn! ex)))))

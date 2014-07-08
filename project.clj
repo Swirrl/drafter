@@ -18,12 +18,16 @@
                  [environ "0.5.0"]]
 
   :repl-options {:init-ns drafter.repl
+                 :init (start-server)
                  :port 5678}
+
   :plugins [[lein-ring "0.8.10"]
             [lein-environ "0.5.0"]]
+
   :ring {:handler drafter.handler/app
          :init    drafter.handler/init
          :destroy drafter.handler/destroy}
+
   :profiles
   {:uberjar {:aot :all}
    :production {:ring {:open-browser? false

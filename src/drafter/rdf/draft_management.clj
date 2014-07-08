@@ -158,13 +158,6 @@
              (add db (managed-graph graph))
              (add db triples))))
 
-(defn migrate-graph [db graph]
-  ;; 1. remove the destination graph
-  ;; 2. lookup staging graph
-  ;; 3. copy staging graph to "live graph name"
-  ;; 4. leave staging graph in place for future staging changes
-  )
-
 (defn delete-graph [db graph]
   ;; 1. lookup staging graph
   ;; 2. remove staging graph
