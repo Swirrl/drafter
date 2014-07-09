@@ -26,7 +26,6 @@
        (-> queue .toArray seq)))
 
 (defn take!
-
   "Take a job from the queue."
   [queue]
   (let [v (.take queue)]

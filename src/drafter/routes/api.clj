@@ -97,7 +97,7 @@
         (when-params [graph file]
                      (add-import-job! queue file graph :replace-with-file)))
 
-   (DELETE "/draft" {{graph "graph"} :query-params}
+   (DELETE "/graph" {{graph "graph"} :query-params}
 
            (when-params [graph]
              (ses/with-transaction repo

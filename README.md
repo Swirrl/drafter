@@ -81,11 +81,11 @@ The file must be supplied as multi-part-form data under the key
 Same as above, but instead of reading the file from the request body, it takes
 the data from the supplied `source-graph`.
 
-**Delete a draft**
+**Delete a draft or live graph**
 
-`DELETE /draft?graph=GURI`
+`DELETE /graph?graph=GURI`
 
-Deletes the draft.
+Deletes the draft or live graph.
 
 **Making drafts live**
 

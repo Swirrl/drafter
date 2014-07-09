@@ -16,6 +16,11 @@
     (catch Exception ex
       false)))
 
+(defn make-live-graph [db graph-uri]
+  (let [draft-graph (import-data-to-draft! db graph-uri (test-triples "http://test.com/subject-1"))]
+    (migrate-live! db draft-graph)))
+
+
 (deftest api-routes-test
   (let [q-size 1
         queue (q/make-queue q-size)]
@@ -104,6 +109,41 @@
                   :id job-id}
 
                  job))))))
+
+  (testing "DELETE /graph"
+    (do
+      (make-live-graph *test-db* "http://mygraph/live-graph")
+
+      (let [queue (q/make-queue 2)
+            route (api-routes *test-db* queue)
+
+            test-request {:uri "/graph"
+                          :request-method :delete
+                          :query-params {"graph" "http://mygraph/live-graph"}}
+
+            {:keys [status body headers]} (route test-request)]
+
+        (testing "returns job id"
+          (is (= 202 status))
+          (is (instance? java.util.UUID (:queue-id body)))
+          (is (instance? String (:msg body)))
+          (is (= :ok (:type body))))
+
+        (testing "adds a delete job to the queue"
+        (let [job-id (:queue-id body)
+              {:keys [job-id job]} (q/find-job queue job-id)]
+
+          (is (= {:action :delete-graph
+                  :graph-uri "http://mygraph/live-graph"
+                  :id job-id}
+
+                 job)))))
+
+
+      ))
+
+  (testing "DELETE /live"
+    )
 
   ;; TODO add tests for DELETE
   ;; TODO add tests for migrate
