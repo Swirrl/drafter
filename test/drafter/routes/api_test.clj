@@ -61,7 +61,7 @@
           (is (= 1 (q/size queue)))
 
           (let [job-id (:queue-id body)
-                job (find-job queue job-id)]
+                job (q/find-job queue job-id)]
 
             (is (= {:tempfile :tempfile-here
                     :filename "test.nt"
@@ -94,7 +94,7 @@
 
       (testing "adds replace job to queue"
         (let [job-id (:queue-id body)
-              job (find-job queue job-id)]
+              job (q/find-job queue job-id)]
 
           (is (= {:tempfile :tempfile-here
                   :filename "test.nt"
