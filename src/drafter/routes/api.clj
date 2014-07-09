@@ -28,38 +28,35 @@
   [code map]
   (api-response code (merge default-error-map map)))
 
-(defn add-import-job!
-  "Adds a file import job to the queue and either appends the contents
-  of the given file or replaces the graph with the given file
-  depending upon the value of add-or-append which should be
-  either :append-file or :replace-with-file."
+(defn enqueue-job!
+  "Enqueues a job function on the queue and returns a ring HTTP
+  response."
 
-  [queue file graph-uri action]
-  (let [job (merge file {:action action
-                         :graph-uri graph-uri})]
-    (if-let [queue-id (q/offer! queue job)]
+  [queue job-function]
+  (let []
+    (if-let [queue-id (q/offer! queue job-function)]
       (api-response 202 {:queue-id queue-id
                          :msg "Your import request was accepted"})
       (error-response 503 {:msg "The import queue is temporarily full.  Please try again later."}))))
 
-(defn import-file! [repo {:keys [filename size tempfile action graph-uri] :as job}]
-  (let [format (ses/filename->rdf-format filename)]
-    (timbre/info (str "Importing file " tempfile "[" filename " " size " bytes] to graph: " graph-uri))
 
-    (case action
-      :append-file
-      (ses/with-transaction repo
-        (add repo
-             graph-uri
-             (statements tempfile :format format)))
+(comment
+  (defn import-file! [repo {:keys [filename size tempfile action graph-uri] :as job}]
+    (let [format (ses/filename->rdf-format filename)]
+      (case action
+        :append-file
+        (ses/with-transaction repo
+          (add repo
+               graph-uri
+               (statements tempfile :format format)))
 
-      :replace-with-file
-      (ses/with-transaction repo
-        (mgmt/replace-data! repo
-                            graph-uri
-                            (statements tempfile :format format))))
+        :replace-with-file
+        (ses/with-transaction repo
+          (mgmt/replace-data! repo
+                              graph-uri
+                              (statements tempfile :format format))))
 
-    (timbre/info (str "File import complete " tempfile " to graph: " graph-uri))))
+      )))
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 
@@ -75,6 +72,50 @@
                                                                             (interpose ", ")
                                                                             (apply str)))})))
 
+(defn replace-graph-job
+  "Return a function to replace the specified graph with a graph
+  containing the tripes from the specified file."
+  [repo graph {:keys [tempfile size filename] :as file}]
+  (fn []
+    (let [format (ses/filename->rdf-format filename)]
+      (timbre/info (str "Replacing graph " graph " with file " tempfile "[" filename " " size " bytes]"))
+
+      (ses/with-transaction repo
+        (mgmt/replace-data! repo
+                            graph
+                            (statements tempfile :format format)))
+
+      (timbre/info (str "Replaced graph " graph " with file " tempfile "[" filename "]")))))
+
+(defn append-data-to-graph-job
+  "Return a job function that adds the triples from the specified file
+  to the specified graph."
+  [repo graph {:keys [tempfile size filename] :as file}]
+  (fn []
+    (let [format (ses/filename->rdf-format filename)]
+      (timbre/info (str "Importing file " tempfile "[" filename " " size " bytes] to graph: " graph))
+
+      (ses/with-transaction repo
+        (add repo
+             graph
+             (statements (:tempfile file) :format format)))
+
+      (timbre/info (str "File import complete " tempfile " to graph: " graph)))))
+
+(defn delete-graph-job [repo graph]
+  (fn []
+    (timbre/info (str "Deleting graph " graph))
+    (ses/with-transaction repo
+      (mgmt/delete-graph! repo graph))
+    (timbre/info (str "Deleted graph " graph))))
+
+(defn migrate-graph-live-job [repo graph]
+  (fn []
+    (timbre/info (str "Migrating graph " graph))
+    (ses/with-transaction repo
+      (mgmt/migrate-live! repo graph))
+    (timbre/info (str "Migrated graph " graph))))
+
 (defn api-routes [repo queue]
   (routes
    (POST "/draft/create" {{live-graph "live-graph"} :query-params}
@@ -89,26 +130,20 @@
                    {file :file} :params}
 
          (when-params [graph file]
-           (add-import-job! queue file graph :append-file)))
+                      (enqueue-job! queue (append-data-to-graph-job repo graph file))))
 
    (PUT "/draft" {{graph "graph"} :query-params
                   {file :file} :params}
 
         (when-params [graph file]
-                     (add-import-job! queue file graph :replace-with-file)))
+                     (enqueue-job! queue (replace-graph-job repo graph file))))
 
    (DELETE "/graph" {{graph "graph"} :query-params}
-
            (when-params [graph]
-             (ses/with-transaction repo
-               (mgmt/delete-graph! repo graph)
-               (api-response 200 {:msg "Graph deleted"}))))
+                        (enqueue-job! queue (delete-graph-job repo graph))))
 
-   (PUT "/live" request
-        {:status 202
-         :headers {"Content-Type" "application/json"}
-         :body ""}
-        )
+   (PUT "/live" {{graph "graph"} :query-params}
+        (when-params [graph]
+                     (enqueue-job! queue (migrate-graph-live-job repo graph))))))
 
    ;; TODO add queue mangement API
-   ))

@@ -9,11 +9,14 @@
     (ArrayBlockingQueue. capacity fair)))
 
 (defn offer!
-  "Returns true if value was accepted on the queue and false if it
-  wasn't."
-  [queue msg]
+  "Returns true if function was accepted on the queue and false if it
+  wasn't.
+
+Schedules the function for execution on the queue, the function should
+  take zero args and be side-effecting."
+  [queue f]
   (let [uuid (UUID/randomUUID)
-        job (with-meta {:id uuid} msg)]
+        job (with-meta {:id uuid} {:job f})]
     (if (.offer queue job)
       uuid
       false)))
@@ -30,13 +33,13 @@
   [queue]
   (let [v (.take queue)]
     (if (map? v)
-      (meta v)
+      (:job (meta v))
       false)))
 
 (defn clear! [queue]
   (.clear queue))
 
-(defn remove-job [queue id]
+(defn remove-job! [queue id]
   (let [job {:id id}]
     (.remove queue job)))
 
@@ -60,12 +63,12 @@
          (filter (fn [i] (= job-id (:id i))))
          first)))
 
-(defn process-queue [queue f error-fn!]
+(defn process-queue [queue error-fn!]
   (future
     (try
       (loop []
-        (let [arguments (take! queue)]
-          (f arguments)
+        (let [f (take! queue)]
+          (f)
           (recur)))
       (catch java.lang.Exception ex
         (error-fn! ex)))))

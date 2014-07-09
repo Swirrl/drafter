@@ -2,7 +2,7 @@
   (:require [compojure.core :refer [defroutes routes]]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes state-sparql-routes]]
-            [drafter.routes.api :refer [api-routes import-file!]]
+            [drafter.routes.api :refer [api-routes]]
             [drafter.middleware :as middleware]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
@@ -58,10 +58,9 @@
 (defn attach-worker!
   "Attach the import-file! worker to process the jobs queue for
   requests to append/replace graphs with RDF files."
-  [queue worker-f]
+  [queue]
   (set-var-root! #'worker
                  (q/process-queue queue
-                                  worker-f
                                   (fn [ex]
                                     (taoensso.timbre/error
                                      (str "Import Worker Error.  Repo id is: " (System/identityHashCode repo)) ex))))
@@ -70,7 +69,7 @@
 
 (defn initialise-services! []
   (initialise-repo!)
-  (attach-worker! queue (partial import-file! repo))
+  (attach-worker! queue)
   (initialise-app! repo queue))
 
 (defn init
