@@ -57,10 +57,12 @@
           (is (instance? String (:msg body)))
           (is (= :ok (:type body))))
 
-        (testing "adds job to queue"
+        (testing "adds append job to queue"
           (is (= 1 (q/size queue)))
+
           (let [job-id (:queue-id body)
                 job (find-job queue job-id)]
+
             (is (= {:tempfile :tempfile-here
                     :filename "test.nt"
                     :size 10
@@ -76,19 +78,36 @@
           (let [{:keys [status body headers]} (route test-request)]
             (is (= 503 status))
             (is (= :error (:type body)))
-            (is (instance? String (:msg body))))))
+            (is (instance? String (:msg body))))))))
 
-      )
+  (testing "PUT /draft"
+    (let [queue (q/make-queue 10)
+          test-request {:uri "/draft"
+                        :request-method :put
+                        :query-params {"graph" "http://draft.org/draft-graph"}
+                        :params {:file {:filename "test.nt"
+                                        :tempfile :tempfile-here
+                                        :size 10}}}
 
-    (testing "PUT /draft")
+          route (api-routes *test-db* queue)
+          {:keys [status body headers]} (route test-request)]
 
+      (testing "adds replace job to queue"
+        (let [job-id (:queue-id body)
+              job (find-job queue job-id)]
 
+          (is (= {:tempfile :tempfile-here
+                  :filename "test.nt"
+                  :size 10
+                  :action :replace-with-file
+                  :graph-uri "http://draft.org/draft-graph"
+                  :id job-id}
 
+                 job))))))
 
-    ;; TODO add tests for import/replace & queue
+  ;; TODO add tests for DELETE
+  ;; TODO add tests for migrate
 
-    ;; TODO add tests for DELETE
-
-    ))
+  )
 
 (use-fixtures :each wrap-with-clean-test-db)

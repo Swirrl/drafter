@@ -98,9 +98,10 @@
                      (add-import-job! queue file graph :replace-with-file)))
 
    (DELETE "/draft" {{graph "graph"} :query-params}
+
            (when-params [graph]
              (ses/with-transaction repo
-               (mgmt/delete-graph! graph)
+               (mgmt/delete-graph! repo graph)
                (api-response 200 {:msg "Graph deleted"}))))
 
    (PUT "/live" request
