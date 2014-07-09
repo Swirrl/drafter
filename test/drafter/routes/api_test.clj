@@ -5,6 +5,7 @@
             [grafter.rdf.sesame :as ses]
             [drafter.routes.api :refer :all]
             [drafter.rdf.queue :as q]
+            [clojure.java.io :as io]
             [drafter.rdf.draft-management :refer :all]))
 
 (def test-graph-uri "http://example.org/my-graph")
@@ -50,7 +51,7 @@
                           :request-method :post
                           :query-params {"graph" "http://draft.org/draft-graph"}
                           :params {:file {:filename "test.nt"
-                                          :tempfile :tempfile-here
+                                          :tempfile (io/file "./test/test-triple.nt")
                                           :size 10}}}
 
             route (api-routes *test-db* queue)
@@ -66,16 +67,14 @@
           (is (= 1 (q/size queue)))
 
           (let [job-id (:queue-id body)
-                job (q/find-job queue job-id)]
+                job-f (q/find-job queue job-id)]
 
-            (is (= {:tempfile :tempfile-here
-                    :filename "test.nt"
-                    :size 10
-                    :action :append-file
-                    :graph-uri "http://draft.org/draft-graph"
-                    :id job-id}
+            (is (fn? job-f)
+                "Job function is put on the queue")
 
-                   job))))
+            (testing "The job when run appends RDF to the graph"
+              (job-f)
+              (is (ses/query *test-db* (str "ASK WHERE { <http://example.org/test/triple> ?p ?o . }"))))))
 
         (testing "full queue returns a 503 service temporarily unavailable"
           ;; Make a second request.  We should now 503 because the
@@ -86,12 +85,13 @@
             (is (instance? String (:msg body))))))))
 
   (testing "PUT /draft"
+    (make-live-graph *test-db* "http://mygraph/graph-to-be-replaced")
     (let [queue (q/make-queue 10)
           test-request {:uri "/draft"
                         :request-method :put
-                        :query-params {"graph" "http://draft.org/draft-graph"}
+                        :query-params {"graph" "http://mygraph/graph-to-be-replaced"}
                         :params {:file {:filename "test.nt"
-                                        :tempfile :tempfile-here
+                                        :tempfile (io/file "./test/test-triple.nt")
                                         :size 10}}}
 
           route (api-routes *test-db* queue)
@@ -99,16 +99,16 @@
 
       (testing "adds replace job to queue"
         (let [job-id (:queue-id body)
-              job (q/find-job queue job-id)]
+              job-f (q/find-job queue job-id)]
 
-          (is (= {:tempfile :tempfile-here
-                  :filename "test.nt"
-                  :size 10
-                  :action :replace-with-file
-                  :graph-uri "http://draft.org/draft-graph"
-                  :id job-id}
+          (is (fn? job-f))
 
-                 job))))))
+          (testing "the job when run replaces the RDF graph"
+            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }"))
+                "Graph should contain initial state before it is replaced")
+            (job-f)
+            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://example.org/test/triple> ?p ?o . } }"))
+                "The data should be replaced with the new data"))))))
 
   (testing "DELETE /graph"
     (do
@@ -131,23 +131,23 @@
 
         (testing "adds a delete job to the queue"
         (let [job-id (:queue-id body)
-              {:keys [job-id job]} (q/find-job queue job-id)]
+              delete-job (q/find-job queue job-id)]
 
-          (is (= {:action :delete-graph
-                  :graph-uri "http://mygraph/live-graph"
-                  :id job-id}
+          (is (fn? delete-job))
 
-                 job)))))
+          (testing "delete job actually deletes the graph"
+            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }"))
+                "Graph should exist before deletion")
+            (delete-job)
 
+            (is (not (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")))
+                "Graph should be deleted")))))))
 
-      ))
+  (testing "PUT /live"
 
-  (testing "DELETE /live"
-    )
+    ;; TODO add tests for migrate
 
-  ;; TODO add tests for DELETE
-  ;; TODO add tests for migrate
-
-  )
+    (testing "migrates a graph from draft to live"
+      )))
 
 (use-fixtures :each wrap-with-clean-test-db)

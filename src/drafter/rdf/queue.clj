@@ -61,7 +61,8 @@ Schedules the function for execution on the queue, the function should
   (let [job-id (->uuid job-id)]
     (->> (peek-jobs queue)
          (filter (fn [i] (= job-id (:id i))))
-         first)))
+         first
+         :job)))
 
 (defn process-queue [queue error-fn!]
   (future
