@@ -3,6 +3,32 @@
 A RESTful Clojure web service to support PMD's admin tool in moving
 data updates between draft and live triple stores.
 
+
+Getting started
+==================
+
+* clone this project
+* [install leiningen](http://leiningen.org/#install)
+* cd into the project directory `cd drafter`
+* `lein repl` This will start an http server on port 3000
+
+Connecting to the repl with LightTable
+-----------------------------------
+
+Add this to your `.lein/profiles.clj`:
+
+
+    { :user {
+         :plugins [[lein-light-nrepl "0.0.18"]] ;;Make sure to check what the latest version of lein-light-nrepl is
+         :dependencies [[lein-light-nrepl "0.0.18"]]
+         :repl-options {:nrepl-middleware [lighttable.nrepl.handler/lighttable-ops]}
+         }
+    }
+
+In LightTable, you can then add a connection to a Clojure (remote nREPL) (view->connections), on localhost:5678.
+
+
+
 Drafters REST API:
 ==================
 
