@@ -130,24 +130,50 @@
           (is (= :ok (:type body))))
 
         (testing "adds a delete job to the queue"
-        (let [job-id (:queue-id body)
-              delete-job (q/find-job queue job-id)]
+          (let [job-id (:queue-id body)
+                delete-job (q/find-job queue job-id)]
 
-          (is (fn? delete-job))
+            (is (fn? delete-job))
 
-          (testing "delete job actually deletes the graph"
-            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }"))
-                "Graph should exist before deletion")
-            (delete-job)
+            (testing "delete job actually deletes the graph"
+              (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }"))
+                  "Graph should exist before deletion")
+              (delete-job)
 
-            (is (not (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")))
-                "Graph should be deleted")))))))
+              (is (not (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")))
+                  "Graph should be deleted")))))))
+
 
   (testing "PUT /live"
+    (let [draft-graph (import-data-to-draft! *test-db* "http://mygraph.com/live-graph" (test-triples "http://test.com/subject-1"))
+          queue (q/make-queue 2)
+          route (api-routes *test-db* queue)
 
-    ;; TODO add tests for migrate
+          test-request {:uri "/live"
+                        :request-method :put
+                        :query-params {"graph" draft-graph}}
 
-    (testing "migrates a graph from draft to live"
-      )))
+          {:keys [status body headers]} (route test-request)]
+
+      (testing "returns job details"
+          (is (= 202 status))
+          (is (instance? java.util.UUID (:queue-id body)))
+          (is (instance? String (:msg body)))
+          (is (= :ok (:type body))))
+
+      (testing "migrates a graph from draft to live"
+        (let [job-id (:queue-id body)
+              migrate-job (q/find-job queue job-id)]
+
+          (is (fn? migrate-job))
+
+          (testing "migrate moves the draft to live"
+            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
+                "Draft graph should exist before deletion")
+
+            (migrate-job)
+
+            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }"))
+                "Live graph should contain our triples")))))))
 
 (use-fixtures :each wrap-with-clean-test-db)

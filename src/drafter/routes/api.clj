@@ -39,25 +39,6 @@
                          :msg "Your import request was accepted"})
       (error-response 503 {:msg "The import queue is temporarily full.  Please try again later."}))))
 
-
-(comment
-  (defn import-file! [repo {:keys [filename size tempfile action graph-uri] :as job}]
-    (let [format (ses/filename->rdf-format filename)]
-      (case action
-        :append-file
-        (ses/with-transaction repo
-          (add repo
-               graph-uri
-               (statements tempfile :format format)))
-
-        :replace-with-file
-        (ses/with-transaction repo
-          (mgmt/replace-data! repo
-                              graph-uri
-                              (statements tempfile :format format))))
-
-      )))
-
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 
 (defmacro when-params
@@ -104,17 +85,13 @@
 
 (defn delete-graph-job [repo graph]
   (fn []
-    (timbre/info (str "Deleting graph " graph))
     (ses/with-transaction repo
-      (mgmt/delete-graph! repo graph))
-    (timbre/info (str "Deleted graph " graph))))
+      (mgmt/delete-graph! repo graph))))
 
 (defn migrate-graph-live-job [repo graph]
   (fn []
-    (timbre/info (str "Migrating graph " graph))
     (ses/with-transaction repo
-      (mgmt/migrate-live! repo graph))
-    (timbre/info (str "Migrated graph " graph))))
+      (mgmt/migrate-live! repo graph))))
 
 (defn api-routes [repo queue]
   (routes
@@ -145,5 +122,3 @@
    (PUT "/live" {{graph "graph"} :query-params}
         (when-params [graph]
                      (enqueue-job! queue (migrate-graph-live-job repo graph))))))
-
-   ;; TODO add queue mangement API

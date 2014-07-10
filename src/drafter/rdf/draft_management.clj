@@ -2,6 +2,7 @@
   (:require [grafter.rdf.ontologies.rdf :refer :all]
             [grafter.rdf.sesame :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
+            [taoensso.timbre :as timbre]
             [clojure.java.io :as io]
             [grafter.rdf :refer [graph graphify load-triples add-properties]]
             [grafter.rdf.protocols :refer [add subject predicate object context
@@ -71,7 +72,9 @@
   (add db draft-graph-uri triples))
 
 (defn delete-graph! [db graph-uri]
-  (update! db (str "DROP GRAPH <" graph-uri ">")))
+  (timbre/info (str "Deleting graph " graph-uri))
+  (update! db (str "DROP GRAPH <" graph-uri ">"))
+  (timbre/info (str "Deleted graph " graph-uri)))
 
 (defn replace-data!
   [db draft-graph-uri triples]
@@ -133,15 +136,19 @@
   "Moves the triples from the draft graph to the draft graphs live destination."
   [db draft-graph-uri]
 
-  (let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
-    (delete-graph! db live-graph-uri)
-    (add db live-graph-uri
-            (query db
-                   (str "CONSTRUCT { ?s ?p ?o } WHERE
+  (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
+    (do
+      (timbre/info (str "Migrating graph: " draft-graph-uri " to live graph: " live-graph-uri))
+      (delete-graph! db live-graph-uri)
+      (add db live-graph-uri
+           (query db
+                  (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
-    (delete-graph! db draft-graph-uri)
+      (delete-graph! db draft-graph-uri)
+      (set-isPublic! db live-graph-uri true)
+      (timbre/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
 
-    (set-isPublic! db live-graph-uri true)))
+    (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)))))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
