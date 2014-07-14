@@ -47,46 +47,63 @@
           (is (url? (-> body :guri))))))
 
     (testing "POST /draft"
-      (let [test-request {:uri "/draft"
-                          :request-method :post
-                          :query-params {"graph" "http://draft.org/draft-graph"}
-                          :params {:file {:filename "test.nt"
-                                          :tempfile (io/file "./test/test-triple.nt")
-                                          :size 10}}}
+      (testing "with a file"
+        (let [ q-size 1
+              queue (q/make-queue q-size)
+              test-request {:uri "/draft"
+                            :request-method :post
+                            :query-params {"graph" "http://draft.org/draft-graph"}
+                            :params {:file {:filename "test.nt"
+                                            :tempfile (io/file "./test/test-triple.nt")
+                                            :size 10}}}
 
-            route (api-routes *test-db* queue)
-            {:keys [status body headers]} (route test-request)]
+              route (api-routes *test-db* queue)
+              {:keys [status body headers]} (route test-request)]
 
-        (testing "returns job id"
-          (is (= 202 status))
-          (is (instance? java.util.UUID (:queue-id body)))
-          (is (instance? String (:msg body)))
-          (is (= :ok (:type body))))
+          (testing "returns job id"
+            (is (= 202 status))
+            (is (instance? java.util.UUID (:queue-id body)))
+            (is (instance? String (:msg body)))
+            (is (= :ok (:type body))))
 
-        (testing "adds append job to queue"
-          (is (= 1 (q/size queue)))
+          (testing "adds append job to queue"
+            (is (= 1 (q/size queue)))
 
-          (let [job-id (:queue-id body)
-                job-f (q/find-job queue job-id)]
+            (let [job-id (:queue-id body)
+                  job-f (q/find-job queue job-id)]
 
-            (is (fn? job-f)
-                "Job function is put on the queue")
+              (is (fn? job-f)
+                  "Job function is put on the queue")
 
-            (testing "The job when run appends RDF to the graph"
-              (job-f)
-              (is (ses/query *test-db* (str "ASK WHERE { <http://example.org/test/triple> ?p ?o . }"))))))
+              (testing "The job when run appends RDF to the graph"
+                (job-f)
+                (is (ses/query *test-db* (str "ASK WHERE { <http://example.org/test/triple> ?p ?o . }"))))))
 
-        (testing "full queue returns a 503 service temporarily unavailable"
-          ;; Make a second request.  We should now 503 because the
-          ;; queue is full as q-size == 1.
-          (let [{:keys [status body headers]} (route test-request)]
-            (is (= 503 status))
-            (is (= :error (:type body)))
-            (is (instance? String (:msg body))))))))
+          (testing "full queue returns a 503 service temporarily unavailable"
+            ;; Make a second request.  We should now 503 because the
+            ;; queue is full as q-size == 1.
+            (let [{:keys [status body headers]} (route test-request)]
+              (is (= 503 status))
+              (is (= :error (:type body)))
+              (is (instance? String (:msg body)))))))
+
+
+      (testing "with a source graph"
+        (let [ q-size 1
+              queue (q/make-queue q-size)
+              test-request {:uri "/draft"
+                            :request-method :post
+                            :query-params {"graph" "http://draft.org/draft-graph" "source-graph" "http://draft.org/source-graph"}}
+
+              route (api-routes *test-db* queue)
+              {:keys [status body headers]} (route test-request)]
+
+            (testing "status"
+              (is (= 202 status)))))))
 
   (testing "PUT /draft"
     (make-live-graph *test-db* "http://mygraph/graph-to-be-replaced")
-    (let [queue (q/make-queue 10)
+    (let [queue(q/make-queue 10)
           test-request {:uri "/draft"
                         :request-method :put
                         :query-params {"graph" "http://mygraph/graph-to-be-replaced"}
