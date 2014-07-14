@@ -30,13 +30,23 @@ In LightTable, you can then add a connection to a Clojure (remote nREPL) (view->
 Building and running
 --------------------
 
-To build:
-
-    $ lein uberjar
-
 To build and run a repl and a server on port 3001
 
     $ lein repl
+
+To run the tests from the console:
+
+    $ lein test
+
+
+To run a test from a repl, make sure the test namespace is loaded (evaling it will usually do this) then run (for example):
+
+    (clojure.test/run-tests 'drafter.routes.sparql-test)
+
+
+To build:
+
+    $ lein uberjar
 
 To run a built drafter server without leiningen on port 3001:
 
