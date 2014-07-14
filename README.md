@@ -27,7 +27,16 @@ Add this to your `.lein/profiles.clj`:
 
 In LightTable, you can then add a connection to a Clojure (remote nREPL) (view->connections), on localhost:5678.
 
+Building and running
+--------------------
 
+To build:
+
+    $ lein uberjar
+
+To run a built drafter server without leiningen on port 3000:
+
+    java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 
 Drafters REST API:
 ==================
