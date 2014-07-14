@@ -10,7 +10,7 @@ Getting started
 * clone this project
 * [install leiningen](http://leiningen.org/#install)
 * cd into the project directory `cd drafter`
-* `lein repl` This will start an http server on port 3000
+* `lein repl` This will start an http server on port 3001
 
 Connecting to the repl with LightTable
 -----------------------------------
@@ -34,7 +34,11 @@ To build:
 
     $ lein uberjar
 
-To run a built drafter server without leiningen on port 3000:
+To build and run a repl and a server on port 3001
+
+    $ lein repl
+
+To run a built drafter server without leiningen on port 3001:
 
     $ java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 
