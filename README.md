@@ -36,7 +36,7 @@ To build:
 
 To run a built drafter server without leiningen on port 3000:
 
-    java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
+    $ java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 
 Drafters REST API:
 ==================
