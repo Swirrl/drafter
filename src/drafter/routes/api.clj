@@ -53,7 +53,7 @@
                                                                             (interpose ", ")
                                                                             (apply str)))})))
 
-(defn replace-graph-job
+(defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
   containing the tripes from the specified file."
   [repo graph {:keys [tempfile size filename] :as file}]
@@ -68,7 +68,7 @@
 
       (timbre/info (str "Replaced graph " graph " with file " tempfile "[" filename "]")))))
 
-(defn append-data-to-graph-job
+(defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
   to the specified graph."
   [repo graph {:keys [tempfile size filename] :as file}]
@@ -95,8 +95,6 @@
       (ses/with-transaction repo (add repo graph source-data))
       (timbre/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))))
 
-
-
 (defn replace-data-from-graph-job
   [repo graph source-graph]
   (fn []
@@ -106,7 +104,6 @@
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
           source-data (ses/query repo query-str)]
 
-      (println "GOT HERE!!!")
 
       (if source-data
         ; there's some data in the source graph
@@ -118,10 +115,13 @@
 
           (timbre/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))
 
-        ; false expression
+        ; no data in source graph
         (do
-          ; Question: should we replace with emptyness (i.e. delete contents of destination graph? Or do nothing?
-          (timbre/info (str "Source graph " source-graph " was empty. Not doing anything.")))))))
+          (println "NO SOURCE DATA!")
+          (ses/with-transaction repo
+            (mgmt/delete-graph! repo graph))
+
+          (timbre/info (str "Source graph " source-graph " was empty. Deleted destination graph.")))))))
 
 (defn delete-graph-job [repo graph]
   (fn []
@@ -152,7 +152,7 @@
                       (enqueue-job! queue (append-data-to-graph-from-graph-job repo graph source-graph)))
            ; when source graph not supplied: append from the file.
            (when-params [graph file]
-                      (enqueue-job! queue (append-data-to-graph-job repo graph file)))))
+                      (enqueue-job! queue (append-data-to-graph-from-file-job repo graph file)))))
 
    (PUT "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                   {file :file} :params}
@@ -165,7 +165,7 @@
 
             ; when source graph not supplied: replace from the file.
             (when-params [graph file]
-                      (enqueue-job! queue (replace-graph-job repo graph file)))))
+                      (enqueue-job! queue (replace-graph-from-file-job repo graph file)))))
 
 
    (DELETE "/graph" {{graph "graph"} :query-params}

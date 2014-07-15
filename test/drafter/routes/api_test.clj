@@ -26,6 +26,7 @@
     (migrate-live! db draft-graph)))
 
 (deftest api-routes-test
+
   (let [q-size 1
         queue (q/make-queue q-size)]
 
@@ -125,7 +126,7 @@
                  (testing "The job when run appends RDF to the graph"
                    (job-f)
                    (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-appended-to> { <http://test.com/subject-1> ?p ?o . }}")) "graph has got new data in" )
-                   (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-appended-to> { <http://example.org/test/triple> ?p ?o . }}")) "graph has still got the old data in "))))))))
+                   (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-appended-to> { <http://example.org/test/triple> ?p ?o . }}")) "graph has still got the old data in ")))))))
 
   (testing "PUT /draft with a source file"
 
@@ -152,7 +153,7 @@
                 "Graph should contain initial state before it is replaced")
             (job-f)
             (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://example.org/test/triple> ?p ?o . } }"))
-                "The data should be replaced with the new data")))))))
+                "The data should be replaced with the new data"))))))
 
   ; in a different test so that it's in a clean db.
   (testing "PUT /draft with a source graph"
@@ -161,6 +162,7 @@
     (make-live-graph-2 *test-db* "http://draft.org/source-graph")
 
     (testing "when source graph contains data"
+
       (let [queue (q/make-queue 1)
             test-request {:uri "/draft"
                           :request-method :put
@@ -189,10 +191,11 @@
                   "The data should be replaced with the new data"))))))
 
     (testing "when source graph doesn't contain data"
+
       (let [queue (q/make-queue 1)
             test-request {:uri "/draft"
                           :request-method :put
-                          :query-params {"graph" "http://mygraph/graph-to-be-replaced" "source-graph" "http://draft.org/source-graph"}}
+                          :query-params {"graph" "http://mygraph/graph-to-be-replaced" "source-graph" "http://draft.org/source-graph-x"}}
 
             route (api-routes *test-db* queue)
             {:keys [status body headers]} (route test-request)]
@@ -210,18 +213,13 @@
               (is (fn? job-f))
 
               (testing "the job when run deletes contents of the RDF graph"
-                (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }"))
+                ; what's left from the previous test.
+                (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-2> ?p ?o . } }"))
                      "Graph should contain initial state before it is replaced")
                 (job-f)
-;;                 (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }"))
-;;                     "Graph should contain initial state before it is replaced")
-;;                 (job-f)
-;;                 ;(is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-2> ?p ?o . } }"))
-;;                 ;    "The data should be replaced with the new data")
-;;                 )))
-               )
-      ))
-  ))
+                (is (= false (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-2> ?p ?o . } }")))
+                    "Destination graph should be deleted")))))))
+
 
   (testing "DELETE /graph"
     (do
@@ -287,6 +285,6 @@
             (migrate-job)
 
             (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }"))
-                "Live graph should contain our triples")))))))
+                "Live graph should contain our triples"))))))))
 
 (use-fixtures :each wrap-with-clean-test-db)
