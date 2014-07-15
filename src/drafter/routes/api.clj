@@ -91,27 +91,37 @@
 
     (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
-          results (ses/query repo query-str)]
+          source-data (ses/query repo query-str)]
+      (ses/with-transaction repo (add repo graph source-data))
+      (timbre/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))))
 
-      (if results
-        ; true expression
-        (do
-          (println "results TRUE!")
-          (ses/with-transaction repo(add repo graph results))
-          (timbre/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))
 
-        ; false expression
-        (do
-          (println "results FALSE!")
-          (timbre/info (str "source graph " source-graph " was empty. Nothing to do.")))))))
 
-(defn replace-data-graph-from-graph-job
+(defn replace-data-from-graph-job
   [repo graph source-graph]
   (fn []
     (timbre/info (str "Replacing graph " graph " with contents of graph: " source-graph ))
 
+    (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
+                         { GRAPH <" source-graph "> { ?s ?p ?o } }")
+          source-data (ses/query repo query-str)]
 
-    ))
+      (println "GOT HERE!!!")
+
+      (if source-data
+        ; there's some data in the source graph
+        (do
+          (ses/with-transaction repo
+            (mgmt/replace-data! repo
+                            graph
+                            source-data))
+
+          (timbre/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))
+
+        ; false expression
+        (do
+          ; Question: should we replace with emptyness (i.e. delete contents of destination graph? Or do nothing?
+          (timbre/info (str "Source graph " source-graph " was empty. Not doing anything.")))))))
 
 (defn delete-graph-job [repo graph]
   (fn []
@@ -136,7 +146,6 @@
    (POST "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                    {file :file} :params}
 
-         ; TODO: tidy this up? allow passing the if-condition into when-params somehow?
          (if source-graph
            ; when source supplied: append from source-graph.
            (when-params [graph source-graph]
@@ -145,13 +154,19 @@
            (when-params [graph file]
                       (enqueue-job! queue (append-data-to-graph-job repo graph file)))))
 
-   (PUT "/draft" {{graph "graph"} :query-params
+   (PUT "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                   {file :file} :params}
 
-        (when-params [graph file]
-                     (enqueue-job! queue (replace-graph-job repo graph file))))
+        (if source-graph
 
-        ; TODO: make this deal with source graphs too.
+            ; when source supplied: replace from source-graph.
+            (when-params [graph source-graph]
+                     (enqueue-job! queue (replace-data-from-graph-job repo graph source-graph)))
+
+            ; when source graph not supplied: replace from the file.
+            (when-params [graph file]
+                      (enqueue-job! queue (replace-graph-job repo graph file)))))
+
 
    (DELETE "/graph" {{graph "graph"} :query-params}
            (when-params [graph]
