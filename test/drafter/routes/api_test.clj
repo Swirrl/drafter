@@ -89,6 +89,15 @@
 
 
       (testing "with a source graph"
+
+        (println ">>>> IN POST SOURCE GRAPH TEST")
+
+        (testing "queue empty before we start"
+              (is (= 0 (q/size queue))))
+
+        ; put some data into the source-graph before we begin
+        (make-live-graph *test-db* "http://draft.org/source-graph")
+
         (let [ q-size 1
               queue (q/make-queue q-size)
               test-request {:uri "/draft"
@@ -98,8 +107,23 @@
               route (api-routes *test-db* queue)
               {:keys [status body headers]} (route test-request)]
 
-            (testing "status"
-              (is (= 202 status)))))))
+            (testing "returns job id"
+              (is (= 202 status))
+              (is (instance? java.util.UUID (:queue-id body)))
+              (is (instance? String (:msg body)))
+              (is (= :ok (:type body))))
+
+            (testing "adds an append job to queue"
+              (is (= 1 (q/size queue)))
+
+              (let [job-id (:queue-id body)
+                  job-f (q/find-job queue job-id)]
+
+                 (is (fn? job-f) "Job fn on queue")
+
+                 (testing "The job when run appends RDF to the graph"
+                   (job-f)
+                   (is (ses/query *test-db* (str "ASK WHERE { <http://example.org/test/triple> ?p ?o . }"))))))))))
 
   (testing "PUT /draft"
     (make-live-graph *test-db* "http://mygraph/graph-to-be-replaced")

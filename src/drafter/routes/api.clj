@@ -59,7 +59,7 @@
   [repo graph {:keys [tempfile size filename] :as file}]
   (fn []
     (let [format (ses/filename->rdf-format filename)]
-      (timbre/info (str "Replacing graph " graph " with file " tempfile "[" filename " " size " bytes]"))
+      (timbre/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
 
       (ses/with-transaction repo
         (mgmt/replace-data! repo
@@ -74,14 +74,44 @@
   [repo graph {:keys [tempfile size filename] :as file}]
   (fn []
     (let [format (ses/filename->rdf-format filename)]
-      (timbre/info (str "Importing file " tempfile "[" filename " " size " bytes] to graph: " graph))
+      (timbre/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
 
       (ses/with-transaction repo
         (add repo
              graph
              (statements (:tempfile file) :format format)))
 
-      (timbre/info (str "File import complete " tempfile " to graph: " graph)))))
+      (timbre/info (str "File import (append) complete " tempfile " to graph: " graph)))))
+
+(defn append-data-to-graph-from-graph-job
+  [repo graph source-graph]
+  "Return a job function that adds the triples from the specified named graph to the specified graph"
+  (fn []
+    (timbre/info (str "Appending contents of " source-graph "  to graph: " graph))
+
+    (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
+                         { GRAPH <" source-graph "> { ?s ?p ?o } }")
+          results (ses/query repo query-str)]
+
+      (if results
+        ; true expression
+        (do
+          (println "results TRUE!")
+          (ses/with-transaction repo(add repo graph results))
+          (timbre/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))
+
+        ; false expression
+        (do
+          (println "results FALSE!")
+          (timbre/info (str "source graph " source-graph " was empty. Nothing to do.")))))))
+
+(defn replace-data-graph-from-graph-job
+  [repo graph source-graph]
+  (fn []
+    (timbre/info (str "Replacing graph " graph " with contents of graph: " source-graph ))
+
+
+    ))
 
 (defn delete-graph-job [repo graph]
   (fn []
@@ -103,17 +133,25 @@
                                    (mgmt/create-draft-graph! repo live-graph))]
              (api-response 201 {:guri draft-graph-uri}))))
 
-   (POST "/draft" {{graph "graph"} :query-params
+   (POST "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                    {file :file} :params}
 
-         (when-params [graph file]
-                      (enqueue-job! queue (append-data-to-graph-job repo graph file))))
+         ; TODO: tidy this up? allow passing the if-condition into when-params somehow?
+         (if source-graph
+           ; when source supplied: append from source-graph.
+           (when-params [graph source-graph]
+                      (enqueue-job! queue (append-data-to-graph-from-graph-job repo graph source-graph)))
+           ; when source graph not supplied: append from the file.
+           (when-params [graph file]
+                      (enqueue-job! queue (append-data-to-graph-job repo graph file)))))
 
    (PUT "/draft" {{graph "graph"} :query-params
                   {file :file} :params}
 
         (when-params [graph file]
                      (enqueue-job! queue (replace-graph-job repo graph file))))
+
+        ; TODO: make this deal with source graphs too.
 
    (DELETE "/graph" {{graph "graph"} :query-params}
            (when-params [graph]
