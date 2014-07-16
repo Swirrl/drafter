@@ -103,24 +103,18 @@
     (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
           source-data (ses/query repo query-str)]
-
-
       (if source-data
-        ; there's some data in the source graph
         (do
+          ;; there's some data in the source graph
           (ses/with-transaction repo
             (mgmt/replace-data! repo
                             graph
                             source-data))
-
           (timbre/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))
-
-        ; no data in source graph
         (do
-          (println "NO SOURCE DATA!")
+          ;; no data in source graph
           (ses/with-transaction repo
             (mgmt/delete-graph! repo graph))
-
           (timbre/info (str "Source graph " source-graph " was empty. Deleted destination graph.")))))))
 
 (defn delete-graph-job [repo graph]
@@ -145,28 +139,23 @@
 
    (POST "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                    {file :file} :params}
-
          (if source-graph
-           ; when source supplied: append from source-graph.
-           (when-params [graph source-graph]
-                      (enqueue-job! queue (append-data-to-graph-from-graph-job repo graph source-graph)))
-           ; when source graph not supplied: append from the file.
-           (when-params [graph file]
-                      (enqueue-job! queue (append-data-to-graph-from-file-job repo graph file)))))
+           (when-params [graph source-graph] ; when source supplied: append from source-graph.
+                        (enqueue-job! queue
+                                      (append-data-to-graph-from-graph-job repo graph source-graph)))
+           (when-params [graph file] ; when source graph not supplied: append from the file.
+                        (enqueue-job! queue
+                                      (append-data-to-graph-from-file-job repo graph file)))))
 
    (PUT "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                   {file :file} :params}
-
         (if source-graph
-
-            ; when source supplied: replace from source-graph.
-            (when-params [graph source-graph]
-                     (enqueue-job! queue (replace-data-from-graph-job repo graph source-graph)))
-
-            ; when source graph not supplied: replace from the file.
-            (when-params [graph file]
-                      (enqueue-job! queue (replace-graph-from-file-job repo graph file)))))
-
+          (when-params [graph source-graph] ; when source supplied: replace from source-graph.
+                       (enqueue-job! queue
+                                     (replace-data-from-graph-job repo graph source-graph)))
+          (when-params [graph file] ; when source graph not supplied: replace from the file.
+                       (enqueue-job! queue
+                                     (replace-graph-from-file-job repo graph file)))))
 
    (DELETE "/graph" {{graph "graph"} :query-params}
            (when-params [graph]

@@ -97,7 +97,7 @@
         (testing "queue empty before we start"
               (is (= 0 (q/size queue))))
 
-        ; put some data into the source-graph before we begin
+        ;; put some data into the source-graph before we begin
         (make-live-graph *test-db* "http://draft.org/source-graph")
 
         (let [ q-size 1
@@ -213,7 +213,7 @@
               (is (fn? job-f))
 
               (testing "the job when run deletes contents of the RDF graph"
-                ; what's left from the previous test.
+                ;; what's left from the previous test.
                 (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-2> ?p ?o . } }"))
                      "Graph should contain initial state before it is replaced")
                 (job-f)
