@@ -84,8 +84,8 @@
       (timbre/info (str "File import (append) complete " tempfile " to graph: " graph)))))
 
 (defn append-data-to-graph-from-graph-job
-  [repo graph source-graph]
   "Return a job function that adds the triples from the specified named graph to the specified graph"
+  [repo graph source-graph]
   (fn []
     (timbre/info (str "Appending contents of " source-graph "  to graph: " graph))
 
