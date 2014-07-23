@@ -26,12 +26,5 @@
 
         (is (= 200 status))
         (is (= 2 (count (:queue body))))
-
         (is (= "identity" (:desc (first (:queue body)))))
-        (is (= "anon" (:desc (last (:queue body)))))
-
-      )
-    )
-
-  )
-  )
+        (is (= "anon" (:desc (last (:queue body)))))))))
