@@ -10,16 +10,16 @@
 
 (defn offer!
   "Returns true if function was accepted on the queue and false if it
-  wasn't.
-
-Schedules the function for execution on the queue, the function should
+  wasn't. Schedules the function for execution on the queue, the function should
   take zero args and be side-effecting."
-  [queue f]
+  ; last parameter (opts) is optional
+  ([queue f] (offer! queue f {}))
+  ([queue f opts]
   (let [uuid (UUID/randomUUID)
-        job (with-meta {:id uuid} {:job f})]
+        job (with-meta {:id uuid} (merge opts {:job f}))]
     (if (.offer queue job)
       uuid
-      false)))
+      false))))
 
 (defn peek-jobs
   "Peek at all the jobs on the queue without removing any."
