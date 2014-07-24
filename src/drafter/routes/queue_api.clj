@@ -16,8 +16,8 @@
   serialisable."
   [j]
 
-  (fn [j] (merge (dissoc j :id :job)
-                 {:id (str (:id j))})))
+  (merge (dissoc j :id :job)
+         {:id (str (:id j))}))
 
 (defn queue-api-routes [queue]
   (routes
