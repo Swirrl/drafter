@@ -11,14 +11,20 @@
             [drafter.common.api-routes :as api-routes]
             [clojure.data.json :as json]))
 
+(defn renderable-job
+  "Takes a job and returns an API representation of it which is JSON
+  serialisable."
+  [j]
 
+  (fn [j] (merge (dissoc j :id :job)
+                 {:id (str (:id j))})))
 
 (defn queue-api-routes [queue]
   (routes
-   ; TODO: add parameters to allow filtering.
+   ;; TODO: add parameters to allow filtering.
    (GET "/queue/peek" {}
-      ; ditches id and job, returns id as the stringified job id.
-      (let [queue-response (map (fn [j] (merge (dissoc j :id :job)
-                                        {:id (str (:id j))})) (q/peek-jobs queue))]
-        ; the middleware will turn it into json.
-        (api-routes/api-response 200 {:queue queue-response})))))
+        (let [job-list (map renderable-job
+                                  (q/peek-jobs queue))]
+
+          ;; the middleware will turn it into json.
+          (api-routes/api-response 200 {:queue job-list})))))

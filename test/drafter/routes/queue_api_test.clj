@@ -10,7 +10,6 @@
 
 
 (deftest queue-api-routes-test
-
   (let [q-size 10
         queue (q/make-queue q-size)]
 
@@ -18,11 +17,10 @@
     (do (q/offer! queue identity {:job-desc "identity" :meta {"http://foo" "bar"} })
         (q/offer! queue (fn foo[]) {:job-desc "anon"})) ; enqueue something
 
-    (let [
-          {:keys [status body headers]} ((queue-api-routes queue)
-                                             {:uri "/queue/peek"
-                                              :request-method :get
-                                              :headers {"accept" "application/json"}})]
+    (let [{:keys [status body headers]} ((queue-api-routes queue)
+                                         {:uri "/queue/peek"
+                                          :request-method :get
+                                          :headers {"accept" "application/json"}})]
 
         (is (= 200 status))
         (is (= 2 (count (:queue body))))

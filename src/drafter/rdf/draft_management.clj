@@ -68,7 +68,6 @@
 
 (defn append-data!
   [db draft-graph-uri triples]
-
   (add db draft-graph-uri triples))
 
 (defn delete-graph! [db graph-uri]
