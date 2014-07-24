@@ -22,8 +22,7 @@
   [queue job-function opts]
   (let []
     (if-let [queue-id (q/offer! queue job-function opts)]
-      (api-routes/api-response 202 {:queue-id queue-id
-                                    :msg "Your request was accepted"})
+      (api-routes/api-response 202 {:queue-id queue-id :msg "Your request was accepted"})
       (api-routes/error-response 503 {:msg "The queue is temporarily full.  Please try again later."}))))
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
@@ -37,9 +36,7 @@
       (timbre/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
 
       (ses/with-transaction repo
-        (mgmt/replace-data! repo
-                            graph
-                            (statements tempfile :format format)))
+        (mgmt/replace-data! repo graph (statements tempfile :format format)))
 
       (timbre/info (str "Replaced graph " graph " with file " tempfile "[" filename "]")))))
 
@@ -52,9 +49,7 @@
       (timbre/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
 
       (ses/with-transaction repo
-        (add repo
-             graph
-             (statements (:tempfile file) :format format)))
+        (mgmt/append-data! repo graph (statements (:tempfile file) :format format)))
 
       (timbre/info (str "File import (append) complete " tempfile " to graph: " graph)))))
 
@@ -67,7 +62,10 @@
     (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
           source-data (ses/query repo query-str)]
-      (ses/with-transaction repo (add repo graph source-data))
+
+      (ses/with-transaction repo
+        (mgmt/append-data! repo graph source-data))
+
       (timbre/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))))
 
 (defn replace-data-from-graph-job
@@ -84,12 +82,10 @@
         (do
           ;; there's some data in the source graph
           (ses/with-transaction repo
-            (mgmt/replace-data! repo
-                            graph
-                            source-data))
+            (mgmt/replace-data! repo graph source-data))
           (timbre/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))
         (do
-          ;; no data in source graph
+          ;; no data in source graph: acts like a delete (is this the right thing to do?)
           (ses/with-transaction repo
             (mgmt/delete-graph! repo graph))
           (timbre/info (str "Source graph " source-graph " was empty. Deleted destination graph.")))))))
@@ -106,6 +102,9 @@
 
 (defn draft-api-routes [repo queue]
   (routes
+
+   ; makes a new managed/draft graph.
+   ; accepts extra meta- query string params, which are added to the state graph
    (POST "/draft/create" {{live-graph "live-graph"} :query-params}
 
          (api-routes/when-params [live-graph]
@@ -114,6 +113,8 @@
                                    (mgmt/create-draft-graph! repo live-graph))]
              (api-routes/api-response 201 {:guri draft-graph-uri}))))
 
+   ; adds data to the graph from either source-graph or file
+   ; accepts extra meta- query string params, which are added to queue metadata
    (POST "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                    query-params :query-params
                    {file :file} :params}
@@ -133,6 +134,8 @@
                                         {:job-desc (str "append to graph " graph " from file")
                                          :meta (api-routes/meta-params query-params)})))))
 
+   ; replaces data in the graph from either source-graph or file
+   ; accepts extra meta- query string params, which are added to queue metadata
    (PUT "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                   query-params :query-params
                   {file :file} :params}
@@ -150,6 +153,8 @@
                                      {:job-desc (str "replace contents of graph " graph " from file")
                                       :meta (api-routes/meta-params query-params)}))))
 
+   ; deletes data in the graph
+   ; accepts extra meta- query string params, which are added to queue metadata
    (DELETE "/graph" {{graph "graph"} :query-params
                      query-params :query-params}
            (api-routes/when-params [graph]
@@ -157,6 +162,8 @@
                                       {:job-desc (str "delete graph" graph)
                                        :meta (api-routes/meta-params query-params)})))
 
+   ; makes a graph live.
+   ; accepts extra meta- query string params, which are added to queue metadata
    (PUT "/live" {{graph "graph"} :query-params
                  query-params :query-params}
         (api-routes/when-params [graph]

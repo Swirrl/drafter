@@ -18,6 +18,12 @@
 (defn make-draft-graph-uri []
   (str staging-base "/" (java.util.UUID/randomUUID)))
 
+(defn is-graph-managed? [db graph-uri]
+  (query db
+   (str "ASK WHERE {
+        <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
+        "}")))
+
 (defn create-managed-graph
   "Returns some RDF statements to represent the ManagedGraphs state."
   ([graph-uri] (create-managed-graph graph-uri {}))
@@ -25,21 +31,19 @@
      (let [rdf-template [graph-uri
                          [rdf:a drafter:ManagedGraph]
                          [drafter:isPublic false]]]
-
+       ; add the options as extra properties
        (add-properties rdf-template meta-data))))
-
-(defn is-graph-managed? [db graph-uri]
-  (query db
-   (str "ASK WHERE {
-        <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
-        "
-         }")))
 
 (defn create-managed-graph!
   ([db graph-uri] (create-managed-graph! db graph-uri {}))
   ([db graph-uri opts]
-     (let [managed-graph-quads (to-quads (create-managed-graph graph-uri opts))]
-       (add db managed-graph-quads))))
+     ; We only do anything if it's not already a managed graph
+
+     ; FIXME: Is this a potential race condition? i.e. we check for existence (and it's false) and before executing someone else makes
+     ;   the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
+     (if (not (is-graph-managed? db graph-uri))
+       (let [managed-graph-quads (to-quads (create-managed-graph graph-uri opts))]
+       (add db managed-graph-quads)))))
 
 (defn create-draft-graph
   ([live-graph-uri draft-graph-uri time]
@@ -49,9 +53,11 @@
      [[live-graph-uri
        [drafter:hasDraft draft-graph-uri]]
 
-      [draft-graph-uri
-       [rdf:a drafter:DraftGraph]
-       [drafter:modifiedAt time]]]))
+      ; add the options as extra properties
+      (add-properties [draft-graph-uri
+                        [rdf:a drafter:DraftGraph]
+                        [drafter:modifiedAt time]]
+                      opts)]))
 
 (defn create-draft-graph!
   "Creates a new draft graph with a unique graph name, expects the
@@ -62,9 +68,11 @@
      (let [now (Date.)
            draft-graph-uri (make-draft-graph-uri)]
 
+       ; adds the triples returned by crate-draft-graph to the state graph
        (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now)
                     (apply to-quads)))
-       draft-graph-uri)))
+
+       draft-graph-uri))) ; returns the draft-graph-uri
 
 (defn append-data!
   [db draft-graph-uri triples]
@@ -116,8 +124,6 @@
   (set-isPublic! db graph-uri false) ; just make it not public
   (timbre/info (str "updated live state for" graph-uri))
 )
-
-
 
 (defn replace-data!
   [db draft-graph-uri triples]
