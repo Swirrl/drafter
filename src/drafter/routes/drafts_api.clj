@@ -28,21 +28,6 @@
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 
-<<<<<<< HEAD
-=======
-(defmacro when-params
-  "Simple macro that takes a set of paramaters and tests that they're
-  all truthy.  If any are falsey it returns an appropriate ring
-  response with an error message.  The error message assumes that the
-  symbol name is the same as the HTTP parameter name."
-  [params & form]
-  `(if (every? identity ~params)
-     ~@form
-     (api-routes/error-response 400 {:msg (str "You must supply the parameters " ~(->> params
-                                                                                       (interpose ", ")
-                                                                                       (apply str)))})))
-
->>>>>>> queue-api
 (defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
   containing the tripes from the specified file."
