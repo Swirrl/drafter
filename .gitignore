@@ -10,3 +10,4 @@ pom.xml.asc
 /MyDatabases/
 /drafter.log
 /drafter.log.*
+user_repl.clj

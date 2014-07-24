@@ -1,4 +1,4 @@
-(ns drafter.routes.api
+(ns drafter.routes.drafts-api
   (:require [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -10,34 +10,21 @@
             [taoensso.timbre :as timbre]
             [drafter.rdf.queue :as q]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
+            [drafter.common.api-routes :as api-routes]
             [grafter.rdf.sesame :as ses]
             [grafter.rdf.protocols :refer [add statements]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]))
-
-(def default-response-map {:type :ok})
-
-(def default-error-map {:type :error :msg "An unknown error occured"})
-
-(defn api-response
-  [code map]
-  {:status code
-   :headers {"Content-Type" "application/json"}
-   :body (merge default-response-map map)})
-
-(defn error-response
-  [code map]
-  (api-response code (merge default-error-map map)))
 
 (defn enqueue-job!
   "Enqueues a job function on the queue and returns a ring HTTP
   response."
 
-  [queue job-function]
+  [queue job-function opts]
   (let []
-    (if-let [queue-id (q/offer! queue job-function)]
-      (api-response 202 {:queue-id queue-id
-                         :msg "Your import request was accepted"})
-      (error-response 503 {:msg "The import queue is temporarily full.  Please try again later."}))))
+    (if-let [queue-id (q/offer! queue job-function opts)]
+      (api-routes/api-response 202 {:queue-id queue-id
+                                    :msg "Your import request was accepted"})
+      (api-routes/error-response 503 {:msg "The import queue is temporarily full.  Please try again later."}))))
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 
@@ -49,9 +36,9 @@
   [params & form]
   `(if (every? identity ~params)
      ~@form
-     (error-response 400 {:msg (str "You must supply the parameters " ~(->> params
-                                                                            (interpose ", ")
-                                                                            (apply str)))})))
+     (api-routes/error-response 400 {:msg (str "You must supply the parameters " ~(->> params
+                                                                                       (interpose ", ")
+                                                                                       (apply str)))})))
 
 (defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
@@ -96,6 +83,8 @@
       (timbre/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))))
 
 (defn replace-data-from-graph-job
+  "Return a function to replace the specified graph with a graph
+  containing the tripes from the specified source graph."
   [repo graph source-graph]
   (fn []
     (timbre/info (str "Replacing graph " graph " with contents of graph: " source-graph ))
@@ -127,7 +116,7 @@
     (ses/with-transaction repo
       (mgmt/migrate-live! repo graph))))
 
-(defn api-routes [repo queue]
+(defn draft-api-routes [repo queue]
   (routes
    (POST "/draft/create" {{live-graph "live-graph"} :query-params}
 
@@ -135,32 +124,38 @@
            (let [draft-graph-uri (ses/with-transaction repo
                                    (mgmt/create-managed-graph! repo live-graph)
                                    (mgmt/create-draft-graph! repo live-graph))]
-             (api-response 201 {:guri draft-graph-uri}))))
+             (api-routes/api-response 201 {:guri draft-graph-uri}))))
 
    (POST "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                    {file :file} :params}
          (if source-graph
            (when-params [graph source-graph] ; when source supplied: append from source-graph.
                         (enqueue-job! queue
-                                      (append-data-to-graph-from-graph-job repo graph source-graph)))
+                                      (append-data-to-graph-from-graph-job repo graph source-graph)
+                                      {:desc (str "append to graph: " graph " from source graph: " source-graph)}))
            (when-params [graph file] ; when source graph not supplied: append from the file.
                         (enqueue-job! queue
-                                      (append-data-to-graph-from-file-job repo graph file)))))
+                                      (append-data-to-graph-from-file-job repo graph file)
+                                      {:desc (str "append to graph " graph " from file")}))))
 
    (PUT "/draft" {{graph "graph" source-graph "source-graph"} :query-params
                   {file :file} :params}
         (if source-graph
           (when-params [graph source-graph] ; when source supplied: replace from source-graph.
                        (enqueue-job! queue
-                                     (replace-data-from-graph-job repo graph source-graph)))
+                                     (replace-data-from-graph-job repo graph source-graph)
+                                     {:desc (str "replace contents of graph " graph " from source graph: " source-graph)}))
           (when-params [graph file] ; when source graph not supplied: replace from the file.
                        (enqueue-job! queue
-                                     (replace-graph-from-file-job repo graph file)))))
+                                     (replace-graph-from-file-job repo graph file)
+                                     {:desc (str "replace contents of graph " graph " from file")}))))
 
    (DELETE "/graph" {{graph "graph"} :query-params}
            (when-params [graph]
-                        (enqueue-job! queue (delete-graph-job repo graph))))
+                        (enqueue-job! queue (delete-graph-job repo graph)
+                                      {:desc (str "delete graph" graph)})))
 
    (PUT "/live" {{graph "graph"} :query-params}
         (when-params [graph]
-                     (enqueue-job! queue (migrate-graph-live-job repo graph))))))
+                     (enqueue-job! queue (migrate-graph-live-job repo graph)
+                                   {:desc (str "migrate graph " graph " to live")})))))

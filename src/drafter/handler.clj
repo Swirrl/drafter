@@ -2,7 +2,8 @@
   (:require [compojure.core :refer [defroutes routes]]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes state-sparql-routes]]
-            [drafter.routes.api :refer [api-routes]]
+            [drafter.routes.drafts-api :refer [draft-api-routes]]
+            [drafter.routes.queue-api :refer [queue-api-routes]]
             [drafter.middleware :as middleware]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
@@ -40,7 +41,8 @@
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         [pages-routes
-                         (api-routes repo queue)
+                         (draft-api-routes repo queue)
+                         (queue-api-routes queue)
                          (live-sparql-routes repo)
                          (draft-sparql-routes repo)
                          (state-sparql-routes repo)
