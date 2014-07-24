@@ -70,10 +70,54 @@
   [db draft-graph-uri triples]
   (add db draft-graph-uri triples))
 
+(defn set-isPublic! [db live-graph-uri boolean-value]
+  (let [query-str (str "DELETE {"
+                  "GRAPH <" drafter-state-graph "> {"
+                  "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " ."
+                  "}"
+                "} INSERT {"
+                  "GRAPH <" drafter-state-graph "> {"
+                    "<" live-graph-uri "> <" drafter:isPublic  "> " boolean-value " ."
+                    "}"
+                  "} WHERE {"
+                    "GRAPH <" drafter-state-graph "> {"
+                      "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " ."
+                    "}"
+                  "}")]
+
+    (update! db
+             query-str)))
+
 (defn delete-graph! [db graph-uri]
-  (timbre/info (str "Deleting graph " graph-uri))
+  (timbre/info (str "Deleting graph... " graph-uri))
   (update! db (str "DROP GRAPH <" graph-uri ">"))
-  (timbre/info (str "Deleted graph " graph-uri)))
+  (timbre/info (str "Deleted graph " graph-uri))
+
+  (timbre/info (str "Deleting draft graph from state ... " graph-uri))
+  ; if the graph-uri is a draft graph uri,
+  ;   remove the mention of this draft uri, but leave the live graph as a managed graph.
+  (let [query-str (str "DELETE {"
+                  "GRAPH <" drafter-state-graph "> {"
+                     "?live <" drafter:hasDraft "> <" graph-uri "> . "
+                     "<" graph-uri "> ?p ?o . "
+                  "}"
+                "} WHERE {"
+                    "GRAPH <" drafter-state-graph "> {"
+                       "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
+                             "<" drafter:hasDraft "> <" graph-uri "> . "
+                       "<" graph-uri "> ?p ?o . "
+                    "}"
+                  "}")]
+    (update! db
+             query-str))
+  (timbre/info (str "Deleted draft graph from state " graph-uri))
+
+  (timbre/info (str "updating live state for " graph-uri))
+  (set-isPublic! db graph-uri false) ; just make it not public
+  (timbre/info (str "updated live state for" graph-uri))
+)
+
+
 
 (defn replace-data!
   [db draft-graph-uri triples]
@@ -84,8 +128,8 @@
   "Given a draft graph URI, lookup and return its live graph."
   (let [live (-> (query db
                         (str "SELECT ?live WHERE {"
-                               "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
-                                     "<" drafter:hasDraft "> <" draft-graph-uri "> ."
+                               "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
+                                     "<" drafter:hasDraft "> <" draft-graph-uri "> . "
                              "} LIMIT 1"))
                  first
                  (get "live")
@@ -113,23 +157,7 @@
        (map #(str (% "live")))
        (into #{})))
 
-(defn set-isPublic! [db live-graph-uri boolean-value]
-  (let [query-str (str "DELETE {"
-                  "GRAPH <" drafter-state-graph "> {"
-                  "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " ."
-                  "}"
-                "} INSERT {"
-                  "GRAPH <" drafter-state-graph "> {"
-                    "<" live-graph-uri "> <" drafter:isPublic  "> " boolean-value " ."
-                    "}"
-                  "} WHERE {"
-                    "GRAPH <" drafter-state-graph "> {"
-                      "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " ."
-                    "}"
-                  "}")]
 
-    (update! db
-             query-str)))
 
 (defn migrate-live!
   "Moves the triples from the draft graph to the draft graphs live destination."
