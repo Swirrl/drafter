@@ -11,3 +11,4 @@ pom.xml.asc
 /drafter.log
 /drafter.log.*
 user_repl.clj
+.DS_Store
