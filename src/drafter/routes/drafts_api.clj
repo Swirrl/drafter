@@ -28,18 +28,6 @@
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 
-(defmacro when-params
-  "Simple macro that takes a set of paramaters and tests that they're
-  all truthy.  If any are falsey it returns an appropriate ring
-  response with an error message.  The error message assumes that the
-  symbol name is the same as the HTTP parameter name."
-  [params & form]
-  `(if (every? identity ~params)
-     ~@form
-     (api-routes/error-response 400 {:msg (str "You must supply the parameters " ~(->> params
-                                                                            (interpose ", ")
-                                                                            (apply str)))})))
-
 (defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
   containing the tripes from the specified file."
@@ -120,42 +108,58 @@
   (routes
    (POST "/draft/create" {{live-graph "live-graph"} :query-params}
 
-         (when-params [live-graph]
+         (api-routes/when-params [live-graph]
            (let [draft-graph-uri (ses/with-transaction repo
                                    (mgmt/create-managed-graph! repo live-graph)
                                    (mgmt/create-draft-graph! repo live-graph))]
              (api-routes/api-response 201 {:guri draft-graph-uri}))))
 
    (POST "/draft" {{graph "graph" source-graph "source-graph"} :query-params
+                   query-params :query-params
                    {file :file} :params}
-         (if source-graph
-           (when-params [graph source-graph] ; when source supplied: append from source-graph.
-                        (enqueue-job! queue
-                                      (append-data-to-graph-from-graph-job repo graph source-graph)
-                                      {:desc (str "append to graph: " graph " from source graph: " source-graph)}))
-           (when-params [graph file] ; when source graph not supplied: append from the file.
-                        (enqueue-job! queue
-                                      (append-data-to-graph-from-file-job repo graph file)
-                                      {:desc (str "append to graph " graph " from file")}))))
+
+         (let [job-opts (dissoc query-params "graph" "source-graph")]
+
+           (if source-graph
+             (api-routes/when-params [graph source-graph] ; when source supplied: append from source-graph.
+                          (enqueue-job! queue
+                                        (append-data-to-graph-from-graph-job repo graph source-graph)
+                                        {:job-desc (str "append to graph: " graph " from source graph: " source-graph)
+                                         :meta (api-routes/meta-params query-params)}))
+
+             (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
+                          (enqueue-job! queue
+                                        (append-data-to-graph-from-file-job repo graph file)
+                                        {:job-desc (str "append to graph " graph " from file")
+                                         :meta (api-routes/meta-params query-params)})))))
 
    (PUT "/draft" {{graph "graph" source-graph "source-graph"} :query-params
+                  query-params :query-params
                   {file :file} :params}
+
         (if source-graph
-          (when-params [graph source-graph] ; when source supplied: replace from source-graph.
+          (api-routes/when-params [graph source-graph] ; when source supplied: replace from source-graph.
                        (enqueue-job! queue
                                      (replace-data-from-graph-job repo graph source-graph)
-                                     {:desc (str "replace contents of graph " graph " from source graph: " source-graph)}))
-          (when-params [graph file] ; when source graph not supplied: replace from the file.
+                                     {:job-desc (str "replace contents of graph " graph " from source graph: " source-graph)
+                                      :meta (api-routes/meta-params query-params)}))
+
+          (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
                        (enqueue-job! queue
                                      (replace-graph-from-file-job repo graph file)
-                                     {:desc (str "replace contents of graph " graph " from file")}))))
+                                     {:job-desc (str "replace contents of graph " graph " from file")
+                                      :meta (api-routes/meta-params query-params)}))))
 
-   (DELETE "/graph" {{graph "graph"} :query-params}
-           (when-params [graph]
+   (DELETE "/graph" {{graph "graph"} :query-params
+                     query-params :query-params}
+           (api-routes/when-params [graph]
                         (enqueue-job! queue (delete-graph-job repo graph)
-                                      {:desc (str "delete graph" graph)})))
+                                      {:job-desc (str "delete graph" graph)
+                                       :meta (api-routes/meta-params query-params)})))
 
-   (PUT "/live" {{graph "graph"} :query-params}
-        (when-params [graph]
+   (PUT "/live" {{graph "graph"} :query-params
+                 query-params :query-params}
+        (api-routes/when-params [graph]
                      (enqueue-job! queue (migrate-graph-live-job repo graph)
-                                   {:desc (str "migrate graph " graph " to live")})))))
+                                   {:job-desc (str "migrate graph " graph " to live")
+                                    :meta (api-routes/meta-params query-params)})))))

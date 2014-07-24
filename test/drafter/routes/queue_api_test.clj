@@ -15,8 +15,8 @@
         queue (q/make-queue q-size)]
 
   (testing "GET /queue/peek"
-    (do (q/offer! queue identity {:desc "identity"})
-        (q/offer! queue (fn foo[]) {:desc "anon"})) ; enqueue something
+    (do (q/offer! queue identity {:job-desc "identity" :meta {"http://foo" "bar"} })
+        (q/offer! queue (fn foo[]) {:job-desc "anon"})) ; enqueue something
 
     (let [
           {:keys [status body headers]} ((queue-api-routes queue)
@@ -26,5 +26,6 @@
 
         (is (= 200 status))
         (is (= 2 (count (:queue body))))
-        (is (= "identity" (:desc (first (:queue body)))))
-        (is (= "anon" (:desc (last (:queue body)))))))))
+        (is (= "identity" (:job-desc (first (:queue body)))))
+        (is (= "identity" (:job-desc (first (:queue body)))))
+        (is (= "anon" (:job-desc (last (:queue body)))))))))
