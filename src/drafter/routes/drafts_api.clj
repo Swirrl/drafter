@@ -23,8 +23,8 @@
   (let []
     (if-let [queue-id (q/offer! queue job-function opts)]
       (api-routes/api-response 202 {:queue-id queue-id
-                                    :msg "Your import request was accepted"})
-      (api-routes/error-response 503 {:msg "The import queue is temporarily full.  Please try again later."}))))
+                                    :msg "Your request was accepted"})
+      (api-routes/error-response 503 {:msg "The queue is temporarily full.  Please try again later."}))))
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 
