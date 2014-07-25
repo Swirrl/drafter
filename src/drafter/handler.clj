@@ -58,14 +58,14 @@
                         :formats [:json-kw :edn])))
 
 (defn attach-worker!
-  "Attach the import-file! worker to process the jobs queue for
+  "Attach the process-queue worker to process the jobs queue for
   requests to append/replace graphs with RDF files."
   [queue]
   (set-var-root! #'worker
                  (q/process-queue queue
                                   (fn [ex]
                                     (taoensso.timbre/error
-                                     (str "Import Worker Error.  Repo id is: " (System/identityHashCode repo)) ex))))
+                                     (str "Queue Worker Error.  Repo id is: " (System/identityHashCode repo)) ex))))
 
   (timbre/info "Attached import worker to job queue"))
 
