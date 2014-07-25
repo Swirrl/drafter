@@ -34,4 +34,4 @@
                                  v))
           {}
           (select-keys query-params
-                       (filter (fn[p] (.startsWith p "meta-x")) (keys query-params)))))
+                       (filter (fn[p] (.startsWith p "meta-")) (keys query-params)))))
