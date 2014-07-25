@@ -120,9 +120,9 @@
              query-str))
   (timbre/info (str "Deleted draft graph from state " graph-uri))
 
-  (timbre/info (str "updating live state for " graph-uri))
-  (set-isPublic! db graph-uri false) ; just make it not public
-  (timbre/info (str "updated live state for" graph-uri))
+  ;(timbre/info (str "updating live state for " graph-uri))
+  ;(set-isPublic! db graph-uri false) ; just make it not public. Is this the right thing?
+  ;(timbre/info (str "updated live state for" graph-uri))
 )
 
 (defn replace-data!
