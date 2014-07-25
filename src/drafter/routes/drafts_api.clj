@@ -119,7 +119,6 @@
                    query-params :query-params
                    {file :file} :params}
 
-         (let [job-opts (dissoc query-params "graph" "source-graph")]
 
            (if source-graph
              (api-routes/when-params [graph source-graph] ; when source supplied: append from source-graph.
@@ -132,7 +131,7 @@
                           (enqueue-job! queue
                                         (append-data-to-graph-from-file-job repo graph file)
                                         {:job-desc (str "append to graph " graph " from file")
-                                         :meta (api-routes/meta-params query-params)})))))
+                                         :meta (api-routes/meta-params query-params)}))))
 
    ; replaces data in the graph from either source-graph or file
    ; accepts extra meta- query string params, which are added to queue metadata
