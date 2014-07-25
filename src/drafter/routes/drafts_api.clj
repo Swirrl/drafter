@@ -34,10 +34,8 @@
   (fn []
     (let [format (ses/filename->rdf-format filename)]
       (timbre/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
-
       (ses/with-transaction repo
         (mgmt/replace-data! repo graph (statements tempfile :format format)))
-
       (timbre/info (str "Replaced graph " graph " with file " tempfile "[" filename "]")))))
 
 (defn append-data-to-graph-from-file-job
@@ -78,22 +76,14 @@
     (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
           source-data (ses/query repo query-str)]
-      (if source-data
-        (do
-          ;; there's some data in the source graph
           (ses/with-transaction repo
             (mgmt/replace-data! repo graph source-data))
-          (timbre/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))
-        (do
-          ;; no data in source graph: acts like a delete (is this the right thing to do?)
-          (ses/with-transaction repo
-            (mgmt/delete-graph! repo graph))
-          (timbre/info (str "Source graph " source-graph " was empty. Deleted destination graph.")))))))
+          (timbre/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))))
 
 (defn delete-graph-job [repo graph]
   (fn []
     (ses/with-transaction repo
-      (mgmt/delete-graph! repo graph))))
+      (mgmt/delete-graph-and-draft-state! repo graph))))
 
 (defn migrate-graph-live-job [repo graph]
   (fn []
@@ -153,7 +143,7 @@
                                      {:job-desc (str "replace contents of graph " graph " from file")
                                       :meta (api-routes/meta-params query-params)}))))
 
-   ; deletes data in the graph
+   ; deletes data in the graph. This could be a live or a draft graph.
    ; accepts extra meta- query string params, which are added to queue metadata
    (DELETE "/graph" {{graph "graph"} :query-params
                      query-params :query-params}

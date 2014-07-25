@@ -97,10 +97,15 @@
     (update! db
              query-str)))
 
-(defn delete-graph! [db graph-uri]
+(defn delete-graph-contents! [db graph-uri]
   (timbre/info (str "Deleting graph... " graph-uri))
   (update! db (str "DROP GRAPH <" graph-uri ">"))
   (timbre/info (str "Deleted graph " graph-uri))
+  )
+
+; deletes graph data and the state
+(defn delete-graph-and-draft-state! [db graph-uri]
+  (delete-graph-contents! db graph-uri)
 
   (timbre/info (str "Deleting draft graph from state ... " graph-uri))
   ; if the graph-uri is a draft graph uri,
@@ -120,16 +125,13 @@
     (update! db
              query-str))
   (timbre/info (str "Deleted draft graph from state " graph-uri))
-
-  ;(timbre/info (str "updating live state for " graph-uri))
-  ;(set-isPublic! db graph-uri false) ; just make it not public. Is this the right thing?
-  ;(timbre/info (str "updated live state for" graph-uri))
 )
 
 (defn replace-data!
   [db draft-graph-uri triples]
-  (delete-graph! db draft-graph-uri)
-  (add db draft-graph-uri triples))
+  (delete-graph-contents! db draft-graph-uri)
+  (if triples (add db draft-graph-uri triples)) ; add if there's any data
+  )
 
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
@@ -173,12 +175,17 @@
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (do
       (timbre/info (str "Migrating graph: " draft-graph-uri " to live graph: " live-graph-uri))
-      (delete-graph! db live-graph-uri)
-      (add db live-graph-uri
-           (query db
+      (delete-graph-contents! db live-graph-uri)
+
+      (let [contents (query db
                   (str "CONSTRUCT { ?s ?p ?o } WHERE
-                         { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
-      (delete-graph! db draft-graph-uri)
+                         { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
+
+          (println ">>>>>")
+          (println contents)
+          (if contents (add db live-graph-uri contents)))
+
+      (delete-graph-and-draft-state! db draft-graph-uri)
       (set-isPublic! db live-graph-uri true)
       (timbre/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
 
