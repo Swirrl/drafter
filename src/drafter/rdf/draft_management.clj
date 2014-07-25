@@ -50,14 +50,16 @@
      (create-draft-graph live-graph-uri draft-graph-uri time {}))
   ([live-graph-uri draft-graph-uri time opts]
 
-     [[live-graph-uri
-       [drafter:hasDraft draft-graph-uri]]
-
-      ; add the options as extra properties
-      (add-properties [draft-graph-uri
-                        [rdf:a drafter:DraftGraph]
-                        [drafter:modifiedAt time]]
-                      opts)]))
+     (let [
+             live-graph-triples [live-graph-uri
+                               [drafter:hasDraft draft-graph-uri]]
+             draft-graph-triples  [draft-graph-uri
+                                    [rdf:a drafter:DraftGraph]
+                                    [drafter:modifiedAt time]]
+             triples [live-graph-triples (add-properties draft-graph-triples
+                                                         ; we need to make the values of the opts into strings by calling `s`.
+                                                         (into {} (for [[k v] opts] [k ((fn[v] (s v) ) v)])))]]
+         triples))) ; returns the triples
 
 (defn create-draft-graph!
   "Creates a new draft graph with a unique graph name, expects the
@@ -67,9 +69,8 @@
   ([db live-graph-uri opts]
      (let [now (Date.)
            draft-graph-uri (make-draft-graph-uri)]
-
        ; adds the triples returned by crate-draft-graph to the state graph
-       (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now)
+       (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now opts)
                     (apply to-quads)))
 
        draft-graph-uri))) ; returns the draft-graph-uri
