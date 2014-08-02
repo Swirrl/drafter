@@ -1,0 +1,82 @@
+(ns drafter.rdf.sparql-rewriting-test
+  (:require
+   [drafter.test-common :refer [test-triples]]
+   [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph! append-data!]]
+   [grafter.rdf :refer [graph triplify]]
+   [grafter.rdf.protocols :refer [statements]]
+
+   [grafter.rdf.sesame :as ses]
+   [clojure.test :refer :all]
+   [drafter.rdf.sparql-rewriting :refer :all])
+  (:import
+           [org.openrdf.model.impl URIImpl]
+           [org.openrdf.query QueryLanguage]
+           [org.openrdf.query.parser QueryParserUtil]
+           [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
+           [org.openrdf.query.algebra.evaluation.function Function]
+           [org.openrdf.query.algebra Var StatementPattern Extension ExtensionElem FunctionCall]
+           [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
+
+(deftest rewrite-graphs-test
+  (let [graph-map {"http://live-graph.com/graph1" "http://draft-graph.com/graph1"}]
+    (testing "graph clauses are substituted"
+      (let [query "SELECT * WHERE {
+                   GRAPH ?g {
+                      ?s ?p ?o .
+                   }
+
+                   GRAPH <http://live-graph.com/graph1> {
+                      ?s ?p2 ?o2 .
+                   }
+                }"]
+
+        (is (= "http://draft-graph.com/graph1" (second (re-find #"<(.+)>"
+                                                                (rewrite-graphs query
+                                                                                graph-map)))))))
+
+
+    ))
+
+(def uri-query
+  "SELECT * WHERE {
+     BIND(URI(\"http://frogs.com/live-graph\") AS ?g)
+     GRAPH ?g {
+       ?s ?p ?o
+     }
+   } LIMIT 10")
+
+(def graph-constant-query
+  "SELECT * WHERE {
+     GRAPH <http://frogs.com/live-graph> {
+       ?s ?p ?o
+     }
+   } LIMIT 10")
+
+(defn first-result [results key]
+  (-> results first (get key) str))
+
+(deftest query-and-result-rewriting-test
+  (let [db (ses/repo)
+        draft-graph (create-draft-graph! db "http://frogs.com/live-graph")
+        graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
+
+    (append-data! db draft-graph (test-triples "http://kermit.org/the-frog"))
+
+    (testing "rewrites query to query draft graph"
+      (is (= "http://kermit.org/the-frog"
+             (-> db
+                 (evaluate-with-graph-rewriting graph-constant-query graph-map)
+                 (first-result "s"))))
+
+    (testing "rewrites SPARQL URI/IRI functions to query with substitution"
+      (register-function function-registry (pmdfunctions "replace-live-graph-uri") graph-map)
+      (is (= "http://kermit.org/the-frog"
+             (-> db
+                 (evaluate-with-graph-rewriting uri-query graph-map)
+                 (first-result "s"))))
+
+      (testing "rewrites results when graph is in selection"
+        (is (= "http://frogs.com/live-graph"
+               (-> db
+                   (evaluate-with-graph-rewriting uri-query graph-map)
+                   (first-result "g")))))))))

@@ -1,0 +1,195 @@
+(ns drafter.rdf.sparql-rewriting
+  (:require
+   [grafter.rdf.sesame :as ses]
+   [grafter.rdf :refer [prefixer]]
+            [taoensso.timbre :as timbre])
+  (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
+           [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
+            BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
+            StatementImpl BNodeImpl ContextStatementImpl]
+           [org.openrdf.query QueryLanguage]
+           [org.openrdf.query.parser QueryParserUtil]
+           [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
+           [org.openrdf.query.algebra.evaluation.function Function]
+           [org.openrdf.query.algebra Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr]
+           [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
+
+(def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
+
+(defn ->sparql-ast
+  "Converts a SPARQL query string into a mutable Sesame SPARQL AST."
+
+  ([query-string]
+     (->sparql-ast query-string nil))
+  ([query-string base-uri]
+     (QueryParserUtil/parseQuery QueryLanguage/SPARQL query-string base-uri)))
+
+(defn vars-in-graph-position
+  "Given a parsed query, context-set returns the set of Vars which are
+  bound in Graph position."
+  [query]
+  (let [expr (.getTupleExpr query)]
+    (reduce (fn [acc val] (conj acc (.getContextVar val)))
+            #{} (StatementPatternCollector/process expr))))
+
+(defn rewrite-graph-constants [query-ast graph-map context-set]
+  (doseq [context context-set]
+    (when (.isConstant context)
+      (let [new-uri (graph-map (.getValue context))]
+        (.setValue context new-uri))))
+  query-ast)
+
+(def function-registry (org.openrdf.query.algebra.evaluation.function.FunctionRegistry/getInstance))
+
+(defn register-function
+  "Register an arbitrary custom function with the global SPARQL engine registry."
+  [function-registry uri f]
+  (io!
+   (let [sesame-f (drafter.rdf.SesameFunction. uri f)]
+     (doto function-registry
+       (.add sesame-f)))))
+
+(defn replace-values [uri-map]
+  "Return a function that replaces arbitrary values supplied values.
+  If a value is not replaced the original value is returned."
+  (fn [arg]
+    (get uri-map arg arg)))
+
+(defn ->sparql-string
+  "Converts a SPARQL AST back into a query string."
+  [query-ast]
+  (.render (SPARQLQueryRenderer.)
+           query-ast))
+
+(defn flatten-query-ast
+  "Flattens the SPARQL AST into a clojure sequence for filtering etc."
+  [query-ast]
+  (->> query-ast
+       .getTupleExpr
+       drafter.rdf.ClojureCollector/process
+       ;; use distinct to preserve order of nodes instead of (into #{} ...)
+       distinct))
+
+(defn compose-graph-replacer [sparql-function-uri query-ast]
+  ;; todo do this for each node.
+  (let [qnodes (filter (partial instance? IRIFunction)
+                       (flatten-query-ast query-ast))]
+    (doseq [qnode qnodes]
+      (let [parent (.getParentNode qnode)
+            replacement-node (FunctionCall. sparql-function-uri (into-array ValueExpr  [(.clone qnode)]))]
+        (.replaceWith qnode
+                      replacement-node)))
+    query-ast))
+
+(defn substitute-results [substitution-map graph-var-names result]
+  (reduce (fn [acc-res var-name]
+            (let [original (get result var-name)]
+              (assoc acc-res var-name
+                     (get substitution-map original))))
+          result
+          graph-var-names))
+
+(defn evaluate-with-graph-rewriting
+
+  ([repo query-str query-substitutions]
+     (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
+  ([repo query-str query-substitutions dataset]
+     (let [prepared-query (ses/prepare-query repo query-str dataset)
+           binding-set (.getBindings prepared-query)
+           query-ast (-> prepared-query .getParsedQuery)
+           vars-in-graph-position (vars-in-graph-position query-ast)]
+       (do
+         ;; NOTE the AST is mutable and referenced from the prepared-query
+         (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
+         (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
+
+         (if (seq vars-in-graph-position)
+           (let [;; filter out constant values in graph position, leaving just "variables"
+                 unbound-var-names (filter (complement #(.isConstant %)) vars-in-graph-position)
+                 graph-var-names (map #(.getName %)
+                                      unbound-var-names)
+                 result-substitutions (clojure.set/map-invert query-substitutions)]
+
+             (->> (ses/evaluate prepared-query)
+                  (map (partial substitute-results result-substitutions graph-var-names))))
+           (ses/evaluate prepared-query))))))
+
+
+(comment
+
+
+
+
+  (evaluate-with-graph-rewriting drafter.handler/repo
+                           "SELECT * WHERE {
+                               BIND(URI(\"http://opendatacommunities.org/my-graph\") AS ?g)
+                               GRAPH ?g {
+                                 ?s ?p ?o
+                              }
+                            } LIMIT 10"
+                           {(URIImpl. "http://opendatacommunities.org/my-graph") (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1")} nil)
+
+
+
+  (->sparql-ast "SELECT ?g WHERE {
+                   BIND(uri(concat(\"http://live-graph.com/\",\"/graph1\")) AS ?g) .
+                   GRAPH ?g {
+                     ?s ?p ?o .
+                   }
+                 }")
+
+  (ses/query drafter.handler/repo "SELECT * WHERE { GRAPH <http://opendatacommunities.org/my-graph> { ?s ?p ?o }} LIMIT 1")
+
+  (register-function function-registry "http://publishmydata.com/def/functions#replace-live-graph-uri" (fn [x] (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1")))
+  (ses/query drafter.handler/repo "PREFIX drafter: <http://publishmydata.com/def/functions#> SELECT ?result WHERE { BIND( drafter:foo(10) AS ?result )}")
+
+  (rewrite-graph-constants (->sparql-ast "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } GRAPH <http://live-graph.com/graph1> { ?s ?p2 ?o2 }}")
+                  {"http://live-graph.com/graph1" "http://draft-graph.com/graph1"})
+
+  ;; =>
+  ;; select ?g ?s ?p ?o ?p2 ?o2
+  ;; where
+  ;; {
+  ;;  GRAPH ?g {
+  ;;   ?s ?p ?o.
+  ;; } GRAPH <http://draft-graph.com/graph1> {
+  ;;   ?s ?p2 ?o2.
+  ;; }
+  ;;}
+
+  (context-set (->sparql-ast "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } GRAPH <http://live-graph.com/graph1> { ?s ?p2 ?o2 }}"))
+  ;; => #{"g" "http://live-graph.com/graph1"}
+
+
+  )
+
+(comment
+  (take 10 (ses/query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }" :default-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"] :union-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"]))
+
+  )
+
+(comment
+
+  (ses/query drafter.handler/repo "SELECT ?g WHERE {
+BIND(uri(concat(\"http://opendatacommunities.org\",\"/my-graph\")) AS ?pmd-test) .
+BIND(uri(concat(\"http://opendatacommunities.org\",\"/my-graph\")) AS ?g) . GRAPH ?g { ?s ?p ?o .}}")
+
+  )
+
+(comment
+
+  (take 10 (ses/evaluate (ses/prepare-query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }")))
+
+
+
+  ;; Parsing a Query
+  (parse-query "SELECT * WHERE { ?s ?p ?o }")
+
+  ;; gets all bound variables
+  (-> (parse-query "SELECT * WHERE { ?s ?p ?o OPTIONAL { ?g ?z ?a }  }") .getTupleExpr .getBindingNames) ;; #{?s ?p ?o ?g ?z ?a}
+
+  (-> (parse-query "SELECT * WHERE { ?s ?p ?o OPTIONAL { ?g ?z ?a }  }") .getTupleExpr .getAssuredBindingNames) ;; #{?s ?p ?o}
+
+
+
+  )

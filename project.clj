@@ -11,18 +11,23 @@
                  [lib-noir "0.8.4"]
                  [ring-server "0.3.1"]
                  [selmer "0.6.6"]
+                 [org.openrdf.sesame/sesame-queryrender "2.7.11"]
                  [com.taoensso/timbre "3.2.1"]
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
                  [grafter "0.2.0-SNAPSHOT"]
+                 [org.slf4j/slf4j-log4j12 "1.7.7"]
                  [environ "0.5.0"]]
+
+  :java-source-paths ["src-java"]
 
   :repl-options {:init-ns drafter.repl
                  :init (start-server)
                  :port 5678}
 
   :plugins [[lein-ring "0.8.10"]
-            [lein-environ "0.5.0"]]
+            [lein-environ "0.5.0"]
+            [lein-test-out "0.3.1"]]
 
   :ring {:handler drafter.handler/app
          :init    drafter.handler/init
