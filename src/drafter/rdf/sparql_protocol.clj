@@ -30,6 +30,7 @@
            [org.openrdf.query.resultio.binary BinaryQueryResultWriter]
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
+           [org.openrdf.query Dataset]
            [org.openrdf.query.impl DatasetImpl]
            [javax.xml.datatype XMLGregorianCalendar DatatypeFactory]
            [java.util GregorianCalendar Date]
@@ -162,3 +163,19 @@
            (process-sparql-query repo request restriction-fn))
       (POST mount-path request
             (process-sparql-query repo request restriction-fn)))))
+
+
+(comment
+
+  (take 10 (ses/query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }" :default-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"] :union-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"]))
+
+
+
+  (take 10 (ses/evaluate (ses/prepare-query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }")))
+
+  ;; Parsing a Query
+  (org.openrdf.query.parser.QueryParserUtil/parseQuery QueryLanguage/SPARQL "SELECT * WHERE { ?s ?p ?o }" nil)
+
+  (.getBindingNames (.getTupleExpr (org.openrdf.query.parser.QueryParserUtil/parseQuery QueryLanguage/SPARQL "SELECT * WHERE { ?s ?p ?o OPTIONAL { ?g ?z ?a }  }" nil)))
+
+  )
