@@ -18,11 +18,23 @@
 (defn make-draft-graph-uri []
   (str staging-base "/" (java.util.UUID/randomUUID)))
 
+(defn with-state-graph
+  "Wraps the string in a SPARQL
+   GRAPH <http://publishmydata.com/graphs/drafter/draft> {
+     <<sparql-fragment>>
+   } clause."
+
+  [& sparql-string]
+  (apply str " GRAPH <" drafter-state-graph "> { "
+         (concat sparql-string
+                 " }")))
+
 (defn is-graph-managed? [db graph-uri]
   (query db
-   (str "ASK WHERE {
-        <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
-        "}")))
+         (str "ASK WHERE {"
+              (with-state-graph
+               "<" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
+        "}"))))
 
 (defn create-managed-graph
   "Returns some RDF statements to represent the ManagedGraphs state."
@@ -81,18 +93,15 @@
 
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (let [query-str (str "DELETE {"
-                  "GRAPH <" drafter-state-graph "> {"
-                  "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " ."
-                  "}"
-                "} INSERT {"
-                  "GRAPH <" drafter-state-graph "> {"
-                    "<" live-graph-uri "> <" drafter:isPublic  "> " boolean-value " ."
-                    "}"
-                  "} WHERE {"
-                    "GRAPH <" drafter-state-graph "> {"
-                      "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " ."
-                    "}"
-                  "}")]
+                       (with-state-graph
+                        "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " .")
+                       "} INSERT {"
+                       (with-state-graph
+                        "<" live-graph-uri "> <" drafter:isPublic  "> " boolean-value " .")
+                       "} WHERE {"
+                       (with-state-graph
+                        "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " .")
+                       "}")]
 
     (update! db
              query-str)))
@@ -110,17 +119,15 @@
   ; if the graph-uri is a draft graph uri,
   ;   remove the mention of this draft uri, but leave the live graph as a managed graph.
   (let [query-str (str "DELETE {"
-                  "GRAPH <" drafter-state-graph "> {"
-                     "?live <" drafter:hasDraft "> <" graph-uri "> . "
-                     "<" graph-uri "> ?p ?o . "
-                  "}"
-                "} WHERE {"
-                    "GRAPH <" drafter-state-graph "> {"
-                       "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                             "<" drafter:hasDraft "> <" graph-uri "> . "
-                       "<" graph-uri "> ?p ?o . "
-                    "}"
-                  "}")]
+                       (with-state-graph
+                         "?live <" drafter:hasDraft "> <" graph-uri "> . "
+                               "<" graph-uri "> ?p ?o . ")
+                       "} WHERE {"
+                       (with-state-graph
+                         "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
+                               "<" drafter:hasDraft "> <" graph-uri "> . "
+                               "<" graph-uri "> ?p ?o . ")
+                       "}")]
     (update! db
              query-str))
   (timbre/info (str "Deleted draft graph from state " graph-uri)))
@@ -134,24 +141,43 @@
 
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
-  (let [live (-> (query db
-                        (str "SELECT ?live WHERE {"
-                               "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                                     "<" drafter:hasDraft "> <" draft-graph-uri "> . "
-                             "} LIMIT 1"))
-                 first
-                 (get "live")
-                 str)]
-    live))
+  (-> (query db
+             (str "SELECT ?live WHERE {"
+                  (with-state-graph
+                    "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
+                    "<" drafter:hasDraft "> <" draft-graph-uri "> . ")
+                  "} LIMIT 1"))
+      first
+      (get "live")
+      str))
 
 (defn draft-graphs [db]
   "Get all draft graphs"
   (->> (query db
               (str "SELECT ?draft WHERE {"
-                     "?live <" drafter:hasDraft "> ?draft ."
+                   (with-state-graph
+                     "?live <" drafter:hasDraft "> ?draft .")
                      "}"))
        (map #(str (% "draft")))
        (into #{})))
+
+(defn graph-map
+  "Takes a database and a set of drafts and returns a hashmap of live
+  graphs associated with their drafts.
+
+  If a draft URI is not in the database then this function will skip
+  over it, i.e. it won't error if a URI is not found."
+  [db draft-set]
+  (let [drafts (apply str (map #(str "<" % "> ") draft-set))
+        results (->> (query db
+                            (str "SELECT ?live ?draft WHERE {"
+                                 (with-state-graph
+                                   "  VALUES ?draft {" drafts "}"
+                                   "  ?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                                   "        <" drafter:hasDraft "> ?draft .")
+                                 "}")))]
+    (zipmap (map #(get % "live") results)
+            (map #(get % "draft") results))))
 
 (defn live-graphs [db & {:keys [online] :or {online true}}]
   "Get all live graph names.  Takes an optional boolean keyword
@@ -159,8 +185,9 @@
   graphs."
   (->> (query db
               (str "SELECT ?live WHERE {"
-                   "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
-                         "<" drafter:isPublic  "> " online " ."
+                   (with-state-graph
+                     "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                     "<" drafter:isPublic  "> " online " .")
                    "}"))
        (map #(str (% "live")))
        (into #{})))
@@ -178,9 +205,8 @@
                   (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
 
-          (println ">>>>>")
-          (println contents)
-          (if contents (add db live-graph-uri contents)))
+        (when contents
+          (add db live-graph-uri contents)))
 
       (delete-graph-and-draft-state! db draft-graph-uri)
       (set-isPublic! db live-graph-uri true)
@@ -197,12 +223,6 @@
   (let [draft-graph (create-draft-graph! db graph)]
     (add db draft-graph triples)
     draft-graph))
-
-(comment (let [staging-graph (->staging-graph graph)]
-           (with-transaction db
-             (add db (managed-graph graph))
-             (add db triples))))
-
 
 (defn rename-graph [db old-graph new-graph]
   ;; lookup old-graph
