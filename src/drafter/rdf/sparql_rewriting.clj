@@ -32,12 +32,17 @@
     (reduce (fn [acc val] (conj acc (.getContextVar val)))
             #{} (StatementPatternCollector/process expr))))
 
-(defn rewrite-graph-constants [query-ast graph-map context-set]
-  (doseq [context context-set]
-    (when (.isConstant context)
-      (let [new-uri (graph-map (.getValue context))]
-        (.setValue context new-uri))))
-  query-ast)
+(defn rewrite-graph-constants
+  ([query-ast graph-map]
+     (rewrite-graph-constants query-ast graph-map (filter #(.isConstant %)
+                                                          (vars-in-graph-position query-ast))))
+
+  ([query-ast graph-map context-set]
+     (doseq [context context-set]
+       (when (.isConstant context)
+         (let [new-uri (graph-map (.getValue context))]
+           (.setValue context new-uri))))
+     query-ast))
 
 (def function-registry (org.openrdf.query.algebra.evaluation.function.FunctionRegistry/getInstance))
 

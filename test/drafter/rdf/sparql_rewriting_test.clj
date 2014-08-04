@@ -18,7 +18,7 @@
            [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
 
 (deftest rewrite-graphs-test
-  (let [graph-map {"http://live-graph.com/graph1" "http://draft-graph.com/graph1"}]
+  (let [graph-map {(URIImpl. "http://live-graph.com/graph1") (URIImpl. "http://draft-graph.com/graph1")}]
     (testing "graph clauses are substituted"
       (let [query "SELECT * WHERE {
                    GRAPH ?g {
@@ -31,11 +31,8 @@
                 }"]
 
         (is (= "http://draft-graph.com/graph1" (second (re-find #"<(.+)>"
-                                                                (rewrite-graphs query
-                                                                                graph-map)))))))
-
-
-    ))
+                                                                (->sparql-string (rewrite-graph-constants (->sparql-ast query)
+                                                                                                          graph-map))))))))))
 
 (def uri-query
   "SELECT * WHERE {
