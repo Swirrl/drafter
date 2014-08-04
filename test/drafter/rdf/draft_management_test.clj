@@ -7,7 +7,8 @@
    [grafter.rdf.sesame :refer :all]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
-   [clojure.test :refer :all]))
+   [clojure.test :refer :all])
+  (:import [org.openrdf.model.impl URIImpl]))
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
@@ -33,8 +34,7 @@
 
                             ["http://test2.com/data/two"
                              ["http://test2.com/hasProperty" "http://test2.com/data/1"]
-                             ["http://test2.com/hasProperty" "http://test2.com/data/2"]])
-  )
+                             ["http://test2.com/hasProperty" "http://test2.com/data/2"]]))
 
 (def test-graph-uri "http://example.org/my-graph")
 
@@ -182,26 +182,20 @@
          (is (= #{"http://real/graph/1" "http://real/graph/2"}
                 (live-graphs *test-db* :online false))))))
 
+(deftest build-draft-map-test []
+  (let [db (repo)]
+    (testing "graph-map associates live graphs with their drafts"
+      (create-managed-graph! db "http://frogs.com/")
+      (create-managed-graph! db "http://dogs.com/")
+
+      (let [frogs-draft (create-draft-graph! db "http://frogs.com/")
+            dogs-draft (create-draft-graph! db "http://dogs.com/")]
+
+        (is (= {(URIImpl. "http://frogs.com/") (URIImpl. frogs-draft)
+                (URIImpl. "http://dogs.com/")  (URIImpl. dogs-draft)}
+
+               (graph-map db #{frogs-draft dogs-draft})))))))
+
+
+
 (use-fixtures :each wrap-with-clean-test-db)
-
-(comment
-
-  (deftest import-graph-test
-           (testing "Importing graph"
-             (testing "Creates a new state graph"
-               (import-graph *test-db* test-graph-uri  test-triples)
-               (is (has-management-graph? *test-db* test-graph-uri))
-
-               (testing "which is in a draft state")
-               (testing "which is named after the SHA1 of the graph name"))
-             (testing "Stores the raw data in a staging graph")
-
-             ;;(import-graph test-db "http://example.org/my-graph" "drafter-live.ttl")
-             )))
-
-(comment
-  (pr/add *test-db* (rdf-serializer "test.ttl"))
-
-  (pr/add *test-db* (graph "http://foo.com/" ["http://foo.com/" ["http://foo.com/" "http://foo.com/"]]))
-
-  )
