@@ -28,10 +28,12 @@
 (defn meta-params
   "Given a hashmap of query parameters grab the ones prefixed meta-, strip that off, and turn into a URI"
   [query-params]
-  (reduce (fn [acc [k v]] (assoc acc
-                                 (str "http://publishmydata.com/def/drafter/meta/"
-                                      (subs k (+ 1 (.indexOf k "-")) (.length k)))
-                                 v))
+  (reduce (fn [acc [k v]]
+            (let [new-key (str "http://publishmydata.com/def/drafter/meta/"
+                               (subs k (+ 1 (.indexOf k "-")) (.length k)))]
+              (assoc acc new-key v)))
           {}
           (select-keys query-params
-                       (filter (fn[p] (.startsWith p "meta-")) (keys query-params)))))
+                       (filter (fn [p]
+                                 (.startsWith p "meta-"))
+                               (keys query-params)))))
