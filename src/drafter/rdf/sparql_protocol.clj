@@ -138,8 +138,9 @@
 
 (defn process-sparql-query [db request restriction-fn]
   (let [graphs (restriction-fn db)
-        restriction (when graphs (ses/make-restricted-dataset :default-graph graphs
-                                                              :named-graphs graphs))
+        restriction (when graphs
+                      (ses/make-restricted-dataset :default-graph graphs
+                                                   :named-graphs graphs))
 
         {:keys [headers params]} request
         query-str (:query params)
