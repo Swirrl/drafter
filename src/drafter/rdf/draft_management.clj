@@ -37,29 +37,29 @@
 (defn create-managed-graph!
   ([db graph-uri] (create-managed-graph! db graph-uri {}))
   ([db graph-uri opts]
-     ; We only do anything if it's not already a managed graph
+     ;; We only do anything if it's not already a managed graph
 
-     ; FIXME: Is this a potential race condition? i.e. we check for existence (and it's false) and before executing someone else makes
-     ;   the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
+     ;; FIXME: Is this a potential race condition? i.e. we check for existence (and it's false) and before executing someone else makes
+     ;; the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
      (if (not (is-graph-managed? db graph-uri))
        (let [managed-graph-quads (to-quads (create-managed-graph graph-uri opts))]
-       (add db managed-graph-quads)))))
+         (add db managed-graph-quads)))))
 
 (defn create-draft-graph
   ([live-graph-uri draft-graph-uri time]
      (create-draft-graph live-graph-uri draft-graph-uri time {}))
   ([live-graph-uri draft-graph-uri time opts]
 
-     (let [
-             live-graph-triples [live-graph-uri
+     (let [live-graph-triples [live-graph-uri
                                [drafter:hasDraft draft-graph-uri]]
-             draft-graph-triples  [draft-graph-uri
-                                    [rdf:a drafter:DraftGraph]
-                                    [drafter:modifiedAt time]]
-             triples [live-graph-triples (add-properties draft-graph-triples
-                                                         ; we need to make the values of the opts into strings by calling `s`.
-                                                         (into {} (for [[k v] opts] [k ((fn[v] (s v) ) v)])))]]
-         triples))) ; returns the triples
+           draft-graph-triples  [draft-graph-uri
+                                 [rdf:a drafter:DraftGraph]
+                                 [drafter:modifiedAt time]]
+           triples [live-graph-triples (add-properties draft-graph-triples
+                                                       ;; we need to make the values of the opts into strings by calling `s`.
+                                                       (into {} (for [[k v] opts]
+                                                                  [k (s v)])))]]
+       triples))) ; returns the triples
 
 (defn create-draft-graph!
   "Creates a new draft graph with a unique graph name, expects the
@@ -69,7 +69,7 @@
   ([db live-graph-uri opts]
      (let [now (Date.)
            draft-graph-uri (make-draft-graph-uri)]
-       ; adds the triples returned by crate-draft-graph to the state graph
+       ;; adds the triples returned by crate-draft-graph to the state graph
        (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now opts)
                     (apply to-quads)))
 
