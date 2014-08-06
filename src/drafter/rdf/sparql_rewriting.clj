@@ -38,6 +38,7 @@
                                                           (vars-in-graph-position query-ast))))
 
   ([query-ast graph-map context-set]
+     (println graph-map)
      (doseq [context context-set]
        (when (.isConstant context)
          (let [new-uri (graph-map (.getValue context))]
@@ -94,30 +95,39 @@
           result
           graph-var-names))
 
+(defn rewrite-graph-query [repo query-str query-substitutions]
+  (let [prepared-query (ses/prepare-query repo query-str)
+        binding-set (.getBindings prepared-query)
+        query-ast (-> prepared-query .getParsedQuery)
+        vars-in-graph-position (vars-in-graph-position query-ast)]
+    (do
+      ;; NOTE the AST is mutable and referenced from the prepared-query
+      (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
+      (println vars-in-graph-position)
+      (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
+
+      prepared-query)))
+
+(defn rewrite-graph-results [query-substitutions prepared-query]
+  (let [query-ast (.getParsedQuery prepared-query)]
+
+    (if-let [vars-in-graph-position (seq (vars-in-graph-position query-ast))]
+      (let [;; filter out constant values in graph position, leaving just "variables"
+            unbound-var-names (filter (complement #(.isConstant %)) vars-in-graph-position)
+            graph-var-names (map #(.getName %)
+                                 unbound-var-names)
+            result-substitutions (clojure.set/map-invert query-substitutions)]
+
+        (->> (ses/evaluate prepared-query)
+             (map (partial substitute-results result-substitutions graph-var-names))))
+      (ses/evaluate prepared-query))))
+
 (defn evaluate-with-graph-rewriting
-
   ([repo query-str query-substitutions]
-     (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
-  ([repo query-str query-substitutions dataset]
-     (let [prepared-query (ses/prepare-query repo query-str dataset)
-           binding-set (.getBindings prepared-query)
-           query-ast (-> prepared-query .getParsedQuery)
-           vars-in-graph-position (vars-in-graph-position query-ast)]
-       (do
-         ;; NOTE the AST is mutable and referenced from the prepared-query
-         (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
-         (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
-
-         (if (seq vars-in-graph-position)
-           (let [;; filter out constant values in graph position, leaving just "variables"
-                 unbound-var-names (filter (complement #(.isConstant %)) vars-in-graph-position)
-                 graph-var-names (map #(.getName %)
-                                      unbound-var-names)
-                 result-substitutions (clojure.set/map-invert query-substitutions)]
-
-             (->> (ses/evaluate prepared-query)
-                  (map (partial substitute-results result-substitutions graph-var-names))))
-           (ses/evaluate prepared-query))))))
+       (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
+    ([repo query-str query-substitutions dataset]
+       (let [prepared-query (rewrite-graph-query repo query-str query-substitutions dataset)]
+         (rewrite-graph-results query-substitutions prepared-query))))
 
 
 (comment

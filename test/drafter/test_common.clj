@@ -27,8 +27,9 @@
   [stream]
   (let [scanner (doto (Scanner. stream)
                   (.useDelimiter "\\A"))]
-    (when (-> scanner .hasNext)
-      (.next scanner))))
+    (if (-> scanner .hasNext)
+      (.next scanner)
+      "")))
 
 (defn wrap-with-clean-test-db
   ([test-fn] (wrap-with-clean-test-db identity test-fn))

@@ -7,6 +7,7 @@
             [compojure.handler :refer [api]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
+            [drafter.rdf.sparql-rewriting :as rew]
             [grafter.rdf.sesame :as ses])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]))
 
@@ -18,27 +19,38 @@ Returns a function that when called with a single argument (the
 
 If no graphs are found in the request, a function that returns the set
 of live graphs is returned."
-  [request]
+  [repo request]
   (let [graphs (-> request
                   :query-params
                   (get "graph"))]
     (if graphs
-      (constantly
-       (if (instance? String graphs)
-         #{graphs}
-         graphs))
+      (if (instance? String graphs)
+        #{graphs}
+        graphs)
 
-      mgmt/live-graphs)))
+      (mgmt/live-graphs repo))))
+
+(defn draft-query-rewriter [repo draft-uris]
+  (fn [query-str]
+    (doto
+        (rew/rewrite-graph-query repo query-str (mgmt/graph-map repo draft-uris))
+      (.setDataset nil))))
 
 (defn draft-sparql-routes [repo]
   (routes
    (GET "/sparql/draft" request
-        (process-sparql-query repo request (supplied-drafts request)))
+        (let [graph-uris (supplied-drafts repo request)]
+          (process-sparql-query repo request
+                                :query-creator-fn (draft-query-rewriter repo graph-uris)
+                                :graph-restrictions (supplied-drafts repo request))))
+
    (POST "/sparql/draft" request
-         (process-sparql-query repo request (supplied-drafts request)))))
+         (process-sparql-query repo request
+                               :query-creator-fn draft-query-rewriter
+                               :graph-restrictions (supplied-drafts repo request)))))
 
 (defn live-sparql-routes [repo]
-  (sparql-end-point "/sparql/live" repo mgmt/live-graphs))
+  (sparql-end-point "/sparql/live" repo (mgmt/live-graphs repo)))
 
 (defn state-sparql-routes [repo]
-  (sparql-end-point "/sparql/state" repo (constantly #{mgmt/drafter-state-graph})))
+  (sparql-end-point "/sparql/state" repo #{mgmt/drafter-state-graph}))
