@@ -15,7 +15,9 @@
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
                  [grafter "0.2.0-SNAPSHOT"]
-                 [environ "0.5.0"]]
+                 [environ "0.5.0"]
+                 [org.clojure/tools.namespace "0.2.4"] ;; force to prevent version problems in transitive dependencies
+                 ]
 
   :repl-options {:init-ns drafter.repl
                  :init (start-server)
