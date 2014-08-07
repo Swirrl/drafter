@@ -30,24 +30,26 @@ of live graphs is returned."
 
       (mgmt/live-graphs repo))))
 
-(defn draft-query-rewriter [repo draft-uris]
-  (fn [query-str]
-    (doto
-        (rew/rewrite-graph-query repo query-str (mgmt/graph-map repo draft-uris))
-      (.setDataset nil))))
+(defn make-draft-query-rewriter [draft-uris]
+  (fn [repo query-str]
+    (println "draft uris" draft-uris)
+    (let [mapping (mgmt/graph-map repo draft-uris)]
+      (println  "Using mapping: " mapping)
+      (rew/rewrite-graph-query repo query-str mapping))))
+
+(defn- draft-query-endpoint [repo request]
+  (let [graph-uris (supplied-drafts repo request)]
+    (process-sparql-query repo request
+                          :query-creator-fn (make-draft-query-rewriter graph-uris)
+                          :graph-restrictions graph-uris)))
 
 (defn draft-sparql-routes [repo]
   (routes
    (GET "/sparql/draft" request
-        (let [graph-uris (supplied-drafts repo request)]
-          (process-sparql-query repo request
-                                :query-creator-fn (draft-query-rewriter repo graph-uris)
-                                :graph-restrictions (supplied-drafts repo request))))
+        (draft-query-endpoint repo request))
 
    (POST "/sparql/draft" request
-         (process-sparql-query repo request
-                               :query-creator-fn draft-query-rewriter
-                               :graph-restrictions (supplied-drafts repo request)))))
+         (draft-query-endpoint repo request))))
 
 (defn live-sparql-routes [repo]
   (sparql-end-point "/sparql/live" repo (mgmt/live-graphs repo)))

@@ -29,7 +29,10 @@
   bound in Graph position."
   [query]
   (let [expr (.getTupleExpr query)]
-    (reduce (fn [acc val] (conj acc (.getContextVar val)))
+    (reduce (fn [acc val]
+              (if-let [var (.getContextVar val)]
+                (conj acc var)
+                acc))
             #{} (StatementPatternCollector/process expr))))
 
 (defn rewrite-graph-constants
@@ -38,10 +41,10 @@
                                                           (vars-in-graph-position query-ast))))
 
   ([query-ast graph-map context-set]
-     (println graph-map)
+
      (doseq [context context-set]
        (when (.isConstant context)
-         (let [new-uri (graph-map (.getValue context))]
+         (let [new-uri (get graph-map (.getValue context))]
            (.setValue context new-uri))))
      query-ast))
 
@@ -103,8 +106,9 @@
     (do
       ;; NOTE the AST is mutable and referenced from the prepared-query
       (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
-      (println vars-in-graph-position)
-      (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
+
+      (when vars-in-graph-position
+        (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position))
 
       prepared-query)))
 

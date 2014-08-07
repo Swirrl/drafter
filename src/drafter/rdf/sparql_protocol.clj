@@ -67,7 +67,10 @@
                        }
          nil) format))
 
-(defn result-streamer [result-writer query-executor pquery response-mime-type]
+(defn new-result-writer [writer-class ostream]
+  (.newInstance (first (.getConstructors writer-class)) (into-array Object [ostream])))
+
+(defn result-streamer [result-writer-class query-executor pquery response-mime-type]
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
@@ -77,7 +80,7 @@
   ;; TODO replace query-executor with some kind of a RDFHandler wrapper
   (fn [ostream]
     (try
-      (let [writer (.newInstance result-writer ostream)]
+      (let [writer (new-result-writer result-writer-class ostream)]
 
         (if (instance? BooleanTextWriter writer)
           (let [result (.evaluate pquery)]
@@ -122,7 +125,7 @@
 
         {:keys [headers params]} request
         query-str (:query params)
-        pquery (doto (query-creator-fn db query-str graph-restrictions)
+        pquery (doto (query-creator-fn db query-str)
                  (.setDataset restriction))
         media-type (parse-accept headers)]
 

@@ -176,21 +176,24 @@
                                    "  ?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
                                    "        <" drafter:hasDraft "> ?draft .")
                                  "}")))]
-    (zipmap (map #(get % "live") results)
-            (map #(get % "draft") results))))
+    (let [res (zipmap (map #(get % "live") results)
+                      (map #(get % "draft") results))]
+      (println "graph-map results " res)
+
+      res)))
 
 (defn live-graphs [db & {:keys [online] :or {online true}}]
   "Get all live graph names.  Takes an optional boolean keyword
   argument of :online to allow querying for all online/offline live
   graphs."
   (->> (query db
-              (str "SELECT ?live WHERE {"
-                   (with-state-graph
-                     "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
-                     "<" drafter:isPublic  "> " online " .")
-                   "}"))
-       (map #(str (% "live")))
-       (into #{})))
+                 (str "SELECT ?live WHERE {"
+                      (with-state-graph
+                        "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                        "<" drafter:isPublic  "> " online " .")
+                      "}"))
+          (map #(str (% "live")))
+          (into #{})))
 
 (defn migrate-live!
   "Moves the triples from the draft graph to the draft graphs live destination."

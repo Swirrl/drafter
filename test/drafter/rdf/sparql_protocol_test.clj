@@ -8,18 +8,24 @@
    [clojure.data.json :as json]
    [clojure-csv.core :as csv]
    [clojure.test :refer :all])
+
   (:import [java.io ByteArrayOutputStream]
-           [java.util Scanner]))
+           [java.util Scanner]
+           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]))
 
 (defn add-triple-to-db [db]
   (pr/add db "http://foo.com/my-graph" (test-triples "http://test.com/data/one")))
 
-(deftest sparql-results!-test
+(deftest results-streamer-test
   (testing "Streams sparql results into output stream"
-    (let [baos (ByteArrayOutputStream.)]
+    (let [baos (ByteArrayOutputStream.)
+          preped-query (prepare-query *test-db* "SELECT * WHERE { ?s ?p ?o }")
+          streamer! (result-streamer SPARQLResultsJSONWriter
+                                     nil
+                                     preped-query
+                                     "application/sparql-results+json")]
 
-      (-> (prepare-query *test-db* "SELECT * WHERE { ?s ?p ?o }")
-          (sparql-results! baos "application/sparql-results+json"))
+      (streamer! baos)
 
       (let [output (-> baos .toByteArray String. json/read-str)]
         (is (map? output))))))
