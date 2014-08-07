@@ -27,6 +27,7 @@
            [org.openrdf.rio.trig TriGWriter]
            [org.openrdf.rio.trix TriXWriter]
            [org.openrdf.rio.turtle TurtleWriter]
+           [org.openrdf.rio.rdfxml RDFXMLWriter]
            [org.openrdf.query.resultio.binary BinaryQueryResultWriter]
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
@@ -58,6 +59,7 @@
                        "application/trix" :trix
                        "text/turtle" :turtle
                        "text/html" :turtle
+                       "application/rdf+xml" :rdfxml
                        } format)
 
     nil))
@@ -105,6 +107,9 @@
 
 (defmethod sparql-results! :turtle [pquery output-stream format]
   (.evaluate pquery (TurtleWriter. output-stream)))
+
+(defmethod sparql-results! :rdfxml [pquery output-stream format]
+  (.evaluate pquery (RDFXMLWriter. output-stream)))
 
 (defmethod sparql-results! :default [pquery output-stream format]
   (throw (ex-info
