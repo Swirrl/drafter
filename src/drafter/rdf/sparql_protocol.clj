@@ -27,6 +27,7 @@
            [org.openrdf.rio.trig TriGWriter]
            [org.openrdf.rio.trix TriXWriter]
            [org.openrdf.rio.turtle TurtleWriter]
+           [org.openrdf.rio.rdfxml RDFXMLWriter]
            [org.openrdf.query.resultio.binary BinaryQueryResultWriter]
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
@@ -64,6 +65,7 @@
                        "application/trix" TriXWriter
                        "text/turtle" TurtleWriter
                        "text/html" TurtleWriter
+                       "application/rdf+xml" RDFXMLWriter
                        }
          nil) format))
 
