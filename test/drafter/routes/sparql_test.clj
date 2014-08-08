@@ -7,17 +7,18 @@
             [clojure-csv.core :as csv]
             [grafter.rdf.sesame :as ses]
             [drafter.routes.sparql :refer :all]
+            [drafter.rdf.sparql-rewriting :refer [function-registry register-function]]
             [drafter.rdf.draft-management :refer :all]))
 
 (defn add-test-data!
   "Set the state of the database so that we have three managed graphs,
   one of which is made public the other two are still private (draft)."
   [db]
-  (let [draft-1 (import-data-to-draft! db "http://test.com/graph-1" (test-triples "http://test.com/subject-1"))
+  (let [draft-made-live-and-deleted (import-data-to-draft! db "http://test.com/graph-1" (test-triples "http://test.com/subject-1"))
         draft-2 (import-data-to-draft! db "http://test.com/graph-2" (test-triples "http://test.com/subject-2"))
         draft-3 (import-data-to-draft! db "http://test.com/graph-3" (test-triples "http://test.com/subject-3"))]
-    (migrate-live! db draft-1)
-    [draft-1 draft-2 draft-3]))
+    (migrate-live! db draft-made-live-and-deleted)
+    [draft-made-live-and-deleted draft-2 draft-3]))
 
 (def graph-1-result ["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"])
 (def graph-2-result ["http://test.com/subject-2" "http://test.com/hasProperty" "http://test.com/data/1"])
@@ -158,23 +159,26 @@
 (deftest drafts-sparql-routes-with-rewriting-test
   (let [db (ses/repo)
         drafts-request (assoc default-sparql-query :uri "/sparql/draft")
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! db)
+        [_ draft-graph-2 draft-graph-3] (add-test-data! db)
         endpoint (draft-sparql-routes db)]
 
+    (register-function drafter.rdf.sparql-rewriting/function-registry
+                       "http://publishmydata.com/def/functions#replace-live-graph-uri"
+                       (partial drafter.rdf.draft-management/draft-graphs db))
+
     (testing "Queries can be written against their live graph URI"
-        (println "about to run test on draft-graph-1: " draft-graph-1)
         (let [found-graph (-> (endpoint
                                (-> drafts-request
-                                   (assoc-in [:query-params "graph"] [draft-graph-1])
+                                   (assoc-in [:query-params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query]
-                                             "SELECT * WHERE { BIND(URI(\"http://test.com/graph-1\") AS ?g) GRAPH ?g { ?s ?p ?o . } } LIMIT 1")))
+                                             "SELECT * WHERE { BIND(URI(\"http://test.com/graph-2\") AS ?g) GRAPH ?g { ?s ?p ?o . } } LIMIT 1")))
                               csv->
                               first
                               (get "g"))]
 
           (is (= nil (ses/query db (str "SELECT * WHERE { ?live <" drafter.rdf.drafter-ontology/drafter:hasDraft "> ?draft . }"))))
 
-          (is (= found-graph "http://test.com/graph-1"))))))
+          (is (= found-graph "http://test.com/graph-2"))))))
 
 
 ;;(use-fixtures :each (partial wrap-with-clean-test-db))

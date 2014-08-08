@@ -43,6 +43,7 @@ of live graphs is returned."
                           :query-creator-fn (make-draft-query-rewriter graph-uris)
                           :graph-restrictions graph-uris)))
 
+
 (defn draft-sparql-routes [repo]
   (routes
    (GET "/sparql/draft" request
