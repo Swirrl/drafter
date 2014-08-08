@@ -7,7 +7,8 @@
             [grafter.rdf :refer [graph graphify load-triples add-properties]]
             [grafter.rdf.protocols :refer [add subject predicate object context
                                            add-statement statements begin commit rollback]])
-  (:import [java.util Date]))
+  (:import [java.util Date]
+           [org.openrdf.model.impl URIImpl]))
 
 (def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
 
@@ -150,6 +151,11 @@
       first
       (get "live")
       str))
+
+(defn lookup-live-graph-uri [db draft-graph-uri]
+  "Given a draft graph URI, lookup and return its live graph."
+  (-> (lookup-live-graph db draft-graph-uri)
+      (URIImpl.)))
 
 (defn draft-graphs [db]
   "Get all draft graphs"

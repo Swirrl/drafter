@@ -10,9 +10,11 @@
             [taoensso.timbre :as timbre]
             [taoensso.timbre.appenders.rotor :as rotor]
             [selmer.parser :as parser]
+            [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri]]
             [drafter.rdf.queue :as q]
             [grafter.rdf.sesame :as sesame]
             [compojure.handler :only [api]]
+            [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
             [environ.core :refer [env]]))
 
 (def repo-path "MyDatabases/repositories/db")
@@ -31,7 +33,10 @@
 (defn initialise-repo! []
   (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path))]
                           (timbre/info "Initialised repo" repo-path)
-                          repo)))
+                          repo))
+  (register-function function-registry
+                     (pmdfunctions "replace-live-graph")
+                     (partial lookup-live-graph-uri repo)))
 
 (defroutes app-routes
   (route/resources "/")
