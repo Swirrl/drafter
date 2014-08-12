@@ -1,7 +1,5 @@
 (ns drafter.routes.sparql-test
-  (:require [drafter.test-common :refer [;;*test-db*
-                                         test-triples
-                                         ;;wrap-with-clean-test-db
+  (:require [drafter.test-common :refer [test-triples
                                          stream->string select-all-in-graph]]
             [clojure.test :refer :all]
             [clojure-csv.core :as csv]
