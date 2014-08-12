@@ -93,9 +93,16 @@
 
   (timbre/set-config!
     [:shared-appender-config :rotor]
-    {:path "drafter.log" :max-size (* 512 1024) :backlog 10})
+    {:path "drafter.log" :max-size (* 512 1024) :backlog 10
+     })
 
-  (if (env :dev) (parser/cache-off!))
+  (when (env :dev)
+    (parser/cache-off!)
+    (timbre/merge-config! {:appenders
+                         ;; disable colouring of output in dev env as
+                         ;; it causes stacktraces to become invisible
+                         ;; in Emacs.
+                         {:standard-out { :fmt-output-opts {:nofonts? true}}}}))
 
   (initialise-services!)
 
