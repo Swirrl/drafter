@@ -30,13 +30,22 @@
   `(alter-var-root ~var (fn [& _#]
                          ~form)))
 
+(defn register-sparql-extension-functions
+  "Register custom drafter SPARQL extension functions."
+  []
+
+  ;; This function converts draft graphs into live graph URI's and is
+  ;; necessary for drafters query/result rewriting to work.
+  (register-function function-registry
+                     (pmdfunctions "replace-live-graph")
+                     (partial lookup-live-graph-uri repo)))
+
 (defn initialise-repo! []
   (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path))]
                           (timbre/info "Initialised repo" repo-path)
                           repo))
-  (register-function function-registry
-                     (pmdfunctions "replace-live-graph")
-                     (partial lookup-live-graph-uri repo)))
+
+  (register-sparql-extension-functions))
 
 (defroutes app-routes
   (route/resources "/")
