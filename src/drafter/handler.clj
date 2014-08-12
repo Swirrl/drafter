@@ -10,9 +10,11 @@
             [taoensso.timbre :as timbre]
             [taoensso.timbre.appenders.rotor :as rotor]
             [selmer.parser :as parser]
+            [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri]]
             [drafter.rdf.queue :as q]
             [grafter.rdf.sesame :as sesame]
             [compojure.handler :only [api]]
+            [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
             [environ.core :refer [env]]))
 
 (def repo-path "MyDatabases/repositories/db")
@@ -28,10 +30,22 @@
   `(alter-var-root ~var (fn [& _#]
                          ~form)))
 
+(defn register-sparql-extension-functions
+  "Register custom drafter SPARQL extension functions."
+  []
+
+  ;; This function converts draft graphs into live graph URI's and is
+  ;; necessary for drafters query/result rewriting to work.
+  (register-function function-registry
+                     (pmdfunctions "replace-live-graph")
+                     (partial lookup-live-graph-uri repo)))
+
 (defn initialise-repo! []
   (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path))]
                           (timbre/info "Initialised repo" repo-path)
-                          repo)))
+                          repo))
+
+  (register-sparql-extension-functions))
 
 (defroutes app-routes
   (route/resources "/")
@@ -80,7 +94,7 @@
   []
   (timbre/set-config!
     [:appenders :rotor]
-    {:min-level :info
+    {:min-level :fatal
      :enabled? true
      :async? false ; should be always false for rotor
      :max-message-per-msecs nil
@@ -88,9 +102,16 @@
 
   (timbre/set-config!
     [:shared-appender-config :rotor]
-    {:path "drafter.log" :max-size (* 512 1024) :backlog 10})
+    {:path "drafter.log" :max-size (* 512 1024) :backlog 10
+     })
 
-  (if (env :dev) (parser/cache-off!))
+  (when (env :dev)
+    (parser/cache-off!)
+    (timbre/merge-config! {:appenders
+                         ;; disable colouring of output in dev env as
+                         ;; it causes stacktraces to become invisible
+                         ;; in Emacs.
+                         {:standard-out { :fmt-output-opts {:nofonts? true}}}}))
 
   (initialise-services!)
 

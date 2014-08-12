@@ -16,7 +16,9 @@
            [org.openrdf.sail.memory MemoryStore]
            [org.openrdf.rio Rio RDFWriter RDFHandler]
            [org.openrdf.sail.nativerdf NativeStore]
-           [org.openrdf.query TupleQuery TupleQueryResult TupleQueryResultHandler BooleanQueryResultHandler BindingSet QueryLanguage BooleanQuery GraphQuery]
+           [org.openrdf.query TupleQuery TupleQueryResult
+            TupleQueryResultHandler BooleanQueryResultHandler
+            BindingSet QueryLanguage BooleanQuery GraphQuery]
            [org.openrdf.query.resultio.text BooleanTextWriter]
            [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]
            [org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLWriter SPARQLBooleanXMLWriter]
@@ -31,139 +33,142 @@
            [org.openrdf.query.resultio.binary BinaryQueryResultWriter]
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
+           [org.openrdf.query Dataset]
            [org.openrdf.query.impl DatasetImpl]
            [javax.xml.datatype XMLGregorianCalendar DatatypeFactory]
            [java.util GregorianCalendar Date]
            [org.openrdf.rio RDFFormat]))
 
-(defn negotiate-content-type [query-type format]
-  (condp instance? query-type
-    TupleQuery   (get { "application/sparql-results+json" :json
-                        "application/sparql-results+xml" :xml
-                        "application/x-binary-rdf" :binary
-                        "text/csv" :csv
-                        "text/tab-separated-values" :tsv
-                        "text/html" :csv
-                        } format)
-    BooleanQuery (get { "application/sparql-results+xml" :xml
-                        "application/sparql-results+json" :json
-                        "application/x-binary-rdf" :binary
-                        "text/plain" :txt
-                        "text/html" :txt
-                        } format)
-    GraphQuery   (get {
-                       "application/n-triples" :ntriples
-                       "application/n-quads" :nquads
-                       "text/n3" :n3
-                       "application/trig" :trig
-                       "application/trix" :trix
-                       "text/turtle" :turtle
-                       "text/html" :turtle
-                       "application/rdf+xml" :rdfxml
-                       } format)
+(defn negotiate-content-writer
+  "Given a prepared query and a mime-type return the appropriate
+  Sesame SPARQLResultsWriter class, according to the SPARQL protocols
+  content negotiation rules."
+  [preped-query format]
 
-    nil))
+  (get (condp instance? preped-query
+         TupleQuery   { "application/sparql-results+json" SPARQLResultsJSONWriter
+                        "application/sparql-results+xml" SPARQLResultsXMLWriter
+                        "application/x-binary-rdf" BinaryQueryResultWriter
+                        "text/csv" SPARQLResultsCSVWriter
+                        "text/tab-separated-values" SPARQLResultsTSVWriter
+                        "text/html" SPARQLResultsCSVWriter
+                        }
+         BooleanQuery { "application/sparql-results+xml" SPARQLResultsXMLWriter
+                        "application/sparql-results+json" SPARQLResultsJSONWriter
+                        "application/x-binary-rdf" BinaryQueryResultWriter
+                        "text/plain" BooleanTextWriter
+                        "text/html" BooleanTextWriter
+                        }
+         GraphQuery   {
+                       "application/n-triples" NTriplesWriter
+                       "application/n-quads" NQuadsWriter
+                       "text/n3" N3Writer
+                       "application/trig" TriGWriter
+                       "application/trix" TriXWriter
+                       "text/turtle" TurtleWriter
+                       "text/html" TurtleWriter
+                       "application/rdf+xml" RDFXMLWriter
+                       }
+         nil) format))
 
-(defmulti sparql-results! (fn [preped-query output-stream format]
-                            (negotiate-content-type preped-query format)))
+(defn new-result-writer [writer-class ostream]
+  (.newInstance (first (.getConstructors writer-class)) (into-array Object [ostream])))
 
-(defmethod sparql-results! :json [pquery output-stream format]
-  (.evaluate pquery (SPARQLResultsJSONWriter. output-stream)))
+(defn result-streamer [result-writer-class result-rewriter pquery response-mime-type]
+  "Returns a function that handles the errors and closes the SPARQL
+  results stream when it's done.
 
-(defmethod sparql-results! :xml [pquery output-stream format]
-  (.evaluate pquery (SPARQLResultsXMLWriter. output-stream)))
+  If an error is thrown the stream will be closed and an exception
+  logged."
 
-(defmethod sparql-results! :binary [pquery output-stream format]
-  (.evaluate pquery (BinaryQueryResultWriter. output-stream)))
+  (fn [ostream]
+    (try
+      (let [writer (let [w (new-result-writer result-writer-class ostream)]
+                     (if result-rewriter
+                       (result-rewriter w)
+                       w))]
+        (timbre/info "Calling evaluate with writer: " writer)
+        (if (instance? BooleanTextWriter writer)
+          (let [result (.evaluate pquery)]
+            (doto (BooleanTextWriter. ostream)
+              (.handleBoolean result)))
+          (.evaluate pquery writer)))
 
-(defmethod sparql-results! :csv [pquery output-stream format]
-  (.evaluate pquery (SPARQLResultsCSVWriter. output-stream)))
+      (catch Exception ex
+        ;; Note that if we error here it's now too late to return a
+        ;; HTTP RESPONSE code error
+        (timbre/error ex "Error streaming results"))
 
-(defmethod sparql-results! :tsv [pquery output-stream format]
-  (.evaluate pquery (SPARQLResultsTSVWriter. output-stream)))
+      (finally
+        (.close ostream)))))
 
-(defmethod sparql-results! :txt [pquery output-stream format]
-  (let [result (.evaluate pquery)]
-    (doto (BooleanTextWriter. output-stream)
-      (.handleBoolean result))
-    result))
-
-;; graph formats
-
-(defmethod sparql-results! :ntriples [pquery output-stream format]
-  (.evaluate pquery (NTriplesWriter. output-stream)))
-
-(defmethod sparql-results! :nquads [pquery output-stream format]
-  (.evaluate pquery (NQuadsWriter. output-stream)))
-
-(defmethod sparql-results! :n3 [pquery output-stream format]
-  (.evaluate pquery (N3Writer. output-stream)))
-
-(defmethod sparql-results! :trig [pquery output-stream format]
-  (.evaluate pquery (TriGWriter. output-stream)))
-
-(defmethod sparql-results! :trix [pquery output-stream format]
-  (.evaluate pquery (TriXWriter. output-stream)))
-
-(defmethod sparql-results! :turtle [pquery output-stream format]
-  (.evaluate pquery (TurtleWriter. output-stream)))
-
-(defmethod sparql-results! :rdfxml [pquery output-stream format]
-  (.evaluate pquery (RDFXMLWriter. output-stream)))
-
-(defmethod sparql-results! :default [pquery output-stream format]
-  (throw (ex-info
-          (str "Unsupported SPARQL response format for format: "
-               format " with query-type " (class pquery)
-               ". You must set an appropriate Accept header.")
-          {:type :unsupported-media-type})))
-
-(defn- make-streaming-sparql-response [pquery response-mime-type]
-  (if (negotiate-content-type pquery response-mime-type)
+(defn- stream-sparql-response [pquery response-mime-type result-rewriter]
+  (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
     {:status 200
      :headers {"Content-Type" response-mime-type}
-     :body (rio/piped-input-stream (fn [ostream]
-                                     (try
-                                       (sparql-results! pquery ostream response-mime-type)
-                                       (catch clojure.lang.ExceptionInfo ex
-                                         (timbre/error ex "Error streaming results")))
-                                     (.close ostream)))}
+     ;; Designed to work with piped-input-stream this fn will be run
+     ;; in another thread to stream the results to the client.
+     :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
+                                                    pquery response-mime-type))}
     {:status 406
      :headers {"Content-Type" "text/plain"}
      :body (str "Unsupported media-type: " response-mime-type)}))
 
 (defn parse-accept
   "Stupid accept header parsing"
-  [accept-str]
-  (let [fst (-> accept-str
-                (str/split #",")
-                first)]
+  [headers]
+  (let [accept-str (get headers "accept")
+        fst (-> accept-str
+             (str/split #",")
+             first)]
     (or fst accept-str)))
 
-(defn process-sparql-query [db request restriction-fn]
-  (let [graphs (restriction-fn db)
-        restriction (when graphs (ses/make-restricted-dataset :default-graph graphs
-                                                              :named-graphs graphs))
+(defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
+                                                 result-rewriter]
+                                          :or {query-creator-fn ses/prepare-query}}]
+
+  (let [restriction (when graph-restrictions
+                      (ses/make-restricted-dataset :default-graph graph-restrictions
+                                                   :named-graphs graph-restrictions))
 
         {:keys [headers params]} request
         query-str (:query params)
-        pquery (ses/prepare-query db query-str restriction)
-        media-type (-> (headers "accept")
-                       parse-accept)]
+        pquery (doto (query-creator-fn db query-str)
+                 (.setDataset restriction))
+        media-type (parse-accept headers)]
 
-    (timbre/debug (str "Running query " query-str " with graph restriction: " (apply str (interpose "," graphs))))
-    (make-streaming-sparql-response pquery media-type)))
+    (timbre/debug (str "Running query " pquery " with graph restriction: " (apply str (interpose "," graph-restrictions))))
+    (stream-sparql-response pquery media-type result-rewriter)))
 
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path a sesame repository and
   an optional restriction function which returns a list of graph uris
   to restrict both the union and named-graph queries too."
 
-  ([mount-path repo] (sparql-end-point mount-path repo (constantly nil)))
+  ([mount-path repo] (sparql-end-point mount-path repo nil))
 
-  ([mount-path repo restriction-fn]
+  ([mount-path repo restrictions]
+     ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
      (routes
       (GET mount-path request
-           (process-sparql-query repo request restriction-fn))
+           (process-sparql-query repo request
+                                 :graph-restrictions restrictions))
       (POST mount-path request
-            (process-sparql-query repo request restriction-fn)))))
+            (process-sparql-query repo request
+                                  :graph-restrictions restrictions)))))
+
+
+(comment
+
+  (take 10 (ses/query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }" :default-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"] :union-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"]))
+
+
+
+  (take 10 (ses/evaluate (ses/prepare-query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }")))
+
+  ;; Parsing a Query
+  (org.openrdf.query.parser.QueryParserUtil/parseQuery QueryLanguage/SPARQL "SELECT * WHERE { ?s ?p ?o }" nil)
+
+  (.getBindingNames (.getTupleExpr (org.openrdf.query.parser.QueryParserUtil/parseQuery QueryLanguage/SPARQL "SELECT * WHERE { ?s ?p ?o OPTIONAL { ?g ?z ?a }  }" nil)))
+
+  )

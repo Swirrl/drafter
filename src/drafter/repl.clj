@@ -1,14 +1,12 @@
 (ns drafter.repl
   (:use
-        [ring.middleware file-info file])
+   [ring.middleware file-info file])
   (:require [grafter.rdf.protocols :refer [add add-statement statements]]
             [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
             [drafter.rdf.queue :as q]
             [drafter.rdf.draft-management :refer :all]
-
             [drafter.handler :as service]
-            [ring.server.standalone :refer [serve] ]
-            )
+            [ring.server.standalone :refer [serve]])
   (:import [org.openrdf.rio RDFFormat])
   (:gen-class))
 
