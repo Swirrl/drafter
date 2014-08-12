@@ -16,7 +16,9 @@
            [org.openrdf.sail.memory MemoryStore]
            [org.openrdf.rio Rio RDFWriter RDFHandler]
            [org.openrdf.sail.nativerdf NativeStore]
-           [org.openrdf.query TupleQuery TupleQueryResult TupleQueryResultHandler BooleanQueryResultHandler BindingSet QueryLanguage BooleanQuery GraphQuery]
+           [org.openrdf.query TupleQuery TupleQueryResult
+            TupleQueryResultHandler BooleanQueryResultHandler
+            BindingSet QueryLanguage BooleanQuery GraphQuery]
            [org.openrdf.query.resultio.text BooleanTextWriter]
            [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]
            [org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLWriter SPARQLBooleanXMLWriter]
@@ -72,38 +74,41 @@
 (defn new-result-writer [writer-class ostream]
   (.newInstance (first (.getConstructors writer-class)) (into-array Object [ostream])))
 
-(defn result-streamer [result-writer-class query-executor pquery response-mime-type]
+(defn result-streamer [result-writer-class result-rewriter pquery response-mime-type]
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
   If an error is thrown the stream will be closed and an exception
   logged."
 
-  ;; TODO replace query-executor with some kind of a RDFHandler wrapper
   (fn [ostream]
     (try
-      (let [writer (new-result-writer result-writer-class ostream)]
-
+      (let [writer (let [w (new-result-writer result-writer-class ostream)]
+                     (if result-rewriter
+                       (result-rewriter w)
+                       w))]
+        (timbre/info "Calling evaluate with writer: " writer)
         (if (instance? BooleanTextWriter writer)
           (let [result (.evaluate pquery)]
             (doto (BooleanTextWriter. ostream)
               (.handleBoolean result)))
-
           (.evaluate pquery writer)))
 
-      (catch clojure.lang.ExceptionInfo ex
+      (catch Exception ex
         ;; Note that if we error here it's now too late to return a
         ;; HTTP RESPONSE code error
-        (timbre/error ex "Error streaming results")))
-    (.close ostream)))
+        (timbre/error ex "Error streaming results"))
 
-(defn- stream-sparql-response [pquery response-mime-type]
-  (if-let [result-writer (negotiate-content-writer pquery response-mime-type)]
+      (finally
+        (.close ostream)))))
+
+(defn- stream-sparql-response [pquery response-mime-type result-rewriter]
+  (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
     {:status 200
      :headers {"Content-Type" response-mime-type}
      ;; Designed to work with piped-input-stream this fn will be run
      ;; in another thread to stream the results to the client.
-     :body (rio/piped-input-stream (result-streamer result-writer nil ;; TODO replace the nil!!!
+     :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
                                                     pquery response-mime-type))}
     {:status 406
      :headers {"Content-Type" "text/plain"}
@@ -118,7 +123,8 @@
              first)]
     (or fst accept-str)))
 
-(defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions]
+(defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
+                                                 result-rewriter]
                                           :or {query-creator-fn ses/prepare-query}}]
 
   (let [restriction (when graph-restrictions
@@ -131,8 +137,8 @@
                  (.setDataset restriction))
         media-type (parse-accept headers)]
 
-    (timbre/debug (str "Running query " query-str " with graph restriction: " (apply str (interpose "," graph-restrictions))))
-    (stream-sparql-response pquery media-type)))
+    (timbre/debug (str "Running query " pquery " with graph restriction: " (apply str (interpose "," graph-restrictions))))
+    (stream-sparql-response pquery media-type result-rewriter)))
 
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path a sesame repository and

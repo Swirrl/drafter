@@ -154,18 +154,47 @@
 
 (defn lookup-live-graph-uri [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
+
+  (timbre/info "SPARQL graph uri rewriting function called" draft-graph-uri)
   (-> (lookup-live-graph db draft-graph-uri)
       (URIImpl.)))
 
-(defn draft-graphs [db]
-  "Get all draft graphs"
-  (->> (query db
-              (str "SELECT ?draft WHERE {"
-                   (with-state-graph
-                     "?live <" drafter:hasDraft "> ?draft .")
-                     "}"))
-       (map #(str (% "draft")))
-       (into #{})))
+(defn draft-graphs
+  "Get all the draft graph URIs"
+  [db]
+  (let [query-str (str "SELECT ?draft WHERE {"
+                       (with-state-graph
+                         "?live <" drafter:hasDraft "> ?draft .")
+                       "}")
+        res (->> (query db
+                        query-str)
+                 (map #(str (get % "draft")))
+                 (into #{}))]
+    res))
+
+(defn- return-one-or-zero-uris
+  "Helper function to check there's at most only one result and return it packed as a URIImpl.
+  Raise an error if there are more than one result."
+  [res]
+  (if (>= 1 (count res))
+    (URIImpl. (first res))
+    (throw (ex-info
+            "Multiple drafts were found, when only one is expected.  The context is likely too broad."
+            {:error :multiple-drafts-error}))))
+
+(defn lookup-draft-graph-uri
+  "Get all the draft graph URIs.  Assumes there will be at most one
+  draft found."
+  [db live-graph-uri]
+  (let [res (->> (query db
+                        (str "SELECT ?draft WHERE {"
+                             (with-state-graph
+                               "<" live-graph-uri ">" " <" drafter:hasDraft "> ?draft .")
+                             "} LIMIT 2"))
+                 (map #(str (get % "draft")))
+                 return-one-or-zero-uris)]
+    (timbre/info "Runtime rewrite of live graph" live-graph-uri "to draft graph" res)
+    res))
 
 (defn graph-map
   "Takes a database and a set of drafts and returns a hashmap of live
@@ -182,11 +211,8 @@
                                    "  ?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
                                    "        <" drafter:hasDraft "> ?draft .")
                                  "}")))]
-    (let [res (zipmap (map #(get % "live") results)
-                      (map #(get % "draft") results))]
-      (println "graph-map results " res)
-
-      res)))
+    (zipmap (map #(get % "live") results)
+            (map #(get % "draft") results))))
 
 (defn live-graphs [db & {:keys [online] :or {online true}}]
   "Get all live graph names.  Takes an optional boolean keyword

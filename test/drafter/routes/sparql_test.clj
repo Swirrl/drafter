@@ -131,9 +131,6 @@
           (is (= 5 (count csv-result))
               "There should be 5 results (2 triples in both graphs + the csv header row)")))
 
-
-
-
       (testing "Can rewrite queries to use their draft"
         (let [csv-result (csv-> (endpoint
                                  (-> drafts-request
@@ -156,7 +153,7 @@
           (is (= 3 (count csv-result))
               "There should be 5 results (2 triples in both graphs + the csv header row)"))))))
 
-(deftest drafts-sparql-routes-with-rewriting-test
+(deftest drafts-sparql-route-rewrites-constants
   (let [db (ses/repo)
         drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [_ draft-graph-2 draft-graph-3] (add-test-data! db)
@@ -166,19 +163,63 @@
                        "http://publishmydata.com/def/functions#replace-live-graph-uri"
                        (partial drafter.rdf.draft-management/draft-graphs db))
 
+    (testing "Query constants in graph position are rewritten to their draft graph URI"
+        (let [s-p-o-result (-> (endpoint
+                               (-> drafts-request
+                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params :query]
+                                             "SELECT * WHERE { GRAPH <http://test.com/graph-2> { ?s ?p ?o . } } LIMIT 1")))
+                              csv->
+                              second)]
+
+          (is (= ["http://test.com/subject-2" "http://test.com/hasProperty" "http://test.com/data/1"]
+                 s-p-o-result))))))
+
+(deftest drafts-sparql-routes-with-results-rewriting-test
+  (let [db (ses/repo)
+        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
+        [_ draft-graph-2 draft-graph-3] (add-test-data! db)
+        endpoint (draft-sparql-routes db)]
+
+    ;; register the function that does the results rewriting
+    (register-function drafter.rdf.sparql-rewriting/function-registry
+                       "http://publishmydata.com/def/functions#replace-live-graph-uri"
+                       (partial drafter.rdf.draft-management/lookup-draft-graph-uri db))
+
     (testing "Queries can be written against their live graph URI"
         (let [found-graph (-> (endpoint
                                (-> drafts-request
                                    (assoc-in [:query-params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query]
-                                             "SELECT * WHERE { BIND(URI(\"http://test.com/graph-2\") AS ?g) GRAPH ?g { ?s ?p ?o . } } LIMIT 1")))
+                                             "SELECT ?g ?s ?p ?o WHERE { BIND(URI(\"http://test.com/graph-2\") AS ?g) GRAPH ?g { ?s ?p ?o . } } LIMIT 1")))
                               csv->
-                              first
-                              (get "g"))]
+                              second
+                              first ;; ?g is the first result
+                              )]
 
-          (is (= nil (ses/query db (str "SELECT * WHERE { ?live <" drafter.rdf.drafter-ontology/drafter:hasDraft "> ?draft . }"))))
+          ;;(is (= nil (ses/query db (str "SELECT * WHERE { ?live <" drafter.rdf.drafter-ontology/drafter:hasDraft "> ?draft . }"))))
 
-          (is (= found-graph "http://test.com/graph-2"))))))
+          (is (= "http://test.com/graph-2" found-graph))))))
+
+(deftest error-on-invalid-context
+  (let [db (ses/repo)
+        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
+        draft-one (import-data-to-draft! db "http://test.com/graph-1" (test-triples "http://test.com/subject-1"))
+        draft-two (import-data-to-draft! db "http://test.com/graph-1" (test-triples "http://test.com/subject-1"))
+        endpoint (draft-sparql-routes db)]
+
+    (testing "When the context is set to two drafts which represent the same live graph an error should be raised."
+      (let [{:keys [status headers body] :as result} (-> (endpoint
+                                                          (-> drafts-request
+                                                              (assoc-in [:query-params "graph"] [draft-one draft-two])
+                                                              (assoc-in [:params :query]
+                                                                        "SELECT * WHERE { ?s ?p ?o . } LIMIT 1"))))]
+
+        (is (= 412 status))
+        ;; TODO write unit test
+
+        ))))
+
 
 
 ;;(use-fixtures :each (partial wrap-with-clean-test-db))

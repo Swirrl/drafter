@@ -45,6 +45,7 @@
      (doseq [context context-set]
        (when (.isConstant context)
          (let [new-uri (get graph-map (.getValue context))]
+           (timbre/info "Rewriting constant " context " with new-uri " new-uri)
            (.setValue context new-uri))))
      query-ast))
 
@@ -108,7 +109,8 @@
       (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
 
       (when vars-in-graph-position
-        (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position))
+        (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
+        (timbre/info "Rewriten query AST: " prepared-query))
 
       prepared-query)))
 
@@ -130,7 +132,8 @@
   ([repo query-str query-substitutions]
        (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
     ([repo query-str query-substitutions dataset]
-       (let [prepared-query (rewrite-graph-query repo query-str query-substitutions dataset)]
+       (let [prepared-query (doto (rewrite-graph-query repo query-str query-substitutions)
+                              (.setDataset dataset))]
          (rewrite-graph-results query-substitutions prepared-query))))
 
 
