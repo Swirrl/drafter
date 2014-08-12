@@ -196,6 +196,10 @@
     (timbre/info "Runtime rewrite of live graph" live-graph-uri "to draft graph" res)
     res))
 
+(defn- has-duplicates? [col]
+  (not= col
+        (distinct col)))
+
 (defn graph-map
   "Takes a database and a set of drafts and returns a hashmap of live
   graphs associated with their drafts.
@@ -211,8 +215,13 @@
                                    "  ?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
                                    "        <" drafter:hasDraft "> ?draft .")
                                  "}")))]
-    (zipmap (map #(get % "live") results)
-            (map #(get % "draft") results))))
+    (let [live-graphs (map #(get % "live") results)]
+      (when (has-duplicates? live-graphs)
+        (throw (ex-info "Multiple draft graphs were supplied referencing the same live graph."
+                        {:error :multiple-drafts-error})))
+
+      (zipmap live-graphs
+              (map #(get % "draft") results)))))
 
 (defn live-graphs [db & {:keys [online] :or {online true}}]
   "Get all live graph names.  Takes an optional boolean keyword

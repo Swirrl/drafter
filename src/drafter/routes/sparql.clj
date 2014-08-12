@@ -33,22 +33,21 @@ of live graphs is returned."
 
       (mgmt/live-graphs repo))))
 
-(defn make-result-rewriter [solution-handler-fn writer]
+(defn make-result-rewriter
+  "Creates a new SPARQLResultWriter that proxies to the supplied
+  result handler, but rewrites solutions according to the supplied
+  solution-handler-fn."
+  [solution-handler-fn writer]
   (reify TupleQueryResultHandler
     (endQueryResult [this]
-      (timbre/info "endQueryResult")
       (.endQueryResult writer))
     (handleBoolean [this boolean]
-      (timbre/info "handleBoolean" boolean)
       (.handleBoolean writer boolean))
     (handleLinks [this link-urls]
-      (timbre/info "handleLinks" link-urls)
       (.handleLinks writer link-urls))
     (handleSolution [this binding-set]
-      (timbre/info "handleSolution" binding-set)
       (solution-handler-fn writer binding-set))
     (startQueryResult [this binding-names]
-      (timbre/info "startQueryResult" binding-names)
       (.startQueryResult writer binding-names))))
 
 
@@ -82,15 +81,23 @@ of live graphs is returned."
      }))
 
 (defn- draft-query-endpoint [repo request]
-  (let [{:keys [params]} request
+  (try
+    (let [{:keys [params]} request
         query-str (:query params)
         graph-uris (supplied-drafts repo request)
         {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo query-str graph-uris)]
 
-    (process-sparql-query repo request
-                          :query-creator-fn query-rewriter
-                          :result-rewriter result-rewriter
-                          :graph-restrictions graph-uris)))
+      (process-sparql-query repo request
+                            :query-creator-fn query-rewriter
+                            :result-rewriter result-rewriter
+                            :graph-restrictions graph-uris))
+
+    (catch Exception ex
+      (let [unpack #(= %1 (-> %2 ex-data :error))
+            status (condp unpack ex
+                     :multiple-drafts-error 412
+                     nil 500)]
+        {:status status :body (.getMessage ex)}))))
 
 
 (defn draft-sparql-routes [repo]
