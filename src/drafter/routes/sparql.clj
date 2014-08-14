@@ -5,7 +5,6 @@
             [clojure.set :as set]
             [ring.util.io :as io]
             [compojure.route :refer [not-found]]
-            [compojure.handler :refer [api]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.rdf.sparql-rewriting :as rew]
