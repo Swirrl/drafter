@@ -90,73 +90,81 @@
     (ses/with-transaction repo
       (mgmt/migrate-live! repo graph))))
 
-(defn draft-api-routes [repo queue]
+(defn draft-api-routes [mount-point repo queue]
   (routes
+   (context
+    mount-point []
 
-   ; makes a new managed/draft graph.
-   ; accepts extra meta- query string params, which are added to the state graph
-   (POST "/draft/create" {{live-graph "live-graph"} :query-params
-                          query-params :query-params}
+    ;; makes a new managed/draft graph.
+    ;; accepts extra meta- query string params, which are added to the state graph
 
-         (api-routes/when-params [live-graph]
-           (let [draft-graph-uri (ses/with-transaction repo
-                                   (mgmt/create-managed-graph! repo live-graph)
-                                   (mgmt/create-draft-graph! repo live-graph (api-routes/meta-params query-params)))]
-             (api-routes/api-response 201 {:guri draft-graph-uri}))))
-
-   ; adds data to the graph from either source-graph or file
-   ; accepts extra meta- query string params, which are added to queue metadata
-   (POST "/draft" {{graph "graph" source-graph "source-graph"} :query-params
-                   query-params :query-params
-                   {file :file} :params}
-
-
-           (if source-graph
-             (api-routes/when-params [graph source-graph] ; when source supplied: append from source-graph.
-                          (enqueue-job! queue
-                                        (append-data-to-graph-from-graph-job repo graph source-graph)
-                                        {:job-desc (str "append to graph: " graph " from source graph: " source-graph)
-                                         :meta (api-routes/meta-params query-params)}))
-
-             (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
-                          (enqueue-job! queue
-                                        (append-data-to-graph-from-file-job repo graph file)
-                                        {:job-desc (str "append to graph " graph " from file")
-                                         :meta (api-routes/meta-params query-params)}))))
-
-   ; replaces data in the graph from either source-graph or file
-   ; accepts extra meta- query string params, which are added to queue metadata
-   (PUT "/draft" {{graph "graph" source-graph "source-graph"} :query-params
-                  query-params :query-params
-                  {file :file} :params}
-
-        (if source-graph
-          (api-routes/when-params [graph source-graph] ; when source supplied: replace from source-graph.
-                       (enqueue-job! queue
-                                     (replace-data-from-graph-job repo graph source-graph)
-                                     {:job-desc (str "replace contents of graph " graph " from source graph: " source-graph)
-                                      :meta (api-routes/meta-params query-params)}))
-
-          (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
-                       (enqueue-job! queue
-                                     (replace-graph-from-file-job repo graph file)
-                                     {:job-desc (str "replace contents of graph " graph " from file")
-                                      :meta (api-routes/meta-params query-params)}))))
-
-   ; deletes data in the graph. This could be a live or a draft graph.
-   ; accepts extra meta- query string params, which are added to queue metadata
-   (DELETE "/graph" {{graph "graph"} :query-params
+    (POST "/create" {{live-graph "live-graph"} :query-params
                      query-params :query-params}
-           (api-routes/when-params [graph]
-                        (enqueue-job! queue (delete-graph-job repo graph)
-                                      {:job-desc (str "delete graph" graph)
-                                       :meta (api-routes/meta-params query-params)})))
 
-   ; makes a graph live.
-   ; accepts extra meta- query string params, which are added to queue metadata
-   (PUT "/live" {{graph "graph"} :query-params
-                 query-params :query-params}
-        (api-routes/when-params [graph]
-                     (enqueue-job! queue (migrate-graph-live-job repo graph)
-                                   {:job-desc (str "migrate graph " graph " to live")
-                                    :meta (api-routes/meta-params query-params)})))))
+          (api-routes/when-params [live-graph]
+                                  (let [draft-graph-uri (ses/with-transaction repo
+                                                          (mgmt/create-managed-graph! repo live-graph)
+                                                          (mgmt/create-draft-graph! repo live-graph (api-routes/meta-params query-params)))]
+                                    (api-routes/api-response 201 {:guri draft-graph-uri})))))
+
+   ;; adds data to the graph from either source-graph or file
+   ;; accepts extra meta- query string params, which are added to queue metadata
+   (routes
+    (POST mount-point {{graph "graph" source-graph "source-graph"} :query-params
+                       query-params :query-params
+                       {file :file} :params}
+
+
+          (if source-graph
+            (api-routes/when-params [graph source-graph] ; when source supplied: append from source-graph.
+                                    (enqueue-job! queue
+                                                  (append-data-to-graph-from-graph-job repo graph source-graph)
+                                                  {:job-desc (str "append to graph: " graph " from source graph: " source-graph)
+                                                   :meta (api-routes/meta-params query-params)}))
+
+            (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
+                                    (enqueue-job! queue
+                                                  (append-data-to-graph-from-file-job repo graph file)
+                                                  {:job-desc (str "append to graph " graph " from file")
+                                                   :meta (api-routes/meta-params query-params)}))))
+
+    ;; replaces data in the graph from either source-graph or file
+    ;; accepts extra meta- query string params, which are added to queue metadata
+    (PUT mount-point {{graph "graph" source-graph "source-graph"} :query-params
+                      query-params :query-params
+                      {file :file} :params}
+
+         (if source-graph
+           (api-routes/when-params [graph source-graph] ; when source supplied: replace from source-graph.
+                                   (enqueue-job! queue
+                                                 (replace-data-from-graph-job repo graph source-graph)
+                                                 {:job-desc (str "replace contents of graph " graph " from source graph: " source-graph)
+                                                  :meta (api-routes/meta-params query-params)}))
+
+           (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
+                                   (enqueue-job! queue
+                                                 (replace-graph-from-file-job repo graph file)
+                                                 {:job-desc (str "replace contents of graph " graph " from file")
+                                                  :meta (api-routes/meta-params query-params)})))))))
+
+(defn graph-management-routes [mount-point repo queue]
+  (routes
+   ;; deletes data in the graph. This could be a live or a draft graph.
+   ;; accepts extra meta- query string params, which are added to queue metadata
+   (DELETE mount-point {{graph "graph"} :query-params
+                        query-params :query-params}
+           (api-routes/when-params [graph]
+                                   (enqueue-job! queue (delete-graph-job repo graph)
+                                                 {:job-desc (str "delete graph" graph)
+                                                  :meta (api-routes/meta-params query-params)})))
+   (context
+    mount-point []
+
+    ;; makes a graph live.
+    ;; accepts extra meta- query string params, which are added to queue metadata
+    (PUT "/live" {{graph "graph"} :query-params
+                  query-params :query-params}
+         (api-routes/when-params [graph]
+                                 (enqueue-job! queue (migrate-graph-live-job repo graph)
+                                               {:job-desc (str "migrate graph " graph " to live")
+                                                :meta (api-routes/meta-params query-params)}))))))

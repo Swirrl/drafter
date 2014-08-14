@@ -1,8 +1,10 @@
 (ns drafter.handler
   (:require [compojure.core :refer [defroutes routes]]
             [drafter.routes.pages :refer [pages-routes]]
-            [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes state-sparql-routes]]
-            [drafter.routes.drafts-api :refer [draft-api-routes]]
+            [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes
+                                           state-sparql-routes]]
+            [drafter.routes.sparql-update :refer [update-endpoint-route]]
+            [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
             [drafter.routes.queue-api :refer [queue-api-routes]]
             [drafter.middleware :as middleware]
             [noir.util.middleware :refer [app-handler]]
@@ -55,11 +57,13 @@
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         [pages-routes
-                         (draft-api-routes repo queue)
-                         (queue-api-routes queue)
-                         (live-sparql-routes repo)
-                         (draft-sparql-routes repo)
-                         (state-sparql-routes repo)
+                         (draft-api-routes "/draft" repo queue)
+                         (graph-management-routes "/graph" repo queue)
+                         (queue-api-routes "/queue" queue)
+                         (live-sparql-routes "/sparql/live" repo)
+                         (draft-sparql-routes "/sparql/draft" repo)
+                         (state-sparql-routes "/sparql/state" repo)
+
                          app-routes]
                         ;; add custom middleware here
                         :middleware [middleware/template-error-page

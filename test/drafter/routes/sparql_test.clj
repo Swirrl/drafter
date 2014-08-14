@@ -98,7 +98,7 @@
   (let [*test-db* (ses/repo)
         drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-db*)
-        endpoint (draft-sparql-routes *test-db*)]
+        endpoint (draft-sparql-routes "/sparql/draft" *test-db*)]
 
     (testing "draft graphs that are made live can no longer be queried on their draft GURI"
       (let [csv-result (csv-> (endpoint
@@ -155,7 +155,7 @@
   (let [db (ses/repo)
         drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [_ draft-graph-2 draft-graph-3] (add-test-data! db)
-        endpoint (draft-sparql-routes db)]
+        endpoint (draft-sparql-routes "/sparql/draft" db)]
 
     (register-function drafter.rdf.sparql-rewriting/function-registry
                        "http://publishmydata.com/def/functions#replace-live-graph-uri"
@@ -177,7 +177,7 @@
   (let [db (ses/repo)
         drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [_ draft-graph-2 draft-graph-3] (add-test-data! db)
-        endpoint (draft-sparql-routes db)]
+        endpoint (draft-sparql-routes "/sparql/draft" db)]
 
     ;; register the function that does the results rewriting
     (register-function drafter.rdf.sparql-rewriting/function-registry
@@ -204,7 +204,7 @@
         drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         draft-one (import-data-to-draft! db "http://test.com/graph-1" (test-triples "http://test.com/subject-1"))
         draft-two (import-data-to-draft! db "http://test.com/graph-1" (test-triples "http://test.com/subject-1"))
-        endpoint (draft-sparql-routes db)]
+        endpoint (draft-sparql-routes "/sparql/draft" db)]
 
     (testing "When the context is set to two drafts which represent the same live graph an error should be raised."
       (let [{:keys [status headers body] :as result} (-> (endpoint

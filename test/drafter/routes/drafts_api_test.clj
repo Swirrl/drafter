@@ -32,7 +32,7 @@
 
     (testing "POST /draft/create"
       (testing "without a live-graph param returns a 400 error"
-        (let [{:keys [status body headers]} ((draft-api-routes *test-db* queue)
+        (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* queue)
                                              {:uri "/draft/create"
                                               :request-method :post
                                               :headers {"accept" "application/json"}})]
@@ -42,7 +42,7 @@
 
       (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
 
-        (let [{:keys [status body headers]} ((draft-api-routes *test-db* queue)
+        (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* queue)
                                              {:uri "/draft/create"
                                               :request-method :post
                                               :query-params {"live-graph" test-graph-uri}
@@ -61,7 +61,7 @@
                                             :tempfile (io/file "./test/test-triple.nt")
                                             :size 10}}}
 
-              route (draft-api-routes *test-db* queue)
+              route (draft-api-routes "/draft" *test-db* queue)
               {:keys [status body headers]} (route test-request)]
 
           (testing "returns job id"
@@ -106,7 +106,7 @@
                             :request-method :post
                             :query-params {"graph" "http://mygraph/graph-to-be-appended-to" "source-graph" "http://draft.org/source-graph"}}
 
-              route (draft-api-routes *test-db* queue)
+              route (draft-api-routes "/draft" *test-db* queue)
               {:keys [status body headers]} (route test-request)]
 
             (testing "returns job id"
@@ -139,7 +139,7 @@
                                         :tempfile (io/file "./test/test-triple.nt")
                                         :size 10}}}
 
-          route (draft-api-routes *test-db* queue)
+          route (draft-api-routes "/draft" *test-db* queue)
           {:keys [status body headers]} (route test-request)]
 
       (testing "adds replace job to queue"
@@ -168,7 +168,7 @@
                           :request-method :put
                           :query-params {"graph" "http://mygraph/graph-to-be-replaced" "source-graph" "http://draft.org/source-graph"}}
 
-            route (draft-api-routes *test-db* queue)
+            route (draft-api-routes "/draft" *test-db* queue)
             {:keys [status body headers]} (route test-request)]
 
         (testing "returns job id"
@@ -197,7 +197,7 @@
                           :request-method :put
                           :query-params {"graph" "http://mygraph/graph-to-be-replaced" "source-graph" "http://draft.org/source-graph-x"}}
 
-            route (draft-api-routes *test-db* queue)
+            route (draft-api-routes "/draft"  *test-db* queue)
             {:keys [status body headers]} (route test-request)]
 
          (testing "returns job id"
@@ -221,12 +221,15 @@
                     "Destination graph should be deleted")))))))
 
 
+  ))
+
+(deftest graph-management-routes-test
   (testing "DELETE /graph"
     (do
       (make-live-graph *test-db* "http://mygraph/live-graph")
 
       (let [queue (q/make-queue 2)
-            route (draft-api-routes *test-db* queue)
+            route (graph-management-routes "/graph" *test-db* queue)
 
             test-request {:uri "/graph"
                           :request-method :delete
@@ -255,12 +258,12 @@
                   "Graph should be deleted")))))))
 
 
-  (testing "PUT /live"
+  (testing "PUT /graph/live"
     (let [draft-graph (import-data-to-draft! *test-db* "http://mygraph.com/live-graph" (test-triples "http://test.com/subject-1"))
           queue (q/make-queue 2)
-          route (draft-api-routes *test-db* queue)
+          route (graph-management-routes "/graph" *test-db* queue)
 
-          test-request {:uri "/live"
+          test-request {:uri "/graph/live"
                         :request-method :put
                         :query-params {"graph" draft-graph}}
 
@@ -285,6 +288,6 @@
             (migrate-job)
 
             (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }"))
-                "Live graph should contain our triples"))))))))
+                "Live graph should contain our triples")))))))
 
 (use-fixtures :each wrap-with-clean-test-db)

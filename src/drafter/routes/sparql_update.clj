@@ -67,14 +67,14 @@
       (timbre/fatal "An exception was thrown when executing a SPARQL update!" ex)
       {:status 500 :body (str "Unknown server error executing update" ex)})))
 
-(defn update-endpoint
+(defn update-endpoint-route
   ([mount-point repo]
-     (update-endpoint mount-point repo nil))
+     (update-endpoint-route mount-point repo nil))
   ([mount-point repo restrictions]
-     (routes
-      (POST mount-point request
-            (let [{:keys [update graphs]} (parse-update-request request)
-                  update-query (if graphs
-                                 (update/make-rewritten-update repo update graphs)
-                                 (ses/prepare-update repo update))]
-              (execute-update repo update-query))))))
+
+     (POST mount-point request
+           (let [{:keys [update graphs]} (parse-update-request request)
+                 update-query (if graphs
+                                (update/make-rewritten-update repo update graphs)
+                                (ses/prepare-update repo update))]
+             (execute-update repo update-query)))))

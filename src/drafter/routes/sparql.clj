@@ -99,16 +99,16 @@ of live graphs is returned."
         {:status status :body (.getMessage ex)}))))
 
 
-(defn draft-sparql-routes [repo]
+(defn draft-sparql-routes [mount-point repo]
   (routes
-   (GET "/sparql/draft" request
+   (GET mount-point request
         (draft-query-endpoint repo request))
 
-   (POST "/sparql/draft" request
+   (POST mount-point request
          (draft-query-endpoint repo request))))
 
-(defn live-sparql-routes [repo]
-  (sparql-end-point "/sparql/live" repo (mgmt/live-graphs repo)))
+(defn live-sparql-routes [mount-point repo]
+  (sparql-end-point mount-point repo (mgmt/live-graphs repo)))
 
-(defn state-sparql-routes [repo]
-  (sparql-end-point "/sparql/state" repo #{mgmt/drafter-state-graph}))
+(defn state-sparql-routes [mount-point repo]
+  (sparql-end-point mount-point repo #{mgmt/drafter-state-graph}))

@@ -19,12 +19,13 @@
   (merge (dissoc j :id :job)
          {:id (str (:id j))}))
 
-(defn queue-api-routes [queue]
-  (routes
-   ;; TODO: add parameters to allow filtering.
-   (GET "/queue/peek" {}
-        (let [job-list (map renderable-job
-                            (q/peek-jobs queue))]
+(defn queue-api-routes [mount-point queue]
+  (context "/queue" []
+           (routes
+            ;; TODO: add parameters to allow filtering.
+            (GET "/peek" {}
+                 (let [job-list (map renderable-job
+                                     (q/peek-jobs queue))]
 
-          ;; the middleware will turn it into json.
-          (api-routes/api-response 200 {:queue job-list})))))
+                   ;; the middleware will turn it into json.
+                   (api-routes/api-response 200 {:queue job-list}))))))

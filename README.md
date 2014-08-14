@@ -115,7 +115,7 @@ Returns a 202 if enqueued successfully, with the `queue-id` in the response body
 
 **Making a draft live**
 
-`PUT /live?graph=GURIs`
+`PUT /graph/live?graph=GURIs`
 
 (Just supports a single graph at the moment TODO: multiple graphs at once).
 
@@ -128,8 +128,8 @@ Returns a 202 if enqueued successfully, with the `queue-id` in the response body
 
 **Making a 'live graph' public/private (TODO - not available yet)**
 
-`PUT /live?graph=GURI&public=true`
-`PUT /live?graph=GURI&public=false`
+`PUT /graph/live?graph=GURI&public=true`
+`PUT /graph/live?graph=GURI&public=false`
 
 **Metadata**
 

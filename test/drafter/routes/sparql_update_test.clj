@@ -30,7 +30,7 @@
 
 (deftest application-sparql-update-test
   (let [db (repo)
-        endpoint (update-endpoint "/update" db)
+        endpoint (update-endpoint-route "/update" db)
         {:keys [status body headers]} (endpoint (update-request))]
 
     (testing "POST /update"
