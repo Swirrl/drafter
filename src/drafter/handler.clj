@@ -106,8 +106,7 @@
 
   (timbre/set-config!
     [:shared-appender-config :rotor]
-    {:path "drafter.log" :max-size (* 512 1024) :backlog 10
-     })
+    {:path "drafter.log" :max-size (* 512 1024) :backlog 10})
 
   (when (env :dev)
     (parser/cache-off!)

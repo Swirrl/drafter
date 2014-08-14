@@ -218,10 +218,7 @@
                      "Graph should contain initial state before it is replaced")
                 (job-f)
                 (is (= false (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-2> ?p ?o . } }")))
-                    "Destination graph should be deleted")))))))
-
-
-  ))
+                    "Destination graph should be deleted")))))))))
 
 (deftest graph-management-routes-test
   (testing "DELETE /graph"
