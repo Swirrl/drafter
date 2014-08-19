@@ -9,28 +9,10 @@
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.rdf.sparql-rewriting :as rew]
             [taoensso.timbre :as timbre]
-            [grafter.rdf.sesame :as ses])
+            [grafter.rdf.sesame :as ses]
+            [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
            [org.openrdf.query TupleQueryResultHandler BindingSet]))
-
-(defn supplied-drafts
-  "Parses out the set of \"graph\"s supplied on the request.
-
-Returns a function that when called with a single argument (the
-  database which may be ignored) will return a set of named graphs.
-
-If no graphs are found in the request, a function that returns the set
-of live graphs is returned."
-  [repo request]
-  (let [graphs (-> request
-                  :query-params
-                  (get "graph"))]
-    (if graphs
-      (if (instance? String graphs)
-        #{graphs}
-        graphs)
-
-      (mgmt/live-graphs repo))))
 
 (defn make-result-rewriter
   "Creates a new SPARQLResultWriter that proxies to the supplied

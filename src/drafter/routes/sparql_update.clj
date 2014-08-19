@@ -10,13 +10,14 @@
             [drafter.rdf.sparql-rewriting :as rew]
             [taoensso.timbre :as timbre]
             [drafter.rdf.sparql-update :as update]
-            [grafter.rdf.sesame :as ses]))
+            [grafter.rdf.sesame :as ses]
+            [drafter.common.sparql-routes :refer [supplied-drafts]]))
 
 (defn do-update [repo restrictions]
   {:status 200})
 
 (defn decode-x-form-urlencoded-parameters
-  "Decodes application/x-form-urlencoded parameter strings and returns
+  "Decodes application/x-www-form-urlencoded parameter strings and returns
   a hashmap mapping.  If a value occurs multiple times the repeated
   values are stored under that key in a vector.
 
@@ -36,33 +37,30 @@
   "Convert a request into an String representing the SPARQL update
   query depending on the content-type."
   (fn [request]
-    (-> request :headers :content-type)))
+    (-> request :content-type)))
 
-(defn- read-body [request]
+(defn- read-body [body]
   "Extract the body of the request into a string"
-  (-> request :body (slurp :encoding "UTF-8")))
+  (-> body (slurp :encoding "UTF-8")))
 
 (defmethod parse-update-request "application/sparql-update" [{:keys [body params] :as request}]
-  (let [update (read-body request)]
+  (let [update (read-body body)]
     {:update update
      :graphs (:graphs params)}))
 
-(defmethod parse-update-request "application/x-form-urlencoded" [{:keys [body] :as request}]
-  (let [params (-> body read-body decode-x-form-urlencoded-parameters)]
+(defmethod parse-update-request "application/x-www-form-urlencoded" [request]
+  (let [params (-> request :form-params)]
     {:update (get params "update")
      :graphs (get params "graph")}))
 
 (defmethod parse-update-request :default [request]
-  (throw (Exception. "Invalid Content-Type")))
-
-(defn process-request [request]
-  {:graphs [] :update "input stream"})
+  (throw (Exception. (str "Invalid Content-Type " (:content-type request)))))
 
 (defn execute-update [repo update-query]
   (try
     (ses/with-transaction repo
       (ses/evaluate update-query))
-    {:status 200}
+    {:status 200 :body "OK"}
     (catch Exception ex
       (timbre/fatal "An exception was thrown when executing a SPARQL update!" ex)
       {:status 500 :body (str "Unknown server error executing update" ex)})))
@@ -74,7 +72,26 @@
 
      (POST mount-point request
            (let [{:keys [update graphs]} (parse-update-request request)
-                 update-query (if graphs
-                                (update/make-rewritten-update repo update graphs)
-                                (ses/prepare-update repo update))]
-             (execute-update repo update-query)))))
+                 update-query (if restrictions
+                                (let [restricted-ds (ses/make-restricted-dataset :default-graph restrictions
+                                                                                 :union-graph restrictions)]
+                                  (if graphs
+                                    (update/make-rewritten-update repo update graphs restricted-ds)
+                                    (ses/prepare-update repo update restricted-ds)))
+                                (if graphs
+                                  (update/make-rewritten-update repo update graphs)
+                                  (update/make-rewritten-update repo update (mgmt/live-graphs repo))))
+
+                 preped-update (ses/prepare-update repo update)]
+             (timbre/info "About to execute update-query " update-query)
+             (execute-update repo preped-update)))))
+
+(defn draft-update-endpoint-route [mount-point repo]
+  ;; TODO
+  )
+
+(defn live-update-endpoint-route [mount-point repo]
+  (update-endpoint-route mount-point repo (mgmt/live-graphs repo)))
+
+(defn state-update-endpoint-route [mount-point repo]
+  (update-endpoint-route mount-point repo #{mgmt/drafter-state-graph}))

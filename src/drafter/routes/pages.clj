@@ -8,6 +8,12 @@
 
 (defroutes pages-routes
   (GET "/" [] (ring.util.response/redirect "/live"))
-  (GET "/live" [] (query-page { :endpoint "/sparql/live" :name "Live" }))
-  (GET "/draft" [] (query-page { :endpoint "/sparql/draft" :name "Draft" }))
-  (GET "/state" [] (query-page { :endpoint "/sparql/state" :name "State" })))
+  (GET "/live" [] (query-page {:endpoint "/sparql/live"
+                               :update-endpoint "/sparql/live/update"
+                               :name "Live" }))
+  (GET "/draft" [] (query-page {:endpoint "/sparql/draft"
+                                :update-endpoint "/sparql/draft/update"
+                                :name "Draft" }))
+  (GET "/state" [] (query-page {:endpoint "/sparql/state"
+                                :update-endpoint "/sparql/state/update"
+                                :name "State" })))

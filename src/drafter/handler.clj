@@ -7,16 +7,17 @@
             [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
             [drafter.routes.queue-api :refer [queue-api-routes]]
             [drafter.middleware :as middleware]
+            [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
+            [drafter.routes.sparql-update :refer [update-endpoint-route state-update-endpoint-route live-update-endpoint-route]]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
             [taoensso.timbre :as timbre]
             [taoensso.timbre.appenders.rotor :as rotor]
             [selmer.parser :as parser]
-            [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri]]
+            [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri drafter-state-graph]]
             [drafter.rdf.queue :as q]
             [grafter.rdf.sesame :as sesame]
             [compojure.handler :only [api]]
-            [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
             [environ.core :refer [env]]))
 
 (def repo-path "MyDatabases/repositories/db")
@@ -61,9 +62,11 @@
                          (graph-management-routes "/graph" repo queue)
                          (queue-api-routes "/queue" queue)
                          (live-sparql-routes "/sparql/live" repo)
+                         (live-update-endpoint-route "/sparql/live/update" repo)
                          (draft-sparql-routes "/sparql/draft" repo)
+                         (update-endpoint-route "/sparql/draft/update" repo)
                          (state-sparql-routes "/sparql/state" repo)
-
+                         (state-update-endpoint-route "/sparql/state/update" repo)
                          app-routes]
                         ;; add custom middleware here
                         :middleware [middleware/template-error-page
@@ -83,7 +86,7 @@
                  (q/process-queue queue
                                   (fn [ex]
                                     (taoensso.timbre/error
-                                     (str "Queue Worker Error.  Repo id is: " (System/identityHashCode repo)) ex))))
+                                     (str "Queue Worker Error.  Repo id is: " (System/identityHashCode repo) " Queue contains: " queue) ex))))
 
   (timbre/info "Attached import worker to job queue"))
 
