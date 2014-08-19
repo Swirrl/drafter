@@ -4,7 +4,7 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [taoensso.timbre :as timbre]
             [clojure.java.io :as io]
-            [grafter.rdf :refer [graph graphify load-triples add-properties]]
+            [grafter.rdf :refer [graph load-triples add-properties]]
             [grafter.rdf.protocols :refer [add subject predicate object context
                                            add-statement statements begin commit rollback]])
   (:import [java.util Date]
