@@ -1,7 +1,7 @@
 (ns drafter.rdf.draft-management-test
   (:require
    [drafter.test-common :refer [*test-db* wrap-with-clean-test-db]]
-   [grafter.rdf.protocols :as pr]
+   [grafter.rdf :refer [add]]
    [grafter.rdf :refer [graph triplify]]
    [grafter.rdf.ontologies.rdf :refer :all]
    [grafter.rdf.sesame :refer :all]
@@ -118,10 +118,10 @@
 (deftest graph-restricted-queries-test
   (testing "query"
     (testing "supports graph restriction"
-      (pr/add *test-db* "http://example.org/graph/1"
+      (add *test-db* "http://example.org/graph/1"
               test-triples)
 
-      (pr/add *test-db* "http://example.org/graph/2"
+      (add *test-db* "http://example.org/graph/2"
               test-triples-2)
 
       (is (query *test-db*
