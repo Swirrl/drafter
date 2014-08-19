@@ -4,9 +4,9 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [taoensso.timbre :as timbre]
             [clojure.java.io :as io]
-            [grafter.rdf :refer [graph load-triples add-properties]]
-            [grafter.rdf.protocols :refer [add subject predicate object context
-                                           add-statement begin commit rollback]])
+            [grafter.rdf :refer [add add-statement add-properties graph
+                                 load-triples subject predicate object context]]
+            [grafter.rdf.protocols :refer [begin commit rollback]])
   (:import [java.util Date]
            [org.openrdf.model.impl URIImpl]))
 
