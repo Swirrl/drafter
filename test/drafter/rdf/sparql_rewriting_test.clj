@@ -2,9 +2,7 @@
   (:require
    [drafter.test-common :refer [test-triples]]
    [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph! append-data!]]
-   [grafter.rdf :refer [graph triplify]]
-   [grafter.rdf.protocols :refer [statements]]
-
+   [grafter.rdf :refer [graph triplify statements]]
    [grafter.rdf.sesame :as ses]
    [clojure.test :refer :all]
    [drafter.rdf.sparql-rewriting :refer :all])

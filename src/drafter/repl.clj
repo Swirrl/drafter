@@ -1,8 +1,7 @@
 (ns drafter.repl
   (:use
    [ring.middleware file-info file])
-  (:require [grafter.rdf.protocols :refer [add add-statement statements]]
-            [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
+  (:require [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
             [drafter.rdf.queue :as q]
             [drafter.rdf.draft-management :refer :all]
             [drafter.handler :as service]

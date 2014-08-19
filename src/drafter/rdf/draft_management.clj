@@ -6,7 +6,7 @@
             [clojure.java.io :as io]
             [grafter.rdf :refer [graph load-triples add-properties]]
             [grafter.rdf.protocols :refer [add subject predicate object context
-                                           add-statement statements begin commit rollback]])
+                                           add-statement begin commit rollback]])
   (:import [java.util Date]
            [org.openrdf.model.impl URIImpl]))
 

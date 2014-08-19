@@ -12,7 +12,7 @@
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.common.api-routes :as api-routes]
             [grafter.rdf.sesame :as ses]
-            [grafter.rdf.protocols :refer [add statements]])
+            [grafter.rdf :refer [statements]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]))
 
 (defn enqueue-job!
