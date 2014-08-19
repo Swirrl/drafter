@@ -5,7 +5,7 @@
             [taoensso.timbre :as timbre]
             [clojure.java.io :as io]
             [grafter.rdf :refer [add add-statement add-properties graph
-                                 load-triples subject predicate object context]]
+                                 subject predicate object context]]
             [grafter.rdf.protocols :refer [begin commit rollback]])
   (:import [java.util Date]
            [org.openrdf.model.impl URIImpl]))
