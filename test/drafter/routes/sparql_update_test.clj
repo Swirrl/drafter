@@ -1,6 +1,6 @@
 (ns drafter.routes.sparql-update-test
   (:require [drafter.routes.sparql-update :refer :all]
-            [drafter.rdf.draft-management :refer [create-managed-graph!]]
+            [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!]]
             [clojure.test :refer :all]
             [ring.util.codec :as codec]
             [drafter.test-common :refer [stream->string select-all-in-graph]]
@@ -9,7 +9,9 @@
   (:import [java.nio.charset StandardCharsets]
            [java.io ByteArrayInputStream]))
 
-(defn ->input-stream [s]
+(defn ->input-stream
+  "Convert a string into an Input Stream"
+  [s]
   (-> s (.getBytes StandardCharsets/UTF_8) java.io.ByteArrayInputStream.))
 
 (def default-update-string "INSERT { GRAPH <http://example.com/> {
@@ -47,11 +49,23 @@
 
 (deftest application-sparql-update-test
   (let [db (repo)
-        endpoint (update-endpoint-route "/update" db)]
+        endpoint (update-endpoint "/update" db)]
 
     (testing "POST /update"
       (testing "with a valid SPARQL update"
         (let [{:keys [status body headers]} (endpoint (application-sparql-update-request))]
+          (is (= 200 status)
+              "returns 200 success")
+          (is (query db "ASK { <http://test/> <http://test/> <http://test/> . }")
+              "Inserts the data"))))))
+
+(deftest application-x-form-urlencoded-test
+  (let [db (repo)
+        endpoint (update-endpoint "/update" db)]
+
+    (testing "POST /update"
+      (testing "with a SPARQL update"
+        (let [{:keys [status body headers]} (endpoint (x-form-urlencoded-update-request))]
           (is (= 200 status)
               "returns 200 success")
           (is (query db "ASK { <http://test/> <http://test/> <http://test/> . }")
@@ -75,19 +89,22 @@
                    :union-graphs ["http://example.com/"])
             "Inserts the data")))))
 
-(deftest application-x-form-urlencoded-test
-  (let [db (repo)
-        endpoint (update-endpoint-route "/update" db)]
+(deftest draft-endpoint-test
+  (testing "updates against live graphs get directed to the appropriate draft as specified by the graphs parameter"
+    (let [db (repo)
+          endpoint (draft-update-endpoint-route "/update" db)
+          live-graph (create-managed-graph! db "http://live-graph.com/")
+          draft-graph (create-draft-graph! db live-graph)]
+      (testing "POST /update?graphs=<draft>"
+        ;; TODO
+        (let [{:keys [status headers body]} (endpoint (x-form-urlencoded-update-request default-update-string
+                                                                                        [draft-graph]))]
 
-    (testing "POST /update"
-      (testing "with a SPARQL update"
-        (let [{:keys [status body headers]} (endpoint (x-form-urlencoded-update-request))]
-          (is (= 200 status)
-              "returns 200 success")
-          (is (query db "ASK { <http://test/> <http://test/> <http://test/> . }")
-              "Inserts the data"))
-
-        ))))
-
+          (is (= 200 status) "Returns ok")
+          (is (query db (str "ASK { "
+                             "  GRAPH <" draft-graph "> {"
+                             "    <http://test/> <http://test/> <http://test/> ."
+                             "  }"
+                             "}"))))))))
 
 (deftest sparql-update-rewriting-test)

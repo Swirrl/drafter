@@ -3,11 +3,10 @@
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes
                                            state-sparql-routes]]
-            [drafter.routes.sparql-update :refer [update-endpoint-route]]
             [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
             [drafter.middleware :as middleware]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
-            [drafter.routes.sparql-update :refer [update-endpoint-route state-update-endpoint-route live-update-endpoint-route]]
+            [drafter.routes.sparql-update :refer [draft-update-endpoint-route state-update-endpoint-route live-update-endpoint-route]]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
             [taoensso.timbre :as timbre]
@@ -62,7 +61,7 @@
                          (live-sparql-routes "/sparql/live" repo)
                          (live-update-endpoint-route "/sparql/live/update" repo)
                          (draft-sparql-routes "/sparql/draft" repo)
-                         (update-endpoint-route "/sparql/draft/update" repo)
+                         (draft-update-endpoint-route "/sparql/draft/update" repo)
                          (state-sparql-routes "/sparql/state" repo)
                          (state-update-endpoint-route "/sparql/state/update" repo)
                          app-routes]

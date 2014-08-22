@@ -11,7 +11,8 @@
             [taoensso.timbre :as timbre]
             [drafter.rdf.sparql-update :as update]
             [grafter.rdf.sesame :as ses]
-            [drafter.common.sparql-routes :refer [supplied-drafts]]))
+            [drafter.common.sparql-routes :refer [supplied-drafts]])
+  (:import [org.openrdf.query Dataset]))
 
 (defn do-update [repo restrictions]
   {:status 200})
@@ -58,40 +59,103 @@
 
 (defn execute-update [repo update-query]
   (try
-    (ses/with-transaction repo
-      (ses/evaluate update-query))
-    {:status 200 :body "OK"}
+    ;; (with-open [conn (ses/->connection repo)]
+      (ses/with-transaction repo ;;conn
+        (ses/evaluate update-query))
+      {:status 200 :body "OK"}
+      ;; )
     (catch Exception ex
       (timbre/fatal "An exception was thrown when executing a SPARQL update!" ex)
       {:status 500 :body (str "Unknown server error executing update" ex)})))
 
-(defn update-endpoint-route
+(defn- collection-or-nil? [x]
+  (or (coll? x)
+      (nil? x)))
+
+(defn- collection-nil-or-fn? [x]
+  (or (collection-or-nil? x)
+      (ifn? x)))
+
+(defn resolve-restrictions
+  "If restrictions is a sequence or nil return it, otherwise assume
+  it's a 0 arg function and call it returning its parameters."
+  [restrictions-or-f]
+  {:pre [(collection-nil-or-fn? restrictions-or-f)]
+   :post [(or (instance? Dataset %) (nil?  %))]}
+  (let [restrictions (if (collection-or-nil? restrictions-or-f)
+                       restrictions-or-f
+                       (restrictions-or-f))]
+    (when (seq restrictions)
+      (ses/make-restricted-dataset :default-graph restrictions
+                                   :union-graph restrictions))))
+
+(defn prepare-restricted-update [repo update-str graphs]
+  (let [restricted-ds (if graphs
+                        (resolve-restrictions graphs)
+                        (resolve-restrictions (mgmt/live-graphs repo)))]
+    (ses/prepare-update repo update-str restricted-ds)))
+
+(defn update-endpoint
+  "Create a standard update-endpoint with no query-rewriting and
+  optional restrictions on the allowed graphs; restrictions can either
+  be a collection of string graph-uri's or a function that returns
+  such a collection."
   ([mount-point repo]
-     (update-endpoint-route mount-point repo nil))
+     (update-endpoint mount-point repo nil))
   ([mount-point repo restrictions]
-
      (POST mount-point request
-           (let [{:keys [update graphs]} (parse-update-request request)
-                 update-query (if restrictions
-                                (let [restricted-ds (ses/make-restricted-dataset :default-graph restrictions
-                                                                                 :union-graph restrictions)]
-                                  (if graphs
-                                    (update/make-rewritten-update repo update graphs restricted-ds)
-                                    (ses/prepare-update repo update restricted-ds)))
-                                (if graphs
-                                  (update/make-rewritten-update repo update graphs)
-                                  (update/make-rewritten-update repo update (mgmt/live-graphs repo))))
-
-                 preped-update (ses/prepare-update repo update)]
-             (timbre/info "About to execute update-query " update-query)
+           (let [{update :update} (parse-update-request request)
+                 ;; prepare the update based upon the endpoints restrictions
+                 preped-update (prepare-restricted-update repo update restrictions)]
+             (timbre/info "About to execute update-query " preped-update)
              (execute-update repo preped-update)))))
 
+(comment
+  (if-let [restricted-ds (resolve-restrictions restrictions)]
+                                 (ses/prepare-update repo update restricted-ds)
+                                 (let [live-graphs (-> repo mgmt/live-graphs resolve-restrictions)]
+                                   (ses/prepare-update repo update live-graphs))))
+
+
+
+
+(defn draft-update-endpoint
+  "Create an update endpoint with draft query rewriting.  Restrictions
+  are applied on the basis of the &graphs query parameter."
+  ([mount-point repo]
+     (POST mount-point request
+           (let [{:keys [update graphs]} (parse-update-request request)
+                 preped-update (prepare-restricted-update repo update graphs)]
+             (update/rewrite-update-request preped-update)
+             (timbre/info "About to execute update-query " preped-update)
+             (execute-update repo preped-update)))
+
+
+     ))
+
+(comment
+  (POST mount-point request
+        (let [{:keys [update graphs]} (parse-update-request request)
+              update-query (if-let [restricted-graphs (resolve-restrictions restrictions)]
+                             (let [restricted-ds (ses/make-restricted-dataset :default-graph restricted-graphs
+                                                                              :union-graph restricted-graphs)]
+                               (if graphs
+                                 (update/make-rewritten-update repo update graphs restricted-ds)
+                                 (ses/prepare-update repo update restricted-ds)))
+                             ;; else
+                             (if graphs
+                               (update/make-rewritten-update repo update graphs)
+                               (update/make-rewritten-update repo update (mgmt/live-graphs repo))))
+
+              preped-update (ses/prepare-update repo update)]
+          (timbre/info "About to execute update-query " update-query)
+          (execute-update repo preped-update))))
+
 (defn draft-update-endpoint-route [mount-point repo]
-  ;; TODO
-  )
+  (update-endpoint mount-point repo ))
 
 (defn live-update-endpoint-route [mount-point repo]
-  (update-endpoint-route mount-point repo (mgmt/live-graphs repo)))
+  (update-endpoint mount-point repo (partial mgmt/live-graphs repo)))
 
 (defn state-update-endpoint-route [mount-point repo]
-  (update-endpoint-route mount-point repo #{mgmt/drafter-state-graph}))
+  (update-endpoint mount-point repo #{mgmt/drafter-state-graph}))

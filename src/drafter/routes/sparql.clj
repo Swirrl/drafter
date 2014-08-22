@@ -83,9 +83,9 @@
 (defn- draft-query-endpoint [repo request]
   (try
     (let [{:keys [params]} request
-        query-str (:query params)
-        graph-uris (supplied-drafts repo request)
-        {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo query-str graph-uris)]
+          query-str (:query params)
+          graph-uris (supplied-drafts repo request)
+          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo query-str graph-uris)]
 
       (process-sparql-query repo request
                             :query-creator-fn query-rewriter

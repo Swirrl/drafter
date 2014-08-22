@@ -7,11 +7,11 @@
            [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
             BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
             StatementImpl BNodeImpl ContextStatementImpl]
-           [org.openrdf.query QueryLanguage]
-           [org.openrdf.query.parser QueryParserUtil]
+           [org.openrdf.query QueryLanguage Update Query]
+           [org.openrdf.query.parser QueryParserUtil ParsedQuery ParsedUpdate]
            [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
            [org.openrdf.query.algebra.evaluation.function Function]
-           [org.openrdf.query.algebra Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr]
+           [org.openrdf.query.algebra UpdateExpr TupleExpr Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr]
            [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
 
 (def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
@@ -24,16 +24,51 @@
   ([query-string base-uri]
      (QueryParserUtil/parseQuery QueryLanguage/SPARQL query-string base-uri)))
 
-(defn vars-in-graph-position
-  "Given a parsed query, context-set returns the set of Vars which are
+(defn- vars-in-graph-position*
+  "Given a parsed query Expr and returns the set of Vars which are
   bound in Graph position."
-  [query]
-  (let [expr (.getTupleExpr query)]
-    (reduce (fn [acc val]
-              (if-let [var (.getContextVar val)]
-                (conj acc var)
-                acc))
-            #{} (StatementPatternCollector/process expr))))
+  [expr]
+  (reduce (fn [acc val]
+            (if-let [var (.getContextVar val)]
+              (conj acc var)
+              acc))
+          #{} (StatementPatternCollector/process expr)))
+
+(defprotocol ISparqlAst
+  ;; TODO extend this with other ops - perhaps more generic ones.
+  (vars-in-graph-position [query]
+    "Given a parsed query, context-set returns the set of Vars which are
+  bound in Graph position."))
+
+(extend-protocol ISparqlAst
+  Query
+  (vars-in-graph-position [this]
+    (vars-in-graph-position (.getParsedQuery this)))
+
+  ParsedQuery
+  (vars-in-graph-position [this]
+    (vars-in-graph-position (.getExpr this)))
+
+  TupleExpr
+  (vars-in-graph-position [this]
+    (vars-in-graph-position* this))
+
+  Update
+  (vars-in-graph-position [this]
+    (vars-in-graph-position (.getParsedUpdate this)))
+
+  ParsedUpdate
+  (vars-in-graph-position [this]
+                                 ;; TODO find out in what situation
+                             ;; there may be multiple
+                             ;; UpdateExprs.  I'm assuming there
+                             ;; will only ever be one.
+
+    (map vars-in-graph-position (.getUpdateExprs this)))
+
+  UpdateExpr
+  (vars-in-graph-position [this]
+    (vars-in-graph-position* this)))
 
 (defn rewrite-graph-constants
   ([query-ast graph-map]
@@ -41,7 +76,6 @@
                                                           (vars-in-graph-position query-ast))))
 
   ([query-ast graph-map context-set]
-
      (doseq [context context-set]
        (when (.isConstant context)
          (let [new-uri (get graph-map (.getValue context))]
@@ -129,6 +163,7 @@
       (ses/evaluate prepared-query))))
 
 (defn evaluate-with-graph-rewriting
+  "Rewrites the results in the query."
   ([repo query-str query-substitutions]
        (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
     ([repo query-str query-substitutions dataset]
@@ -136,6 +171,15 @@
                               (.setDataset dataset))]
          (rewrite-graph-results query-substitutions prepared-query))))
 
+
+
+(defn rewrite-update-request [preped-update graph-substitutions]
+  (when (vars-in-graph-position preped-update)
+    (rewrite-graph-query preped-update graph-substitutions)
+      (timbre/info "Rewritten update to: " preped-update))
+
+  preped-update
+)
 
 (comment
 

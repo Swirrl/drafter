@@ -4,9 +4,6 @@
 (defn supplied-drafts
   "Parses out the set of \"graph\"s supplied on the request.
 
-Returns a function that when called with a single argument (the
-  database which may be ignored) will return a set of named graphs.
-
 If no graphs are found in the request, it returns the set of live
   graphs.
 

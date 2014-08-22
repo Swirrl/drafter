@@ -48,6 +48,8 @@
        (add-properties rdf-template meta-data))))
 
 (defn create-managed-graph!
+  "Create a record of a managed graph in the database, returns the
+  graph-uri that was passed in."
   ([db graph-uri] (create-managed-graph! db graph-uri {}))
   ([db graph-uri opts]
      ;; We only do anything if it's not already a managed graph
@@ -56,7 +58,8 @@
      ;; the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
      (if (not (is-graph-managed? db graph-uri))
        (let [managed-graph-quads (to-quads (create-managed-graph graph-uri opts))]
-         (add db managed-graph-quads)))))
+         (add db managed-graph-quads)))
+       graph-uri))
 
 (defn create-draft-graph
   ([live-graph-uri draft-graph-uri time]
