@@ -149,7 +149,13 @@
 
           (= graph-1-result (second csv-result))
           (is (= 3 (count csv-result))
-              "There should be 5 results (2 triples in both graphs + the csv header row)"))))))
+              "There should be 5 results (2 triples in both graphs + the csv header row)"))))
+
+    (testing "Can do a construct query"
+      (let [csv-result (csv-> (endpoint
+                               (-> drafts-request
+                                   (assoc-in [:params :query] "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))))]
+        (= graph-2-result (second csv-result))))))
 
 (deftest drafts-sparql-route-rewrites-constants
   (let [db (ses/repo)

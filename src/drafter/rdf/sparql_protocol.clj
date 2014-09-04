@@ -71,8 +71,13 @@
                        }
          nil) format))
 
+(defn output-stream-constructor [writer-class]
+  (->> (.getConstructors writer-class)
+       (filter #(= (first (.getParameterTypes %)) java.io.OutputStream))
+       first))
+
 (defn new-result-writer [writer-class ostream]
-  (.newInstance (first (.getConstructors writer-class)) (into-array Object [ostream])))
+  (.newInstance (output-stream-constructor writer-class) (into-array Object [ostream])))
 
 (defn result-streamer [result-writer-class result-rewriter pquery response-mime-type]
   "Returns a function that handles the errors and closes the SPARQL
