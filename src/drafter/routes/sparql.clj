@@ -12,14 +12,16 @@
             [grafter.rdf.sesame :as ses]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
-           [org.openrdf.query TupleQueryResultHandler BindingSet]))
+           [org.openrdf.query TupleQueryResultHandler BindingSet]
+           [org.openrdf.rio RDFHandler]))
 
 (defn make-result-rewriter
   "Creates a new SPARQLResultWriter that proxies to the supplied
   result handler, but rewrites solutions according to the supplied
   solution-handler-fn."
   [solution-handler-fn writer]
-  (reify TupleQueryResultHandler
+  (reify
+    TupleQueryResultHandler
     (endQueryResult [this]
       (.endQueryResult writer))
     (handleBoolean [this boolean]
@@ -29,7 +31,18 @@
     (handleSolution [this binding-set]
       (solution-handler-fn writer binding-set))
     (startQueryResult [this binding-names]
-      (.startQueryResult writer binding-names))))
+      (.startQueryResult writer binding-names))
+    RDFHandler
+    (startRDF [this]
+      (.startRDF writer))
+    (endRDF [this]
+      (.endRDF writer))
+    (handleNamespace [this prefix uri]
+      (.handleNamespace writer prefix uri))
+    (handleStatement [this statement]
+      (.handleStatement writer statement)) ; solution-handler-fn required?
+    (handleComment [this comment]
+      (.handleComment writer comment))))
 
 
 (defn make-draft-query-rewriter [repo query-str draft-uris]

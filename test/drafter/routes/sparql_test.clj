@@ -93,7 +93,6 @@
 
                  (is (= "false" body)))))))
 
-
 (deftest drafts-sparql-routes-test
   (let [*test-db* (ses/repo)
         drafts-request (assoc default-sparql-query :uri "/sparql/draft")
@@ -151,11 +150,25 @@
           (is (= 3 (count csv-result))
               "There should be 5 results (2 triples in both graphs + the csv header row)"))))
 
-    (testing "Can do a construct query"
+    (testing "Can do a construct query without a graph"
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
                                    (assoc-in [:params :query] "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))))]
-        (= graph-2-result (second csv-result))))))
+        (= graph-2-result (second csv-result))))
+
+    (testing "Can do a construct query with a graph"
+      (let [csv-result (csv-> (endpoint
+                               (-> drafts-request
+                                   (assoc-in [:params :query] "CONSTRUCT { ?s ?p ?o } WHERE { graph <http://test.com/graph-1> { ?s ?p ?o . } }"))))]
+        (= graph-1-result (second csv-result))))
+
+    (testing "Can do a describe query with a graph"
+      (let [csv-result (csv-> (endpoint
+                               (-> drafts-request
+                                   (assoc-in [:headers "accept"] "application/n-triples")
+                                   (assoc-in [:params :query] "DESCRIBE ?s WHERE { graph <http://test.com/graph-1> { ?s ?p ?o . } }"))))]
+        (= (clojure.string/join " " graph-1-result)
+           (-> csv-result first first))))))
 
 (deftest drafts-sparql-route-rewrites-constants
   (let [db (ses/repo)
