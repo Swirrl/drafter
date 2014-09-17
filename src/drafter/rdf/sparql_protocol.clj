@@ -94,7 +94,9 @@
           (let [result (.evaluate pquery)]
             (doto (BooleanTextWriter. ostream)
               (.handleBoolean result)))
-          (.evaluate pquery writer)))
+          (do
+            (timbre/info "pquery is " pquery " writer is " writer)
+            (.evaluate pquery writer))))
 
       (catch Exception ex
         ;; Note that if we error here it's now too late to return a
