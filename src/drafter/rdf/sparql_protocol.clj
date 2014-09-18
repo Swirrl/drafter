@@ -6,12 +6,12 @@
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
             [taoensso.timbre :as timbre])
-  (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
+  (:import [org.openrdf.query GraphQuery]
+           [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
            [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
             BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
             StatementImpl BNodeImpl ContextStatementImpl]
            [org.openrdf.repository Repository RepositoryConnection]
-           [org.openrdf.query.resultio TupleQueryResultFormat]
            [org.openrdf.repository.sail SailRepository]
            [org.openrdf.sail.memory MemoryStore]
            [org.openrdf.rio Rio RDFWriter RDFHandler]
@@ -19,9 +19,6 @@
            [org.openrdf.query TupleQuery TupleQueryResult
             TupleQueryResultHandler BooleanQueryResultHandler
             BindingSet QueryLanguage BooleanQuery GraphQuery]
-           [org.openrdf.query.resultio.text BooleanTextWriter]
-           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]
-           [org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLWriter SPARQLBooleanXMLWriter]
            [org.openrdf.rio.ntriples NTriplesWriter]
            [org.openrdf.rio.nquads NQuadsWriter]
            [org.openrdf.rio.n3 N3Writer]
@@ -30,11 +27,17 @@
            [org.openrdf.rio.trix TriXWriter]
            [org.openrdf.rio.turtle TurtleWriter]
            [org.openrdf.rio.rdfxml RDFXMLWriter]
+           [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
+           [org.openrdf.query.resultio TupleQueryResultFormat]
+           [org.openrdf.query.resultio.text BooleanTextWriter]
+           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]
+           [org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLWriter SPARQLBooleanXMLWriter]
            [org.openrdf.query.resultio.binary BinaryQueryResultWriter]
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
            [org.openrdf.query Dataset]
-           [org.openrdf.query.impl DatasetImpl]
+           [org.openrdf.query.resultio QueryResultWriter]
+           [org.openrdf.query.impl DatasetImpl MapBindingSet]
            [javax.xml.datatype XMLGregorianCalendar DatatypeFactory]
            [java.util GregorianCalendar Date]
            [org.openrdf.rio RDFFormat]))
@@ -44,7 +47,6 @@
   Sesame SPARQLResultsWriter class, according to the SPARQL protocols
   content negotiation rules."
   [preped-query format]
-
   (get (condp instance? preped-query
          TupleQuery   { "application/sparql-results+json" SPARQLResultsJSONWriter
                         "application/sparql-results+xml" SPARQLResultsXMLWriter
@@ -68,11 +70,40 @@
                        "text/turtle" TurtleWriter
                        "text/html" TurtleWriter
                        "application/rdf+xml" RDFXMLWriter
+                       "text/csv" SPARQLResultsCSVWriter
+                       "text/tab-separated-values" SPARQLResultsTSVWriter
                        }
          nil) format))
 
 (defn new-result-writer [writer-class ostream]
-  (.newInstance (first (.getConstructors writer-class)) (into-array Object [ostream])))
+  (.newInstance
+   (.getConstructor writer-class (into-array [java.io.OutputStream]))
+   (into-array Object [ostream])))
+
+(defn result-handler-wrapper
+  ([writer] (result-handler-wrapper writer {}))
+  ([writer draft->live]
+     (reify
+       RDFHandler
+       (startRDF [this]
+         (.startQueryResult writer '("s" "p" "o")))
+       (endRDF [this]
+         (.endQueryResult writer))
+       (handleNamespace [this prefix uri]
+         ;; No op
+         )
+       (handleStatement [this statement]
+         (let [s (.getSubject statement)
+               p (.getPredicate statement)
+               o (.getObject statement)
+               bs (doto (MapBindingSet.)
+                    (.addBinding "s" (get draft->live s s))
+                    (.addBinding "p" (get draft->live p p))
+                    (.addBinding "o" (get draft->live o o)))]
+           (.handleSolution writer bs)))
+       (handleComment [this comment]
+         ;; No op
+         ))))
 
 (defn result-streamer [result-writer-class result-rewriter pquery response-mime-type]
   "Returns a function that handles the errors and closes the SPARQL
@@ -88,11 +119,22 @@
                        (result-rewriter w)
                        w))]
         (timbre/info "Calling evaluate with writer: " writer)
-        (if (instance? BooleanTextWriter writer)
-          (let [result (.evaluate pquery)]
+
+        (cond
+         (instance? BooleanTextWriter writer)
+         (let [result (.evaluate pquery)]
             (doto (BooleanTextWriter. ostream)
               (.handleBoolean result)))
-          (.evaluate pquery writer)))
+
+         (and (instance? QueryResultWriter writer)
+              (instance? GraphQuery pquery))
+         (do (timbre/info "pquery is " pquery " writer is " writer)
+             (.evaluate pquery (result-handler-wrapper writer)))
+
+         :else
+         (do
+           (timbre/info "pquery is " pquery " writer is " writer)
+           (.evaluate pquery writer))))
 
       (catch Exception ex
         ;; Note that if we error here it's now too late to return a

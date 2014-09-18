@@ -6,20 +6,24 @@
             [ring.util.io :as io]
             [compojure.route :refer [not-found]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper]]
             [drafter.rdf.sparql-rewriting :as rew]
             [taoensso.timbre :as timbre]
             [grafter.rdf.sesame :as ses]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
-           [org.openrdf.query TupleQueryResultHandler BindingSet]))
+           [org.openrdf.query QueryResultHandler TupleQueryResultHandler BindingSet]
+           [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
+           [org.openrdf.query.impl MapBindingSet]
+           [org.openrdf.rio RDFHandler RDFWriter]))
 
-(defn make-result-rewriter
+(defn make-select-result-rewriter
   "Creates a new SPARQLResultWriter that proxies to the supplied
   result handler, but rewrites solutions according to the supplied
   solution-handler-fn."
   [solution-handler-fn writer]
-  (reify TupleQueryResultHandler
+  (reify
+    TupleQueryResultHandler
     (endQueryResult [this]
       (.endQueryResult writer))
     (handleBoolean [this boolean]
@@ -31,6 +35,34 @@
     (startQueryResult [this binding-names]
       (.startQueryResult writer binding-names))))
 
+(defn- make-construct-result-rewriter
+  "Creates a result-rewriter for construct queries - not a tautology
+  honest!"
+  [writer draft->live]
+  (if (instance? QueryResultHandler writer)
+    (result-handler-wrapper writer draft->live)
+    writer))
+
+(defn- choose-result-rewriter [query-ast vars-in-graph-position draft->live writer]
+  (if (seq vars-in-graph-position)
+    ;; if there are vars in graph position - we should rewrite the
+    ;; results
+    (let [rewrite-graph-result (fn [^QueryResultHandler writer ^BindingSet binding-set]
+                                 (doseq [var vars-in-graph-position]
+                                   (when-not (.isConstant var)
+                                     (let [val (.getValue binding-set (.getName var))
+                                           new-uri (get draft->live val val)]
+                                       (timbre/info "converting var" (.getName var) "val" val "to new-uri" new-uri)
+                                       (.setBinding binding-set (.getName var) new-uri))))
+                                 (.handleSolution writer binding-set))]
+      (cond
+       (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
+       (instance? ParsedTupleQuery query-ast) (make-select-result-rewriter rewrite-graph-result writer)
+       (instance? ParsedBooleanQuery query-ast) writer
+       :else writer))
+
+    ;; else return the standard writer
+    writer))
 
 (defn make-draft-query-rewriter [repo query-str draft-uris]
   (let [live->draft (mgmt/graph-map repo draft-uris)
@@ -42,23 +74,10 @@
 
      :result-rewriter
      (fn [writer]
-       (let [binding-set (.getBindings preped-query)
-             query-ast (-> preped-query .getParsedQuery)
+       (let [query-ast (-> preped-query .getParsedQuery)
              vars-in-graph-position (rew/vars-in-graph-position query-ast)
              draft->live (set/map-invert live->draft)]
-         (if (seq vars-in-graph-position)
-           (let [rewrite-graph-result (fn [^TupleQueryResultHandler writer ^BindingSet binding-set]
-                                        (doseq [var vars-in-graph-position]
-                                          (when-not (.isConstant var)
-                                            (let [val (.getValue binding-set (.getName var))
-                                                  new-uri (get draft->live val val)]
-                                              (timbre/info "converting var" (.getName var) "val" val "to new-uri" new-uri)
-                                              (.setBinding binding-set (.getName var) new-uri))))
-                                        (timbre/info "Binding set: " binding-set )
-                                        (.handleSolution writer binding-set))]
-             (make-result-rewriter rewrite-graph-result writer))
-           ;; else return the standard writer
-           writer)))
+         (choose-result-rewriter query-ast vars-in-graph-position draft->live writer)))
      }))
 
 (defn- draft-query-endpoint [repo request]
