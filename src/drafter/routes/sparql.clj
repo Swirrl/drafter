@@ -6,7 +6,7 @@
             [ring.util.io :as io]
             [compojure.route :refer [not-found]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper]]
             [drafter.rdf.sparql-rewriting :as rew]
             [taoensso.timbre :as timbre]
             [grafter.rdf.sesame :as ses]
@@ -14,7 +14,8 @@
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
            [org.openrdf.query QueryResultHandler TupleQueryResultHandler BindingSet]
            [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
-           [org.openrdf.rio RDFHandler]))
+           [org.openrdf.query.impl MapBindingSet]
+           [org.openrdf.rio RDFHandler RDFWriter]))
 
 (defn make-select-result-rewriter
   "Creates a new SPARQLResultWriter that proxies to the supplied
@@ -35,22 +36,14 @@
       (.startQueryResult writer binding-names))))
 
 (defn- make-construct-result-rewriter
-  [solution-handler-fn writer]
-  (reify
-    RDFHandler
-    (startRDF [this]
-      (.startRDF writer))
-    (endRDF [this]
-      (.endRDF writer))
-    (handleNamespace [this prefix uri]
-      (.handleNamespace writer prefix uri))
-    (handleStatement [this statement]
-      (timbre/info "RDFHANDLER called " writer statement)
-      (.handleStatement writer statement)) ; solution-handler-fn required?
-    (handleComment [this comment]
-      (.handleComment writer comment))))
+  "Creates a result-rewriter for construct queries - not a tautology
+  honest!"
+  [writer draft->live]
+  (if (instance? QueryResultHandler writer)
+    (result-handler-wrapper writer draft->live)
+    writer))
 
-(defn- select-result-rewriter [query-ast vars-in-graph-position draft->live writer]
+(defn- choose-result-rewriter [query-ast vars-in-graph-position draft->live writer]
   (if (seq vars-in-graph-position)
     ;; if there are vars in graph position - we should rewrite the
     ;; results
@@ -61,12 +54,9 @@
                                            new-uri (get draft->live val val)]
                                        (timbre/info "converting var" (.getName var) "val" val "to new-uri" new-uri)
                                        (.setBinding binding-set (.getName var) new-uri))))
-                                 (timbre/info "Binding set: " binding-set )
                                  (.handleSolution writer binding-set))]
       (cond
-       (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter (fn [^RDFHandler rdf-handler]
-                                                                                ;; TODO
-                                                                                ) writer)
+       (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
        (instance? ParsedTupleQuery query-ast) (make-select-result-rewriter rewrite-graph-result writer)
        (instance? ParsedBooleanQuery query-ast) writer
        :else writer))
@@ -87,7 +77,7 @@
        (let [query-ast (-> preped-query .getParsedQuery)
              vars-in-graph-position (rew/vars-in-graph-position query-ast)
              draft->live (set/map-invert live->draft)]
-         (select-result-rewriter query-ast vars-in-graph-position draft->live writer)))
+         (choose-result-rewriter query-ast vars-in-graph-position draft->live writer)))
      }))
 
 (defn- draft-query-endpoint [repo request]

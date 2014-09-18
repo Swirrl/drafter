@@ -1,4 +1,4 @@
-,(ns drafter.routes.sparql-test
+(ns drafter.routes.sparql-test
   (:require [drafter.test-common :refer [test-triples
                                          stream->string select-all-in-graph]]
             [clojure.test :refer :all]
@@ -168,10 +168,10 @@
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
                                    (assoc-in [:params :query] "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))))]
-        (is (= graph-2-result
+        (is (= graph-1-result
                (second csv-result)))))
 
-    (testing "Can do a construct query with a graph"
+    (testing "Can do a construct query with against a draft graph (with query rewrite)"
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
                                    (assoc-in [:query-params "graph"] [draft-graph-2])
@@ -179,6 +179,19 @@
         (is (= graph-2-result
                (second csv-result)))))
 
+    (testing "Can do a construct query with a graph variable bound into results (with query & result rewrite)"
+      (let [csv-result (csv-> (endpoint
+                               (-> drafts-request
+                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params :query] "CONSTRUCT { ?g ?p ?o } WHERE { graph ?g { ?s ?p ?o . } }"))))]
+        (is (= ["http://test.com/graph-2" "http://test.com/hasProperty" "http://test.com/data/1"]
+               (second csv-result)))))))
+
+(deftest drafts-sparql-routes-with-desribe-queries-test
+  (let [test-db (make-store)
+        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
     (testing "Can do a describe query with a graph"
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
