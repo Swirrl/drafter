@@ -47,7 +47,7 @@
 
   ParsedQuery
   (vars-in-graph-position [this]
-    (vars-in-graph-position (.getExpr this)))
+    (vars-in-graph-position (.getTupleExpr this)))
 
   TupleExpr
   (vars-in-graph-position [this]
