@@ -2,7 +2,6 @@
   (:use
    [ring.middleware file-info file])
   (:require [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
-            [drafter.rdf.queue :as q]
             [drafter.rdf.draft-management :refer :all]
             [drafter.handler :as service]
             [ring.server.standalone :refer [serve]])
