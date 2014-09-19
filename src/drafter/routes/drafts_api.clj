@@ -8,22 +8,25 @@
             [compojure.handler :refer [api]]
             [drafter.rdf.draft-management :as mgmt]
             [taoensso.timbre :as timbre]
-            [drafter.rdf.queue :as q]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.common.api-routes :as api-routes]
             [grafter.rdf.sesame :as ses]
             [grafter.rdf :refer [statements]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]))
 
-(defn enqueue-job!
-  "Enqueues a job function on the queue and returns a ring HTTP
+(defn exec-job!
+  "Executes a job function straight away and returns a ring HTTP
   response."
-
-  [queue job-function opts]
-  (let []
-    (if-let [queue-id (q/offer! queue job-function opts)]
-      (api-routes/api-response 202 {:queue-id queue-id :msg "Your request was accepted"})
-      (api-routes/error-response 503 {:msg "The queue is temporarily full.  Please try again later."}))))
+  ;; state should be an atom
+  [state job-function opts]
+  (let [job-id (java.util.UUID/randomUUID)]
+    (try
+      (swap! state assoc job-id opts)
+      ; TODO make the job function return the status code and message.
+      (job-function)
+      (api-routes/api-response 200 {:msg "Your job executed succesfully"})
+     (finally
+       (swap! state dissoc job-id)))))
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 
@@ -90,7 +93,7 @@
     (ses/with-transaction repo
       (mgmt/migrate-live! repo graph))))
 
-(defn draft-api-routes [mount-point repo queue]
+(defn draft-api-routes [mount-point repo state]
   (routes
    (context
     mount-point []
@@ -117,13 +120,13 @@
 
           (if source-graph
             (api-routes/when-params [graph source-graph] ; when source supplied: append from source-graph.
-                                    (enqueue-job! queue
+                                    (exec-job! state
                                                   (append-data-to-graph-from-graph-job repo graph source-graph)
                                                   {:job-desc (str "append to graph: " graph " from source graph: " source-graph)
                                                    :meta (api-routes/meta-params query-params)}))
 
             (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
-                                    (enqueue-job! queue
+                                    (exec-job! state
                                                   (append-data-to-graph-from-file-job repo graph file)
                                                   {:job-desc (str "append to graph " graph " from file")
                                                    :meta (api-routes/meta-params query-params)}))))
@@ -136,25 +139,25 @@
 
          (if source-graph
            (api-routes/when-params [graph source-graph] ; when source supplied: replace from source-graph.
-                                   (enqueue-job! queue
+                                   (exec-job! state
                                                  (replace-data-from-graph-job repo graph source-graph)
                                                  {:job-desc (str "replace contents of graph " graph " from source graph: " source-graph)
                                                   :meta (api-routes/meta-params query-params)}))
 
            (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
-                                   (enqueue-job! queue
+                                   (exec-job! state
                                                  (replace-graph-from-file-job repo graph file)
                                                  {:job-desc (str "replace contents of graph " graph " from file")
                                                   :meta (api-routes/meta-params query-params)})))))))
 
-(defn graph-management-routes [mount-point repo queue]
+(defn graph-management-routes [mount-point repo state]
   (routes
    ;; deletes data in the graph. This could be a live or a draft graph.
    ;; accepts extra meta- query string params, which are added to queue metadata
    (DELETE mount-point {{graph "graph"} :query-params
                         query-params :query-params}
            (api-routes/when-params [graph]
-                                   (enqueue-job! queue (delete-graph-job repo graph)
+                                   (exec-job! state (delete-graph-job repo graph)
                                                  {:job-desc (str "delete graph" graph)
                                                   :meta (api-routes/meta-params query-params)})))
    (context
@@ -165,6 +168,6 @@
     (PUT "/live" {{graph "graph"} :query-params
                   query-params :query-params}
          (api-routes/when-params [graph]
-                                 (enqueue-job! queue (migrate-graph-live-job repo graph)
+                                 (exec-job! state (migrate-graph-live-job repo graph)
                                                {:job-desc (str "migrate graph " graph " to live")
                                                 :meta (api-routes/meta-params query-params)}))))))

@@ -5,7 +5,6 @@
                                            state-sparql-routes]]
             [drafter.routes.sparql-update :refer [update-endpoint-route]]
             [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
-            [drafter.routes.queue-api :refer [queue-api-routes]]
             [drafter.middleware :as middleware]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
             [drafter.routes.sparql-update :refer [update-endpoint-route state-update-endpoint-route live-update-endpoint-route]]
@@ -15,7 +14,6 @@
             [taoensso.timbre.appenders.rotor :as rotor]
             [selmer.parser :as parser]
             [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri drafter-state-graph]]
-            [drafter.rdf.queue :as q]
             [grafter.rdf.sesame :as sesame]
             [compojure.handler :only [api]]
             [environ.core :refer [env]]))
@@ -27,7 +25,8 @@
 (def app)
 
 (def worker)
-(def queue (q/make-queue 10))
+
+(def state (atom {})); initialize state with an empty hashmap
 
 (defmacro set-var-root! [var form]
   `(alter-var-root ~var (fn [& _#]
@@ -54,13 +53,12 @@
   (route/resources "/")
   (route/not-found "Not Found"))
 
-(defn initialise-app! [repo queue]
+(defn initialise-app! [repo state]
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         [pages-routes
-                         (draft-api-routes "/draft" repo queue)
-                         (graph-management-routes "/graph" repo queue)
-                         (queue-api-routes "/queue" queue)
+                         (draft-api-routes "/draft" repo state)
+                         (graph-management-routes "/graph" repo state)
                          (live-sparql-routes "/sparql/live" repo)
                          (live-update-endpoint-route "/sparql/live/update" repo)
                          (draft-sparql-routes "/sparql/draft" repo)
@@ -78,22 +76,9 @@
                         ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                         :formats [:json-kw :edn])))
 
-(defn attach-worker!
-  "Attach the process-queue worker to process the jobs queue for
-  requests to append/replace graphs with RDF files."
-  [queue]
-  (set-var-root! #'worker
-                 (q/process-queue queue
-                                  (fn [ex]
-                                    (taoensso.timbre/error
-                                     (str "Queue Worker Error.  Repo id is: " (System/identityHashCode repo) " Queue contains: " queue) ex))))
-
-  (timbre/info "Attached import worker to job queue"))
-
 (defn initialise-services! []
   (initialise-repo!)
-  (attach-worker! queue)
-  (initialise-app! repo queue))
+  (initialise-app! repo state))
 
 (defn init
   "init will be called once when app is deployed as a servlet on an
