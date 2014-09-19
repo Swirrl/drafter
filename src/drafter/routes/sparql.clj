@@ -109,7 +109,7 @@
          (draft-query-endpoint repo request))))
 
 (defn live-sparql-routes [mount-point repo]
-  (sparql-end-point mount-point repo (mgmt/live-graphs repo)))
+  (sparql-end-point mount-point repo (partial mgmt/live-graphs repo)))
 
 (defn state-sparql-routes [mount-point repo]
   (sparql-end-point mount-point repo #{mgmt/drafter-state-graph}))

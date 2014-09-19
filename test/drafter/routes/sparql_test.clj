@@ -39,67 +39,70 @@
   (-> body stream->string csv/parse-csv))
 
 ;; TODO uncomment these as soon as I get the draft one working again
-(comment (deftest live-sparql-routes-test
-           (let [[draft-graph-1 draft-graph-2] (add-test-data! *test-db*)
-                 endpoint (live-sparql-routes *test-db*)
-                 {:keys [status headers body]
-                  :as result} (endpoint
+(deftest live-sparql-routes-test
+  (let [test-db (make-store)
+        [draft-graph-1 draft-graph-2] (add-test-data! test-db)
+        endpoint (live-sparql-routes "/sparql/live" test-db)
+        {:keys [status headers body]
+         :as result} (endpoint
+         (assoc-in default-sparql-query [:params :query]
+                   (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
+        csv-result (csv-> result)]
+
+    (is (= "text/csv" (headers "Content-Type"))
+        "Returns content-type")
+
+    (is (= ["s" "p" "o"] (first csv-result))
+        "Returns CSV")
+
+    (is (= graph-1-result (second csv-result))
+        "Named (live) graph is publicly queryable")
+
+    (testing "Draft graphs are not exposed"
+      (let [csv-result (csv-> (endpoint
                                (assoc-in default-sparql-query [:params :query]
-                                         (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
-                  csv-result (csv-> result)]
-             (is (= "text/csv" (headers "Content-Type"))
-                 "Returns content-type")
+                                         (select-all-in-graph draft-graph-2))))]
+        (is (empty? (second csv-result)))))
 
-             (is (= ["s" "p" "o"] (first csv-result))
-                 "Returns CSV")
+    (testing "Offline public graphs are not exposed"
+      (set-isPublic! test-db "http://test.com/made-live-and-deleted-1" false)
+      (let [csv-result (csv-> (endpoint
+                               (assoc-in default-sparql-query [:params :query]
+                                         (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
 
-             (is (= graph-1-result (second csv-result))
-                 "Named (live) graph is publicly queryable")
+        (is (not= graph-1-result (second csv-result)))))))
 
-             (testing "Draft graphs are not exposed"
-               (let [csv-result (csv-> (endpoint
-                                        (assoc-in default-sparql-query [:params :query]
-                                                  (select-all-in-graph draft-graph-2))))]
-                 (is (empty? (second csv-result)))))
+(deftest state-sparql-routes-test
+  (let [test-db (make-store)
+        drafts-request (-> default-sparql-query
+                           (assoc :uri "/sparql/state")
+                           (assoc-in [:headers "accept"] "text/plain"))
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        endpoint (state-sparql-routes "/sparql/state" test-db)]
 
-             (testing "Offline public graphs are not exposed"
-               (set-isPublic! *test-db* "http://test.com/made-live-and-deleted-1" false)
-               (let [csv-result (csv-> (endpoint
-                                        (assoc-in default-sparql-query [:params :query]
-                                                  (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
+    (testing "The state graph should be accessible"
+      (let [result (endpoint
+                    (-> drafts-request
+                        (assoc-in [:params :query] (str "ASK WHERE {"
+                                                        "  GRAPH <" drafter-state-graph "> {"
+                                                        "    ?s ?p ?o ."
+                                                        "  }"
+                                                        "}"))))
+            body (-> result :body stream->string)]
 
-                 (is (not= graph-1-result (second csv-result)))))))
+        (is (= "true" body))))
 
-         (deftest state-sparql-routes-test
-           (let [drafts-request (-> default-sparql-query
-                                    (assoc :uri "/sparql/state")
-                                    (assoc-in [:headers "accept"] "text/plain"))
-                 [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-db*)
-                 endpoint (state-sparql-routes *test-db*)]
+    (testing "The data graphs (live and drafts) should be hidden"
+      (let [result (endpoint
+                    (-> drafts-request
+                        (assoc-in [:params :query] (str "ASK WHERE {"
+                                                        "  GRAPH <" draft-graph-2 "> {"
+                                                        "    ?s ?p ?o ."
+                                                        "  }"
+                                                        "}"))))
+            body (-> result :body stream->string)]
 
-             (testing "The state graph should be accessible"
-               (let [result (endpoint
-                             (-> drafts-request
-                                 (assoc-in [:params :query] (str "ASK WHERE {"
-                                                                 "  GRAPH <" drafter-state-graph "> {"
-                                                                 "    ?s ?p ?o ."
-                                                                 "  }"
-                                                                 "}"))))
-                     body (-> result :body stream->string)]
-
-                 (is (= "true" body))))
-
-             (testing "The data graphs (live and drafts) should be hidden"
-               (let [result (endpoint
-                             (-> drafts-request
-                                 (assoc-in [:params :query] (str "ASK WHERE {"
-                                                                 "  GRAPH <" draft-graph-2 "> {"
-                                                                 "    ?s ?p ?o ."
-                                                                 "  }"
-                                                                 "}"))))
-                     body (-> result :body stream->string)]
-
-                 (is (= "false" body)))))))
+        (is (= "false" body))))))
 
 (deftest drafts-sparql-routes-test
   (let [test-db (make-store)

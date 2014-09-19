@@ -165,21 +165,31 @@
              first)]
     (or fst accept-str)))
 
+(defn restricted-dataset
+  "Returns a restricted dataset or nil when given either a 0-arg
+  function or a collection of graph uris."
+  [graph-restrictions]
+  (let [graph-restrictions (cond
+                            (coll? graph-restrictions) graph-restrictions
+                            (fn? graph-restrictions) (graph-restrictions)
+                            :else nil)]
+
+    (when graph-restrictions
+      (ses/make-restricted-dataset :default-graph graph-restrictions
+                                   :named-graphs graph-restrictions))))
+
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
                                                  result-rewriter]
                                           :or {query-creator-fn ses/prepare-query}}]
 
-  (let [restriction (when graph-restrictions
-                      (ses/make-restricted-dataset :default-graph graph-restrictions
-                                                   :named-graphs graph-restrictions))
-
+  (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
         query-str (:query params)
         pquery (doto (query-creator-fn db query-str)
                  (.setDataset restriction))
         media-type (parse-accept headers)]
 
-    (timbre/debug (str "Running query " pquery " with graph restriction: " (apply str (interpose "," graph-restrictions))))
+    (timbre/debug (str "Running query " query-str " with graph restriction: " graph-restrictions))
     (stream-sparql-response pquery media-type result-rewriter)))
 
 (defn sparql-end-point
