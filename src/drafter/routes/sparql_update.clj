@@ -9,7 +9,6 @@
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.rdf.sparql-rewriting :as rew]
             [taoensso.timbre :as timbre]
-            [drafter.rdf.sparql-update :as update]
             [grafter.rdf.sesame :as ses]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query Dataset]))
@@ -126,7 +125,7 @@
      (POST mount-point request
            (let [{:keys [update graphs]} (parse-update-request request)
                  preped-update (prepare-restricted-update repo update graphs)]
-             (update/rewrite-update-request preped-update)
+             (rew/rewrite-update-request preped-update)
              (timbre/info "About to execute update-query " preped-update)
              (execute-update repo preped-update)))
 

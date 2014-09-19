@@ -171,15 +171,12 @@
                               (.setDataset dataset))]
          (rewrite-graph-results query-substitutions prepared-query))))
 
-
-
 (defn rewrite-update-request [preped-update graph-substitutions]
   (when (vars-in-graph-position preped-update)
     (rewrite-graph-query preped-update graph-substitutions)
       (timbre/info "Rewritten update to: " preped-update))
 
-  preped-update
-)
+  preped-update)
 
 (comment
 
