@@ -118,7 +118,7 @@
                      (if result-rewriter
                        (result-rewriter w)
                        w))]
-        (timbre/info "Calling evaluate with writer: " writer)
+        (timbre/debug "Calling evaluate with writer: " writer)
 
         (cond
          (instance? BooleanTextWriter writer)
@@ -128,12 +128,12 @@
 
          (and (instance? QueryResultWriter writer)
               (instance? GraphQuery pquery))
-         (do (timbre/info "pquery is " pquery " writer is " writer)
+         (do (timbre/debug "pquery is " pquery " writer is " writer)
              (.evaluate pquery (result-handler-wrapper writer)))
 
          :else
          (do
-           (timbre/info "pquery is " pquery " writer is " writer)
+           (timbre/debug "pquery is " pquery " writer is " writer)
            (.evaluate pquery writer))))
 
       (catch Exception ex

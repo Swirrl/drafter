@@ -46,7 +46,7 @@
 (defmethod parse-update-request "application/sparql-update" [{:keys [body params] :as request}]
   (let [update (read-body body)]
     {:update update
-     :graphs (:graphs params)}))
+     :graphs (get params "graph")}))
 
 (defmethod parse-update-request "application/x-www-form-urlencoded" [request]
   (let [params (-> request :form-params)]
@@ -106,17 +106,8 @@
            (let [{update :update} (parse-update-request request)
                  ;; prepare the update based upon the endpoints restrictions
                  preped-update (prepare-restricted-update repo update restrictions)]
-             (timbre/info "About to execute update-query " preped-update)
+             (timbre/debug "About to execute update-query " preped-update)
              (execute-update repo preped-update)))))
-
-(comment
-  (if-let [restricted-ds (resolve-restrictions restrictions)]
-                                 (ses/prepare-update repo update restricted-ds)
-                                 (let [live-graphs (-> repo mgmt/live-graphs resolve-restrictions)]
-                                   (ses/prepare-update repo update live-graphs))))
-
-
-
 
 (defn draft-update-endpoint
   "Create an update endpoint with draft query rewriting.  Restrictions
@@ -125,33 +116,13 @@
      (POST mount-point request
            (let [{:keys [update graphs]} (parse-update-request request)
                  preped-update (prepare-restricted-update repo update graphs)]
-             (rew/rewrite-update-request preped-update)
-             (timbre/info "About to execute update-query " preped-update)
-             (execute-update repo preped-update)))
 
-
-     ))
-
-(comment
-  (POST mount-point request
-        (let [{:keys [update graphs]} (parse-update-request request)
-              update-query (if-let [restricted-graphs (resolve-restrictions restrictions)]
-                             (let [restricted-ds (ses/make-restricted-dataset :default-graph restricted-graphs
-                                                                              :union-graph restricted-graphs)]
-                               (if graphs
-                                 (update/make-rewritten-update repo update graphs restricted-ds)
-                                 (ses/prepare-update repo update restricted-ds)))
-                             ;; else
-                             (if graphs
-                               (update/make-rewritten-update repo update graphs)
-                               (update/make-rewritten-update repo update (mgmt/live-graphs repo))))
-
-              preped-update (ses/prepare-update repo update)]
-          (timbre/info "About to execute update-query " update-query)
-          (execute-update repo preped-update))))
+             (rew/rewrite-update-request preped-update (mgmt/graph-map repo graphs))
+             (timbre/debug "Executing update-query " preped-update)
+             (execute-update repo preped-update)))))
 
 (defn draft-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo ))
+  (draft-update-endpoint mount-point repo))
 
 (defn live-update-endpoint-route [mount-point repo]
   (update-endpoint mount-point repo (partial mgmt/live-graphs repo)))

@@ -3,8 +3,8 @@
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!]]
             [clojure.test :refer :all]
             [ring.util.codec :as codec]
-            [drafter.test-common :refer [stream->string select-all-in-graph]]
-            [grafter.rdf.sesame :refer [repo query]])
+            [drafter.test-common :refer [stream->string select-all-in-graph make-store]]
+            [grafter.rdf.sesame :refer [query]])
 
   (:import [java.nio.charset StandardCharsets]
            [java.io ByteArrayInputStream]))
@@ -31,7 +31,7 @@
                          :content-type "application/sparql-update"
                          }]
        (if (seq graphs)
-         (assoc base-request :params { "graphs" graphs })
+         (assoc base-request :params { "graph" graphs })
          base-request))))
 
 (defn x-form-urlencoded-update-request
@@ -44,11 +44,11 @@
                      :form-params {"update" update-str }
                      :content-type "application/x-www-form-urlencoded"}]
        (if (seq graphs)
-         (assoc-in base-req [:form-params "graphs"] graphs)
+         (assoc-in base-req [:form-params "graph"] graphs)
          base-req))))
 
 (deftest application-sparql-update-test
-  (let [db (repo)
+  (let [db (make-store)
         endpoint (update-endpoint "/update" db)]
 
     (testing "POST /update"
@@ -60,7 +60,7 @@
               "Inserts the data"))))))
 
 (deftest application-x-form-urlencoded-test
-  (let [db (repo)
+  (let [db (make-store)
         endpoint (update-endpoint "/update" db)]
 
     (testing "POST /update"
@@ -72,7 +72,7 @@
               "Inserts the data"))))))
 
 (deftest live-update-endpoint-route-test
-  (let [db (repo)
+  (let [db (make-store)
         endpoint (live-update-endpoint-route "/update" db)]
 
     (create-managed-graph! db "http://example.com/")
@@ -90,13 +90,13 @@
             "Inserts the data")))))
 
 (deftest draft-endpoint-test
-  (testing "updates against live graphs get directed to the appropriate draft as specified by the graphs parameter"
-    (let [db (repo)
-          endpoint (draft-update-endpoint-route "/update" db)
-          live-graph (create-managed-graph! db "http://live-graph.com/")
-          draft-graph (create-draft-graph! db live-graph)]
-      (testing "POST /update?graphs=<draft>"
-        ;; TODO
+  (let [db (make-store)
+        endpoint (draft-update-endpoint-route "/update" db)
+        live-graph (create-managed-graph! db "http://example.com/")
+        draft-graph (create-draft-graph! db live-graph)]
+
+    (testing "POST /update?graph=<draft>"
+      (testing "against live graphs are stored against their draft"
         (let [{:keys [status headers body]} (endpoint (x-form-urlencoded-update-request default-update-string
                                                                                         [draft-graph]))]
 
@@ -105,6 +105,25 @@
                              "  GRAPH <" draft-graph "> {"
                              "    <http://test/> <http://test/> <http://test/> ."
                              "  }"
-                             "}"))))))))
+                             "}")))))
 
-(deftest sparql-update-rewriting-test)
+      (testing "dynamically rewrite to their draft"
+        (let [update "INSERT {
+                        GRAPH ?g {
+                          ?s ?p ?o .
+                        }
+                      } WHERE {
+                        BIND(URI(\"http://example.com/\") AS ?g)
+                        GRAPH ?g {
+                          ?s ?p ?o .
+                        }
+                      }"
+              {:keys [status headers body]} (endpoint (x-form-urlencoded-update-request update
+                                                                                        [draft-graph]))]
+
+          (is (= 200 status) "Returns ok")
+          (is (query db (str "ASK { "
+                             "  GRAPH <" draft-graph "> {"
+                             "    <http://test/> <http://test/> <http://test/> ."
+                             "  }"
+                             "}"))))))))

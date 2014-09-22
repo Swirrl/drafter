@@ -1,20 +1,12 @@
 (ns drafter.routes.sparql-test
   (:require [drafter.test-common :refer [test-triples
-                                         stream->string select-all-in-graph]]
+                                         make-store stream->string select-all-in-graph]]
             [clojure.test :refer :all]
             [clojure-csv.core :as csv]
             [grafter.rdf.sesame :as ses]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function]]
             [drafter.rdf.draft-management :refer :all]))
-
-(defn make-store []
-  (let [store (ses/repo)]
-    ;; register the function that does the results rewriting
-    (register-function drafter.rdf.sparql-rewriting/function-registry
-                       "http://publishmydata.com/def/functions#replace-live-graph-uri"
-                       (partial drafter.rdf.draft-management/lookup-draft-graph-uri store))
-    store))
 
 (defn add-test-data!
   "Set the state of the database so that we have three managed graphs,

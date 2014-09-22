@@ -111,7 +111,6 @@
              query-str)))
 
 (defn delete-graph-contents! [db graph-uri]
-  (timbre/info (str "Deleting graph... " graph-uri))
   (update! db (str "DROP GRAPH <" graph-uri ">"))
   (timbre/info (str "Deleted graph " graph-uri)))
 
@@ -119,7 +118,6 @@
 (defn delete-graph-and-draft-state! [db graph-uri]
   (delete-graph-contents! db graph-uri)
 
-  (timbre/info (str "Deleting draft graph from state ... " graph-uri))
   ; if the graph-uri is a draft graph uri,
   ;   remove the mention of this draft uri, but leave the live graph as a managed graph.
   (let [query-str (str "DELETE {"
@@ -158,7 +156,7 @@
 (defn lookup-live-graph-uri [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
 
-  (timbre/info "SPARQL graph uri rewriting function called" draft-graph-uri)
+  (timbre/debug "SPARQL graph uri rewriting function called" draft-graph-uri)
   (-> (lookup-live-graph db draft-graph-uri)
       (URIImpl.)))
 
@@ -196,7 +194,7 @@
                              "} LIMIT 2"))
                  (map #(str (get % "draft")))
                  return-one-or-zero-uris)]
-    (timbre/info "Runtime rewrite of live graph" live-graph-uri "to draft graph" res)
+    (timbre/debug "Runtime rewrite of live graph" live-graph-uri "to draft graph" res)
     res))
 
 (defn- has-duplicates? [col]
@@ -245,7 +243,7 @@
 
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (do
-      (timbre/info (str "Migrating graph: " draft-graph-uri " to live graph: " live-graph-uri))
+      (timbre/debug (str "Migrating graph: " draft-graph-uri " to live graph: " live-graph-uri))
       (delete-graph-contents! db live-graph-uri)
 
       (let [contents (query db

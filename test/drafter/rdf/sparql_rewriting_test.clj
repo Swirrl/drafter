@@ -82,3 +82,13 @@
                (-> db
                    (evaluate-with-graph-rewriting uri-query graph-map)
                    (first-result "g")))))))))
+
+(deftest rewrite-update-request-test
+  (let [db (ses/repo)
+        draft-graph (create-draft-graph! db "http://frogs.com/live-graph")
+        graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
+
+    (rewrite-update-request (ses/prepare-update db "INSERT { GRAPH <http://frogs.com/live-graph> {
+                                      <http://test/> <http://test/> <http://test/> .
+                            }} WHERE { }")
+                             graph-map)))

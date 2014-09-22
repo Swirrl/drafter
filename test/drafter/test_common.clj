@@ -2,7 +2,9 @@
   (:require [clojure.test :refer :all]
             [grafter.rdf.sesame :refer :all]
             [grafter.rdf :refer [triplify]]
-            [me.raynes.fs :as fs])
+            [me.raynes.fs :as fs]
+            [drafter.rdf.draft-management :refer [lookup-draft-graph-uri]]
+            [drafter.rdf.sparql-rewriting :refer [function-registry register-function]])
   (:import [java.util Scanner]))
 
 (def ^:dynamic *test-db* (repo (memory-store)))
@@ -40,3 +42,11 @@
          (test-fn))
        (finally
          (fs/delete-dir test-db-path)))))
+
+(defn make-store []
+  (let [store (repo)]
+    ;; register the function that does the results rewriting
+    (register-function function-registry
+                       "http://publishmydata.com/def/functions#replace-live-graph-uri"
+                       (partial lookup-draft-graph-uri store))
+    store))
