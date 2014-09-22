@@ -91,7 +91,10 @@
 (defn migrate-graph-live-job [repo graph]
   (fn []
     (ses/with-transaction repo
-      (mgmt/migrate-live! repo graph))))
+      (if (instance? String graph)
+        (mgmt/migrate-live! repo graph)
+        (doseq [g graph]
+          (mgmt/migrate-live! repo g))))))
 
 (defn draft-api-routes [mount-point repo state]
   (routes

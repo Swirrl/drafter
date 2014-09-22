@@ -115,11 +115,15 @@ Returns a 202 if enqueued successfully, with the `queue-id` in the response body
 
 **Making a draft live**
 
-`PUT /graph/live?graph=GURIs`
-
-(Just supports a single graph at the moment TODO: multiple graphs at once).
+`PUT /graph/live?graph=GURI`
 
 Enqueues transactional migration the specified graph(s) from draft to live.
+
+If you wish to make multiple graphs live at once, simply supply
+multiple graph arguments, these should all be scheduled together to
+occur in a single transaction e.g.
+
+`PUT /graph/live?graph=GURI&graph=GURI&graph=GURI`
 
 This replaces the content of the live graph with the draft one, removing
 the draft afterwards.  It also sets isPublic to true.
