@@ -56,6 +56,7 @@
                             :query-params {"graph" "http://mygraph/graph-to-be-appended-to"}
                             :params {:file {:filename "test.nt"
                                             :tempfile (io/file "./test/test-triple.nt")
+                                            :content-type "application/n-triples"
                                             :size 10}}}
 
               route (draft-api-routes "/draft" *test-db* state)
@@ -98,6 +99,7 @@
                           :query-params {"graph" "http://mygraph/graph-to-be-replaced"}
                           :params {:file {:filename "test.nt"
                                           :tempfile (io/file "./test/test-triple.nt")
+                                          :content-type "application/n-triples"
                                           :size 10}}}
              route (draft-api-routes "/draft" *test-db* state)
              {:keys [status body headers]} (route test-request)]
