@@ -69,6 +69,22 @@
           (testing "appends RDF to the graph"
             (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-appended-to> {<http://example.org/test/triple> ?p ?o . }}"))))))
 
+
+      (testing "with an invalid RDF file"
+        (let [state (atom {})
+              test-request {:uri "/draft"
+                            :request-method :post
+                            :query-params {"graph" "http://mygraph/graph-to-be-appended-to"}
+                            :params {:file {:filename "invalid-file.nt"
+                                            :tempfile (io/file "project.clj") ;; not an RDF file
+                                            :content-type "application/n-triples" ;; but claim it is
+                                            :size 10}}}
+
+              route (draft-api-routes "/draft" *test-db* state)
+              {:keys [status body headers]} (route test-request)]
+
+          (is (= 400 status) "400 Bad Request")))
+
       (testing "with a source graph"
         ;; put some data into the source-graph before we begin
         (make-live-graph *test-db* "http://draft.org/source-graph")
@@ -112,7 +128,7 @@
           (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://example.org/test/triple> ?p ?o . } }"))
                  "The data should be replaced with the new data"))))
 
-    ; in a different test so that it's in a clean db.
+        ; in a different test so that it's in a clean db.
     (testing "PUT /draft with a source graph"
       (make-live-graph *test-db* "http://mygraph/graph-to-be-replaced")
       (make-live-graph-2 *test-db* "http://draft.org/source-graph")

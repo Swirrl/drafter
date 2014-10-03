@@ -25,8 +25,15 @@
       ; TODO make the job function return the status code and message.
       (job-function)
       (api-routes/api-response 200 {:msg "Your job executed succesfully"})
-     (finally
-       (swap! state dissoc job-id)))))
+      (catch clojure.lang.ExceptionInfo ex
+        (cond
+         (= :reading-aborted (-> ex ex-data :type)) (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " ex)})
+         :else (do
+                 (timbre/error "Unknown error " ex)
+                 (api-routes/api-response 500 {:msg (str "Unknown error: " ex)}))
+         ))
+      (finally
+        (swap! state dissoc job-id)))))
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 
