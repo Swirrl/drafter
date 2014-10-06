@@ -121,6 +121,19 @@
         (is (= 3 (count csv-result))
             "There should be two results and one header row"))
 
+      (testing "SELECT DISTINCT queries on drafts"
+        (let [csv-result (csv-> (endpoint
+                                 (-> drafts-request
+                                     (assoc-in [:query-params "graph"] [draft-graph-2])
+                                     (assoc-in [:params :query] (str "SELECT DISTINCT ?g WHERE {
+                                                                        GRAPH ?g {
+                                                                          ?s ?p ?o .
+                                                                        }
+                                                                     }")))))]
+          (let [[header & results] csv-result]
+            (is (= 1 (count results))
+                "There should only be 1 DISTINCT ?g result returned"))))
+
       ;; TODO test rewriting of results
       (testing "Can query union of several specified draft graphs"
         (let [csv-result (csv-> (endpoint
@@ -152,6 +165,26 @@
           (= graph-1-result (second csv-result))
           (is (= 3 (count csv-result))
               "There should be 5 results (2 triples in both graphs + the csv header row)"))))))
+
+
+(deftest drafts-sparql-routes-distinct-test
+  (let [test-db (make-store)
+        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+
+    (testing "SELECT DISTINCT queries on drafts"
+      (let [csv-result (csv-> (endpoint
+                               (-> drafts-request
+                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params :query] (str "SELECT DISTINCT ?g WHERE {
+                                                                        GRAPH ?g {
+                                                                          ?s ?p ?o .
+                                                                        }
+                                                                     }")))))]
+        (let [[header & results] csv-result]
+          (is (= 1 (count results))
+              "There should only be 1 DISTINCT ?g result returned"))))))
 
 (deftest drafts-sparql-routes-with-construct-queries-test
   (let [test-db (make-store)

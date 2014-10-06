@@ -12,7 +12,7 @@
             [grafter.rdf.sesame :as ses]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
-           [org.openrdf.query QueryResultHandler TupleQueryResultHandler BindingSet]
+           [org.openrdf.query QueryResultHandler TupleQueryResultHandler BindingSet Binding]
            [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
            [org.openrdf.query.impl MapBindingSet]
            [org.openrdf.rio RDFHandler RDFWriter]))
@@ -31,7 +31,10 @@
     (handleLinks [this link-urls]
       (.handleLinks writer link-urls))
     (handleSolution [this binding-set]
-      (solution-handler-fn writer binding-set))
+      (timbre/info "select result wrapper " this  "writer: " writer)
+      (solution-handler-fn writer binding-set)
+      ;;(.handleSolution writer binding-set)
+      )
     (startQueryResult [this binding-names]
       (.startQueryResult writer binding-names))))
 
@@ -43,18 +46,33 @@
     (result-handler-wrapper writer draft->live)
     writer))
 
+(defn clone-binding-set
+  "Copy a binding set"
+  [binding-set]
+  (let [bs (MapBindingSet.)]
+    (doseq [^Binding binding (iterator-seq (.iterator binding-set))]
+      (.addBinding bs (.getName binding) (.getValue binding)))
+    bs))
+
 (defn- choose-result-rewriter [query-ast vars-in-graph-position draft->live writer]
   (if (seq vars-in-graph-position)
     ;; if there are vars in graph position - we should rewrite the
     ;; results
     (let [rewrite-graph-result (fn [^QueryResultHandler writer ^BindingSet binding-set]
-                                 (doseq [var vars-in-graph-position]
-                                   (when-not (.isConstant var)
-                                     (let [val (.getValue binding-set (.getName var))
-                                           new-uri (get draft->live val val)]
-                                       (timbre/info "converting var" (.getName var) "val" val "to new-uri" new-uri)
-                                       (.setBinding binding-set (.getName var) new-uri))))
-                                 (.handleSolution writer binding-set))]
+                                 (timbre/debug "vars in graph position" vars-in-graph-position)
+
+                                 (if (seq vars-in-graph-position)
+                                   (let [new-binding-set (clone-binding-set binding-set)]
+                                     ;; Copy binding-set as mutating it whilst writing (iterating)
+                                     ;; results causes bedlam with the iteration, especially with SPARQL
+                                     ;; DISTINCT queries.
+                                     (doseq [var vars-in-graph-position]
+                                       (when-not (.isConstant var)
+                                         (let [val (.getValue binding-set (.getName var))
+                                               new-uri (get draft->live val val)]
+                                           (.addBinding new-binding-set (.getName var) new-uri))))
+                                     (.handleSolution writer new-binding-set))
+                                   (.handleSolution writer binding-set)))]
       (cond
        (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
        (instance? ParsedTupleQuery query-ast) (make-select-result-rewriter rewrite-graph-result writer)

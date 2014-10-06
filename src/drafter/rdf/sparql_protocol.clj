@@ -96,10 +96,10 @@
          (let [s (.getSubject statement)
                p (.getPredicate statement)
                o (.getObject statement)
-               bs (doto (MapBindingSet.)
-                    (.addBinding "s" (get draft->live s s))
-                    (.addBinding "p" (get draft->live p p))
-                    (.addBinding "o" (get draft->live o o)))]
+               bs (do (doto (MapBindingSet.)
+                        (.addBinding "s" (get draft->live s s))
+                        (.addBinding "p" (get draft->live p p))
+                        (.addBinding "o" (get draft->live o o))))]
            (.handleSolution writer bs)))
        (handleComment [this comment]
          ;; No op
@@ -118,8 +118,6 @@
                      (if result-rewriter
                        (result-rewriter w)
                        w))]
-        (timbre/debug "Calling evaluate with writer: " writer)
-
         (cond
          (instance? BooleanTextWriter writer)
          (let [result (.evaluate pquery)]
@@ -133,7 +131,7 @@
 
          :else
          (do
-           (timbre/debug "pquery is " pquery " writer is " writer)
+           (timbre/debug "pquery (default) is " pquery " writer is " writer)
            (.evaluate pquery writer))))
 
       (catch Exception ex
