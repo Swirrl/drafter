@@ -110,11 +110,10 @@
                             :result-rewriter result-rewriter
                             :graph-restrictions graph-uris))
 
-    (catch Exception ex
+    (catch clojure.lang.ExceptionInfo ex
       (let [unpack #(= %1 (-> %2 ex-data :error))
             status (condp unpack ex
-                     :multiple-drafts-error 412
-                     nil 500)]
+                     :multiple-drafts-error 412)]
         {:status status :body (.getMessage ex)}))))
 
 
