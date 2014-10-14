@@ -186,6 +186,31 @@
           (is (= 1 (count results))
               "There should only be 1 DISTINCT ?g result returned"))))))
 
+
+(deftest drafts-sparql-routes-distinct-subselect-test
+  (let [test-db (make-store)
+        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+
+    (testing "SELECT DISTINCT subqueries with count on drafts "
+      (let [{status :status headers :headers :as response} (endpoint
+                                           (-> drafts-request
+                                               (assoc-in [:query-params "graph"] [draft-graph-2])
+                                               (assoc-in [:params :query] (str "SELECT (COUNT(*) as ?tripod_count_var) {
+                                                                                  SELECT DISTINCT ?uri ?graph WHERE {
+                                                                                     GRAPH ?graph {
+                                                                                       ?uri ?p ?o .
+                                                                                      }
+                                                                                  }
+                                                                                }"))))]
+
+        (is (= 200 status))
+
+        (let [[header & results] (csv-> response)]
+          (is (= "1" (ffirst results))
+              "There should be a count of 1 returned"))))))
+
 (deftest drafts-sparql-routes-with-construct-queries-test
   (let [test-db (make-store)
         drafts-request (assoc default-sparql-query :uri "/sparql/draft")

@@ -111,7 +111,6 @@
 
   If an error is thrown the stream will be closed and an exception
   logged."
-
   (fn [ostream]
     (try
       (let [writer (let [w (new-result-writer result-writer-class ostream)]
