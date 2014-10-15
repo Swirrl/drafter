@@ -9,8 +9,8 @@
   `(if (every? identity ~params)
      ~@form
      (api-routes/error-response 400 {:msg (str "You must supply the parameters " ~(->> params
-                                                                            (interpose ", ")
-                                                                            (apply str)))})))
+                                                                                       (interpose ", ")
+                                                                                       (apply str)))})))
 (def default-response-map {:type :ok})
 
 (def default-error-map {:type :error :msg "An unknown error occured"})
@@ -25,12 +25,16 @@
   [code map]
   (api-response code (merge default-error-map map)))
 
+(defn meta-uri [param]
+  "Returns a string representation of the URI for the given metadata parameter"
+  (str "http://publishmydata.com/def/drafter/meta/" param))
+
 (defn meta-params
   "Given a hashmap of query parameters grab the ones prefixed meta-, strip that off, and turn into a URI"
   [query-params]
   (reduce (fn [acc [k v]]
-            (let [new-key (str "http://publishmydata.com/def/drafter/meta/"
-                               (subs k (+ 1 (.indexOf k "-")) (.length k)))]
+            (let [param-name (subs k (+ 1 (.indexOf k "-")) (.length k))
+                  new-key (meta-uri param-name)]
               (assoc acc new-key v)))
           {}
           (select-keys query-params

@@ -40,30 +40,32 @@
 (defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
   containing the tripes from the specified file."
-  [repo graph {:keys [tempfile size filename content-type] :as file}]
+  [repo graph {:keys [tempfile size filename content-type] :as file} metadata]
   (fn []
     (timbre/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
     (ses/with-transaction repo
       (mgmt/replace-data! repo graph (statements tempfile
-                                                 :format (ses/mimetype->rdf-format content-type))))
+                                                 :format (ses/mimetype->rdf-format content-type))
+                          metadata))
     (timbre/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))))
 
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
   to the specified graph."
-  [repo graph {:keys [tempfile size filename content-type] :as file}]
+  [repo graph {:keys [tempfile size filename content-type] :as file} meta]
   (fn []
     (timbre/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
 
     (ses/with-transaction repo
       (mgmt/append-data! repo graph (statements (:tempfile file)
-                                                :format (ses/mimetype->rdf-format content-type))))
+                                                :format (ses/mimetype->rdf-format content-type))
+                         meta))
 
     (timbre/info (str "File import (append) complete " tempfile " to graph: " graph))))
 
 (defn append-data-to-graph-from-graph-job
   "Return a job function that adds the triples from the specified named graph to the specified graph"
-  [repo graph source-graph]
+  [repo graph source-graph meta]
   (fn []
     (timbre/info (str "Appending contents of " source-graph "  to graph: " graph))
 
@@ -72,14 +74,14 @@
           source-data (ses/query repo query-str)]
 
       (ses/with-transaction repo
-        (mgmt/append-data! repo graph source-data))
+        (mgmt/append-data! repo graph source-data meta))
 
       (timbre/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))))
 
 (defn replace-data-from-graph-job
   "Return a function to replace the specified graph with a graph
   containing the tripes from the specified source graph."
-  [repo graph source-graph]
+  [repo graph source-graph meta]
   (fn []
     (timbre/info (str "Replacing graph " graph " with contents of graph: " source-graph ))
 
@@ -87,7 +89,7 @@
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
           source-data (ses/query repo query-str)]
           (ses/with-transaction repo
-            (mgmt/replace-data! repo graph source-data))
+            (mgmt/replace-data! repo graph source-data meta))
           (timbre/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))))
 
 (defn delete-graph-job [repo graph]
@@ -127,38 +129,40 @@
                        query-params :query-params
                        {file :file} :params}
 
+          (let [metadata (api-routes/meta-params query-params)]
+            (if source-graph
+              (api-routes/when-params [graph source-graph] ; when source supplied: append from source-graph.
+                                      (exec-job! state
+                                                 (append-data-to-graph-from-graph-job repo graph source-graph metadata)
+                                                 {:job-desc (str "append to graph: " graph " from source graph: " source-graph)
+                                                  :meta metadata}))
 
-          (if source-graph
-            (api-routes/when-params [graph source-graph] ; when source supplied: append from source-graph.
-                                    (exec-job! state
-                                                  (append-data-to-graph-from-graph-job repo graph source-graph)
-                                                  {:job-desc (str "append to graph: " graph " from source graph: " source-graph)
-                                                   :meta (api-routes/meta-params query-params)}))
+              (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
+                                      (exec-job! state
+                                                 (append-data-to-graph-from-file-job repo graph file metadata)
+                                                 {:job-desc (str "append to graph " graph " from file")
+                                                  :meta metadata})))))
 
-            (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
-                                    (exec-job! state
-                                                  (append-data-to-graph-from-file-job repo graph file)
-                                                  {:job-desc (str "append to graph " graph " from file")
-                                                   :meta (api-routes/meta-params query-params)}))))
-
-    ;; replaces data in the graph from either source-graph or file
-    ;; accepts extra meta- query string params, which are added to queue metadata
+      ;; replaces data in the graph from either source-graph or file
+      ;; accepts extra meta- query string params, which are added to queue metadata
+      
     (PUT mount-point {{graph "graph" source-graph "source-graph"} :query-params
                       query-params :query-params
                       {file :file} :params}
 
-         (if source-graph
-           (api-routes/when-params [graph source-graph] ; when source supplied: replace from source-graph.
-                                   (exec-job! state
-                                                 (replace-data-from-graph-job repo graph source-graph)
-                                                 {:job-desc (str "replace contents of graph " graph " from source graph: " source-graph)
-                                                  :meta (api-routes/meta-params query-params)}))
+         (let [metadata (api-routes/meta-params query-params)]
+           (if source-graph
+             (api-routes/when-params [graph source-graph] ; when source supplied: replace from source-graph.
+                                     (exec-job! state
+                                                (replace-data-from-graph-job repo graph source-graph metadata)
+                                                {:job-desc (str "replace contents of graph " graph " from source graph: " source-graph)
+                                                 :meta metadata}))
 
-           (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
-                                   (exec-job! state
-                                                 (replace-graph-from-file-job repo graph file)
-                                                 {:job-desc (str "replace contents of graph " graph " from file")
-                                                  :meta (api-routes/meta-params query-params)})))))))
+             (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
+                                     (exec-job! state
+                                                (replace-graph-from-file-job repo graph file metadata)
+                                                {:job-desc (str "replace contents of graph " graph " from file")
+                                                 :meta metadata}))))))))
 
 (defn graph-management-routes [mount-point repo state]
   (routes
