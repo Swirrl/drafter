@@ -276,20 +276,21 @@
  [test-name http-method request-mods]
 
  (deftest test-name
-   (let [state (atom {})
-         route (draft-api-routes "/draft" *test-db* state)
-         source-graph-uri (make-live-graph *test-db* "http://mygraph/source-graph")
-         draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
+   (testing "Updating draft graph with metadata"
+     (let [state (atom {})
+           route (draft-api-routes "/draft" *test-db* state)
+           source-graph-uri (make-live-graph *test-db* "http://mygraph/source-graph")
+           draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
 
-         {:keys [status body headers]} (route (-> {:uri "/draft" :request-method http-method}
-                                                  (add-request-metadata "uploaded-by" "test")
-                                                  request-mods))]
-     (testing "Request ok"
-       (is (= 200 status)))
+           {:keys [status body headers]} (route (-> {:uri "/draft" :request-method http-method}
+                                                    (add-request-metadata "uploaded-by" "test")
+                                                    request-mods))]
+       (testing "Request ok"
+         (is (= 200 status)))
 
-     (testing "Adds metadata"
-       (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
-         (is (ses/query *test-db* sparql))))))
+       (testing "Adds metadata"
+         (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
+           (is (ses/query *test-db* sparql)))))))
 
  meta-update-with-put-graph-test :put (add-request-graph-source-graph draft-graph-uri source-graph-uri)
 
