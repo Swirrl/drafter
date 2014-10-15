@@ -5,7 +5,7 @@
             [grafter.rdf.sesame :as ses]
             [drafter.routes.drafts-api :refer :all]
             [clojure.java.io :as io]
-            [clojure.template :as tpl]
+            [clojure.template :refer [do-template]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.common.api-routes :refer [meta-uri]]))
 
@@ -272,7 +272,7 @@
           (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
-(tpl/do-template
+(do-template
  [test-name http-method request-mods]
 
  (deftest test-name
