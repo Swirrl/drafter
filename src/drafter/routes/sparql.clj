@@ -51,6 +51,7 @@
   [binding-set]
   (let [bs (MapBindingSet.)]
     (doseq [^Binding binding (iterator-seq (.iterator binding-set))]
+      (timbre/debug "cloning binding: " (.getName binding) "val: "(.getValue binding))
       (.addBinding bs (.getName binding) (.getValue binding)))
     bs))
 
@@ -66,11 +67,15 @@
                                      ;; Copy binding-set as mutating it whilst writing (iterating)
                                      ;; results causes bedlam with the iteration, especially with SPARQL
                                      ;; DISTINCT queries.
+                                     (timbre/debug "old binding set: " binding-set "new binding-set" new-binding-set)
                                      (doseq [var vars-in-graph-position]
                                        (when-not (.isConstant var)
-                                         (let [val (.getValue binding-set (.getName var))
-                                               new-uri (get draft->live val val)]
-                                           (.addBinding new-binding-set (.getName var) new-uri))))
+                                         (when-let [val (.getValue binding-set (.getName var))]
+                                           ;; only rewrite results if the value is bound as a return
+                                           ;; value (i.e. it's a named result parameter for SELECT)
+                                           (let [new-uri (get draft->live val val)]
+                                             (timbre/debug "Substituting val" val "for new-uri:" new-uri "for var:" var)
+                                             (.addBinding new-binding-set (.getName var) new-uri)))))
                                      (.handleSolution writer new-binding-set))
                                    (.handleSolution writer binding-set)))]
       (cond

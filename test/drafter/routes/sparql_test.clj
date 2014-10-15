@@ -3,6 +3,7 @@
                                          make-store stream->string select-all-in-graph]]
             [clojure.test :refer :all]
             [clojure-csv.core :as csv]
+            [clojure.data.json :as json]
             [grafter.rdf.sesame :as ses]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function]]
@@ -193,23 +194,35 @@
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (draft-sparql-routes "/sparql/draft" test-db)]
 
-    (testing "SELECT DISTINCT subqueries with count on drafts "
-      (let [{status :status headers :headers :as response} (endpoint
-                                           (-> drafts-request
-                                               (assoc-in [:query-params "graph"] [draft-graph-2])
-                                               (assoc-in [:params :query] (str "SELECT (COUNT(*) as ?tripod_count_var) {
-                                                                                  SELECT DISTINCT ?uri ?graph WHERE {
-                                                                                     GRAPH ?graph {
-                                                                                       ?uri ?p ?o .
-                                                                                      }
-                                                                                  }
-                                                                                }"))))]
+    (testing "SELECT DISTINCT subqueries with count on drafts"
+      (let [count-request (-> drafts-request
+                              (assoc-in [:query-params "graph"] [draft-graph-2])
+                              (assoc-in [:params :query] (str "SELECT (COUNT(*) as ?tripod_count_var) {
+                                                                   SELECT DISTINCT ?uri ?graph WHERE {
+                                                                      GRAPH ?graph {
+                                                                        ?uri ?p ?o .
+                                                                       }
+                                                                   }
+                                                                 }")))]
+        (testing "as text/csv"
+          (let [{status :status headers :headers :as response} (endpoint count-request)]
 
-        (is (= 200 status))
+            (is (= 200 status))
 
-        (let [[header & results] (csv-> response)]
-          (is (= "1" (ffirst results))
-              "There should be a count of 1 returned"))))))
+            (let [[header & results] (csv-> response)]
+              (is (= "1" (ffirst results))
+                  "There should be a count of 1 returned"))))
+
+        (testing "as application/sparql-results+json"
+          (let [count-request-as-json (assoc-in count-request [:headers "accept"] "application/sparql-results+json")
+                {status :status headers :headers :as response} (endpoint count-request-as-json)]
+
+            (println count-request-as-json)
+            (is (= 200 status))
+
+            (is (= "1" (-> response :body stream->string json/read-str
+                           (get-in ["results" "bindings" 0 "tripod_count_var" "value"])))
+                "There should be a count of 1 returned")))))))
 
 (deftest drafts-sparql-routes-with-construct-queries-test
   (let [test-db (make-store)
