@@ -51,13 +51,13 @@
   "Create a record of a managed graph in the database, returns the
   graph-uri that was passed in."
   ([db graph-uri] (create-managed-graph! db graph-uri {}))
-  ([db graph-uri opts]
+  ([db graph-uri meta-data]
      ;; We only do anything if it's not already a managed graph
 
      ;; FIXME: Is this a potential race condition? i.e. we check for existence (and it's false) and before executing someone else makes
      ;; the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
      (if (not (is-graph-managed? db graph-uri))
-       (let [managed-graph-quads (to-quads (create-managed-graph graph-uri opts))]
+       (let [managed-graph-quads (to-quads (create-managed-graph graph-uri meta-data))]
          (add db managed-graph-quads)))
        graph-uri))
 
@@ -91,9 +91,15 @@
 
        draft-graph-uri))) ; returns the draft-graph-uri
 
+(defn- add-metadata-to-draft [db draft-graph-uri metadata]
+  (doseq [[meta-name value] metadata]
+       (add db drafter-state-graph (to-quads [draft-graph-uri [meta-name (s value)]]))))
+
 (defn append-data!
-  [db draft-graph-uri triples]
-  (add db draft-graph-uri triples))
+  ([db draft-graph-uri triples] (append-data! db draft-graph-uri triples {}))
+  ([db draft-graph-uri triples metadata]
+     (add-metadata-to-draft db draft-graph-uri metadata)
+     (add db draft-graph-uri triples)))
 
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (let [query-str (str "DELETE {"
@@ -135,11 +141,13 @@
   (timbre/info (str "Deleted draft graph from state " graph-uri)))
 
 (defn replace-data!
-  [db draft-graph-uri triples]
-  (delete-graph-contents! db draft-graph-uri)
-  (when triples
-    ;; add if there's any data
-    (add db draft-graph-uri triples)))
+  ([db draft-graph-uri triples] (replace-data! db draft-graph-uri triples {}))
+  ([db draft-graph-uri triples metadata]
+      (delete-graph-contents! db draft-graph-uri)
+      (add-metadata-to-draft db draft-graph-uri metadata)
+      (when triples
+        ;; add if there's any data
+        (add db draft-graph-uri triples))))
 
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
@@ -255,7 +263,8 @@
 
       (delete-graph-and-draft-state! db draft-graph-uri)
       (set-isPublic! db live-graph-uri true)
-      (timbre/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
+      (timbre/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri))
+      live-graph-uri)
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)))))
 
