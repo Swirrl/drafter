@@ -25,8 +25,9 @@
   [code map]
   (api-response code (merge default-error-map map)))
 
-(defn meta-uri [param]
+(defn meta-uri
   "Returns a string representation of the URI for the given metadata parameter"
+  [param]
   (str "http://publishmydata.com/def/drafter/meta/" param))
 
 (defn meta-params
