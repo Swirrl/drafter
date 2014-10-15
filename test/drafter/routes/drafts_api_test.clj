@@ -5,6 +5,7 @@
             [grafter.rdf.sesame :as ses]
             [drafter.routes.drafts-api :refer :all]
             [clojure.java.io :as io]
+            [clojure.template :as tpl]
             [drafter.rdf.draft-management :refer :all]
             [drafter.common.api-routes :refer [meta-uri]]))
 
@@ -271,43 +272,31 @@
           (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
-(deftest graph-metadata
-  (testing "Updating draft graph with metadata"
-    (doseq [method [:put :post]]
-      (testing (str (clojure.string/upper-case (name method)) " /draft with source graph")
-        (let [state (atom {})
-              route (draft-api-routes "/draft" *test-db* state)
-              source-graph-uri (make-live-graph *test-db* "http://mygraph/source-graph")
-              draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
+(tpl/do-template
+ [test-name http-method request-mods]
 
-              request (-> {:uri "/draft" :request-method method}
-                          (add-request-graph-source-graph draft-graph-uri source-graph-uri)
-                          (add-request-metadata "uploaded-by" "test"))
-              {:keys [status body headers]} (route request)]
+ (deftest test-name
+   (let [state (atom {})
+         route (draft-api-routes "/draft" *test-db* state)
+         source-graph-uri (make-live-graph *test-db* "http://mygraph/source-graph")
+         draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
 
-          (testing "Request ok"
-            (is (= 200 status)))
+         {:keys [status body headers]} (route (-> {:uri "/draft" :request-method http-method}
+                                                  (add-request-metadata "uploaded-by" "test")
+                                                  request-mods))]
+     (testing "Request ok"
+       (is (= 200 status)))
 
-          (testing "Adds metadata"
-            (let [meta-subject (meta-uri "uploaded-by")
-                  sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
-              (is (ses/query *test-db* sparql))))))
-      
-      (testing (str (clojure.string/upper-case (name method)) " /draft with source file")
-        (let [state (atom {})
-              route (draft-api-routes "/draft" *test-db* state)
-              draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
+     (testing "Adds metadata"
+       (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
+         (is (ses/query *test-db* sparql))))))
 
-              request (-> {:uri "/draft" :request-method method}
-                          (add-request-metadata "uploaded-by" "test")
-                          (add-request-graph-source-file draft-graph-uri "./test/test-triple.nt"))
-              {:keys [status body headers]} (route request)]
+ meta-update-with-put-graph-test :put (add-request-graph-source-graph draft-graph-uri source-graph-uri)
 
-          (testing "Request ok"
-            (is (= 200 status)))
+ meta-update-with-post-graph-test :post (add-request-graph-source-graph draft-graph-uri source-graph-uri)
 
-          (testing "Adds metadata"
-            (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
-              (is (ses/query *test-db* sparql)))))))))
+ meta-update-with-put-file-test :put (add-request-graph-source-file draft-graph-uri "./test/test-triple.nt")
+
+ meta-update-with-post-file-test :post (add-request-graph-source-file draft-graph-uri "./test/test-triple.nt"))
 
 (use-fixtures :each wrap-with-clean-test-db)
