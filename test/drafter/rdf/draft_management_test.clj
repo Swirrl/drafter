@@ -1,7 +1,7 @@
 (ns drafter.rdf.draft-management-test
   (:require
    [drafter.test-common :refer [*test-db* wrap-with-clean-test-db]]
-   [grafter.rdf :refer [add]]
+   [grafter.rdf :refer [add add-statement triplify]]
    [grafter.rdf :refer [graph triplify]]
    [grafter.rdf.ontologies.rdf :refer :all]
    [grafter.rdf.sesame :refer :all]
@@ -182,7 +182,7 @@
          (is (= #{"http://real/graph/1" "http://real/graph/2"}
                 (live-graphs *test-db* :online false))))))
 
-(deftest build-draft-map-test []
+(deftest build-draft-map-test
   (let [db (repo)]
     (testing "graph-map associates live graphs with their drafts"
       (create-managed-graph! db "http://frogs.com/")
@@ -196,6 +196,17 @@
 
                (graph-map db #{frogs-draft dogs-draft})))))))
 
+(deftest upsert-single-object-insert-test 
+  (let [db (repo)]
+    (upsert-single-object! db "http://foo/" "http://bar/" "baz")
+    (is (query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
+(deftest upsert-single-object-update-test 
+  (let [db (repo)
+        subject "http://example.com/subject"
+        predicate "http://example.com/predicate"]
+    (add db (triplify [subject [predicate (s "initial")]]))
+    (upsert-single-object! db subject predicate "updated")
+    (is (query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <" subject "> <" predicate "> \"updated\"} }")))))
 
 (use-fixtures :each wrap-with-clean-test-db)

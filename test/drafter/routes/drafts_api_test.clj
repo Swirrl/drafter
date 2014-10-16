@@ -58,10 +58,6 @@
       (add-request-graph dest-graph)
       (add-request-file source-file)))
 
-(defn metadata-exists-sparql [draft-graph-uri name value]
-  (let [meta-subject (meta-uri name)]
-    (str "ASK WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> \"" value "\" } }")))
-
 (deftest drafts-api-routes-test
 
   (let [state (atom {})]
@@ -266,6 +262,14 @@
           (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
+(defn metadata-exists-sparql [draft-graph-uri name value]
+  (let [meta-subject (meta-uri name)]
+    (str "ASK WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> \"" value "\" } }")))
+
+(defn metadata-values-sparql [draft-graph-uri name]
+  (let [meta-subject (meta-uri name)]
+    (str "SELECT ?o WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> ?o } }")))
+
 (do-template
  [test-name http-method request-mods]
 
@@ -275,17 +279,30 @@
            route (draft-api-routes "/draft" *test-db* state)
            source-graph-uri (make-live-graph *test-db* "http://mygraph/source-graph")
            draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
-
-           {:keys [status body headers]} (route 
-                                          (-> {:uri "/draft" :request-method http-method}
+           request (-> {:uri "/draft" :request-method http-method}
                                               (add-request-metadata "uploaded-by" "test")
-                                              (request-mods draft-graph-uri)))]
+                                              (request-mods draft-graph-uri))
+
+           {:keys [status body headers]} (route request)]
        (testing "Request ok"
          (is (= 200 status)))
 
        (testing "Adds metadata"
          (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
-           (is (ses/query *test-db* sparql)))))))
+           (is (ses/query *test-db* sparql))))
+
+       (testing "Overwrites metadata"
+         (let [new-request (add-request-metadata request "uploaded-by" "updated")
+               {:keys [status body]} (route new-request)
+               meta-query (metadata-values-sparql draft-graph-uri "uploaded-by")
+               meta-records (ses/query *test-db* meta-query)]
+
+           (testing "Request ok"
+             (is (= 200 status)))
+
+           (testing "Metadata overwritten"
+             (is (= 1 (count meta-records))
+                 (= "updated" (get (first meta-records) "o")))))))))
 
  meta-replace-with-put-graph-test :put (fn [req graph] (add-request-graph-source-graph req graph "http://mygraph/source-graph"))
  
