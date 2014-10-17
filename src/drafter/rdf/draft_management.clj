@@ -91,16 +91,6 @@
 
        draft-graph-uri))) ; returns the draft-graph-uri
 
-(defn- add-metadata-to-draft [db draft-graph-uri metadata]
-  (doseq [[meta-name value] metadata]
-    (upsert-single-object! db draft-graph-uri meta-name value)))
-
-(defn append-data!
-  ([db draft-graph-uri triples] (append-data! db draft-graph-uri triples {}))
-  ([db draft-graph-uri triples metadata]
-     (add-metadata-to-draft db draft-graph-uri metadata)
-     (add db draft-graph-uri triples)))
-
 (defn escape-sparql-value [val]
   (if (string? val)
     (str "\"" val "\"")
@@ -123,6 +113,16 @@
   [db subject predicate object]
   (let [sparql (upsert-single-object-sparql subject predicate object)]
     (update! db sparql)))
+
+(defn- add-metadata-to-draft [db draft-graph-uri metadata]
+  (doseq [[meta-name value] metadata]
+    (upsert-single-object! db draft-graph-uri meta-name value)))
+
+(defn append-data!
+  ([db draft-graph-uri triples] (append-data! db draft-graph-uri triples {}))
+  ([db draft-graph-uri triples metadata]
+     (add-metadata-to-draft db draft-graph-uri metadata)
+     (add db draft-graph-uri triples)))
 
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
