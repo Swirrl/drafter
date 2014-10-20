@@ -91,22 +91,22 @@
 
        draft-graph-uri))) ; returns the draft-graph-uri
 
-(defn escape-sparql-value [val]
+(defn- escape-sparql-value [val]
   (if (string? val)
     (str "\"" val "\"")
     (str val)))
 
-(defn upsert-single-object-sparql [subject predicate object]
+(defn- upsert-single-object-sparql [subject predicate object]
   (str "DELETE {"
-                       (with-state-graph
-                        "<" subject "> <" predicate "> ?o")
-                       "} INSERT {"
-                       (with-state-graph
-                         "<" subject "> <" predicate  "> " (escape-sparql-value object))
-                       "} WHERE {"
-                       (with-state-graph
-                         "OPTIONAL { <" subject "> <" predicate  "> ?o }")
-                       "}"))
+       (with-state-graph
+         "<" subject "> <" predicate "> ?o")
+       "} INSERT {"
+       (with-state-graph
+         "<" subject "> <" predicate  "> " (escape-sparql-value object))
+       "} WHERE {"
+       (with-state-graph
+         "OPTIONAL { <" subject "> <" predicate  "> ?o }")
+       "}"))
 
 (defn upsert-single-object!
   "Inserts or updates the single object for a given predicate and subject in the state graph"

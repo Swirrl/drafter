@@ -280,8 +280,8 @@
            source-graph-uri (make-live-graph *test-db* "http://mygraph/source-graph")
            draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
            request (-> {:uri "/draft" :request-method http-method}
-                                              (add-request-metadata "uploaded-by" "test")
-                                              (request-mods draft-graph-uri))
+                       (add-request-metadata "uploaded-by" "test")
+                       (request-mods draft-graph-uri))
 
            {:keys [status body headers]} (route request)]
        (testing "Request ok"
@@ -305,7 +305,7 @@
                  (= "updated" (get (first meta-records) "o")))))))))
 
  meta-replace-with-put-graph-test :put (fn [req graph] (add-request-graph-source-graph req graph "http://mygraph/source-graph"))
- 
+
  meta-update-with-post-graph-test :post (fn [req graph] (add-request-graph-source-graph req graph "http://mygraph/source-graph"))
 
  meta-replace-with-put-file-test :put (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt"))
