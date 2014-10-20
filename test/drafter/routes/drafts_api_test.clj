@@ -58,10 +58,6 @@
       (add-request-graph dest-graph)
       (add-request-file source-file)))
 
-(defn metadata-exists-sparql [draft-graph-uri name value]
-  (let [meta-subject (meta-uri name)]
-    (str "ASK WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> \"" value "\" } }")))
-
 (deftest drafts-api-routes-test
 
   (let [state (atom {})]
@@ -89,10 +85,9 @@
     (testing "POST /draft"
       (testing "with a file"
         (let [state (atom {})
-              test-request {:uri "/draft"
-                            :request-method :post
-                            :query-params {"graph" "http://mygraph/graph-to-be-appended-to"}
-                            :params {:file (get-file-request-data "./test/test-triple.nt") }}
+              dest-graph "http://mygraph/graph-to-be-appended-to"
+              test-request (-> {:uri "/draft" :request-method :post}
+                               (add-request-graph-source-file dest-graph "./test/test-triple.nt"))
 
               route (draft-api-routes "/draft" *test-db* state)
               {:keys [status body headers]} (route test-request)]
@@ -102,17 +97,12 @@
             (is (= :ok (:type body))))
 
           (testing "appends RDF to the graph"
-            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-appended-to> {<http://example.org/test/triple> ?p ?o . }}"))))))
+            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
 
       (testing "with an invalid RDF file"
         (let [state (atom {})
-              test-request {:uri "/draft"
-                            :request-method :post
-                            :query-params {"graph" "http://mygraph/graph-to-be-appended-to"}
-                            :params {:file {:filename "invalid-file.nt"
-                                            :tempfile (io/file "project.clj") ;; not an RDF file
-                                            :content-type "application/n-triples" ;; but claim it is
-                                            :size 10}}}
+              test-request (-> {:uri "/draft" :request-method :post}
+                               (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "project.clj"))
 
               route (draft-api-routes "/draft" *test-db* state)
               {:keys [status body headers]} (route test-request)]
@@ -123,9 +113,9 @@
         ;; put some data into the source-graph before we begin
         (make-live-graph *test-db* "http://draft.org/source-graph")
           (let [state (atom {})
-                test-request {:uri "/draft"
-                              :request-method :post
-                              :query-params {"graph" "http://mygraph/graph-to-be-appended-to" "source-graph" "http://draft.org/source-graph"}}
+                dest-graph "http://mygraph/graph-to-be-appended-to"
+                test-request (-> {:uri "/draft" :request-method :post}
+                                 (add-request-graph-source-graph dest-graph "http://draft.org/source-graph"))
                 route (draft-api-routes "/draft" *test-db* state)
                 {:keys [status body headers]} (route test-request)]
 
@@ -134,8 +124,8 @@
               (is (= :ok (:type body))))
 
             (testing "appends RDF to the graph"
-              (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-appended-to> { <http://test.com/subject-1> ?p ?o . }}") "graph has got new data in" )
-              (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-appended-to> { <http://example.org/test/triple> ?p ?o . }}") "graph has still got the old data in ")))))
+              (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-1> ?p ?o . }}")) "graph has got new data in" )
+              (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . }}")) "graph has still got the old data in ")))))
 
     (testing "PUT /draft with a source file"
       (make-live-graph *test-db* "http://mygraph/graph-to-be-replaced")
@@ -144,10 +134,10 @@
                  "Graph should contain initial state before it is replaced")
 
       (let [state (atom {})
-            test-request {:uri "/draft"
-                          :request-method :put
-                          :query-params {"graph" "http://mygraph/graph-to-be-replaced"}
-                          :params {:file (get-file-request-data "./test/test-triple.nt") }}
+            dest-graph "http://mygraph/graph-to-be-replaced"
+            test-request (->  {:uri "/draft" :request-method :put}
+                              (add-request-graph dest-graph)
+                              (add-request-file "./test/test-triple.nt"))
              route (draft-api-routes "/draft" *test-db* state)
              {:keys [status body headers]} (route test-request)]
 
@@ -156,7 +146,7 @@
               (is (= :ok (:type body))))
 
         (testing "replaces RDF in the graph"
-          (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://example.org/test/triple> ?p ?o . } }")
+          (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . } }"))
                  "The data should be replaced with the new data"))))
 
         ; in a different test so that it's in a clean db.
@@ -272,6 +262,14 @@
           (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
+(defn metadata-exists-sparql [draft-graph-uri name value]
+  (let [meta-subject (meta-uri name)]
+    (str "ASK WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> \"" value "\" } }")))
+
+(defn metadata-values-sparql [draft-graph-uri name]
+  (let [meta-subject (meta-uri name)]
+    (str "SELECT ?o WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> ?o } }")))
+
 (do-template
  [test-name http-method request-mods]
 
@@ -281,23 +279,37 @@
            route (draft-api-routes "/draft" *test-db* state)
            source-graph-uri (make-live-graph *test-db* "http://mygraph/source-graph")
            draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
+           request (-> {:uri "/draft" :request-method http-method}
+                       (add-request-metadata "uploaded-by" "test")
+                       (request-mods draft-graph-uri))
 
-           {:keys [status body headers]} (route (-> {:uri "/draft" :request-method http-method}
-                                                    (add-request-metadata "uploaded-by" "test")
-                                                    request-mods))]
+           {:keys [status body headers]} (route request)]
        (testing "Request ok"
          (is (= 200 status)))
 
        (testing "Adds metadata"
          (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
-           (is (ses/query *test-db* sparql)))))))
+           (is (ses/query *test-db* sparql))))
 
- meta-update-with-put-graph-test :put (add-request-graph-source-graph draft-graph-uri source-graph-uri)
+       (testing "Overwrites metadata"
+         (let [new-request (add-request-metadata request "uploaded-by" "updated")
+               {:keys [status body]} (route new-request)
+               meta-query (metadata-values-sparql draft-graph-uri "uploaded-by")
+               meta-records (ses/query *test-db* meta-query)]
 
- meta-update-with-post-graph-test :post (add-request-graph-source-graph draft-graph-uri source-graph-uri)
+           (testing "Request ok"
+             (is (= 200 status)))
 
- meta-update-with-put-file-test :put (add-request-graph-source-file draft-graph-uri "./test/test-triple.nt")
+           (testing "Metadata overwritten"
+             (is (= 1 (count meta-records))
+                 (= "updated" (get (first meta-records) "o")))))))))
 
- meta-update-with-post-file-test :post (add-request-graph-source-file draft-graph-uri "./test/test-triple.nt"))
+ meta-replace-with-put-graph-test :put (fn [req graph] (add-request-graph-source-graph req graph "http://mygraph/source-graph"))
+
+ meta-update-with-post-graph-test :post (fn [req graph] (add-request-graph-source-graph req graph "http://mygraph/source-graph"))
+
+ meta-replace-with-put-file-test :put (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt"))
+
+ meta-update-with-post-file-test :post (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt")))
 
 (use-fixtures :each wrap-with-clean-test-db)

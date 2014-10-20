@@ -91,9 +91,32 @@
 
        draft-graph-uri))) ; returns the draft-graph-uri
 
+(defn- escape-sparql-value [val]
+  (if (string? val)
+    (str "\"" val "\"")
+    (str val)))
+
+(defn- upsert-single-object-sparql [subject predicate object]
+  (str "DELETE {"
+       (with-state-graph
+         "<" subject "> <" predicate "> ?o")
+       "} INSERT {"
+       (with-state-graph
+         "<" subject "> <" predicate  "> " (escape-sparql-value object))
+       "} WHERE {"
+       (with-state-graph
+         "OPTIONAL { <" subject "> <" predicate  "> ?o }")
+       "}"))
+
+(defn upsert-single-object!
+  "Inserts or updates the single object for a given predicate and subject in the state graph"
+  [db subject predicate object]
+  (let [sparql (upsert-single-object-sparql subject predicate object)]
+    (update! db sparql)))
+
 (defn- add-metadata-to-draft [db draft-graph-uri metadata]
   (doseq [[meta-name value] metadata]
-       (add db drafter-state-graph (to-quads [draft-graph-uri [meta-name (s value)]]))))
+    (upsert-single-object! db draft-graph-uri meta-name value)))
 
 (defn append-data!
   ([db draft-graph-uri triples] (append-data! db draft-graph-uri triples {}))
@@ -102,19 +125,7 @@
      (add db draft-graph-uri triples)))
 
 (defn set-isPublic! [db live-graph-uri boolean-value]
-  (let [query-str (str "DELETE {"
-                       (with-state-graph
-                        "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " .")
-                       "} INSERT {"
-                       (with-state-graph
-                        "<" live-graph-uri "> <" drafter:isPublic  "> " boolean-value " .")
-                       "} WHERE {"
-                       (with-state-graph
-                        "<" live-graph-uri "> <" drafter:isPublic  "> " (not boolean-value) " .")
-                       "}")]
-
-    (update! db
-             query-str)))
+  (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
 
 (defn delete-graph-contents! [db graph-uri]
   (update! db (str "DROP GRAPH <" graph-uri ">"))
