@@ -52,11 +52,8 @@ To run a built drafter server without leiningen on port 3001:
 
     $ java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 
-Drafters REST API:
-==================
-
-Querying
---------
+Drafters SPARQL Endpoints
+=========================
 
 Drafter exposes a number of specialised SPARQL endpoints for querying they are:
 
@@ -72,6 +69,10 @@ graph on each request to know what this is).
 `GET | POST /sparql/draft?graph=GURI1&graph=GURI2...&query=select * FROM...`
 
 SPARQL endpoint on an arbitrary set of drafts (plus the rest from live).
+
+
+Drafters REST API:
+==================
 
 Graph Management Operations
 ---------------------------
