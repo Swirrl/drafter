@@ -97,16 +97,17 @@
 
         (is (= "false" body))))))
 
+(def drafts-request (assoc default-sparql-query :uri "/sparql/draft"))
+
 (deftest drafts-sparql-routes-test
   (let [test-db (make-store)
-        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (draft-sparql-routes "/sparql/draft" test-db)]
 
     (testing "draft graphs that are made live can no longer be queried on their draft GURI"
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
-                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query] (select-all-in-graph draft-graph-2)))))]
 
         (is (= graph-2-result (second csv-result)))))
@@ -114,7 +115,7 @@
     (testing "Can query draft :graphs that are supplied on the request"
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
-                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query] (select-all-in-graph draft-graph-2)))))]
 
         (is (= graph-2-result (second csv-result))
@@ -125,7 +126,7 @@
       (testing "SELECT DISTINCT queries on drafts"
         (let [csv-result (csv-> (endpoint
                                  (-> drafts-request
-                                     (assoc-in [:query-params "graph"] [draft-graph-2])
+                                     (assoc-in [:params "graph"] [draft-graph-2])
                                      (assoc-in [:params :query] (str "SELECT DISTINCT ?g WHERE {
                                                                         GRAPH ?g {
                                                                           ?s ?p ?o .
@@ -139,7 +140,7 @@
       (testing "Can query union of several specified draft graphs"
         (let [csv-result (csv-> (endpoint
                                  (-> drafts-request
-                                     (assoc-in [:query-params "graph"] [draft-graph-2 draft-graph-3])
+                                     (assoc-in [:params "graph"] [draft-graph-2 draft-graph-3])
                                      (assoc-in [:params :query] "SELECT * WHERE { ?s ?p ?o }"))))]
 
           (is (= 5 (count csv-result))
@@ -148,7 +149,7 @@
       (testing "Can rewrite queries to use their draft"
         (let [csv-result (csv-> (endpoint
                                  (-> drafts-request
-                                     (assoc-in [:query-params "graph"] [draft-graph-2])
+                                     (assoc-in [:params "graph"] [draft-graph-2])
                                      (assoc-in [:params :query] (select-all-in-graph "http://test.com/graph-2")))))]
 
 
@@ -170,14 +171,13 @@
 
 (deftest drafts-sparql-routes-distinct-test
   (let [test-db (make-store)
-        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (draft-sparql-routes "/sparql/draft" test-db)]
 
     (testing "SELECT DISTINCT queries on drafts"
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
-                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query] (str "SELECT DISTINCT ?g WHERE {
                                                                         GRAPH ?g {
                                                                           ?s ?p ?o .
@@ -190,13 +190,12 @@
 
 (deftest drafts-sparql-routes-distinct-subselect-test
   (let [test-db (make-store)
-        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (draft-sparql-routes "/sparql/draft" test-db)]
 
     (testing "SELECT DISTINCT subqueries with count on drafts"
       (let [count-request (-> drafts-request
-                              (assoc-in [:query-params "graph"] [draft-graph-2])
+                              (assoc-in [:params "graph"] [draft-graph-2])
                               (assoc-in [:params :query] (str "SELECT (COUNT(*) as ?tripod_count_var) {
                                                                    SELECT DISTINCT ?uri ?graph WHERE {
                                                                       GRAPH ?graph {
@@ -226,7 +225,6 @@
 
 (deftest drafts-sparql-routes-with-construct-queries-test
   (let [test-db (make-store)
-        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (draft-sparql-routes "/sparql/draft" test-db)]
 
@@ -240,7 +238,7 @@
     (testing "Can do a construct query with against a draft graph (with query rewrite)"
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
-                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query] "CONSTRUCT { ?s ?p ?o } WHERE { graph <http://test.com/graph-2> { ?s ?p ?o . } }"))))]
         (is (= graph-2-result
                (second csv-result)))))
@@ -248,14 +246,13 @@
     (testing "Can do a construct query with a graph variable bound into results (with query & result rewrite)"
       (let [csv-result (csv-> (endpoint
                                (-> drafts-request
-                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query] "CONSTRUCT { ?g ?p ?o } WHERE { graph ?g { ?s ?p ?o . } }"))))]
         (is (= ["http://test.com/graph-2" "http://test.com/hasProperty" "http://test.com/data/1"]
                (second csv-result)))))))
 
 (deftest drafts-sparql-routes-with-desribe-queries-test
   (let [test-db (make-store)
-        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (draft-sparql-routes "/sparql/draft" test-db)]
     (testing "Can do a describe query with a graph"
@@ -268,14 +265,13 @@
 
 (deftest drafts-sparql-route-rewrites-constants
   (let [db (make-store)
-        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [_ draft-graph-2 draft-graph-3] (add-test-data! db)
         endpoint (draft-sparql-routes "/sparql/draft" db)]
 
     (testing "Query constants in graph position are rewritten to their draft graph URI"
         (let [s-p-o-result (-> (endpoint
                                (-> drafts-request
-                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query]
                                              "SELECT * WHERE { GRAPH <http://test.com/graph-2> { ?s ?p ?o . } } LIMIT 1")))
                               csv->
@@ -286,14 +282,13 @@
 
 (deftest drafts-sparql-routes-with-results-rewriting-test
   (let [db (make-store)
-        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         [_ draft-graph-2 draft-graph-3] (add-test-data! db)
         endpoint (draft-sparql-routes "/sparql/draft" db)]
 
     (testing "Queries can be written against their live graph URI"
         (let [found-graph (-> (endpoint
                                (-> drafts-request
-                                   (assoc-in [:query-params "graph"] [draft-graph-2])
+                                   (assoc-in [:params "graph"] [draft-graph-2])
                                    (assoc-in [:params :query]
                                              "SELECT ?g ?s ?p ?o WHERE { BIND(URI(\"http://test.com/graph-2\") AS ?g) GRAPH ?g { ?s ?p ?o . } } LIMIT 1")))
                               csv->
@@ -313,7 +308,7 @@
     (testing "When the context is set to two drafts which represent the same live graph an error should be raised."
       (let [{:keys [status headers body] :as result} (-> (endpoint
                                                           (-> drafts-request
-                                                              (assoc-in [:query-params "graph"] [draft-one draft-two])
+                                                              (assoc-in [:params "graph"] [draft-one draft-two])
                                                               (assoc-in [:params :query]
                                                                         "SELECT * WHERE { ?s ?p ?o . } LIMIT 1"))))]
 
