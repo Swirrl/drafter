@@ -11,8 +11,9 @@ This implementation does not enforce any security restrictions, and
   assumes that the client is trustworthy."
   [repo request]
   (let [graphs (-> request
-                  :query-params
+                  :params
                   (get "graph"))]
+
     (if graphs
       (if (instance? String graphs)
         #{graphs}

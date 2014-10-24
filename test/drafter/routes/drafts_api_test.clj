@@ -1,6 +1,6 @@
 (ns drafter.routes.drafts-api-test
   (:require [drafter.test-common :refer [*test-db* test-triples wrap-with-clean-test-db
-                                         stream->string select-all-in-graph]]
+                                         make-store stream->string select-all-in-graph make-graph-live!]]
             [clojure.test :refer :all]
             [grafter.rdf.sesame :as ses]
             [drafter.routes.drafts-api :refer :all]
@@ -17,14 +17,6 @@
     true
     (catch Exception ex
       false)))
-
-(defn make-live-graph [db graph-uri]
-  (let [draft-graph (import-data-to-draft! db graph-uri (test-triples "http://test.com/subject-1"))]
-    (migrate-live! db draft-graph)))
-
-(defn make-live-graph-2 [db graph-uri]
-  (let [draft-graph (import-data-to-draft! db graph-uri (test-triples "http://test.com/subject-2"))]
-    (migrate-live! db draft-graph)))
 
 (defn get-file-request-data [path]
   (let [file (io/file path)]
@@ -59,7 +51,6 @@
       (add-request-file source-file)))
 
 (deftest drafts-api-routes-test
-
   (let [state (atom {})]
 
     (testing "POST /draft/create"
@@ -111,7 +102,7 @@
 
       (testing "with a source graph"
         ;; put some data into the source-graph before we begin
-        (make-live-graph *test-db* "http://draft.org/source-graph")
+        (make-graph-live! *test-db* "http://draft.org/source-graph")
           (let [state (atom {})
                 dest-graph "http://mygraph/graph-to-be-appended-to"
                 test-request (-> {:uri "/draft" :request-method :post}
@@ -128,7 +119,7 @@
               (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . }}")) "graph has still got the old data in ")))))
 
     (testing "PUT /draft with a source file"
-      (make-live-graph *test-db* "http://mygraph/graph-to-be-replaced")
+      (make-graph-live! *test-db* "http://mygraph/graph-to-be-replaced")
 
       (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
                  "Graph should contain initial state before it is replaced")
@@ -151,8 +142,8 @@
 
         ; in a different test so that it's in a clean db.
     (testing "PUT /draft with a source graph"
-      (make-live-graph *test-db* "http://mygraph/graph-to-be-replaced")
-      (make-live-graph-2 *test-db* "http://draft.org/source-graph")
+      (make-graph-live! *test-db* "http://mygraph/graph-to-be-replaced")
+      (make-graph-live! *test-db* "http://draft.org/source-graph" (test-triples "http://test.com/subject-2"))
 
       (testing "when source graph contains data"
 
@@ -311,5 +302,6 @@
  meta-replace-with-put-file-test :put (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt"))
 
  meta-update-with-post-file-test :post (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt")))
+
 
 (use-fixtures :each wrap-with-clean-test-db)
