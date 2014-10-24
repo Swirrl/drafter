@@ -108,7 +108,7 @@
   ([query-ast graph-map context-set]
      (doseq [context context-set]
        (when (.isConstant context)
-         (let [new-uri (get graph-map (.getValue context))]
+         (when-let [new-uri (get graph-map (.getValue context))]
            (timbre/debug "Rewriting constant " context " with new-uri " new-uri)
            (.setValue context new-uri))))
      query-ast))

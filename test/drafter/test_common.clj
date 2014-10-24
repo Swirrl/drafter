@@ -3,7 +3,7 @@
             [grafter.rdf.sesame :refer :all]
             [grafter.rdf :refer [triplify]]
             [me.raynes.fs :as fs]
-            [drafter.rdf.draft-management :refer [lookup-draft-graph-uri]]
+            [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function]])
   (:import [java.util Scanner]))
 
@@ -50,3 +50,12 @@
                        "http://publishmydata.com/def/functions#replace-live-graph-uri"
                        (partial lookup-draft-graph-uri store))
     store))
+
+(defn make-graph-live!
+  ([db live-guri]
+     (make-graph-live! db live-guri (test-triples "http://test.com/subject-1")))
+
+  ([db live-guri data]
+     (let [draft-guri (import-data-to-draft! db live-guri data)]
+       (migrate-live! db draft-guri))
+     live-guri))

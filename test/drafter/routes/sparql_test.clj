@@ -1,6 +1,6 @@
 (ns drafter.routes.sparql-test
   (:require [drafter.test-common :refer [test-triples
-                                         make-store stream->string select-all-in-graph]]
+                                         make-store stream->string select-all-in-graph make-graph-live!]]
             [clojure.test :refer :all]
             [clojure-csv.core :as csv]
             [clojure.data.json :as json]
@@ -27,6 +27,31 @@
                            :params {:query "SELECT * WHERE { ?s ?p ?o }"}
                            :headers {"accept" "text/csv"}})
 
+(defn- build-query [endpoint-path query graphs]
+  (let [graphs (if (instance? String graphs)
+                 [graphs]
+                 graphs)
+        query-request (-> default-sparql-query
+                          (assoc-in [:params :query] query)
+                          (assoc :uri endpoint-path))]
+
+    (reduce (fn [req graph]
+              (update-in req [:params "graph"] (fn [old new]
+                                                 (cond
+                                                  (nil? old) new
+                                                  (instance? String old) [old new]
+                                                  :else (conj old new))) graph))
+            query-request graphs)))
+
+(def draft-query (partial build-query "/sparql/draft"))
+
+(defn live-query [qstr]
+  (build-query "/sparql/live" qstr nil))
+
+(defn state-query [qstr]
+  (build-query "/sparql/state" qstr nil))
+
+
 (defn csv-> [{:keys [body]}]
   "Parse a response into a CSV"
   (-> body stream->string csv/parse-csv))
@@ -37,9 +62,7 @@
         [draft-graph-1 draft-graph-2] (add-test-data! test-db)
         endpoint (live-sparql-routes "/sparql/live" test-db)
         {:keys [status headers body]
-         :as result} (endpoint
-         (assoc-in default-sparql-query [:params :query]
-                   (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
+         :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
         csv-result (csv-> result)]
 
     (is (= "text/csv" (headers "Content-Type"))
@@ -53,51 +76,47 @@
 
     (testing "Draft graphs are not exposed"
       (let [csv-result (csv-> (endpoint
-                               (assoc-in default-sparql-query [:params :query]
-                                         (select-all-in-graph draft-graph-2))))]
+                               (live-query (select-all-in-graph draft-graph-2))))]
         (is (empty? (second csv-result)))))
 
     (testing "Offline public graphs are not exposed"
       (set-isPublic! test-db "http://test.com/made-live-and-deleted-1" false)
       (let [csv-result (csv-> (endpoint
-                               (assoc-in default-sparql-query [:params :query]
-                                         (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
+                               (live-query
+                                (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
 
         (is (not= graph-1-result (second csv-result)))))))
 
 (deftest state-sparql-routes-test
   (let [test-db (make-store)
-        drafts-request (-> default-sparql-query
-                           (assoc :uri "/sparql/state")
-                           (assoc-in [:headers "accept"] "text/plain"))
+        ;;drafts-request (assoc-in [:headers "accept"] "text/plain")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (state-sparql-routes "/sparql/state" test-db)]
 
     (testing "The state graph should be accessible"
-      (let [result (endpoint
-                    (-> drafts-request
-                        (assoc-in [:params :query] (str "ASK WHERE {"
-                                                        "  GRAPH <" drafter-state-graph "> {"
-                                                        "    ?s ?p ?o ."
-                                                        "  }"
-                                                        "}"))))
+      (let [result (endpoint (-> (state-query (str "ASK WHERE {"
+                                                   "  GRAPH <" drafter-state-graph "> {"
+                                                   "    ?s ?p ?o ."
+                                                   "  }"
+                                                   "}"))
+                                 (assoc-in [:headers "accept"] "text/plain")))
             body (-> result :body stream->string)]
 
         (is (= "true" body))))
 
     (testing "The data graphs (live and drafts) should be hidden"
       (let [result (endpoint
-                    (-> drafts-request
-                        (assoc-in [:params :query] (str "ASK WHERE {"
-                                                        "  GRAPH <" draft-graph-2 "> {"
-                                                        "    ?s ?p ?o ."
-                                                        "  }"
-                                                        "}"))))
+                    (-> (state-query (str "ASK WHERE {"
+                                          "  GRAPH <" draft-graph-2 "> {"
+                                          "    ?s ?p ?o ."
+                                          "  }"
+                                          "}"))
+                        (assoc-in [:headers "accept"] "text/plain")))
             body (-> result :body stream->string)]
 
         (is (= "false" body))))))
 
-(def drafts-request (assoc default-sparql-query :uri "/sparql/draft"))
+;(def drafts-request (assoc default-sparql-query :uri "/sparql/draft"))
 
 (deftest drafts-sparql-routes-test
   (let [test-db (make-store)
@@ -106,17 +125,13 @@
 
     (testing "draft graphs that are made live can no longer be queried on their draft GURI"
       (let [csv-result (csv-> (endpoint
-                               (-> drafts-request
-                                   (assoc-in [:params "graph"] [draft-graph-2])
-                                   (assoc-in [:params :query] (select-all-in-graph draft-graph-2)))))]
+                               (draft-query (select-all-in-graph draft-graph-2) draft-graph-2)))]
 
         (is (= graph-2-result (second csv-result)))))
 
     (testing "Can query draft :graphs that are supplied on the request"
       (let [csv-result (csv-> (endpoint
-                               (-> drafts-request
-                                   (assoc-in [:params "graph"] [draft-graph-2])
-                                   (assoc-in [:params :query] (select-all-in-graph draft-graph-2)))))]
+                               (draft-query (select-all-in-graph draft-graph-2) draft-graph-2)))]
 
         (is (= graph-2-result (second csv-result))
             "The data should be as expected")
@@ -125,13 +140,11 @@
 
       (testing "SELECT DISTINCT queries on drafts"
         (let [csv-result (csv-> (endpoint
-                                 (-> drafts-request
-                                     (assoc-in [:params "graph"] [draft-graph-2])
-                                     (assoc-in [:params :query] (str "SELECT DISTINCT ?g WHERE {
+                                 (draft-query (str "SELECT DISTINCT ?g WHERE {
                                                                         GRAPH ?g {
                                                                           ?s ?p ?o .
                                                                         }
-                                                                     }")))))]
+                                                                     }") [draft-graph-2])))]
           (let [[header & results] csv-result]
             (is (= 1 (count results))
                 "There should only be 1 DISTINCT ?g result returned"))))
@@ -139,19 +152,14 @@
       ;; TODO test rewriting of results
       (testing "Can query union of several specified draft graphs"
         (let [csv-result (csv-> (endpoint
-                                 (-> drafts-request
-                                     (assoc-in [:params "graph"] [draft-graph-2 draft-graph-3])
-                                     (assoc-in [:params :query] "SELECT * WHERE { ?s ?p ?o }"))))]
+                                 (draft-query  "SELECT * WHERE { ?s ?p ?o }" [draft-graph-2 draft-graph-3])))]
 
           (is (= 5 (count csv-result))
               "There should be 5 results (2 triples in both graphs + the csv header row)")))
 
       (testing "Can rewrite queries to use their draft"
         (let [csv-result (csv-> (endpoint
-                                 (-> drafts-request
-                                     (assoc-in [:params "graph"] [draft-graph-2])
-                                     (assoc-in [:params :query] (select-all-in-graph "http://test.com/graph-2")))))]
-
+                                 (draft-query (select-all-in-graph "http://test.com/graph-2") draft-graph-2)))]
 
           (is (= graph-2-result (second csv-result))
               "The data should be as expected")
@@ -160,13 +168,12 @@
               "There should be two results and one header row")))
 
       (testing "If no drafts are supplied queries should be restricted to the set of live graphs"
-        (let [csv-result (csv-> (endpoint
-                                 (-> drafts-request
-                                     (assoc-in [:params :query] "SELECT * WHERE { ?s ?p ?o }"))))]
+        (let [csv-result (csv-> (endpoint (draft-query "SELECT * WHERE { ?s ?p ?o }" nil)))]
+
 
           (= graph-1-result (second csv-result))
           (is (= 3 (count csv-result))
-              "There should be 5 results (2 triples in both graphs + the csv header row)"))))))
+              "There should be 3 rows in the csv (2 triples in one graph + the csv header row)"))))))
 
 
 (deftest drafts-sparql-routes-distinct-test
@@ -257,10 +264,9 @@
         endpoint (draft-sparql-routes "/sparql/draft" test-db)]
     (testing "Can do a describe query with a graph"
       (let [csv-result (csv-> (endpoint
-                               (-> drafts-request
-                                   (assoc-in [:headers "accept"] "application/n-triples")
-                                   (assoc-in [:params :query] "DESCRIBE ?s WHERE { graph <http://test.com/graph-2> { ?s ?p ?o . } }"))))]
-        (is (= "<http://test.com/subject-1> <http://test.com/hasProperty> <http://test.com/data/1> ."
+                               (-> (draft-query "DESCRIBE ?s WHERE { graph <http://test.com/graph-2> { ?s ?p ?o . } }" draft-graph-2)
+                                   (assoc-in [:headers "accept"] "application/n-triples"))))]
+        (is (= "<http://test.com/subject-2> <http://test.com/hasProperty> <http://test.com/data/1> ."
                (-> csv-result first first)))))))
 
 (deftest drafts-sparql-route-rewrites-constants
@@ -298,9 +304,43 @@
 
           (is (= "http://test.com/graph-2" found-graph))))))
 
+
+(defn make-new-draft-from-graph! [db live-guri]
+  (let [draft-guri (create-draft-graph! db live-guri)
+        query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
+                         { GRAPH <" live-guri "> { ?s ?p ?o } }")
+        source-data (ses/query db query-str)]
+    (append-data! db draft-guri source-data)
+
+    draft-guri))
+
+(deftest put-two-graphs-live-and-check-they-stay-isolated-test
+  (let [state (atom {})
+        db (make-store)
+        endpoint (draft-sparql-routes "/sparql/draft" db)]
+
+    ;; Put two graphs live
+    (let [graph-a (make-graph-live! db "http://graph.com/a" (test-triples "http://test.com/a"))
+          graph-b (make-graph-live! db "http://graph.com/b" (test-triples "http://test.com/b"))
+          ;; and then change one of them... a'
+          draft-graph-a' (make-new-draft-from-graph! db graph-a)]
+
+      (append-data! db draft-graph-a' (test-triples "http://test.com/a-prime"))
+
+      ;;(make-graph-live! db draft-graph-a')
+
+      (let [result (-> (endpoint (draft-query (str "SELECT * WHERE {
+                                                        GRAPH <" graph-b "> {
+                                                          ?s ?p ?o .
+                                                        }
+                                                     }") draft-graph-a'))
+                       csv->
+                       second
+                       first)]
+        (is (nil? result))))))
+
 (deftest error-on-invalid-context
   (let [db (make-store)
-        drafts-request (assoc default-sparql-query :uri "/sparql/draft")
         draft-one (import-data-to-draft! db "http://test.com/made-live-and-deleted-1" (test-triples "http://test.com/subject-1"))
         draft-two (import-data-to-draft! db "http://test.com/made-live-and-deleted-1" (test-triples "http://test.com/subject-1"))
         endpoint (draft-sparql-routes "/sparql/draft" db)]
