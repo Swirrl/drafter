@@ -36,7 +36,7 @@
                           (assoc :uri endpoint-path))]
 
     (reduce (fn [req graph]
-              (update-in req [:params "graph"] (fn [old new]
+              (update-in req [:params :graph] (fn [old new]
                                                  (cond
                                                   (nil? old) new
                                                   (instance? String old) [old new]

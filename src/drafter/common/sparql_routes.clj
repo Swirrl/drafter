@@ -12,7 +12,7 @@ This implementation does not enforce any security restrictions, and
   [repo request]
   (let [graphs (-> request
                   :params
-                  (get "graph"))]
+                  (get :graph))]
 
     (if graphs
       (if (instance? String graphs)
