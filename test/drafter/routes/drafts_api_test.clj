@@ -190,7 +190,7 @@
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph"
       (do
-        (make-live-graph *test-db* "http://mygraph/live-graph")
+        (make-graph-live! *test-db* "http://mygraph/live-graph")
 
         (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")
             "Graph should exist before deletion")
@@ -268,7 +268,7 @@
    (testing "Updating draft graph with metadata"
      (let [state (atom {})
            route (draft-api-routes "/draft" *test-db* state)
-           source-graph-uri (make-live-graph *test-db* "http://mygraph/source-graph")
+           source-graph-uri (make-graph-live! *test-db* "http://mygraph/source-graph")
            draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
            request (-> {:uri "/draft" :request-method http-method}
                        (add-request-metadata "uploaded-by" "test")
