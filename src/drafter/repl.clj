@@ -1,9 +1,10 @@
 (ns drafter.repl
   (:use
-   [ring.middleware file-info file])
+   [ring.middleware file-info resource])
   (:require [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.handler :as service]
+            [clojure.java.io :as io]
             [ring.server.standalone :refer [serve]])
   (:import [org.openrdf.rio RDFFormat])
   (:gen-class))
@@ -17,7 +18,7 @@
   ;; changes, the server picks it up without having to restart.
   (-> #'service/app
       ; Makes static assets in $PROJECT_DIR/resources/public/ available.
-      (wrap-file "resources")
+      (wrap-resource "public")
       ; Content-Type, Content-Length, and Last Modified headers for files in body
       (wrap-file-info)))
 
