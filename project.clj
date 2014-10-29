@@ -63,8 +63,9 @@
 
          :env {:dev true}}}
 
-  :jvm-opts ["-Dorg.openrdf.repository.debug=true"]
+  ;;:jvm-opts ["-Dorg.openrdf.repository.debug=true"]
   :min-lein-version "2.0.0"
 
-;  :main drafter.repl
+  :aot [drafter.repl]
+  :main drafter.repl
   )
