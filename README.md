@@ -70,6 +70,11 @@ graph on each request to know what this is).
 
 SPARQL endpoint on an arbitrary set of drafts (plus the rest from live).
 
+If on the draft graph you want the drafts to be unioned with the
+current state of the public live graphs then you should also pass the
+HTTP parameter `&union-with-live=true`.  The default value for this is
+false.
+
 
 Drafters REST API:
 ==================

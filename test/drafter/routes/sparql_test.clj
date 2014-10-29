@@ -167,8 +167,10 @@
           (is (= 3 (count csv-result))
               "There should be two results and one header row")))
 
-      (testing "If no drafts are supplied queries should be restricted to the set of live graphs"
-        (let [csv-result (csv-> (endpoint (draft-query "SELECT * WHERE { ?s ?p ?o }" nil)))]
+      (testing "If no drafts are supplied and union-with-live is true then queries should be restricted to the set of live graphs"
+        (let [csv-result (csv-> (endpoint
+                                 (-> (draft-query "SELECT * WHERE { ?s ?p ?o }" nil)
+                                     (assoc-in [:params :union-with-live] "true"))))]
 
 
           (= graph-1-result (second csv-result))
@@ -234,7 +236,9 @@
 
     (testing "Can do a construct query without a graph"
       (let [csv-result (csv-> (endpoint
-                               (draft-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }" nil)))]
+                               (-> (draft-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }" nil)
+                                   (assoc-in [:params :union-with-live] "true"))
+                               ))]
         (is (= graph-1-result
                (second csv-result)))))
 
@@ -331,6 +335,21 @@
                        second
                        first)]
         (is (nil? result))))))
+
+(deftest drafts-unioned-with-live-test
+  (let [test-db (make-store)
+        [draft-graph-1-made-live draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+
+    (is (= #{"http://test.com/graph-2"
+             "http://test.com/made-live-and-deleted-1"}
+           (->> (-> (draft-query "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o . } }" [draft-graph-2])
+                    (assoc-in [:params :union-with-live] "true")
+                    endpoint
+                    csv->
+                    flatten)
+                (drop 1)
+                (into #{}))))))
 
 (deftest error-on-invalid-context
   (let [db (make-store)
