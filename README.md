@@ -57,7 +57,7 @@ Configuring Drafter
 -------------------
 
 Drafter uses [environ](https://github.com/weavejester/environ) for its
-configuration.  This means it uses environment variables (and or java
+configuration.  This means it uses environment variables (and/or java
 properties) to pass configuration variables from the environment.
 
 Configurable properties and their defaults are:
