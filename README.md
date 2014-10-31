@@ -56,7 +56,7 @@ To run a built drafter server (without leiningen or a repl) on port 3001:
 Configuring Drafter
 -------------------
 
-Drafter uses (environ)[https://github.com/weavejester/environ] for its
+Drafter uses [environ](https://github.com/weavejester/environ) for its
 configuration.  This means it uses environment variables (and or java
 properties) to pass configuration variables from the environment.
 
