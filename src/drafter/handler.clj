@@ -17,7 +17,7 @@
             [compojure.handler :only [api]]
             [environ.core :refer [env]]))
 
-(def repo-path "MyDatabases/repositories/db")
+(def default-repo-path "drafter-db")
 
 ;; Set these values later when we start the server
 (def repo)
@@ -25,7 +25,7 @@
 
 (def worker)
 
-(def state (atom {})); initialize state with an empty hashmap
+(def state (atom {})) ; initialize state with an empty hashmap
 
 (defmacro set-var-root! [var form]
   `(alter-var-root ~var (fn [& _#]
@@ -41,7 +41,7 @@
                      (pmdfunctions "replace-live-graph")
                      (partial lookup-live-graph-uri repo)))
 
-(defn initialise-repo! []
+(defn initialise-repo! [repo-path]
   (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path))]
                           (timbre/info "Initialised repo" repo-path)
                           repo))
@@ -75,8 +75,8 @@
                         ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                         :formats [:json-kw :edn])))
 
-(defn initialise-services! []
-  (initialise-repo!)
+(defn initialise-services! [repo-path]
+  (initialise-repo! repo-path)
   (initialise-app! repo state))
 
 (defn init
@@ -103,7 +103,8 @@
                          ;; in Emacs.
                          {:standard-out { :fmt-output-opts {:nofonts? true}}}}))
 
-  (initialise-services!)
+  (initialise-services! (or (:drafter-repo-path env)
+                            default-repo-path))
 
   (timbre/info "drafter started successfully"))
 

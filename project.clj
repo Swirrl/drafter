@@ -7,7 +7,8 @@
                  ;;                    :passphrase :env}]
                  ["swirrl-private-snapshots" {:url "s3p://leiningen-private-repo/snapshots/"
                                               :username :env
-                                              :passphrase :env}]]
+                                              :passphrase :env}]
+                 ]
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
@@ -31,16 +32,16 @@
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
                  [org.slf4j/slf4j-log4j12 "1.7.7"]
-                 [environ "0.5.0"]]
+                 [environ "1.0.0"]]
 
   :java-source-paths ["src-java"]
 
   :repl-options {:init-ns drafter.repl
-                 :init (start-server)
+                 :init (-main)
                  :port 5678}
 
   :plugins [[lein-ring "0.8.10"]
-            [lein-environ "0.5.0"]
+            [lein-environ "1.0.0"]
             [lein-test-out "0.3.1"]]
 
   :ring {:handler drafter.handler/app

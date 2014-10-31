@@ -12,3 +12,4 @@ pom.xml.asc
 /drafter.log.*
 user_repl.clj
 .DS_Store
+/drafter-db/

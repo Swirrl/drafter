@@ -5,7 +5,8 @@
             [drafter.rdf.draft-management :refer :all]
             [drafter.handler :as service]
             [clojure.java.io :as io]
-            [ring.server.standalone :refer [serve]])
+            [ring.server.standalone :refer [serve]]
+            [environ.core :refer [env]])
   (:import [org.openrdf.rio RDFFormat])
   (:gen-class))
 
@@ -23,23 +24,29 @@
       (wrap-file-info)))
 
 (defn start-server
-  "used for starting the server in development mode from REPL"
-  [& [port]]
-  (let [port (if port (Integer/parseInt port) 3001)]
-    (reset! server
-            (serve (get-handler)
-                   {:port port
-                    :init service/init
-                    :auto-reload? true
-                    :destroy service/destroy
-                    :join? false}))
-    (println (str "You can view the site at http://localhost:" port))))
+  "Used for starting the server in development mode from REPL"
+  [port]
+  (reset! server
+          (serve (get-handler)
+                 {:port port
+                  :init service/init
+                  :auto-reload? true
+                  :destroy service/destroy
+                  :join? false}))
+
+  (println (str "You can view the site at http://localhost:" port)))
 
 (defn stop-server []
   (service/destroy)
   (.stop @server)
   (reset! server nil))
 
+(defn ->int [i]
+  (when i
+    (if (integer? i)
+      i
+      (Integer/parseInt i))))
 
 (defn -main [& args]
-  (start-server))
+  (start-server (or (->int (:drafter-http-port env))
+                    3001)))

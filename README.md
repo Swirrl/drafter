@@ -30,7 +30,8 @@ In LightTable, you can then add a connection to a Clojure (remote nREPL) (view->
 Building and running
 --------------------
 
-To build and run a repl and a server on port 3001
+To run a dev build of the drafter server with configuration defaults
+(port 3001 and a repo stored in ./drafter/repositories/db) simply run
 
     $ lein repl
 
@@ -48,9 +49,35 @@ To build:
 
     $ lein uberjar
 
-To run a built drafter server without leiningen on port 3001:
+To run a built drafter server (without leiningen or a repl) on port 3001:
 
     $ java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
+
+Configuring Drafter
+-------------------
+
+Drafter uses [https://github.com/weavejester/environ](environ) for its
+configuration.  This means it uses environment variables (and or java
+properties) to pass configuration variables from the environment.
+
+Configurable properties and their defaults are:
+
+    DRAFTER_HTTP_PORT:            (default 3001)
+    DRAFTER_REPO_PATH:            (default "drafter-db")
+
+Some examples of supplying these properties are provided below:
+
+As environment variables via lein run:
+
+    $ env DRAFTER_HTTP_PORT=3040 DRAFTER_REPO_PATH=/var/drafter-db lein run
+
+As java properties via a built application jar:
+
+    $ java -Ddrafter.http.port=3050 -Ddrafter.repo.path=./drafter-database -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
+
+As environment variables via a built application jar:
+
+    $ env DRAFTER_HTTP_PORT=3050 DRAFTER_REPO_PATH=./drafter-database java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 
 Drafters SPARQL Endpoints
 =========================
