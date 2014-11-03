@@ -2,7 +2,7 @@
   (:require
    [grafter.rdf.sesame :as ses]
    [grafter.rdf :refer [prefixer]]
-            [taoensso.timbre :as timbre])
+   [clojure.tools.logging :as log])
   (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
            [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
             BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
@@ -109,7 +109,7 @@
      (doseq [context context-set]
        (when (.isConstant context)
          (when-let [new-uri (get graph-map (.getValue context))]
-           (timbre/debug "Rewriting constant " context " with new-uri " new-uri)
+           (log/debug "Rewriting constant " context " with new-uri " new-uri)
            (.setValue context new-uri))))
      query-ast))
 
@@ -165,7 +165,7 @@
 
       (when vars-in-graph-position
         (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
-        (timbre/debug "Rewriten query AST: " prepared-query))
+        (log/debug "Rewriten query AST: " prepared-query))
 
       prepared-query)))
 
@@ -203,7 +203,7 @@
 
         (when vars-in-graph-position
           (rewrite-graph-constants query-ast graph-substitutions vars-in-graph-position)
-          (timbre/debug "Rewriten query AST: " preped-update))
+          (log/debug "Rewriten query AST: " preped-update))
 
         preped-update)))
 

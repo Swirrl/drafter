@@ -28,7 +28,9 @@
                   :exclusions [org.openrdf.sesame/sesame-repository-manager]]
                  ;;[org.openrdf.sesame/sesame-runtime "2.8.0-beta2"]
                  ;;[org.openrdf.sesame/sesame-queryrender "2.8.0-beta2"]
-                 [com.taoensso/timbre "3.2.1"]
+                 ;;[com.taoensso/timbre "3.2.1"]
+                 ;;[com.palletops/log-config "0.1.4"]   ;; provides make-tools-logging-appender
+                 [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
                  [org.slf4j/slf4j-log4j12 "1.7.7"]

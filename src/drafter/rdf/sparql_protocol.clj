@@ -5,7 +5,7 @@
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
-            [taoensso.timbre :as timbre])
+            [clojure.tools.logging :as log])
   (:import [org.openrdf.query GraphQuery]
            [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
            [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
@@ -125,18 +125,18 @@
 
          (and (instance? QueryResultWriter writer)
               (instance? GraphQuery pquery))
-         (do (timbre/debug "pquery is " pquery " writer is " writer)
+         (do (log/debug "pquery is " pquery " writer is " writer)
              (.evaluate pquery (result-handler-wrapper writer)))
 
          :else
          (do
-           (timbre/debug "pquery (default) is " pquery " writer is " writer)
+           (log/debug "pquery (default) is " pquery " writer is " writer)
            (.evaluate pquery writer))))
 
       (catch Exception ex
         ;; Note that if we error here it's now too late to return a
         ;; HTTP RESPONSE code error
-        (timbre/error ex "Error streaming results"))
+        (log/error ex "Error streaming results"))
 
       (finally
         (.close ostream)))))
@@ -186,7 +186,7 @@
                  (.setDataset restriction))
         media-type (parse-accept headers)]
 
-    (timbre/debug (str "Running query " query-str " with graph restriction: " graph-restrictions))
+    (log/debug (str "Running query " query-str " with graph restriction: " graph-restrictions))
     (stream-sparql-response pquery media-type result-rewriter)))
 
 (defn sparql-end-point

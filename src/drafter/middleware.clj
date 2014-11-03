@@ -1,12 +1,12 @@
 (ns drafter.middleware
-  (:require [taoensso.timbre :as timbre]
+  (:require [clojure.tools.logging :as log]
             [selmer.parser :as parser]
             [environ.core :refer [env]]))
 
 (defn log-request [handler]
   (if (env :dev)
     (fn [req]
-      (timbre/debug req)
+      (log/debug req)
       (handler req))
     handler))
 

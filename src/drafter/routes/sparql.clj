@@ -8,7 +8,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper]]
             [drafter.rdf.sparql-rewriting :as rew]
-            [taoensso.timbre :as timbre]
+            [clojure.tools.logging :as log]
             [grafter.rdf.sesame :as ses]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
@@ -31,7 +31,7 @@
     (handleLinks [this link-urls]
       (.handleLinks writer link-urls))
     (handleSolution [this binding-set]
-      (timbre/info "select result wrapper " this  "writer: " writer)
+      (log/info "select result wrapper " this  "writer: " writer)
       (solution-handler-fn writer binding-set)
       ;;(.handleSolution writer binding-set)
       )
@@ -51,7 +51,7 @@
   [binding-set]
   (let [bs (MapBindingSet.)]
     (doseq [^Binding binding (iterator-seq (.iterator binding-set))]
-      (timbre/debug "cloning binding: " (.getName binding) "val: "(.getValue binding))
+      (log/debug "cloning binding: " (.getName binding) "val: "(.getValue binding))
       (.addBinding bs (.getName binding) (.getValue binding)))
     bs))
 
@@ -60,21 +60,21 @@
     ;; if there are vars in graph position - we should rewrite the
     ;; results
     (let [rewrite-graph-result (fn [^QueryResultHandler writer ^BindingSet binding-set]
-                                 (timbre/debug "vars in graph position" vars-in-graph-position)
+                                 (log/debug "vars in graph position" vars-in-graph-position)
 
                                  (if (seq vars-in-graph-position)
                                    (let [new-binding-set (clone-binding-set binding-set)]
                                      ;; Copy binding-set as mutating it whilst writing (iterating)
                                      ;; results causes bedlam with the iteration, especially with SPARQL
                                      ;; DISTINCT queries.
-                                     (timbre/debug "old binding set: " binding-set "new binding-set" new-binding-set)
+                                     (log/debug "old binding set: " binding-set "new binding-set" new-binding-set)
                                      (doseq [var vars-in-graph-position]
                                        (when-not (.isConstant var)
                                          (when-let [val (.getValue binding-set (.getName var))]
                                            ;; only rewrite results if the value is bound as a return
                                            ;; value (i.e. it's a named result parameter for SELECT)
                                            (let [new-uri (get draft->live val val)]
-                                             (timbre/debug "Substituting val" val "for new-uri:" new-uri "for var:" var)
+                                             (log/debug "Substituting val" val "for new-uri:" new-uri "for var:" var)
                                              (.addBinding new-binding-set (.getName var) new-uri)))))
                                      (.handleSolution writer new-binding-set))
                                    (.handleSolution writer binding-set)))]
@@ -92,7 +92,7 @@
         preped-query (rew/rewrite-graph-query repo query-str live->draft)]
     {:query-rewriter
      (fn [repo query-str]
-       (timbre/info  "Using mapping: " live->draft)
+       (log/info  "Using mapping: " live->draft)
        preped-query)
 
      :result-rewriter

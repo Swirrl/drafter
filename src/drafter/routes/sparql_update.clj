@@ -8,7 +8,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.rdf.sparql-rewriting :as rew]
-            [taoensso.timbre :as timbre]
+            [clojure.tools.logging :as log]
             [grafter.rdf.sesame :as ses]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query Dataset]))
@@ -64,7 +64,7 @@
       {:status 200 :body "OK"}
       ;; )
     (catch Exception ex
-      (timbre/fatal "An exception was thrown when executing a SPARQL update!" ex)
+      (log/fatal "An exception was thrown when executing a SPARQL update!" ex)
       {:status 500 :body (str "Unknown server error executing update" ex)})))
 
 (defn- collection-or-nil? [x]
@@ -106,7 +106,7 @@
            (let [{update :update} (parse-update-request request)
                  ;; prepare the update based upon the endpoints restrictions
                  preped-update (prepare-restricted-update repo update restrictions)]
-             (timbre/debug "About to execute update-query " preped-update)
+             (log/debug "About to execute update-query " preped-update)
              (execute-update repo preped-update)))))
 
 (defn draft-update-endpoint
@@ -118,7 +118,7 @@
                  preped-update (prepare-restricted-update repo update graphs)]
 
              (rew/rewrite-update-request preped-update (mgmt/graph-map repo graphs))
-             (timbre/debug "Executing update-query " preped-update)
+             (log/debug "Executing update-query " preped-update)
              (execute-update repo preped-update)))))
 
 (defn draft-update-endpoint-route [mount-point repo]

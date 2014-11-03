@@ -7,7 +7,7 @@
             [compojure.route :refer [not-found]]
             [compojure.handler :refer [api]]
             [drafter.rdf.draft-management :as mgmt]
-            [taoensso.timbre :as timbre]
+            [clojure.tools.logging :as log]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.common.api-routes :as api-routes]
             [grafter.rdf.sesame :as ses]
@@ -29,7 +29,7 @@
         (cond
          (= :reading-aborted (-> ex ex-data :type)) (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " ex)})
          :else (do
-                 (timbre/error "Unknown error " ex)
+                 (log/error "Unknown error " ex)
                  (api-routes/api-response 500 {:msg (str "Unknown error: " ex)}))
          ))
       (finally
@@ -42,32 +42,32 @@
   containing the tripes from the specified file."
   [repo graph {:keys [tempfile size filename content-type] :as file} metadata]
   (fn []
-    (timbre/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
+    (log/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
     (ses/with-transaction repo
       (mgmt/replace-data! repo graph (statements tempfile
                                                  :format (ses/mimetype->rdf-format content-type))
                           metadata))
-    (timbre/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))))
+    (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))))
 
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
   to the specified graph."
   [repo graph {:keys [tempfile size filename content-type] :as file} metadata]
   (fn []
-    (timbre/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
+    (log/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
 
     (ses/with-transaction repo
       (mgmt/append-data! repo graph (statements (:tempfile file)
                                                 :format (ses/mimetype->rdf-format content-type))
                          metadata))
 
-    (timbre/info (str "File import (append) complete " tempfile " to graph: " graph))))
+    (log/info (str "File import (append) complete " tempfile " to graph: " graph))))
 
 (defn append-data-to-graph-from-graph-job
   "Return a job function that adds the triples from the specified named graph to the specified graph"
   [repo graph source-graph metadata]
   (fn []
-    (timbre/info (str "Appending contents of " source-graph "  to graph: " graph))
+    (log/info (str "Appending contents of " source-graph "  to graph: " graph))
 
     (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
@@ -76,21 +76,21 @@
       (ses/with-transaction repo
         (mgmt/append-data! repo graph source-data metadata))
 
-      (timbre/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))))
+      (log/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))))
 
 (defn replace-data-from-graph-job
   "Return a function to replace the specified graph with a graph
   containing the tripes from the specified source graph."
   [repo graph source-graph metadata]
   (fn []
-    (timbre/info (str "Replacing graph " graph " with contents of graph: " source-graph ))
+    (log/info (str "Replacing graph " graph " with contents of graph: " source-graph ))
 
     (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
           source-data (ses/query repo query-str)]
           (ses/with-transaction repo
             (mgmt/replace-data! repo graph source-data metadata))
-          (timbre/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))))
+          (log/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))))
 
 (defn delete-graph-job [repo graph]
   (fn []

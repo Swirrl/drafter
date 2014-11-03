@@ -2,7 +2,7 @@
   (:require [grafter.rdf.ontologies.rdf :refer :all]
             [grafter.rdf.sesame :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
-            [taoensso.timbre :as timbre]
+            [clojure.tools.logging :as log]
             [clojure.java.io :as io]
             [grafter.rdf :refer [add add-statement add-properties graph
                                  subject predicate object context]]
@@ -129,7 +129,7 @@
 
 (defn delete-graph-contents! [db graph-uri]
   (update! db (str "DROP GRAPH <" graph-uri ">"))
-  (timbre/info (str "Deleted graph " graph-uri)))
+  (log/info (str "Deleted graph " graph-uri)))
 
 ; deletes graph data and the state
 (defn delete-graph-and-draft-state! [db graph-uri]
@@ -149,7 +149,7 @@
                        "}")]
     (update! db
              query-str))
-  (timbre/info (str "Deleted draft graph from state " graph-uri)))
+  (log/info (str "Deleted draft graph from state " graph-uri)))
 
 (defn replace-data!
   ([db draft-graph-uri triples] (replace-data! db draft-graph-uri triples {}))
@@ -175,7 +175,7 @@
 (defn lookup-live-graph-uri [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
 
-  (timbre/debug "SPARQL graph uri rewriting function called" draft-graph-uri)
+  (log/debug "SPARQL graph uri rewriting function called" draft-graph-uri)
   (-> (lookup-live-graph db draft-graph-uri)
       (URIImpl.)))
 
@@ -213,7 +213,7 @@
                              "} LIMIT 2"))
                  (map #(str (get % "draft")))
                  return-one-or-zero-uris)]
-    (timbre/debug "Runtime rewrite of live graph" live-graph-uri "to draft graph" res)
+    (log/debug "Runtime rewrite of live graph" live-graph-uri "to draft graph" res)
     res))
 
 (defn- has-duplicates? [col]
@@ -262,7 +262,7 @@
 
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (do
-      (timbre/debug (str "Migrating graph: " draft-graph-uri " to live graph: " live-graph-uri))
+      (log/debug (str "Migrating graph: " draft-graph-uri " to live graph: " live-graph-uri))
       (delete-graph-contents! db live-graph-uri)
 
       (let [contents (query db
@@ -274,7 +274,7 @@
 
       (delete-graph-and-draft-state! db draft-graph-uri)
       (set-isPublic! db live-graph-uri true)
-      (timbre/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri))
+      (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri))
       live-graph-uri)
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)))))

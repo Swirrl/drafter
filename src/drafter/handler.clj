@@ -9,13 +9,13 @@
             [drafter.routes.sparql-update :refer [draft-update-endpoint-route state-update-endpoint-route live-update-endpoint-route]]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
-            [taoensso.timbre :as timbre]
-            [taoensso.timbre.appenders.rotor :as rotor]
             [selmer.parser :as parser]
             [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri drafter-state-graph]]
             [grafter.rdf.sesame :as sesame]
             [compojure.handler :only [api]]
-            [environ.core :refer [env]]))
+            [environ.core :refer [env]]
+            [clojure.tools.logging :as log]
+            [clj-logging-config.log4j :as l4j]))
 
 (def default-repo-path "drafter-db")
 
@@ -43,7 +43,7 @@
 
 (defn initialise-repo! [repo-path]
   (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path))]
-                          (timbre/info "Initialised repo" repo-path)
+                          (log/info "Initialised repo" repo-path)
                           repo))
 
   (register-sparql-extension-functions))
@@ -83,36 +83,26 @@
   "init will be called once when app is deployed as a servlet on an
   app server such as Tomcat put any initialization code here"
   []
-  (timbre/set-config!
-    [:appenders :rotor]
-    {:min-level :fatal
-     :enabled? true
-     :async? false ; should be always false for rotor
-     :max-message-per-msecs nil
-     :fn rotor/appender-fn})
 
-  (timbre/set-config!
-    [:shared-appender-config :rotor]
-    {:path "drafter.log" :max-size (* 512 1024) :backlog 10})
+  (l4j/set-loggers!
+   "drafter" {:name "drafter" :level "INFO" :pattern "%d{ABSOLUTE} %-5p %-20c{1} :: %m%n"}
+   ["org.openrdf"] {:name "openrdf" :level :debug :pattern "%d{ABSOLUTE} %-5p %-20c{1} :: %m%n"})
+
+
 
   (when (env :dev)
     (parser/cache-off!)
-    (timbre/merge-config! {:appenders
-                         ;; disable colouring of output in dev env as
-                         ;; it causes stacktraces to become invisible
-                         ;; in Emacs.
-                         {:standard-out { :fmt-output-opts {:nofonts? true}}}}))
 
-  (initialise-services! (or (:drafter-repo-path env)
-                            default-repo-path))
+    (initialise-services! (or (:drafter-repo-path env)
+                              default-repo-path))
 
-  (timbre/info "drafter started successfully"))
+    (log/info "drafter started successfully")))
 
 (defn destroy
   "destroy will be called when your application
    shuts down, put any clean up code here"
   []
-  (timbre/info "drafter is shutting down.  Please wait (this can take a minute)...")
+  (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
   (sesame/shutdown repo)
   (future-cancel worker)
-  (timbre/info "drafter has shut down."))
+  (log/info "drafter has shut down."))
