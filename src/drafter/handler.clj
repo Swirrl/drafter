@@ -105,12 +105,12 @@
   (configure-logging! (io/file (get env :log-config-file "log-config.edn")))
 
   (when (env :dev)
-    (parser/cache-off!)
+    (parser/cache-off!))
 
-    (initialise-services! (or (:drafter-repo-path env)
+  (initialise-services! (or (:drafter-repo-path env)
                               default-repo-path))
 
-    (log/info "drafter started successfully")))
+  (log/info "drafter started successfully"))
 
 (defn destroy
   "destroy will be called when your application

@@ -47,6 +47,6 @@
       i
       (Integer/parseInt i))))
 
-(defn -main [& args]
+(defn -main []
   (start-server (or (->int (:drafter-http-port env))
                     3001)))
