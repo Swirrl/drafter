@@ -79,6 +79,68 @@ As environment variables via a built application jar:
 
     $ env DRAFTER_HTTP_PORT=3050 DRAFTER_REPO_PATH=./drafter-database java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 
+Configuring Logging
+-------------------
+
+Logging on the JVM can be awkward due to Java's legacy, however we've
+tried to keep it as simple as possible by supporting:
+
+- Logging config via our log-config.edn file, which supports pure
+  Clojure configuration (No XML or Log4J Property Files).
+- Logging both Java and Clojure code (meaning it's easy to output
+  sesame's log messages with the same config)
+- A logging configuration fallback chain (log-config.edn -> default
+  config in drafter.jar!log-config.edn)
+
+This is achieved by through the use of various logging libraries:
+
+- [clojure.tools.logging](https://github.com/clojure/tools.logging) with
+  the [Log4J](http://logging.apache.org/log4j/2.x/) logging
+
+- [clj-logging-config](https://github.com/malcolmsparks/clj-logging-config)
+  for the configuration DSL to provide simple Log4J configuration to
+  configure logging in different namespaces, Java packages and setup
+  your own log appenders.
+
+To configure logging in Drafter you should create a file called
+`log-config.edn` by copying the example `log-config.edn.example`.
+
+An example of a drafter `log-config.edn` file is here:
+
+````
+(let [log-pattern "%d{ABSOLUTE} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"]
+       (set-loggers!
+        ["org.openrdf" "drafter"]
+        {:name "drafter"
+         :level :trace
+         :out (DailyRollingFileAppender.
+               (EnhancedPatternLayout. log-pattern)
+               "logs/drafter.log" "'.'YYYY-MM")}
+
+        "drafter.rdf.sparql-protocol"
+        {:name "sparql"
+         :level :info
+         :out (DailyRollingFileAppender.
+               (EnhancedPatternLayout. log-pattern)
+               "logs/sparql.log" "'.'YYYY-MM")}))
+````
+
+The first thing to note is that this
+[edn](https://github.com/edn-format/edn) file must contain a Clojure
+form to be evaluated.
+
+When drafter starts it first looks at the environment for a variable
+called `LOG_CONFIG_FILE` if this is defined then the file at the
+location is evaluated, and if no file is found then Drafter will
+fallback to a file in its working directory named `log-config.edn`.
+Finally if this file is not found then drafter will configure its
+logging by using a default `log-config.edn` file contained in its Jar
+file.
+
+To configure the logging these forms should then contain a call to
+[clj-logging-config's](https://github.com/malcolmsparks/clj-logging-config)
+`set-loggers!` macro.
+
 Drafters SPARQL Endpoints
 =========================
 
@@ -177,8 +239,6 @@ For all of the above routes, you can supply additional k-v pairs (slug->str). Th
 For `POST/draft/create`, it will add metadata to the state graph.
 
 For the rest, it will add metadata to the queue :meta (as URI->str) (available via `/queue/peek`)
-
-
 
 Drafter Data Model
 ==================

@@ -31,7 +31,7 @@
     (handleLinks [this link-urls]
       (.handleLinks writer link-urls))
     (handleSolution [this binding-set]
-      (log/info "select result wrapper " this  "writer: " writer)
+      (log/debug "select result wrapper " this  "writer: " writer)
       (solution-handler-fn writer binding-set)
       ;;(.handleSolution writer binding-set)
       )
@@ -67,14 +67,14 @@
                                      ;; Copy binding-set as mutating it whilst writing (iterating)
                                      ;; results causes bedlam with the iteration, especially with SPARQL
                                      ;; DISTINCT queries.
-                                     (log/debug "old binding set: " binding-set "new binding-set" new-binding-set)
+                                     (log/trace "old binding set: " binding-set "new binding-set" new-binding-set)
                                      (doseq [var vars-in-graph-position]
                                        (when-not (.isConstant var)
                                          (when-let [val (.getValue binding-set (.getName var))]
                                            ;; only rewrite results if the value is bound as a return
                                            ;; value (i.e. it's a named result parameter for SELECT)
                                            (let [new-uri (get draft->live val val)]
-                                             (log/debug "Substituting val" val "for new-uri:" new-uri "for var:" var)
+                                             (log/trace "Substituting val" val "for new-uri:" new-uri "for var:" var)
                                              (.addBinding new-binding-set (.getName var) new-uri)))))
                                      (.handleSolution writer new-binding-set))
                                    (.handleSolution writer binding-set)))]
@@ -92,7 +92,7 @@
         preped-query (rew/rewrite-graph-query repo query-str live->draft)]
     {:query-rewriter
      (fn [repo query-str]
-       (log/info  "Using mapping: " live->draft)
+       (log/info "Using mapping: " live->draft)
        preped-query)
 
      :result-rewriter

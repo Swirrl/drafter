@@ -1,0 +1,17 @@
+(let [console (ConsoleAppender. (EnhancedPatternLayout. "%d{ABSOLUTE} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"))]
+  (set-loggers!
+   ["org.openrdf" "drafter"]
+   {:name "drafter"
+    :level :warn
+    :out console}
+
+   ["drafter.middleware" "drafter.rdf.draft-management"]
+   {:name "sparql"
+    :level :info
+    :out console }
+
+   ["drafter.rdf.sparql-protocol"]
+   {:name "sparql"
+    :level :warn
+    :out console }
+   ))

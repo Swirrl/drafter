@@ -13,3 +13,5 @@ pom.xml.asc
 user_repl.clj
 .DS_Store
 /drafter-db/
+/logs/
+/log-config.edn

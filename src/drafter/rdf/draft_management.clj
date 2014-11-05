@@ -175,7 +175,6 @@
 (defn lookup-live-graph-uri [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
 
-  (log/debug "SPARQL graph uri rewriting function called" draft-graph-uri)
   (-> (lookup-live-graph db draft-graph-uri)
       (URIImpl.)))
 
@@ -213,7 +212,7 @@
                              "} LIMIT 2"))
                  (map #(str (get % "draft")))
                  return-one-or-zero-uris)]
-    (log/debug "Runtime rewrite of live graph" live-graph-uri "to draft graph" res)
+    (log/debug "Live->Draft mapping: " live-graph-uri " -> " res)
     res))
 
 (defn- has-duplicates? [col]

@@ -15,7 +15,12 @@
             [compojure.handler :only [api]]
             [environ.core :refer [env]]
             [clojure.tools.logging :as log]
-            [clj-logging-config.log4j :as l4j]))
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
+            [clj-logging-config.log4j :refer [set-loggers!]])
+  (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
+           [org.apache.log4j.helpers DateLayout]))
+
 
 (def default-repo-path "drafter-db")
 
@@ -79,16 +84,25 @@
   (initialise-repo! repo-path)
   (initialise-app! repo state))
 
+(defn- load-logging-configuration [config-file]
+  (-> config-file slurp read-string))
+
+(defn configure-logging! [config-file]
+  (binding [*ns* (find-ns 'drafter.handler)]
+    (let [default-config (load-logging-configuration (io/resource "log-config.edn"))
+          config-file (when (.exists config-file)
+                        (load-logging-configuration config-file))]
+
+      (let [chosen-config (or config-file default-config)]
+        (eval chosen-config)
+        (log/debug "Loaded logging config" chosen-config)))))
+
 (defn init
   "init will be called once when app is deployed as a servlet on an
   app server such as Tomcat put any initialization code here"
   []
 
-  (l4j/set-loggers!
-   "drafter" {:name "drafter" :level "INFO" :pattern "%d{ABSOLUTE} %-5p %-20c{1} :: %m%n"}
-   ["org.openrdf"] {:name "openrdf" :level :debug :pattern "%d{ABSOLUTE} %-5p %-20c{1} :: %m%n"})
-
-
+  (configure-logging! (io/file (get env :log-config-file "log-config.edn")))
 
   (when (env :dev)
     (parser/cache-off!)

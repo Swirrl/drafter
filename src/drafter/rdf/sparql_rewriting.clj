@@ -165,7 +165,7 @@
 
       (when vars-in-graph-position
         (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
-        (log/debug "Rewriten query AST: " prepared-query))
+        (log/debug "Rewriten SPARQL Query AST: " prepared-query))
 
       prepared-query)))
 
@@ -203,7 +203,7 @@
 
         (when vars-in-graph-position
           (rewrite-graph-constants query-ast graph-substitutions vars-in-graph-position)
-          (log/debug "Rewriten query AST: " preped-update))
+          (log/debug "Rewriten SPARQL Update AST: " preped-update))
 
         preped-update)))
 

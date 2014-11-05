@@ -186,7 +186,7 @@
                  (.setDataset restriction))
         media-type (parse-accept headers)]
 
-    (log/debug (str "Running query " query-str " with graph restriction: " graph-restrictions))
+    (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
     (stream-sparql-response pquery media-type result-rewriter)))
 
 (defn sparql-end-point
