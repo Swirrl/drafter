@@ -75,6 +75,21 @@
                        }
          nil) format))
 
+(def mime-type-preferences ["application/n-triples" :qs 1.0,
+                            "application/n-quads" :qs 0.9,
+                            "text/turtle" :qs 0.9,
+                            "application/rdf+xml" :qs 0.9,
+                            "text/n3" :qs 0.9,
+                            "application/sparql-results+xml" :qs 0.9,
+                            "application/sparql-results+json" :qs 0.9,
+                            "text/csv" :qs 0.8,
+                            "application/trig" :qs 0.8,
+                            "application/trix" :qs 0.8,
+                            "application/x-binary-rdf" :qs 0.7,
+                            "text/plain" :qs 0.7,
+                            "text/html" :qs 0.7,
+                            "text/tab-separated-values" :qs 0.7])
+
 (defn new-result-writer [writer-class ostream]
   (.newInstance
    (.getConstructor writer-class (into-array [java.io.OutputStream]))
@@ -190,7 +205,7 @@
     (stream-sparql-response pquery media-type result-rewriter)))
 
 (defn sparql-end-point
-  "Builds a SPARQL end point from a mount-path a sesame repository and
+  "Builds a SPARQL end point from a mount-path, a sesame repository and
   an optional restriction function which returns a list of graph uris
   to restrict both the union and named-graph queries too."
 
@@ -199,26 +214,17 @@
   ([mount-path repo restrictions]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
      (routes
-      (GET mount-path request
-           (process-sparql-query repo request
-                                 :graph-restrictions restrictions))
-      (POST mount-path request
+      (ring.middleware.accept/wrap-accept
+       (GET mount-path request
             (process-sparql-query repo request
-                                  :graph-restrictions restrictions)))))
+                                  :graph-restrictions restrictions))
+       {:mime mime-type-preferences})
 
-
-(comment
-  (let [app (ring.middleware.accept/wrap-accept identity
-                                                {:mime ["text/plain" :qs 0.1,
-                                                        "application/bar;q=0.1"
-                                                        "application/ntriples" :qs 0.5]})]
-
-
-    (app {:headers {:accept "text/plain;q=0.1,application/bar;q=0.8,application/ntriples;q-0.5"}}))
-
-  )
-
-
+      (ring.middleware.accept/wrap-accept
+       (POST mount-path request
+             (process-sparql-query repo request
+                                   :graph-restrictions restrictions))
+       {:mime mime-type-preferences}))))
 
 (comment
 

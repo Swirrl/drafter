@@ -8,7 +8,7 @@
             [compojure.handler :refer [api]]
             [drafter.rdf.draft-management :as mgmt]
             [clojure.tools.logging :as log]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
+            [drafter.rdf.sparql-protocol :refer [process-sparql-query]]
             [drafter.common.api-routes :as api-routes]
             [grafter.rdf.sesame :as ses]
             [grafter.rdf :refer [statements]])
