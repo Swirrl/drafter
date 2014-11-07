@@ -6,11 +6,12 @@
             [ring.util.io :as io]
             [compojure.route :refer [not-found]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper mime-type-preferences]]
             [drafter.rdf.sparql-rewriting :as rew]
             [clojure.tools.logging :as log]
             [grafter.rdf.sesame :as ses]
-            [drafter.common.sparql-routes :refer [supplied-drafts]])
+            [drafter.common.sparql-routes :refer [supplied-drafts]]
+            [ring.middleware.accept :refer [wrap-accept]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
            [org.openrdf.query QueryResultHandler TupleQueryResultHandler BindingSet Binding]
            [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
@@ -123,12 +124,14 @@
 
 
 (defn draft-sparql-routes [mount-point repo]
-  (routes
-   (GET mount-point request
-        (draft-query-endpoint repo request))
+  (wrap-accept
+   (routes
+    (GET mount-point request
+         (draft-query-endpoint repo request))
 
-   (POST mount-point request
-         (draft-query-endpoint repo request))))
+    (POST mount-point request
+          (draft-query-endpoint repo request)))
+   {:mime mime-type-preferences}))
 
 (defn live-sparql-routes [mount-point repo]
   (sparql-end-point mount-point repo (partial mgmt/live-graphs repo)))
