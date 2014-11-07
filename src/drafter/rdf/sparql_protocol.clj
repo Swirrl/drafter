@@ -207,18 +207,16 @@
 
   ([mount-path repo restrictions]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
-     (routes
-      (wrap-accept
+     (wrap-accept 
+      (routes
        (GET mount-path request
             (process-sparql-query repo request
                                   :graph-restrictions restrictions))
-       {:mime mime-type-preferences})
 
-      (wrap-accept
        (POST mount-path request
              (process-sparql-query repo request
-                                   :graph-restrictions restrictions))
-       {:mime mime-type-preferences}))))
+                                   :graph-restrictions restrictions)))
+      {:mime mime-type-preferences})))
 
 (comment
 
