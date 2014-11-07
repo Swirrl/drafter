@@ -64,6 +64,7 @@ Configurable properties and their defaults are:
 
     DRAFTER_HTTP_PORT:            (default 3001)
     DRAFTER_REPO_PATH:            (default "drafter-db")
+    DRAFTER_INDEXES:              spoc,posc,cosp (Best for query performance, slowest for insert)
 
 Some examples of supplying these properties are provided below:
 
@@ -78,6 +79,10 @@ As java properties via a built application jar:
 As environment variables via a built application jar:
 
     $ env DRAFTER_HTTP_PORT=3050 DRAFTER_REPO_PATH=./drafter-database java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
+
+Indexes can be configured via the property `DRAFTER_INDEXES`, we use
+the same default indexes as sesame. `spoc,posc,cosp` which covers all
+possible
 
 Configuring Logging
 -------------------

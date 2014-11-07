@@ -46,8 +46,8 @@
                      (pmdfunctions "replace-live-graph")
                      (partial lookup-live-graph-uri repo)))
 
-(defn initialise-repo! [repo-path]
-  (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path))]
+(defn initialise-repo! [repo-path indexes]
+  (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path indexes))]
                           (log/info "Initialised repo" repo-path)
                           repo))
 
@@ -80,8 +80,8 @@
                         ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                         :formats [:json-kw :edn])))
 
-(defn initialise-services! [repo-path]
-  (initialise-repo! repo-path)
+(defn initialise-services! [repo-path indexes]
+  (initialise-repo! repo-path indexes)
   (initialise-app! repo state))
 
 (defn- load-logging-configuration [config-file]
@@ -107,8 +107,8 @@
   (when (env :dev)
     (parser/cache-off!))
 
-  (initialise-services! (or (:drafter-repo-path env)
-                              default-repo-path))
+  (initialise-services! (get env :drafter-repo-path default-repo-path)
+                        (get env :drafter-indexes "spoc,posc,cosp"))
 
   (log/info "drafter started successfully"))
 
