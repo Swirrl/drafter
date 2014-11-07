@@ -1,0 +1,15 @@
+(let [log-pattern "%d{ABSOLUTE} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"]
+     (set-loggers!
+       ["org.openrdf" "drafter"]
+       {:name "drafter"
+        :level :trace
+        :out (DailyRollingFileAppender.
+               (EnhancedPatternLayout. log-pattern)
+               "logs/drafter.log" "'.'YYYY-MM")}
+
+       "drafter.rdf.sparql-protocol"
+       {:name "sparql"
+        :level :info
+        :out (DailyRollingFileAppender.
+               (EnhancedPatternLayout. log-pattern)
+               "logs/sparql.log" "'.'YYYY-MM")}))

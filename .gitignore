@@ -15,3 +15,5 @@ user_repl.clj
 /drafter-db/
 /logs/
 /log-config.edn
+.idea/
+drafter.iml
