@@ -5,7 +5,8 @@
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [ring.middleware.accept :refer [wrap-accept]])
   (:import [org.openrdf.query GraphQuery]
            [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
            [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
@@ -75,20 +76,23 @@
                        }
          nil) format))
 
-(def mime-type-preferences ["application/n-triples" :qs 1.0,
-                            "application/n-quads" :qs 0.9,
-                            "text/turtle" :qs 0.9,
-                            "application/rdf+xml" :qs 0.9,
-                            "text/n3" :qs 0.9,
-                            "application/sparql-results+xml" :qs 0.9,
-                            "application/sparql-results+json" :qs 0.9,
-                            "text/csv" :qs 0.8,
-                            "application/trig" :qs 0.8,
-                            "application/trix" :qs 0.8,
-                            "application/x-binary-rdf" :qs 0.7,
-                            "text/plain" :qs 0.7,
-                            "text/html" :qs 0.7,
-                            "text/tab-separated-values" :qs 0.7])
+(def mime-type-preferences
+  (let [mt (fn [m q] [m :as m :qs q])
+        mts [(mt "application/n-triples" 1.0)
+             (mt "application/n-quads" 0.9)
+             (mt "text/turtle" 0.9)
+             (mt "application/rdf+xml" 0.9)
+             (mt "text/n3" 0.9)
+             (mt "application/sparql-results+xml" 0.9)
+             (mt "application/sparql-results+json" 0.9)
+             (mt "text/csv" 0.8)
+             (mt "application/trig" 0.8)
+             (mt "application/trix" 0.8)
+             (mt "application/x-binary-rdf" 0.7)
+             (mt "text/plain" 0.7)
+             (mt "text/html" 0.7)
+             (mt "text/tab-separated-values" 0.7)]]
+    (apply vector (apply concat mts))))
 
 (defn new-result-writer [writer-class ostream]
   (.newInstance
@@ -168,15 +172,6 @@
      :headers {"Content-Type" "text/plain"}
      :body (str "Unsupported media-type: " response-mime-type)}))
 
-(defn parse-accept
-  "Stupid accept header parsing"
-  [headers]
-  (let [accept-str (get headers "accept")
-        fst (-> accept-str
-             (str/split #",")
-             first)]
-    (or fst accept-str)))
-
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
   function or a collection of graph uris."
@@ -195,11 +190,10 @@
                                           :or {query-creator-fn ses/prepare-query}}]
 
   (let [restriction (restricted-dataset graph-restrictions)
-        {:keys [headers params]} request
+        {:keys [headers params] {media-type :mime} :accept} request
         query-str (:query params)
         pquery (doto (query-creator-fn db query-str)
-                 (.setDataset restriction))
-        media-type (parse-accept headers)]
+                 (.setDataset restriction))]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
     (stream-sparql-response pquery media-type result-rewriter)))
@@ -214,13 +208,13 @@
   ([mount-path repo restrictions]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
      (routes
-      (ring.middleware.accept/wrap-accept
+      (wrap-accept
        (GET mount-path request
             (process-sparql-query repo request
                                   :graph-restrictions restrictions))
        {:mime mime-type-preferences})
 
-      (ring.middleware.accept/wrap-accept
+      (wrap-accept
        (POST mount-path request
              (process-sparql-query repo request
                                    :graph-restrictions restrictions))
