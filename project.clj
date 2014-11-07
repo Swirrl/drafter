@@ -12,13 +12,15 @@
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
-                 [lib-noir "0.8.4"]
+                 [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
+                 ;;[lib-noir "0.8.4" ]
                  [ring-server "0.3.1"]
                  [selmer "0.6.9"]
                  [grafter "0.2.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
                  [org.openrdf.sesame/sesame-queryrender "2.7.13"]
                  ;; 2.7.14-SNAPSHOT contains our fix for https://openrdf.atlassian.net/browse/SES-2111
-                 [org.openrdf.sesame/sesame-queryalgebra-model "2.7.14-drafter-patch-SNAPSHOT"]
+                 [org.openrdf.sesame/sesame-queryalgebra-model "2.7.14-drafter-patch-SNAPSHOT" :exclusions [org.openrdf.sesame/sesame-query
+                                                                                                            org.openrdf.sesame/sesame-rio-api]]
                  [org.openrdf.sesame/sesame-runtime "2.7.13"
 
                   ;; For some reason there appears to be a weird
@@ -33,7 +35,7 @@
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
-                 [org.slf4j/slf4j-log4j12 "1.7.7"]
+                 [org.slf4j/slf4j-log4j12 "1.7.7" :exclusions [log4j org.slf4j/slf4j-api]]
                  [environ "1.0.0"]]
 
   :java-source-paths ["src-java"]
@@ -42,9 +44,9 @@
                  :init (-main)
                  :port 5678}
 
-  :plugins [[lein-ring "0.8.10"]
+  :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
             [lein-environ "1.0.0"]
-            [lein-test-out "0.3.1"]]
+            [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
 
   :ring {:handler drafter.handler/app
          :init    drafter.handler/init
@@ -56,17 +58,17 @@
                        :stacktraces?  false
                        :auto-reload?  false}}
    :dev {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
-                   [s3-wagon-private "1.1.2"]]
+                   [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
          :dependencies [[ring-mock "0.1.5"]
-                        [com.aphyr/prism "0.1.1"]
+                        [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
                         [org.clojure/data.json "0.2.5"]
                         [clojure-csv/clojure-csv "2.0.1"]
-                        [ring/ring-devel "1.3.0"]]
+                        [ring/ring-devel "1.3.0" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
 
          :env {:dev true}}}
 
-  ;;:jvm-opts ["-Dorg.openrdf.repository.debug=true"]
+  :jvm-opts ["-Dorg.openrdf.repository.debug=true" "-Djava.awt.headless=true"]
   :min-lein-version "2.0.0"
 
   :aot [drafter.repl]
