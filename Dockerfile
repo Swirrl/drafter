@@ -13,11 +13,14 @@ ADD ./ /drafter
 ADD https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein /usr/bin/lein
 RUN chmod a+x /usr/bin/lein
 
+# copy production log config
+ADD docker/log-config.edn /drafter/log-config.edn
+
 WORKDIR /drafter
 RUN /usr/bin/lein uberjar
 
 # Mount logs
-VOLUME ["/drafter/logs"]
+VOLUME ["/drafter/logs", "/var/lib/drafter-database"]
 
 # serve nginx
 EXPOSE 3001
