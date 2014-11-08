@@ -179,7 +179,7 @@ Depending on the server topology, you might want to do one of the following:
 * use an ambassador container to link over the network 
 
 e.g. (exposing a port to the host server)
-`docker run -d -p 127.0.0.1:<port-to-expose-on-host>:3001 --volumes-from drafter-data --volumes-from drafter-logs --name drafter`
+`docker run -d -p 127.0.0.1:<port-to-expose-on-host>:3001 --volumes-from drafter-data --volumes-from drafter-logs --name drafter swirrl/drafter:build_xxx`
 
 (check it's running with `docker ps`)
 
