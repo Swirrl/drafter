@@ -150,22 +150,38 @@ To configure the logging these forms should then contain a call to
 Docker
 ======
 
-Successful drafter builds get built into docker images on dockerhub (hub.docker.com) at `swirrl/drafter`
+Successful drafter builds get built into docker images on dockerhub (hub.docker.com) at `swirrl/drafter`. 
 
-Suggested commands to run:
 
-1. Make a data container for the database
+Running the container
+---------------------
+
+Suggested commands:
+
+1. Pull the image
+
+`docker pull swirrl/drafter:build_<build-number>`
+
+2. Make a data container for the database
 
 `docker run -d -v /var/lib/drafter-database --name drafter-data ubuntu true`
 
-2. Make a data container for the logs
+3. Make a data container for the logs
 
 `docker run -d -v /drafter/logs --name drafter-logs ubuntu true`
 
-3. Run drafter itself
+4. Run drafter itself
 
+Depending on the server topology, you might want to do one of the following:
+
+* link the drafter container to a client container
+* expose a port to the host server (which you could proxy-to via nginx)
+* use an ambassador container to link over the network 
+
+e.g. (exposing a port to the host server)
 `docker run -d -p 127.0.0.1:<port-to-expose-on-host>:3001 --volumes-from drafter-data --volumes-from drafter-logs --name drafter`
 
+(check it's running with `docker ps`)
 
 To backup the data
 ------------------
