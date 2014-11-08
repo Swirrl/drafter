@@ -191,8 +191,8 @@ Explanation: this
 
 * creates a new container based on `ubuntu` image, 
 * mounts the data volume onto it
-* mounts a folder of your choice from the hsot system into `/backup` inside the container
-* inside the container, it tars contents of `/var/lib/drafter-database` (the mounted volume from `drafter-data`) into `/backup` volume (which will appear on the mounted host dir).
+* mounts a folder of your choice from the hsot system into `/data-backup` inside the container
+* inside the container, it tars contents of `/var/lib/drafter-database` (the mounted volume from `drafter-data`) into `/data-backup` volume (which will appear on the mounted host dir).
 
 To backup the logs
 ------------------
