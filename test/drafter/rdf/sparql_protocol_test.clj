@@ -97,13 +97,25 @@
              :as result} (end-point {:request-method :get
                                      :uri "/live/sparql"
                                      :params {:query "ASK WHERE { ?s ?p ?o }"}
-                                     :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,text/html;q=0.9,*/*;q=0.8"}})]
+                                     :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,*/*;q=0.8"}})]
 
         (is (= 200 status))
         (is (= "text/plain" (headers "Content-Type")))
 
         (let [body-str (stream->string body)]
           (is (= "true" body-str)))))))
+
+(deftest sparql-endpoint-sets-content-type-text-plain-if-html-requested
+  (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
+    (testing "SPARQL endpoint sets content type to text/plain if text/html requested"
+      (let [{:keys [status headers body]
+             :as result} (end-point {:request-method :get
+                                     :uri "/live/sparql"
+                                     :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                                     :headers {"accept" "text/html"}})]
+
+        (is (= 200 status))
+        (is (= "text/plain" (headers "Content-Type")))))))
 
 (use-fixtures :each (partial wrap-with-clean-test-db
                              add-triple-to-db))

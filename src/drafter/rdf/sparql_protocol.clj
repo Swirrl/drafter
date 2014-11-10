@@ -176,10 +176,15 @@
       (finally
         (.close ostream)))))
 
+(defn get-sparql-response-content-type [mime-type]
+  (if (= "text/html" mime-type)
+    "text/plain"
+    mime-type))
+
 (defn- stream-sparql-response [pquery response-mime-type result-rewriter]
   (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
     {:status 200
-     :headers {"Content-Type" response-mime-type}
+     :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
      ;; Designed to work with piped-input-stream this fn will be run
      ;; in another thread to stream the results to the client.
      :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
