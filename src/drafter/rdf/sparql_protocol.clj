@@ -55,6 +55,7 @@
                         "text/csv" SPARQLResultsCSVWriter
                         "text/tab-separated-values" SPARQLResultsTSVWriter
                         "text/html" SPARQLResultsCSVWriter
+                        "text/plain" SPARQLResultsCSVWriter
                         }
          BooleanQuery { "application/sparql-results+xml" SPARQLResultsXMLWriter
                         "application/sparql-results+json" SPARQLResultsJSONWriter
@@ -76,23 +77,38 @@
                        }
          nil) format))
 
-(def mime-type-preferences
-  (let [mt (fn [m q] [m :as m :qs q])
-        mts [(mt "application/n-triples" 1.0)
-             (mt "application/n-quads" 0.9)
-             (mt "text/turtle" 0.9)
-             (mt "application/rdf+xml" 0.9)
-             (mt "text/n3" 0.9)
-             (mt "application/sparql-results+xml" 0.9)
-             (mt "application/sparql-results+json" 0.9)
-             (mt "text/csv" 0.8)
-             (mt "application/trig" 0.8)
-             (mt "application/trix" 0.8)
-             (mt "application/x-binary-rdf" 0.7)
-             (mt "text/plain" 0.7)
-             (mt "text/html" 0.7)
-             (mt "text/tab-separated-values" 0.7)]]
-    (apply vector (apply concat mts))))
+(defn mime-pref [mime q] [mime :as mime :qs q])
+
+(defn mime-table [& preferences]
+  (apply vector (apply concat preferences)))
+
+(def tuple-query-mime-preferences
+  (mime-table (mime-pref "application/sparql-results+json" 0.9)
+              (mime-pref "application/sparql-results+xml" 0.9)
+              (mime-pref "application/x-binary-rdf" 0.7)
+              (mime-pref "text/csv" 1.0)
+              (mime-pref "text/tab-separated-values" 0.8)
+              (mime-pref "text/plain" 1.0)
+              (mime-pref "text/html" 1.0)))
+
+(def boolean-query-mime-preferences
+  (mime-table (mime-pref "application/sparql-results+xml" 1.0)
+              (mime-pref "application/sparql-results+json" 1.0)
+              (mime-pref "application/x-binary-rdf" 0.7)
+              (mime-pref "text/plain" 0.9)
+              (mime-pref "text/html" 0.8)))
+
+(def graph-query-mime-preferences
+  (mime-table (mime-pref "application/n-triples" 1.0)
+              (mime-pref "application/n-quads" 0.9)
+              (mime-pref "text/n3" 0.9)
+              (mime-pref "application/trig" 0.8)
+              (mime-pref "application/trix" 0.8)
+              (mime-pref "text/turtle" 0.9)
+              (mime-pref "text/html" 0.7)
+              (mime-pref "application/rdf+xml" 0.9)
+              (mime-pref "text/csv" 0.8)
+              (mime-pref "text/tab-separated-values" 0.7)))
 
 (defn new-result-writer [writer-class ostream]
   (.newInstance
@@ -185,21 +201,32 @@
       (ses/make-restricted-dataset :default-graph graph-restrictions
                                    :named-graphs graph-restrictions))))
 
+(defn get-query-mime-preferences [query]
+  (condp instance? query
+    TupleQuery tuple-query-mime-preferences
+    BooleanQuery boolean-query-mime-preferences
+    GraphQuery graph-query-mime-preferences
+    nil))
+
+(defn negotiate-sparql-query-mime-type [query request]
+  (let [mime-preferences (get-query-mime-preferences query)
+        accept-handler (wrap-accept identity {:mime mime-preferences})
+        mime (get-in (accept-handler request) [:accept :mime])]
+    mime))
+
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
                                                  result-rewriter]
                                           :or {query-creator-fn ses/prepare-query}}]
 
   (let [restriction (restricted-dataset graph-restrictions)
-        {:keys [headers params] {media-type :mime} :accept} request
+        {:keys [headers params]} request
         query-str (:query params)
         pquery (doto (query-creator-fn db query-str)
-                 (.setDataset restriction))]
+                 (.setDataset restriction))
+        media-type (negotiate-sparql-query-mime-type pquery request)]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
     (stream-sparql-response pquery media-type result-rewriter)))
-
-(defn wrap-sparql-handler-conneg [handler]
-  (wrap-accept handler {:mime mime-type-preferences}))
 
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path, a sesame repository and
@@ -210,15 +237,14 @@
 
   ([mount-path repo restrictions]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
-     (wrap-sparql-handler-conneg
-      (routes
-       (GET mount-path request
-            (process-sparql-query repo request
-                                  :graph-restrictions restrictions))
+     (routes
+      (GET mount-path request
+           (process-sparql-query repo request
+                                 :graph-restrictions restrictions))
 
-       (POST mount-path request
-             (process-sparql-query repo request
-                                   :graph-restrictions restrictions))))))
+      (POST mount-path request
+            (process-sparql-query repo request
+                                  :graph-restrictions restrictions)))))
 
 (comment
 

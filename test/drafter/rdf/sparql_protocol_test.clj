@@ -54,7 +54,7 @@
 (defn get-spo-set [triples]
   (set (map (fn [{:keys [s p o]}] [s p o]) triples)))
 
-(deftest sparql-end-point-accept-test
+(deftest sparql-end-point-graph-query-accept-test
   (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
     (testing "Standard SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
@@ -71,6 +71,39 @@
               expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
 
           (is (= expected-triples triples)))))))
+
+(deftest sparql-end-point-tuple-query-accept-test
+  (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
+    (testing "Tuple SPARQL query with multiple accepted MIME types and qualities"
+      (let [{:keys [status headers body]
+             :as result} (end-point {:request-method :get
+                                     :uri "/live/sparql"
+                                     :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
+                                     :headers {"accept" "text/csv,application/sparql-results+json;q=0.9,*/*;q=0.8"}})]
+
+        (is (= 200 status))
+        (is (= "text/csv" (headers "Content-Type")))
+
+        (let [csv-result (csv/parse-csv (stream->string body))
+              triples (set (drop 1 csv-result))
+              expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
+          (is (= ["s" "p" "o"] (first csv-result)))
+          (is (= expected-triples triples)))))))
+
+(deftest sparql-end-point-boolean-query-accept-test
+  (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
+    (testing "Boolean SPARQL query with multiple accepted MIME types and qualities"
+      (let [{:keys [status headers body]
+             :as result} (end-point {:request-method :get
+                                     :uri "/live/sparql"
+                                     :params {:query "ASK WHERE { ?s ?p ?o }"}
+                                     :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,text/html;q=0.9,*/*;q=0.8"}})]
+
+        (is (= 200 status))
+        (is (= "text/plain" (headers "Content-Type")))
+
+        (let [body-str (stream->string body)]
+          (is (= "true" body-str)))))))
 
 (use-fixtures :each (partial wrap-with-clean-test-db
                              add-triple-to-db))
