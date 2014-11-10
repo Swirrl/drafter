@@ -20,7 +20,7 @@ WORKDIR /drafter
 RUN /usr/bin/lein uberjar
 
 # Mount logs
-VOLUME ["/drafter/logs", "/var/lib/drafter-database"]
+VOLUME ["/drafter/logs", "/data/drafter-database"]
 
 # serve nginx
 EXPOSE 3001

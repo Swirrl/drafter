@@ -164,7 +164,7 @@ Suggested commands:
 
 2. Make a data container for the database
 
-`docker run -d -v /var/lib/drafter-database --name drafter-data ubuntu true`
+`docker run -d -v /data/drafter-database --name drafter-data ubuntu true`
 
 3. Make a data container for the logs
 
@@ -185,7 +185,7 @@ e.g. (exposing a port to the host server)
 
 To backup the data
 ------------------
-`docker run --volumes-from drafter-data -v <folder-on-the-host-to-backup-to>:/data-backup ubuntu tar cvf /data-backup/backup.tar /var/lib/drafter-database`
+`docker run --volumes-from drafter-data -v <folder-on-the-host-to-backup-to>:/data-backup ubuntu tar cvf /data-backup/backup.tar /data/drafter-database`
 
 Explanation: this 
 
