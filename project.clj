@@ -13,7 +13,7 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
                  [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
-                 ;;[lib-noir "0.8.4" ]
+
                  [ring-server "0.3.1"]
                  [selmer "0.6.9"]
                  [grafter "0.2.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
@@ -28,10 +28,7 @@
                   ;; exclude it, as we're not using it.
 
                   :exclusions [org.openrdf.sesame/sesame-repository-manager]]
-                 ;;[org.openrdf.sesame/sesame-runtime "2.8.0-beta2"]
-                 ;;[org.openrdf.sesame/sesame-queryrender "2.8.0-beta2"]
-                 ;;[com.taoensso/timbre "3.2.1"]
-                 ;;[com.palletops/log-config "0.1.4"]   ;; provides make-tools-logging-appender
+
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
@@ -39,6 +36,8 @@
                  [environ "1.0.0"]]
 
   :java-source-paths ["src-java"]
+
+  :pedantic? :abort
 
   :repl-options {:init-ns drafter.repl
                  :init (-main)
@@ -66,10 +65,12 @@
                         [clojure-csv/clojure-csv "2.0.1"]
                         [ring/ring-devel "1.3.0" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
 
-         :env {:dev true}}}
+         :env {:dev true}}
+   }
 
-  :jvm-opts ["-Dorg.openrdf.repository.debug=true" "-Djava.awt.headless=true"]
-  :min-lein-version "2.0.0"
+
+  :jvm-opts ["-Djava.awt.headless=true"]
+  :min-lein-version "2.5.0"
 
   :aot [drafter.repl]
   :main drafter.repl
