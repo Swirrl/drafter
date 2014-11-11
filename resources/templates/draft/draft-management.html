@@ -1,0 +1,13 @@
+{% extends "templates/base.html" %}
+
+{% block content %}
+
+<form method="POST" action="/draft/create">
+	<input type="textbox" name="live-graph" value="" size="50" placeholder="http://foo.com/" />
+	<button class="btn btn-primary" type="submit">Create new Draft</button>
+</form>
+
+{% include "templates/query.html" %}
+
+
+{% endblock %}

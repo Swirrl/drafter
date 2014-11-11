@@ -88,7 +88,7 @@
     writer))
 
 (defn make-draft-query-rewriter [repo query-str draft-uris]
-  (let [live->draft (mgmt/graph-map repo draft-uris)
+  (let [live->draft (log/spy (mgmt/graph-map repo draft-uris))
         preped-query (rew/rewrite-graph-query repo query-str live->draft)]
     {:query-rewriter
      (fn [repo query-str]
@@ -107,7 +107,7 @@
   (try
     (let [{:keys [params]} request
           query-str (:query params)
-          graph-uris (supplied-drafts repo request)
+          graph-uris (log/spy (supplied-drafts repo request))
           {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo query-str graph-uris)]
 
       (process-sparql-query repo request

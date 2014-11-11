@@ -4,6 +4,10 @@
 
 (def drafter (prefixer "http://publishmydata.com/def/drafter/"))
 
+(def draft-uri (prefixer "http://publishmydata.com/graphs/drafter/draft/"))
+
+(def meta-uri (prefixer "http://publishmydata.com/def/drafter/meta/"))
+
 (def drafter:ManagedGraph (drafter "ManagedGraph"))
 
 (def drafter:DraftGraph (drafter "DraftGraph"))

@@ -1,4 +1,5 @@
-(ns drafter.common.api-routes)
+(ns drafter.common.api-routes
+  (:require [drafter.rdf.drafter-ontology :refer [meta-uri]]))
 
 (defmacro when-params
   "Simple macro that takes a set of paramaters and tests that they're
@@ -25,20 +26,17 @@
   [code map]
   (api-response code (merge default-error-map map)))
 
-(defn meta-uri
-  "Returns a string representation of the URI for the given metadata parameter"
-  [param]
-  (str "http://publishmydata.com/def/drafter/meta/" param))
-
 (defn meta-params
   "Given a hashmap of query parameters grab the ones prefixed meta-, strip that off, and turn into a URI"
   [query-params]
+
   (reduce (fn [acc [k v]]
-            (let [param-name (subs k (+ 1 (.indexOf k "-")) (.length k))
+            (let [k (name k)
+                  param-name (subs k (+ 1 (.indexOf k "-")) (.length k))
                   new-key (meta-uri param-name)]
               (assoc acc new-key v)))
           {}
           (select-keys query-params
                        (filter (fn [p]
-                                 (.startsWith p "meta-"))
+                                 (.startsWith (name p) "meta-"))
                                (keys query-params)))))

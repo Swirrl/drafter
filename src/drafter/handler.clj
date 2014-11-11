@@ -60,7 +60,7 @@
 (defn initialise-app! [repo state]
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
-                        [pages-routes
+                        [(pages-routes repo)
                          (draft-api-routes "/draft" repo state)
                          (graph-management-routes "/graph" repo state)
                          (live-sparql-routes "/sparql/live" repo)

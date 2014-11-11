@@ -5,7 +5,7 @@
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
             [grafter.rdf :refer [add add-statement add-properties graph
-                                 subject predicate object context]]
+                                 statements subject predicate object context format-rdf-trig]]
             [grafter.rdf.protocols :refer [begin commit rollback]])
   (:import [java.util Date]
            [org.openrdf.model.impl URIImpl]))
@@ -175,7 +175,7 @@
 (defn lookup-live-graph-uri [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
 
-  (-> (lookup-live-graph db draft-graph-uri)
+  (-> (log/spy (lookup-live-graph db draft-graph-uri))
       (URIImpl.)))
 
 (defn draft-graphs

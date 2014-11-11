@@ -113,13 +113,13 @@
     ;; makes a new managed/draft graph.
     ;; accepts extra meta- query string params, which are added to the state graph
 
-    (POST "/create" {{live-graph "live-graph"} :query-params
-                     query-params :query-params}
+    (POST "/create" {{live-graph :live-graph} :params
+                     params :params}
 
           (api-routes/when-params [live-graph]
                                   (let [draft-graph-uri (ses/with-transaction repo
                                                           (mgmt/create-managed-graph! repo live-graph)
-                                                          (mgmt/create-draft-graph! repo live-graph (api-routes/meta-params query-params)))]
+                                                          (mgmt/create-draft-graph! repo live-graph (api-routes/meta-params params)))]
                                     (api-routes/api-response 201 {:guri draft-graph-uri})))))
 
    ;; adds data to the graph from either source-graph or file

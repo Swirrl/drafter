@@ -4,10 +4,10 @@
             [clojure.test :refer :all]
             [grafter.rdf.sesame :as ses]
             [drafter.routes.drafts-api :refer :all]
+            [drafter.rdf.drafter-ontology :refer [meta-uri]]
             [clojure.java.io :as io]
             [clojure.template :refer [do-template]]
-            [drafter.rdf.draft-management :refer :all]
-            [drafter.common.api-routes :refer [meta-uri]]))
+            [drafter.rdf.draft-management :refer :all]))
 
 (def test-graph-uri "http://example.org/my-graph")
 
@@ -68,10 +68,27 @@
         (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* state)
                                              {:uri "/draft/create"
                                               :request-method :post
-                                              :query-params {"live-graph" test-graph-uri}
+                                              :params {:live-graph test-graph-uri}
                                               :headers {"accept" "application/json"}})]
           (is (= 201 status))
-          (is (url? (-> body :guri)))))))
+          (is (url? (-> body :guri)))))
+
+      (testing (str "with meta data" test-graph-uri " should see meta data stored")
+
+        (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* state)
+                                             {:uri "/draft/create"
+                                              :request-method :post
+                                              :params {:live-graph test-graph-uri "meta-foo" "foo" "meta-bar" "bar"}
+                                              :headers {"accept" "application/json"}})]
+          (is (= 201 status))
+          (is (url? (-> body :guri)))
+          (is (ses/query *test-db* (str "ASK WHERE {"
+                                        "  GRAPH <" drafter-state-graph "> {"
+                                        "     ?graph <" (meta-uri "foo") "> ?foo ."
+                                        "     ?graph <" (meta-uri "bar") "> ?bar ."
+                                        "  } "
+                                        "}"))
+              "meta-* params are converted into metadata predicates.")))))
 
     (testing "POST /draft"
       (testing "with a file"

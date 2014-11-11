@@ -3,6 +3,16 @@
 <h1>Query {{ name }}</h1>
 
 <form method="GET" action="{{ endpoint }}">
+	<ul>
+		{% for draft in drafts %}
+		<div class="checkbox">
+			<label>
+				<input name="graph" type="checkbox" value="{{ draft.draft }}"> <a href="/draft/{{ draft.guid }}">{{ draft.draft}}</a> &#8594; {{ draft.live}}
+			</label>
+		</div>
+		{% endfor %}
+	</ul>
+
 	<textarea accept-charset="UTF-8" name="query" id="query" rows="20" cols="100" tabindex="1">
 PREFIX rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
 PREFIX rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt;
@@ -15,7 +25,7 @@ SELECT * WHERE {
 	</textarea>
 
 	<input type="hidden" name="utf8" value="✓" />
-	<input type="submit" value="Run Query" />
+	<button class="btn btn-primary" type="submit">Query</button>
 </form>
 
 <h1>Update {{ name }}</h1>
@@ -35,8 +45,7 @@ INSERT {
 
 }
 </textarea>
-<input type="submit" value="Update" />
+<button class="btn btn-danger" type="submit">Update</button>
 </form>
-
 
 {% endblock %}

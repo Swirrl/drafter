@@ -2,9 +2,12 @@
   (:require [drafter.test-common :refer [test-triples
                                          make-store stream->string select-all-in-graph make-graph-live!]]
             [clojure.test :refer :all]
+            [clojure.tools.logging :as log]
+
             [clojure-csv.core :as csv]
             [clojure.data.json :as json]
             [grafter.rdf.sesame :as ses]
+            [grafter.rdf.protocols :as pr]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function]]
             [drafter.rdf.draft-management :refer :all]))
@@ -36,11 +39,11 @@
                           (assoc :uri endpoint-path))]
 
     (reduce (fn [req graph]
-              (update-in req [:params :graph] (fn [old new]
-                                                 (cond
-                                                  (nil? old) new
-                                                  (instance? String old) [old new]
-                                                  :else (conj old new))) graph))
+              (log/spy (update-in req [:params :graph] (fn [old new]
+                                                         (cond
+                                                          (nil? old) new
+                                                          (instance? String old) [old new]
+                                                          :else (conj old new))) graph)))
             query-request graphs)))
 
 (def draft-query (partial build-query "/sparql/draft"))
@@ -344,6 +347,22 @@
     (is (= #{"http://test.com/graph-2"
              "http://test.com/made-live-and-deleted-1"}
            (->> (-> (draft-query "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o . } }" [draft-graph-2])
+                    (assoc-in [:params :union-with-live] "true")
+                    endpoint
+                    csv->
+                    flatten)
+                (drop 1)
+                (into #{}))))))
+
+(deftest state-graph-is-hidden-test
+  (let [test-db (make-store)
+        test-graph (let [draft-graph (import-data-to-draft! test-db "http://test.com/test-graph" (test-triples "http://test.com/subject-1"))]
+                     (pr/add test-db draft-graph (test-triples "http://test.com/subject-2"))
+                     draft-graph)
+        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+
+    (is (= #{"http://test.com/subject-1" "http://test.com/subject-2"}
+           (->> (-> (log/spy (draft-query "SELECT ?s WHERE { GRAPH ?g { ?s ?p ?o } . }" [test-graph]))
                     (assoc-in [:params :union-with-live] "true")
                     endpoint
                     csv->
