@@ -5,7 +5,8 @@
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [ring.middleware.accept :refer [wrap-accept]])
   (:import [org.openrdf.query GraphQuery]
            [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
            [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
@@ -54,6 +55,7 @@
                         "text/csv" SPARQLResultsCSVWriter
                         "text/tab-separated-values" SPARQLResultsTSVWriter
                         "text/html" SPARQLResultsCSVWriter
+                        "text/plain" SPARQLResultsCSVWriter
                         }
          BooleanQuery { "application/sparql-results+xml" SPARQLResultsXMLWriter
                         "application/sparql-results+json" SPARQLResultsJSONWriter
@@ -74,6 +76,39 @@
                        "text/tab-separated-values" SPARQLResultsTSVWriter
                        }
          nil) format))
+
+(defn mime-pref [mime q] [mime :as mime :qs q])
+
+(defn mime-table [& preferences]
+  (apply vector (apply concat preferences)))
+
+(def tuple-query-mime-preferences
+  (mime-table (mime-pref "application/sparql-results+json" 0.9)
+              (mime-pref "application/sparql-results+xml" 0.9)
+              (mime-pref "application/x-binary-rdf" 0.7)
+              (mime-pref "text/csv" 1.0)
+              (mime-pref "text/tab-separated-values" 0.8)
+              (mime-pref "text/plain" 1.0)
+              (mime-pref "text/html" 1.0)))
+
+(def boolean-query-mime-preferences
+  (mime-table (mime-pref "application/sparql-results+xml" 1.0)
+              (mime-pref "application/sparql-results+json" 1.0)
+              (mime-pref "application/x-binary-rdf" 0.7)
+              (mime-pref "text/plain" 0.9)
+              (mime-pref "text/html" 0.8)))
+
+(def graph-query-mime-preferences
+  (mime-table (mime-pref "application/n-triples" 1.0)
+              (mime-pref "application/n-quads" 0.9)
+              (mime-pref "text/n3" 0.9)
+              (mime-pref "application/trig" 0.8)
+              (mime-pref "application/trix" 0.8)
+              (mime-pref "text/turtle" 0.9)
+              (mime-pref "text/html" 0.7)
+              (mime-pref "application/rdf+xml" 0.9)
+              (mime-pref "text/csv" 0.8)
+              (mime-pref "text/tab-separated-values" 0.7)))
 
 (defn new-result-writer [writer-class ostream]
   (.newInstance
@@ -141,10 +176,15 @@
       (finally
         (.close ostream)))))
 
+(defn get-sparql-response-content-type [mime-type]
+  (if (= "text/html" mime-type)
+    "text/plain"
+    mime-type))
+
 (defn- stream-sparql-response [pquery response-mime-type result-rewriter]
   (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
     {:status 200
-     :headers {"Content-Type" response-mime-type}
+     :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
      ;; Designed to work with piped-input-stream this fn will be run
      ;; in another thread to stream the results to the client.
      :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
@@ -152,15 +192,6 @@
     {:status 406
      :headers {"Content-Type" "text/plain"}
      :body (str "Unsupported media-type: " response-mime-type)}))
-
-(defn parse-accept
-  "Stupid accept header parsing"
-  [headers]
-  (let [accept-str (get headers "accept")
-        fst (-> accept-str
-             (str/split #",")
-             first)]
-    (or fst accept-str)))
 
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
@@ -175,6 +206,19 @@
       (ses/make-restricted-dataset :default-graph graph-restrictions
                                    :named-graphs graph-restrictions))))
 
+(defn get-query-mime-preferences [query]
+  (condp instance? query
+    TupleQuery tuple-query-mime-preferences
+    BooleanQuery boolean-query-mime-preferences
+    GraphQuery graph-query-mime-preferences
+    nil))
+
+(defn negotiate-sparql-query-mime-type [query request]
+  (let [mime-preferences (get-query-mime-preferences query)
+        accept-handler (wrap-accept identity {:mime mime-preferences})
+        mime (get-in (accept-handler request) [:accept :mime])]
+    mime))
+
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
                                                  result-rewriter]
                                           :or {query-creator-fn ses/prepare-query}}]
@@ -184,13 +228,13 @@
         query-str (:query params)
         pquery (doto (query-creator-fn db query-str)
                  (.setDataset restriction))
-        media-type (parse-accept headers)]
+        media-type (negotiate-sparql-query-mime-type pquery request)]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
     (stream-sparql-response pquery media-type result-rewriter)))
 
 (defn sparql-end-point
-  "Builds a SPARQL end point from a mount-path a sesame repository and
+  "Builds a SPARQL end point from a mount-path, a sesame repository and
   an optional restriction function which returns a list of graph uris
   to restrict both the union and named-graph queries too."
 
@@ -202,23 +246,10 @@
       (GET mount-path request
            (process-sparql-query repo request
                                  :graph-restrictions restrictions))
+
       (POST mount-path request
             (process-sparql-query repo request
                                   :graph-restrictions restrictions)))))
-
-
-(comment
-  (let [app (ring.middleware.accept/wrap-accept identity
-                                                {:mime ["text/plain" :qs 0.1,
-                                                        "application/bar;q=0.1"
-                                                        "application/ntriples" :qs 0.5]})]
-
-
-    (app {:headers {:accept "text/plain;q=0.1,application/bar;q=0.8,application/ntriples;q-0.5"}}))
-
-  )
-
-
 
 (comment
 
