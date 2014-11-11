@@ -208,6 +208,19 @@
 
 
 (comment
+  (let [app (ring.middleware.accept/wrap-accept identity
+                                                {:mime ["text/plain" :qs 0.1,
+                                                        "application/bar;q=0.1"
+                                                        "application/ntriples" :qs 0.5]})]
+
+
+    (app {:headers {:accept "text/plain;q=0.1,application/bar;q=0.8,application/ntriples;q-0.5"}}))
+
+  )
+
+
+
+(comment
 
   (take 10 (ses/query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }" :default-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"] :union-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"]))
 

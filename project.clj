@@ -33,6 +33,7 @@
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
                  [org.slf4j/slf4j-log4j12 "1.7.7" :exclusions [log4j org.slf4j/slf4j-api]]
+                 [ring-middleware-accept "2.0.2"]
                  [environ "1.0.0"]]
 
   :java-source-paths ["src-java"]
