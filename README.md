@@ -12,20 +12,6 @@ Getting started
 * cd into the project directory `cd drafter`
 * `lein repl` This will start an http server on port 3001
 
-Connecting to the repl with LightTable
------------------------------------
-
-Add this to your `.lein/profiles.clj`:
-
-
-    { :user {
-         :plugins [[lein-light-nrepl "0.0.18"]] ;;Make sure to check what the latest version of lein-light-nrepl is
-         :dependencies [[lein-light-nrepl "0.0.18"]]
-         :repl-options {:nrepl-middleware [lighttable.nrepl.handler/lighttable-ops]}
-         }
-    }
-
-In LightTable, you can then add a connection to a Clojure (remote nREPL) (view->connections), on localhost:5678.
 
 Building and running
 --------------------
@@ -43,7 +29,6 @@ To run the tests from the console:
 To run a test from a repl, make sure the test namespace is loaded (evaling it will usually do this) then run (for example):
 
     (clojure.test/run-tests 'drafter.routes.sparql-test)
-
 
 To build:
 

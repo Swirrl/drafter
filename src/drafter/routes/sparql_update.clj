@@ -103,8 +103,9 @@
      (update-endpoint mount-point repo nil))
   ([mount-point repo restrictions]
      (POST mount-point request
+
            (let [{update :update} (parse-update-request request)
-                 ;; prepare the update based upon the endpoints restrictions
+                 ;; prepare the update based upon the endpoints restrictions(
                  preped-update (prepare-restricted-update repo update restrictions)]
              (log/debug "About to execute update-query " preped-update)
              (execute-update repo preped-update)))))
@@ -129,3 +130,6 @@
 
 (defn state-update-endpoint-route [mount-point repo]
   (update-endpoint mount-point repo #{mgmt/drafter-state-graph}))
+
+(defn raw-update-endpoint-route [mount-point repo]
+  (update-endpoint mount-point repo))
