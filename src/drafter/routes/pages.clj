@@ -7,7 +7,7 @@
    [ring.util.response :refer [not-found]]
    [drafter.util :as util]
    [grafter.rdf :refer [add format-rdf-trig statements]]
-   [drafter.rdf.draft-management :refer [drafter-state-graph]]
+   [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph]]
    [drafter.rdf.drafter-ontology :refer :all]
    [grafter.rdf.sesame :refer [rdf-serializer query]]))
 
@@ -17,8 +17,8 @@
 (defn draft-management-page [params]
   (layout/render "/draft/draft-management.html" params))
 
-(defn upload-form [guid]
-  (layout/render "upload.html" {:graph (draft-uri guid)}))
+(defn upload-form [params]
+  (layout/render "upload.html" params ))
 
 (defn dump-database
   "A convenience function intended for development use.  It will dump
@@ -30,7 +30,7 @@
 (defn parse-guid [uri]
   (.replace (str uri) (draft-uri "") ""))
 
-(defn list-all-drafts [db]
+(defn all-drafts [db]
   (->> (query db (str
                   "SELECT ?draft ?live WHERE {"
                   "   GRAPH <" drafter-state-graph "> {"
@@ -58,12 +58,14 @@
    (GET "/draft" [] (draft-management-page {:endpoint "/sparql/draft"
                                             :update-endpoint "/sparql/draft/update"
                                             :name "Draft"
-                                            :drafts (list-all-drafts db)
+                                            :drafts (all-drafts db)
                                             }))
 
    (GET "/draft/:guid" [guid]
         (if (draft-exists? db guid)
-          (upload-form guid)
+          (let [draft (draft-uri guid)
+                live (lookup-live-graph db draft)]
+            (upload-form {:draft draft :live live}))
           (not-found (str "No such Draft:" guid))))
 
    (GET "/state" [] (query-page {:endpoint "/sparql/state"
