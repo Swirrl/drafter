@@ -1,9 +1,10 @@
 {% extends "templates/base.html" %}
 {% block content %}
-<h1>Upload RDF to Draft</h1>
-<pre>{{ graph }}</pre>
-<form method="POST" id="" action="/draft?graph={{ graph }}" enctype="multipart/form-data">
-	<input type="file" name="file" />
-	<button class="btn btn-primary" type="submit">Upload RDF</button>
+<h1>Append RDF to Draft</h1>
+<pre>Live: {{ live }}</pre>
+<pre>Draft: {{ draft }}</pre>
+<form method="POST" id="" action="/draft?graph={{ draft }}" enctype="multipart/form-data">
+    <input type="file" name="file" />
+    <button class="btn btn-primary" type="submit">Append RDF</button>
 </form>
 {% endblock %}
