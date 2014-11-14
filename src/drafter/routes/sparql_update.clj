@@ -100,7 +100,7 @@
   be a collection of string graph-uri's or a function that returns
   such a collection."
   ([mount-point repo]
-     (update-endpoint mount-point repo nil))
+     (update-endpoint mount-point repo #{}))
   ([mount-point repo restrictions]
      (POST mount-point request
 
