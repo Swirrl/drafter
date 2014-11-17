@@ -153,18 +153,23 @@
                        (result-rewriter w)
                        w))]
         (cond
-         (instance? BooleanTextWriter writer)
+         (instance? BooleanQuery pquery)
          (let [result (.evaluate pquery)]
-            (doto (BooleanTextWriter. ostream)
-              (.handleBoolean result)))
+           (doto writer
+             (.handleBoolean result)))
 
          (and (instance? QueryResultWriter writer)
               (instance? GraphQuery pquery))
-         (do (log/debug "pquery is " pquery " writer is " writer)
-             (.evaluate pquery (result-handler-wrapper writer)))
+         (do
+           ;; Allow CSV and other tabular writers to work with graph
+           ;; queries.
+           (log/debug "pquery is " pquery " writer is " writer)
+           (.evaluate pquery (result-handler-wrapper writer)))
 
          :else
          (do
+           ;; Can be either a TupleQuery with QueryResultWriter or a
+           ;; GraphQuery with an RDFHandler.
            (log/debug "pquery (default) is " pquery " writer is " writer)
            (.evaluate pquery writer))))
 
