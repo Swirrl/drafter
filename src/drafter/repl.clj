@@ -31,6 +31,7 @@
                  {:port port
                   :init service/init
                   :auto-reload? true
+                  :open-browser? (:dev env)
                   :destroy service/destroy
                   :join? false}))
 
