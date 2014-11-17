@@ -66,7 +66,9 @@
                         [clojure-csv/clojure-csv "2.0.1"]
                         [ring/ring-devel "1.3.0" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
 
-         :env {:dev true}}
+         :env {:dev true}
+
+         :jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]}
    }
 
 

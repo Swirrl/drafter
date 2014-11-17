@@ -73,6 +73,11 @@
    (GET "/state" [] (query-page {:endpoint "/sparql/state"
                                  :update-endpoint "/sparql/state/update"
                                  :name "State" }))
+
+   (GET "/raw" [] (query-page {:endpoint "/sparql/raw"
+                               :update-endpoint "/sparql/raw/update"
+                               :name "Raw" }))
+
    (GET "/dump" []
         {:status 200
          :headers {"Content-Type" "text/plain; charset=utf-8"

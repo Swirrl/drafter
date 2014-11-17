@@ -2,11 +2,11 @@
   (:require [compojure.core :refer [defroutes routes]]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes
-                                           state-sparql-routes]]
+                                           state-sparql-routes raw-sparql-routes]]
             [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
             [drafter.middleware :as middleware]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
-            [drafter.routes.sparql-update :refer [draft-update-endpoint-route state-update-endpoint-route live-update-endpoint-route]]
+            [drafter.routes.sparql-update :refer [draft-update-endpoint-route state-update-endpoint-route live-update-endpoint-route raw-update-endpoint-route]]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
             [selmer.parser :as parser]
@@ -65,6 +65,10 @@
                          (graph-management-routes "/graph" repo state)
                          (live-sparql-routes "/sparql/live" repo)
                          (live-update-endpoint-route "/sparql/live/update" repo)
+
+                         (raw-sparql-routes "/sparql/raw" repo)
+                         (raw-update-endpoint-route "/sparql/raw/update" repo)
+
                          (draft-sparql-routes "/sparql/draft" repo)
                          (draft-update-endpoint-route "/sparql/draft/update" repo)
                          (state-sparql-routes "/sparql/state" repo)

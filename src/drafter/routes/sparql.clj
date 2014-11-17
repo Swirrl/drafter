@@ -135,3 +135,6 @@
 
 (defn state-sparql-routes [mount-point repo]
   (sparql-end-point mount-point repo #{mgmt/drafter-state-graph}))
+
+(defn raw-sparql-routes [mount-point repo]
+  (sparql-end-point mount-point repo))

@@ -102,7 +102,7 @@
   be a collection of string graph-uri's or a function that returns
   such a collection."
   ([mount-point repo]
-     (update-endpoint mount-point repo nil))
+     (update-endpoint mount-point repo #{}))
   ([mount-point repo restrictions]
      (POST mount-point request
            (with-open [conn (->connection repo)]
@@ -111,6 +111,7 @@
                    preped-update (prepare-restricted-update conn update restrictions)]
                (log/debug "About to execute update-query " preped-update)
                (execute-update conn preped-update))))))
+
 
 (defn draft-update-endpoint
   "Create an update endpoint with draft query rewriting.  Restrictions
@@ -133,3 +134,6 @@
 
 (defn state-update-endpoint-route [mount-point repo]
   (update-endpoint mount-point repo #{mgmt/drafter-state-graph}))
+
+(defn raw-update-endpoint-route [mount-point repo]
+  (update-endpoint mount-point repo))

@@ -46,7 +46,7 @@
                                                           :else (conj old new))) graph)))
             query-request graphs)))
 
-(def draft-query (partial build-query "/sparql/draft"))
+(def draft-query (partial build-query "/sparql/draft" ))
 
 (defn live-query [qstr]
   (build-query "/sparql/live" qstr nil))
@@ -54,6 +54,8 @@
 (defn state-query [qstr]
   (build-query "/sparql/state" qstr nil))
 
+(defn raw-query [qstr]
+  (build-query "/sparql/raw" qstr nil))
 
 (defn csv-> [{:keys [body]}]
   "Parse a response into a CSV"
@@ -118,6 +120,35 @@
             body (-> result :body stream->string)]
 
         (is (= "false" body))))))
+
+(deftest raw-sparql-routes-test
+  (let [test-db (make-store)
+        ;;drafts-request (assoc-in [:headers "accept"] "text/plain")
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        endpoint (raw-sparql-routes "/sparql/raw" test-db)]
+
+    (testing "The state graph should be accessible"
+      (let [result (endpoint (-> (raw-query (str "ASK WHERE {"
+                                                   "  GRAPH <" drafter-state-graph "> {"
+                                                   "    ?s ?p ?o ."
+                                                   "  }"
+                                                   "}"))
+                                 (assoc-in [:headers "accept"] "text/plain")))
+            body (-> result :body stream->string)]
+
+        (is (= "true" body))))
+
+    (testing "The data graphs (live and drafts) should be accessible"
+      (let [result (endpoint
+                     (-> (raw-query (str "ASK WHERE {"
+                                           "  GRAPH <" draft-graph-2 "> {"
+                                           "    ?s ?p ?o ."
+                                           "  }"
+                                           "}"))
+                         (assoc-in [:headers "accept"] "text/plain")))
+            body (-> result :body stream->string)]
+
+        (is (= "true" body))))))
 
 ;(def drafts-request (assoc default-sparql-query :uri "/sparql/draft"))
 
