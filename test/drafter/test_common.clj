@@ -9,7 +9,7 @@
 
 (def ^:dynamic *test-db* (repo (memory-store)))
 
-(def test-db-path "MyDatabases/repositories/test-db")
+(def test-db-path "drafter-test-db")
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri

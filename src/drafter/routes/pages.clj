@@ -1,15 +1,15 @@
 (ns drafter.routes.pages
-  (:require
-   [compojure.core :refer [GET routes]]
-   [clojure.walk :refer [keywordize-keys]]
-   [drafter.layout :as layout]
-   [ring.util.io :as rio]
-   [ring.util.response :refer [not-found]]
-   [drafter.util :as util]
-   [grafter.rdf :refer [add format-rdf-trig statements]]
-   [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph]]
-   [drafter.rdf.drafter-ontology :refer :all]
-   [grafter.rdf.sesame :refer [rdf-serializer query]]))
+  (:require [compojure.core :refer [GET routes]]
+            [clojure.walk :refer [keywordize-keys]]
+            [drafter.layout :as layout]
+            [ring.util.io :as rio]
+            [ring.util.response :refer [not-found]]
+            [drafter.util :as util]
+            [grafter.rdf :refer [add format-rdf-trig statements]]
+            [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph]]
+            [drafter.rdf.drafter-ontology :refer :all]
+            [grafter.rdf.sesame :refer [rdf-serializer query ->connection]])
+  (:import [org.openrdf.repository RepositoryConnection]))
 
 (defn query-page [params]
   (layout/render "query.html" params))
@@ -55,18 +55,20 @@
    (GET "/live" [] (query-page {:endpoint "/sparql/live"
                                 :update-endpoint "/sparql/live/update"
                                 :name "Live" }))
-   (GET "/draft" [] (draft-management-page {:endpoint "/sparql/draft"
-                                            :update-endpoint "/sparql/draft/update"
-                                            :name "Draft"
-                                            :drafts (all-drafts db)
-                                            }))
+   (GET "/draft" [] (with-open [conn (->connection db)]
+                      (draft-management-page {:endpoint "/sparql/draft"
+                                              :update-endpoint "/sparql/draft/update"
+                                              :name "Draft"
+                                              :drafts (all-drafts conn)
+                                              })))
 
    (GET "/draft/:guid" [guid]
-        (if (draft-exists? db guid)
-          (let [draft (draft-uri guid)
-                live (lookup-live-graph db draft)]
-            (upload-form {:draft draft :live live}))
-          (not-found (str "No such Draft:" guid))))
+        (with-open [conn (->connection db)]
+          (if (draft-exists? conn guid)
+            (let [draft (draft-uri guid)
+                  live (lookup-live-graph conn draft)]
+              (upload-form {:draft draft :live live}))
+            (not-found (str "No such Draft:" guid)))))
 
    (GET "/state" [] (query-page {:endpoint "/sparql/state"
                                  :update-endpoint "/sparql/state/update"

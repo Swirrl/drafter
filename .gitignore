@@ -8,6 +8,7 @@ pom.xml.asc
 /.lein-*
 /.nrepl-port
 /MyDatabases/
+/drafter-test-db/
 /drafter.log
 /drafter.log.*
 user_repl.clj

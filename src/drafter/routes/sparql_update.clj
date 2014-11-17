@@ -10,8 +10,10 @@
             [drafter.rdf.sparql-rewriting :as rew]
             [clojure.tools.logging :as log]
             [grafter.rdf.sesame :as ses]
+            [grafter.rdf.sesame :refer [->connection]]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
-  (:import [org.openrdf.query Dataset]))
+  (:import [org.openrdf.query Dataset]
+           [org.openrdf.repository Repository RepositoryConnection]))
 
 (defn do-update [repo restrictions]
   {:status 200})
@@ -103,23 +105,25 @@
      (update-endpoint mount-point repo nil))
   ([mount-point repo restrictions]
      (POST mount-point request
-           (let [{update :update} (parse-update-request request)
-                 ;; prepare the update based upon the endpoints restrictions
-                 preped-update (prepare-restricted-update repo update restrictions)]
-             (log/debug "About to execute update-query " preped-update)
-             (execute-update repo preped-update)))))
+           (with-open [conn (->connection repo)]
+             (let [{update :update} (parse-update-request request)
+                   ;; prepare the update based upon the endpoints restrictions
+                   preped-update (prepare-restricted-update conn update restrictions)]
+               (log/debug "About to execute update-query " preped-update)
+               (execute-update conn preped-update))))))
 
 (defn draft-update-endpoint
   "Create an update endpoint with draft query rewriting.  Restrictions
   are applied on the basis of the &graphs query parameter."
   ([mount-point repo]
      (POST mount-point request
-           (let [{:keys [update graphs]} (parse-update-request request)
-                 preped-update (prepare-restricted-update repo update graphs)]
+           (with-open [conn (->connection repo)]
+             (let [{:keys [update graphs]} (parse-update-request request)
+                   preped-update (prepare-restricted-update conn update graphs)]
 
-             (rew/rewrite-update-request preped-update (mgmt/graph-map repo graphs))
-             (log/debug "Executing update-query " preped-update)
-             (execute-update repo preped-update)))))
+               (rew/rewrite-update-request preped-update (mgmt/graph-map conn graphs))
+               (log/debug "Executing update-query " preped-update)
+               (execute-update conn preped-update))))))
 
 (defn draft-update-endpoint-route [mount-point repo]
   (draft-update-endpoint mount-point repo))
