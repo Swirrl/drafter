@@ -1,14 +1,14 @@
 (defproject drafter "0.1.0-SNAPSHOT"
   :description "Backend PMD service"
   :url "http://example.com/FIXME"
-  :repositories [["apache" "https://repository.apache.org/content/repositories/releases/"]
-                 ;; ["swirrl-private" {:url "s3p://leiningen-private-repo/releases/"
-                 ;;                    :username :env
-                 ;;                    :passphrase :env}]
-                 ["swirrl-private-snapshots" {:url "s3p://leiningen-private-repo/snapshots/"
-                                              :username :env
-                                              :passphrase :env}]
-                 ]
+  ;; :repositories [["apache" "https://repository.apache.org/content/repositories/releases/"]
+  ;;                ["swirrl-private" {:url "s3p://leiningen-private-repo/releases/"
+  ;;                                   :username :env
+  ;;                                   :passphrase :env}]
+  ;;                ["swirrl-private-snapshots" {:url "s3p://leiningen-private-repo/snapshots/"
+  ;;                                             :username :env
+  ;;                                             :passphrase :env}]
+  ;;                ]
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
@@ -17,11 +17,10 @@
                  [ring-server "0.3.1"]
                  [selmer "0.6.9"]
                  [grafter "0.2.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
-                 [org.openrdf.sesame/sesame-queryrender "2.7.13"]
-                 ;; 2.7.14-SNAPSHOT contains our fix for https://openrdf.atlassian.net/browse/SES-2111
-                 [org.openrdf.sesame/sesame-queryalgebra-model "2.7.14-drafter-patch-SNAPSHOT" :exclusions [org.openrdf.sesame/sesame-query
-                                                                                                            org.openrdf.sesame/sesame-rio-api]]
-                 [org.openrdf.sesame/sesame-runtime "2.7.13"
+
+                 [org.openrdf.sesame/sesame-queryrender "2.7.14"]
+
+                 [org.openrdf.sesame/sesame-runtime "2.7.14"
 
                   ;; For some reason there appears to be a weird
                   ;; version conflict with this sesame library.  So

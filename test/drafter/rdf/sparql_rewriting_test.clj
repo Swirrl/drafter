@@ -10,7 +10,6 @@
            [org.openrdf.model.impl URIImpl]
            [org.openrdf.query QueryLanguage]
            [org.openrdf.query.parser QueryParserUtil]
-           [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
            [org.openrdf.query.algebra.evaluation.function Function]
            [org.openrdf.query.algebra Var StatementPattern Extension ExtensionElem FunctionCall]
            [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
