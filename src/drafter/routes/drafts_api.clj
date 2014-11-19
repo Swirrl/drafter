@@ -14,6 +14,7 @@
             [grafter.rdf.sesame :refer [->connection]]
             [grafter.rdf :refer [statements]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
+           [org.openrdf.rio RDFParseException]
            [org.openrdf.repository Repository RepositoryConnection]))
 
 (defn exec-job!
@@ -27,6 +28,9 @@
       ; TODO make the job function return the status code and message.
       (job-function)
       (api-routes/api-response 200 {:msg "Your job executed succesfully"})
+
+      (catch RDFParseException ex
+        (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " ex)}))
       (catch clojure.lang.ExceptionInfo ex
         (cond
          (= :reading-aborted (-> ex ex-data :type)) (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " ex)})
@@ -59,8 +63,8 @@
     (log/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
 
     (ses/with-transaction repo
-      (mgmt/append-data! repo graph (statements (:tempfile file)
-                                                :format (ses/mimetype->rdf-format content-type))
+      (mgmt/append-data! repo graph (ses/mimetype->rdf-format content-type)
+                         (:tempfile file)
                          metadata))
 
     (log/info (str "File import (append) complete " tempfile " to graph: " graph))))

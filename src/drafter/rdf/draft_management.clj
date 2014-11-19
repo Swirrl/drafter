@@ -122,7 +122,10 @@
   ([db draft-graph-uri triples] (append-data! db draft-graph-uri triples {}))
   ([db draft-graph-uri triples metadata]
      (add-metadata-to-draft db draft-graph-uri metadata)
-     (add db draft-graph-uri triples)))
+     (add db draft-graph-uri triples))
+  ([db draft-graph-uri format triple-stream metadata]
+     (add-metadata-to-draft db draft-graph-uri metadata)
+     (add db draft-graph-uri format triple-stream)))
 
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
@@ -158,7 +161,14 @@
       (add-metadata-to-draft db draft-graph-uri metadata)
       (when triples
         ;; add if there's any data
-        (add db draft-graph-uri triples))))
+        (add db draft-graph-uri triples)))
+
+  ([db draft-graph-uri format triples metadata]
+      (delete-graph-contents! db draft-graph-uri)
+      (add-metadata-to-draft db draft-graph-uri metadata)
+      (when triples
+        ;; add if there's any data
+        (add db draft-graph-uri format triples))))
 
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
