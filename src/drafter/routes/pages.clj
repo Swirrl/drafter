@@ -8,6 +8,7 @@
             [grafter.rdf :refer [add format-rdf-trig statements]]
             [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph]]
             [drafter.rdf.drafter-ontology :refer :all]
+            [clojure.tools.logging :as log]
             [grafter.rdf.sesame :refer [rdf-serializer query ->connection]])
   (:import [org.openrdf.repository RepositoryConnection]))
 
