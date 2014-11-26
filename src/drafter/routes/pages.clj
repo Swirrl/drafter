@@ -16,7 +16,7 @@
   (layout/render "query.html" params))
 
 (defn draft-management-page [params]
-  (layout/render "/draft/draft-management.html" params))
+  (layout/render "draft/draft-management.html" params))
 
 (defn upload-form [params]
   (layout/render "upload.html" params ))

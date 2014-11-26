@@ -13,13 +13,11 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
                  [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
-
                  [ring-server "0.3.1"]
                  [selmer "0.6.9"]
                  [grafter "0.2.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
-
                  [org.openrdf.sesame/sesame-runtime "2.7.14"
 
                   ;; For some reason there appears to be a weird
@@ -36,7 +34,7 @@
                  [environ "1.0.0"]]
 
   :java-source-paths ["src-java"]
-
+  :resource-paths ["resources"]
   :pedantic? :abort
 
   :repl-options {:init-ns drafter.repl
