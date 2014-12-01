@@ -11,7 +11,7 @@
             [compojure.route :as route]
             [selmer.parser :as parser]
             [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri drafter-state-graph]]
-            [grafter.rdf.sesame :as sesame]
+            [grafter.rdf.repository :as repo]
             [compojure.handler :only [api]]
             [environ.core :refer [env]]
             [clojure.tools.logging :as log]
@@ -47,7 +47,7 @@
                      (partial lookup-live-graph-uri repo)))
 
 (defn initialise-repo! [repo-path indexes]
-  (set-var-root! #'repo (let [repo (sesame/repo (sesame/native-store repo-path indexes))]
+  (set-var-root! #'repo (let [repo (repo/repo (repo/native-store repo-path indexes))]
                           (log/info "Initialised repo" repo-path)
                           repo))
 
@@ -121,6 +121,6 @@
    shuts down, put any clean up code here"
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
-  (sesame/shutdown repo)
+  (repo/shutdown repo)
   (future-cancel worker)
   (log/info "drafter has shut down."))

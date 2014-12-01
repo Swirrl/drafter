@@ -1,9 +1,10 @@
 (ns drafter.rdf.sparql-protocol-test
   (:require
    [drafter.test-common :refer :all]
+   [grafter.rdf.formats :refer [rdf-ntriples]]
    [grafter.rdf :as rdf]
    [grafter.rdf.protocols :as pr]
-   [grafter.rdf.sesame :refer :all]
+   [grafter.rdf.repository :refer :all]
    [drafter.rdf.sparql-protocol :refer :all]
    [clojure.java.io :as io]
    [clojure.data.json :as json]
@@ -67,7 +68,7 @@
         (is (= "application/n-triples" (headers "Content-Type")))
 
         (let [triple-reader (java.io.InputStreamReader. body)
-              triples (get-spo-set (rdf/statements triple-reader :format rdf/format-rdf-ntriples))
+              triples (get-spo-set (rdf/statements triple-reader :format rdf-ntriples))
               expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
 
           (is (= expected-triples triples)))))))

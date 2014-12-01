@@ -1,10 +1,10 @@
 (ns drafter.rdf.draft-management-test
   (:require
    [drafter.test-common :refer [*test-db* wrap-with-clean-test-db]]
-   [grafter.rdf :refer [add add-statement triplify]]
-   [grafter.rdf :refer [graph triplify]]
+   [grafter.rdf :refer [s add add-statement]]
+   [grafter.rdf.templater :refer [graph triplify]]
    [grafter.rdf.ontologies.rdf :refer :all]
-   [grafter.rdf.sesame :refer :all]
+   [grafter.rdf.repository :refer :all]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
    [clojure.test :refer :all])
@@ -196,12 +196,12 @@
 
                (graph-map db #{frogs-draft dogs-draft})))))))
 
-(deftest upsert-single-object-insert-test 
+(deftest upsert-single-object-insert-test
   (let [db (repo)]
     (upsert-single-object! db "http://foo/" "http://bar/" "baz")
     (is (query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
-(deftest upsert-single-object-update-test 
+(deftest upsert-single-object-update-test
   (let [db (repo)
         subject "http://example.com/subject"
         predicate "http://example.com/predicate"]

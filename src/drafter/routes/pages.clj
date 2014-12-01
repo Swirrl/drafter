@@ -5,7 +5,8 @@
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]
             [drafter.util :as util]
-            [grafter.rdf :refer [add format-rdf-trig statements]]
+            [grafter.rdf :refer [add statements]]
+            [grafter.rdf.formats :refer [rdf-trig]]
             [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph]]
             [drafter.rdf.drafter-ontology :refer :all]
             [clojure.tools.logging :as log]
@@ -26,7 +27,7 @@
   the RAW database as a Trig String for debugging.  Don't use on large
   databases as it will be loaded into memory."
   [db ostream]
-  (add (rdf-serializer ostream :format format-rdf-trig) (statements db)))
+  (add (rdf-serializer ostream :format rdf-trig) (statements db)))
 
 (defn parse-guid [uri]
   (.replace (str uri) (draft-uri "") ""))

@@ -1,11 +1,13 @@
 (ns drafter.rdf.draft-management
   (:require [grafter.rdf.ontologies.rdf :refer :all]
-            [grafter.rdf.sesame :refer :all]
+            [grafter.rdf.repository :refer []]
             [drafter.rdf.drafter-ontology :refer :all]
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
-            [grafter.rdf :refer [add add-statement add-properties graph
-                                 statements subject predicate object context format-rdf-trig]]
+            [grafter.rdf :refer [s add add-statement statements subject predicate object context]]
+            [grafter.rdf.repository :refer [query update!]]
+            [grafter.rdf.templater :refer [add-properties graph]]
+            [grafter.rdf.formats :refer :all]
             [grafter.rdf.protocols :refer [begin commit rollback]])
   (:import [java.util Date]
            [org.openrdf.model.impl URIImpl]))
