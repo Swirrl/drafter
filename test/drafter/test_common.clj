@@ -1,6 +1,6 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
-            [grafter.rdf.sesame :refer :all]
+            [grafter.rdf.repository :refer :all]
             [grafter.rdf.templater :refer [triplify]]
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]

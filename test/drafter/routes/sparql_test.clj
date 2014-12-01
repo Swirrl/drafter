@@ -6,7 +6,7 @@
 
             [clojure-csv.core :as csv]
             [clojure.data.json :as json]
-            [grafter.rdf.sesame :as ses]
+            [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function]]
@@ -340,7 +340,7 @@
   (let [draft-guri (create-draft-graph! db live-guri)
         query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" live-guri "> { ?s ?p ?o } }")
-        source-data (ses/query db query-str)]
+        source-data (repo/query db query-str)]
     (append-data! db draft-guri source-data)
 
     draft-guri))

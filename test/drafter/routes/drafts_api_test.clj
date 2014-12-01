@@ -2,7 +2,7 @@
   (:require [drafter.test-common :refer [*test-db* test-triples wrap-with-clean-test-db
                                          make-store stream->string select-all-in-graph make-graph-live!]]
             [clojure.test :refer :all]
-            [grafter.rdf.sesame :as ses]
+            [grafter.rdf.repository :as repo]
             [drafter.routes.drafts-api :refer :all]
             [drafter.rdf.drafter-ontology :refer [meta-uri]]
             [clojure.java.io :as io]
@@ -82,7 +82,7 @@
                                               :headers {"accept" "application/json"}})]
           (is (= 201 status))
           (is (url? (-> body :guri)))
-          (is (ses/query *test-db* (str "ASK WHERE {"
+          (is (repo/query *test-db* (str "ASK WHERE {"
                                         "  GRAPH <" drafter-state-graph "> {"
                                         "     ?graph <" (meta-uri "foo") "> ?foo ."
                                         "     ?graph <" (meta-uri "bar") "> ?bar ."
@@ -105,7 +105,7 @@
             (is (= :ok (:type body))))
 
           (testing "appends RDF to the graph"
-            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
+            (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
 
       (testing "with an invalid RDF file"
         (let [state (atom {})
@@ -132,13 +132,13 @@
               (is (= :ok (:type body))))
 
             (testing "appends RDF to the graph"
-              (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-1> ?p ?o . }}")) "graph has got new data in" )
-              (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . }}")) "graph has still got the old data in ")))))
+              (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-1> ?p ?o . }}")) "graph has got new data in" )
+              (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . }}")) "graph has still got the old data in ")))))
 
     (testing "PUT /draft with a source file"
       (make-graph-live! *test-db* "http://mygraph/graph-to-be-replaced")
 
-      (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
+      (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
                  "Graph should contain initial state before it is replaced")
 
       (let [state (atom {})
@@ -154,7 +154,7 @@
               (is (= :ok (:type body))))
 
         (testing "replaces RDF in the graph"
-          (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . } }"))
+          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . } }"))
                  "The data should be replaced with the new data"))))
 
         ; in a different test so that it's in a clean db.
@@ -164,7 +164,7 @@
 
       (testing "when source graph contains data"
 
-        (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
+        (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
                    "Graph should contain initial state before it is replaced")
 
         (let [state (atom {})
@@ -180,12 +180,12 @@
               (is (= :ok (:type body))))
 
           (testing "replaces RDF in the graph"
-            (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }"))
+            (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }"))
                  "The data should be replaced with the new data")))
 
       (testing "when source graph doesn't contain data"
         ;; what's left from the previous test.
-        (is (ses/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-2> ?p ?o . } }"))
+        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-2> ?p ?o . } }"))
                      "Graph should contain initial state before it is replaced")
 
          (let [state (atom {})
@@ -201,7 +201,7 @@
               (is (= :ok (:type body))))
 
           (testing "the job when run deletes contents of the RDF graph"
-            (is (= false (ses/query *test-db* (str  "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }")))
+            (is (= false (repo/query *test-db* (str  "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }")))
                     "Destination graph should be deleted")))))))
 
 (deftest graph-management-delete-graph-test
@@ -209,7 +209,7 @@
       (do
         (make-graph-live! *test-db* "http://mygraph/live-graph")
 
-        (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")
+        (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")
             "Graph should exist before deletion")
 
         (let [state (atom {})
@@ -223,13 +223,13 @@
             (is (= :ok (:type body))))
 
           (testing "delete job actually deletes the graph"
-            (is (not (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }"))
+            (is (not (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }"))
                 "Graph should be deleted"))))))
 
 (deftest graph-management-live-test-with-one-graph
   (testing "PUT /graph/live"
     (let [draft-graph (import-data-to-draft! *test-db* "http://mygraph.com/live-graph" (test-triples "http://test.com/subject-1"))]
-      (is (ses/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
+      (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
           "Draft graph should exist before deletion")
 
       (let [state (atom {})
@@ -244,7 +244,7 @@
           (is (= :ok (:type body))))
 
         (testing "moves the draft to live"
-          (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }")
+          (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
 (deftest graph-management-live-test-multiple-graphs
@@ -265,9 +265,9 @@
           (is (= :ok (:type body))))
 
         (testing "moves the draft to live"
-          (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-1> { <http://test.com/subject-1> ?p ?o } }")
+          (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-1> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples")
-          (is (ses/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
+          (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
 (defn metadata-exists-sparql [draft-graph-uri name value]
@@ -297,13 +297,13 @@
 
        (testing "Adds metadata"
          (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
-           (is (ses/query *test-db* sparql))))
+           (is (repo/query *test-db* sparql))))
 
        (testing "Overwrites metadata"
          (let [new-request (add-request-metadata request "uploaded-by" "updated")
                {:keys [status body]} (route new-request)
                meta-query (metadata-values-sparql draft-graph-uri "uploaded-by")
-               meta-records (ses/query *test-db* meta-query)]
+               meta-records (repo/query *test-db* meta-query)]
 
            (testing "Request ok"
              (is (= 200 status)))

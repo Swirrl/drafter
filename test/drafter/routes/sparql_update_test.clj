@@ -4,7 +4,7 @@
             [clojure.test :refer :all]
             [ring.util.codec :as codec]
             [drafter.test-common :refer [stream->string select-all-in-graph make-store]]
-            [grafter.rdf.sesame :refer [query]])
+            [grafter.rdf.repository :refer [query]])
 
   (:import [java.nio.charset StandardCharsets]
            [java.io ByteArrayInputStream]))
