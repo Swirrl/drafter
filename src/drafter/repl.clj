@@ -1,7 +1,7 @@
 (ns drafter.repl
   (:use
    [ring.middleware file-info resource])
-  (:require [grafter.rdf.sesame :refer [query prepare-query evaluate with-transaction]]
+  (:require [grafter.rdf.repository :refer [query prepare-query evaluate with-transaction]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.handler :as service]
             [clojure.java.io :as io]
