@@ -1,7 +1,7 @@
 (ns drafter.rdf.sparql-protocol
   (:require [ring.util.io :as rio]
             [clojure.string :as str]
-            [grafter.rdf.sesame :as ses]
+            [grafter.rdf.repository :as repo]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -208,7 +208,7 @@
                             :else nil)]
 
     (when graph-restrictions
-      (ses/make-restricted-dataset :default-graph graph-restrictions
+      (repo/make-restricted-dataset :default-graph graph-restrictions
                                    :named-graphs graph-restrictions))))
 
 (defn get-query-mime-preferences [query]
@@ -226,7 +226,7 @@
 
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
                                                  result-rewriter]
-                                          :or {query-creator-fn ses/prepare-query}}]
+                                          :or {query-creator-fn repo/prepare-query}}]
 
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
@@ -258,11 +258,11 @@
 
 (comment
 
-  (take 10 (ses/query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }" :default-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"] :union-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"]))
+  (take 10 (repo/query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }" :default-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"] :union-graph ["http://publishmydata.com/graphs/drafter/draft/ccb30b57-2b67-4e7b-a8a8-1a00aa2eeaf1"]))
 
 
 
-  (take 10 (ses/evaluate (ses/prepare-query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }")))
+  (take 10 (repo/evaluate (repo/prepare-query drafter.handler/repo "SELECT * WHERE { ?s ?p ?o }")))
 
   ;; Parsing a Query
   (org.openrdf.query.parser.QueryParserUtil/parseQuery QueryLanguage/SPARQL "SELECT * WHERE { ?s ?p ?o }" nil)

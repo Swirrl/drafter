@@ -1,13 +1,11 @@
 (ns drafter.rdf.draft-management
   (:require [grafter.rdf.ontologies.rdf :refer :all]
-            [grafter.rdf.repository :refer []]
             [drafter.rdf.drafter-ontology :refer :all]
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
             [grafter.rdf :refer [s add add-statement statements subject predicate object context]]
             [grafter.rdf.repository :refer [query update!]]
             [grafter.rdf.templater :refer [add-properties graph]]
-            [grafter.rdf.formats :refer :all]
             [grafter.rdf.protocols :refer [begin commit rollback]])
   (:import [java.util Date]
            [org.openrdf.model.impl URIImpl]))
@@ -158,19 +156,20 @@
 
 (defn replace-data!
   ([db draft-graph-uri triples] (replace-data! db draft-graph-uri triples {}))
+
   ([db draft-graph-uri triples metadata]
-      (delete-graph-contents! db draft-graph-uri)
-      (add-metadata-to-draft db draft-graph-uri metadata)
-      (when triples
-        ;; add if there's any data
-        (add db draft-graph-uri triples)))
+   (delete-graph-contents! db draft-graph-uri)
+   (add-metadata-to-draft db draft-graph-uri metadata)
+   (when triples
+     ;; add if there's any data
+     (add db draft-graph-uri triples)))
 
   ([db draft-graph-uri format triples metadata]
-      (delete-graph-contents! db draft-graph-uri)
-      (add-metadata-to-draft db draft-graph-uri metadata)
-      (when triples
-        ;; add if there's any data
-        (add db draft-graph-uri format triples))))
+   (delete-graph-contents! db draft-graph-uri)
+   (add-metadata-to-draft db draft-graph-uri metadata)
+   (when triples
+     ;; add if there's any data
+     (add db draft-graph-uri format triples))))
 
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."

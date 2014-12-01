@@ -9,8 +9,7 @@
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.rdf.sparql-rewriting :as rew]
             [clojure.tools.logging :as log]
-            [grafter.rdf.sesame :as ses]
-            [grafter.rdf.sesame :refer [->connection]]
+            [grafter.rdf.repository :refer [->connection with-transaction make-restricted-dataset prepare-update evaluate]]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query Dataset]
            [org.openrdf.repository Repository RepositoryConnection]))
@@ -60,9 +59,9 @@
 
 (defn execute-update [repo update-query]
   (try
-    ;; (with-open [conn (ses/->connection repo)]
-      (ses/with-transaction repo ;;conn
-        (ses/evaluate update-query))
+    ;; (with-open [conn (->connection repo)]
+      (with-transaction repo ;;conn
+        (evaluate update-query))
       {:status 200 :body "OK"}
       ;; )
     (catch Exception ex
@@ -87,14 +86,14 @@
                        restrictions-or-f
                        (restrictions-or-f))]
     (when (seq restrictions)
-      (ses/make-restricted-dataset :default-graph restrictions
+      (make-restricted-dataset :default-graph restrictions
                                    :union-graph restrictions))))
 
 (defn prepare-restricted-update [repo update-str graphs]
   (let [restricted-ds (if graphs
                         (resolve-restrictions graphs)
                         (resolve-restrictions (mgmt/live-graphs repo)))]
-    (ses/prepare-update repo update-str restricted-ds)))
+    (prepare-update repo update-str restricted-ds)))
 
 (defn update-endpoint
   "Create a standard update-endpoint with no query-rewriting and

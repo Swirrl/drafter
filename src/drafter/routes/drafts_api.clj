@@ -10,8 +10,8 @@
             [clojure.tools.logging :as log]
             [drafter.rdf.sparql-protocol :refer [process-sparql-query]]
             [drafter.common.api-routes :as api-routes]
-            [grafter.rdf.sesame :as ses]
-            [grafter.rdf.sesame :refer [->connection]]
+            [grafter.rdf.io :refer [mimetype->rdf-format]]
+            [grafter.rdf.repository :refer [->connection with-transaction query]]
             [grafter.rdf :refer [statements]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
            [org.openrdf.rio RDFParseException]
@@ -49,9 +49,9 @@
   [repo graph {:keys [tempfile size filename content-type] :as file} metadata]
   (fn []
     (log/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
-    (ses/with-transaction repo
+    (with-transaction repo
       (mgmt/replace-data! repo graph (statements tempfile
-                                                 :format (ses/mimetype->rdf-format content-type))
+                                                 :format (mimetype->rdf-format content-type))
                           metadata))
     (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))))
 
@@ -62,8 +62,8 @@
   (fn []
     (log/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
 
-    (ses/with-transaction repo
-      (mgmt/append-data! repo graph (ses/mimetype->rdf-format content-type)
+    (with-transaction repo
+      (mgmt/append-data! repo graph (mimetype->rdf-format content-type)
                          (:tempfile file)
                          metadata))
 
@@ -77,9 +77,9 @@
 
     (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
-          source-data (ses/query repo query-str)]
+          source-data (query repo query-str)]
 
-      (ses/with-transaction repo
+      (with-transaction repo
         (mgmt/append-data! repo graph source-data metadata))
 
       (log/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph)))))
@@ -93,19 +93,19 @@
 
     (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
-          source-data (ses/query repo query-str)]
-          (ses/with-transaction repo
+          source-data (query repo query-str)]
+          (with-transaction repo
             (mgmt/replace-data! repo graph source-data metadata))
           (log/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))))
 
 (defn delete-graph-job [repo graph]
   (fn []
-    (ses/with-transaction repo
+    (with-transaction repo
       (mgmt/delete-graph-and-draft-state! repo graph))))
 
 (defn migrate-graph-live-job [repo graph]
   (fn []
-    (ses/with-transaction repo
+    (with-transaction repo
       (if (instance? String graph)
         (mgmt/migrate-live! repo graph)
         (doseq [g graph]
@@ -123,7 +123,7 @@
                      params :params}
           (with-open [conn (->connection repo)]
             (api-routes/when-params [live-graph]
-                                    (let [draft-graph-uri (ses/with-transaction conn
+                                    (let [draft-graph-uri (with-transaction conn
                                                             (mgmt/create-managed-graph! conn live-graph)
                                                             (mgmt/create-draft-graph! conn live-graph (api-routes/meta-params params)))]
                                       (api-routes/api-response 201 {:guri draft-graph-uri}))))))

@@ -1,6 +1,6 @@
 (ns drafter.rdf.sparql-rewriting
   (:require
-   [grafter.rdf.sesame :as ses]
+   [grafter.rdf.repository :as repo]
    [grafter.rdf :refer [prefixer]]
    [clojure.tools.logging :as log])
   (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
@@ -155,7 +155,7 @@
           graph-var-names))
 
 (defn rewrite-graph-query [repo query-str query-substitutions]
-  (let [prepared-query (ses/prepare-query repo query-str)
+  (let [prepared-query (repo/prepare-query repo query-str)
         binding-set (.getBindings prepared-query)
         query-ast (-> prepared-query .getParsedQuery)
         vars-in-graph-position (vars-in-graph-position query-ast)]
@@ -179,9 +179,9 @@
                                  unbound-var-names)
             result-substitutions (clojure.set/map-invert query-substitutions)]
 
-        (->> (ses/evaluate prepared-query)
+        (->> (repo/evaluate prepared-query)
              (map (partial substitute-results result-substitutions graph-var-names))))
-      (ses/evaluate prepared-query))))
+      (repo/evaluate prepared-query))))
 
 (defn evaluate-with-graph-rewriting
   "Rewrites the results in the query."

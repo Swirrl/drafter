@@ -9,7 +9,7 @@
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper]]
             [drafter.rdf.sparql-rewriting :as rew]
             [clojure.tools.logging :as log]
-            [grafter.rdf.sesame :as ses]
+            [grafter.rdf.repository :as ses]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
            [org.openrdf.query QueryResultHandler TupleQueryResultHandler BindingSet Binding]

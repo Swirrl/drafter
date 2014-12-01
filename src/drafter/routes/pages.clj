@@ -6,11 +6,12 @@
             [ring.util.response :refer [not-found]]
             [drafter.util :as util]
             [grafter.rdf :refer [add statements]]
-            [grafter.rdf.formats :refer [rdf-trig]]
-            [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph]]
             [drafter.rdf.drafter-ontology :refer :all]
-            [clojure.tools.logging :as log]
-            [grafter.rdf.sesame :refer [rdf-serializer query ->connection]])
+            [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph]]
+            [grafter.rdf.formats :refer [rdf-trig]]
+            [grafter.rdf.io :refer [rdf-serializer]]
+            [grafter.rdf.repository :refer [query ->connection]]
+            [clojure.tools.logging :as log])
   (:import [org.openrdf.repository RepositoryConnection]))
 
 (defn query-page [params]
