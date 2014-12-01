@@ -4,7 +4,7 @@
    [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph! append-data!]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.rdf :refer [statements]]
-   [grafter.rdf.repository :as ses]
+   [grafter.rdf.repository :refer [repo prepare-update]]
    [clojure.test :refer :all]
    [drafter.rdf.sparql-rewriting :refer :all])
   (:import
@@ -51,7 +51,7 @@
   (-> results first (get key) str))
 
 (deftest query-and-result-rewriting-test
-  (let [db (ses/repo)
+  (let [db (repo)
         draft-graph (create-draft-graph! db "http://frogs.com/live-graph")
         graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
 
@@ -84,11 +84,11 @@
                    (first-result "g")))))))))
 
 (deftest rewrite-update-request-test
-  (let [db (ses/repo)
+  (let [db (repo)
         draft-graph (create-draft-graph! db "http://frogs.com/live-graph")
         graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
 
-    (rewrite-update-request (ses/prepare-update db "INSERT { GRAPH <http://frogs.com/live-graph> {
+    (rewrite-update-request (prepare-update db "INSERT { GRAPH <http://frogs.com/live-graph> {
                                       <http://test/> <http://test/> <http://test/> .
                             }} WHERE { }")
                              graph-map)))
