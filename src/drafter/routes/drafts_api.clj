@@ -50,9 +50,9 @@
   (fn []
     (log/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
     (with-transaction repo
-      (mgmt/replace-data! repo graph (statements tempfile
-                                                 :format (mimetype->rdf-format content-type))
-                          metadata))
+                      (mgmt/replace-data! repo graph (mimetype->rdf-format content-type)
+                                         (:tempfile file)
+                                         metadata))
     (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))))
 
 (defn append-data-to-graph-from-file-job
@@ -63,10 +63,9 @@
     (log/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
 
     (with-transaction repo
-      (mgmt/append-data! repo graph (mimetype->rdf-format content-type)
-                         (:tempfile file)
-                         metadata))
-
+                      (mgmt/append-data! repo graph (mimetype->rdf-format content-type)
+                                        (:tempfile file)
+                                        metadata))
     (log/info (str "File import (append) complete " tempfile " to graph: " graph))))
 
 (defn append-data-to-graph-from-graph-job
