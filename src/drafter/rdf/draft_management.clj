@@ -159,16 +159,13 @@
   ([db draft-graph-uri triples metadata]
    (delete-graph-contents! db draft-graph-uri)
    (add-metadata-to-draft db draft-graph-uri metadata)
-   (when triples
-     ;; add if there's any data
-     (add db draft-graph-uri triples)))
+   (add db draft-graph-uri triples))
 
   ([db draft-graph-uri format triples metadata]
    (delete-graph-contents! db draft-graph-uri)
    (add-metadata-to-draft db draft-graph-uri metadata)
-   (when triples
      ;; add if there's any data
-     (add db draft-graph-uri format triples))))
+   (add db draft-graph-uri format triples)))
 
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
