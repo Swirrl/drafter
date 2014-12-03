@@ -4,8 +4,8 @@
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
             [grafter.rdf :refer [s add add-statement statements subject predicate object context]]
-            [grafter.rdf.repository :refer [query update!]]
-            [grafter.rdf.protocols :refer [begin commit rollback]]
+            [grafter.rdf.repository :refer [query]]
+            [grafter.rdf.protocols :refer [begin commit rollback update!]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import [java.util Date]
            [org.openrdf.model.impl URIImpl]))
