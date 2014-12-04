@@ -192,7 +192,6 @@
                dest-graph "http://mygraph/graph-to-be-replaced"
                test-request (->  {:uri "/draft" :request-method :put}
                                  (add-request-graph-source-graph dest-graph "http://draft.org/source-graph-x"))
-
                route (draft-api-routes "/draft" *test-db* state)
                {:keys [status body headers]} (route test-request)]
 
