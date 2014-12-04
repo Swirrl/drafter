@@ -1,15 +1,21 @@
 (ns drafter.common.sparql-routes
   (:require [drafter.rdf.draft-management :refer [live-graphs]]
+            [drafter.rdf.draft-management :as mgmt]
+            [clojure.tools.logging :as log]
             [clojure.set :as set]))
 
-(defn- maybe-merge-with-live [repo union-with-live graphs]
+(defn- maybe-merge-with-live [repo union-with-live graphs graphs-with-drafts]
   (let [live-graphs (when union-with-live
-                       (live-graphs repo))
+                      (live-graphs repo))
         supplied-graphs (if (instance? String graphs)
                           #{graphs}
                           graphs)]
-    (set/union live-graphs
-               supplied-graphs)))
+
+
+    ;; remove the graphs-with-drafts from the live-graphs
+    (set/union
+      (set/difference live-graphs graphs-with-drafts)
+      supplied-graphs)))
 
 (defn supplied-drafts
   "Parses out the set of \"graph\"s supplied on the request.
@@ -20,9 +26,15 @@ If no graphs are found in the request, it returns the set of live
 This implementation does not enforce any security restrictions, and
   assumes that the client is trustworthy."
   [repo {:keys [params] :as request}]
-  (let [graphs (get params :graph)
-        union-with-live (get params :union-with-live false)]
 
-    (maybe-merge-with-live repo union-with-live graphs)
+  (let [graphs (get params :graph)
+        union-with-live (get params :union-with-live false)
+        draft-set (if (instance? String graphs)
+                    #{graphs}
+                    graphs)
+        ;; get the graphs with drafts from graph-map
+        graphs-with-drafts (into #{} (map str (keys (mgmt/graph-map repo draft-set))))]
+
+    (maybe-merge-with-live repo union-with-live graphs graphs-with-drafts)
     ;;(live-graphs repo)
     ))
