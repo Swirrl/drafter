@@ -94,7 +94,7 @@
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
           source-data (query repo query-str)]
           (with-transaction repo
-            (mgmt/replace-data! repo graph source-data metadata))
+                            (mgmt/replace-data! repo graph source-data metadata))
           (log/info (str "Graph replace complete. Replaced contents of " source-graph " into graph: " graph)))))
 
 (defn delete-graph-job [repo graph]

@@ -156,6 +156,7 @@
 
 (defn replace-data!
   ([db draft-graph-uri triples] (replace-data! db draft-graph-uri triples {}))
+
   ([db draft-graph-uri triples metadata]
    (delete-graph-contents! db draft-graph-uri)
    (add-metadata-to-draft db draft-graph-uri metadata)
@@ -164,7 +165,6 @@
   ([db draft-graph-uri format triples metadata]
    (delete-graph-contents! db draft-graph-uri)
    (add-metadata-to-draft db draft-graph-uri metadata)
-     ;; add if there's any data
    (add db draft-graph-uri format triples)))
 
 (defn lookup-live-graph [db draft-graph-uri]
