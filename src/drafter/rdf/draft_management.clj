@@ -143,7 +143,7 @@
   (let [query-str (str "DELETE {"
                        (with-state-graph
                          "?live <" drafter:hasDraft "> <" graph-uri "> . "
-                               "<" graph-uri "> ?p ?o . ")
+                         "<" graph-uri "> ?p ?o . ")
                        "} WHERE {"
                        (with-state-graph
                          "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
