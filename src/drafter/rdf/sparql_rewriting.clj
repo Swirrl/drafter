@@ -2,6 +2,7 @@
   (:require
    [grafter.rdf.repository :as repo]
    [grafter.rdf :refer [prefixer]]
+   [clojure.set :as set]
    [clojure.tools.logging :as log])
   (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
            [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
@@ -26,14 +27,14 @@
      (QueryParserUtil/parseQuery QueryLanguage/SPARQL query-string base-uri)))
 
 (defn- vars-in-graph-position*
-  "Given a parsed query Expr and returns the set of Vars which are
+  "Given a parsed query Expr and returns the vars which are
   bound in Graph position."
   [expr]
   (reduce (fn [acc val]
             (if-let [var (.getContextVar val)]
               (conj acc var)
               acc))
-          #{} (StatementPatternCollector/process expr)))
+          [] (StatementPatternCollector/process expr)))
 
 (defprotocol ISparqlAst
   ;; TODO extend this with other ops - perhaps more generic ones.
@@ -109,7 +110,7 @@
      (doseq [context context-set]
        (when (.isConstant context)
          (when-let [new-uri (get graph-map (.getValue context))]
-           (log/debug "Rewriting constant " context " with new-uri " new-uri)
+           (log/info "Rewriting constant " context " with new-uri " new-uri)
            (.setValue context new-uri))))
      query-ast))
 
@@ -177,7 +178,7 @@
             unbound-var-names (filter (complement #(.isConstant %)) vars-in-graph-position)
             graph-var-names (map #(.getName %)
                                  unbound-var-names)
-            result-substitutions (clojure.set/map-invert query-substitutions)]
+            result-substitutions (set/map-invert query-substitutions)]
 
         (->> (repo/evaluate prepared-query)
              (map (partial substitute-results result-substitutions graph-var-names))))

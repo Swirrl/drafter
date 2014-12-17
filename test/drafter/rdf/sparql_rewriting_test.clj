@@ -15,6 +15,12 @@
            [org.openrdf.query.algebra Var StatementPattern Extension ExtensionElem FunctionCall]
            [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
 
+(defn rewrite-sparql-graph-query
+  "Rewrite graph clauses in the supplied SPARQL query and return an AST"
+  [query graph-map]
+  (rewrite-graph-constants (->sparql-ast query)
+                           graph-map))
+
 (deftest rewrite-graphs-test
   (let [graph-map {(URIImpl. "http://live-graph.com/graph1") (URIImpl. "http://draft-graph.com/graph1")}]
     (testing "graph clauses are substituted"
@@ -28,9 +34,28 @@
                    }
                 }"]
 
-        (is (= "http://draft-graph.com/graph1" (second (re-find #"<(.+)>"
-                                                                (->sparql-string (rewrite-graph-constants (->sparql-ast query)
-                                                                                                          graph-map))))))))))
+        (is (= "http://draft-graph.com/graph1" (second (->> (rewrite-sparql-graph-query query graph-map)
+                                                            ->sparql-string
+                                                            (re-find #"<(.+)>")))))))
+
+    (testing "multiple graph clauses are substituted"
+      (let [query "SELECT * WHERE {
+                   GRAPH <http://live-graph.com/graph1> {
+                      ?s ?p ?o .
+                   }
+                   {
+                     SELECT ?s2 WHERE {
+                       GRAPH <http://live-graph.com/graph1> {
+                          ?s2 ?p2 ?o2 .
+                       }
+                     }
+                   }
+                }"]
+
+        (is (= ["http://draft-graph.com/graph1" "http://draft-graph.com/graph1"] (->> (rewrite-sparql-graph-query query graph-map)
+                                                                                      ->sparql-string
+                                                                                      (re-seq #"<(.+)>")
+                                                                                      (map second))))))))
 
 (def uri-query
   "SELECT * WHERE {
