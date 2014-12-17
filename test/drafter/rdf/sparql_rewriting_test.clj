@@ -39,6 +39,9 @@
                                                             (re-find #"<(.+)>")))))))
 
     (testing "multiple graph clauses are substituted"
+      ;; Note that in this test we need to add an additional SELECT to
+      ;; prevent the query being rewritten (optimised) to contain only
+      ;; one graph clause.
       (let [query "SELECT * WHERE {
                    GRAPH <http://live-graph.com/graph1> {
                       ?s ?p ?o .
