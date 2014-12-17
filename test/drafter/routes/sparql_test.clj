@@ -3,7 +3,6 @@
                                          make-store stream->string select-all-in-graph make-graph-live!]]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
-
             [clojure-csv.core :as csv]
             [clojure.data.json :as json]
             [grafter.rdf.repository :as repo]

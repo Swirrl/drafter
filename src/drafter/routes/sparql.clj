@@ -121,7 +121,6 @@
                      :multiple-drafts-error 412)]
         {:status status :body (.getMessage ex)}))))
 
-
 (defn draft-sparql-routes [mount-point repo]
   (routes
    (GET mount-point request
