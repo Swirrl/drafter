@@ -10,6 +10,7 @@
             [drafter.rdf.sparql-rewriting :as rew]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository :refer [->connection with-transaction make-restricted-dataset prepare-update evaluate]]
+            [pantomime.media :as mt]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [org.openrdf.query Dataset]
            [org.openrdf.repository Repository RepositoryConnection]))
@@ -38,7 +39,8 @@
   "Convert a request into an String representing the SPARQL update
   query depending on the content-type."
   (fn [request]
-    (-> request :content-type)))
+    (let [mime (mt/base-type (:content-type request))]
+      (str (.getType mime) \/ (.getSubtype mime)))))
 
 (defn- read-body [body]
   "Extract the body of the request into a string"
