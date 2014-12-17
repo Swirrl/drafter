@@ -33,16 +33,22 @@
 (defn parse-guid [uri]
   (.replace (str uri) (draft-uri "") ""))
 
+
+
+(defn map-values [f m]
+  (into {} (for [[k v] m] [k (f v)])))
+
 (defn all-drafts [db]
-  (->> (query db (str
-                  "SELECT ?draft ?live WHERE {"
-                  "   GRAPH <" drafter-state-graph "> {"
-                  "     ?draft a <" drafter:DraftGraph "> . "
-                  "     ?live <" drafter:hasDraft "> ?draft . "
-                  "   }"
-                  "}"))
-       (map keywordize-keys)
-       (map (fn [m] (assoc m :guid (parse-guid (:draft m)))))))
+  (doall (->> (query db (str
+                         "SELECT ?draft ?live WHERE {"
+                         "   GRAPH <" drafter-state-graph "> {"
+                         "     ?draft a <" drafter:DraftGraph "> . "
+                         "     ?live <" drafter:hasDraft "> ?draft . "
+                         "   }"
+                         "}"))
+              (map keywordize-keys)
+              (map (partial map-values str))
+              (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
 (defn draft-exists? [db guid]
   (query db
