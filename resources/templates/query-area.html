@@ -1,10 +1,5 @@
-{% extends "templates/base.html" %}
-{% block content %}
-<h1>Query {{ name }}</h1>
-
-<form method="GET" action="{{ endpoint }}">
-
 	<textarea accept-charset="UTF-8" name="query" id="query" rows="20" cols="100" tabindex="1">
+{% block query %}
 PREFIX rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
 PREFIX rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt;
 PREFIX xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt;
@@ -12,14 +7,7 @@ PREFIX xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt;
 SELECT * WHERE {
   ?s ?p ?o .
 } LIMIT 10
-
+{% endblock %}
 	</textarea>
 
-	<input type="hidden" name="utf8" value="✓" />
 	<button class="btn btn-primary" type="submit">Query</button>
-</form>
-
-<h1>Update {{ name }}</h1>
-{% include "templates/update-area.html" %}
-
-{% endblock %}

@@ -4,10 +4,19 @@
 
 <form method="POST" action="/draft/create">
 	<input type="textbox" name="live-graph" value="" size="50" placeholder="http://foo.com/" />
-		<button class="btn btn-primary" type="submit">Create new Draft</button>
+	<button class="btn btn-primary" type="submit">Create new Draft</button>
 </form>
 
-{% include "templates/query.html" %}
+<h1>Query {{ name }}</h1>
+<form method="GET" action="{{ endpoint }}">
+{% include "templates/draft/draft-graphs-list.html" %}
+{% include "templates/query-area.html" %}
+</form>
 
+<h1>Update {{ name }}</h1>
+<form method="POST" action="{{ update-endpoint }}" enctype="application/x-www-form-urlencoded">
+{% include "templates/draft/draft-graphs-list.html" %}
+{% include "templates/update-area.html" %}
+</form>
 
 {% endblock %}

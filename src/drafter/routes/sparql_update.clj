@@ -89,10 +89,15 @@
                        (restrictions-or-f))]
     (when (seq restrictions)
       (make-restricted-dataset :default-graph restrictions
-                                   :union-graph restrictions))))
+                               :union-graph restrictions))))
+
+(defn- lift [g]
+  (if (instance? String g)
+    [g]
+    g))
 
 (defn prepare-restricted-update [repo update-str graphs]
-  (let [restricted-ds (if graphs
+  (let [restricted-ds (if (seq graphs)
                         (resolve-restrictions graphs)
                         (resolve-restrictions (mgmt/live-graphs repo)))]
     (prepare-update repo update-str restricted-ds)))
@@ -113,19 +118,19 @@
                (log/debug "About to execute update-query " preped-update)
                (execute-update conn preped-update))))))
 
-
 (defn draft-update-endpoint
   "Create an update endpoint with draft query rewriting.  Restrictions
   are applied on the basis of the &graphs query parameter."
   ([mount-point repo]
-     (POST mount-point request
-           (with-open [conn (->connection repo)]
-             (let [{:keys [update graphs]} (parse-update-request request)
-                   preped-update (prepare-restricted-update conn update graphs)]
+   (POST mount-point request
+         (with-open [conn (->connection repo)]
+           (let [{:keys [update graphs]} (parse-update-request request)
+                 graphs (lift graphs)
+                 preped-update (prepare-restricted-update conn update graphs)]
 
-               (rew/rewrite-update-request preped-update (mgmt/graph-map conn graphs))
-               (log/debug "Executing update-query " preped-update)
-               (execute-update conn preped-update))))))
+             (rew/rewrite-update-request preped-update (mgmt/graph-map conn graphs))
+             (log/debug "Executing update-query " preped-update)
+             (execute-update conn preped-update))))))
 
 (defn draft-update-endpoint-route [mount-point repo]
   (draft-update-endpoint mount-point repo))

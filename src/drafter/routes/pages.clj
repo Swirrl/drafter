@@ -15,7 +15,7 @@
   (:import [org.openrdf.repository RepositoryConnection]))
 
 (defn query-page [params]
-  (layout/render "query.html" params))
+  (layout/render "query-page.html" params))
 
 (defn draft-management-page [params]
   (layout/render "draft/draft-management.html" params))
@@ -32,8 +32,6 @@
 
 (defn parse-guid [uri]
   (.replace (str uri) (draft-uri "") ""))
-
-
 
 (defn map-values [f m]
   (into {} (for [[k v] m] [k (f v)])))
