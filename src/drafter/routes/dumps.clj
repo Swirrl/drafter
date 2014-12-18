@@ -12,8 +12,12 @@
    (dumps-route mount-path repo nil))
 
   ([mount-path repo restrictions]
-   (GET mount-path {{graph-uri "graph-uri"} :query-params
-                    :as request }
-        (let [construct-request (assoc-in request [:params :query] (str "CONSTRUCT { ?s ?p ?o . } WHERE { GRAPH <" graph-uri "> { ?s ?p ?o . } }"))]
-          (sparql/process-sparql-query repo construct-request
-                                       :graph-restrictions restrictions)))))
+   (GET mount-path {{graph-uri "graph-uri"} :params
+                    :as request}
+        (if-not graph-uri
+          {:status 500 :body "You must supply a graph-uri parameter to specify the graph to dump."}
+
+          (let [construct-request (assoc-in request [:params :query] (str "CONSTRUCT { ?s ?p ?o . } WHERE { GRAPH <" graph-uri "> { ?s ?p ?o . } }"))]
+            (println construct-request)
+            (sparql/process-sparql-query repo construct-request
+                                         :graph-restrictions restrictions))))))
