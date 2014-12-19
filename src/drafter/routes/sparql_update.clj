@@ -114,7 +114,9 @@
            (with-open [conn (->connection repo)]
              (let [{update :update} (parse-update-request request)
                    ;; prepare the update based upon the endpoints restrictions
-                   preped-update (prepare-restricted-update conn update restrictions)]
+                   preped-update (prepare-restricted-update conn update (if (fn? restrictions)
+                                                                          (restrictions)
+                                                                          restrictions))]
                (log/debug "About to execute update-query " preped-update)
                (execute-update conn preped-update))))))
 
