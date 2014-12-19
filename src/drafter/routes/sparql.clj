@@ -107,7 +107,7 @@
   (try
     (let [{:keys [params]} request
           query-str (:query params)
-          graph-uris (log/spy (supplied-drafts repo request))
+          graph-uris (log/spy :info  (supplied-drafts repo request))
           {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo query-str graph-uris)]
 
       (process-sparql-query repo request

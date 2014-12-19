@@ -3,7 +3,7 @@
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes
                                            state-sparql-routes raw-sparql-routes]]
-            [drafter.routes.dumps :refer [dumps-route]]
+            [drafter.routes.dumps :refer [dumps-endpoint]]
             [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
             [drafter.middleware :as middleware]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
@@ -67,15 +67,15 @@
 
                          (live-sparql-routes "/sparql/live" repo)
                          (live-update-endpoint-route "/sparql/live/update" repo)
-                         (dumps-route "/data/live" repo)
+                         (dumps-endpoint (live-sparql-routes "/data/live" repo))
 
                          (raw-sparql-routes "/sparql/raw" repo)
                          (raw-update-endpoint-route "/sparql/raw/update" repo)
-                         (dumps-route "/data/raw" repo)
+                         (dumps-endpoint (raw-sparql-routes "/data/raw" repo))
 
                          (draft-sparql-routes "/sparql/draft" repo)
                          (draft-update-endpoint-route "/sparql/draft/update" repo)
-                         (dumps-route "/data/draft" repo)
+                         (dumps-endpoint (draft-sparql-routes "/data/draft" repo))
 
                          (state-sparql-routes "/sparql/state" repo)
                          (state-update-endpoint-route "/sparql/state/update" repo)
