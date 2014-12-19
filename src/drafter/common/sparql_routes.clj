@@ -5,7 +5,6 @@
             [clojure.set :as set]))
 
 (defn- maybe-merge-with-live [repo union-with-live graphs graphs-with-drafts]
-  (println union-with-live)
   (let [live-graphs (when union-with-live
                       (live-graphs repo))
         supplied-graphs (if (instance? String graphs)
