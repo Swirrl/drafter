@@ -135,7 +135,7 @@ To configure the logging these forms should then contain a call to
 Docker
 ======
 
-Successful drafter builds get built into docker images on dockerhub (hub.docker.com) at `swirrl/drafter`. 
+Successful drafter builds get built into docker images on dockerhub (hub.docker.com) at `swirrl/drafter`.
 
 
 Running the container
@@ -161,7 +161,7 @@ Depending on the server topology, you might want to do one of the following:
 
 * link the drafter container to a client container
 * expose a port to the host server (which you could proxy-to via nginx)
-* use an ambassador container to link over the network 
+* use an ambassador container to link over the network
 
 e.g. (exposing a port to the host server)
 `docker run -d -p 127.0.0.1:<port-to-expose-on-host>:3001 --volumes-from drafter-data --volumes-from drafter-logs --name drafter swirrl/drafter:build_xxx`
@@ -172,9 +172,9 @@ To backup the data
 ------------------
 `docker run --volumes-from drafter-data -v <folder-on-the-host-to-backup-to>:/data-backup ubuntu tar cvf /data-backup/backup.tar /data/drafter-database`
 
-Explanation: this 
+Explanation: this
 
-* creates a new container based on `ubuntu` image, 
+* creates a new container based on `ubuntu` image,
 * mounts the data volume onto it
 * mounts a folder of your choice from the host system into `/data-backup` inside the container
 * inside the container, it tars contents of `/var/lib/drafter-database` (the mounted volume from `drafter-data`) into `/data-backup` volume (which will appear on the mounted host dir).
@@ -293,8 +293,29 @@ For `POST/draft/create`, it will add metadata to the state graph.
 
 For the rest, it will add metadata to the queue :meta (as URI->str) (available via `/queue/peek`)
 
-Drafter Data Model
-==================
+Dumps End Points
+================
+
+For each of its endpoints drafter supports a dumps endpoint, for
+retrieving data in the requested graph serialisation.  The endpoints
+are at the following locations:
+
+`GET /data/draft`
+`GET /data/live`
+`GET /data/raw`
+
+Each of these endpoints supports a `graph-uri` parameter to specify
+which graph you wish to retrieve the data for.
+
+Unlike the others the draft endpoint should be given the live graph
+URI along with `graph` parameters that specify the draft set.  NOTE
+you can supply just the draft graph for the desired live graph.
+
+Any supported graph serialisation can be selected by setting the
+accept header to the desired mime/type e.g. `application/n-triples`.
+
+Data Model
+==========
 
 This is an alternative model to that written up by Ric.  It is
 also different from what I was originally pitching.  The
@@ -348,4 +369,3 @@ Other notes
 Drafter doesn't know the difference between metadata graphs
 and data graphs. It just moves data around and between states.
 That's up to PMD to orchestrate.
-
