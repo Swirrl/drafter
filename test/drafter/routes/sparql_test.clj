@@ -255,7 +255,6 @@
           (let [count-request-as-json (assoc-in count-request [:headers "accept"] "application/sparql-results+json")
                 {status :status headers :headers :as response} (endpoint count-request-as-json)]
 
-            (println count-request-as-json)
             (is (= 200 status))
 
             (is (= "1" (-> response :body stream->string json/read-str
