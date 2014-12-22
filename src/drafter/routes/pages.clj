@@ -7,7 +7,7 @@
             [drafter.util :as util]
             [grafter.rdf :refer [add statements]]
             [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph]]
+            [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph live-graphs]]
             [grafter.rdf.formats :refer [rdf-trig]]
             [grafter.rdf.io :refer [rdf-serializer]]
             [grafter.rdf.repository :refer [query ->connection]]
@@ -56,18 +56,33 @@
               "  }"
               "}")))
 
+(defn data-page [template dumps-endpoint graphs]
+  (layout/render template {:dump-path dumps-endpoint :graphs graphs}))
+
+(def live-dumps-form (partial data-page "dumps-page.html"))
+
+(def draft-dumps-form (partial data-page "draft/dumps-page.html"))
+
 (defn pages-routes [db]
   (routes
    (GET "/" [] (ring.util.response/redirect "/live"))
    (GET "/live" [] (query-page {:endpoint "/sparql/live"
                                 :update-endpoint "/sparql/live/update"
+                                :dump-path "/live/data"
                                 :name "Live" }))
    (GET "/draft" [] (with-open [conn (->connection db)]
                       (draft-management-page {:endpoint "/sparql/draft"
                                               :update-endpoint "/sparql/draft/update"
                                               :name "Draft"
                                               :drafts (all-drafts conn)
+                                              :dump-path "/draft/data"
                                               })))
+
+   (GET "/live/data" request
+        (live-dumps-form "/data/live" (doall (live-graphs db))))
+
+   (GET "/draft/data" request
+        (draft-dumps-form "/data/draft" (doall (all-drafts db))))
 
    (GET "/draft/:guid" [guid]
         (with-open [conn (->connection db)]

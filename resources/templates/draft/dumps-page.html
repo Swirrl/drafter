@@ -1,0 +1,19 @@
+{% extends "templates/base.html" %}
+{% block content %}
+<h1>Dump Data</h1>
+<p>Select a graph to dump your data from.</p>
+
+<form method="GET" action="{{dump-path}}">
+	<ul>
+	{% for graph in graphs %}
+		<div class="radio">
+			<label>
+				<input name="graph-uri" type="radio" value="{{ graph.draft }}">{{ graph.live }}
+				<input name="graph" type="hidden" value="{{ graph.draft }}">
+			</label>
+		</div>
+	{% endfor %}
+	</ul>
+	<button class="btn btn-primary">Dump Graph</button>
+</form>
+{% endblock %}

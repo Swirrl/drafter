@@ -1,6 +1,9 @@
 {% extends "templates/base.html" %}
-
 {% block content %}
+
+{% include "templates/dump-link.html" %}
+
+<br/><br/>
 
 <form method="POST" action="/draft/create">
 	<input type="textbox" name="live-graph" value="" size="50" placeholder="http://foo.com/" />
