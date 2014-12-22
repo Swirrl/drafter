@@ -186,8 +186,10 @@
 
     ;; makes a graph live.
     ;; accepts extra meta- query string params, which are added to queue metadata
-    (PUT "/live" {{graph "graph"} :query-params
-                  query-params :query-params}
+    (PUT "/live" {{graph :graph} :params
+                  query-params :query-params
+                  :as request}
+         (log/info request)
          (with-open [conn (->connection repo)]
            (api-routes/when-params [graph]
                                    (exec-job! state (migrate-graph-live-job conn graph)

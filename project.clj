@@ -14,6 +14,7 @@
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
                  [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [ring-server "0.3.1"]
+                 [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
                  [grafter "0.3.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
 

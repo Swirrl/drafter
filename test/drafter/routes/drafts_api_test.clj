@@ -233,8 +233,8 @@
 
       (let [state (atom {})
             route (graph-management-routes "/graph" *test-db* state)
-            test-request (-> {:uri "/graph/live" :request-method :put}
-                             (add-request-graph draft-graph))
+            test-request (-> {:uri "/graph/live" :request-method :put
+                              :params {:graph draft-graph}})
 
             {:keys [status body headers]} (route test-request)]
 
@@ -255,7 +255,7 @@
             route (graph-management-routes "/graph" *test-db* state)
             test-request {:uri "/graph/live"
                           :request-method :put
-                          :query-params {"graph" [draft-graph-1 draft-graph-2]}}
+                          :params {:graph [draft-graph-1 draft-graph-2]}}
 
             {:keys [status body headers]} (route test-request)]
 

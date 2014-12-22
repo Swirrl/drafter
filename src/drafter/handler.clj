@@ -1,5 +1,6 @@
 (ns drafter.handler
   (:require [compojure.core :refer [defroutes routes]]
+            [ring.middleware.verbs :refer [wrap-verbs]]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes
                                            state-sparql-routes raw-sparql-routes]]
@@ -81,7 +82,8 @@
                          (state-update-endpoint-route "/sparql/state/update" repo)
                          app-routes]
                         ;; add custom middleware here
-                        :middleware [middleware/template-error-page
+                        :middleware [wrap-verbs
+                                     middleware/template-error-page
                                      middleware/log-request]
                         ;; add access rules here
                         :access-rules []
