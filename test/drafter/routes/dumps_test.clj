@@ -30,7 +30,7 @@
     (let [[test-db draft-graph] (make-store-with-draft)]
       (migrate-live! test-db draft-graph)
 
-      (let [dumps (dumps-endpoint (sparql-end-point "/data/live" test-db))
+      (let [dumps (dumps-endpoint "/data/live" sparql-end-point test-db)
             response (dumps dumps-request)]
 
         (is (= 2 (count-statements response)))))))
@@ -39,7 +39,7 @@
   (testing "dumps-endpoint with draft endpoint"
     (let [[test-db draft-graph] (make-store-with-draft)]
 
-      (let [dumps (dumps-endpoint (draft-sparql-routes "/data/live" test-db))
+      (let [dumps (dumps-endpoint "/data/live" draft-sparql-routes test-db)
             response (dumps (assoc-in dumps-request [:params :graph] draft-graph))]
 
         (is (= 2 (count-statements response)))))))

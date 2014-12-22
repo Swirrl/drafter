@@ -67,15 +67,15 @@
 
                          (live-sparql-routes "/sparql/live" repo)
                          (live-update-endpoint-route "/sparql/live/update" repo)
-                         (dumps-endpoint (live-sparql-routes "/data/live" repo))
+                         (dumps-endpoint "/data/live" live-sparql-routes repo)
 
                          (raw-sparql-routes "/sparql/raw" repo)
                          (raw-update-endpoint-route "/sparql/raw/update" repo)
-                         (dumps-endpoint (raw-sparql-routes "/data/raw" repo))
+                         (dumps-endpoint "/data/raw" raw-sparql-routes repo)
 
                          (draft-sparql-routes "/sparql/draft" repo)
                          (draft-update-endpoint-route "/sparql/draft/update" repo)
-                         (dumps-endpoint (draft-sparql-routes "/data/draft" repo))
+                         (dumps-endpoint "/data/draft" draft-sparql-routes repo)
 
                          (state-sparql-routes "/sparql/state" repo)
                          (state-update-endpoint-route "/sparql/state/update" repo)

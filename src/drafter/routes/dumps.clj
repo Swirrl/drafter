@@ -5,7 +5,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :as sparql]
             [drafter.routes.sparql :as sp]
-            [compojure.core :refer [let-request]]
+            [compojure.core :refer [GET]]
             [clojure.tools.logging :as log]
             [ring.middleware.accept :refer [wrap-accept]]))
 
@@ -18,14 +18,16 @@
   functionality on a query-rewriting endpoint, a restricted
   endpoint (e.g. only drafter public/live graphs) a raw endpoint, or
   any other."
-  [endpoint-handler]
-  (fn [request]
-    (let [{graph-uri :graph-uri} (:params request)]
-      (if-not graph-uri
-        {:status 500 :body "You must supply a graph-uri parameter to specify the graph to dump."}
+  [mount-path make-endpoint-f repo]
+  (GET mount-path request
+       (let [{graph-uri :graph-uri} (:params request)]
+         (if-not graph-uri
+           {:status 500 :body "You must supply a graph-uri parameter to specify the graph to dump."}
 
-        (let [construct-request (assoc-in request
-                                          [:params :query]
-                                          (str "CONSTRUCT { ?s ?p ?o . } WHERE { GRAPH <" graph-uri "> { ?s ?p ?o . } }"))]
+           (let [construct-request (assoc-in request
+                                             [:params :query]
+                                             (str "CONSTRUCT { ?s ?p ?o . } WHERE { GRAPH <" graph-uri "> { ?s ?p ?o . } }"))
+                 endpoint (make-endpoint-f mount-path repo)]
 
-          (endpoint-handler construct-request))))))
+
+             (endpoint construct-request))))))
