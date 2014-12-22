@@ -10,8 +10,17 @@
 </form>
 
 <h1>Append RDF to Draft</h1>
-<form method="POST" id="" action="/draft?graph={{ draft }}" enctype="multipart/form-data">
-	<input type="file" name="file" />
+<form class="col-sm-4" method="POST" role="form" action="/draft?graph={{ draft }}" enctype="multipart/form-data">
+	<div class="form-group">
+		<select class="form-control" name="content-type">
+			<option value="application/n-triples">application/n-triples</option>
+			<option value="application/rdf+xml">application/rdf+xml</option>
+			<option value="text/turtle">text/turtle</option>
+			<option value="text/n3">text/n3</option>
+		</select>
+		<br/>
+		<input type="file" name="file" />
+	</div>
 	<button class="btn btn-primary" type="submit">Append RDF</button>
 </form>
 

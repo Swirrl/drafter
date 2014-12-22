@@ -110,6 +110,14 @@
         (doseq [g graph]
           (mgmt/migrate-live! repo g))))))
 
+(defn override-file-format
+  "Takes a file object (hash) and if a non-nil file-format is supplied
+  overrides its content-type."
+  [file-format file-obj]
+  (if file-format
+    (assoc file-obj :content-type file-format)
+    file-format))
+
 (defn draft-api-routes [mount-point repo state]
   (routes
    (context
@@ -131,6 +139,7 @@
    ;; accepts extra meta- query string params, which are added to queue metadata
    (routes
     (POST mount-point {{graph "graph" source-graph "source-graph"} :query-params
+                       {content-type :content-type} :params
                        query-params :query-params
                        {file :file} :params}
 
@@ -145,7 +154,7 @@
 
                 (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
                                         (exec-job! state
-                                                   (append-data-to-graph-from-file-job conn graph file metadata)
+                                                   (append-data-to-graph-from-file-job conn graph (override-file-format content-type file) metadata)
                                                    {:job-desc (str "append to graph " graph " from file")
                                                     :meta metadata}))))))
 
@@ -153,6 +162,7 @@
       ;; accepts extra meta- query string params, which are added to queue metadata
 
     (PUT mount-point {{graph "graph" source-graph "source-graph"} :query-params
+                      {content-type :content-type} :params
                       query-params :query-params
                       {file :file} :params}
          (with-open [conn (->connection repo)]
@@ -166,7 +176,7 @@
 
                (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
                                        (exec-job! state
-                                                  (replace-graph-from-file-job conn graph file metadata)
+                                                  (replace-graph-from-file-job conn graph (override-file-format content-type file) metadata)
                                                   {:job-desc (str "replace contents of graph " graph " from file")
                                                    :meta metadata})))))))))
 
