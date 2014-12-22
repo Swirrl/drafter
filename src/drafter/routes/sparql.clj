@@ -6,7 +6,7 @@
             [ring.util.io :as io]
             [compojure.route :refer [not-found]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper wrap-sparql-errors]]
             [drafter.rdf.sparql-rewriting :as rew]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository :as ses]
@@ -122,12 +122,13 @@
         {:status status :body (.getMessage ex)}))))
 
 (defn draft-sparql-routes [mount-point repo]
-  (routes
-   (GET mount-point request
-        (draft-query-endpoint repo request))
+  (wrap-sparql-errors
+   (routes
+    (GET mount-point request
+         (draft-query-endpoint repo request))
 
-   (POST mount-point request
-         (draft-query-endpoint repo request))))
+    (POST mount-point request
+          (draft-query-endpoint repo request)))))
 
 (defn live-sparql-routes [mount-point repo]
   (sparql-end-point mount-point repo (partial mgmt/live-graphs repo)))

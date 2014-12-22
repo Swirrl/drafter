@@ -36,7 +36,7 @@
            [org.openrdf.query.resultio.binary BinaryQueryResultWriter]
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
-           [org.openrdf.query Dataset]
+           [org.openrdf.query Dataset MalformedQueryException]
            [org.openrdf.query.resultio QueryResultWriter]
            [org.openrdf.query.impl DatasetImpl MapBindingSet]
            [javax.xml.datatype XMLGregorianCalendar DatatypeFactory]
@@ -238,23 +238,32 @@
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
     (stream-sparql-response pquery media-type result-rewriter)))
 
+(defn wrap-sparql-errors [handler]
+  (fn [request]
+    (try
+      (handler request)
+      (catch MalformedQueryException ex
+        (let [error-message (.getMessage ex)]
+          (log/info "Malformed query: " error-message)
+          {:status 400 :headers {"Content-Type" "text/plain"} :body error-message})))))
+
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path, a sesame repository and
   an optional restriction function which returns a list of graph uris
   to restrict both the union and named-graph queries too."
 
   ([mount-path repo] (sparql-end-point mount-path repo nil))
-
   ([mount-path repo restrictions]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
-     (routes
-      (GET mount-path request
-           (process-sparql-query repo request
-                                 :graph-restrictions restrictions))
+   (wrap-sparql-errors
+    (routes
+     (GET mount-path request
+          (process-sparql-query repo request
+                                :graph-restrictions restrictions))
 
-      (POST mount-path request
-            (process-sparql-query repo request
-                                  :graph-restrictions restrictions)))))
+     (POST mount-path request
+           (process-sparql-query repo request
+                                 :graph-restrictions restrictions))))))
 
 (comment
 
