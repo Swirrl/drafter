@@ -35,10 +35,10 @@
   (assoc-in request [:query-params (str "meta-" meta-name)] value))
 
 (defn add-request-graph [request graph]
-  (assoc-in request [:query-params "graph"] graph))
+  (assoc-in request [:params :graph] graph))
 
 (defn add-request-source-graph [request source-graph]
-  (assoc-in request [:query-params "source-graph"] source-graph))
+  (assoc-in request [:params :source-graph] source-graph))
 
 (defn add-request-graph-source-graph [request dest-graph source-graph]
   (-> request
@@ -49,6 +49,8 @@
   (-> request
       (add-request-graph dest-graph)
       (add-request-file source-file)))
+
+
 
 (deftest drafts-api-routes-test
   (let [state (atom {})]
@@ -97,6 +99,7 @@
               test-request (-> {:uri "/draft" :request-method :post}
                                (add-request-graph-source-file dest-graph "./test/test-triple.nt"))
 
+              _ (println test-request)
               route (draft-api-routes "/draft" *test-db* state)
               {:keys [status body headers]} (route test-request)]
 

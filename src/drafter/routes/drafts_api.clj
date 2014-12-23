@@ -61,7 +61,6 @@
   [repo graph {:keys [tempfile size filename content-type] :as file} metadata]
   (fn []
     (log/info (str "Appending contents of file " tempfile "[" filename " " size " bytes] to graph: " graph))
-
     (with-transaction repo
                       (mgmt/append-data! repo graph (mimetype->rdf-format content-type)
                                         (:tempfile file)
@@ -116,7 +115,7 @@
   [file-format file-obj]
   (if file-format
     (assoc file-obj :content-type file-format)
-    file-format))
+    file-obj))
 
 (defn draft-api-routes [mount-point repo state]
   (routes
@@ -138,7 +137,7 @@
    ;; adds data to the graph from either source-graph or file
    ;; accepts extra meta- query string params, which are added to queue metadata
    (routes
-    (POST mount-point {{graph "graph" source-graph "source-graph"} :query-params
+    (POST mount-point {{graph :graph source-graph :source-graph} :params
                        {content-type :content-type} :params
                        query-params :query-params
                        {file :file} :params}
@@ -161,7 +160,7 @@
       ;; replaces data in the graph from either source-graph or file
       ;; accepts extra meta- query string params, which are added to queue metadata
 
-    (PUT mount-point {{graph "graph" source-graph "source-graph"} :query-params
+    (PUT mount-point {{graph :graph source-graph :source-graph} :params
                       {content-type :content-type} :params
                       query-params :query-params
                       {file :file} :params}
@@ -184,7 +183,7 @@
   (routes
    ;; deletes data in the graph. This could be a live or a draft graph.
    ;; accepts extra meta- query string params, which are added to queue metadata
-   (DELETE mount-point {{graph "graph"} :query-params
+   (DELETE mount-point {{graph :graph} :params
                         query-params :query-params}
            (with-open [conn (->connection repo)]
              (api-routes/when-params [graph]
