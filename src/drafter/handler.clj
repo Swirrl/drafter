@@ -11,7 +11,7 @@
             [drafter.routes.sparql-update :refer [draft-update-endpoint-route state-update-endpoint-route live-update-endpoint-route raw-update-endpoint-route]]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
-            [selmer.parser :as parser]
+            ;;[selmer.parser :as parser]
             [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri drafter-state-graph]]
             [grafter.rdf.repository :as repo]
             [compojure.handler :only [api]]
@@ -56,7 +56,7 @@
   (register-sparql-extension-functions))
 
 (defroutes app-routes
-  (route/resources "/")
+  (route/resources "/" {:root "dist"})
   (route/not-found "Not Found"))
 
 (defn initialise-app! [repo state]
@@ -117,7 +117,8 @@
   (configure-logging! (io/file (get env :log-config-file "log-config.edn")))
 
   (when (env :dev)
-    (parser/cache-off!))
+    ;;(parser/cache-off!)
+    )
 
   (initialise-services! (get env :drafter-repo-path default-repo-path)
                         (get env :drafter-indexes "spoc,posc,cosp"))

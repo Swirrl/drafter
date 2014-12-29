@@ -1,7 +1,8 @@
 (ns drafter.routes.pages
   (:require [compojure.core :refer [GET routes]]
-            [clojure.walk :refer [keywordize-keys]]
+            [drafter.pages.query-page :refer [query-page all-drafts]]
             [drafter.layout :as layout]
+            [net.cgrand.enlive-html :as en]
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]
             [drafter.util :as util]
@@ -11,17 +12,38 @@
             [grafter.rdf.formats :refer [rdf-trig]]
             [grafter.rdf.io :refer [rdf-serializer]]
             [grafter.rdf.repository :refer [query ->connection]]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [environ.core :refer [env]])
   (:import [org.openrdf.repository RepositoryConnection]))
 
-(defn query-page [params]
-  (layout/render "query-page.html" params))
+(en/deftemplate layout "dist/html/drafter.html"
+  [{:keys [site-name site-url]} body]
+  [:section.masthead :a]
+  (en/do-> (en/set-attr :href site-url)
+           (en/content site-name))
+  [:main :#contents :section]
+  (en/substitute body))
+
+(defn render [nodes]
+  (apply str nodes))
+
+(defn layout-params [env]
+  (let [site-name (or (:drafter-site-name env)
+                      "drafter-site-name")
+        site-url (or (:drafter-site-url env)
+                     "#")]
+    {:site-name site-name :site-url site-url}))
+
+(defn apply-layout [params content]
+  (render (layout (layout-params params) content)))
 
 (defn draft-management-page [params]
-  (layout/render "draft/draft-management.html" params))
+  ;;(layout/render "draft/draft-management.html" params)
+  )
 
 (defn upload-form [params]
-  (layout/render "upload.html" params ))
+  ;;(layout/render "upload.html" params )
+  )
 
 (defn dump-database
   "A convenience function intended for development use.  It will dump
@@ -29,24 +51,6 @@
   databases as it will be loaded into memory."
   [db ostream]
   (add (rdf-serializer ostream :format rdf-trig) (statements db)))
-
-(defn parse-guid [uri]
-  (.replace (str uri) (draft-uri "") ""))
-
-(defn map-values [f m]
-  (into {} (for [[k v] m] [k (f v)])))
-
-(defn all-drafts [db]
-  (doall (->> (query db (str
-                         "SELECT ?draft ?live WHERE {"
-                         "   GRAPH <" drafter-state-graph "> {"
-                         "     ?draft a <" drafter:DraftGraph "> . "
-                         "     ?live <" drafter:hasDraft "> ?draft . "
-                         "   }"
-                         "}"))
-              (map keywordize-keys)
-              (map (partial map-values str))
-              (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
 (defn draft-exists? [db guid]
   (query db
@@ -57,7 +61,8 @@
               "}")))
 
 (defn data-page [template dumps-endpoint graphs]
-  (layout/render template {:dump-path dumps-endpoint :graphs graphs}))
+  ;(layout/render template {:dump-path dumps-endpoint :graphs graphs})
+  )
 
 (def live-dumps-form (partial data-page "dumps-page.html"))
 
@@ -66,10 +71,10 @@
 (defn pages-routes [db]
   (routes
    (GET "/" [] (ring.util.response/redirect "/live"))
-   (GET "/live" [] (query-page {:endpoint "/sparql/live"
-                                :update-endpoint "/sparql/live/update"
-                                :dump-path "/live/data"
-                                :name "Live" }))
+   (GET "/live" [] (apply-layout (merge env {:name "Live"})
+                                 (query-page "Live endpoint" {:action-uri "/sparql/live"
+                                                              :graph-uris []})))
+
    (GET "/draft" [] (with-open [conn (->connection db)]
                       (draft-management-page {:endpoint "/sparql/draft"
                                               :update-endpoint "/sparql/draft/update"

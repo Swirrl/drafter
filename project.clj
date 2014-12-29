@@ -12,10 +12,11 @@
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
-                 [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
+                 [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
-                 [selmer "0.6.9"]
+                 ;;[selmer "0.6.9"]
+                 [enlive "1.1.5"]
                  [grafter "0.3.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
@@ -25,7 +26,7 @@
                   ;; version conflict with this sesame library.  So
                   ;; exclude it, as we're not using it.
 
-                  :exclusions [org.openrdf.sesame/sesame-repository-manager]]
+                  :exclusions [org.openrdf.sesame/sesame-repository-manager commons-codec]]
 
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
@@ -35,7 +36,7 @@
                  [environ "1.0.0"]]
 
   :java-source-paths ["src-java"]
-  :resource-paths ["resources"]
+  :resource-paths ["resources" "girder"]
   :pedantic? :abort
 
   :repl-options {:init-ns drafter.repl
@@ -58,11 +59,11 @@
    :dev {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                    [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
-         :dependencies [[ring-mock "0.1.5"]
+         :dependencies [[ring-mock "0.1.5" :exclusions [commons-codec]]
                         [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
                         [org.clojure/data.json "0.2.5"]
                         [clojure-csv/clojure-csv "2.0.1"]
-                        [ring/ring-devel "1.3.0" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
+                        [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
 
          :env {:dev true}
 
