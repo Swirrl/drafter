@@ -314,6 +314,11 @@ you can supply just the draft graph for the desired live graph.
 Any supported graph serialisation can be selected by setting the
 accept header to the desired mime/type e.g. `application/n-triples`.
 
+Each of these endpoints should additionally support all of the
+behaviours and options of the endpoints that they wrap.  For example
+the drafts dumps end point will inherit support of the drafts endpoint
+`union-with-live` parameter.
+
 Data Model
 ==========
 
