@@ -7,7 +7,30 @@
             [drafter.routes.sparql :as sp]
             [compojure.core :refer [GET]]
             [clojure.tools.logging :as log]
-            [ring.middleware.accept :refer [wrap-accept]]))
+            [ring.middleware.accept :refer [wrap-accept]])
+  (:import [org.openrdf.rio RDFFormat]))
+
+(defn graph-slug [s]
+  (last (clojure.string/split s #"/")))
+
+(defn safe-filename [s]
+  (.replaceAll s "[^a-z,A-Z,0-9]" "-"))
+
+(defn add-file-extension [f accept]
+  (str f (if-let [format (RDFFormat/forMIMEType accept) ]
+           (str "." (.getDefaultFileExtension format))
+           ".nt")))
+
+(defn make-filename [graph-uri mimetype]
+  (-> graph-uri
+      graph-slug
+      safe-filename
+      (add-file-extension mimetype)))
+
+(defn add-content-disposition [response graph-uri mimetype]
+  (let [filename (make-filename graph-uri mimetype)]
+    (assoc-in response [:headers "Content-Disposition"]
+              (str "attachment; filename=\"" filename "\""))))
 
 (defn dumps-endpoint
   "Implemented as a ring middle-ware dumps-endpoint wraps an existing
@@ -27,7 +50,7 @@
            (let [construct-request (assoc-in request
                                              [:params :query]
                                              (str "CONSTRUCT { ?s ?p ?o . } WHERE { GRAPH <" graph-uri "> { ?s ?p ?o . } }"))
-                 endpoint (make-endpoint-f mount-path repo)]
+                 endpoint (make-endpoint-f mount-path repo)
+                 response (endpoint construct-request)]
 
-
-             (endpoint construct-request))))))
+             (add-content-disposition response graph-uri (get-in request [:headers "accept"])))))))

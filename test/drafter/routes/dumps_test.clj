@@ -13,12 +13,12 @@
 
 (def dumps-request {:request-method :get
                     :uri "/data/live"
-                    :params {:graph-uri "http://capybara.com/1"}
+                    :params {:graph-uri "http://capybara.com/capybara-data-1"}
                     :headers {"accept" "application/n-triples"}})
 
 (defn make-store-with-draft []
   (let [test-db (make-store)
-        draft-graph (import-data-to-draft! test-db "http://capybara.com/1" (test-triples "http://test.com/subject-1"))]
+        draft-graph (import-data-to-draft! test-db "http://capybara.com/capybara-data-1" (test-triples "http://test.com/subject-1"))]
     [test-db draft-graph]))
 
 (defn count-statements [response-data]
@@ -33,7 +33,8 @@
       (let [dumps (dumps-endpoint "/data/live" sparql-end-point test-db)
             response (dumps dumps-request)]
 
-        (is (= 2 (count-statements response)))))))
+        (is (= 2 (count-statements response)))
+        (is (= "attachment; filename=\"capybara-data-1.nt\"" (get-in response [:headers "Content-Disposition"])))))))
 
 (deftest dumps-route-draft-test
   (testing "dumps-endpoint with draft endpoint"
