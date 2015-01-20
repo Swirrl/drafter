@@ -39,8 +39,7 @@
   :pedantic? :abort
 
   :repl-options {:init-ns drafter.repl
-                 :init (-main)
-                 :port 5678}
+                 :init (-main)}
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
             [lein-environ "1.0.0"]
