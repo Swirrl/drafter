@@ -1,6 +1,6 @@
 (ns drafter.rdf.draft-management-test
   (:require
-   [drafter.test-common :refer [*test-db* wrap-with-clean-test-db]]
+   [drafter.test-common :refer [*test-db* wrap-with-clean-test-db make-graph-live!]]
    [grafter.rdf :refer [s add add-statement]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.rdf.ontologies.rdf :refer :all]
@@ -29,12 +29,12 @@
                              ["http://test.com/hasProperty" "http://test.com/data/2"]]))
 
 (def test-triples-2 (triplify ["http://test2.com/data/one"
-                             ["http://test2.com/hasProperty" "http://test2.com/data/1"]
-                             ["http://test2.com/hasProperty" "http://test2.com/data/2"]]
+                               ["http://test2.com/hasProperty" "http://test2.com/data/1"]
+                               ["http://test2.com/hasProperty" "http://test2.com/data/2"]]
 
-                            ["http://test2.com/data/two"
-                             ["http://test2.com/hasProperty" "http://test2.com/data/1"]
-                             ["http://test2.com/hasProperty" "http://test2.com/data/2"]]))
+                              ["http://test2.com/data/two"
+                               ["http://test2.com/hasProperty" "http://test2.com/data/1"]
+                               ["http://test2.com/hasProperty" "http://test2.com/data/2"]]))
 
 (def test-graph-uri "http://example.org/my-graph")
 
@@ -67,13 +67,25 @@
 
 (deftest append-data!-test
   (testing "append-data!"
-    (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
+    (testing "on an empty live graph"
+      (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
 
-      (append-data! *test-db* draft-graph-uri test-triples)
+        (append-data! *test-db* draft-graph-uri test-triples)
 
-      (is (ask? "GRAPH <" draft-graph-uri "> {
+        (is (ask? "GRAPH <" draft-graph-uri "> {
                  <http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .
-               }")))))
+               }"))))
+
+    (testing "with live graph with existing data, copies data into draft"
+      (let [live-uri (make-graph-live! *test-db* "http://clones/original/data" (triplify ["http://starting/data" ["http://starting/data" "http://starting/data"]]))
+            draft-graph-uri (create-managed-graph-with-draft! live-uri)]
+
+        (append-data! *test-db* draft-graph-uri test-triples)
+
+        (is (ask? "GRAPH <" draft-graph-uri "> {
+                 <http://starting/data> <http://starting/data> <http://starting/data> .
+                 <http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .
+               }"))))))
 
 (deftest replace-data!-test
   (testing "replace-data!"

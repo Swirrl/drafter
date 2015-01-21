@@ -118,14 +118,35 @@
   (doseq [[meta-name value] metadata]
     (upsert-single-object! db draft-graph-uri meta-name value)))
 
+(defn copy-data-to-live-query [draft-graph-uri]
+  (str
+   "INSERT {"
+   "  GRAPH <" draft-graph-uri "> {"
+   "    ?s ?p ?o ."
+   "  }"
+   "} WHERE { "
+   (with-state-graph
+     "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+     "      <" drafter:hasDraft "> <" draft-graph-uri "> .")
+   "  GRAPH ?live {"
+   "    ?s ?p ?o ."
+   "  }"
+   "}"))
+
 (defn append-data!
   ([db draft-graph-uri triples] (append-data! db draft-graph-uri triples {}))
+
   ([db draft-graph-uri triples metadata]
-     (add-metadata-to-draft db draft-graph-uri metadata)
-     (add db draft-graph-uri triples))
+
+   (add-metadata-to-draft db draft-graph-uri metadata)
+   (update! db (copy-data-to-live-query draft-graph-uri))
+   (add db draft-graph-uri triples))
+
   ([db draft-graph-uri format triple-stream metadata]
-     (add-metadata-to-draft db draft-graph-uri metadata)
-     (add db draft-graph-uri format triple-stream)))
+
+   (add-metadata-to-draft db draft-graph-uri metadata)
+   (update! db (copy-data-to-live-query draft-graph-uri))
+   (add db draft-graph-uri format triple-stream)))
 
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
