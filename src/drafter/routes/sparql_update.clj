@@ -97,9 +97,8 @@
     g))
 
 (defn prepare-restricted-update [repo update-str graphs]
-  (let [restricted-ds (if (seq graphs)
-                        (resolve-restrictions graphs)
-                        (resolve-restrictions (mgmt/live-graphs repo)))]
+  (let [restricted-ds (when (seq graphs)
+                        (resolve-restrictions graphs))]
     (prepare-update repo update-str restricted-ds)))
 
 (defn update-endpoint
