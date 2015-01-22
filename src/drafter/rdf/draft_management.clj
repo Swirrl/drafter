@@ -118,7 +118,7 @@
   (doseq [[meta-name value] metadata]
     (upsert-single-object! db draft-graph-uri meta-name value)))
 
-(defn copy-data-to-live-query [draft-graph-uri]
+(defn- clone-data-from-live-to-draft-query [draft-graph-uri]
   (str
    "INSERT {"
    "  GRAPH <" draft-graph-uri "> {"
@@ -133,19 +133,27 @@
    "  }"
    "}"))
 
+(defn clone-data-from-live-to-draft!
+  "Copy all of the data found in the drafts live graph into the
+  specified draft."
+
+  [repo draft-graph-uri]
+  (log/info "Cloning data from live graph into draft: " draft-graph-uri)
+  (update! repo (clone-data-from-live-to-draft-query draft-graph-uri)))
+
 (defn append-data!
   ([db draft-graph-uri triples] (append-data! db draft-graph-uri triples {}))
 
   ([db draft-graph-uri triples metadata]
 
    (add-metadata-to-draft db draft-graph-uri metadata)
-   (update! db (copy-data-to-live-query draft-graph-uri))
+   (clone-data-from-live-to-draft! db draft-graph-uri)
    (add db draft-graph-uri triples))
 
   ([db draft-graph-uri format triple-stream metadata]
 
    (add-metadata-to-draft db draft-graph-uri metadata)
-   (update! db (copy-data-to-live-query draft-graph-uri))
+   (clone-data-from-live-to-draft! db draft-graph-uri)
    (add db draft-graph-uri format triple-stream)))
 
 (defn set-isPublic! [db live-graph-uri boolean-value]
