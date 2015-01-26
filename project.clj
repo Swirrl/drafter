@@ -16,7 +16,6 @@
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
-                 [com.ontotext/graphdb-se-uberjar "6.1.0"]
 
                  [grafter "0.3.0" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
 
