@@ -1,4 +1,4 @@
-(defproject drafter "0.1.0-SNAPSHOT"
+(defproject drafter "0.1.0"
   :description "Backend PMD service"
   :url "http://example.com/FIXME"
   ;; :repositories [["apache" "https://repository.apache.org/content/repositories/releases/"]
@@ -16,16 +16,15 @@
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
-                 [grafter "0.3.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
+                 [com.ontotext/graphdb-se-uberjar "6.1.0"]
+
+                 [grafter "0.3.0" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
-                 [org.openrdf.sesame/sesame-runtime "2.7.14"
+                 [org.openrdf.sesame/sesame-runtime "2.7.14"]
 
-                  ;; For some reason there appears to be a weird
-                  ;; version conflict with this sesame library.  So
-                  ;; exclude it, as we're not using it.
-
-                  :exclusions [org.openrdf.sesame/sesame-repository-manager]]
+                 ;; [org.openrdf.sesame/sesame-queryrender "2.7.8"]
+                 ;; [org.openrdf.sesame/sesame-runtime "2.7.8"]
 
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
@@ -70,7 +69,7 @@
    }
 
 
-  :jvm-opts ["-Djava.awt.headless=true"]
+  :jvm-opts ["-Djava.awt.headless=true -Dowlim-license=/Users/rick/Software/graphdb-se-6.1-Final/uberjar/GRAPHDB_SE.license"]
   :min-lein-version "2.5.0"
 
   :aot [drafter.repl]
