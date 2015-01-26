@@ -13,7 +13,9 @@
             [compojure.route :as route]
             [selmer.parser :as parser]
             [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri drafter-state-graph]]
+            [grafter.rdf :refer [add statements subject predicate object]]
             [grafter.rdf.repository :as repo]
+            [grafter.rdf.ontologies.rdf :refer :all]
             [compojure.handler :only [api]]
             [environ.core :refer [env]]
             [clojure.tools.logging :as log]
@@ -21,7 +23,12 @@
             [clojure.java.io :as io]
             [clj-logging-config.log4j :refer [set-loggers!]])
   (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
-           [org.apache.log4j.helpers DateLayout]))
+           [org.apache.log4j.helpers DateLayout]
+           [org.openrdf.model.impl GraphImpl URIImpl BNodeImpl]
+           [org.openrdf.repository.manager LocalRepositoryManager]
+           [org.openrdf.repository.sail SailRepository]
+           [org.openrdf.repository.config RepositoryConfig]
+           [com.ontotext.trree OwlimSchemaRepository]))
 
 
 (def default-repo-path "drafter-db")
@@ -48,10 +55,47 @@
                      (pmdfunctions "replace-live-graph")
                      (partial lookup-live-graph-uri repo)))
 
+(comment
+  (defn load-graph-db-config [config-file]
+    (let [config (statements config-file)
+          config-graph (let [g (GraphImpl.)]  ;; Load config into a Graph
+                         (add g config)
+                         g)
+          find-repo-nodes (fn [col] (filter (fn [q] ) config))
+          lrm (LocalRepositoryManager. (io/file "my-repositories-10"))
+          repo-nodes (->> config find-repo-nodes)]
+
+      (.initialize lrm)
+
+      (doseq [q config
+              :when (or (and (= rdf:a (predicate q))
+                             (= "http://www.openrdf.org/config/repository#Repository" (object q))))
+              q2 config
+              :when (and (= (subject q) (subject q2))
+                         (= "http://www.openrdf.org/config/repository#repositoryID" (predicate q2)))]
+
+        (log/info "Registering repo" (object q) "with id: " (subject q))
+        (.addRepositoryConfig lrm (RepositoryConfig/create config-graph (URIImpl. (subject q)))))
+
+      lrm))
+
+  (def local-repo-manager (load-graph-db-config "graph-db.ttl")))
+
+(defn make-native-sesame-repo [repo-path indexes]
+  (let [repo (repo/repo (repo/native-store repo-path indexes))]
+    (log/info "Initialised repo" repo-path)
+    repo))
+
+(defn make-graphdb-repo [repo-path indexes]
+  (doto (SailRepository. (doto (OwlimSchemaRepository.)
+                           (.setParameter "owlim-license" "SWIRRL_GRAPHDB_SE_expires-23-07-2015_latest-23-07-2015_16cores.license")
+                           (.setParameter "storage-folder" repo-path)
+                           (.setParameter "repository-type" "file-repository")
+                           (.setParameter "enable-context-index" "true")))
+    (.initialize)))
+
 (defn initialise-repo! [repo-path indexes]
-  (set-var-root! #'repo (let [repo (repo/repo (repo/native-store repo-path indexes))]
-                          (log/info "Initialised repo" repo-path)
-                          repo))
+  (set-var-root! #'repo (make-graphdb-repo repo-path indexes) )
 
   (register-sparql-extension-functions))
 

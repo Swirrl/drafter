@@ -17,6 +17,7 @@
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
                  [grafter "0.3.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
+                 [com.ontotext/graphdb-se-uberjar "6.1.0"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"

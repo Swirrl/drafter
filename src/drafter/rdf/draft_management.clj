@@ -268,7 +268,6 @@
 
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (do
-      (log/debug (str "Migrating graph: " draft-graph-uri " to live graph: " live-graph-uri))
       (delete-graph-contents! db live-graph-uri)
 
       (let [contents (query db
