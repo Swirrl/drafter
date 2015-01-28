@@ -1,14 +1,13 @@
 (defproject drafter "0.1.0-SNAPSHOT"
   :description "Backend PMD service"
   :url "http://example.com/FIXME"
-  ;; :repositories [["apache" "https://repository.apache.org/content/repositories/releases/"]
-  ;;                ["swirrl-private" {:url "s3p://leiningen-private-repo/releases/"
-  ;;                                   :username :env
-  ;;                                   :passphrase :env}]
-  ;;                ["swirrl-private-snapshots" {:url "s3p://leiningen-private-repo/snapshots/"
-  ;;                                             :username :env
-  ;;                                             :passphrase :env}]
-  ;;                ]
+
+
+  :repositories [["swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"
+                                           :sign-releases false}]
+                 ["swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"
+                                          :sign-releases true
+                                          }]]
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
