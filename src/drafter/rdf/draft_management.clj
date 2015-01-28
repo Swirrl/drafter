@@ -127,12 +127,31 @@
      (add-metadata-to-draft db draft-graph-uri metadata)
      (add db draft-graph-uri format triple-stream)))
 
+(defn set-isPublic
+  [live-graph-uri boolean-value]
+  (upsert-single-object-sparql live-graph-uri drafter:isPublic boolean-value))
+
 (defn set-isPublic! [db live-graph-uri boolean-value]
-  (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
+  (update! db (set-isPublic live-graph-uri boolean-value)))
 
 (defn delete-graph-contents! [db graph-uri]
   (update! db (str "DROP GRAPH <" graph-uri ">"))
   (log/info (str "Deleted graph " graph-uri)))
+
+(defn delete-draft-from-state-sparql
+  "Update operation (query) to remove the draft graph entries from the
+  state graph."
+  [graph-uri]
+  (str "DELETE {"
+       (with-state-graph
+         "?live <" drafter:hasDraft "> <" graph-uri "> . "
+         "<" graph-uri "> ?p ?o . ")
+       "} WHERE {"
+       (with-state-graph
+         "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
+         "<" drafter:hasDraft "> <" graph-uri "> . "
+         "<" graph-uri "> ?p ?o . ")
+       "}"))
 
 ; deletes graph data and the state
 (defn delete-graph-and-draft-state! [db graph-uri]
@@ -140,16 +159,7 @@
 
   ; if the graph-uri is a draft graph uri,
   ;   remove the mention of this draft uri, but leave the live graph as a managed graph.
-  (let [query-str (str "DELETE {"
-                       (with-state-graph
-                         "?live <" drafter:hasDraft "> <" graph-uri "> . "
-                         "<" graph-uri "> ?p ?o . ")
-                       "} WHERE {"
-                       (with-state-graph
-                         "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                               "<" drafter:hasDraft "> <" graph-uri "> . "
-                               "<" graph-uri "> ?p ?o . ")
-                       "}")]
+  (let [query-str (delete-draft-from-state-sparql graph-uri)]
     (update! db
              query-str))
   (log/info (str "Deleted draft graph from state " graph-uri)))
@@ -267,20 +277,12 @@
   [db draft-graph-uri]
 
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
-    (do
-      (delete-graph-contents! db live-graph-uri)
+    (do (update! db (str "MOVE <" draft-graph-uri "> TO <" live-graph-uri "> ; "
+                         (delete-draft-from-state-sparql draft-graph-uri) " ; "
+                         (set-isPublic live-graph-uri true)))
 
-      (let [contents (query db
-                  (str "CONSTRUCT { ?s ?p ?o } WHERE
-                         { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
-
-        (when contents
-          (add db live-graph-uri contents)))
-
-      (delete-graph-and-draft-state! db draft-graph-uri)
-      (set-isPublic! db live-graph-uri true)
-      (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri))
-      live-graph-uri)
+        (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri))
+        live-graph-uri)
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)))))
 
