@@ -25,7 +25,7 @@
   (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
            [org.apache.log4j.helpers DateLayout]
            [org.openrdf.model.impl GraphImpl URIImpl BNodeImpl]
-           [org.openrdf.repository.manager LocalRepositoryManager]
+           ;;[org.openrdf.repository.manager LocalRepositoryManager]
            [org.openrdf.repository.sail SailRepository]
            [org.openrdf.repository.config RepositoryConfig]
            [com.ontotext.trree OwlimSchemaRepository]))
@@ -86,16 +86,21 @@
     (log/info "Initialised repo" repo-path)
     repo))
 
-(defn make-graphdb-repo [repo-path indexes]
+(defn make-graphdb-repo [repo-path]
   (doto (SailRepository. (doto (OwlimSchemaRepository.)
                            (.setParameter "owlim-license" "SWIRRL_GRAPHDB_SE_expires-23-07-2015_latest-23-07-2015_16cores.license")
                            (.setParameter "storage-folder" repo-path)
+                           (.setParameter "ruleset" "empty")
+                           (.setParameter "transaction-mode" "fast")
+                           (.setParameter "enable-literal-index" "false")
                            (.setParameter "repository-type" "file-repository")
-                           (.setParameter "enable-context-index" "true")))
+                           (.setParameter "enable-context-index" "false")))
     (.initialize)))
 
 (defn initialise-repo! [repo-path indexes]
-  (set-var-root! #'repo (make-graphdb-repo repo-path indexes) )
+  (set-var-root! #'repo
+                 ;;(make-native-sesame-repo repo-path indexes)
+                 (make-graphdb-repo repo-path))
 
   (register-sparql-extension-functions))
 
