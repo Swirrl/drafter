@@ -7,16 +7,21 @@
                                            :sign-releases false}]
                  ["swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"
                                           :sign-releases true
-                                          }]]
+                                          }]
+                 ["systap-releases" {:url "http://www.systap.com/maven/releases"}]]
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
-                 [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
+                 [lib-noir "0.8.4" :exclusions [org.clojure/tools.reader org.clojure/java.classpath com.fasterxml.jackson.core/jackson-core com.ibm.icu/icu4j]]
+
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
+
+                 [selmer "0.6.9" :exclusions [com.fasterxml.jackson.core/jackson-core]]
+
                  [grafter "0.3.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
-                 [com.ontotext/graphdb-se-uberjar "6.1.0"]
+                 [com.bigdata/bigdata "1.4.0" :exclusions [commons-io]]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"
@@ -36,6 +41,7 @@
 
   :java-source-paths ["src-java"]
   :resource-paths ["resources"]
+
   :pedantic? :abort
 
   :repl-options {:init-ns drafter.repl

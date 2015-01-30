@@ -18,3 +18,4 @@ user_repl.clj
 /log-config.edn
 .idea/
 drafter.iml
+/bigdata.jnl

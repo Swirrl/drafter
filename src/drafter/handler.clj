@@ -28,7 +28,10 @@
            ;;[org.openrdf.repository.manager LocalRepositoryManager]
            [org.openrdf.repository.sail SailRepository]
            [org.openrdf.repository.config RepositoryConfig]
-           [com.ontotext.trree OwlimSchemaRepository]))
+           [com.bigdata.rdf.sail BigdataSail BigdataSailRepository BigdataSail$Options BigdataSailFactory]
+
+                                        ;[com.ontotext.trree OwlimSchemaRepository]
+           ))
 
 
 (def default-repo-path "drafter-db")
@@ -86,21 +89,39 @@
     (log/info "Initialised repo" repo-path)
     repo))
 
-(defn make-graphdb-repo [repo-path]
-  (doto (SailRepository. (doto (OwlimSchemaRepository.)
-                           (.setParameter "owlim-license" "SWIRRL_GRAPHDB_SE_expires-23-07-2015_latest-23-07-2015_16cores.license")
-                           (.setParameter "storage-folder" repo-path)
-                           (.setParameter "ruleset" "empty")
-                           (.setParameter "transaction-mode" "fast")
-                           (.setParameter "enable-literal-index" "false")
-                           (.setParameter "repository-type" "file-repository")
-                           (.setParameter "enable-context-index" "false")))
-    (.initialize)))
+(defn make-bigdata-repo-1 [repo-path]
+  (let [r (com.bigdata.rdf.sail.BigdataSailFactory/openRepository repo-path true)]
+    (.initialize r)
+    r))
+
+(defn make-bigdata-repo [repo-path]
+  (let [journal (java.io.File/createTempFile "bigdata" ".jnl")
+        config (doto (java.util.Properties.)
+                 (.load (clojure.java.io/reader "bigdata-fastload.properties"))
+                 (.setProperty BigdataSail$Options/FILE (.getAbsolutePath journal))
+                 (.setProperty BigdataSail$Options/ISOLATABLE_INDICES "true"))
+        _ (println config)
+        r (BigdataSailRepository. (BigdataSail. config))]
+    (.initialize r)
+    r))
+
+(comment (defn make-graphdb-repo [repo-path]
+           (doto (SailRepository. (doto (OwlimSchemaRepository.)
+                                    (.setParameter "owlim-license" "SWIRRL_GRAPHDB_SE_expires-23-07-2015_latest-23-07-2015_16cores.license")
+                                    (.setParameter "storage-folder" repo-path)
+                                    (.setParameter "ruleset" "empty")
+                                    (.setParameter "transaction-mode" "fast")
+                                    (.setParameter "enable-literal-index" "false")
+                                    (.setParameter "repository-type" "file-repository")
+                                    (.setParameter "enable-context-index" "false")))
+             (.initialize))))
 
 (defn initialise-repo! [repo-path indexes]
   (set-var-root! #'repo
+                 (make-bigdata-repo repo-path)
                  ;;(make-native-sesame-repo repo-path indexes)
-                 (make-graphdb-repo repo-path))
+                 ;;(make-graphdb-repo repo-path)
+                 )
 
   (register-sparql-extension-functions))
 
