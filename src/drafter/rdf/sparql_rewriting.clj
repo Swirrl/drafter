@@ -189,8 +189,9 @@
   ([repo query-str query-substitutions]
        (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
     ([repo query-str query-substitutions dataset]
-       (let [prepared-query (doto (rewrite-graph-query repo query-str query-substitutions)
-                              (.setDataset dataset))]
+     (let [prepared-query (let [pq (rewrite-graph-query repo query-str query-substitutions)]
+                            (when dataset (.setDataset pq dataset))
+                            pq)]
          (rewrite-graph-results query-substitutions prepared-query))))
 
 (defn rewrite-update-request [preped-update graph-substitutions]

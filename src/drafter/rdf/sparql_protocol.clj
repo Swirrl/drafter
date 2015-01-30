@@ -231,8 +231,9 @@
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
         query-str (:query params)
-        pquery (doto (query-creator-fn db query-str)
-                 (.setDataset restriction))
+        pquery (let [pq (query-creator-fn db query-str)]
+                 (when restriction (.setDataset pq restriction))
+                 pq)
         media-type (negotiate-sparql-query-mime-type pquery request)]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
