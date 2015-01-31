@@ -12,7 +12,9 @@
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
-                 [lib-noir "0.8.4" :exclusions [org.clojure/tools.reader org.clojure/java.classpath com.fasterxml.jackson.core/jackson-core com.ibm.icu/icu4j]]
+                 [lib-noir "0.8.4" :exclusions [org.clojure/tools.reader org.clojure/java.classpath com.fasterxml.jackson.core/jackson-core ;com.ibm.icu/icu4j
+
+                                                ]]
 
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
@@ -20,8 +22,16 @@
 
                  [selmer "0.6.9" :exclusions [com.fasterxml.jackson.core/jackson-core]]
 
-                 [grafter "0.3.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
-                 [com.bigdata/bigdata "1.4.0" :exclusions [commons-io]]
+                 [grafter "0.3.0" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
+                 ;;[com.bigdata/bigdata "1.4.0" :exclusions [commons-io]]
+
+;;                  [com.complexible.stardog/sesame "2.2.4" :exclusions [com.google.protobuf/protobuf-java commons-logging org.apache.httpcomponents/httpclient org.apache.httpcomponents/httpcore com.fasterxml.jackson.core/jackson-core]]
+;; [com.complexible.stardog.protocols.http/client "2.2.4" :exclusions [commons-logging org.apache.httpcomponents/httpclient org.apache.httpcomponents/httpcore com.fasterxml.jackson.core/jackson-core]]
+
+                 [com.complexible.stardog/sesame "2.2.4"]
+                 ;;[com.complexible.stardog.protocols.http/client "2.2.4"]
+                 [com.complexible.stardog.protocols.snarl/client "2.2.4"]
+
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"
@@ -42,7 +52,7 @@
   :java-source-paths ["src-java"]
   :resource-paths ["resources"]
 
-  :pedantic? :abort
+  ;;:pedantic? :abort
 
   :repl-options {:init-ns drafter.repl
                  :init (-main)

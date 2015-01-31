@@ -28,10 +28,8 @@
            ;;[org.openrdf.repository.manager LocalRepositoryManager]
            [org.openrdf.repository.sail SailRepository]
            [org.openrdf.repository.config RepositoryConfig]
-           [com.bigdata.rdf.sail BigdataSail BigdataSailRepository BigdataSail$Options BigdataSailFactory]
-
-                                        ;[com.ontotext.trree OwlimSchemaRepository]
-           ))
+           [com.complexible.stardog.api ConnectionConfiguration]
+           [com.complexible.stardog.sesame StardogRepository]))
 
 
 (def default-repo-path "drafter-db")
@@ -89,21 +87,24 @@
     (log/info "Initialised repo" repo-path)
     repo))
 
-(defn make-bigdata-repo-1 [repo-path]
-  (let [r (com.bigdata.rdf.sail.BigdataSailFactory/openRepository repo-path true)]
-    (.initialize r)
-    r))
+(comment
+  (defn make-bigdata-repo-1 [repo-path]
+    (let [r (com.bigdata.rdf.sail.BigdataSailFactory/openRepository repo-path true)]
+      (.initialize r)
+      r)))
 
-(defn make-bigdata-repo [repo-path]
-  (let [journal (java.io.File/createTempFile "bigdata" ".jnl")
-        config (doto (java.util.Properties.)
-                 (.load (clojure.java.io/reader "bigdata-fastload.properties"))
-                 (.setProperty BigdataSail$Options/FILE (.getAbsolutePath journal))
-                 (.setProperty BigdataSail$Options/ISOLATABLE_INDICES "true"))
-        _ (println config)
-        r (BigdataSailRepository. (BigdataSail. config))]
-    (.initialize r)
-    r))
+(comment
+
+  (defn make-bigdata-repo [repo-path]
+    (let [journal (java.io.File/createTempFile "bigdata" ".jnl")
+          config (doto (java.util.Properties.)
+                   (.load (clojure.java.io/reader "bigdata-fastload.properties"))
+                   (.setProperty BigdataSail$Options/FILE (.getAbsolutePath journal))
+                   (.setProperty BigdataSail$Options/ISOLATABLE_INDICES "true"))
+          _ (println config)
+          r (BigdataSailRepository. (BigdataSail. config))]
+      (.initialize r)
+      r)))
 
 (comment (defn make-graphdb-repo [repo-path]
            (doto (SailRepository. (doto (OwlimSchemaRepository.)
@@ -116,9 +117,16 @@
                                     (.setParameter "enable-context-index" "false")))
              (.initialize))))
 
+(defn make-star-dog-repo [repo-path]
+  (StardogRepository. (.. ConnectionConfiguration
+                          (to "performance-tests")
+                          (server "http://localhost:5820/")
+                          (credentials "admin" "admin") )))
+
 (defn initialise-repo! [repo-path indexes]
   (set-var-root! #'repo
-                 (make-bigdata-repo repo-path)
+                 (make-star-dog-repo repo-path)
+                 ;(make-bigdata-repo repo-path)
                  ;;(make-native-sesame-repo repo-path indexes)
                  ;;(make-graphdb-repo repo-path)
                  )
