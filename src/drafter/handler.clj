@@ -120,7 +120,7 @@
     (parser/cache-off!))
 
   (initialise-services! (get env :drafter-repo-path default-repo-path)
-                        (get env :drafter-indexes "spoc,posc,cosp"))
+                        (get env :drafter-indexes "spoc,posc,ospc,cspo,sopc,pcso"))
 
   (log/info "drafter started successfully"))
 

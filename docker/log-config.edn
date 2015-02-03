@@ -2,7 +2,7 @@
      (set-loggers!
        ["org.openrdf" "drafter"]
        {:name "drafter"
-        :level :trace
+        :level :info
         :out (DailyRollingFileAppender.
                (EnhancedPatternLayout. log-pattern)
                "logs/drafter.log" "'.'YYYY-MM")}
