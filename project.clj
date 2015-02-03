@@ -1,14 +1,14 @@
-(defproject drafter "0.1.0-SNAPSHOT"
+(defproject drafter "0.2.0-SNAPSHOT"
   :description "Backend PMD service"
-  :url "http://example.com/FIXME"
-  ;; :repositories [["apache" "https://repository.apache.org/content/repositories/releases/"]
-  ;;                ["swirrl-private" {:url "s3p://leiningen-private-repo/releases/"
-  ;;                                   :username :env
-  ;;                                   :passphrase :env}]
-  ;;                ["swirrl-private-snapshots" {:url "s3p://leiningen-private-repo/snapshots/"
-  ;;                                             :username :env
-  ;;                                             :passphrase :env}]
-  ;;                ]
+  :url "http://github.com/Swirrl/drafter"
+  :license {:name "Proprietary & Commercially Licensed Only"
+            :url "http://swirrl.com/"}
+
+  :repositories [["swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"
+                                           :sign-releases false}]
+                 ["swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"
+                                          :sign-releases true
+                                          }]]
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
@@ -16,16 +16,14 @@
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
-                 [grafter "0.3.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
+
+                 [grafter "0.3.0" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
-                 [org.openrdf.sesame/sesame-runtime "2.7.14"
+                 [org.openrdf.sesame/sesame-runtime "2.7.14"]
 
-                  ;; For some reason there appears to be a weird
-                  ;; version conflict with this sesame library.  So
-                  ;; exclude it, as we're not using it.
-
-                  :exclusions [org.openrdf.sesame/sesame-repository-manager]]
+                 ;; [org.openrdf.sesame/sesame-queryrender "2.7.8"]
+                 ;; [org.openrdf.sesame/sesame-runtime "2.7.8"]
 
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
@@ -70,7 +68,7 @@
    }
 
 
-  :jvm-opts ["-Djava.awt.headless=true"]
+  :jvm-opts ["-Djava.awt.headless=true -Dowlim-license=/Users/rick/Software/graphdb-se-6.1-Final/uberjar/GRAPHDB_SE.license"]
   :min-lein-version "2.5.0"
 
   :aot [drafter.repl]
