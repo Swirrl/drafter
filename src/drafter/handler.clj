@@ -120,7 +120,9 @@
     (parser/cache-off!))
 
   (initialise-services! (get env :drafter-repo-path default-repo-path)
-                        (get env :drafter-indexes "spoc,posc,ospc,cspo,sopc,pcso"))
+  ; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
+  ; (but we have to specify 4 char strings, so in some cases last chars don't matter
+                    (get env :drafter-indexes "spoc,pocs,ocsp,cspo,cpos,oscp"))
 
   (log/info "drafter started successfully"))
 
