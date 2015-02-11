@@ -2,6 +2,7 @@
   (:require [ring.util.io :as rio]
             [clojure.string :as str]
             [grafter.rdf.repository :as repo]
+            [drafter.operations :refer :all]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -140,7 +141,35 @@
          ;; No op
          ))))
 
-(defn result-streamer [result-writer-class result-rewriter pquery response-mime-type]
+(defn notifying-query-result-handler [notify-fn inner-handler]
+  (reify
+    TupleQueryResultHandler
+    (handleBoolean [this b]
+      (notify-fn)
+      (.handleBoolean inner-handler b))
+    (handleLinks [this links] (.handleLinks inner-handler links))
+    (startQueryResult [this binding-names] (.startQueryResult inner-handler binding-names))
+    (endQueryResult [this] (.endQueryResult inner-handler))
+    (handleSolution [this binding-set]
+      (notify-fn)
+      (.handleSolution inner-handler binding-set))))
+
+(defn notifying-rdf-handler [notify-fn inner-handler]
+  (reify
+    RDFHandler
+    (startRDF [this]
+      (.startRDF inner-handler))
+    (endRDF [this]
+      (.endRDF inner-handler))
+    (handleNamespace [this prefix uri]
+      (.handleNamespace inner-handler prefix uri))
+    (handleStatement [this statement]
+      (notify-fn)
+      (.handleStatement inner-handler statement))
+    (handleComment [this comment]
+      (.handleComment inner-handler comment))))
+
+(defn result-streamer [result-writer-class result-rewriter pquery response-mime-type result-notify-fn]
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
@@ -154,8 +183,9 @@
                        w))]
         (cond
          (instance? BooleanQuery pquery)
-         (let [result (.evaluate pquery)]
-           (doto writer
+         (let [notifying-handler (notifying-query-result-handler result-notify-fn writer)
+               result (.evaluate pquery)]
+           (doto notifying-handler
              (.handleBoolean result)))
 
          (and (instance? QueryResultWriter writer)
@@ -164,14 +194,16 @@
            ;; Allow CSV and other tabular writers to work with graph
            ;; queries.
            (log/debug "pquery is " pquery " writer is " writer)
-           (.evaluate pquery (result-handler-wrapper writer)))
+           (.evaluate pquery (notifying-rdf-handler result-notify-fn (result-handler-wrapper writer))))
 
          :else
          (do
            ;; Can be either a TupleQuery with QueryResultWriter or a
            ;; GraphQuery with an RDFHandler.
            (log/debug "pquery (default) is " pquery " writer is " writer)
-           (.evaluate pquery writer))))
+           (cond
+            (instance? TupleQuery pquery) (.evaluate pquery (notifying-query-result-handler result-notify-fn writer))
+            (instance? GraphQuery pquery) (.evaluate pquery (notifying-rdf-handler result-notify-fn writer))))))
 
       (catch Exception ex
         ;; Note that if we error here it's now too late to return a
@@ -181,6 +213,8 @@
       (finally
         (.close ostream)))))
 
+(def query-operation-monitor (create-monitor))
+
 (defn get-sparql-response-content-type [mime-type]
   (if (= "text/html" mime-type)
     "text/plain"
@@ -188,12 +222,21 @@
 
 (defn- stream-sparql-response [pquery response-mime-type result-rewriter]
   (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
-    {:status 200
-     :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
-     ;; Designed to work with piped-input-stream this fn will be run
-     ;; in another thread to stream the results to the client.
-     :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
-                                                    pquery response-mime-type))}
+    (let [{:keys [publish] :as query-operation} (create-operation query-operation-monitor)
+          [write-fn input-stream] (connect-piped-output-stream (result-streamer result-writer-class result-rewriter
+                                                                                pquery response-mime-type publish))
+          _ (connect-operation query-operation write-fn)
+
+          ;hard-code query timeouts for now - 30s for each result and 2 minutes for the entire operation
+          query-operation-timeouts (create-timeouts 30000 120000)]
+
+      (submit-operation query-operation query-operation-timeouts)
+      
+      {:status 200
+       :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
+       ;; Designed to work with piped-input-stream this fn will be run
+       ;; in another thread to stream the results to the client.
+       :body input-stream})
     {:status 406
      :headers {"Content-Type" "text/plain"}
      :body (str "Unsupported media-type: " response-mime-type)}))

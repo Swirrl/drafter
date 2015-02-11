@@ -25,7 +25,8 @@
           streamer! (result-streamer SPARQLResultsJSONWriter
                                      nil
                                      preped-query
-                                     "application/sparql-results+json")]
+                                     "application/sparql-results+json"
+                                     (fn []))]
 
       (streamer! baos)
 
