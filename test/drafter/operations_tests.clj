@@ -96,18 +96,26 @@
       (is (= {in-progress1 {}} remaining)))))
 
 (deftest shutdown-monitor-test
-  (testing "owns executor"
+  (testing "cancels all operations"
+    (let [operations (take 4 (repeatedly cancel-only-future))
+          operations-map (into {} (map (fn [o] [(atom o) {}]) operations))
+          monitor {:executor (Executors/newSingleThreadExecutor) :owns-executor true :stop-monitor-fn (fn []) :operations (atom operations-map)}]
+      (shutdown-monitor monitor)
+      (doseq [op operations]
+        (is (= true (.isCancelled op))))))
+  
+  (testing "shutsdown owned executor"
     (let [stopped-monitor (atom false)
           executor (Executors/newSingleThreadExecutor)
-          monitor {:executor executor :owns-executor true :stop-monitor-fn (fn [] (reset! stopped-monitor true))}]
+          monitor {:executor executor :owns-executor true :stop-monitor-fn (fn [] (reset! stopped-monitor true)) :operations (atom {})}]
       (shutdown-monitor monitor)
       (is (= true @stopped-monitor)
           (= true (.isShutdown executor)))))
 
-  (testing "does not own executor"
+  (testing "does not shutdown external executor"
     (let [stopped-monitor (atom false)
           executor (Executors/newSingleThreadExecutor)
-          monitor {:executor executor :owns-executor false :stop-monitor-fn (fn [] (reset! stopped-monitor true))}]
+          monitor {:executor executor :owns-executor false :stop-monitor-fn (fn [] (reset! stopped-monitor true)) :operations (atom {})}]
       (shutdown-monitor monitor)
       (is (= true @stopped-monitor)
           (= false (.isShutdown executor)))
