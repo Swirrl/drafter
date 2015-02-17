@@ -13,6 +13,8 @@
             [compojure.route :as route]
             [selmer.parser :as parser]
             [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri drafter-state-graph]]
+            [drafter.operations :as operations]
+            [drafter.rdf.sparql-protocol :as sproto]
             [grafter.rdf.repository :as repo]
             [compojure.handler :only [api]]
             [environ.core :refer [env]]
@@ -33,6 +35,7 @@
 (def worker)
 
 (def state (atom {})) ; initialize state with an empty hashmap
+(def stop-reaper (fn []))
 
 (defmacro set-var-root! [var form]
   `(alter-var-root ~var (fn [& _#]
@@ -94,7 +97,8 @@
 
 (defn initialise-services! [repo-path indexes]
   (initialise-repo! repo-path indexes)
-  (initialise-app! repo state))
+  (initialise-app! repo state)
+  (set-var-root! #'stop-reaper (operations/start-reaper sproto/query-operations 2000)))
 
 (defn- load-logging-configuration [config-file]
   (-> config-file slurp read-string))
@@ -133,4 +137,5 @@
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
   (repo/shutdown repo)
   (future-cancel worker)
+  (stop-reaper)
   (log/info "drafter has shut down."))

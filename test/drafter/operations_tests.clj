@@ -95,39 +95,11 @@
     (testing "should only keep in-progress operations"
       (is (= {in-progress1 {}} remaining)))))
 
-(deftest shutdown-monitor-test
-  (testing "cancels all operations"
-    (let [operations (take 4 (repeatedly cancel-only-future))
-          operations-map (into {} (map (fn [o] [(atom o) {}]) operations))
-          monitor {:executor (Executors/newSingleThreadExecutor) :owns-executor true :stop-monitor-fn (fn []) :operations (atom operations-map)}]
-      (shutdown-monitor monitor)
-      (doseq [op operations]
-        (is (= true (.isCancelled op))))))
-  
-  (testing "shutsdown owned executor"
-    (let [stopped-monitor (atom false)
-          executor (Executors/newSingleThreadExecutor)
-          monitor {:executor executor :owns-executor true :stop-monitor-fn (fn [] (reset! stopped-monitor true)) :operations (atom {})}]
-      (shutdown-monitor monitor)
-      (is (= true @stopped-monitor)
-          (= true (.isShutdown executor)))))
-
-  (testing "does not shutdown external executor"
-    (let [stopped-monitor (atom false)
-          executor (Executors/newSingleThreadExecutor)
-          monitor {:executor executor :owns-executor false :stop-monitor-fn (fn [] (reset! stopped-monitor true)) :operations (atom {})}]
-      (shutdown-monitor monitor)
-      (is (= true @stopped-monitor)
-          (= false (.isShutdown executor)))
-
-      (.shutdown executor))))
-
-(deftest create-monitor-publish-fn-test
+(deftest create-operation-publish-fn-test
   (let [now 200
         key :op
         operations (atom {:op {}})
-        monitor {:clock (fixed-clock now) :operations operations}
-        publish-fn (create-monitor-publish-fn :op monitor)]
+        publish-fn (create-operation-publish-fn :op (fixed-clock now) operations)]
     
     (publish-fn)
 
@@ -139,15 +111,14 @@
     (let [now 100
           result-timeout 200
           operation-timeout 1000
-          operations-map (atom {})
-          monitor {:operations operations-map :clock (fixed-clock now)}
-          {:keys [publish operation-ref] :as operation} (create-operation monitor)]
+          operations (atom {})
+          {:keys [publish operation-ref] :as operation} (create-operation operations (fixed-clock now))]
       (connect-operation operation (fn []))
       (register-operation operation (create-timeouts result-timeout operation-timeout))
 
       (publish)
 
-      (let [last-event (get-in @operations-map [operation-ref :last-event])]
+      (let [last-event (get-in @operations [operation-ref :last-event])]
         (is (= now last-event))))))
 
 (defn current-thread-executor []
@@ -156,12 +127,13 @@
     (execute [_ r] (.run r))))
 
 (deftest submit-operation-test
-  (let [monitor {:executor (current-thread-executor) :clock (fixed-clock 100) :operations (atom {})}
+  (let [operations (atom {})
+        clock (fixed-clock 100)
         ran-op (atom false)
-        operation (create-operation monitor)]
+        operation (create-operation operations clock)]
     
     (connect-operation operation (fn [] (reset! ran-op true)))
-    (submit-operation operation (create-timeouts 100 1000))
+    (submit-operation operation (current-thread-executor) (create-timeouts 100 1000))
 
     (is (= true @ran-op))))
 

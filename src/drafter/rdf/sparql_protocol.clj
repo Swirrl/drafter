@@ -213,25 +213,25 @@
       (finally
         (.close ostream)))))
 
-(def query-operation-monitor (create-monitor))
-
 (defn get-sparql-response-content-type [mime-type]
   (if (= "text/html" mime-type)
     "text/plain"
     mime-type))
 
+(def query-operations (atom {}))
+
 (defn- stream-sparql-response [pquery response-mime-type result-rewriter]
   (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
-    (let [{:keys [publish] :as query-operation} (create-operation query-operation-monitor)
+    (let [{:keys [publish] :as query-operation} (create-operation query-operations)
           [write-fn input-stream] (connect-piped-output-stream (result-streamer result-writer-class result-rewriter
                                                                                 pquery response-mime-type publish))
           _ (connect-operation query-operation write-fn)
 
           ;hard-code query timeouts for now - 60s for each result and 4 minutes for the entire operation
           ;TODO: make this configurable!
-          query-operation-timeouts (create-timeouts 60000 24000)]
+          query-operation-timeouts (create-timeouts 60000 240000)]
 
-      (submit-operation query-operation query-operation-timeouts)
+      (submit-operation query-operation clojure.lang.Agent/soloExecutor query-operation-timeouts)
 
       {:status 200
        :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}

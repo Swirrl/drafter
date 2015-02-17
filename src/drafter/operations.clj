@@ -1,7 +1,6 @@
 (ns drafter.operations
   (:require [taoensso.timbre :as timbre])
-  (:import [java.util.concurrent FutureTask]
-           [java.util.concurrent.atomic AtomicBoolean]
+  (:import [java.util.concurrent FutureTask TimeUnit Executors]
            [java.io PipedInputStream PipedOutputStream]))
 
 (def system-clock {:now-fn #(System/currentTimeMillis) :offset-fn +})
@@ -111,62 +110,45 @@
   (process-categorised (categorise clock operations)))
 
 (defn create-repeating-task-fn
-  "Creates a function which executes a given task function repeatedly while a given flag is set, with a delay between each iteration.
-  Any exceptions thrown by the task function are caught and logged and do not stop the iteration."
-  [^AtomicBoolean flag delay-ms f]
-  (fn []
-    (while (.get flag)
-      (try
-        (do
-          (Thread/sleep delay-ms)
-          (f))
-        (catch Exception ex (timbre/error ex "Error executing task function"))))))
+  "Creates a function which tries to execute the given function and catches and logs any thrown exceptions."
+  [f]
+  #(try (f)
+     (catch Exception ex (timbre/error ex "Error executing task function"))))
 
 (defn repeating-task
   "Creates a starts a new thread which repeatedly executes the given task function with the specified delay between iterations.
-  Returns a no-argument function which can be called to stop the task."
+   Returns a no-argument function which stops the repeating task when called."
   [f delay-ms]
-  (let [flag (AtomicBoolean. true)
-        thread-fn (create-repeating-task-fn flag delay-ms f)
-        thread (Thread. thread-fn)]
-    (.start thread)
-    (fn [] (.set flag false))))
+  (let [executor-service (Executors/newSingleThreadScheduledExecutor)
+        task-future (.scheduleWithFixedDelay executor-service (create-repeating-task-fn f) delay-ms delay-ms TimeUnit/MILLISECONDS)]
+    (fn []
+      (future-cancel task-future)
+      (.shutdown executor-service))))
 
-(defn create-monitor
-  "Creates and starts a monitor with the given clock and ExecutorService. The clock is used to report the time of the last result write
-  for each operation and used to calculate time outs. The ExecutorService is used to execute operation tasks - if owns-executor is true
-  then shutdown-monitor will shutdown the ExecutorService when called. The monitor period is the number of milliseconds between checks
-  for timed-out operations."
-  ([] (create-monitor system-clock clojure.lang.Agent/soloExecutor false 2000))
-  ([clock executor owns-executor monitor-period-ms]
-     (let [operations (atom {})
-           monitor-fn (fn [] (swap! operations #(monitor-operations clock %)))
-           stop-monitor-fn (repeating-task monitor-fn monitor-period-ms)]
-       {:clock clock :executor executor :operations operations :owns-executor owns-executor :stop-monitor-fn stop-monitor-fn})))
+(defn start-reaper
+  "Starts a 'reaper' task to periodically find and cancel timed-out operations inside the given Atom[Map[IDeref[Future], OperationState]].
+   Returns a no-argument function which cancels the reaper task when called."
+  ([operations-atom monitor-period-ms] (start-reaper operations-atom monitor-period-ms system-clock))
+  ([operations-atom monitor-period-ms clock]
+     (let [monitor-fn (fn [] (swap! operations-atom #(monitor-operations clock %)))
+           stop-reaper-fn (repeating-task monitor-fn monitor-period-ms)]
+       stop-reaper-fn)))
 
-(defn shutdown-monitor
-  "Shuts down the given monitor. This cancels all running operations and stops the monitoring operation. If the monitor owns its 
-  ExecutorService it also shuts it down."
-  [{:keys [executor owns-executor stop-monitor-fn operations]}]
-  (cancel-all @operations)
-  (stop-monitor-fn)
-  (if owns-executor
-    (.shutdown executor)))
-
-(defn create-monitor-publish-fn
+(defn create-operation-publish-fn
   "Creates a function which when called publishes the last result write time for the operation according to the given clock."
-  [key {:keys [clock operations]}]
+  [key clock operations]
   (fn []
     (let [event (now-by clock)]
       (swap! operations #(update-latest-operation-event % key event))
       nil)))
 
 (defn create-operation
-  "Creates an unconnected operation on the given monitor."
-  [monitor]
-  (let [task-p (promise)
-        publish-fn (create-monitor-publish-fn task-p monitor)]
-    {:publish publish-fn :operation-ref task-p :monitor monitor}))
+  "Creates an unconnected operation on an operations map with the given clock."
+  ([operations-atom] (create-operation operations-atom system-clock))
+  ([operations-atom clock]
+     (let [task-p (promise)
+           publish-fn (create-operation-publish-fn task-p clock operations-atom)]
+       {:publish publish-fn :operation-ref task-p :clock clock :operations-atom operations-atom})))
 
 (defn connect-operation
   "Connects an operation to the function to execute when submitted. This must be called before submitting the operation."
@@ -186,21 +168,20 @@
 
 (defn register-operation
   "Registers an operation in the operations map with the given timeout periods."
-  [{:keys [monitor operation-ref]} timeouts]
+  [{:keys [clock operation-ref operations-atom]} timeouts]
   {:pre [(realized? operation-ref)]}
-  (let [{:keys [clock operations]} monitor]
-    (letfn [(register [operation-map]
-            (if (contains? operation-map operation-ref)
+  (letfn [(register [operations-map]
+            (if (contains? operations-map operation-ref)
               (throw (IllegalStateException. "Operation already submitted"))
-              (assoc operation-map operation-ref (init-operation-state (now-by clock) timeouts))))]
-      (swap! operations register)))
-  nil)
+              (assoc operations-map operation-ref (init-operation-state (now-by clock) timeouts))))]
+    (swap! operations-atom register)
+    nil))
 
 (defn submit-operation
-  "Submits an operation for execution on its monitor."
-  [{:keys [monitor operation-ref] :as operation} timeouts]
+  "Submits an operation for execution on an ExecutorService."
+  [{:keys [operation-ref] :as operation} executor-service timeouts]
   (register-operation operation timeouts)
-  (.execute (:executor monitor) @operation-ref))
+  (.execute executor-service @operation-ref))
 
 (defn connect-piped-output-stream
   "Creates a no-argument thunk from a function which takes a single OutputStream argument which it writes to when executed.
