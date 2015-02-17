@@ -106,9 +106,6 @@
   (cancel-all timed-out)
   in-progress)
 
-(defn monitor-operations [clock operations]
-  (process-categorised (categorise clock operations)))
-
 (defn create-repeating-task-fn
   "Creates a function which tries to execute the given function and catches and logs any thrown exceptions."
   [f]
@@ -125,13 +122,21 @@
       (future-cancel task-future)
       (.shutdown executor-service))))
 
+(defn create-reaper-fn
+  "Returns a no-argument function which finds inside the operations ref all timed-out and completed operations according to the clock.
+   Any timed-out operations are cancelled while completed operations are removed leaving only the in-progress operations in the map
+   pointed to by the ref."
+  [operations-ref clock]
+  (let [killing-time #(process-categorised (categorise clock %))]
+    #(swap! operations-ref killing-time)))
+
 (defn start-reaper
   "Starts a 'reaper' task to periodically find and cancel timed-out operations inside the given Atom[Map[IDeref[Future], OperationState]].
    Returns a no-argument function which cancels the reaper task when called."
   ([operations-atom monitor-period-ms] (start-reaper operations-atom monitor-period-ms system-clock))
   ([operations-atom monitor-period-ms clock]
-     (let [monitor-fn (fn [] (swap! operations-atom #(monitor-operations clock %)))
-           stop-reaper-fn (repeating-task monitor-fn monitor-period-ms)]
+     (let [reaper-fn (create-reaper-fn operations-atom clock)
+           stop-reaper-fn (repeating-task reaper-fn monitor-period-ms)]
        stop-reaper-fn)))
 
 (defn create-operation-publish-fn

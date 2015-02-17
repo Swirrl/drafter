@@ -7,6 +7,33 @@
 
 (defn fixed-clock [at] {:now-fn (constantly at) :offset-fn +})
 
+(defn cancel-only-future []
+  (let [cancelled (AtomicBoolean. false)
+        invalid-fn (fn [] (throw (RuntimeException. "Can't get result")))]
+    (reify
+      Future
+      (get [_] (invalid-fn))
+      (get [_ timeout unit] (invalid-fn))
+      (isCancelled [_] (.get cancelled))
+      (isDone [_] (.get cancelled))
+      (cancel [_ interrupt?]
+        (.set cancelled true)
+        true))))
+
+(defn completed-future []
+  (reify
+    Future
+    (get [_] nil)
+    (get [_ timeout unit] nil)
+    (isCancelled [_] false)
+    (isDone [_] true)
+    (cancel [_ interrupt?] false)))
+
+(defn current-thread-executor []
+  (reify
+    Executor
+    (execute [_ r] (.run r))))
+
 (deftest max-event-test
   (let [first-result 100
         second-result 200]
@@ -37,28 +64,6 @@
          150 300 true   ;next result exceeded timeout
          1150 1200 true ;next result not timed out but total timeout exceeded
          )))
-
-(defn cancel-only-future []
-  (let [cancelled (AtomicBoolean. false)
-        invalid-fn (fn [] (throw (RuntimeException. "Can't get result")))]
-    (reify
-      Future
-      (get [_] (invalid-fn))
-      (get [_ timeout unit] (invalid-fn))
-      (isCancelled [_] (.get cancelled))
-      (isDone [_] (.get cancelled))
-      (cancel [_ interrupt?]
-        (.set cancelled true)
-        true))))
-
-(defn completed-future []
-  (reify
-    Future
-    (get [_] nil)
-    (get [_ timeout unit] nil)
-    (isCancelled [_] false)
-    (isDone [_] true)
-    (cancel [_ interrupt?] false)))
 
 (deftest get-status-p-test
   (are [operation operation-state timed-out-p expected-state] (= expected-state (get-status-p timed-out-p operation operation-state))
@@ -121,11 +126,6 @@
       (let [last-event (get-in @operations [operation-ref :last-event])]
         (is (= now last-event))))))
 
-(defn current-thread-executor []
-  (reify
-    Executor
-    (execute [_ r] (.run r))))
-
 (deftest submit-operation-test
   (let [operations (atom {})
         clock (fixed-clock 100)
@@ -136,6 +136,28 @@
     (submit-operation operation (current-thread-executor) (create-timeouts 100 1000))
 
     (is (= true @ran-op))))
+
+(deftest reaper-fn-test
+  (let [[task1 task2 task3] (take 3 (repeatedly cancel-only-future))
+        task4 (completed-future)
+        checked-at 1500
+        operations {(atom task1) {:started-at 100 :result-timeout 1000 :operation-timeout 10000}
+                    (atom task2) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :last-event 1400}
+                    (atom task3) {:started-at 100 :result-timeout 500  :operation-timeout 10000 :last-event 1200}
+                    (atom task4) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :last-event 1400}}
+        operations-atom (atom operations)
+        reaper-fn (create-reaper-fn operations-atom (fixed-clock checked-at))]
+
+    (reaper-fn)
+
+    ;task1 has exceeded the last result timeout
+    ;task2 has exceeded the total operation timeout
+    ;task3 has not timed out and is still in progress
+    ;task4 has completed normally
+    (let [survived @operations-atom]
+      (is (= [task3] (vec (map (fn [r] @r) (keys survived)))))
+      (is (.isCancelled task1))
+      (is (.isCancelled task2)))))
 
 (deftest connect-piped-input-stream-test
   (let [msg "Hello world!"
