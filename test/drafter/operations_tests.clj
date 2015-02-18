@@ -34,30 +34,31 @@
     Executor
     (execute [_ r] (.run r))))
 
-(deftest max-event-test
+(deftest max-timestamp-test
   (let [first-result 100
         second-result 200]
-    (are [e1 e2 max] (= max (max-event e1 e2))
+    (are [e1 e2 max] (= max (max-timestamp e1 e2))
          nil first-result first-result
          first-result nil first-result
          first-result second-result second-result
          second-result first-result second-result)))
 
-(deftest update-lastest-operation-event-test
-  (let [operation-map {:op {:last-event 100}}]
-    (testing "should update latest event for known operation"
-      (let [next-event 200
-            updated-map (update-latest-operation-event operation-map :op next-event)]
-        (is (= {:op {:last-event next-event}} updated-map))))
+(deftest update-operation-timestamp-test
+  (let [operation-map {:op {:timestamp 100}}]
+    (testing "should update latest timestamp for known operation"
+      (let [next-timestamp 200
+            updated-map (update-operation-timestamp operation-map :op next-timestamp)]
+        (is (= {:op {:timestamp next-timestamp}} updated-map))))
 
-    (testing "should ignore event for unknown operation"
-      (let [updated-map (update-latest-operation-event operation-map :unknown 300)]
+    (testing "should ignore timestamp for unknown operation"
+      (let [updated-map (update-operation-timestamp operation-map :unknown 300)]
         (is (= operation-map updated-map))))))
 
 (deftest timed-out-test
   (let [initial-state (assoc (create-timeouts 100 1000) :started-at 100)
-        set-last-event (fn [e] (assoc initial-state :last-event e))]
-    (are [last-event now should-be-timed-out?] (= should-be-timed-out? (timed-out? (fixed-clock now) (set-last-event last-event)))
+        set-last-timestamp (fn [e] (assoc initial-state :timestamp e))]
+    (are [timestamp now should-be-timed-out?]
+      (= should-be-timed-out? (timed-out? (fixed-clock now) (set-last-timestamp timestamp)))
          nil 250 true   ;first result exceeded timeout
          nil 150 false  ;first result not yet exceeded timeout
          150 200 false  ;next result not yet exceeded timeout
@@ -69,8 +70,8 @@
   (are [operation operation-state timed-out-p expected-state] (= expected-state (get-status-p timed-out-p operation operation-state))
        (completed-future) {} (constantly true) :completed
        (cancel-only-future) {} (constantly true) :timed-out
-       (cancel-only-future) {:last-event nil} (constantly false) :in-progress
-       (cancel-only-future) {:last-event 200} (constantly false) :in-progress))
+       (cancel-only-future) {:timestamp nil} (constantly false) :in-progress
+       (cancel-only-future) {:timestamp 200} (constantly false) :in-progress))
 
 ;group-by :: [a] -> (a -> k) -> Map[k, [a]]
 (deftest categorise-f-test
@@ -108,11 +109,11 @@
     
     (publish-fn)
 
-    (let [last-event (get-in @operations [:op :last-event])]
-      (is (= now last-event)))))
+    (let [timestamp (get-in @operations [:op :timestamp])]
+      (is (= now timestamp)))))
 
 (deftest register-operation-test
-  (testing "should register operation and publish event"
+  (testing "should register operation and publish timestamp"
     (let [now 100
           result-timeout 200
           operation-timeout 1000
@@ -123,8 +124,8 @@
 
       (publish)
 
-      (let [last-event (get-in @operations [operation-ref :last-event])]
-        (is (= now last-event))))))
+      (let [timestamp (get-in @operations [operation-ref :timestamp])]
+        (is (= now timestamp))))))
 
 (deftest submit-operation-test
   (let [operations (atom {})
@@ -142,9 +143,9 @@
         task4 (completed-future)
         checked-at 1500
         operations {(atom task1) {:started-at 100 :result-timeout 1000 :operation-timeout 10000}
-                    (atom task2) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :last-event 1400}
-                    (atom task3) {:started-at 100 :result-timeout 500  :operation-timeout 10000 :last-event 1200}
-                    (atom task4) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :last-event 1400}}
+                    (atom task2) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :timestamp 1400}
+                    (atom task3) {:started-at 100 :result-timeout 500  :operation-timeout 10000 :timestamp 1200}
+                    (atom task4) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :timestamp 1400}}
         operations-atom (atom operations)
         reaper-fn (create-reaper-fn operations-atom (fixed-clock checked-at))]
 

@@ -11,53 +11,60 @@
   (now-fn))
 
 (defn offset
-  "Gets the time at an offset from an absolute time according to the given clock"
+  "Gets the time at an offset from an absolute time according to the
+  given clock"
   [{:keys [offset-fn]} absolute relative]
   (offset-fn absolute relative))
 
-(defn max-event
-  "Gets the latest of the two given events. A non-nil event is considered later than a nil event."
+(defn max-timestamp
+  "Gets the latest of the two given times. A non-nil time is
+  considered later than a nil time."
   [t1 t2]
   (if (nil? (and t1 t2))
     (or t1 t2)
     (max t1 t2)))
 
-(defn combine-events
-  "Finds the latest event between the existing and next for an operation. The next event cannot be nil."
+(defn combine-timestamps
+  "Finds the latest timestamps between the existing and next for an
+  operation. The next timestamp cannot be nil."
   [existing next]
   {:pre [(some? next)]}
-  (max-event existing next))
+  (max-timestamp existing next))
 
-(defn operation-event
-  "Updates the latest event for an operation and returns the new state."
-  [operation-state event]
-  (update-in operation-state [:last-event] #(combine-events % event)))
+(defn update-timestamp
+  "Updates the latest timestamp for an operation and returns the new
+  state."
+  [operation-state timestamp]
+  (update-in operation-state [:timestamp] #(combine-timestamps % timestamp)))
 
-(defn update-latest-operation-event
-  "Updates the latest event for an operation in the operations map. If the operation does not exsist in the map then it is not inserted and the
-  event is ignored."
-  [operations-map operation event]
+(defn update-operation-timestamp
+  "Updates the latest timestamp for an operation in the operations
+  map. If the operation does not exsist in the map then it is not
+  inserted and the timestamp is ignored."
+  [operations-map operation timestamp]
   (if-let [op-state (get operations-map operation)]
-    (update-in operations-map [operation] #(operation-event % event))
+    (update-in operations-map [operation] #(update-timestamp % timestamp))
     (do
-      (timbre/warn "Received event for unknown operation")
+      (timbre/warn "Received timestamp for unknown operation")
       operations-map)))
 
 (defn exceeded-total-time?
-  "Calculates whether the operation has exceeded the total timeout according to the given clock."
+  "Calculates whether the operation has exceeded the total timeout
+  according to the given clock."
   [clock {:keys [operation-timeout started-at]}]
   (let [max-operation-time (offset clock started-at operation-timeout)]
     (> (now-by clock) max-operation-time)))
 
 (defn- exceeded-result-timeout?
-  [clock result-timeout last-result-time]
+  [clock result-timeout last-timestamp]
   (let [now (now-by clock)]
-    (> now (offset clock last-result-time result-timeout))))
+    (> now (offset clock last-timestamp result-timeout))))
 
 (defn exceeded-result-time?
-  "Calculates whether the operation has exceeded the timeout for writing the next result according to the given clock."
-  [clock {:keys [started-at last-event operation-timeout result-timeout]}]
-  (exceeded-result-timeout? clock result-timeout (or last-event started-at)))
+  "Calculates whether the operation has exceeded the timeout for
+  writing the next result according to the given clock."
+  [clock {:keys [started-at timestamp operation-timeout result-timeout]}]
+  (exceeded-result-timeout? clock result-timeout (or timestamp started-at)))
 
 (defn timed-out?
   "Whether an operation has timed out according to a clock."
@@ -66,7 +73,8 @@
       (exceeded-result-time? clock operation-state)))
 
 (defn get-status-p
-  "Gets the status of a query operation given its current state and a predicate for calculating whether it has timed out."
+  "Gets the status of a query operation given its current state and a
+  predicate for calculating whether it has timed out."
   [timed-out-p operation operation-state]
   {:post [(#{:completed, :timed-out, :in-progress} %)]}
   (cond (.isDone operation) :completed
@@ -80,8 +88,10 @@
 
 ;categorise-f :: Map[k, v] -> ((k, v) -> c) -> Map[c, Map[k, v]]
 (defn categorise-f
-  "Categorises the pairs in a map according to the given categorisation function. The categorisation function should partition
-  the pairs in the input map to produce a map of maps where each top-level map contains all pairs in the input with the same
+  "Categorises the pairs in a map according to the given
+  categorisation function. The categorisation function should
+  partition the pairs in the input map to produce a map of maps where
+  each top-level map contains all pairs in the input with the same
   categorisation."
   [operations-map categorise-f]
   (let [grouped (group-by #(apply categorise-f %) operations-map)
@@ -89,32 +99,37 @@
     (into {} merged)))
 
 (defn categorise
-  "Categorises all operations in the operations map according to their status (completed, timed out, in progress) by the given clock"
+  "Categorises all operations in the operations map according to their
+  status (completed, timed out, in progress) by the given clock"
   [clock operations]
   (categorise-f operations (fn [op-ref state] (get-status clock @op-ref state))))
 
 (defn cancel-all
-  "Given a Map[IDeref[Future], a] cancels all the futures in the keys of the map."
+  "Given a Map[IDeref[Future], a] cancels all the futures in the keys
+  of the map."
   [operations]
   (doseq [op (keys operations)]
     (future-cancel @op)))
 
 (defn process-categorised
-  "Given a categorised map (see categorise) of operations, cancels all those that have timed out and returns the map of those still
-  in progress."
+  "Given a categorised map (see categorise) of operations, cancels all
+  those that have timed out and returns the map of those still in
+  progress."
   [{:keys [in-progress completed timed-out]}]
   (cancel-all timed-out)
   in-progress)
 
 (defn create-repeating-task-fn
-  "Creates a function which tries to execute the given function and catches and logs any thrown exceptions."
+  "Creates a function which tries to execute the given function and
+  catches and logs any thrown exceptions."
   [f]
   #(try (f)
      (catch Exception ex (timbre/error ex "Error executing task function"))))
 
 (defn repeating-task
-  "Creates a starts a new thread which repeatedly executes the given task function with the specified delay between iterations.
-   Returns a no-argument function which stops the repeating task when called."
+  "Creates a starts a new thread which repeatedly executes the given
+  task function with the specified delay between iterations. Returns a
+  no-argument function which stops the repeating task when called."
   [f delay-ms]
   (let [executor-service (Executors/newSingleThreadScheduledExecutor)
         task-future (.scheduleWithFixedDelay executor-service (create-repeating-task-fn f) delay-ms delay-ms TimeUnit/MILLISECONDS)]
@@ -123,16 +138,20 @@
       (.shutdown executor-service))))
 
 (defn create-reaper-fn
-  "Returns a no-argument function which finds inside the operations ref all timed-out and completed operations according to the clock.
-   Any timed-out operations are cancelled while completed operations are removed leaving only the in-progress operations in the map
-   pointed to by the ref."
+  "Returns a no-argument function which finds inside the operations
+  ref all timed-out and completed operations according to the
+  clock. Any timed-out operations are cancelled while completed
+  operations are removed leaving only the in-progress operations in
+  the map pointed to by the ref."
   [operations-ref clock]
   (let [killing-time #(process-categorised (categorise clock %))]
     #(swap! operations-ref killing-time)))
 
 (defn start-reaper
-  "Starts a 'reaper' task to periodically find and cancel timed-out operations inside the given Atom[Map[IDeref[Future], OperationState]].
-   Returns a no-argument function which cancels the reaper task when called."
+  "Starts a 'reaper' task to periodically find and cancel timed-out
+  operations inside the given Atom[Map[IDeref[Future],
+  OperationState]]. Returns a no-argument function which cancels the
+  reaper task when called."
   ([operations-atom monitor-period-ms] (start-reaper operations-atom monitor-period-ms system-clock))
   ([operations-atom monitor-period-ms clock]
      (let [reaper-fn (create-reaper-fn operations-atom clock)
@@ -140,15 +159,16 @@
        stop-reaper-fn)))
 
 (defn create-operation-publish-fn
-  "Creates a function which when called publishes the last result write time for the operation according to the given clock."
+  "Creates a function which when called publishes the last result
+  write time for the operation according to the given clock."
   [key clock operations]
   (fn []
-    (let [event (now-by clock)]
-      (swap! operations #(update-latest-operation-event % key event))
-      nil)))
+    (swap! operations #(update-operation-timestamp % key (now-by clock)))
+    nil))
 
 (defn create-operation
-  "Creates an unconnected operation on an operations map with the given clock."
+  "Creates an unconnected operation on an operations map with the
+  given clock."
   ([operations-atom] (create-operation operations-atom system-clock))
   ([operations-atom clock]
      (let [task-p (promise)
@@ -156,7 +176,8 @@
        {:publish publish-fn :operation-ref task-p :clock clock :operations-atom operations-atom})))
 
 (defn connect-operation
-  "Connects an operation to the function to execute when submitted. This must be called before submitting the operation."
+  "Connects an operation to the function to execute when
+  submitted. This must be called before submitting the operation."
   [{task-p :operation-ref} operation-fn]
   {:pre [(not (realized? task-p))]}
   (let [f (FutureTask. operation-fn)]
@@ -189,8 +210,10 @@
   (.execute executor-service @operation-ref))
 
 (defn connect-piped-output-stream
-  "Creates a no-argument thunk from a function which takes a single OutputStream argument which it writes to when executed.
-  Returns a vector containing the thunk for the write operation and the input stream which will be written to by the write operation."
+  "Creates a no-argument thunk from a function which takes a single
+  OutputStream argument which it writes to when executed. Returns a
+  vector containing the thunk for the write operation and the input
+  stream which will be written to by the write operation."
   [func]
   (let [input-stream  (PipedInputStream.)
         output-stream (PipedOutputStream. input-stream)
