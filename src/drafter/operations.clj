@@ -24,14 +24,14 @@
     (or t1 t2)
     (max t1 t2)))
 
-(defn combine-timestamps
+(defn- combine-timestamps
   "Finds the latest timestamps between the existing and next for an
   operation. The next timestamp cannot be nil."
   [existing next]
   {:pre [(some? next)]}
   (max-timestamp existing next))
 
-(defn update-timestamp
+(defn- update-timestamp
   "Updates the latest timestamp for an operation and returns the new
   state."
   [operation-state timestamp]
@@ -48,7 +48,7 @@
       (timbre/warn "Received timestamp for unknown operation")
       operations-map)))
 
-(defn exceeded-total-time?
+(defn- exceeded-total-time?
   "Calculates whether the operation has exceeded the total timeout
   according to the given clock."
   [clock {:keys [operation-timeout started-at]}]
@@ -60,7 +60,7 @@
   (let [now (now-by clock)]
     (> now (offset clock last-timestamp result-timeout))))
 
-(defn exceeded-result-time?
+(defn- exceeded-result-time?
   "Calculates whether the operation has exceeded the timeout for
   writing the next result according to the given clock."
   [clock {:keys [started-at timestamp operation-timeout result-timeout]}]
@@ -81,7 +81,7 @@
         (timed-out-p operation-state) :timed-out
         :else :in-progress))
 
-(defn get-status
+(defn- get-status
   "Gets the status of an operation with respect to a given clock."
   [clock operation operation-state]
   (get-status-p #(timed-out? clock %) operation operation-state))
@@ -104,7 +104,7 @@
   [clock operations]
   (categorise-f operations (fn [op-ref state] (get-status clock @op-ref state))))
 
-(defn cancel-all
+(defn- cancel-all
   "Given a Map[IDeref[Future], a] cancels all the futures in the keys
   of the map."
   [operations]
@@ -119,14 +119,14 @@
   (cancel-all timed-out)
   in-progress)
 
-(defn create-repeating-task-fn
+(defn- create-repeating-task-fn
   "Creates a function which tries to execute the given function and
   catches and logs any thrown exceptions."
   [f]
   #(try (f)
      (catch Exception ex (timbre/error ex "Error executing task function"))))
 
-(defn repeating-task
+(defn- repeating-task
   "Creates a starts a new thread which repeatedly executes the given
   task function with the specified delay between iterations. Returns a
   no-argument function which stops the repeating task when called."
