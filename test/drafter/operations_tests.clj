@@ -133,8 +133,7 @@
         ran-op (atom false)
         operation (create-operation operations clock)]
     
-    (connect-operation operation (fn [] (reset! ran-op true)))
-    (execute-operation operation (create-timeouts 100 1000) (current-thread-executor))
+    (execute-operation operation (fn [] (reset! ran-op true)) (create-timeouts 100 1000) (current-thread-executor))
 
     (is (= true @ran-op))))
 

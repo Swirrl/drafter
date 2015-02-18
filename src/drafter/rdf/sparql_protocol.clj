@@ -223,13 +223,12 @@
     (let [{:keys [publish] :as query-operation} (create-operation)
           [write-fn input-stream] (connect-piped-output-stream (result-streamer result-writer-class result-rewriter
                                                                                 pquery response-mime-type publish))
-          _ (connect-operation query-operation write-fn)
 
           ;hard-code query timeouts for now - 60s for each result and 4 minutes for the entire operation
           ;TODO: make this configurable!
           query-operation-timeouts (create-timeouts 60000 240000)]
 
-      (execute-operation query-operation query-operation-timeouts)
+      (execute-operation query-operation write-fn query-operation-timeouts)
 
       {:status 200
        :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}

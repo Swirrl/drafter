@@ -206,8 +206,9 @@
 
 (defn execute-operation
   "Submits an operation for execution on an ExecutorService."
-  ([operation timeouts] (execute-operation operation timeouts clojure.lang.Agent/soloExecutor))
-  ([{:keys [operation-ref] :as operation} timeouts executor-service]
+  ([operation op-fn timeouts] (execute-operation operation op-fn timeouts clojure.lang.Agent/soloExecutor))
+  ([{:keys [operation-ref] :as operation} op-fn timeouts executor-service]
+     (connect-operation operation op-fn)
      (register-operation operation timeouts)
      (.execute executor-service @operation-ref)))
 
