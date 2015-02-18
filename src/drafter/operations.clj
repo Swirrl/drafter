@@ -3,18 +3,18 @@
   (:import [java.util.concurrent FutureTask TimeUnit Executors]
            [java.io PipedInputStream PipedOutputStream]))
 
-(def system-clock {:now-fn #(System/currentTimeMillis) :offset-fn +})
+(def system-clock {:now-fn #(System/currentTimeMillis)})
 
-(defn now-by
+(defn- now-by
   "Gets the current time according to the given clock"
   [{:keys [now-fn]}]
   (now-fn))
 
-(defn offset
+(defn- offset
   "Gets the time at an offset from an absolute time according to the
   given clock"
-  [{:keys [offset-fn]} absolute relative]
-  (offset-fn absolute relative))
+  [clock absolute relative]
+  (+ absolute relative))
 
 (defn max-timestamp
   "Gets the latest of the two given times. A non-nil time is

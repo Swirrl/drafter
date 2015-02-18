@@ -5,7 +5,7 @@
            [java.nio.charset Charset]
            [java.util.concurrent.atomic AtomicBoolean]))
 
-(defn fixed-clock [at] {:now-fn (constantly at) :offset-fn +})
+(defn fixed-clock [at] {:now-fn (constantly at)})
 
 (defn cancel-only-future []
   (let [cancelled (AtomicBoolean. false)
