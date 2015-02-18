@@ -98,7 +98,7 @@
 (defn initialise-services! [repo-path indexes]
   (initialise-repo! repo-path indexes)
   (initialise-app! repo state)
-  (set-var-root! #'stop-reaper (operations/start-reaper sproto/query-operations 2000)))
+  (set-var-root! #'stop-reaper (operations/start-reaper 2000)))
 
 (defn- load-logging-configuration [config-file]
   (-> config-file slurp read-string))

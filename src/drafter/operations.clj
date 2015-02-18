@@ -137,6 +137,8 @@
       (future-cancel task-future)
       (.shutdown executor-service))))
 
+(def query-operations (atom {}))
+
 (defn create-reaper-fn
   "Returns a no-argument function which finds inside the operations
   ref all timed-out and completed operations according to the
@@ -149,14 +151,12 @@
 
 (defn start-reaper
   "Starts a 'reaper' task to periodically find and cancel timed-out
-  operations inside the given Atom[Map[IDeref[Future],
-  OperationState]]. Returns a no-argument function which cancels the
-  reaper task when called."
-  ([operations-atom monitor-period-ms] (start-reaper operations-atom monitor-period-ms system-clock))
-  ([operations-atom monitor-period-ms clock]
-     (let [reaper-fn (create-reaper-fn operations-atom clock)
-           stop-reaper-fn (repeating-task reaper-fn monitor-period-ms)]
-       stop-reaper-fn)))
+  operations inside the query-operations atom. Returns a no-argument
+  function which cancels the reaper task when called."
+  [monitor-period-ms]
+  (let [reaper-fn (create-reaper-fn query-operations system-clock)
+        stop-reaper-fn (repeating-task reaper-fn monitor-period-ms)]
+    stop-reaper-fn))
 
 (defn create-operation-publish-fn
   "Creates a function which when called publishes the last result
@@ -169,6 +169,7 @@
 (defn create-operation
   "Creates an unconnected operation on an operations map with the
   given clock."
+  ([] (create-operation query-operations))
   ([operations-atom] (create-operation operations-atom system-clock))
   ([operations-atom clock]
      (let [task-p (promise)

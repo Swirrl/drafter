@@ -218,11 +218,9 @@
     "text/plain"
     mime-type))
 
-(def query-operations (atom {}))
-
 (defn- stream-sparql-response [pquery response-mime-type result-rewriter]
   (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
-    (let [{:keys [publish] :as query-operation} (create-operation query-operations)
+    (let [{:keys [publish] :as query-operation} (create-operation)
           [write-fn input-stream] (connect-piped-output-stream (result-streamer result-writer-class result-rewriter
                                                                                 pquery response-mime-type publish))
           _ (connect-operation query-operation write-fn)
