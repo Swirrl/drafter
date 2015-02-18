@@ -203,11 +203,12 @@
     (swap! operations-atom register)
     nil))
 
-(defn submit-operation
+(defn execute-operation
   "Submits an operation for execution on an ExecutorService."
-  [{:keys [operation-ref] :as operation} executor-service timeouts]
-  (register-operation operation timeouts)
-  (.execute executor-service @operation-ref))
+  ([operation timeouts] (execute-operation operation timeouts clojure.lang.Agent/soloExecutor))
+  ([{:keys [operation-ref] :as operation} timeouts executor-service]
+     (register-operation operation timeouts)
+     (.execute executor-service @operation-ref)))
 
 (defn connect-piped-output-stream
   "Creates a no-argument thunk from a function which takes a single

@@ -127,14 +127,14 @@
       (let [timestamp (get-in @operations [operation-ref :timestamp])]
         (is (= now timestamp))))))
 
-(deftest submit-operation-test
+(deftest execute-operation-test
   (let [operations (atom {})
         clock (fixed-clock 100)
         ran-op (atom false)
         operation (create-operation operations clock)]
     
     (connect-operation operation (fn [] (reset! ran-op true)))
-    (submit-operation operation (current-thread-executor) (create-timeouts 100 1000))
+    (execute-operation operation (create-timeouts 100 1000) (current-thread-executor))
 
     (is (= true @ran-op))))
 

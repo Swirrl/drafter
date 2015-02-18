@@ -231,7 +231,7 @@
           ;TODO: make this configurable!
           query-operation-timeouts (create-timeouts 60000 240000)]
 
-      (submit-operation query-operation clojure.lang.Agent/soloExecutor query-operation-timeouts)
+      (execute-operation query-operation query-operation-timeouts)
 
       {:status 200
        :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
