@@ -112,30 +112,19 @@
     (let [timestamp (get-in @operations [:op :timestamp])]
       (is (= now timestamp)))))
 
-(deftest register-operation-test
-  (testing "should register operation and publish timestamp"
-    (let [now 100
-          result-timeout 200
-          operation-timeout 1000
-          operations (atom {})
-          {:keys [publish operation-ref] :as operation} (create-operation operations (fixed-clock now))]
-      (connect-operation operation (fn []))
-      (register-operation operation (create-timeouts result-timeout operation-timeout))
-
-      (publish)
-
-      (let [timestamp (get-in @operations [operation-ref :timestamp])]
-        (is (= now timestamp))))))
-
 (deftest execute-operation-test
   (let [operations (atom {})
-        clock (fixed-clock 100)
+        now 100
+        timeouts (create-timeouts 100 1000)
         ran-op (atom false)
-        operation (create-operation operations clock)]
+        expected-state (assoc timeouts :started-at now)
+        {:keys [operations-atom operation-ref] :as operation} (create-operation operations (fixed-clock now))]
     
-    (execute-operation operation (fn [] (reset! ran-op true)) (create-timeouts 100 1000) (current-thread-executor))
+    (execute-operation operation #(reset! ran-op true) timeouts (current-thread-executor))
 
-    (is (= true @ran-op))))
+    (is (= true @ran-op))
+    (is (= expected-state (get @operations-atom operation-ref)))
+    (is (realized? operation-ref))))
 
 (deftest reaper-fn-test
   (let [[task1 task2 task3] (take 3 (repeatedly cancel-only-future))

@@ -176,41 +176,24 @@
            publish-fn (create-operation-publish-fn task-p clock operations-atom)]
        {:publish publish-fn :operation-ref task-p :clock clock :operations-atom operations-atom})))
 
-(defn connect-operation
-  "Connects an operation to the function to execute when
-  submitted. This must be called before submitting the operation."
-  [{task-p :operation-ref} operation-fn]
-  {:pre [(not (realized? task-p))]}
-  (let [f (FutureTask. operation-fn)]
-    (deliver task-p f)
-    f))
-
-(defn- init-operation-state [started-at timeouts]
-  (assoc timeouts :started-at started-at))
-
 (defn create-timeouts
   "Specifies the timeouts for an operation."
   [result-timeout operation-timeout]
   {:result-timeout result-timeout :operation-timeout operation-timeout})
 
-(defn register-operation
-  "Registers an operation in the operations map with the given timeout periods."
-  [{:keys [clock operation-ref operations-atom]} timeouts]
-  {:pre [(realized? operation-ref)]}
-  (letfn [(register [operations-map]
-            (if (contains? operations-map operation-ref)
-              (throw (IllegalStateException. "Operation already submitted"))
-              (assoc operations-map operation-ref (init-operation-state (now-by clock) timeouts))))]
-    (swap! operations-atom register)
-    nil))
-
 (defn execute-operation
   "Submits an operation for execution on an ExecutorService."
   ([operation op-fn timeouts] (execute-operation operation op-fn timeouts clojure.lang.Agent/soloExecutor))
-  ([{:keys [operation-ref] :as operation} op-fn timeouts executor-service]
-     (connect-operation operation op-fn)
-     (register-operation operation timeouts)
-     (.execute executor-service @operation-ref)))
+  ([{:keys [operation-ref clock operations-atom] :as operation} op-fn timeouts executor]
+     {:pre [(not (realized? operation-ref))]}
+     (let [init-state (assoc timeouts :started-at (now-by clock))
+           fut (FutureTask. op-fn)
+           reg-fn (fn [op-map]
+                    (deliver operation-ref fut)
+                    (.execute executor fut)
+                    (assoc op-map operation-ref init-state))]
+       (swap! operations-atom reg-fn)
+       nil)))
 
 (defn connect-piped-output-stream
   "Creates a no-argument thunk from a function which takes a single
