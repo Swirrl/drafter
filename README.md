@@ -69,6 +69,68 @@ Indexes can be configured via the property `DRAFTER_INDEXES`, we use
 the same default indexes as sesame. `spoc,posc,cosp` which covers all
 possible
 
+Configuring Timeouts
+--------------------
+
+SPARQL queries may require a long time to be evaluated, so to maintain the availability of the server, each SPARQL endpoint
+can be configured with various timeouts. There are two timeouts associated with each running query - the time between
+generated results, and the total time for the entire query. If either of these two timeouts are exceeded by a query, it will
+be cancelled by the server. Each SPARQL route in Drafter may have two associated endpoints - a query endpoint and an update
+endpoint. Therefore there are three elements to the timeouts for each SPARQL query:
+
+* The name of the endpoint
+* Whether the endpoint is for updates or queries
+* The timeouts for the next result and the total operation
+
+By default, all endpoints have a timeout of 60 seconds to produce the next query result, and 4 minutes for the entire operation.
+
+Individual timeouts, or groups of timeouts can be specified by defining an environment variable in a particular format with
+a value for the number of seconds to set the corresponding timeout(s) to. There are three components to the variable name - each
+of these components are optional and if a component is omitted then it matches every timeout for that component. For example if
+the endpoint name is omitted then the timeout applies for every endpoint in the database. The format of variable names is:
+
+    DRAFTER_TIMEOUT[_(UPDATE|QUERY)][_(ENDPOINT_name)][_(RESULT|OPERATION)]
+
+The three components go from most to least specific left-to-right:
+
+1. UPDATE applies to all update endpoints while QUERY to all query endpoints
+2. ENDPOINT\_name applies to the endpoint with name 'name' e.g. ENDPOINT\_LIVE or ENDPOINT\_RAW
+3. RESULT specifies the timeout to produce the next result while OPERATION applies to the entire query operation.
+
+Note that since update queries to not produce intermediate results, specifying UPDATE and RESULT in the same setting has
+no effect and results in a warning being logged.
+
+Multiple timeout variables can be configured at once and these will be applied in order so more specific timeout settings can
+be applied to override more general ones.
+
+### Timeout examples
+
+To set the default timeout across all endpoints to 30 seconds:
+
+    DRAFTER_TIMEOUT=30
+
+To set the result timeout for all queries to 20 seconds:
+
+    DRAFTER_TIMEOUT_RESULT=20
+
+To set the timeout for all live endpoints to 45 seconds:
+
+    DRAFTER_TIMEOUT_ENDPOINT_LIVE=45
+
+To set the result timeout for all queries on the raw endpoint to 2 minutes:
+
+    DRAFTER_TIMEOUT_ENDPOINT_RAW_RESULT=120
+
+To set the default result timeout to 30 seconds and the total timeout for updates on the live endpoint to 1 minute:
+
+    DRAFTER_TIMEOUT_RESULT=30
+    DRAFTER_TIMEOUT_UPDATE_ENDPOINT_LIVE_OPERATION=60
+
+To set the default operation timeout to 50 seconds except the raw endpoint which is 3 minutes:
+
+    DRAFTER_TIMEOUT_OPERATION=50
+	DRAFTER_TIMEOUT_ENDPOINT_RAW_OPERATION=180
+
 Configuring Logging
 -------------------
 
