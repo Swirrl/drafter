@@ -53,54 +53,51 @@
 
 
 (deftest drafts-api-routes-test
-  (let [state (atom {})]
+  (testing "POST /draft/create"
+    (testing "without a live-graph param returns a 400 error"
+      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db*)
+                                           {:uri "/draft/create"
+                                            :request-method :post
+                                            :headers {"accept" "application/json"}})]
+        (is (= 400 status))
+        (is (= :error (body :type)))
+        (is (instance? String (body :msg)))))
 
-    (testing "POST /draft/create"
-      (testing "without a live-graph param returns a 400 error"
-        (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* state)
-                                             {:uri "/draft/create"
-                                              :request-method :post
-                                              :headers {"accept" "application/json"}})]
-          (is (= 400 status))
-          (is (= :error (body :type)))
-          (is (instance? String (body :msg)))))
+    (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
 
-      (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
+      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db*)
+                                           {:uri "/draft/create"
+                                            :request-method :post
+                                            :params {:live-graph test-graph-uri}
+                                            :headers {"accept" "application/json"}})]
+        (is (= 201 status))
+        (is (url? (-> body :guri)))))
 
-        (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* state)
-                                             {:uri "/draft/create"
-                                              :request-method :post
-                                              :params {:live-graph test-graph-uri}
-                                              :headers {"accept" "application/json"}})]
-          (is (= 201 status))
-          (is (url? (-> body :guri)))))
+    (testing (str "with meta data" test-graph-uri " should see meta data stored")
 
-      (testing (str "with meta data" test-graph-uri " should see meta data stored")
+      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db*)
+                                           {:uri "/draft/create"
+                                            :request-method :post
+                                            :params {:live-graph test-graph-uri "meta-foo" "foo" "meta-bar" "bar"}
+                                            :headers {"accept" "application/json"}})]
+        (is (= 201 status))
+        (is (url? (-> body :guri)))
+        (is (repo/query *test-db* (str "ASK WHERE {"
+                                       "  GRAPH <" drafter-state-graph "> {"
+                                       "     ?graph <" (meta-uri "foo") "> ?foo ."
+                                       "     ?graph <" (meta-uri "bar") "> ?bar ."
+                                       "  } "
+                                       "}"))
+            "meta-* params are converted into metadata predicates."))))
 
-        (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* state)
-                                             {:uri "/draft/create"
-                                              :request-method :post
-                                              :params {:live-graph test-graph-uri "meta-foo" "foo" "meta-bar" "bar"}
-                                              :headers {"accept" "application/json"}})]
-          (is (= 201 status))
-          (is (url? (-> body :guri)))
-          (is (repo/query *test-db* (str "ASK WHERE {"
-                                        "  GRAPH <" drafter-state-graph "> {"
-                                        "     ?graph <" (meta-uri "foo") "> ?foo ."
-                                        "     ?graph <" (meta-uri "bar") "> ?bar ."
-                                        "  } "
-                                        "}"))
-              "meta-* params are converted into metadata predicates.")))))
-
-    (testing "POST /draft"
+  (testing "POST /draft"
       (testing "with a file"
-        (let [state (atom {})
-              dest-graph "http://mygraph/graph-to-be-appended-to"
+        (let [dest-graph "http://mygraph/graph-to-be-appended-to"
               test-request (-> {:uri "/draft" :request-method :post}
                                (add-request-graph-source-file dest-graph "./test/test-triple.nt"))
 
               _ (println test-request)
-              route (draft-api-routes "/draft" *test-db* state)
+              route (draft-api-routes "/draft" *test-db*)
               {:keys [status body headers]} (route test-request)]
 
           (testing "returns success"
@@ -111,11 +108,10 @@
             (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
 
       (testing "with an invalid RDF file"
-        (let [state (atom {})
-              test-request (-> {:uri "/draft" :request-method :post}
+        (let [test-request (-> {:uri "/draft" :request-method :post}
                                (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "project.clj"))
 
-              route (draft-api-routes "/draft" *test-db* state)
+              route (draft-api-routes "/draft" *test-db*)
               {:keys [status body headers]} (route test-request)]
 
           (is (= 400 status) "400 Bad Request")))
@@ -123,12 +119,11 @@
       (testing "with a source graph"
         ;; put some data into the source-graph before we begin
         (make-graph-live! *test-db* "http://draft.org/source-graph")
-          (let [state (atom {})
-                dest-graph "http://mygraph/graph-to-be-appended-to"
-                test-request (-> {:uri "/draft" :request-method :post}
-                                 (add-request-graph-source-graph dest-graph "http://draft.org/source-graph"))
-                route (draft-api-routes "/draft" *test-db* state)
-                {:keys [status body headers]} (route test-request)]
+        (let [dest-graph "http://mygraph/graph-to-be-appended-to"
+              test-request (-> {:uri "/draft" :request-method :post}
+                               (add-request-graph-source-graph dest-graph "http://draft.org/source-graph"))
+              route (draft-api-routes "/draft" *test-db*)
+              {:keys [status body headers]} (route test-request)]
 
             (testing "returns success"
               (is (= 200 status))
@@ -144,13 +139,12 @@
       (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
                  "Graph should contain initial state before it is replaced")
 
-      (let [state (atom {})
-            dest-graph "http://mygraph/graph-to-be-replaced"
+      (let [dest-graph "http://mygraph/graph-to-be-replaced"
             test-request (->  {:uri "/draft" :request-method :put}
                               (add-request-graph dest-graph)
                               (add-request-file "./test/test-triple.nt"))
-             route (draft-api-routes "/draft" *test-db* state)
-             {:keys [status body headers]} (route test-request)]
+            route (draft-api-routes "/draft" *test-db*)
+            {:keys [status body headers]} (route test-request)]
 
         (testing "returns success"
               (is (= 200 status))
@@ -170,13 +164,12 @@
         (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
                    "Graph should contain initial state before it is replaced")
 
-        (let [state (atom {})
-              dest-graph "http://mygraph/graph-to-be-replaced"
+        (let [dest-graph "http://mygraph/graph-to-be-replaced"
               test-request (-> {:uri "/draft" :request-method :put}
                                (add-request-graph-source-graph dest-graph "http://draft.org/source-graph"))
 
-               route (draft-api-routes "/draft" *test-db* state)
-               {:keys [status body headers]} (route test-request)]
+              route (draft-api-routes "/draft" *test-db*)
+              {:keys [status body headers]} (route test-request)]
 
           (testing "returns success"
               (is (= 200 status))
@@ -191,12 +184,11 @@
         (is (repo/query *test-db* (str "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-2> ?p ?o . } }"))
                      "Graph should contain initial state before it is replaced")
 
-         (let [state (atom {})
-               dest-graph "http://mygraph/graph-to-be-replaced"
-               test-request (->  {:uri "/draft" :request-method :put}
-                                 (add-request-graph-source-graph dest-graph "http://draft.org/source-graph-x"))
-               route (draft-api-routes "/draft" *test-db* state)
-               {:keys [status body headers]} (route test-request)]
+        (let [dest-graph "http://mygraph/graph-to-be-replaced"
+              test-request (->  {:uri "/draft" :request-method :put}
+                                (add-request-graph-source-graph dest-graph "http://draft.org/source-graph-x"))
+              route (draft-api-routes "/draft" *test-db*)
+              {:keys [status body headers]} (route test-request)]
 
           (testing "returns success"
               (is (= 200 status))
@@ -214,8 +206,7 @@
         (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")
             "Graph should exist before deletion")
 
-        (let [state (atom {})
-              route (graph-management-routes "/graph" *test-db* state)
+        (let [route (graph-management-routes "/graph" *test-db*)
               test-request (-> {:uri "/graph" :request-method :delete}
                                (add-request-graph "http://mygraph/live-graph"))
               {:keys [status body headers]} (route test-request)]
@@ -234,8 +225,7 @@
       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
           "Draft graph should exist before deletion")
 
-      (let [state (atom {})
-            route (graph-management-routes "/graph" *test-db* state)
+      (let [route (graph-management-routes "/graph" *test-db*)
             test-request (-> {:uri "/graph/live" :request-method :put
                               :params {:graph draft-graph}})
 
@@ -254,8 +244,7 @@
     (let [draft-graph-1 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-1" (test-triples "http://test.com/subject-1"))
           draft-graph-2 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-2" (test-triples "http://test.com/subject-1"))]
 
-      (let [state (atom {})
-            route (graph-management-routes "/graph" *test-db* state)
+      (let [route (graph-management-routes "/graph" *test-db*)
             test-request {:uri "/graph/live"
                           :request-method :put
                           :params {:graph [draft-graph-1 draft-graph-2]}}
@@ -285,8 +274,7 @@
 
  (deftest test-name
    (testing "Updating draft graph with metadata"
-     (let [state (atom {})
-           route (draft-api-routes "/draft" *test-db* state)
+     (let [route (draft-api-routes "/draft" *test-db*)
            source-graph-uri (make-graph-live! *test-db* "http://mygraph/source-graph")
            draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
            request (-> {:uri "/draft" :request-method http-method}

@@ -19,7 +19,8 @@
             [clojure.tools.logging :as log]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clj-logging-config.log4j :refer [set-loggers!]])
+            [clj-logging-config.log4j :refer [set-loggers!]]
+            [drafter.write-scheduler :refer [start-writer! stop-writer!]])
   (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
            [org.apache.log4j.helpers DateLayout]))
 
@@ -32,7 +33,8 @@
 
 (def worker)
 
-(def state (atom {})) ; initialize state with an empty hashmap
+(def ^{:doc "A future to control the single write thread that performs database writes."}
+  writer-service)
 
 (defmacro set-var-root! [var form]
   `(alter-var-root ~var (fn [& _#]
@@ -59,12 +61,12 @@
   (route/resources "/")
   (route/not-found "Not Found"))
 
-(defn initialise-app! [repo state]
+(defn initialise-app! [repo]
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         [(pages-routes repo)
-                         (draft-api-routes "/draft" repo state)
-                         (graph-management-routes "/graph" repo state)
+                         (draft-api-routes "/draft" repo)
+                         (graph-management-routes "/graph" repo)
 
                          (live-sparql-routes "/sparql/live" repo)
                          (live-update-endpoint-route "/sparql/live/update" repo)
@@ -92,9 +94,13 @@
                         ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                         :formats [:json-kw :edn])))
 
+(defn initialise-write-service! []
+  (set-var-root! #'writer-service  (start-writer!)))
+
 (defn initialise-services! [repo-path indexes]
   (initialise-repo! repo-path indexes)
-  (initialise-app! repo state))
+  (initialise-write-service!)
+  (initialise-app! repo))
 
 (defn- load-logging-configuration [config-file]
   (-> config-file slurp read-string))
@@ -120,9 +126,10 @@
     (parser/cache-off!))
 
   (initialise-services! (get env :drafter-repo-path default-repo-path)
-  ; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
-  ; (but we have to specify 4 char strings, so in some cases last chars don't matter
-                    (get env :drafter-indexes "spoc,pocs,ocsp,cspo,cpos,oscp"))
+
+                        ;; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
+                        ;; (but we have to specify 4 char strings, so in some cases last chars don't matter
+                        (get env :drafter-indexes "spoc,pocs,ocsp,cspo,cpos,oscp"))
 
   (log/info "drafter started successfully"))
 
@@ -133,4 +140,5 @@
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
   (repo/shutdown repo)
   (future-cancel worker)
+  (stop-writer! writer-service)
   (log/info "drafter has shut down."))
