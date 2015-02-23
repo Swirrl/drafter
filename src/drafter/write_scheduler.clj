@@ -39,6 +39,15 @@
          f
          (promise)))
 
+(defn invalid-rdf-response [job-result]
+  (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
+
+(defn submitted-job-response [job]
+  {:status 202 :body (:id job)})
+
+(defn unknown-error-response [job-result]
+  (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)}))
+
 (defn blocking-response
   "Block and await the delivery of the jobs result.  When it arrives
   return an appropriate HTTP response."
@@ -47,22 +56,19 @@
   (let [job-result @(:value-p job)]
     (condp = (class job-result)
       RDFParseException
-      (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)})
+      (invalid-rdf-response job-result)
 
       clojure.lang.ExceptionInfo
       (if (= :reading-aborted (-> job-result ex-data :type))
-        (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)})
+        (invalid-rdf-response job-result)
         (do
           (log/error "Unknown error " job-result)
-          (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)})))
+          (submitted-job-response job-result)))
 
       Exception
-      (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)})
+      (submitted-job-response job-result)
 
       job-result)))
-
-(defn submitted-job-response [job]
-  {:status 202 :body (:id job)})
 
 (defn submit-job! [job & [metadata]]
   (let [job (with-meta job metadata)]
