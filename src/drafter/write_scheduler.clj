@@ -67,10 +67,11 @@
 (defn submit-job! [job & [metadata]]
   (let [job (with-meta job metadata)]
     (if (= :make-live (:type job))
-      (.add writes-queue (assoc job
-                                :function (fn []
-                                            (with-lock
-                                              ((:function job))))))
+      (do (.add writes-queue (assoc job
+                                    :function (fn []
+                                                (with-lock
+                                                  ((:function job))))))
+          (submitted-job-response job))
       (if (.tryLock global-writes-lock)
         ;; We try the lock, not because we need the lock, but because we
         ;; need to 503/refuse the addition of an item if the lock is
