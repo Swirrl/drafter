@@ -34,17 +34,22 @@
       (.next scanner)
       "")))
 
-(defonce test-writer (start-writer!))
+(declare ^:dynamic *test-writer*)
 
 (defn wrap-with-clean-test-db
+  "Sets up a native store and starts a drafter-writer thread to ensure
+  operations are written.  The writer should be stopped and GC'd when
+  the scope is closed."
   ([test-fn] (wrap-with-clean-test-db identity test-fn))
   ([setup-state-fn test-fn]
+   (binding [*test-db* (repo (native-store test-db-path))
+             *test-writer* (start-writer!)]
      (try
-       (binding [*test-db* (repo (native-store test-db-path))]
-         (setup-state-fn *test-db*)
-         (test-fn))
+       (setup-state-fn *test-db*)
+       (test-fn)
        (finally
-         (fs/delete-dir test-db-path)))))
+         (fs/delete-dir test-db-path)
+         (stop-writer! *test-writer*))))))
 
 (defn make-store []
   (let [store (repo)]
