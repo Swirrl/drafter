@@ -121,7 +121,7 @@
   (create-job :exclusive-write
               (fn []
                 (let [conn (->connection repo)]
-                  (with-transaction
+                  (with-transaction conn
                     (if (instance? String graph)
                       (mgmt/migrate-live! conn graph)
                       (doseq [g graph]
