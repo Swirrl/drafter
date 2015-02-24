@@ -167,8 +167,9 @@
   (update! db (str "DROP GRAPH <" graph-uri ">"))
   (log/info (str "Deleted graph " graph-uri)))
 
-; deletes graph data and the state
-(defn delete-graph-and-draft-state! [db graph-uri]
+(defn delete-graph-and-draft-state!
+  "Deletes graph data and the state"
+  [db graph-uri]
   (delete-graph-contents! db graph-uri)
 
   ; if the graph-uri is a draft graph uri,
