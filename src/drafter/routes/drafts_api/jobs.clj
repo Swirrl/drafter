@@ -36,7 +36,8 @@
   (create-job :sync
               (fn []
                 (with-transaction repo
-                  (mgmt/delete-graph-and-draft-state! repo graph)))))
+                  (mgmt/delete-graph-and-draft-state! repo graph))
+                (restapi/api-response 200 nil))))
 
 (defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
@@ -50,7 +51,8 @@
                   (mgmt/replace-data! repo graph (mimetype->rdf-format content-type)
                                       (:tempfile file)
                                       metadata))
-                (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]")))))
+                (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]")))
+              (restapi/api-response 200 {:type :ok})))
 
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
@@ -65,7 +67,8 @@
                     (mgmt/append-data! conn graph (mimetype->rdf-format content-type)
                                        (:tempfile file)
                                        metadata))
-                  (log/info (str "File import (append) complete " tempfile " to graph: " graph))))))
+                  (log/info (str "File import (append) complete " tempfile " to graph: " graph))
+                  (restapi/api-response 200 {:type :ok})))))
 
 (defn append-data-to-graph-from-graph-job
   "Return a job function that adds the triples from the specified named graph to the specified graph"
@@ -81,7 +84,8 @@
                   (with-transaction repo
                     (mgmt/append-data! repo graph source-data metadata))
 
-                  (log/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph))))))
+                  (log/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph))
+                  (restapi/api-response 200 {:type :ok})))))
 
 (defn replace-data-from-graph-job
   "Return a function to replace the specified graph with a graph
@@ -95,7 +99,8 @@
                          { GRAPH <" source-graph "> { ?s ?p ?o } }")
                       source-data (query repo query-str)]
                   (with-transaction repo
-                    (mgmt/delete-graph-and-draft-state! repo graph))))))
+                    (mgmt/delete-graph-and-draft-state! repo graph))
+                  (restapi/api-response 200 {:type :ok})))))
 
 (defn migrate-graph-live-job [repo graph]
   (create-job :make-live
@@ -104,4 +109,5 @@
                   (if (instance? String graph)
                     (mgmt/migrate-live! repo graph)
                     (doseq [g graph]
-                      (mgmt/migrate-live! repo g)))))))
+                      (mgmt/migrate-live! repo g))))
+                (restapi/api-response 200 {:type :ok}))))

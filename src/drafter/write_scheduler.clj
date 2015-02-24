@@ -43,7 +43,7 @@
   (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
 
 (defn submitted-job-response [job]
-  {:status 202 :body (:id job)})
+  {:status 202 :body {:type :ok :id (:id job)}})
 
 (defn unknown-error-response [job-result]
   (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)}))
@@ -91,11 +91,14 @@
               (submitted-job-response job)))
         {:status 503}))))
 
+(def finished-jobs (atom {}))
+
 (defn start-writer! []
   (future
     (log/info "Writer started waiting for tasks")
     (loop [{task-f :function
             type :type
+            job-id :id
             promis :value-p :as job} (.take writes-queue)]
       (try
         ;; leave logging of task up to the task
@@ -103,7 +106,9 @@
           (deliver promis res))
         (catch Exception ex
           (log/warn "A task raised an error delivering error to promise" ex)
-          (deliver promis ex)))
+          (deliver promis {:type :error
+                           :exception ex})))
+      (swap! finished-jobs assoc job-id promis)
       (log/info "Writer waiting for tasks")
       (recur (.take writes-queue)))))
 

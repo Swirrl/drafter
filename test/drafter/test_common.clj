@@ -4,6 +4,7 @@
             [grafter.rdf.templater :refer [triplify]]
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
+            [drafter.write-scheduler :refer [start-writer! stop-writer!]]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function]])
   (:import [java.util Scanner]))
 
@@ -32,6 +33,8 @@
     (if (-> scanner .hasNext)
       (.next scanner)
       "")))
+
+(defonce test-writer (start-writer!))
 
 (defn wrap-with-clean-test-db
   ([test-fn] (wrap-with-clean-test-db identity test-fn))
