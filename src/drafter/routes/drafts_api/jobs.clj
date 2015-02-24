@@ -35,7 +35,7 @@
 
   (create-job :sync
               (fn []
-                (with-transaction repo
+                (with-transaction (->connection repo)
                   (mgmt/delete-graph-and-draft-state! repo graph))
                 (restapi/api-response 200 nil))))
 
@@ -47,7 +47,7 @@
   (create-job :batch
               (fn []
                 (log/info (str "Replacing graph " graph " with contents of file " tempfile "[" filename " " size " bytes]"))
-                (with-transaction repo
+                (with-transaction (->connection repo)
                   (mgmt/replace-data! repo graph (mimetype->rdf-format content-type)
                                       (:tempfile file)
                                       metadata))
@@ -81,7 +81,7 @@
                                       { GRAPH <" source-graph "> { ?s ?p ?o } }")
                       source-data (query repo query-str)]
 
-                  (with-transaction repo
+                  (with-transaction (->connection repo)
                     (mgmt/append-data! repo graph source-data metadata))
 
                   (log/info (str "Graph import complete. Imported contents of " source-graph " to graph: " graph))
@@ -94,7 +94,7 @@
   (create-job :batch
               (fn []
                 (log/info (str "Replacing graph " graph " with contents of graph: " source-graph))
-                (with-transaction repo
+                (with-transaction (->connection repo)
                   ;; TODO might want to batch this operation - though
                   ;; batching graph -> graph copies might be hard if
                   ;; we're also to allow writes in.
@@ -105,7 +105,7 @@
 (defn migrate-graph-live-job [repo graph]
   (create-job :make-live
               (fn []
-                (with-transaction repo
+                (with-transaction (->connection repo)
                   (if (instance? String graph)
                     (mgmt/migrate-live! repo graph)
                     (doseq [g graph]
