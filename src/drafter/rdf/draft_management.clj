@@ -114,9 +114,13 @@
   (let [sparql (upsert-single-object-sparql subject predicate object)]
     (update! db sparql)))
 
-(defn- add-metadata-to-draft [db draft-graph-uri metadata]
+(defn add-metadata-to-graph
+  "Takes a hash-map of metadata key/value pairs and adds them as
+  metadata to the graphs state graph, converting keys into drafter
+  URIs as necessary.  Assumes all values are strings."
+  [db graph-uri metadata]
   (doseq [[meta-name value] metadata]
-    (upsert-single-object! db draft-graph-uri meta-name value)))
+    (upsert-single-object! db graph-uri meta-name value)))
 
 (defn- clone-data-from-live-to-draft-query [draft-graph-uri]
   (str
@@ -146,13 +150,13 @@
 
   ([db draft-graph-uri triples metadata]
 
-   (add-metadata-to-draft db draft-graph-uri metadata)
+   (add-metadata-to-graph db draft-graph-uri metadata)
    (clone-data-from-live-to-draft! db draft-graph-uri)
    (add db draft-graph-uri triples))
 
   ([db draft-graph-uri format triple-stream metadata]
 
-   (add-metadata-to-draft db draft-graph-uri metadata)
+   (add-metadata-to-graph db draft-graph-uri metadata)
    (clone-data-from-live-to-draft! db draft-graph-uri)
    (add db draft-graph-uri format triple-stream)))
 
@@ -188,12 +192,12 @@
 
   ([db draft-graph-uri triples metadata]
    (delete-graph-contents! db draft-graph-uri)
-   (add-metadata-to-draft db draft-graph-uri metadata)
+   (add-metadata-to-graph db draft-graph-uri metadata)
    (add db draft-graph-uri triples))
 
   ([db draft-graph-uri format triples metadata]
    (delete-graph-contents! db draft-graph-uri)
-   (add-metadata-to-draft db draft-graph-uri metadata)
+   (add-metadata-to-graph db draft-graph-uri metadata)
    (add db draft-graph-uri format triples)))
 
 (defn lookup-live-graph [db draft-graph-uri]
@@ -323,6 +327,9 @@
   (let [draft-graph (create-draft-graph! db graph)]
     (add db draft-graph triples)
     draft-graph))
+
+(defn copy-graph [db source destination]
+  (update! db (str "COPY <" source "> TO <" destination ">")))
 
 (defn rename-graph [db old-graph new-graph]
   ;; lookup old-graph

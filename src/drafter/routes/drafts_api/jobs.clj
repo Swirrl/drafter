@@ -93,14 +93,14 @@
   [repo graph source-graph metadata]
   (create-job :batch
               (fn []
-                (log/info (str "Replacing graph " graph " with contents of graph: " source-graph ))
-
-                (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
-                         { GRAPH <" source-graph "> { ?s ?p ?o } }")
-                      source-data (query repo query-str)]
-                  (with-transaction repo
-                    (mgmt/delete-graph-and-draft-state! repo graph))
-                  (restapi/api-response 200 {:type :ok})))))
+                (log/info (str "Replacing graph " graph " with contents of graph: " source-graph))
+                (with-transaction repo
+                  ;; TODO might want to batch this operation - though
+                  ;; batching graph -> graph copies might be hard if
+                  ;; we're also to allow writes in.
+                  (mgmt/copy-graph repo source-graph graph)
+                  (mgmt/add-metadata-to-graph repo graph metadata))
+                (restapi/api-response 200 {:type :ok}))))
 
 (defn migrate-graph-live-job [repo graph]
   (create-job :make-live

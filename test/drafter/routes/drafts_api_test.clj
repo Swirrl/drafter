@@ -203,44 +203,50 @@
 
 (deftest drafts-api-routes-replace-graph-test
   (testing "PUT /draft with a source graph"
+    (testing "when source graph contains data"
+      (let [dest-graph "http://mygraph/graph-to-be-replaced"
+            source-graph "http://draft.org/source-graph-with-initial-data"]
+        (make-graph-live! *test-db* dest-graph)
+        (make-graph-live! *test-db* source-graph (test-triples "http://test.com/subject-2"))
 
-    (let [dest-graph "http://mygraph/graph-to-be-replaced"]
-      (make-graph-live! *test-db* "http://mygraph/graph-to-be-replaced")
-      (make-graph-live! *test-db* "http://draft.org/source-graph" (test-triples "http://test.com/subject-2"))
+        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-1> ?p ?o . } }"))
+            "Graph should contain initial state before it is replaced")
 
-      (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
-          "Graph should contain initial state before it is replaced")
+        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" source-graph "> { <http://test.com/subject-2> ?p ?o . } }"))
+            "Graph should contain initial state before it is replaced")
 
-      (testing "when source graph contains data"
         (let [test-request (-> {:uri "/draft" :request-method :put}
-                               (add-request-graph-source-graph dest-graph "http://draft.org/source-graph"))
+                               (add-request-graph-source-graph dest-graph source-graph))
 
               route (draft-api-routes "/draft" *test-db*)
-              {:keys [status body headers] :as response} (route test-request)]
+              {:keys [body] :as response} (route test-request)]
 
           (job-is-accepted response)
           (await-completion finished-jobs (:id body))
 
           (testing "replaces data in the destination graph with the new data from source"
-            (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }")))))
+            (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }")))))))))
 
-        (testing "when source graph doesn't contain data"
-          ;; what's left from the previous test.
-          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }"))
-              "Graph should contain initial state before it is replaced")
+(deftest drafts-api-routes-replace-with-empty-graph-test
+  (testing "PUT /draft with a source graph"
+    (testing "When source graph doesn't contain data"
 
-          (let [dest-graph "http://mygraph/graph-to-be-replaced"
-                test-request (->  {:uri "/draft" :request-method :put}
-                                  (add-request-graph-source-graph dest-graph "http://draft.org/source-graph-x"))
-                route (draft-api-routes "/draft" *test-db*)
-                {:keys [status body headers] :as response} (route test-request)]
+      (let [dest-graph "http://mygraph/graph-to-be-replaced"
+            source-graph "http://draft.org/empty-source-graph"]
 
-            (job-is-accepted response)
-            (await-completion finished-jobs (:id body))
+        (make-graph-live! *test-db* dest-graph) ;; populate destination graph
 
-            (testing "the job when run deletes contents of the RDF graph"
-              (is (= false (repo/query *test-db* (str  "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }")))
-                  "Destination graph should be deleted"))))))))
+        (let [test-request (->  {:uri "/draft" :request-method :put}
+                                (add-request-graph-source-graph dest-graph source-graph))
+              route (draft-api-routes "/draft" *test-db*)
+              {:keys [body] :as response} (route test-request)]
+
+          (job-is-accepted response)
+          (await-completion finished-jobs (:id body))
+
+          (testing "the job when run deletes contents of the RDF graph"
+            (is (= false (repo/query *test-db* (str  "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }")))
+                "Destination graph should be deleted")))))))
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph"
@@ -307,45 +313,51 @@
 
 (defn metadata-values-sparql [draft-graph-uri name]
   (let [meta-subject (meta-uri name)]
-    (str "SELECT ?o WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> ?o } }")))
+    (str "SELECT ?o WHERE { GRAPH <" drafter-state-graph "> {
+           <" draft-graph-uri "> <" meta-subject "> ?o }"
+        "}")))
 
 (do-template
- [test-name http-method request-mods]
+ [test-name http-method modify-request]
 
  (deftest test-name
    (testing "Updating draft graph with metadata"
-     (let [route (draft-api-routes "/draft" *test-db*)
-           source-graph-uri (make-graph-live! *test-db* "http://mygraph/source-graph")
-           draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
-           request (-> {:uri "/draft" :request-method http-method}
-                       (add-request-metadata "uploaded-by" "test")
-                       (request-mods draft-graph-uri))
+     (testing "Adds metadata"
+       (let [route (draft-api-routes "/draft" *test-db*)
+             source-graph-uri (make-graph-live! *test-db* "http://mygraph/source-graph")
+             draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
 
-           {:keys [status body headers]} (route request)]
+             request (-> {:uri "/draft" :request-method http-method}
+                         (add-request-metadata "uploaded-by" "fido")
+                         (modify-request draft-graph-uri))
 
-       (testing "Request ok"
-         (is (= 202 status)))
+             {:keys [status body]} (route request)]
 
-       (await-completion finished-jobs (:id body))
+         (testing "Accepts job"
+           (is (= 202 status)))
 
-       (testing "Adds metadata"
-         (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "test")]
-           (is (repo/query *test-db* sparql))))
+         (await-completion finished-jobs (:id body))
 
-       (testing "Overwrites metadata"
-         (let [new-request (add-request-metadata request "uploaded-by" "updated")
-               {:keys [status body]} (route new-request)
-               meta-query (metadata-values-sparql draft-graph-uri "uploaded-by")
-               meta-records (repo/query *test-db* meta-query)]
+         (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "fido")]
+           (is (repo/query *test-db* sparql)))
 
-           (testing "Request ok"
-             (is (= 202 status)))
+         (testing "Overwrites metadata"
+           ;; try overwriting the value we've just written i.e. replacing
+           ;; {uploaded-by fido} with {uploaded-by bonzo}
 
-           (await-completion finished-jobs (:id body))
+           (let [new-request (add-request-metadata request "uploaded-by" "bonzo")
+                 {:keys [status body]} (route new-request)]
 
-           (testing "Metadata overwritten"
-             (is (= 1 (count meta-records))
-                 (= "updated" (get (first meta-records) "o")))))))))
+             (testing "Accepts job"
+               (is (= 202 status)))
+
+             (await-completion finished-jobs (:id body))
+
+             (let [meta-query (metadata-values-sparql draft-graph-uri "uploaded-by")
+                   meta-records (repo/query *test-db* meta-query)]
+               (testing "Metadata overwritten"
+                 (is (= 1 (count meta-records))
+                     (= "updated" (get (first meta-records) "o")))))))))))
 
  meta-replace-with-put-graph-test :put (fn [req graph] (add-request-graph-source-graph req graph "http://mygraph/source-graph"))
 
