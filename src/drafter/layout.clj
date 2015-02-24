@@ -1,8 +1,8 @@
 (ns drafter.layout
-  (:require [selmer.parser :as parser]
-            [clojure.string :as s]
+  (:require [clojure.string :as s]
+            [compojure.response :refer [Renderable]]
             [ring.util.response :refer [content-type response]]
-            [compojure.response :refer [Renderable]]))
+            [selmer.parser :as parser]))
 
 (def template-path "templates/")
 

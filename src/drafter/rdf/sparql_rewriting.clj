@@ -1,20 +1,16 @@
 (ns drafter.rdf.sparql-rewriting
-  (:require
-   [grafter.rdf.repository :as repo]
-   [grafter.rdf :refer [prefixer]]
-   [clojure.set :as set]
-   [clojure.tools.logging :as log])
-  (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
-           [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
-            BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
-            StatementImpl BNodeImpl ContextStatementImpl]
-           [org.openrdf.query QueryLanguage Update Query]
-           [org.openrdf.repository.sail SailUpdate]
-           [org.openrdf.query.parser QueryParserUtil ParsedQuery ParsedUpdate]
-           [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
-           [org.openrdf.query.algebra.evaluation.function Function]
-           [org.openrdf.query.algebra UpdateExpr TupleExpr Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr]
-           [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
+  (:require [clojure.set :as set]
+            [clojure.tools.logging :as log]
+            [grafter.rdf :refer [prefixer]]
+            [grafter.rdf.repository :as repo])
+  (:import (org.openrdf.query Query QueryLanguage)
+           (org.openrdf.query.algebra FunctionCall IRIFunction
+                                      TupleExpr UpdateExpr ValueExpr)
+           (org.openrdf.query.algebra.helpers StatementPatternCollector)
+           (org.openrdf.query.parser ParsedQuery ParsedUpdate
+                                     QueryParserUtil)
+           (org.openrdf.queryrender.sparql SPARQLQueryRenderer)
+           (org.openrdf.repository.sail SailUpdate)))
 
 (def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
 

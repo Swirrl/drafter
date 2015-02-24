@@ -1,14 +1,6 @@
 (ns drafter.routes.dumps
-  (:require [ring.util.io :as rio]
-            [clojure.string :as str]
-            [grafter.rdf.repository :as repo]
-            [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :as sparql]
-            [drafter.routes.sparql :as sp]
-            [compojure.core :refer [GET]]
-            [clojure.tools.logging :as log]
-            [ring.middleware.accept :refer [wrap-accept]])
-  (:import [org.openrdf.rio RDFFormat]))
+  (:require [compojure.core :refer [GET]])
+  (:import (org.openrdf.rio RDFFormat)))
 
 (defn graph-slug [s]
   (last (clojure.string/split s #"/")))

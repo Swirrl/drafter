@@ -1,13 +1,9 @@
 (ns drafter.repl
-  (:use
-   [ring.middleware file-info resource])
-  (:require [grafter.rdf.repository :refer [query prepare-query evaluate with-transaction]]
-            [drafter.rdf.draft-management :refer :all]
-            [drafter.handler :as service]
-            [clojure.java.io :as io]
-            [ring.server.standalone :refer [serve]]
-            [environ.core :refer [env]])
-  (:import [org.openrdf.rio RDFFormat])
+  (:require [drafter.handler :as service]
+            [environ.core :refer [env]]
+            [ring.middleware.file-info :refer :all]
+            [ring.middleware.resource :refer :all]
+            [ring.server.standalone :refer [serve]])
   (:gen-class))
 
 (defonce server (atom nil))

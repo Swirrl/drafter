@@ -1,21 +1,20 @@
 (ns drafter.routes.sparql
-  (:require [compojure.core :refer [context defroutes routes routing let-request
-                                    make-route let-routes
-                                    ANY GET POST PUT DELETE HEAD]]
-            [clojure.set :as set]
-            [ring.util.io :as io]
-            [compojure.route :refer [not-found]]
-            [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper wrap-sparql-errors]]
-            [drafter.rdf.sparql-rewriting :as rew]
+  (:require [clojure.set :as set]
             [clojure.tools.logging :as log]
-            [grafter.rdf.repository :as ses]
-            [drafter.common.sparql-routes :refer [supplied-drafts]])
-  (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
-           [org.openrdf.query QueryResultHandler TupleQueryResultHandler BindingSet Binding]
-           [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
-           [org.openrdf.query.impl MapBindingSet]
-           [org.openrdf.rio RDFHandler RDFWriter]))
+            [compojure.core :refer [GET POST routes]]
+            [drafter.common.sparql-routes :refer [supplied-drafts]]
+            [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.sparql-protocol :refer [process-sparql-query
+                                                 result-handler-wrapper
+                                                 sparql-end-point
+                                                 wrap-sparql-errors]]
+            [drafter.rdf.sparql-rewriting :as rew])
+  (:import (org.openrdf.query Binding BindingSet QueryResultHandler
+                              TupleQueryResultHandler)
+           (org.openrdf.query.impl MapBindingSet)
+           (org.openrdf.query.parser ParsedBooleanQuery
+                                     ParsedGraphQuery
+                                     ParsedTupleQuery)))
 
 (defn make-select-result-rewriter
   "Creates a new SPARQLResultWriter that proxies to the supplied

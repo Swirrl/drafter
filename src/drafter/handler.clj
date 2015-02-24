@@ -1,28 +1,39 @@
 (ns drafter.handler
-  (:require [compojure.core :refer [defroutes routes]]
-            [ring.middleware.verbs :refer [wrap-verbs]]
-            [drafter.routes.pages :refer [pages-routes]]
-            [drafter.routes.sparql :refer [live-sparql-routes draft-sparql-routes
-                                           state-sparql-routes raw-sparql-routes]]
-            [drafter.routes.dumps :refer [dumps-endpoint]]
-            [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
-            [drafter.middleware :as middleware]
-            [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
-            [drafter.routes.sparql-update :refer [draft-update-endpoint-route state-update-endpoint-route live-update-endpoint-route raw-update-endpoint-route]]
-            [noir.util.middleware :refer [app-handler]]
-            [compojure.route :as route]
-            [selmer.parser :as parser]
-            [drafter.rdf.draft-management :refer [graph-map lookup-live-graph-uri drafter-state-graph]]
-            [grafter.rdf.repository :as repo]
-            [compojure.handler :only [api]]
-            [environ.core :refer [env]]
+  (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clj-logging-config.log4j :refer [set-loggers!]]
-            [drafter.write-scheduler :refer [start-writer! stop-writer!]])
+            [compojure.core :refer [defroutes]]
+            [compojure.route :as route]
+            [drafter.middleware :as middleware]
+            [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
+            [drafter.rdf.sparql-rewriting :refer [function-registry
+                                                  pmdfunctions
+                                                  register-function]]
+            [drafter.routes.drafts-api :refer [draft-api-routes
+                                               graph-management-routes]]
+            [drafter.routes.dumps :refer [dumps-endpoint]]
+            [drafter.routes.pages :refer [pages-routes]]
+            [drafter.routes.sparql :refer [draft-sparql-routes
+                                           live-sparql-routes
+                                           raw-sparql-routes
+                                           state-sparql-routes]]
+            [drafter.routes.sparql-update :refer [draft-update-endpoint-route
+                                                  live-update-endpoint-route
+                                                  raw-update-endpoint-route
+                                                  state-update-endpoint-route]]
+            [drafter.write-scheduler :refer [start-writer!
+                                             stop-writer!]]
+            [environ.core :refer [env]]
+            [grafter.rdf.repository :as repo]
+            [noir.util.middleware :refer [app-handler]]
+            [ring.middleware.verbs :refer [wrap-verbs]]
+            [selmer.parser :as parser])
+
+  ;; Note that though the classes and requires below aren't used in this namespace
+  ;; they are needed by the log-config file which is loaded from here.
   (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
-           [org.apache.log4j.helpers DateLayout]))
+           [org.apache.log4j.helpers DateLayout])
+
+  (:require [clj-logging-config.log4j :refer [set-loggers!]]))
 
 
 (def default-repo-path "drafter-db")

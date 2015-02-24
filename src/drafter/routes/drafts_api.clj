@@ -1,30 +1,15 @@
 (ns drafter.routes.drafts-api
-  (:require [compojure.core :refer [context defroutes routes routing let-request
-                                    make-route let-routes
-                                    ANY GET POST PUT DELETE HEAD]]
-            [ring.util.io :as io]
-            [ring.middleware.multipart-params]
-            [compojure.route :refer [not-found]]
-            [compojure.handler :refer [api]]
-            [drafter.rdf.draft-management :as mgmt]
-            [clojure.tools.logging :as log]
-            [drafter.rdf.sparql-protocol :refer [process-sparql-query]]
+  (:require [clojure.tools.logging :as log]
+            [compojure.core :refer [DELETE POST PUT context routes]]
             [drafter.common.api-routes :as api-routes]
-            [drafter.write-scheduler :refer [submit-job! create-job]]
-            [drafter.routes.drafts-api.jobs :refer [create-draft-job
-                                                    replace-graph-from-file-job
-                                                    append-data-to-graph-from-file-job
+            [drafter.routes.drafts-api.jobs :refer [append-data-to-graph-from-file-job
                                                     append-data-to-graph-from-graph-job
-                                                    replace-data-from-graph-job
+                                                    create-draft-job
                                                     delete-graph-job
-                                                    migrate-graph-live-job]]
-
-            [grafter.rdf.io :refer [mimetype->rdf-format]]
-            [grafter.rdf.repository :refer [->connection with-transaction query]]
-            [grafter.rdf :refer [statements]])
-  (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
-           [org.openrdf.rio RDFParseException]
-           [org.openrdf.repository Repository RepositoryConnection]))
+                                                    migrate-graph-live-job
+                                                    replace-data-from-graph-job
+                                                    replace-graph-from-file-job]]
+            [drafter.write-scheduler :refer [submit-job!]]))
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
 

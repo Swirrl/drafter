@@ -1,13 +1,11 @@
 (ns drafter.routes.drafts-api.jobs
-  (:require [compojure.route :refer [not-found]]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [drafter.common.api-routes :as restapi]
             [drafter.rdf.draft-management :as mgmt]
-            [grafter.rdf.io :refer [mimetype->rdf-format]]
-            [grafter.rdf.repository :refer [->connection with-transaction query]]
             [drafter.write-scheduler :refer [create-job]]
-            [grafter.rdf :refer [statements]])
-  (:import [org.openrdf.repository Repository RepositoryConnection]))
+            [grafter.rdf.io :refer [mimetype->rdf-format]]
+            [grafter.rdf.repository :refer [->connection query
+                                            with-transaction]]))
 
 (defn create-draft-job [repo live-graph params]
   (create-job :sync

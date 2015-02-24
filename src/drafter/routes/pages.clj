@@ -1,18 +1,18 @@
 (ns drafter.routes.pages
-  (:require [compojure.core :refer [GET routes]]
-            [clojure.walk :refer [keywordize-keys]]
+  (:require [clojure.walk :refer [keywordize-keys]]
+            [compojure.core :refer [GET routes]]
             [drafter.layout :as layout]
-            [ring.util.io :as rio]
-            [ring.util.response :refer [not-found]]
-            [drafter.util :as util]
-            [grafter.rdf :refer [add statements]]
+            [drafter.rdf.draft-management :refer [drafter-state-graph
+                                                  live-graphs
+                                                  lookup-live-graph]]
             [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.draft-management :refer [drafter-state-graph lookup-live-graph live-graphs]]
+            [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
             [grafter.rdf.io :refer [rdf-serializer]]
-            [grafter.rdf.repository :refer [query ->connection]]
-            [clojure.tools.logging :as log])
-  (:import [org.openrdf.repository RepositoryConnection]))
+            [grafter.rdf.repository :refer [->connection query]]
+            [ring.util.io :as rio]
+            [ring.util.response :refer [not-found]])
+  (:import (org.openrdf.repository RepositoryConnection)))
 
 (defn query-page [params]
   (layout/render "query-page.html" params))

@@ -1,8 +1,8 @@
 (ns drafter.middleware
-  (:require [clojure.tools.logging :as log]
-            [clj-logging-config.log4j :as l4j]
-            [selmer.parser :as parser]
-            [environ.core :refer [env]]))
+  (:require [clj-logging-config.log4j :as l4j]
+            [clojure.tools.logging :as log]
+            [environ.core :refer [env]]
+            [selmer.parser :as parser]))
 
 (defn log-request [handler]
   (fn [req]

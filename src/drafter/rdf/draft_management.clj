@@ -1,14 +1,13 @@
 (ns drafter.rdf.draft-management
-  (:require [grafter.rdf.ontologies.rdf :refer :all]
+  (:require [clojure.tools.logging :as log]
             [drafter.rdf.drafter-ontology :refer :all]
-            [clojure.tools.logging :as log]
-            [clojure.java.io :as io]
-            [grafter.rdf :refer [s add add-statement statements subject predicate object context]]
+            [grafter.rdf :refer [add s]]
+            [grafter.rdf.ontologies.rdf :refer :all]
+            [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.repository :refer [query]]
-            [grafter.rdf.protocols :refer [begin commit rollback update!]]
             [grafter.rdf.templater :refer [add-properties graph]])
-  (:import [java.util Date]
-           [org.openrdf.model.impl URIImpl]))
+  (:import (java.util Date)
+           (org.openrdf.model.impl URIImpl)))
 
 (def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
 

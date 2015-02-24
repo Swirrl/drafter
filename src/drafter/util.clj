@@ -1,6 +1,6 @@
 (ns drafter.util
-  (:require [noir.io :as io]
-            [markdown.core :as md]))
+  (:require [markdown.core :as md]
+            [noir.io :as io]))
 
 (defn md->html
   "reads a markdown file from public/md and returns an HTML string"

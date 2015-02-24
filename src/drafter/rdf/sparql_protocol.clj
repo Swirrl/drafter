@@ -1,47 +1,27 @@
 (ns drafter.rdf.sparql-protocol
-  (:require [ring.util.io :as rio]
-            [clojure.string :as str]
+  (:require [clojure.tools.logging :as log]
+            [compojure.core :refer [GET POST routes]]
             [grafter.rdf.repository :as repo]
-            [compojure.core :refer [context defroutes routes routing let-request
-                                    make-route let-routes
-                                    ANY GET POST PUT DELETE HEAD]]
-            [clojure.tools.logging :as log]
-            [ring.middleware.accept :refer [wrap-accept]])
-  (:import [org.openrdf.query GraphQuery]
-           [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
-           [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
-            BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
-            StatementImpl BNodeImpl ContextStatementImpl]
-           [org.openrdf.repository Repository RepositoryConnection]
-           [org.openrdf.repository.sail SailRepository]
-           [org.openrdf.sail.memory MemoryStore]
-           [org.openrdf.rio Rio RDFWriter RDFHandler]
-           [org.openrdf.sail.nativerdf NativeStore]
-           [org.openrdf.query TupleQuery TupleQueryResult
-            TupleQueryResultHandler BooleanQueryResultHandler
-            BindingSet QueryLanguage BooleanQuery GraphQuery]
-           [org.openrdf.rio.ntriples NTriplesWriter]
-           [org.openrdf.rio.nquads NQuadsWriter]
-           [org.openrdf.rio.n3 N3Writer]
-           [org.openrdf.rio.n3 N3Writer]
-           [org.openrdf.rio.trig TriGWriter]
-           [org.openrdf.rio.trix TriXWriter]
-           [org.openrdf.rio.turtle TurtleWriter]
-           [org.openrdf.rio.rdfxml RDFXMLWriter]
-           [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
-           [org.openrdf.query.resultio TupleQueryResultFormat]
-           [org.openrdf.query.resultio.text BooleanTextWriter]
-           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]
-           [org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLWriter SPARQLBooleanXMLWriter]
-           [org.openrdf.query.resultio.binary BinaryQueryResultWriter]
-           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
-           [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
-           [org.openrdf.query Dataset MalformedQueryException]
-           [org.openrdf.query.resultio QueryResultWriter]
-           [org.openrdf.query.impl DatasetImpl MapBindingSet]
-           [javax.xml.datatype XMLGregorianCalendar DatatypeFactory]
-           [java.util GregorianCalendar Date]
-           [org.openrdf.rio RDFFormat]))
+            [ring.middleware.accept :refer [wrap-accept]]
+            [ring.util.io :as rio])
+  (:import (org.openrdf.query BooleanQuery GraphQuery
+                              MalformedQueryException TupleQuery)
+           (org.openrdf.query.impl MapBindingSet)
+           (org.openrdf.query.resultio QueryResultWriter)
+           (org.openrdf.query.resultio.binary BinaryQueryResultWriter)
+           (org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter)
+           (org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLWriter)
+           (org.openrdf.query.resultio.text BooleanTextWriter)
+           (org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter)
+           (org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter)
+           (org.openrdf.rio RDFHandler)
+           (org.openrdf.rio.n3 N3Writer)
+           (org.openrdf.rio.nquads NQuadsWriter)
+           (org.openrdf.rio.ntriples NTriplesWriter)
+           (org.openrdf.rio.rdfxml RDFXMLWriter)
+           (org.openrdf.rio.trig TriGWriter)
+           (org.openrdf.rio.trix TriXWriter)
+           (org.openrdf.rio.turtle TurtleWriter)))
 
 (defn negotiate-content-writer
   "Given a prepared query and a mime-type return the appropriate

@@ -1,19 +1,16 @@
 (ns drafter.routes.sparql-update
-  (:require [compojure.core :refer [context defroutes routes routing let-request
-                                    make-route let-routes
-                                    ANY GET POST PUT DELETE HEAD]]
-            [ring.util.io :as io]
-            [ring.util.codec :as codec]
-            [compojure.route :refer [not-found]]
+  (:require [clojure.tools.logging :as log]
+            [compojure.core :refer [POST]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.rdf.sparql-rewriting :as rew]
-            [clojure.tools.logging :as log]
-            [grafter.rdf.repository :refer [->connection with-transaction make-restricted-dataset prepare-update evaluate]]
+            [grafter.rdf.repository :refer [->connection evaluate
+                                            make-restricted-dataset
+                                            prepare-update
+                                            with-transaction]]
             [pantomime.media :as mt]
-            [drafter.common.sparql-routes :refer [supplied-drafts]])
-  (:import [org.openrdf.query Dataset]
-           [org.openrdf.repository Repository RepositoryConnection]))
+            [ring.util.codec :as codec])
+  (:import (org.openrdf.query Dataset)
+           (org.openrdf.repository RepositoryConnection)))
 
 (defn do-update [repo restrictions]
   {:status 200})

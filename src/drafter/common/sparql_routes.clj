@@ -1,8 +1,6 @@
 (ns drafter.common.sparql-routes
-  (:require [drafter.rdf.draft-management :refer [live-graphs]]
-            [drafter.rdf.draft-management :as mgmt]
-            [clojure.tools.logging :as log]
-            [clojure.set :as set]))
+  (:require [clojure.set :as set]
+            [drafter.rdf.draft-management :as mgmt :refer [live-graphs]]))
 
 (defn- maybe-merge-with-live [repo union-with-live graphs graphs-with-drafts]
   (let [live-graphs (when union-with-live

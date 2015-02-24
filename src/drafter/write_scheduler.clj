@@ -1,10 +1,10 @@
 (ns drafter.write-scheduler
   (:require [clojure.tools.logging :as log]
             [drafter.common.api-routes :as api-routes])
-  (:import [java.util.concurrent.locks ReentrantLock]
-           [java.util.concurrent PriorityBlockingQueue]
-           [org.openrdf.rio RDFParseException]
-           [java.util UUID]))
+  (:import (java.util UUID)
+           (java.util.concurrent PriorityBlockingQueue)
+           (java.util.concurrent.locks ReentrantLock)
+           (org.openrdf.rio RDFParseException)))
 
 (def ^:private global-writes-lock (ReentrantLock.))
 
