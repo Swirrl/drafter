@@ -119,7 +119,7 @@
         (let [res (task-f)]
           (deliver promis res))
         (catch Exception ex
-          (log/warn "A task raised an error delivering error to promise" ex)
+          (log/warn ex "A task raised an error delivering error to promise")
           (deliver promis {:type :error
                            :exception ex})))
       (swap! finished-jobs assoc job-id promis)
