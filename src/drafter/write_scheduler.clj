@@ -6,11 +6,15 @@
            (java.util.concurrent.locks ReentrantLock)
            (org.openrdf.rio RDFParseException)))
 
-(def ^:private global-writes-lock (ReentrantLock.))
+(defonce ^:private global-writes-lock (ReentrantLock.))
+
+(def priority-levels-map {:sync-write 0 :exclusive-write 1 :batch-write 2})
+
+(def all-priority-types (into #{} (keys priority-levels-map)))
 
 (def compare-jobs (comparator
                    (fn [job1 job2]
-                     (let [ordering {:sync 0 :make-live 1 :batch 2}
+                     (let [ordering priority-levels-map
                            {type1 :type time1 :time} job1
                            {type2 :type time2 :time} job2]
 
@@ -19,20 +23,23 @@
 
 (def ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
-;; TODO consider a done map
+(def ^{:doc "Map of finished jobs to promises containing their results."}
+  finished-jobs (atom {}))
 
 (defmacro with-lock [& forms]
   `(do
+     (log/info "Locking for an :exclusive-write")
      (.lock global-writes-lock)
      (try
        ~@forms
        (finally
+         (log/info "Unlocking :exclusive-write lock")
          (.unlock global-writes-lock)))))
 
 (defrecord Job [id type time function value-p])
 
 (defn create-job [type f & metadata]
-  {:pre [(#{:sync :make-live :batch} type)]}
+  {:pre [(all-priority-types type)]}
   (->Job (UUID/randomUUID)
          type
          (System/currentTimeMillis)
@@ -47,6 +54,9 @@
 
 (defn unknown-error-response [job-result]
   (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)}))
+
+(def temporarily-locked-for-writes-response
+  {:status 503 :body {:type :error :message "Write operations are temporarily unavailable.  Please try again later."}})
 
 (defn blocking-response
   "Block and await the delivery of the jobs result.  When it arrives
@@ -70,13 +80,18 @@
 
       job-result)))
 
-(defn submit-job! [job & [metadata]]
+(defn submit-job!
+  "Submit a write job to the job queue for execution."
+  [job & [metadata]]
   (let [job (with-meta job metadata)]
-    (if (= :make-live (:type job))
-      (do (.add writes-queue (assoc job
-                                    :function (fn []
-                                                (with-lock
-                                                  ((:function job))))))
+    (if (= :exclusive-write (:type job))
+      (do
+        (log/info "Queueing :exclusive-write job")
+        (.add writes-queue (assoc job
+                                  :function (fn []
+                                              (with-lock
+                                                (let [fun (:function job)]
+                                                  (fun))))))
           (submitted-job-response job))
       (if (.tryLock global-writes-lock)
         ;; We try the lock, not because we need the lock, but because we
@@ -86,12 +101,11 @@
               (.add writes-queue job)
               (finally
                 (.unlock global-writes-lock)))
-            (if (= :sync (:type job))
+            (if (= :sync-write (:type job))
               (blocking-response job)
               (submitted-job-response job)))
-        {:status 503}))))
 
-(def finished-jobs (atom {}))
+        temporarily-locked-for-writes-response))))
 
 (defn start-writer! []
   (future
