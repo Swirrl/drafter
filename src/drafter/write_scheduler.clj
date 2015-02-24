@@ -23,7 +23,7 @@
 
 (def ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
-(def ^{:doc "Map of finished jobs to promises containing their results."}
+(defonce ^{:doc "Map of finished jobs to promises containing their results."}
   finished-jobs (atom {}))
 
 (defmacro with-lock [& forms]
