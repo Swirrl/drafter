@@ -88,7 +88,7 @@
         (submit-job! (assoc job :function apply-next-batch)))
 
       (do
-        ;; TODO Add metadata triples
+        (mgmt/add-metadata-to-graph conn draft-graph)
         (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
         (complete-job! job (restapi/api-response 200 {:type :ok}))))))
 
@@ -114,16 +114,36 @@
                                 :format (mimetype->rdf-format content-type)
                                 :buffer-size batched-write-size)
 
-        triples (lazy-cat new-triples (query repo
-                                             (str "CONSTRUCT { ?s ?p ?o } "
-                                                  "WHERE { "
-                                                  (mgmt/with-state-graph
-                                                    "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
-                                                    "      <" drafter:hasDraft "> <" draft-graph "> .")
-                                                  "  GRAPH ?live { "
-                                                  "    ?s ?p ?o . "
-                                                  "  }"
-                                                  "}")))]
+        ;; NOTE that this is technically not transactionally safe as
+        ;; sesame currently only supports the READ_COMMITTED isolation
+        ;; level.
+        ;;
+        ;; As there is no read lock or support for (repeatable reads)
+        ;; this means that the CONSTRUCT below can witness data
+        ;; changing underneath it.
+        ;;
+        ;; TODO: protect against this, either by adopting a better
+        ;; storage engine or by adding code to either refuse make-live
+        ;; operations on jobs that touch the same graphs that we're
+        ;; manipulating here, or to raise an error on the batch task.
+        ;;
+        ;; http://en.wikipedia.org/wiki/Isolation_%28database_systems%29#Read_committed
+        ;;
+        ;; This can occur if a user does a make-live on a graph
+        ;; which is being written to in a batch job.
+        ;;
+        triples (lazy-cat (query repo
+                                 (str "CONSTRUCT { ?s ?p ?o } "
+                                      "WHERE { "
+                                      (mgmt/with-state-graph
+                                        "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                                        "      <" drafter:hasDraft "> <" draft-graph "> .")
+                                      "  GRAPH ?live { "
+                                      "    ?s ?p ?o . "
+                                      "  }"
+                                      "}"))
+
+                          new-triples)]
 
     (create-job :batch-write
                 (partial append-data-in-batches repo draft-graph metadata

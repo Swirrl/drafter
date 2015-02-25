@@ -127,11 +127,9 @@
             job-id :id
             promis :value-p :as job} (.take writes-queue)]
       (try
-        ;; leave logging of task up to the task
-
-        ;; TODO modify so that tasks recieve the job as an argument -
-        ;; so they can implement the delivery of the promise and the
-        ;; setting of DONE and also preserve their job id.
+        ;; Task functions are responsible for the delivery of the
+        ;; promise and the setting of DONE and also preserve their job
+        ;; id.
         (task-f! job writes-queue)
         (catch Exception ex
           (log/warn ex "A task raised an error delivering error to promise")
