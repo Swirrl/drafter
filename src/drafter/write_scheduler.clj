@@ -89,7 +89,7 @@
       (do
         (log/trace "Queueing :exclusive-write job")
         (.add writes-queue (assoc job
-                                  :function (fn []
+                                  :function (fn [job writes-queue]
                                               (with-lock
                                                 (let [fun (:function job)]
                                                   (fun job writes-queue))))))
