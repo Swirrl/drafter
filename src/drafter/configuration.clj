@@ -142,3 +142,6 @@
     (log-config-errors errors)
     (reduce apply-setting default-config ordered-params)))
 
+(defn get-endpoint-timeout [name endpoint-type timeout-config]
+  {:pre [(#{:query :update} endpoint-type)]}
+  (get-in timeout-config [name endpoint-type]))

@@ -72,7 +72,7 @@
 
 (deftest live-update-endpoint-route-test
   (let [db (make-store)
-        endpoint (live-update-endpoint-route "/update" db)]
+        endpoint (live-update-endpoint-route "/update" db nil)]
 
     (create-managed-graph! db "http://example.com/")
     (testing "and a graph restriction"
@@ -90,7 +90,7 @@
 
 (deftest draft-endpoint-test
   (let [db (make-store)
-        endpoint (draft-update-endpoint-route "/update" db)
+        endpoint (draft-update-endpoint-route "/update" db nil)
         live-graph (create-managed-graph! db "http://example.com/")
         draft-graph (create-draft-graph! db live-graph)]
 

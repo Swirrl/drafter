@@ -108,7 +108,8 @@
   such a collection."
   ([mount-point repo]
      (update-endpoint mount-point repo #{}))
-  ([mount-point repo restrictions]
+  ([mount-point repo restrictions] (update-endpoint mount-point repo restrictions nil))
+  ([mount-point repo restrictions timeouts]
      (POST mount-point request
            (with-open [conn (->connection repo)]
              (let [{update :update} (parse-update-request request)
@@ -122,7 +123,7 @@
 (defn draft-update-endpoint
   "Create an update endpoint with draft query rewriting.  Restrictions
   are applied on the basis of the &graphs query parameter."
-  ([mount-point repo]
+  ([mount-point repo timeouts]
    (POST mount-point request
          (with-open [conn (->connection repo)]
            (let [{:keys [update graphs]} (parse-update-request request)
@@ -133,14 +134,14 @@
              (log/debug "Executing update-query " preped-update)
              (execute-update conn preped-update))))))
 
-(defn draft-update-endpoint-route [mount-point repo]
-  (draft-update-endpoint mount-point repo))
+(defn draft-update-endpoint-route [mount-point repo timeouts]
+  (draft-update-endpoint mount-point repo timeouts))
 
-(defn live-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo (partial mgmt/live-graphs repo)))
+(defn live-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo (partial mgmt/live-graphs repo) timeouts))
 
-(defn state-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo #{mgmt/drafter-state-graph}))
+(defn state-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo #{mgmt/drafter-state-graph} timeouts))
 
-(defn raw-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo))
+(defn raw-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo timeouts))
