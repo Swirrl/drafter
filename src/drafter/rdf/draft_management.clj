@@ -1,7 +1,7 @@
 (ns drafter.rdf.draft-management
   (:require [clojure.tools.logging :as log]
-            [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add s]]
+            [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.ontologies.rdf :refer :all]
             [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.repository :refer [query]]
@@ -121,7 +121,7 @@
   (doseq [[meta-name value] metadata]
     (upsert-single-object! db graph-uri meta-name value)))
 
-(defn- clone-data-from-live-to-draft-query [draft-graph-uri]
+(defn clone-data-from-live-to-draft-query [draft-graph-uri]
   (str
    "INSERT {"
    "  GRAPH <" draft-graph-uri "> {"

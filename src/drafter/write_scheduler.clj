@@ -6,8 +6,6 @@
            (java.util.concurrent.locks ReentrantLock)
            (org.openrdf.rio RDFParseException)))
 
-(defonce ^:private global-writes-lock (ReentrantLock.))
-
 (def priority-levels-map {:sync-write 0 :exclusive-write 1 :batch-write 2})
 
 (def all-priority-types (into #{} (keys priority-levels-map)))
@@ -20,6 +18,8 @@
 
                        (= -1 (compare [(ordering type1) time1]
                                       [(ordering type2) time2]))))))
+
+(defonce ^:private global-writes-lock (ReentrantLock.))
 
 (def ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
@@ -84,14 +84,15 @@
   "Submit a write job to the job queue for execution."
   [job & [metadata]]
   (let [job (with-meta job metadata)]
+    (log/info "Queueing job: " job)
     (if (= :exclusive-write (:type job))
       (do
-        (log/info "Queueing :exclusive-write job")
+        (log/trace "Queueing :exclusive-write job")
         (.add writes-queue (assoc job
                                   :function (fn []
                                               (with-lock
                                                 (let [fun (:function job)]
-                                                  (fun))))))
+                                                  (fun job writes-queue))))))
           (submitted-job-response job))
       (if (.tryLock global-writes-lock)
         ;; We try the lock, not because we need the lock, but because we
@@ -107,22 +108,36 @@
 
         temporarily-locked-for-writes-response))))
 
+(defn complete-job!
+  "Adds the job to the state map of finished-jobs and delivers the
+  supplied result to the jobs promise, which will cause blocking jobs
+  to unblock, and give job consumers the ability to receive the
+  value."
+  [job result]
+  (let [{job-id :id promis :value-p} job]
+    (deliver promis result)
+    (swap! finished-jobs assoc job-id promis)
+    (log/info "Job " job-id "complete")))
+
 (defn start-writer! []
   (future
     (log/info "Writer started waiting for tasks")
-    (loop [{task-f :function
+    (loop [{task-f! :function
             type :type
             job-id :id
             promis :value-p :as job} (.take writes-queue)]
       (try
         ;; leave logging of task up to the task
-        (let [res (task-f)]
-          (deliver promis res))
+
+        ;; TODO modify so that tasks recieve the job as an argument -
+        ;; so they can implement the delivery of the promise and the
+        ;; setting of DONE and also preserve their job id.
+        (task-f! job writes-queue)
         (catch Exception ex
           (log/warn ex "A task raised an error delivering error to promise")
-          (deliver promis {:type :error
-                           :exception ex})))
-      (swap! finished-jobs assoc job-id promis)
+          (complete-job! job {:type :error
+                              :exception ex})))
+
       (log/info "Writer waiting for tasks")
       (recur (.take writes-queue)))))
 
