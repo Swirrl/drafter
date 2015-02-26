@@ -261,13 +261,10 @@
         mime (get-in (accept-handler request) [:accept :mime])]
     mime))
 
-;default query timeouts - 60s for each result and 4 minutes for the entire operation
-(def default-query-timeouts (create-timeouts 60000 240000))
-
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
                                                  result-rewriter query-timeouts]
                                           :or {query-creator-fn repo/prepare-query
-                                               query-timeouts default-query-timeouts}}]
+                                               query-timeouts default-timeouts}}]
 
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request

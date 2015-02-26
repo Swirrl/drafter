@@ -99,7 +99,7 @@
 (def state-endpoint-spec (specify-endpoint state-sparql-routes state-update-endpoint-route false))
 
 (defn create-sparql-routes [endpoint-map repo]
-  (let [default-timeouts (ops/create-timeouts 60000 240000)
+  (let [default-timeouts ops/default-timeouts
         timeout-conf (conf/get-timeout-config env (keys endpoint-map) default-timeouts)
         ep-routes (fn [[ep-name {:keys [query-fn update-fn has-dump]}]]
                     (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump repo timeout-conf))]

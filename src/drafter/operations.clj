@@ -206,3 +206,11 @@
         f #(with-open [os output-stream]
               (func os))]
     [f input-stream]))
+
+(def default-timeouts
+  "default timeouts for SPARQL operations - 60s for each result and 4
+  minutes for the entire operation. Since updates do not produce
+  intermediate values the timeout is effectively the operation
+  timeout"
+  (create-timeouts 60000 240000))
+
