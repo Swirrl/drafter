@@ -182,8 +182,13 @@
         (.close ostream)))))
 
 (defn get-sparql-response-content-type [mime-type]
-  (if (= "text/html" mime-type)
-    "text/plain"
+  (case mime-type
+    ;; if they ask for html they're probably a browser so serve it as
+    ;; text/plain
+    "text/html" "text/plain; charset=utf-8"
+    ;; force a charset of UTF-8 in this case... NOTE this should
+    ;; really consult the Accept-Charset header
+    "text/plain" "text/plain; charset=utf-8"
     mime-type))
 
 (defn- stream-sparql-response [pquery response-mime-type result-rewriter]
@@ -195,7 +200,7 @@
      :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
                                                     pquery response-mime-type))}
     {:status 406
-     :headers {"Content-Type" "text/plain"}
+     :headers {"Content-Type" "text/plain; charset=utf-8"}
      :body (str "Unsupported media-type: " response-mime-type)}))
 
 (defn restricted-dataset
@@ -245,7 +250,7 @@
       (catch MalformedQueryException ex
         (let [error-message (.getMessage ex)]
           (log/info "Malformed query: " error-message)
-          {:status 400 :headers {"Content-Type" "text/plain"} :body error-message})))))
+          {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
 
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path, a sesame repository and

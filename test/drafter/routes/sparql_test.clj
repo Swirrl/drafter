@@ -93,7 +93,7 @@
 
 (deftest state-sparql-routes-test
   (let [test-db (make-store)
-        ;;drafts-request (assoc-in [:headers "accept"] "text/plain")
+        ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (state-sparql-routes "/sparql/state" test-db)]
 
@@ -103,7 +103,7 @@
                                                    "    ?s ?p ?o ."
                                                    "  }"
                                                    "}"))
-                                 (assoc-in [:headers "accept"] "text/plain")))
+                                 (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
             body (-> result :body stream->string)]
 
         (is (= "true" body))))
@@ -115,14 +115,14 @@
                                           "    ?s ?p ?o ."
                                           "  }"
                                           "}"))
-                        (assoc-in [:headers "accept"] "text/plain")))
+                        (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
             body (-> result :body stream->string)]
 
         (is (= "false" body))))))
 
 (deftest raw-sparql-routes-test
   (let [test-db (make-store)
-        ;;drafts-request (assoc-in [:headers "accept"] "text/plain")
+        ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
         endpoint (raw-sparql-routes "/sparql/raw" test-db)]
 
@@ -132,7 +132,7 @@
                                                    "    ?s ?p ?o ."
                                                    "  }"
                                                    "}"))
-                                 (assoc-in [:headers "accept"] "text/plain")))
+                                 (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
             body (-> result :body stream->string)]
 
         (is (= "true" body))))
@@ -144,7 +144,7 @@
                                            "    ?s ?p ?o ."
                                            "  }"
                                            "}"))
-                         (assoc-in [:headers "accept"] "text/plain")))
+                         (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
             body (-> result :body stream->string)]
 
         (is (= "true" body))))))
