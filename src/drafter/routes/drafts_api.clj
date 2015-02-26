@@ -2,13 +2,13 @@
   (:require [clojure.tools.logging :as log]
             [compojure.core :refer [DELETE POST PUT context routes]]
             [drafter.common.api-routes :as api-routes]
-            [drafter.routes.drafts-api.jobs :refer [append-data-to-graph-from-file-job
-                                                    append-data-to-graph-from-graph-job
-                                                    create-draft-job
-                                                    delete-graph-job
-                                                    migrate-graph-live-job
-                                                    replace-data-from-graph-job
-                                                    replace-graph-from-file-job]]
+            [drafter.rdf.draft-management.jobs :refer [append-data-to-graph-from-file-job
+                                                       append-data-to-graph-from-graph-job
+                                                       create-draft-job
+                                                       delete-graph-job
+                                                       migrate-graph-live-job
+                                                       replace-data-from-graph-job
+                                                       replace-graph-from-file-job]]
             [drafter.write-scheduler :refer [submit-job!]]))
 
 (def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})

@@ -46,16 +46,16 @@
          f
          (promise)))
 
-(defn invalid-rdf-response [job-result]
+(defn- invalid-rdf-response [job-result]
   (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
 
-(defn submitted-job-response [job]
+(defn- submitted-job-response [job]
   {:status 202 :body {:type :ok :id (:id job)}})
 
-(defn unknown-error-response [job-result]
+(defn- unknown-error-response [job-result]
   (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)}))
 
-(def temporarily-locked-for-writes-response
+(def ^:private temporarily-locked-for-writes-response
   {:status 503 :body {:type :error :message "Write operations are temporarily unavailable.  Please try again later."}})
 
 (defn blocking-response

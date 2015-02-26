@@ -1,4 +1,4 @@
-(ns drafter.routes.drafts-api.jobs
+(ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
             [drafter.common.api-routes :as restapi]
             [drafter.rdf.draft-management :as mgmt]
