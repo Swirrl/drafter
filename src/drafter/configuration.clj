@@ -12,10 +12,6 @@
          (contains? #{:result-timeout :operation-timeout nil} scope)]}
   {:endpoint endpoint :method method :scope scope})
 
-(def selector-endpoint :endpoint)
-(def selector-method :method)
-(def selector-scope :scope)
-
 (defn match-timeout-selector [p]
   (let [matcher (re-matcher timeout-param-pattern (name p))]
     (if (.matches matcher)
@@ -26,18 +22,18 @@
         (create-selector endpoint method scope))
       (Exception. (str "Invalid format for drafter timeout variable '" p "'")))))
 
-(defn selector->path [s]
+(defn- selector->path [s]
   ((juxt :endpoint :method :scope) s))
 
 (defn selector-lt? [s1 s2]
   (< (compare (selector->path s1) (selector->path s2)) 0))
 
-(defn lift-f [f & values]
+(defn- lift-f [f & values]
   (if-let [ex (first (filter #(instance? Exception %) values))]
     ex
     (apply f values)))
 
-(defn map-error-msg [f v]
+(defn- map-error-msg [f v]
   (if (instance? Exception v)
     (Exception. (f (.getMessage v))))
   v)
@@ -54,24 +50,38 @@
 (defn create-setting [selector timeout]
   {:timeout timeout :selector selector})
 
-(defn parse-timeout-setting [name value]
+(defn- parse-timeout-setting [name value]
   (let [selector (match-timeout-selector name)
         timeout (->> (try-parse-timeout value)
                      (map-error-msg (fn [m] (str "Invalid value for timeout parameter '" name "': " m))))]
     (lift-f create-setting selector timeout)))
 
+(defn- format-selector [s]
+  (let [pairs (map (fn [k] [k (k s)]) [:endpoint :method :scope])
+        segments (map (fn [[aspect value]] (str (name aspect) " => " (string/upper-case (name (or value :any))))) pairs)]
+    (string/join ", " segments)))
+
 ;validate-setting-endpoint :: Set[Endpoint] -> Setting -> Try[Setting]
-(defn validate-setting-endpoint [endpoints {:keys [selector] :as setting}]
-  (let [ep (selector-endpoint selector)]
+(defn- validate-setting-endpoint [endpoints {:keys [selector] :as setting}]
+  (let [ep (:endpoint selector)]
     (if (or (nil? ep) (contains? endpoints ep))
       setting
-      (Exception. (str "Found setting for unknown endpoint '" (name (selector-endpoint selector)) "'")))))
+      (Exception. (str "Unknown endpoint '" (name ep) "' for setting: " (format-selector selector))))))
+
+(defn- is-update-result-selector? [selector]
+  (= [:update :result-timeout] ((juxt :method :scope) selector)))
+
+(defn- validate-setting-applicable [{:keys [selector] :as setting}]
+  (if (is-update-result-selector? selector)
+    (Exception. (str "Cannot apply result timeout for update endpoint for setting: " (format-selector selector)))
+    setting))
 
 (defn parse-and-validate-timeout-setting [name value endpoints]
   (->> (parse-timeout-setting name value)
-       (lift-f #(validate-setting-endpoint endpoints %))))
+       (lift-f #(validate-setting-endpoint endpoints %))
+       (lift-f validate-setting-applicable)))
 
-(defn looks-like-timeout-parameter? [[k _]]
+(defn- looks-like-timeout-parameter? [[k _]]
   (.startsWith (name k) timeout-param-prefix))
 
 ;find-timeout-variables :: Map[String, String] -> Set[Endpoint] -> {errors :: [Exception], settings :: [Setting]}
@@ -80,12 +90,12 @@
         validated (map (fn [[name value]] (parse-and-validate-timeout-setting name value endpoints)) timeout-vars)]
     (group-by #(if (instance? Exception %) :errors :settings) validated)))
 
-(defn create-initial-timeouts [endpoints default-timeouts]
+(defn- create-initial-timeouts [endpoints default-timeouts]
   (let [default-m {:update default-timeouts :query default-timeouts}]
     (into {} (map vector endpoints (repeat default-m)))))
 
 ;match-nodes :: k -> Map k a -> [(k, a)]
-(defn match-nodes [k m]
+(defn- match-nodes [k m]
   (cond (nil? k) (vec m)
         (contains? m k) [[k (get m k)]]
         :else nil))
@@ -96,7 +106,7 @@
     (mapv (fn [[node sub-tree]] [(conj path node) sub-tree]) sub-trees)))
 
 ;step-all :: [(Path, Tree a)] -> Key -> [(Path, Tree a)]
-(defn step-all [positions stage]
+(defn- step-all [positions stage]
   (mapcat (fn [[path tree]] (step path stage tree)) positions))
 
 ;find-paths :: Tree a -> [Key] -> [(Path, a)]
@@ -112,25 +122,20 @@
   (reduce (fn [acc [p v]] (assoc-in acc p v)) config paths))
 
 ;config-tree :: Tree a -> [Key]  -> a -> Tree a
-(defn update-config [source-tree spec timeout]
+(defn- update-config [source-tree spec timeout]
   (if-let [paths (find-paths source-tree spec)]
     (let [updated-paths (mapv (fn [[path cur-val]] [path timeout]) paths)]
       (update-paths source-tree updated-paths))
     source-tree))
 
-(defn order-settings [settings]
+(defn- order-settings [settings]
   (sort-by :selector selector-lt? settings))
 
-(defn format-selector [s]
-  (let [pairs (map (fn [k] [k (k s)]) [:endpoint :method :scope])
-        segments (map (fn [[aspect value]] (str (name aspect) " => " (string/upper-case (name (or value :any))))) pairs)]
-    (string/join ", " segments)))
-
-(defn apply-setting [timeouts {:keys [timeout selector]}]
+(defn- apply-setting [timeouts {:keys [timeout selector]}]
   (timbre/info (str "Applying setting " (format-selector selector) " with timeout " timeout))
   (update-config timeouts (selector->path selector) timeout))
 
-(defn log-config-errors [errors]
+(defn- log-config-errors [errors]
   (doseq [ex errors]
     (timbre/warn "Timeout configuration:" (.getMessage ex))))
 

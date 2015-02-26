@@ -49,14 +49,24 @@
   (testing "should convert valid to milliseconds"
     (is (= 34000 (try-parse-timeout "34")))))
 
-(deftest validate-setting-endpoint-test
+(deftest parse-and-validate-timeout-setting-test
   (testing "invalid settings"
     (are [name value endpoints]
       (instance? Exception (parse-and-validate-timeout-setting name value endpoints))
+      ;invalid setting format
       :drafter-timeout-invalid "23" #{:live}
+
+      ;invalid timeout
       :drafter-timeout-result "abc" #{:live}
+
+      ;invalid timeout
       :drafter-timeout-operation "-34" #{:live}
-      :drafter-timeout-endpoint-raw "20" #{:live}))
+
+      ;unknown endpoint name
+      :drafter-timeout-endpoint-raw "20" #{:live}
+
+      ;result timeout for update endpoint
+      :drafter-timeout-update-result "10" #{:live}))
 
   (testing "valid settings"
     (are [name value endpoints expected]
