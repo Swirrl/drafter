@@ -181,12 +181,28 @@
   [result-timeout operation-timeout]
   {:result-timeout result-timeout :operation-timeout operation-timeout})
 
+(defn- get-initial-state [timeouts clock]
+  (assoc timeouts :started-at (now-by clock)))
+
+(defn register-for-cancellation-on-timeout
+  "Register an instance of java.util.concurrent.Future to be monitored
+  for timeout and cancelled if any timeouts are exceeded. This
+  function does NOT schedule the given Future for execution, this is
+  the responsibility of the caller."
+  ([fut timeouts] (register-for-cancellation-on-timeout fut timeouts query-operations))
+  ([fut timeouts operations-atom] (register-for-cancellation-on-timeout fut timeouts operations-atom system-clock))
+  ([fut timeouts operations-atom clock]
+     (let [op-ref (atom fut)
+           init-state (get-initial-state timeouts clock)]
+       (swap! operations-atom #(assoc % op-ref init-state))
+       nil)))
+
 (defn execute-operation
   "Submits an operation for execution on an ExecutorService."
   ([operation op-fn timeouts] (execute-operation operation op-fn timeouts clojure.lang.Agent/soloExecutor))
   ([{:keys [operation-ref clock operations-atom] :as operation} op-fn timeouts executor]
      {:pre [(not (realized? operation-ref))]}
-     (let [init-state (assoc timeouts :started-at (now-by clock))
+     (let [init-state (get-initial-state timeouts clock)
            fut (FutureTask. op-fn)
            reg-fn (fn [op-map]
                     (deliver operation-ref fut)
