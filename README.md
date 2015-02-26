@@ -91,7 +91,8 @@ the endpoint name is omitted then the timeout applies for every endpoint in the 
 
     DRAFTER_TIMEOUT[_(UPDATE|QUERY)][_(ENDPOINT_name)][_(RESULT|OPERATION)]
 
-The three components go from most to least specific left-to-right:
+It is anticipated that components on the right are more likely to be configured than those on the left i.e. query RESULT timeouts
+are likely to be configured while settings for UPDATE or QUERY endpoints are less likely.
 
 1. UPDATE applies to all update endpoints while QUERY to all query endpoints
 2. ENDPOINT\_name applies to the endpoint with name 'name' e.g. ENDPOINT\_LIVE or ENDPOINT\_RAW
@@ -101,7 +102,12 @@ Note that since update queries to not produce intermediate results, specifying U
 no effect and results in a warning being logged.
 
 Multiple timeout variables can be configured at once and these will be applied in order so more specific timeout settings can
-be applied to override more general ones.
+be applied to override more general ones. RESULT/OPERATION settings are considered least specific, UPDATE/QUERY settings
+are the next, while individual endpoint settings are the most specific. This means that variables which specify RESULT or
+OPERATION timeouts will be applied before those for UPDATE or QUERY operations which are in turn are applied before any
+endpoint-specific settings. If a variable specifies multiple timeout components then these orderings are applied in turn e.g.
+endpoint OPERATION timeouts are applied before endpoint QUERY timeouts. On startup, Drafter logs timeout settings in the order
+they are applied.
 
 ### Timeout examples
 
