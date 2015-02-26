@@ -12,9 +12,9 @@
 
 (def batched-write-size 10000)
 
-(defmacro make-job [write-priority [job writes-queue :as args] & forms]
+(defmacro make-job [write-priority [job :as args] & forms]
   `(create-job ~write-priority
-               (fn [~job ~writes-queue]
+               (fn [~job]
                  (try
                    ~@forms
                    (catch Exception ex#
@@ -22,7 +22,7 @@
                                           :exception ex#}))))))
 
 (defn create-draft-job [repo live-graph params]
-  (make-job :sync-write [job writes-queue]
+  (make-job :sync-write [job]
             (let [conn (->connection repo)
                   draft-graph-uri (with-transaction conn
                                     (mgmt/create-managed-graph! conn live-graph)
@@ -44,12 +44,12 @@
   ;;
   ;; And loop until the graph is empty?
 
-  (make-job :sync-write [job writes-queue]
+  (make-job :sync-write [job]
             (let [conn (->connection repo)]
               (with-transaction conn
                 (mgmt/delete-graph-and-draft-state! conn graph)))
 
-            (complete-job! job (restapi/api-response 200 nil))))
+            (complete-job! job restapi/ok-response)))
 
 (defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
@@ -60,7 +60,7 @@
 
   [repo graph {:keys [tempfile size filename content-type] :as file} metadata]
 
-  (make-job :batch-write [job writes-queue]
+  (make-job :batch-write [job]
             (log/info (str "Replacing graph " graph " with contents of file "
                            tempfile "[" filename " " size " bytes]"))
 
@@ -70,9 +70,9 @@
                                     (:tempfile file)
                                     metadata)))
             (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))
-            (complete-job! job (restapi/api-response 200 {:type :ok}))))
+            (complete-job! job restapi/ok-response)))
 
-(defn append-data-in-batches [repo draft-graph metadata triples job writes-queue]
+(defn- append-data-in-batches [repo draft-graph metadata triples job]
   (let [conn (->connection repo)
         [current-batch remaining-triples] (split-at batched-write-size triples)]
 
@@ -88,9 +88,9 @@
         (submit-job! (assoc job :function apply-next-batch)))
 
       (do
-        (mgmt/add-metadata-to-graph conn draft-graph)
+        (mgmt/add-metadata-to-graph conn draft-graph metadata)
         (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
-        (complete-job! job (restapi/api-response 200 {:type :ok}))))))
+        (complete-job! job restapi/ok-response)))))
 
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
@@ -158,7 +158,7 @@
 
   [repo draft-graph source-graph metadata]
 
-  (make-job :exclusive-write [job writes-queue]
+  (make-job :exclusive-write [job]
             (log/info "Appending contents of " source-graph "  to draft-graph: " draft-graph)
 
             (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
@@ -171,7 +171,7 @@
                 (mgmt/append-data! conn draft-graph source-data metadata))
 
               (log/info  "Graph import complete. Imported contents of " source-graph " to draft-graph: " draft-graph)
-              (complete-job! job (restapi/api-response 200 {:type :ok})))))
+              (complete-job! job restapi/ok-response))))
 
 (defn replace-data-from-graph-job
   "Return a function to replace the specified graph with a graph
@@ -182,20 +182,22 @@
 
   [repo graph source-graph metadata]
 
-  (make-job :exclusive-write [job writes-queue]
+  (make-job :exclusive-write [job]
             (log/info "Replacing graph " graph " with contents of graph: " source-graph)
             (let [conn (->connection repo)]
               (with-transaction conn
                 (mgmt/copy-graph conn source-graph graph)
                 (mgmt/add-metadata-to-graph conn graph metadata)))
-            (complete-job! job (restapi/api-response 200 {:type :ok}))))
+            (complete-job! job restapi/ok-response)))
 
 (defn migrate-graph-live-job [repo graph]
-  (make-job :exclusive-write [job writes-queue]
+  (make-job :exclusive-write [job]
+            (log/info "Starting make-live for graph" graph)
             (let [conn (->connection repo)]
               (with-transaction conn
                 (if (instance? String graph)
                   (mgmt/migrate-live! conn graph)
                   (doseq [g graph]
                     (mgmt/migrate-live! conn g)))))
-            (complete-job! job (restapi/api-response 200 {:type :ok}))))
+            (log/info "Make-live for graph" graph "done")
+            (complete-job! job restapi/ok-response)))

@@ -21,7 +21,7 @@
 
 (defonce ^:private global-writes-lock (ReentrantLock.))
 
-(def ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
+(defonce ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
 (defonce ^{:doc "Map of finished jobs to promises containing their results."}
   finished-jobs (atom {}))
@@ -88,12 +88,8 @@
     (if (= :exclusive-write (:type job))
       (do
         (log/trace "Queueing :exclusive-write job")
-        (.add writes-queue (assoc job
-                                  :function (fn [job writes-queue]
-                                              (with-lock
-                                                (let [fun (:function job)]
-                                                  (fun job writes-queue))))))
-          (submitted-job-response job))
+        (.add writes-queue job)
+        (submitted-job-response job))
       (if (.tryLock global-writes-lock)
         ;; We try the lock, not because we need the lock, but because we
         ;; need to 503/refuse the addition of an item if the lock is
@@ -119,25 +115,40 @@
     (swap! finished-jobs assoc job-id promis)
     (log/info "Job " job-id "complete")))
 
-(defn start-writer! []
-  (future
-    (log/info "Writer started waiting for tasks")
+(defn- write-loop
+  "Start the write loop running.  Note this function does not return
+  and is supposed to be run asynchronously on a future or thread.
+
+  Users should normally use start-writer! to set this running."
+
+  []
+  (log/info "Writer started waiting for tasks")
     (loop [{task-f! :function
             type :type
             job-id :id
             promis :value-p :as job} (.take writes-queue)]
       (try
-        ;; Task functions are responsible for the delivery of the
-        ;; promise and the setting of DONE and also preserve their job
-        ;; id.
-        (task-f! job writes-queue)
+        ;; Note that task functions are responsible for the delivery
+        ;; of the promise and the setting of DONE and also preserve
+        ;; their job id.
+        (log/info "Executing job at write-priority" type)
+
+        (if (= :exclusive-write type)
+          (with-lock
+            (task-f! job))
+          (task-f! job))
+
         (catch Exception ex
           (log/warn ex "A task raised an error delivering error to promise")
           (complete-job! job {:type :error
                               :exception ex})))
 
       (log/info "Writer waiting for tasks")
-      (recur (.take writes-queue)))))
+      (recur (.take writes-queue))))
+
+(defn start-writer! []
+  (future
+    (write-loop)))
 
 (defn stop-writer! [writer]
   (future-cancel writer))

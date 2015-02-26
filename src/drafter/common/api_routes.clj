@@ -22,6 +22,8 @@
    :headers {"Content-Type" "application/json"}
    :body (merge default-response-map map)})
 
+(def ok-response (api-response 200 {:type :ok}))
+
 (defn error-response
   [code map]
   (api-response code (merge default-error-map map)))
