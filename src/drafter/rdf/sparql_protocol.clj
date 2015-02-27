@@ -218,17 +218,13 @@
     "text/plain"
     mime-type))
 
-(defn- stream-sparql-response [pquery response-mime-type result-rewriter]
+(defn- stream-sparql-response [pquery response-mime-type result-rewriter query-timeouts]
   (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
     (let [{:keys [publish] :as query-operation} (create-operation)
           [write-fn input-stream] (connect-piped-output-stream (result-streamer result-writer-class result-rewriter
-                                                                                pquery response-mime-type publish))
+                                                                                pquery response-mime-type publish))]
 
-          ;hard-code query timeouts for now - 60s for each result and 4 minutes for the entire operation
-          ;TODO: make this configurable!
-          query-operation-timeouts (create-timeouts 60000 240000)]
-
-      (execute-operation query-operation write-fn query-operation-timeouts)
+      (execute-operation query-operation write-fn query-timeouts)
 
       {:status 200
        :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
@@ -266,8 +262,9 @@
     mime))
 
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
-                                                 result-rewriter]
-                                          :or {query-creator-fn repo/prepare-query}}]
+                                                 result-rewriter query-timeouts]
+                                          :or {query-creator-fn repo/prepare-query
+                                               query-timeouts default-timeouts}}]
 
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
@@ -277,7 +274,7 @@
         media-type (negotiate-sparql-query-mime-type pquery request)]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
-    (stream-sparql-response pquery media-type result-rewriter)))
+    (stream-sparql-response pquery media-type result-rewriter query-timeouts)))
 
 (defn wrap-sparql-errors [handler]
   (fn [request]
@@ -294,17 +291,20 @@
   to restrict both the union and named-graph queries too."
 
   ([mount-path repo] (sparql-end-point mount-path repo nil))
-  ([mount-path repo restrictions]
+  ([mount-path repo restrictions] (sparql-end-point mount-path repo restrictions nil))
+  ([mount-path repo restrictions timeouts]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
    (wrap-sparql-errors
     (routes
      (GET mount-path request
           (process-sparql-query repo request
-                                :graph-restrictions restrictions))
+                                :graph-restrictions restrictions
+                                :query-timeouts timeouts))
 
      (POST mount-path request
            (process-sparql-query repo request
-                                 :graph-restrictions restrictions))))))
+                                 :graph-restrictions restrictions
+                                 :query-timeouts timeouts))))))
 
 (comment
 

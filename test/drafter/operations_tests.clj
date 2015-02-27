@@ -1,7 +1,7 @@
 (ns drafter.operations-tests
   (:require [drafter.operations :refer :all]
             [clojure.test :refer :all])
-  (:import [java.util.concurrent Future Executors Executor TimeUnit]
+  (:import [java.util.concurrent Future FutureTask Executors Executor TimeUnit]
            [java.nio.charset Charset]
            [java.util.concurrent.atomic AtomicBoolean]))
 
@@ -125,6 +125,20 @@
     (is (= true @ran-op))
     (is (= expected-state (get @operations-atom operation-ref)))
     (is (realized? operation-ref))))
+
+(deftest register-for-cancellation-on-timeout-test
+  (let [operations (atom {})
+        now 100
+        timeouts (create-timeouts 200 5000)
+        expected-state (assoc timeouts :started-at now)
+        fut (FutureTask. (fn [] 1))]
+
+    (register-for-cancellation-on-timeout fut timeouts operations (fixed-clock now))
+
+    (let [[k state] (first @operations)]
+      (is (= 1 (count @operations)))
+      (is (= fut @k))
+      (is (= expected-state state)))))
 
 (deftest reaper-fn-test
   (let [[task1 task2 task3] (take 3 (repeatedly cancel-only-future))
