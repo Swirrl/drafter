@@ -1,7 +1,7 @@
 (ns drafter.handler
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [compojure.core :refer [defroutes]]
+            [compojure.core :refer [defroutes context]]
             [compojure.route :as route]
             [drafter.middleware :as middleware]
             [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
@@ -10,6 +10,7 @@
                                                   register-function]]
             [drafter.routes.drafts-api :refer [draft-api-routes
                                                graph-management-routes]]
+            [drafter.routes.status :refer [status-routes]]
             [drafter.routes.dumps :refer [dumps-endpoint]]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [draft-sparql-routes
@@ -21,6 +22,8 @@
                                                   raw-update-endpoint-route
                                                   state-update-endpoint-route]]
             [drafter.write-scheduler :refer [start-writer!
+                                             global-writes-lock
+                                             finished-jobs
                                              stop-writer!]]
             [environ.core :refer [env]]
             [grafter.rdf.repository :as repo]
@@ -93,6 +96,10 @@
 
                          (state-sparql-routes "/sparql/state" repo)
                          (state-update-endpoint-route "/sparql/state/update" repo)
+
+                         (context "/status" []
+                                        (status-routes global-writes-lock finished-jobs))
+
                          app-routes]
                         ;; add custom middleware here
                         :middleware [wrap-verbs

@@ -8,7 +8,8 @@
             [clojure.java.io :as io]
             [clojure.template :refer [do-template]]
             [drafter.rdf.draft-management :refer :all]
-            [drafter.write-scheduler :refer [finished-jobs]]))
+            [drafter.write-scheduler :refer [finished-jobs]])
+  (:import [java.util UUID]))
 
 (def test-graph-uri "http://example.org/my-graph")
 
@@ -62,12 +63,18 @@
     (is (= 200 status))
     (is (= :ok (:type body)))))
 
+(def job-id-path #"/status/finished-jobs/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})")
+
+(defn parse-guid [job-path]
+  (if-let [uid (second (re-matches job-id-path job-path))]
+    (UUID/fromString uid)))
+
 (defn job-is-accepted [response]
   (let [{:keys [status body headers]} response]
     (testing "returns 202 - Job accepted"
       (is (= 202 status))
       (is (= :ok (:type body)))
-      (is (= java.util.UUID (class (:id body)))))))
+      (is (instance? UUID (parse-guid (:id body)))))))
 
 (defn is-error-response [response]
   (let [{:keys [status body headers]} response]
@@ -119,16 +126,18 @@
 
   If the job doesn't appear before timeout time has passed an
   exception is raised."
-  ([state-atom guid] (await-completion state-atom guid default-timeout))
-  ([state-atom guid timeout]
+  ([state-atom path] (await-completion state-atom path default-timeout))
+  ([state-atom path timeout]
    (let [start (System/currentTimeMillis)]
-     (if-let [value (@state-atom guid)]
-       @value
-       (if (> (System/currentTimeMillis) (+ start (or timeout default-timeout) ))
-         (throw (RuntimeException. "Timed out awaiting test value"))
-         (do
-           (Thread/sleep 5)
-           (recur state-atom guid timeout)))))))
+     (loop [state-atom state-atom
+            guid (parse-guid path)]
+       (if-let [value (@state-atom guid)]
+         @value
+         (if (> (System/currentTimeMillis) (+ start (or timeout default-timeout) ))
+           (throw (RuntimeException. "Timed out awaiting test value"))
+           (do
+             (Thread/sleep 5)
+             (recur state-atom guid))))))))
 
 (def ok-response {:status 200 :headers {"Content-Type" "application/json"} :body {:type :ok}})
 
@@ -151,6 +160,7 @@
 
     (testing "with an invalid RDF file"
       (let [test-request (-> {:uri "/draft" :request-method :post}
+                             ;; project.clj is not RDF
                              (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "project.clj"))
 
             route (draft-api-routes "/draft" *test-db*)
@@ -175,11 +185,14 @@
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
+        (println response)
         (await-completion finished-jobs (:id body))
 
         (testing "appends RDF to the graph"
-          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-1> ?p ?o . }}")) "graph has got new data in" )
-          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . }}")) "graph has still got the old data in ")))))
+          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-1> ?p ?o . }}"))
+              "graph has got new data in")
+          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . }}"))
+              "graph has still got the old data in")))))
 
   (testing "PUT /draft with a source file"
     (make-graph-live! *test-db* "http://mygraph/graph-to-be-replaced")
@@ -261,7 +274,8 @@
                                (add-request-graph "http://mygraph/live-graph"))
               response (route test-request)]
 
-          (is-success response)
+          (job-is-accepted response)
+          (await-completion finished-jobs (:id (:body response)))
 
           (testing "delete job actually deletes the graph"
             (is (not (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }"))

@@ -8,18 +8,29 @@
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [grafter.rdf.repository :refer [->connection query
-                                            with-transaction]]))
+                                            with-transaction]]
+            [environ.core :refer [env]]))
 
-(def batched-write-size 10000)
+(defn batched-write-size []
+  (Integer/parseInt (get env :drafter-batched-write-size "10000")))
+
+(defmacro with-job-exception-handling [job & forms]
+  `(try
+     ~@forms
+     (catch clojure.lang.ExceptionInfo exi#
+       (complete-job! ~job {:type :error
+                            :error-type (str (class exi#))
+                            :exception (.getCause exi#)}))
+     (catch Exception ex#
+       (complete-job! ~job {:type :error
+                            :error-type (str (class ex#))
+                            :exception ex#}))))
 
 (defmacro make-job [write-priority [job :as args] & forms]
   `(create-job ~write-priority
                (fn [~job]
-                 (try
-                   ~@forms
-                   (catch Exception ex#
-                     (complete-job! ~job {:type :error
-                                          :exception ex#}))))))
+                 (with-job-exception-handling ~job
+                   ~@forms))))
 
 (defn create-draft-job [repo live-graph params]
   (make-job :sync-write [job]
@@ -44,7 +55,7 @@
   ;;
   ;; And loop until the graph is empty?
 
-  (make-job :sync-write [job]
+  (make-job :exclusive-write [job]
             (let [conn (->connection repo)]
               (with-transaction conn
                 (mgmt/delete-graph-and-draft-state! conn graph)))
@@ -73,24 +84,25 @@
             (complete-job! job restapi/ok-response)))
 
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
-  (let [conn (->connection repo)
-        [current-batch remaining-triples] (split-at batched-write-size triples)]
+  (with-job-exception-handling job
+    (let [conn (->connection repo)
+          [current-batch remaining-triples] (split-at (batched-write-size) triples)]
 
-    (log/info (str "Adding a batch of triples to repo" current-batch))
-    (with-transaction conn
-      (mgmt/append-data! conn draft-graph current-batch))
+      (log/info (str "Adding a batch of triples to repo" current-batch))
+      (with-transaction conn
+        (mgmt/append-data! conn draft-graph current-batch))
 
-    (if-not (empty? remaining-triples)
-      ;; resubmit the remaining batches under the same job to the
-      ;; queue to give higher priority jobs a chance to write
-      (let [apply-next-batch (partial append-data-in-batches repo draft-graph metadata
-                                      remaining-triples)]
-        (submit-job! (assoc job :function apply-next-batch)))
+      (if-not (empty? remaining-triples)
+        ;; resubmit the remaining batches under the same job to the
+        ;; queue to give higher priority jobs a chance to write
+        (let [apply-next-batch (partial append-data-in-batches repo draft-graph metadata
+                                        remaining-triples)]
+          (submit-job! (assoc job :function apply-next-batch)))
 
-      (do
-        (mgmt/add-metadata-to-graph conn draft-graph metadata)
-        (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
-        (complete-job! job restapi/ok-response)))))
+        (do
+          (mgmt/add-metadata-to-graph conn draft-graph metadata)
+          (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
+          (complete-job! job restapi/ok-response))))))
 
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
@@ -112,7 +124,7 @@
 
   (let [new-triples (statements tempfile
                                 :format (mimetype->rdf-format content-type)
-                                :buffer-size batched-write-size)
+                                :buffer-size (batched-write-size))
 
         ;; NOTE that this is technically not transactionally safe as
         ;; sesame currently only supports the READ_COMMITTED isolation

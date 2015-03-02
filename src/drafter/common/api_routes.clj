@@ -24,6 +24,9 @@
 
 (def ok-response (api-response 200 {:type :ok}))
 
+(defn not-found-response [message]
+  (api-response 404 {:type :not-found :message message}))
+
 (defn error-response
   [code map]
   (api-response code (merge default-error-map map)))

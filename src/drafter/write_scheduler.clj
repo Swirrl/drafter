@@ -1,6 +1,7 @@
 (ns drafter.write-scheduler
   (:require [clojure.tools.logging :as log]
-            [drafter.common.api-routes :as api-routes])
+            [drafter.common.api-routes :as api-routes]
+            [drafter.routes.status :refer [finished-job-route]])
   (:import (java.util UUID)
            (java.util.concurrent PriorityBlockingQueue)
            (java.util.concurrent.locks ReentrantLock)
@@ -19,7 +20,7 @@
                        (= -1 (compare [(ordering type1) time1]
                                       [(ordering type2) time2]))))))
 
-(defonce ^:private global-writes-lock (ReentrantLock.))
+(defonce global-writes-lock (ReentrantLock.))
 
 (defonce ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
@@ -50,7 +51,7 @@
   (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
 
 (defn- submitted-job-response [job]
-  {:status 202 :body {:type :ok :id (:id job)}})
+  (api-routes/api-response 202 {:type :ok :id (finished-job-route job)}))
 
 (defn- unknown-error-response [job-result]
   (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)}))
