@@ -50,6 +50,7 @@ Configurable properties and their defaults are:
     DRAFTER_HTTP_PORT:            (default 3001)
     DRAFTER_REPO_PATH:            (default "drafter-db")
     DRAFTER_INDEXES:              spoc,posc,cosp (Best for query performance, slowest for insert)
+    DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
 
 Some examples of supplying these properties are provided below:
 
