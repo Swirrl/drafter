@@ -75,6 +75,15 @@
      }
    } LIMIT 10")
 
+(def graph-values-query
+  "SELECT * WHERE {
+     GRAPH ?g {
+       ?s ?p ?o
+     }
+     VALUES ?g { <http://frogs.com/live-graph> }
+   }"
+  )
+
 (defn first-result [results key]
   (-> results first (get key) str))
 
@@ -109,7 +118,14 @@
         (is (= "http://frogs.com/live-graph"
                (-> db
                    (evaluate-with-graph-rewriting uri-query graph-map)
-                   (first-result "g")))))))))
+                   (first-result "g")))))
+
+      (testing "rewrites source graphs in VALUES clause"
+        (is (= "http://frogs.com/live-graph"
+               (-> db
+                   (evaluate-with-graph-rewriting graph-values-query graph-map)
+                   (first-result "g"))))
+        )))))
 
 (deftest rewrite-update-request-test
   (let [db (repo)
