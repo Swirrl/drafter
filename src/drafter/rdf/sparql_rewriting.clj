@@ -9,11 +9,13 @@
             BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
             StatementImpl BNodeImpl ContextStatementImpl]
            [org.openrdf.query QueryLanguage Update Query]
+           [org.openrdf.query.impl BindingImpl MapBindingSet]
            [org.openrdf.repository.sail SailUpdate]
            [org.openrdf.query.parser QueryParserUtil ParsedQuery ParsedUpdate]
            [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
            [org.openrdf.query.algebra.evaluation.function Function]
-           [org.openrdf.query.algebra UpdateExpr TupleExpr Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr]
+           [org.openrdf.query.algebra UpdateExpr TupleExpr Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr
+            BindingSetAssignment]
            [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
 
 (def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
@@ -114,6 +116,47 @@
            (.setValue context new-uri))))
      query-ast))
 
+(defn rewrite-binding
+  "Rewrites the value of a Binding if it appears in the given graph map"
+  [binding graph-map]
+  (if-let [mapped-graph (get graph-map (.getValue binding))]
+    (BindingImpl. (.getName binding) mapped-graph)
+    binding))
+
+;binding-seq->binding-set :: Seq[Binding] -> BindingSet
+(defn binding-seq->binding-set
+  "Creates a BindingSet instance from a sequence of Bindings"
+  [bindings]
+  (let [bs (MapBindingSet.)]
+    (doseq [b bindings]
+      (.addBinding bs b))
+    bs))
+
+;rewrite-binding-set :: BindingSet -> Map[URI, URI] -> BindingSet
+(defn rewrite-binding-set
+  "Creates a new BindingSet where each value is re-written according
+  to the given graph mapping."
+  [binding-set graph-map]
+  (let [mapped-bindings (map #(rewrite-binding % graph-map) binding-set)]
+    (binding-seq->binding-set mapped-bindings)))
+
+;update-binding-set-assignment :: BindingSetAssignment -> Map[URI, URI] -> ()
+(defn update-binding-set-assignment!
+  "Modifies all the BindingSets in a BindingSetAssignment according to
+  the given graph mapping."
+  [bsa graph-map]
+  (let [rewritten-bindings (mapv #(rewrite-binding-set % graph-map) (.getBindingSets bsa))]
+    (.setBindingSets bsa rewritten-bindings)))
+
+;rewrite-binding-set-assignments :: ISparqlAst -> Map[URI, URI] -> ()
+(defn rewrite-binding-set-assignments!
+  "Rewrites all BindingSets in all BindingSetAssignment instances
+  inside the given query AST."
+  [query-ast graph-map]
+  (let [nodes (flatten-ast query-ast)]
+    (doseq [bsa (filter #(instance? BindingSetAssignment %) nodes)]
+      (update-binding-set-assignment! bsa graph-map))))
+
 (def function-registry (org.openrdf.query.algebra.evaluation.function.FunctionRegistry/getInstance))
 
 (defn register-function
@@ -163,6 +206,7 @@
     (do
       ;; NOTE the AST is mutable and referenced from the prepared-query
       (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
+      (rewrite-binding-set-assignments! query-ast query-substitutions)
 
       (when vars-in-graph-position
         (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
