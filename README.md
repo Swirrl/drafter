@@ -227,11 +227,19 @@ Graph Management Operations
 
 **Create a new draft**
 
-`POST /draft/create?live-graph=GURI`
+| Verbs | Route           | Synchronous |
+|-------+-----------------+-------------|
+| POST  | `/draft/create` | Yes         |
 
-Supply the ultimate intended live graph uri.
+This route synchronously creates a new draft and returns the `GURI`
+(Graph URI) of the draft graph in its response object.
 
-Synchronously creates a new draft and returns the `GURI` (Graph URI) of the draft graph.
+It accepts the following parameters:
+
+| Parameter    | Required | Description                                                             |
+|--------------+----------+-------------------------------------------------------------------------|
+| `live-graph` | Yes      | The Graph URI of the live graph that this is a draft graph of.          |
+| `meta-???`   | No       | Key/Value pair for metadata to attach to this draft in the state graph. |
 
 **Add content from a file to a draft**
 
@@ -246,13 +254,6 @@ Must contain the file of triples with a correct mime-type.
 The file must be supplied as multi-part-form data under the key `file`.
 
 Returns a 202 if enqueued successfully, with the `queue-id` in the response body
-
-**Add content from another graph to a draft**
-
-`PUT | POST /draft?graph=graph-uri&source-graph=GURI`
-
-Same as above, but instead of reading the file from the request body, it takes
-the data from the supplied `source-graph`.
 
 **Delete a draft or live graph**
 
@@ -289,10 +290,6 @@ Returns a 202 if enqueued successfully, with the `queue-id` in the response body
 For all of the above routes, you can supply additional k-v pairs (slug->str). The slug should start `meta-`. e.g.
 
 `PUT | POST /draft?graph=graph-uri&source-graph=GURI&meta-foo=bar`
-
-For `POST/draft/create`, it will add metadata to the state graph.
-
-For the rest, it will add metadata to the queue :meta (as URI->str) (available via `/queue/peek`)
 
 Dumps End Points
 ================
