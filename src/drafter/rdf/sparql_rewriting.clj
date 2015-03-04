@@ -2,6 +2,7 @@
   (:require
    [grafter.rdf.repository :as repo]
    [grafter.rdf :refer [prefixer]]
+   [drafter.util :refer [map-values]]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
   (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
@@ -227,13 +228,6 @@
       (rewrite-query-value-constants! query-ast query-substitutions)
 
       prepared-query)))
-
-;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
-(defn map-values
-  "Maps"
-  [f m]
-  (let [mapped-pairs (map (fn [[k v]] [k (f v)]) m)]
-    (into {} mapped-pairs)))
 
 ;apply-map-or-default :: Map[a, a] -> (a -> a)
 (defn apply-map-or-default
