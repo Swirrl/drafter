@@ -81,11 +81,28 @@
        ?s ?p ?o
      }
      VALUES ?g { <http://frogs.com/live-graph> }
-   }"
-  )
+   }")
+
+(def graph-filter-query
+  "SELECT * WHERE {
+    GRAPH ?g {
+      ?s ?p ?o
+    }
+    FILTER( ?g = <http://frogs.com/live-graph> )
+    }")
 
 (defn first-result [results key]
   (-> results first (get key) str))
+
+(defn juxt-keys [ks]
+  (let [fns (map (fn [k] (fn [m] (get m k))) ks)]
+    (apply juxt fns)))
+
+(defn result-keys [m ks]
+  (mapv str ((juxt-keys ks) m)))
+
+(defn first-result-keys [results ks]
+  (result-keys (first results) ks))
 
 (deftest query-and-result-rewriting-test
   (let [db (repo)
@@ -93,6 +110,62 @@
         graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
 
     (append-data! db draft-graph (test-triples "http://kermit.org/the-frog"))
+
+    (testing "rewrites subject URIs"
+      (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { <http://kermit.org/the-frog> ?p ?o } }"
+            mapped-subject "http://mapped-subject"
+            graph-map (assoc graph-map (URIImpl. "http://kermit.org/the-frog") (URIImpl. mapped-subject))
+            po ["http://predicate" "http://object"]
+            mapped-triples (triplify [mapped-subject po])]
+
+        (append-data! db draft-graph mapped-triples)
+
+        (is (= po
+               (-> db
+                   (evaluate-with-graph-rewriting query graph-map)
+                   (first-result-keys ["p" "o"]))))))
+
+    (testing "rewrites predicate URIs"
+      (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { ?s <http://source-predicate> ?o } }"
+            mapped-predicate "http://mapped-predicate"
+            graph-map (assoc graph-map (URIImpl. "http://source-predicate") (URIImpl. mapped-predicate))
+            mapped-triples (triplify ["http://kermit.org/the-frog" [mapped-predicate "http://object"]])]
+
+        (append-data! db draft-graph mapped-triples)
+
+        (is (= ["http://kermit.org/the-frog" "http://object"]
+               (-> db
+                   (evaluate-with-graph-rewriting query graph-map)
+                   (first-result-keys ["s" "o"]))))))
+
+    (testing "rewrites object URIs"
+      (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { ?s ?p <http://source-object> } }"
+            mapped-object "http://mapped-object"
+            graph-map (assoc graph-map (URIImpl. "http://source-object") (URIImpl. mapped-object))
+            mapped-triples (triplify ["http://kermit.org/the-frog" ["http://predicate" mapped-object]])]
+
+        (append-data! db draft-graph mapped-triples)
+
+        (is (= ["http://kermit.org/the-frog" "http://predicate"]
+               (-> db
+                   (evaluate-with-graph-rewriting query graph-map)
+                   (first-result-keys ["s" "p"]))))))
+
+    (testing "rewrites all result URIs"
+      (let [query "SELECT * WHERE { ?s ?p ?o }"
+            db (repo)
+            live-triple ["http://live-subject" "http://live-predicate" "http://live-object"]
+            draft-triple ["http://draft-subject" "http://draft-predicate" "http://draft-object"]
+            [live-subject live-predicate live-object] live-triple
+            [draft-subject draft-predicate draft-object] draft-triple
+            graph-map (apply hash-map (map #(URIImpl. %) (interleave live-triple draft-triple)))]
+        
+        (append-data! db draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
+
+        (is (= live-triple
+               (-> db
+                   (evaluate-with-graph-rewriting query graph-map)
+                   (first-result-keys ["s" "p" "o"]))))))
 
     (testing "rewrites query to query draft graph"
       ;; NOTE this query rewrites the URI constant <http://frogs.com/live-graph>
@@ -124,6 +197,13 @@
         (is (= "http://frogs.com/live-graph"
                (-> db
                    (evaluate-with-graph-rewriting graph-values-query graph-map)
+                   (first-result "g"))))
+        )
+
+      (testing "rewrites source graph literals in FILTER clause"
+        (is (= "http://frogs.com/live-graph"
+               (-> db
+                   (evaluate-with-graph-rewriting graph-filter-query graph-map)
                    (first-result "g"))))
         )))))
 
