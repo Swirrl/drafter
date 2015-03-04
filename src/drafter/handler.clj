@@ -8,7 +8,7 @@
             [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
             [drafter.middleware :as middleware]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
-            [drafter.routes.sparql-update :refer [draft-update-endpoint-route state-update-endpoint-route live-update-endpoint-route raw-update-endpoint-route]]
+            [drafter.routes.sparql-update :refer [state-update-endpoint-route live-update-endpoint-route raw-update-endpoint-route]]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
             [selmer.parser :as parser]
@@ -75,7 +75,6 @@
                          (dumps-endpoint "/data/raw" raw-sparql-routes repo)
 
                          (draft-sparql-routes "/sparql/draft" repo)
-                         (draft-update-endpoint-route "/sparql/draft/update" repo)
                          (dumps-endpoint "/data/draft" draft-sparql-routes repo)
 
                          (state-sparql-routes "/sparql/state" repo)
