@@ -268,20 +268,3 @@
        (let [prepared-query (doto (rewrite-graph-query repo query-str query-substitutions)
                               (.setDataset dataset))]
          (rewrite-graph-results query-substitutions prepared-query))))
-
-(defn rewrite-update-request [preped-update graph-substitutions]
-  (when (vars-in-graph-position preped-update)
-    (let [binding-set (.getBindings preped-update)
-          query-ast (-> preped-update .getParsedUpdate .getUpdateExprs first)
-          vars-in-graph-position (vars-in-graph-position query-ast)]
-      (do
-        ;; NOTE the AST is mutable and referenced from the prepared-query
-        (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
-
-        (when vars-in-graph-position
-          (rewrite-graph-constants query-ast graph-substitutions vars-in-graph-position)
-          (log/debug "Rewriten SPARQL Update AST: " preped-update))
-
-        preped-update)))
-
-  preped-update)
