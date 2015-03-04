@@ -15,7 +15,7 @@
            [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
            [org.openrdf.query.algebra.evaluation.function Function]
            [org.openrdf.query.algebra UpdateExpr TupleExpr Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr
-            BindingSetAssignment]
+            BindingSetAssignment ValueConstant]
            [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
 
 (def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
@@ -157,6 +157,22 @@
     (doseq [bsa (filter #(instance? BindingSetAssignment %) nodes)]
       (update-binding-set-assignment! bsa graph-map))))
 
+(defn get-query-nodes-of-type [type query-ast]
+  (filter #(instance? type %) (flatten-ast query-ast)))
+
+(defn get-query-vars [query-ast]
+  (get-query-nodes-of-type Var query-ast))
+
+(defn rewrite-query-vars! [query-ast graph-map]
+  (let [vars (get-query-vars query-ast)]
+    (rewrite-graph-constants query-ast graph-map vars)))
+
+(defn rewrite-query-value-constants! [query-ast graph-map]
+  (let [value-constants (get-query-nodes-of-type ValueConstant query-ast)]
+    (doseq [c value-constants]
+      (when-let [rewritten (get graph-map (.getValue c))]
+        (.setValue c rewritten)))))
+
 (def function-registry (org.openrdf.query.algebra.evaluation.function.FunctionRegistry/getInstance))
 
 (defn register-function
@@ -207,26 +223,42 @@
       ;; NOTE the AST is mutable and referenced from the prepared-query
       (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
       (rewrite-binding-set-assignments! query-ast query-substitutions)
-
-      (when vars-in-graph-position
-        (rewrite-graph-constants query-ast query-substitutions vars-in-graph-position)
-        (log/debug "Rewriten SPARQL Query AST: " prepared-query))
+      (rewrite-query-vars! query-ast query-substitutions)
+      (rewrite-query-value-constants! query-ast query-substitutions)
 
       prepared-query)))
 
+;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
+(defn map-values
+  "Maps"
+  [f m]
+  (let [mapped-pairs (map (fn [[k v]] [k (f v)]) m)]
+    (into {} mapped-pairs)))
+
+;apply-map-or-default :: Map[a, a] -> (a -> a)
+(defn apply-map-or-default
+  "Returns a function with a single argument. When applied, it sees if
+  the value is a key in the source map - if it exists, the
+  corresponding value is returned, otherwise the argument is
+  returned."
+  [m]
+  (fn [r]
+    (if-let [mapped (get m r)]
+      mapped
+      r)))
+
+;rewrite-result :: Map[Uri, Uri] -> Map[a, Uri] -> Map[a, Uri]
+(defn rewrite-result
+  "Rewrites all the values in a result based on the given draft->live
+  graph mapping."
+  [graph-map r]
+  (map-values (apply-map-or-default graph-map) r))
+
 (defn rewrite-graph-results [query-substitutions prepared-query]
   (let [query-ast (.getParsedQuery prepared-query)]
-
-    (if-let [vars-in-graph-position (seq (vars-in-graph-position query-ast))]
-      (let [;; filter out constant values in graph position, leaving just "variables"
-            unbound-var-names (filter (complement #(.isConstant %)) vars-in-graph-position)
-            graph-var-names (map #(.getName %)
-                                 unbound-var-names)
-            result-substitutions (set/map-invert query-substitutions)]
-
+    (let [result-substitutions (set/map-invert query-substitutions)]
         (->> (repo/evaluate prepared-query)
-             (map (partial substitute-results result-substitutions graph-var-names))))
-      (repo/evaluate prepared-query))))
+             (map #(rewrite-result result-substitutions %))))))
 
 (defn evaluate-with-graph-rewriting
   "Rewrites the results in the query."
