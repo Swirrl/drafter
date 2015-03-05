@@ -32,9 +32,7 @@
       (.handleLinks writer link-urls))
     (handleSolution [this binding-set]
       (log/debug "select result wrapper " this  "writer: " writer)
-      (solution-handler-fn writer binding-set)
-      ;;(.handleSolution writer binding-set)
-      )
+      (solution-handler-fn writer binding-set))
     (startQueryResult [this binding-names]
       (.startQueryResult writer binding-names))))
 
@@ -55,37 +53,29 @@
       (.addBinding bs (.getName binding) (.getValue binding)))
     bs))
 
+(defn- rewrite-graph-result [vars draft->live ^QueryResultHandler writer ^BindingSet binding-set]
+  (let [new-binding-set (clone-binding-set binding-set)]
+    ;; Copy binding-set as mutating it whilst writing (iterating)
+    ;; results causes bedlam with the iteration, especially with SPARQL
+    ;; DISTINCT queries.
+    (log/trace "old binding set: " binding-set "new binding-set" new-binding-set)
+    (doseq [var vars]
+      (when-not (.isConstant var)
+        (when-let [val (.getValue binding-set (.getName var))]
+          ;; only rewrite results if the value is bound as a return
+          ;; value (i.e. it's a named result parameter for SELECT)
+          (let [new-uri (get draft->live val val)]
+            (log/trace "Substituting val" val "for new-uri:" new-uri "for var:" var)
+            (.addBinding new-binding-set (.getName var) new-uri)))))
+    (.handleSolution writer new-binding-set)))
+
 (defn- choose-result-rewriter [query-ast vars-in-graph-position draft->live writer]
-  (if (seq vars-in-graph-position)
-    ;; if there are vars in graph position - we should rewrite the
-    ;; results
-    (let [rewrite-graph-result (fn [^QueryResultHandler writer ^BindingSet binding-set]
-                                 (log/debug "vars in graph position" vars-in-graph-position)
-
-                                 (if (seq vars-in-graph-position)
-                                   (let [new-binding-set (clone-binding-set binding-set)]
-                                     ;; Copy binding-set as mutating it whilst writing (iterating)
-                                     ;; results causes bedlam with the iteration, especially with SPARQL
-                                     ;; DISTINCT queries.
-                                     (log/trace "old binding set: " binding-set "new binding-set" new-binding-set)
-                                     (doseq [var vars-in-graph-position]
-                                       (when-not (.isConstant var)
-                                         (when-let [val (.getValue binding-set (.getName var))]
-                                           ;; only rewrite results if the value is bound as a return
-                                           ;; value (i.e. it's a named result parameter for SELECT)
-                                           (let [new-uri (get draft->live val val)]
-                                             (log/trace "Substituting val" val "for new-uri:" new-uri "for var:" var)
-                                             (.addBinding new-binding-set (.getName var) new-uri)))))
-                                     (.handleSolution writer new-binding-set))
-                                   (.handleSolution writer binding-set)))]
-      (cond
-       (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
-       (instance? ParsedTupleQuery query-ast) (make-select-result-rewriter rewrite-graph-result writer)
-       (instance? ParsedBooleanQuery query-ast) writer
-       :else writer))
-
-    ;; else return the standard writer
-    writer))
+  (cond
+   (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
+   (instance? ParsedTupleQuery query-ast) (let [rewriter #(rewrite-graph-result vars-in-graph-position draft->live %1 %2)]
+                                            (make-select-result-rewriter rewriter writer))
+   (instance? ParsedBooleanQuery query-ast) writer
+   :else writer))
 
 (defn make-draft-query-rewriter [repo query-str draft-uris]
   (let [live->draft (log/spy (mgmt/graph-map repo draft-uris))
@@ -97,7 +87,7 @@
 
      :result-rewriter
      (fn [writer]
-       (let [query-ast (-> preped-query .getParsedQuery)
+       (let [query-ast (.getParsedQuery preped-query)
              vars-in-graph-position (rew/vars-in-graph-position query-ast)
              draft->live (set/map-invert live->draft)]
          (choose-result-rewriter query-ast vars-in-graph-position draft->live writer)))
