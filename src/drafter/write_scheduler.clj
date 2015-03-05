@@ -14,8 +14,8 @@
 (def compare-jobs (comparator
                    (fn [job1 job2]
                      (let [ordering priority-levels-map
-                           {type1 :type time1 :time} job1
-                           {type2 :type time2 :time} job2]
+                           {type1 :priority time1 :time} job1
+                           {type2 :priority time2 :time} job2]
 
                        (= -1 (compare [(ordering type1) time1]
                                       [(ordering type2) time2]))))))
@@ -37,12 +37,12 @@
          (log/info "Unlocking :exclusive-write lock")
          (.unlock global-writes-lock)))))
 
-(defrecord Job [id type time function value-p])
+(defrecord Job [id priority time function value-p])
 
-(defn create-job [type f & metadata]
-  {:pre [(all-priority-types type)]}
+(defn create-job [priority f]
+  {:pre [(all-priority-types priority)]}
   (->Job (UUID/randomUUID)
-         type
+         priority
          (System/currentTimeMillis)
          f
          (promise)))
@@ -83,27 +83,32 @@
 
 (defn submit-job!
   "Submit a write job to the job queue for execution."
-  [job & [metadata]]
-  (let [job (with-meta job metadata)]
-    (log/info "Queueing job: " job)
-    (if (= :exclusive-write (:type job))
-      (do
-        (log/trace "Queueing :exclusive-write job")
-        (.add writes-queue job)
-        (submitted-job-response job))
-      (if (.tryLock global-writes-lock)
-        ;; We try the lock, not because we need the lock, but because we
-        ;; need to 503/refuse the addition of an item if the lock is
-        ;; taken.
-        (do (try
-              (.add writes-queue job)
-              (finally
-                (.unlock global-writes-lock)))
-            (if (= :sync-write (:type job))
-              (blocking-response job)
-              (submitted-job-response job)))
 
-        temporarily-locked-for-writes-response))))
+  [job restart-id]
+  (log/info "Queueing job: " job)
+  (if (= :exclusive-write (:priority job))
+    (do
+      (log/trace "Queueing :exclusive-write job on queue" writes-queue)
+      (.add writes-queue job)
+      (submitted-job-response job restart-id))
+    (if (.tryLock global-writes-lock)
+      ;; We try the lock, not because we need the lock, but because we
+      ;; need to 503/refuse the addition of an item if the lock is
+      ;; taken.
+      (do (try
+            (.add writes-queue job)
+            (finally
+              (.unlock global-writes-lock)))
+          (if (= :sync-write (:priority job))
+            (blocking-response job)
+            (submitted-job-response job restart-id)))
+
+      temporarily-locked-for-writes-response)))
+
+(defn submit-sync-job!
+  [job]
+  {:pre [(= :sync-write (:priority job))]}
+  (submit-job! job nil))
 
 (defn complete-job!
   "Adds the job to the state map of finished-jobs and delivers the
@@ -125,16 +130,16 @@
   []
   (log/info "Writer started waiting for tasks")
     (loop [{task-f! :function
-            type :type
+            priority :priority
             job-id :id
             promis :value-p :as job} (.take writes-queue)]
       (try
         ;; Note that task functions are responsible for the delivery
         ;; of the promise and the setting of DONE and also preserve
         ;; their job id.
-        (log/info "Executing job at write-priority" type)
+        (log/info "Executing job" job)
 
-        (if (= :exclusive-write type)
+        (if (= :exclusive-write priority)
           (with-lock
             (task-f! job))
           (task-f! job))
