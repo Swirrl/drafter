@@ -3,16 +3,18 @@
    [grafter.rdf.repository :as repo]
    [grafter.rdf :refer [prefixer]]
    [drafter.util :refer [map-values]]
+   [drafter.rdf.draft-management :as mgmt]
+   [drafter.rdf.sparql-protocol :refer [result-handler-wrapper]]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
   (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
            [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
             BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
             StatementImpl BNodeImpl ContextStatementImpl]
-           [org.openrdf.query QueryLanguage Update Query]
+           [org.openrdf.query QueryLanguage Update Query QueryResultHandler TupleQueryResultHandler BindingSet Binding]
            [org.openrdf.query.impl BindingImpl MapBindingSet]
            [org.openrdf.repository.sail SailUpdate]
-           [org.openrdf.query.parser QueryParserUtil ParsedQuery ParsedUpdate]
+           [org.openrdf.query.parser QueryParserUtil ParsedQuery ParsedUpdate ParsedGraphQuery ParsedTupleQuery ParsedBooleanQuery]
            [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
            [org.openrdf.query.algebra.evaluation.function Function]
            [org.openrdf.query.algebra UpdateExpr TupleExpr Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr
@@ -231,3 +233,79 @@
        (let [prepared-query (doto (rewrite-graph-query repo query-str query-substitutions)
                               (.setDataset dataset))]
          (rewrite-graph-results query-substitutions prepared-query))))
+
+(defn- make-select-result-rewriter
+  "Creates a new SPARQLResultWriter that proxies to the supplied
+  result handler, but rewrites solutions according to the supplied
+  solution-handler-fn."
+  [solution-handler-fn writer]
+  (reify
+    TupleQueryResultHandler
+    (endQueryResult [this]
+      (.endQueryResult writer))
+    (handleBoolean [this boolean]
+      (.handleBoolean writer boolean))
+    (handleLinks [this link-urls]
+      (.handleLinks writer link-urls))
+    (handleSolution [this binding-set]
+      (log/debug "select result wrapper " this  "writer: " writer)
+      (solution-handler-fn writer binding-set))
+    (startQueryResult [this binding-names]
+      (.startQueryResult writer binding-names))))
+
+(defn- make-construct-result-rewriter
+  "Creates a result-rewriter for construct queries - not a tautology
+  honest!"
+  [writer draft->live]
+  (if (instance? QueryResultHandler writer)
+    (result-handler-wrapper writer draft->live)
+    writer))
+
+(defn- clone-binding-set
+  "Copy a binding set"
+  [binding-set]
+  (let [bs (MapBindingSet.)]
+    (doseq [^Binding binding (iterator-seq (.iterator binding-set))]
+      (log/debug "cloning binding: " (.getName binding) "val: "(.getValue binding))
+      (.addBinding bs (.getName binding) (.getValue binding)))
+    bs))
+
+(defn- rewrite-graph-result [vars draft->live ^QueryResultHandler writer ^BindingSet binding-set]
+  (let [new-binding-set (clone-binding-set binding-set)]
+    ;; Copy binding-set as mutating it whilst writing (iterating)
+    ;; results causes bedlam with the iteration, especially with SPARQL
+    ;; DISTINCT queries.
+    (log/trace "old binding set: " binding-set "new binding-set" new-binding-set)
+    (doseq [var vars]
+      (when-not (.isConstant var)
+        (when-let [val (.getValue binding-set (.getName var))]
+          ;; only rewrite results if the value is bound as a return
+          ;; value (i.e. it's a named result parameter for SELECT)
+          (let [new-uri (get draft->live val val)]
+            (log/trace "Substituting val" val "for new-uri:" new-uri "for var:" var)
+            (.addBinding new-binding-set (.getName var) new-uri)))))
+    (.handleSolution writer new-binding-set)))
+
+(defn- choose-result-rewriter [query-ast vars-in-graph-position draft->live writer]
+  (cond
+   (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
+   (instance? ParsedTupleQuery query-ast) (let [rewriter #(rewrite-graph-result vars-in-graph-position draft->live %1 %2)]
+                                            (make-select-result-rewriter rewriter writer))
+   (instance? ParsedBooleanQuery query-ast) writer
+   :else writer))
+
+(defn make-draft-query-rewriter [repo query-str draft-uris]
+  (let [live->draft (log/spy (mgmt/graph-map repo draft-uris))
+        preped-query (rewrite-graph-query repo query-str live->draft)]
+    {:query-rewriter
+     (fn [repo query-str]
+       (log/info "Using mapping: " live->draft)
+       preped-query)
+
+     :result-rewriter
+     (fn [writer]
+       (let [query-ast (.getParsedQuery preped-query)
+             vars-in-graph-position (vars-in-graph-position query-ast)
+             draft->live (set/map-invert live->draft)]
+         (choose-result-rewriter query-ast vars-in-graph-position draft->live writer)))
+     }))
