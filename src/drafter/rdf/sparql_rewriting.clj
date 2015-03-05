@@ -104,19 +104,6 @@
          ;; use distinct to preserve order of nodes instead of (into #{} ...)
          distinct)))
 
-(defn rewrite-graph-constants
-  ([query-ast graph-map]
-     (rewrite-graph-constants query-ast graph-map (filter #(.isConstant %)
-                                                          (vars-in-graph-position query-ast))))
-
-  ([query-ast graph-map context-set]
-     (doseq [context context-set]
-       (when (.isConstant context)
-         (when-let [new-uri (get graph-map (.getValue context))]
-           (log/info "Rewriting constant " context " with new-uri " new-uri)
-           (.setValue context new-uri))))
-     query-ast))
-
 (defn rewrite-binding
   "Rewrites the value of a Binding if it appears in the given graph map"
   [binding graph-map]
@@ -161,14 +148,27 @@
 (defn get-query-nodes-of-type [type query-ast]
   (filter #(instance? type %) (flatten-ast query-ast)))
 
-(defn get-query-vars [query-ast]
-  (get-query-nodes-of-type Var query-ast))
+(defn rewrite-constant-vars
+  "Rewrites the values of any constant Var nodes if they are mapped in
+  the given graph mapping."
+  [graph-map context-set]
+  (doseq [context context-set]
+    (when (.isConstant context)
+      (when-let [new-uri (get graph-map (.getValue context))]
+        (log/info "Rewriting constant " context " with new-uri " new-uri)
+        (.setValue context new-uri)))))
 
-(defn rewrite-query-vars! [query-ast graph-map]
-  (let [vars (get-query-vars query-ast)]
-    (rewrite-graph-constants query-ast graph-map vars)))
+(defn rewrite-query-vars!
+  "Rewrites all the constant Var nodes in the query AST according to a
+  graph mapping."
+  [query-ast graph-map]
+  (let [vars (get-query-nodes-of-type Var query-ast)]
+    (rewrite-constant-vars graph-map vars)))
 
-(defn rewrite-query-value-constants! [query-ast graph-map]
+(defn rewrite-query-value-constants!
+  "Rewrites all the ValueConstant nodes in a query AST according to a
+  graph mapping."
+  [query-ast graph-map]
   (let [value-constants (get-query-nodes-of-type ValueConstant query-ast)]
     (doseq [c value-constants]
       (when-let [rewritten (get graph-map (.getValue c))]
@@ -215,19 +215,20 @@
           result
           graph-var-names))
 
-(defn rewrite-graph-query [repo query-str query-substitutions]
+(defn rewrite-query-ast! [query-ast graph-map]
+  ;; NOTE the AST is mutable and referenced from the prepared-query
+  (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
+  (rewrite-binding-set-assignments! query-ast graph-map)
+  (rewrite-query-vars! query-ast graph-map)
+  (rewrite-query-value-constants! query-ast graph-map)
+  nil)
+
+(defn rewrite-graph-query [repo query-str graph-map]
   (let [prepared-query (repo/prepare-query repo query-str)
         binding-set (.getBindings prepared-query)
-        query-ast (-> prepared-query .getParsedQuery)
-        vars-in-graph-position (vars-in-graph-position query-ast)]
-    (do
-      ;; NOTE the AST is mutable and referenced from the prepared-query
-      (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
-      (rewrite-binding-set-assignments! query-ast query-substitutions)
-      (rewrite-query-vars! query-ast query-substitutions)
-      (rewrite-query-value-constants! query-ast query-substitutions)
-
-      prepared-query)))
+        query-ast (-> prepared-query .getParsedQuery)]
+    (rewrite-query-ast! query-ast graph-map)
+    prepared-query))
 
 ;apply-map-or-default :: Map[a, a] -> (a -> a)
 (defn apply-map-or-default

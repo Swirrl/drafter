@@ -18,8 +18,9 @@
 (defn rewrite-sparql-graph-query
   "Rewrite graph clauses in the supplied SPARQL query and return an AST"
   [query graph-map]
-  (rewrite-graph-constants (->sparql-ast query)
-                           graph-map))
+  (let [query-ast (->sparql-ast query)]
+    (rewrite-query-ast! query-ast graph-map)
+    query-ast))
 
 (deftest rewrite-graphs-test
   (let [graph-map {(URIImpl. "http://live-graph.com/graph1") (URIImpl. "http://draft-graph.com/graph1")}]
