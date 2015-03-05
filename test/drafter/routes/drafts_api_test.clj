@@ -195,53 +195,6 @@
         (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . } }"))
             "The data should be replaced with the new data")))))
 
-(deftest drafts-api-routes-replace-graph-test
-  (testing "PUT /draft with a source graph"
-    (testing "when source graph contains data"
-      (let [dest-graph "http://mygraph/graph-to-be-replaced"
-            source-graph "http://draft.org/source-graph-with-initial-data"]
-        (make-graph-live! *test-db* dest-graph)
-        (make-graph-live! *test-db* source-graph (test-triples "http://test.com/subject-2"))
-
-        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-1> ?p ?o . } }"))
-            "Graph should contain initial state before it is replaced")
-
-        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" source-graph "> { <http://test.com/subject-2> ?p ?o . } }"))
-            "Graph should contain initial state before it is replaced")
-
-        (let [test-request (-> {:uri "/draft" :request-method :put}
-                               (add-request-graph-source-graph dest-graph source-graph))
-
-              route (draft-api-routes "/draft" *test-db*)
-              {:keys [body] :as response} (route test-request)]
-
-          (job-is-accepted response)
-          (await-completion finished-jobs (:id body))
-
-          (testing "replaces data in the destination graph with the new data from source"
-            (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }")))))))))
-
-(deftest drafts-api-routes-replace-with-empty-graph-test
-  (testing "PUT /draft with a source graph"
-    (testing "When source graph doesn't contain data"
-
-      (let [dest-graph "http://mygraph/graph-to-be-replaced"
-            source-graph "http://draft.org/empty-source-graph"]
-
-        (make-graph-live! *test-db* dest-graph) ;; populate destination graph
-
-        (let [test-request (->  {:uri "/draft" :request-method :put}
-                                (add-request-graph-source-graph dest-graph source-graph))
-              route (draft-api-routes "/draft" *test-db*)
-              {:keys [body] :as response} (route test-request)]
-
-          (job-is-accepted response)
-          (await-completion finished-jobs (:id body))
-
-          (testing "the job when run deletes contents of the RDF graph"
-            (is (= false (repo/query *test-db* (str  "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-2> ?p ?o . } }")))
-                "Destination graph should be deleted")))))))
-
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph"
       (do
