@@ -63,13 +63,6 @@
   UpdateExpr
   (->root-node [this] this))
 
-(defn vars-in-graph-position
-  "Given a parsed query Expr and returns the vars which are
-  bound in Graph position."
-  [ast-like]
-  (let [expr (->root-node ast-like)]
-    (vec (remove nil? (map #(.getContextVar %) (StatementPatternCollector/process expr))))))
-
 (defn flatten-ast [ast-like]
   (->> (->root-node ast-like)
        drafter.rdf.ClojureCollector/process
@@ -207,10 +200,7 @@
   corresponding value is returned, otherwise the argument is
   returned."
   [m]
-  (fn [r]
-    (if-let [mapped (get m r)]
-      mapped
-      r)))
+  (fn [r] (get m r r)))
 
 ;rewrite-result :: Map[Uri, Uri] -> Map[a, Uri] -> Map[a, Uri]
 (defn rewrite-result
@@ -261,35 +251,19 @@
     (result-handler-wrapper writer draft->live)
     writer))
 
-(defn- clone-binding-set
-  "Copy a binding set"
-  [binding-set]
-  (let [bs (MapBindingSet.)]
-    (doseq [^Binding binding (iterator-seq (.iterator binding-set))]
-      (log/debug "cloning binding: " (.getName binding) "val: "(.getValue binding))
-      (.addBinding bs (.getName binding) (.getValue binding)))
-    bs))
-
-(defn- rewrite-graph-result [vars draft->live ^QueryResultHandler writer ^BindingSet binding-set]
-  (let [new-binding-set (clone-binding-set binding-set)]
-    ;; Copy binding-set as mutating it whilst writing (iterating)
-    ;; results causes bedlam with the iteration, especially with SPARQL
-    ;; DISTINCT queries.
+(defn- rewrite-graph-result [graph-map ^QueryResultHandler writer ^BindingSet binding-set]
+  ;; NOTE: mutating the binding set whilst writing (iterating)
+  ;; results causes bedlam with the iteration, especially with SPARQL
+  ;; DISTINCT queries.
+  ;; rewrite-binding-set creates a new BindingSet with the modifications
+  (let [new-binding-set (rewrite-binding-set binding-set graph-map)]
     (log/trace "old binding set: " binding-set "new binding-set" new-binding-set)
-    (doseq [var vars]
-      (when-not (.isConstant var)
-        (when-let [val (.getValue binding-set (.getName var))]
-          ;; only rewrite results if the value is bound as a return
-          ;; value (i.e. it's a named result parameter for SELECT)
-          (let [new-uri (get draft->live val val)]
-            (log/trace "Substituting val" val "for new-uri:" new-uri "for var:" var)
-            (.addBinding new-binding-set (.getName var) new-uri)))))
     (.handleSolution writer new-binding-set)))
 
-(defn- choose-result-rewriter [query-ast vars-in-graph-position draft->live writer]
+(defn- choose-result-rewriter [query-ast draft->live writer]
   (cond
    (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
-   (instance? ParsedTupleQuery query-ast) (let [rewriter #(rewrite-graph-result vars-in-graph-position draft->live %1 %2)]
+   (instance? ParsedTupleQuery query-ast) (let [rewriter #(rewrite-graph-result draft->live %1 %2)]
                                             (make-select-result-rewriter rewriter writer))
    (instance? ParsedBooleanQuery query-ast) writer
    :else writer))
@@ -305,7 +279,6 @@
      :result-rewriter
      (fn [writer]
        (let [query-ast (.getParsedQuery preped-query)
-             vars-in-graph-position (vars-in-graph-position query-ast)
              draft->live (set/map-invert live->draft)]
-         (choose-result-rewriter query-ast vars-in-graph-position draft->live writer)))
+         (choose-result-rewriter query-ast draft->live writer)))
      }))
