@@ -66,11 +66,7 @@
   bound in Graph position."
   [ast-like]
   (let [expr (->root-node ast-like)]
-    (reduce (fn [acc val]
-              (if-let [var (.getContextVar val)]
-                (conj acc var)
-                acc))
-            [] (StatementPatternCollector/process expr))))
+    (vec (remove nil? (map #(.getContextVar %) (StatementPatternCollector/process expr))))))
 
 (defn flatten-ast [ast-like]
   (->> (->root-node ast-like)
