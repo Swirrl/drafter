@@ -34,10 +34,12 @@
   ;; Note that though the classes and requires below aren't used in this namespace
   ;; they are needed by the log-config file which is loaded from here.
   (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
-           [org.apache.log4j.helpers DateLayout])
+           [org.apache.log4j.helpers DateLayout]
+           [java.util UUID])
 
   (:require [clj-logging-config.log4j :refer [set-loggers!]]))
 
+(defonce process-id (UUID/randomUUID))
 
 (def default-repo-path "drafter-db")
 
@@ -79,8 +81,8 @@
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         [(pages-routes repo)
-                         (draft-api-routes "/draft" repo)
-                         (graph-management-routes "/graph" repo)
+                         (draft-api-routes "/draft" repo process-id)
+                         (graph-management-routes "/graph" repo process-id)
 
                          (live-sparql-routes "/sparql/live" repo)
                          (live-update-endpoint-route "/sparql/live/update" repo)
@@ -98,7 +100,7 @@
                          (state-update-endpoint-route "/sparql/state/update" repo)
 
                          (context "/status" []
-                                        (status-routes global-writes-lock finished-jobs))
+                                  (status-routes global-writes-lock finished-jobs process-id))
 
                          app-routes]
                         ;; add custom middleware here

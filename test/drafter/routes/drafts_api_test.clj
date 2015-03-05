@@ -13,6 +13,8 @@
 
 (def test-graph-uri "http://example.org/my-graph")
 
+(defonce restart-id (UUID/fromString "00000000-0000-0000-0000-000000000000"))
+
 (defn url? [u]
   (try
     (java.net.URL. u)
@@ -85,7 +87,7 @@
 (deftest drafts-api-create-draft-test
   (testing "POST /draft/create"
     (testing "without a live-graph param returns a 400 error"
-      (let [response ((draft-api-routes "/draft" *test-db*)
+      (let [response ((draft-api-routes "/draft" *test-db* restart-id)
                                            {:uri "/draft/create"
                                             :request-method :post
                                             :headers {"accept" "application/json"}})]
@@ -93,7 +95,7 @@
 
     (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
 
-      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-db*)
+      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-db* restart-id)
                                                         {:uri "/draft/create"
                                                          :request-method :post
                                                          :params {:live-graph test-graph-uri}
@@ -102,7 +104,7 @@
 
     (testing (str "with meta data" test-graph-uri " should see meta data stored")
 
-      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db*)
+      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* restart-id)
                                            {:uri "/draft/create"
                                             :request-method :post
                                             :params {:live-graph test-graph-uri "meta-foo" "foo" "meta-bar" "bar"}
@@ -148,7 +150,7 @@
             test-request (-> {:uri "/draft" :request-method :post}
                              (add-request-graph-source-file dest-graph "./test/test-triple.nt"))
 
-            route (draft-api-routes "/draft" *test-db*)
+            route (draft-api-routes "/draft" *test-db* restart-id)
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
@@ -163,7 +165,7 @@
                              ;; project.clj is not RDF
                              (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "project.clj"))
 
-            route (draft-api-routes "/draft" *test-db*)
+            route (draft-api-routes "/draft" *test-db* restart-id)
             {:keys [body] :as response} (route test-request)]
 
         (job-is-accepted response)
@@ -185,7 +187,7 @@
           test-request (->  {:uri "/draft" :request-method :put}
                             (add-request-graph dest-graph)
                             (add-request-file "./test/test-triple.nt"))
-          route (draft-api-routes "/draft" *test-db*)
+          route (draft-api-routes "/draft" *test-db* restart-id)
           {:keys [status body headers] :as response} (route test-request)]
 
       (job-is-accepted response)
@@ -203,7 +205,7 @@
         (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")
             "Graph should exist before deletion")
 
-        (let [route (graph-management-routes "/graph" *test-db*)
+        (let [route (graph-management-routes "/graph" *test-db* restart-id)
               test-request (-> {:uri "/graph" :request-method :delete}
                                (add-request-graph "http://mygraph/live-graph"))
               response (route test-request)]
@@ -221,7 +223,7 @@
       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
           "Draft graph should exist before deletion")
 
-      (let [route (graph-management-routes "/graph" *test-db*)
+      (let [route (graph-management-routes "/graph" *test-db* restart-id)
             test-request (-> {:uri "/graph/live" :request-method :put
                               :params {:graph draft-graph}})
 
@@ -239,7 +241,7 @@
     (let [draft-graph-1 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-1" (test-triples "http://test.com/subject-1"))
           draft-graph-2 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-2" (test-triples "http://test.com/subject-1"))]
 
-      (let [route (graph-management-routes "/graph" *test-db*)
+      (let [route (graph-management-routes "/graph" *test-db* restart-id)
             test-request {:uri "/graph/live"
                           :request-method :put
                           :params {:graph [draft-graph-1 draft-graph-2]}}
@@ -271,7 +273,7 @@
  (deftest test-name
    (testing "Updating draft graph with metadata"
      (testing "Adds metadata"
-       (let [route (draft-api-routes "/draft" *test-db*)
+       (let [route (draft-api-routes "/draft" *test-db* restart-id)
              source-graph-uri (make-graph-live! *test-db* "http://mygraph/source-graph")
              draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
 

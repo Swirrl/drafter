@@ -50,8 +50,10 @@
 (defn- invalid-rdf-response [job-result]
   (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
 
-(defn- submitted-job-response [job]
-  (api-routes/api-response 202 {:type :ok :id (finished-job-route job)}))
+(defn- submitted-job-response [job restart-id]
+  (api-routes/api-response 202 {:type :ok
+                                :finished-job (finished-job-route job)
+                                :restart-id restart-id}))
 
 (defn- unknown-error-response [job-result]
   (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)}))
