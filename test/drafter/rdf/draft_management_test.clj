@@ -3,7 +3,7 @@
    [drafter.test-common :refer [*test-db* wrap-with-clean-test-db make-graph-live!]]
    [grafter.rdf :refer [s add add-statement]]
    [grafter.rdf.templater :refer [graph triplify]]
-   [grafter.rdf.ontologies.rdf :refer :all]
+   [grafter.vocabularies.rdf :refer :all]
    [grafter.rdf.repository :refer :all]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]

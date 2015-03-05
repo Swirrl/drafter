@@ -1,5 +1,5 @@
 (ns drafter.rdf.draft-management
-  (:require [grafter.rdf.ontologies.rdf :refer :all]
+  (:require [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
