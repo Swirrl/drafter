@@ -1,0 +1,35 @@
+* Getting started
+
+Not developing drafter itself then just grab a recent build from
+[[https://build.publishmydata.com/view/Grafter%2520master/job/drafter/][Jenkins]].
+
+* Developing Drafter
+
+- clone this project
+- [[http://leiningen.org/#install][Install leiningen]]
+- cd into the project directory =cd drafter=
+- =lein repl= This will start an http server on port 3001
+
+To run a dev build of the drafter server with configuration defaults
+(port 3001 and a repo stored in =./drafter-db=) simply run:
+
+=$ lein repl=
+
+To run the tests from the console:
+
+=$ lein test=
+
+To run a test from a repl, make sure the test namespace is loaded
+(evaling it will usually do this) then run (for example):
+
+#+BEGIN_SRC clojure
+(clojure.test/run-tests 'drafter.routes.sparql-test)
+#+END_SRC
+
+To build:
+
+=$ lein uberjar=
+
+To run a built drafter server (without leiningen or a repl) on port 3001:
+
+=$ java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar=
