@@ -22,11 +22,16 @@ example file you can modify at [[https://github.com/Swirrl/drafter/blob/master/l
 
 ** Drafter's SPARQL Endpoints
 
-Drafter exposes a number of specialised SPARQL endpoints for querying they are:
+Drafter provides four [[http://www.w3.org/TR/sparql11-protocol/][SPARQL]] endpoints for querying they are:
+
+- The Live (or public) endpoint
+- The Draft endpoint
+- The State endpoint
+- The Raw endpoint
 
 =GET | POST /sparql/state?query=select * FROM...=
 
-SPARQL endpoint on state graph only
+SPARQL endpoint on state graph only:
 
 =GET | POST /sparql/live?query=select * FROM...=
 
