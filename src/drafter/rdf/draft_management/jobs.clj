@@ -143,7 +143,7 @@
         ;;
         ;; This can occur if a user does a make-live on a graph
         ;; which is being written to in a batch job.
-        ;;
+
         triples (lazy-cat (query repo
                                  (str "CONSTRUCT { ?s ?p ?o } "
                                       "WHERE { "
@@ -158,8 +158,8 @@
                           new-triples)]
 
     (create-job :batch-write
-                (partial append-data-in-batches repo draft-graph metadata
-                         triples))))
+                (partial append-data-in-batches repo
+                         draft-graph metadata triples))))
 
 (defn migrate-graph-live-job [repo graph]
   (make-job :exclusive-write [job]
