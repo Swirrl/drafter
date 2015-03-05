@@ -76,7 +76,7 @@
     (testing "returns 202 - Job accepted"
       (is (= 202 status))
       (is (= :ok (:type body)))
-      (is (instance? UUID (parse-guid (:id body)))))))
+      (is (instance? UUID (parse-guid (:finished-job body)))))))
 
 (defn is-error-response [response]
   (let [{:keys [status body headers]} response]
@@ -155,7 +155,7 @@
 
         (job-is-accepted response)
         (is (= ok-response
-               (await-completion finished-jobs (:id body))))
+               (await-completion finished-jobs (:finished-job body))))
 
         (testing "appends RDF to the graph"
           (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
@@ -171,7 +171,7 @@
         (job-is-accepted response)
 
         (testing "Stores ParseException in DONE atom of responses for later collection via REST API"
-          (let [guid (:id body)
+          (let [guid (:finished-job body)
                 error-result (await-completion finished-jobs guid)]
 
             (is (= :error (:type error-result)))
@@ -191,7 +191,7 @@
           {:keys [status body headers] :as response} (route test-request)]
 
       (job-is-accepted response)
-      (await-completion finished-jobs (:id body))
+      (await-completion finished-jobs (:finished-job body))
 
       (testing "replaces RDF in the graph"
         (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . } }"))
@@ -211,7 +211,7 @@
               response (route test-request)]
 
           (job-is-accepted response)
-          (await-completion finished-jobs (:id (:body response)))
+          (await-completion finished-jobs (:finished-job (:body response)))
 
           (testing "delete job actually deletes the graph"
             (is (not (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }"))
@@ -230,7 +230,7 @@
             {:keys [body] :as response} (route test-request)]
 
         (job-is-accepted response)
-        (await-completion finished-jobs (:id body))
+        (await-completion finished-jobs (:finished-job body))
 
         (testing "moves the draft to live"
           (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }")
@@ -249,7 +249,7 @@
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
-        (await-completion finished-jobs (:id body))
+        (await-completion finished-jobs (:finished-job body))
 
         (testing "moves the draft to live"
           (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-1> { <http://test.com/subject-1> ?p ?o } }")
@@ -286,7 +286,7 @@
          (testing "Accepts job"
            (is (= 202 status)))
 
-         (await-completion finished-jobs (:id body))
+         (await-completion finished-jobs (:finished-job body))
 
          (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "fido")]
            (is (repo/query *test-db* sparql)))
@@ -301,7 +301,7 @@
              (testing "Accepts job"
                (is (= 202 status)))
 
-             (await-completion finished-jobs (:id body))
+             (await-completion finished-jobs (:finished-job body))
 
              (let [meta-query (metadata-values-sparql draft-graph-uri "uploaded-by")
                    meta-records (repo/query *test-db* meta-query)]
