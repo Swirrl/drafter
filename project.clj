@@ -17,7 +17,7 @@
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
 
-                 [grafter "0.4.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
+                 [grafter "0.4.0" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
                  [grafter-vocabularies "0.1.0-SNAPSHOT"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
