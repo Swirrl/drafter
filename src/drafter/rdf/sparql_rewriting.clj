@@ -29,80 +29,54 @@
   ([query-string base-uri]
      (QueryParserUtil/parseQuery QueryLanguage/SPARQL query-string base-uri)))
 
-(defn- vars-in-graph-position*
-  "Given a parsed query Expr and returns the vars which are
-  bound in Graph position."
-  [expr]
-  (reduce (fn [acc val]
-            (if-let [var (.getContextVar val)]
-              (conj acc var)
-              acc))
-          [] (StatementPatternCollector/process expr)))
-
 (defprotocol ISparqlAst
-  ;; TODO extend this with other ops - perhaps more generic ones.
-  (vars-in-graph-position [query]
-    "Given a parsed query, context-set returns the set of Vars which are
-  bound in Graph position.")
-  (flatten-ast [query]))
+  (->root-node [query]))
 
 (extend-protocol ISparqlAst
   Query
-  (vars-in-graph-position [this]
-    (vars-in-graph-position (.getParsedQuery this)))
+  (->root-node [this] (.getParsedQuery this))
 
+  ;getTupleExpr :: ParsedQuery -> TupleExpr
   ParsedQuery
-  (vars-in-graph-position [this]
-    (vars-in-graph-position (.getTupleExpr this)))
+  (->root-node [this] (->root-node (.getTupleExpr this)))
 
-  (flatten-ast [query-ast]
-    (->> query-ast
-         .getTupleExpr
-         flatten-ast))
-
+  ;TupleExpr extends QueryModelNode
   TupleExpr
-  (vars-in-graph-position [this]
-    (vars-in-graph-position* this))
+  (->root-node [this] this)
 
-  (flatten-ast [te]
-    (->> te
-         drafter.rdf.ClojureCollector/process
-         ;; use distinct to preserve order of nodes instead of (into #{} ...)
-         distinct))
-
+  ;getParsedUpdate :: SailUpdate -> ParsedUpdate
   SailUpdate
-  (vars-in-graph-position [this]
-    (vars-in-graph-position (.getParsedUpdate this)))
+  (->root-node [this] (->root-node (.getParsedUpdate this)))
 
-  (flatten-ast [query-ast]
-    (->> query-ast
-         .getParsedUpdate
-         flatten-ast))
-
+  ;getUpdateExprs :: ParsedUpdate -> List<UdateExpr>
   ParsedUpdate
-  (vars-in-graph-position [this]
     ;; TODO find out in what situation
     ;; there may be multiple
     ;; UpdateExprs.  I'm assuming there
     ;; will only ever be one.
+  (->root-node [this]
+    (->root-node (first (.getUpdateExprs this))))
 
-    (first (map vars-in-graph-position (.getUpdateExprs this))))
-
-  (flatten-ast [query-ast]
-    (->> query-ast
-         .getUpdateExprs
-         first
-         flatten-ast))
-
+  ;UpdateExpr extends QueryModelNode
   UpdateExpr
-  (vars-in-graph-position [this]
-    (vars-in-graph-position* this))
+  (->root-node [this] this))
 
-  (flatten-ast [ue]
-    (->> ue
-         drafter.rdf.ClojureCollector/process
-         ;; use distinct to preserve order of nodes instead of (into #{} ...)
-         distinct)))
+(defn vars-in-graph-position
+  "Given a parsed query Expr and returns the vars which are
+  bound in Graph position."
+  [ast-like]
+  (let [expr (->root-node ast-like)]
+    (reduce (fn [acc val]
+              (if-let [var (.getContextVar val)]
+                (conj acc var)
+                acc))
+            [] (StatementPatternCollector/process expr))))
+
+(defn flatten-ast [ast-like]
+  (->> (->root-node ast-like)
+       drafter.rdf.ClojureCollector/process
+       ;; use distinct to preserve order of nodes instead of (into #{} ...)
+       distinct))
 
 (defn rewrite-binding
   "Rewrites the value of a Binding if it appears in the given graph map"
@@ -136,17 +110,16 @@
   (let [rewritten-bindings (mapv #(rewrite-binding-set % graph-map) (.getBindingSets bsa))]
     (.setBindingSets bsa rewritten-bindings)))
 
+(defn get-query-nodes-of-type [type query-ast]
+  (filter #(instance? type %) (flatten-ast query-ast)))
+
 ;rewrite-binding-set-assignments :: ISparqlAst -> Map[URI, URI] -> ()
 (defn rewrite-binding-set-assignments!
   "Rewrites all BindingSets in all BindingSetAssignment instances
   inside the given query AST."
   [query-ast graph-map]
-  (let [nodes (flatten-ast query-ast)]
-    (doseq [bsa (filter #(instance? BindingSetAssignment %) nodes)]
-      (update-binding-set-assignment! bsa graph-map))))
-
-(defn get-query-nodes-of-type [type query-ast]
-  (filter #(instance? type %) (flatten-ast query-ast)))
+  (doseq [bsa (get-query-nodes-of-type BindingSetAssignment query-ast)]
+    (update-binding-set-assignment! bsa graph-map)))
 
 (defn rewrite-constant-vars
   "Rewrites the values of any constant Var nodes if they are mapped in
@@ -198,8 +171,7 @@
 
 (defn compose-graph-replacer [sparql-function-uri query-ast]
   ;; todo do this for each node.
-  (let [qnodes (filter (partial instance? IRIFunction)
-                       (flatten-ast query-ast))]
+  (let [qnodes (get-query-nodes-of-type IRIFunction query-ast)]
     (doseq [qnode qnodes]
       (let [parent (.getParentNode qnode)
             replacement-node (FunctionCall. sparql-function-uri (into-array ValueExpr  [(.clone qnode)]))]
