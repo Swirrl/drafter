@@ -78,7 +78,11 @@
 
 (defn create-draft-graph!
   "Creates a new draft graph with a unique graph name, expects the
-  live graph to already be created."
+  live graph to already be created.  Returns the URI of the draft that
+  was created.
+
+  Converts the optional opts hash into drafter meta-data triples
+  attached to the draft graph resource in the drafter state graph."
   ([db live-graph-uri]
      (create-draft-graph! db live-graph-uri {}))
   ([db live-graph-uri opts]
@@ -88,7 +92,7 @@
        (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now opts)
                     (apply to-quads)))
 
-       draft-graph-uri))) ; returns the draft-graph-uri
+       draft-graph-uri)))
 
 (defn- escape-sparql-value [val]
   (if (string? val)
