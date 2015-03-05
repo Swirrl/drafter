@@ -121,7 +121,8 @@
   (let [{job-id :id promis :value-p} job]
     (deliver promis result)
     (swap! finished-jobs assoc job-id promis)
-    (log/info "Job " job-id "complete")))
+    (log/info "Job " job-id "complete")
+    result))
 
 (defn- write-loop
   "Start the write loop running.  Note this function does not return
