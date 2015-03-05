@@ -173,26 +173,7 @@
                 error-result (await-completion finished-jobs guid)]
 
             (is (= :error (:type error-result)))
-            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))
-
-    (testing "with a source graph"
-      ;; put some data into the source-graph before we begin
-      (make-graph-live! *test-db* "http://draft.org/source-graph")
-      (let [dest-graph "http://mygraph/graph-to-be-appended-to"
-            test-request (-> {:uri "/draft" :request-method :post}
-                             (add-request-graph-source-graph dest-graph "http://draft.org/source-graph"))
-            route (draft-api-routes "/draft" *test-db*)
-            {:keys [status body headers] :as response} (route test-request)]
-
-        (job-is-accepted response)
-        (println response)
-        (await-completion finished-jobs (:id body))
-
-        (testing "appends RDF to the graph"
-          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://test.com/subject-1> ?p ?o . }}"))
-              "graph has got new data in")
-          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . }}"))
-              "graph has still got the old data in")))))
+            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result))))))))
 
   (testing "PUT /draft with a source file"
     (make-graph-live! *test-db* "http://mygraph/graph-to-be-replaced")
@@ -372,10 +353,6 @@
                (testing "Metadata overwritten"
                  (is (= 1 (count meta-records))
                      (= "updated" (get (first meta-records) "o")))))))))))
-
- meta-replace-with-put-graph-test :put (fn [req graph] (add-request-graph-source-graph req graph "http://mygraph/source-graph"))
-
- meta-update-with-post-graph-test :post (fn [req graph] (add-request-graph-source-graph req graph "http://mygraph/source-graph"))
 
  meta-replace-with-put-file-test :put (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt"))
 

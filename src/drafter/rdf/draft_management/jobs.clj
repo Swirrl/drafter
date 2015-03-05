@@ -161,47 +161,6 @@
                 (partial append-data-in-batches repo draft-graph metadata
                          triples))))
 
-(defn append-data-to-graph-from-graph-job
-  "Return a job function that adds the triples from the specified
-  named graph to the specified graph.
-
-  This operation can't be batched so must occur at an exclusive-write
-  level."
-
-  [repo draft-graph source-graph metadata]
-
-  (make-job :exclusive-write [job]
-            (log/info "Appending contents of " source-graph "  to draft-graph: " draft-graph)
-
-            (let [query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
-                                      { GRAPH <" source-graph "> { ?s ?p ?o } }")
-                  conn (->connection repo)
-                  source-data (query repo query-str)]
-
-              (with-transaction conn
-                (mgmt/add-metadata-to-graph conn draft-graph)
-                (mgmt/append-data! conn draft-graph source-data metadata))
-
-              (log/info  "Graph import complete. Imported contents of " source-graph " to draft-graph: " draft-graph)
-              (complete-job! job restapi/ok-response))))
-
-(defn replace-data-from-graph-job
-  "Return a function to replace the specified graph with a graph
-  containing the tripes from the specified source graph.
-
-  This operation can't be batched so must occur at an exclusive-write
-  level."
-
-  [repo graph source-graph metadata]
-
-  (make-job :exclusive-write [job]
-            (log/info "Replacing graph " graph " with contents of graph: " source-graph)
-            (let [conn (->connection repo)]
-              (with-transaction conn
-                (mgmt/copy-graph conn source-graph graph)
-                (mgmt/add-metadata-to-graph conn graph metadata)))
-            (complete-job! job restapi/ok-response)))
-
 (defn migrate-graph-live-job [repo graph]
   (make-job :exclusive-write [job]
             (log/info "Starting make-live for graph" graph)
