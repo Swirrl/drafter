@@ -225,10 +225,9 @@
          (rewrite-graph-results query-substitutions prepared-query))))
 
 (defn- make-select-result-rewriter
-  "Creates a new SPARQLResultWriter that proxies to the supplied
-  result handler, but rewrites solutions according to the supplied
-  solution-handler-fn."
-  [solution-handler-fn writer]
+  "Creates a new SPARQLResultWriter that rewrites values in solutions
+  according to the given graph mapping."
+  [graph-map writer]
   (reify
     TupleQueryResultHandler
     (endQueryResult [this]
@@ -239,7 +238,13 @@
       (.handleLinks writer link-urls))
     (handleSolution [this binding-set]
       (log/debug "select result wrapper " this  "writer: " writer)
-      (solution-handler-fn writer binding-set))
+      ;; NOTE: mutating the binding set whilst writing (iterating)
+      ;; results causes bedlam with the iteration, especially with SPARQL
+      ;; DISTINCT queries.
+      ;; rewrite-binding-set creates a new BindingSet with the modifications
+      (let [new-binding-set (rewrite-binding-set binding-set graph-map)]
+        (log/trace "old binding set: " binding-set "new binding-set" new-binding-set)
+        (.handleSolution writer new-binding-set)))
     (startQueryResult [this binding-names]
       (.startQueryResult writer binding-names))))
 
@@ -251,20 +256,10 @@
     (result-handler-wrapper writer draft->live)
     writer))
 
-(defn- rewrite-graph-result [graph-map ^QueryResultHandler writer ^BindingSet binding-set]
-  ;; NOTE: mutating the binding set whilst writing (iterating)
-  ;; results causes bedlam with the iteration, especially with SPARQL
-  ;; DISTINCT queries.
-  ;; rewrite-binding-set creates a new BindingSet with the modifications
-  (let [new-binding-set (rewrite-binding-set binding-set graph-map)]
-    (log/trace "old binding set: " binding-set "new binding-set" new-binding-set)
-    (.handleSolution writer new-binding-set)))
-
 (defn- choose-result-rewriter [query-ast draft->live writer]
   (cond
    (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
-   (instance? ParsedTupleQuery query-ast) (let [rewriter #(rewrite-graph-result draft->live %1 %2)]
-                                            (make-select-result-rewriter rewriter writer))
+   (instance? ParsedTupleQuery query-ast) (make-select-result-rewriter draft->live writer)
    (instance? ParsedBooleanQuery query-ast) writer
    :else writer))
 
