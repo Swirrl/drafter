@@ -23,7 +23,7 @@
     (let [baos (ByteArrayOutputStream.)
           preped-query (prepare-query *test-db* "SELECT * WHERE { ?s ?p ?o }")
           streamer! (result-streamer SPARQLResultsJSONWriter
-                                     nil
+                                     identity
                                      preped-query
                                      "application/sparql-results+json")]
 
