@@ -191,17 +191,18 @@
     "text/plain" "text/plain; charset=utf-8"
     mime-type))
 
-(defn- stream-sparql-response [pquery response-mime-type result-rewriter]
-  (if-let [result-writer-class (negotiate-content-writer pquery response-mime-type)]
-    {:status 200
-     :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
-     ;; Designed to work with piped-input-stream this fn will be run
-     ;; in another thread to stream the results to the client.
-     :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
-                                                    pquery response-mime-type))}
-    {:status 406
+(defn- stream-sparql-response [pquery response-mime-type result-writer-class result-rewriter]
+  {:status 200
+   :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
+   ;; Designed to work with piped-input-stream this fn will be run
+   ;; in another thread to stream the results to the client.
+   :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
+                                                  pquery response-mime-type))})
+
+(defn- unsupported-media-type-response [media-type]
+  {:status 406
      :headers {"Content-Type" "text/plain; charset=utf-8"}
-     :body (str "Unsupported media-type: " response-mime-type)}))
+     :body (str "Unsupported media-type: " media-type)})
 
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
@@ -240,9 +241,11 @@
         pquery (doto (query-creator-fn db query-str)
                  (.setDataset restriction))
         media-type (negotiate-sparql-query-mime-type pquery request)]
-
+    
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
-    (stream-sparql-response pquery media-type result-rewriter)))
+    (if-let [result-writer-class (negotiate-content-writer pquery media-type)]
+      (stream-sparql-response pquery media-type result-writer-class result-rewriter)
+      (unsupported-media-type-response media-type))))
 
 (defn wrap-sparql-errors [handler]
   (fn [request]
