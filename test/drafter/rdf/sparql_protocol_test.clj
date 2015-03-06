@@ -22,10 +22,8 @@
   (testing "Streams sparql results into output stream"
     (let [baos (ByteArrayOutputStream.)
           preped-query (prepare-query *test-db* "SELECT * WHERE { ?s ?p ?o }")
-          streamer! (result-streamer SPARQLResultsJSONWriter
-                                     nil
-                                     preped-query
-                                     "application/sparql-results+json")]
+          streamer! (result-streamer #(SPARQLResultsJSONWriter. %)
+                                     preped-query)]
 
       (streamer! baos)
 

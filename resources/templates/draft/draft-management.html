@@ -16,10 +16,4 @@
 {% include "templates/query-area.html" %}
 </form>
 
-<h1>Update {{ name }}</h1>
-<form method="POST" action="{{ update-endpoint }}" enctype="application/x-www-form-urlencoded">
-{% include "templates/draft/draft-graphs-list.html" %}
-{% include "templates/update-area.html" %}
-</form>
-
 {% endblock %}

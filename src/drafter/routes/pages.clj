@@ -33,9 +33,6 @@
 (defn parse-guid [uri]
   (.replace (str uri) (draft-uri "") ""))
 
-(defn map-values [f m]
-  (into {} (for [[k v] m] [k (f v)])))
-
 (defn all-drafts [db]
   (doall (->> (query db (str
                          "SELECT ?draft ?live WHERE {"
@@ -45,7 +42,7 @@
                          "   }"
                          "}"))
               (map keywordize-keys)
-              (map (partial map-values str))
+              (map (partial util/map-values str))
               (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
 (defn draft-exists? [db guid]
