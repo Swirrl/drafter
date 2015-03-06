@@ -224,29 +224,30 @@
                               (.setDataset dataset))]
          (rewrite-graph-results query-substitutions prepared-query))))
 
+;Map[Uri, Uri] -> QueryResultHandler -> QueryResultHandler
 (defn- make-select-result-rewriter
   "Creates a new SPARQLResultWriter that rewrites values in solutions
   according to the given graph mapping."
-  [graph-map writer]
+  [graph-map handler]
   (reify
     TupleQueryResultHandler
     (endQueryResult [this]
-      (.endQueryResult writer))
+      (.endQueryResult handler))
     (handleBoolean [this boolean]
-      (.handleBoolean writer boolean))
+      (.handleBoolean handler boolean))
     (handleLinks [this link-urls]
-      (.handleLinks writer link-urls))
+      (.handleLinks handler link-urls))
     (handleSolution [this binding-set]
-      (log/debug "select result wrapper " this  "writer: " writer)
+      (log/debug "select result wrapper " this  "handler: " handler)
       ;; NOTE: mutating the binding set whilst writing (iterating)
       ;; results causes bedlam with the iteration, especially with SPARQL
       ;; DISTINCT queries.
       ;; rewrite-binding-set creates a new BindingSet with the modifications
       (let [new-binding-set (rewrite-binding-set binding-set graph-map)]
         (log/trace "old binding set: " binding-set "new binding-set" new-binding-set)
-        (.handleSolution writer new-binding-set)))
+        (.handleSolution handler new-binding-set)))
     (startQueryResult [this binding-names]
-      (.startQueryResult writer binding-names))))
+      (.startQueryResult handler binding-names))))
 
 (defn- make-construct-result-rewriter
   "Creates a result-rewriter for construct queries - not a tautology

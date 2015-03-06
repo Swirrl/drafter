@@ -140,7 +140,9 @@
          ;; No op
          ))))
 
+;result-streamer :: Class -> (Writer -> Writer) -> Query -> MimeType -> (OutputStream -> ())
 (defn result-streamer [result-writer-class result-rewriter pquery response-mime-type]
+  {:pre [(some? result-rewriter)]}
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
@@ -148,10 +150,8 @@
   logged."
   (fn [ostream]
     (try
-      (let [writer (let [w (new-result-writer result-writer-class ostream)]
-                     (if result-rewriter
-                       (result-rewriter w)
-                       w))]
+      (let [raw-writer (new-result-writer result-writer-class ostream)
+            writer (result-rewriter raw-writer)]
         (cond
          (instance? BooleanQuery pquery)
          (let [result (.evaluate pquery)]
@@ -168,7 +168,7 @@
 
          :else
          (do
-           ;; Can be either a TupleQuery with QueryResultWriter or a
+           ;; Can be either a TupleQuery with TupleQueryResultHandler or a
            ;; GraphQuery with an RDFHandler.
            (log/debug "pquery (default) is " pquery " writer is " writer)
            (.evaluate pquery writer))))
@@ -231,7 +231,8 @@
 
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
                                                  result-rewriter]
-                                          :or {query-creator-fn repo/prepare-query}}]
+                                          :or {query-creator-fn repo/prepare-query
+                                               result-rewriter identity}}]
 
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
