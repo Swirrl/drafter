@@ -1,7 +1,7 @@
 (ns drafter.routes.status
   (:require [compojure.core :refer [GET routes]]
             [ring.util.io :as rio]
-            [ring.util.response :refer [not-found]]
+            [ring.util.response :refer [not-found response]]
             [drafter.common.api-routes :as api])
   (:import [java.util UUID]))
 
@@ -15,5 +15,5 @@
    (GET "/finished-jobs/:job-id" [job-id]
         (let [p (get @finished-jobs (UUID/fromString job-id))]
           (if p
-            (assoc @p :restart-id restart-id)
+            (api/api-response 200 (assoc @p :restart-id restart-id))
             (api/not-found-response "The specified job-id was not found"))))))

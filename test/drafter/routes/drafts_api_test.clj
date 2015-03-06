@@ -76,6 +76,7 @@
     (testing "returns 202 - Job accepted"
       (is (= 202 status))
       (is (= :ok (:type body)))
+      (is (= restart-id (:restart-id body)))
       (is (instance? UUID (parse-guid (:finished-job body)))))))
 
 (defn is-error-response [response]
