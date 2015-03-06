@@ -2,6 +2,7 @@
   (:require [ring.util.io :as rio]
             [clojure.string :as str]
             [grafter.rdf.repository :as repo]
+            [drafter.util :refer [construct-dynamic*]]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -110,11 +111,6 @@
               (mime-pref "text/csv" 0.8)
               (mime-pref "text/tab-separated-values" 0.7)))
 
-(defn new-result-writer [writer-class ostream]
-  (.newInstance
-   (.getConstructor writer-class (into-array [java.io.OutputStream]))
-   (into-array Object [ostream])))
-
 (defn result-handler-wrapper
   ([writer] (result-handler-wrapper writer {}))
   ([writer draft->live]
@@ -140,9 +136,8 @@
          ;; No op
          ))))
 
-;result-streamer :: Class -> (Writer -> Writer) -> Query -> MimeType -> (OutputStream -> ())
-(defn result-streamer [result-writer-class result-rewriter pquery response-mime-type]
-  {:pre [(some? result-rewriter)]}
+;result-streamer :: (OutputStream -> Writer) -> Query -> MimeType -> (OutputStream -> ())
+(defn result-streamer [writer-fn pquery response-mime-type]
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
@@ -150,8 +145,7 @@
   logged."
   (fn [ostream]
     (try
-      (let [raw-writer (new-result-writer result-writer-class ostream)
-            writer (result-rewriter raw-writer)]
+      (let [writer (writer-fn ostream)]
         (cond
          (instance? BooleanQuery pquery)
          (let [result (.evaluate pquery)]
@@ -191,13 +185,12 @@
     "text/plain" "text/plain; charset=utf-8"
     mime-type))
 
-(defn- stream-sparql-response [pquery response-mime-type result-writer-class result-rewriter]
+(defn- stream-sparql-response [pquery response-mime-type writer-fn]
   {:status 200
    :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
    ;; Designed to work with piped-input-stream this fn will be run
    ;; in another thread to stream the results to the client.
-   :body (rio/piped-input-stream (result-streamer result-writer-class result-rewriter
-                                                  pquery response-mime-type))})
+   :body (rio/piped-input-stream (result-streamer writer-fn pquery response-mime-type))})
 
 (defn- unsupported-media-type-response [media-type]
   {:status 406
@@ -230,6 +223,11 @@
         mime (get-in (accept-handler request) [:accept :mime])]
     mime))
 
+(defn class->writer-fn [writer-class result-rewriter]
+  (fn [output-stream]
+    (let [inner (construct-dynamic* writer-class output-stream)]
+      (result-rewriter inner))))
+
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
                                                  result-rewriter]
                                           :or {query-creator-fn repo/prepare-query
@@ -244,7 +242,7 @@
     
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
     (if-let [result-writer-class (negotiate-content-writer pquery media-type)]
-      (stream-sparql-response pquery media-type result-writer-class result-rewriter)
+      (stream-sparql-response pquery media-type (class->writer-fn result-writer-class result-rewriter))
       (unsupported-media-type-response media-type))))
 
 (defn wrap-sparql-errors [handler]
