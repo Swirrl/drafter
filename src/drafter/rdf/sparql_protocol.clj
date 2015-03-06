@@ -223,15 +223,15 @@
         mime (get-in (accept-handler request) [:accept :mime])]
     mime))
 
-(defn class->writer-fn [writer-class result-rewriter]
+(defn class->writer-fn [pquery writer-class result-rewriter]
   (fn [output-stream]
     (let [inner (construct-dynamic* writer-class output-stream)]
-      (result-rewriter inner))))
+      (result-rewriter pquery inner))))
 
 (defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
                                                  result-rewriter]
                                           :or {query-creator-fn repo/prepare-query
-                                               result-rewriter identity}}]
+                                               result-rewriter (fn [query writer] writer)}}]
 
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
@@ -242,7 +242,7 @@
     
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
     (if-let [result-writer-class (negotiate-content-writer pquery media-type)]
-      (stream-sparql-response pquery media-type (class->writer-fn result-writer-class result-rewriter))
+      (stream-sparql-response pquery media-type (class->writer-fn pquery result-writer-class result-rewriter))
       (unsupported-media-type-response media-type))))
 
 (defn wrap-sparql-errors [handler]
