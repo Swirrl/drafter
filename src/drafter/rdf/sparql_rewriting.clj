@@ -19,7 +19,8 @@
            [org.openrdf.query.algebra.evaluation.function Function]
            [org.openrdf.query.algebra UpdateExpr TupleExpr Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr
             BindingSetAssignment ValueConstant]
-           [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
+           [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]
+           [org.openrdf.query.algebra.evaluation.function FunctionRegistry]))
 
 (def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
 
@@ -138,16 +139,6 @@
       (when-let [rewritten (get graph-map (.getValue c))]
         (.setValue c rewritten)))))
 
-(def function-registry (org.openrdf.query.algebra.evaluation.function.FunctionRegistry/getInstance))
-
-(defn register-function
-  "Register an arbitrary custom function with the global SPARQL engine registry."
-  [function-registry uri f]
-  (io!
-   (let [sesame-f (drafter.rdf.SesameFunction. uri f)]
-     (doto function-registry
-       (.add sesame-f)))))
-
 (defn replace-values [uri-map]
   "Return a function that replaces arbitrary values supplied values.
   If a value is not replaced the original value is returned."
@@ -263,6 +254,17 @@
    (instance? ParsedTupleQuery query-ast) (make-select-result-rewriter draft->live writer)
    (instance? ParsedBooleanQuery query-ast) writer
    :else writer))
+
+(def ^{:doc "The global function registry for drafter SPARQL functions."}
+  function-registry (FunctionRegistry/getInstance))
+
+(defn register-function!
+  "Register an arbitrary custom function with the global SPARQL engine registry."
+  [function-registry uri f]
+  (io!
+   (let [sesame-f (drafter.rdf.SesameFunction. uri f)]
+     (doto function-registry
+       (.add sesame-f)))))
 
 (defn make-draft-query-rewriter [repo draft-uris]
   (let [live->draft (log/spy (mgmt/graph-map repo draft-uris))]

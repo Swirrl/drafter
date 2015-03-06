@@ -160,7 +160,7 @@
             [live-subject live-predicate live-object] live-triple
             [draft-subject draft-predicate draft-object] draft-triple
             graph-map (apply hash-map (map #(URIImpl. %) (interleave live-triple draft-triple)))]
-        
+
         (append-data! db draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
 
         (is (= live-triple
@@ -176,7 +176,7 @@
                  (first-result "s"))))
 
     (testing "rewrites SPARQL URI/IRI functions to query with substitution"
-      (register-function function-registry (pmdfunctions "replace-live-graph-uri") graph-map)
+      (register-function! function-registry (pmdfunctions "replace-live-graph-uri") graph-map)
       ;; NOTE this query rewrites dynamically.  It does not rewrite
       ;; the constant string "http://frogs.com/live-graph" but instead
       ;; rewrites it at runtime via the function composition.
@@ -198,12 +198,10 @@
         (is (= "http://frogs.com/live-graph"
                (-> db
                    (evaluate-with-graph-rewriting graph-values-query graph-map)
-                   (first-result "g"))))
-        )
+                   (first-result "g")))))
 
       (testing "rewrites source graph literals in FILTER clause"
         (is (= "http://frogs.com/live-graph"
                (-> db
                    (evaluate-with-graph-rewriting graph-filter-query graph-map)
-                   (first-result "g"))))
-        )))))
+                   (first-result "g")))))))))

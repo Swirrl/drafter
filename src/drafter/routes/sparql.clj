@@ -5,7 +5,7 @@
             [clojure.set :as set]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
-            [drafter.rdf.sparql-rewriting :as rew]
+            [drafter.rdf.sparql-rewriting :refer [make-draft-query-rewriter]]
             [clojure.tools.logging :as log]
             [drafter.common.sparql-routes :refer [supplied-drafts]]))
 
@@ -13,7 +13,7 @@
   (try
     (let [{:keys [params]} request
           graph-uris (log/spy :info  (supplied-drafts repo request))
-          {:keys [result-rewriter query-rewriter]} (rew/make-draft-query-rewriter repo graph-uris)]
+          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo graph-uris)]
 
       (process-sparql-query repo request
                             :query-creator-fn query-rewriter

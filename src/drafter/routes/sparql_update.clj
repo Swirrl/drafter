@@ -7,7 +7,6 @@
             [compojure.route :refer [not-found]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
-            [drafter.rdf.sparql-rewriting :as rew]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository :refer [->connection with-transaction make-restricted-dataset prepare-update evaluate]]
             [pantomime.media :as mt]

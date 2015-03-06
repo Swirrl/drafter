@@ -7,7 +7,7 @@
             [drafter.routes.dumps :refer [dumps-endpoint]]
             [drafter.routes.drafts-api :refer [draft-api-routes graph-management-routes]]
             [drafter.middleware :as middleware]
-            [drafter.rdf.sparql-rewriting :refer [function-registry register-function pmdfunctions]]
+            [drafter.rdf.sparql-rewriting :refer [function-registry register-function! pmdfunctions]]
             [drafter.routes.sparql-update :refer [state-update-endpoint-route live-update-endpoint-route raw-update-endpoint-route]]
             [noir.util.middleware :refer [app-handler]]
             [compojure.route :as route]
@@ -44,9 +44,9 @@
 
   ;; This function converts draft graphs into live graph URI's and is
   ;; necessary for drafters query/result rewriting to work.
-  (register-function function-registry
-                     (pmdfunctions "replace-live-graph")
-                     (partial lookup-live-graph-uri repo)))
+  (register-function! function-registry
+                      (pmdfunctions "replace-live-graph")
+                      (partial lookup-live-graph-uri repo)))
 
 (defn initialise-repo! [repo-path indexes]
   (set-var-root! #'repo (let [repo (repo/repo (repo/native-store repo-path indexes))]
