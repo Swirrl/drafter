@@ -264,17 +264,16 @@
    (instance? ParsedBooleanQuery query-ast) writer
    :else writer))
 
-(defn make-draft-query-rewriter [repo query-str draft-uris]
-  (let [live->draft (log/spy (mgmt/graph-map repo draft-uris))
-        preped-query (rewrite-graph-query repo query-str live->draft)]
+(defn make-draft-query-rewriter [repo draft-uris]
+  (let [live->draft (log/spy (mgmt/graph-map repo draft-uris))]
     {:query-rewriter
      (fn [repo query-str]
        (log/info "Using mapping: " live->draft)
-       preped-query)
+       (rewrite-graph-query repo query-str live->draft))
 
      :result-rewriter
-     (fn [writer]
-       (let [query-ast (.getParsedQuery preped-query)
+     (fn [prepared-query writer]
+       (let [query-ast (.getParsedQuery prepared-query)
              draft->live (set/map-invert live->draft)]
          (choose-result-rewriter query-ast draft->live writer)))
      }))
