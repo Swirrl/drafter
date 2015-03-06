@@ -136,8 +136,8 @@
          ;; No op
          ))))
 
-;result-streamer :: (OutputStream -> Writer) -> Query -> MimeType -> (OutputStream -> ())
-(defn result-streamer [writer-fn pquery response-mime-type]
+;result-streamer :: (OutputStream -> Writer) -> Query -> (OutputStream -> ())
+(defn result-streamer [writer-fn pquery]
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
@@ -190,12 +190,12 @@
    :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
    ;; Designed to work with piped-input-stream this fn will be run
    ;; in another thread to stream the results to the client.
-   :body (rio/piped-input-stream (result-streamer writer-fn pquery response-mime-type))})
+   :body (rio/piped-input-stream (result-streamer writer-fn pquery))})
 
 (defn- unsupported-media-type-response [media-type]
   {:status 406
-     :headers {"Content-Type" "text/plain; charset=utf-8"}
-     :body (str "Unsupported media-type: " media-type)})
+   :headers {"Content-Type" "text/plain; charset=utf-8"}
+   :body (str "Unsupported media-type: " media-type)})
 
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
