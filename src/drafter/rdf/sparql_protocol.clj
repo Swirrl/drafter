@@ -127,10 +127,10 @@
          (let [s (.getSubject statement)
                p (.getPredicate statement)
                o (.getObject statement)
-               bs (do (doto (MapBindingSet.)
-                        (.addBinding "s" (get draft->live s s))
-                        (.addBinding "p" (get draft->live p p))
-                        (.addBinding "o" (get draft->live o o))))]
+               bs (doto (MapBindingSet.)
+                    (.addBinding "s" (get draft->live s s))
+                    (.addBinding "p" (get draft->live p p))
+                    (.addBinding "o" (get draft->live o o)))]
            (.handleSolution writer bs)))
        (handleComment [this comment]
          ;; No op
@@ -239,7 +239,7 @@
         pquery (doto (query-creator-fn db query-str)
                  (.setDataset restriction))
         media-type (negotiate-sparql-query-mime-type pquery request)]
-    
+
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
     (if-let [result-writer-class (negotiate-content-writer pquery media-type)]
       (stream-sparql-response pquery media-type (class->writer-fn pquery result-writer-class result-rewriter))

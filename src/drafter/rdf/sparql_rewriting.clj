@@ -189,7 +189,7 @@
 (defn rewrite-graph-query [repo query-str graph-map]
   (let [prepared-query (repo/prepare-query repo query-str)
         binding-set (.getBindings prepared-query)
-        query-ast (-> prepared-query .getParsedQuery)]
+        query-ast (.getParsedQuery prepared-query)]
     (rewrite-query-ast! query-ast graph-map)
     prepared-query))
 
@@ -218,11 +218,11 @@
 (defn evaluate-with-graph-rewriting
   "Rewrites the results in the query."
   ([repo query-str query-substitutions]
-       (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
-    ([repo query-str query-substitutions dataset]
-       (let [prepared-query (doto (rewrite-graph-query repo query-str query-substitutions)
-                              (.setDataset dataset))]
-         (rewrite-graph-results query-substitutions prepared-query))))
+   (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
+  ([repo query-str query-substitutions dataset]
+   (let [prepared-query (doto (rewrite-graph-query repo query-str query-substitutions)
+                          (.setDataset dataset))]
+     (rewrite-graph-results query-substitutions prepared-query))))
 
 ;Map[Uri, Uri] -> QueryResultHandler -> QueryResultHandler
 (defn- make-select-result-rewriter
