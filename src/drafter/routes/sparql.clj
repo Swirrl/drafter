@@ -3,18 +3,11 @@
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
             [clojure.set :as set]
-            [ring.util.io :as io]
-            [compojure.route :refer [not-found]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query result-handler-wrapper wrap-sparql-errors]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
             [drafter.rdf.sparql-rewriting :as rew]
             [clojure.tools.logging :as log]
-            [grafter.rdf.repository :as ses]
-            [drafter.common.sparql-routes :refer [supplied-drafts]])
-  (:import [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat]
-           [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
-           [org.openrdf.query.impl MapBindingSet]
-           [org.openrdf.rio RDFHandler RDFWriter]))
+            [drafter.common.sparql-routes :refer [supplied-drafts]]))
 
 (defn- draft-query-endpoint [repo request]
   (try
