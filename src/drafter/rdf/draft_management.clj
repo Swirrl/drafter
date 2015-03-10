@@ -301,8 +301,8 @@
       (delete-graph-contents! db live-graph-uri)
 
       (let [contents (query db
-                  (str "CONSTRUCT { ?s ?p ?o } WHERE
-                         { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
+                            (str "CONSTRUCT { ?s ?p ?o } WHERE
+                                 { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
 
         (when contents
           (add db live-graph-uri contents)))
