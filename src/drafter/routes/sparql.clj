@@ -12,7 +12,7 @@
 (defn- draft-query-endpoint [repo request]
   (try
     (let [{:keys [params]} request
-          graph-uris (log/spy :info  (supplied-drafts repo request))
+          graph-uris (supplied-drafts repo request)
           {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo graph-uris)]
 
       (process-sparql-query repo request
