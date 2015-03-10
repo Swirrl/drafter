@@ -23,6 +23,7 @@
   (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
            [org.apache.log4j.helpers DateLayout]))
 
+(def default-indexes "spoc,pocs,ocsp,cspo,cpos,oscp")
 
 (def default-repo-path "drafter-db")
 
@@ -118,10 +119,11 @@
   (when (env :dev)
     (parser/cache-off!))
 
+  (log/info "Initialising repository")
   (initialise-services! (get env :drafter-repo-path default-repo-path)
-  ; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
-  ; (but we have to specify 4 char strings, so in some cases last chars don't matter
-                    (get env :drafter-indexes "spoc,pocs,ocsp,cspo,cpos,oscp"))
+                        ;; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
+                        ;; (but we have to specify 4 char strings, so in some cases last chars don't matter
+                        (get env :drafter-indexes default-indexes))
 
   (log/info "drafter started successfully"))
 
@@ -133,3 +135,14 @@
   (repo/shutdown repo)
   (future-cancel worker)
   (log/info "drafter has shut down."))
+
+(defn reindex
+  "Reindex the database according to the DRAFTER_INDEXES set at
+  DRAFTER_REPO_PATH in the environment.  If no environment variables
+  are set for these values the defaults are used."
+  []
+  (let [indexes (get env :drafter-indexes default-indexes)
+        repo-path (get env :drafter-repo-path default-repo-path)]
+    (log/info "Reindexing database at" repo-path " with indexes" indexes)
+    (repo/repo (repo/native-store repo-path indexes))
+    (log/info "Reindexing finished")))

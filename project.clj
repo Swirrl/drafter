@@ -48,6 +48,8 @@
          :init    drafter.handler/init
          :destroy drafter.handler/destroy}
 
+  :aliases {"reindex" ["run" "-m" "drafter.handler/reindex"]}
+
   :profiles
   {:uberjar {:aot :all}
    :production {:ring {:open-browser? false
