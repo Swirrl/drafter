@@ -72,6 +72,9 @@
 
 
   :jvm-opts ["-Djava.awt.headless=true -Dowlim-license=/Users/rick/Software/graphdb-se-6.1-Final/uberjar/GRAPHDB_SE.license"]
+  
+  ;NOTE: expected JVM version to run against is defined in the Dockerfile
+  :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
 
   :aot [drafter.repl]
