@@ -1,4 +1,4 @@
-(defproject drafter "0.2.0-SNAPSHOT"
+(defproject drafter "0.2.0"
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
@@ -18,7 +18,7 @@
                  [selmer "0.6.9"]
 
                  [grafter "0.4.0" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
-                 [grafter-vocabularies "0.1.0-SNAPSHOT"]
+                 [grafter/vocabularies "0.1.0"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"]
