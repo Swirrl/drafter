@@ -64,7 +64,7 @@
 (deftest live-sparql-routes-test
   (let [test-db (make-store)
         [draft-graph-1 draft-graph-2] (add-test-data! test-db)
-        endpoint (live-sparql-routes "/sparql/live" test-db)
+        endpoint (live-sparql-routes "/sparql/live" test-db nil)
         {:keys [status headers body]
          :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
         csv-result (csv-> result)]
@@ -95,7 +95,7 @@
   (let [test-db (make-store)
         ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (state-sparql-routes "/sparql/state" test-db)]
+        endpoint (state-sparql-routes "/sparql/state" test-db nil)]
 
     (testing "The state graph should be accessible"
       (let [result (endpoint (-> (state-query (str "ASK WHERE {"
@@ -124,7 +124,7 @@
   (let [test-db (make-store)
         ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (raw-sparql-routes "/sparql/raw" test-db)]
+        endpoint (raw-sparql-routes "/sparql/raw" test-db nil)]
 
     (testing "The state graph should be accessible"
       (let [result (endpoint (-> (raw-query (str "ASK WHERE {"

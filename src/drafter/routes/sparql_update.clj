@@ -7,11 +7,13 @@
             [compojure.route :refer [not-found]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
+            [drafter.operations :as ops]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository :refer [->connection with-transaction make-restricted-dataset prepare-update evaluate]]
             [pantomime.media :as mt]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
-  (:import [org.openrdf.query Dataset]
+  (:import [java.util.concurrent FutureTask CancellationException]
+           [org.openrdf.query Dataset]
            [org.openrdf.repository Repository RepositoryConnection]))
 
 (defn do-update [repo restrictions]
@@ -58,16 +60,28 @@
 (defmethod parse-update-request :default [request]
   (throw (Exception. (str "Invalid Content-Type " (:content-type request)))))
 
-(defn execute-update [repo update-query]
-  (try
-    ;; (with-open [conn (->connection repo)]
-      (with-transaction repo ;;conn
-        (evaluate update-query))
+(defn- execute-update [repo update-query timeouts]
+  (let [timeouts (or timeouts ops/default-timeouts)
+        update-fn (fn []
+                    (with-transaction repo
+                      (evaluate update-query)))
+        update-future (FutureTask. update-fn)]
+    (try
+      ;the 'reaper' framework monitors instances of the Future interface and cancels them if they timeout
+      ;create a Future for the update, register it for cancellation on timeout and then run it on this thread.
+      (ops/register-for-cancellation-on-timeout update-future timeouts)
+      (.run update-future)
+      (.get update-future)
       {:status 200 :body "OK"}
-      ;; )
-    (catch Exception ex
-      (log/fatal "An exception was thrown when executing a SPARQL update!" ex)
-      {:status 500 :body (str "Unknown server error executing update" ex)})))
+      (catch CancellationException cex
+        ;update future was run on the current thread so it was interrupted when the future was cancelled
+        ;clear the interrupted flag on this thread
+        (Thread/interrupted)
+        (log/fatal "Update operation cancelled due to timeout")
+        {:status 500 :body "Update operation timed out"})
+      (catch Exception ex
+        (log/fatal "An exception was thrown when executing a SPARQL update!" ex)
+        {:status 500 :body (str "Unknown server error executing update" ex)}))))
 
 (defn- collection-or-nil? [x]
   (or (coll? x)
@@ -107,7 +121,8 @@
   such a collection."
   ([mount-point repo]
      (update-endpoint mount-point repo #{}))
-  ([mount-point repo restrictions]
+  ([mount-point repo restrictions] (update-endpoint mount-point repo restrictions nil))
+  ([mount-point repo restrictions timeouts]
      (POST mount-point request
            (with-open [conn (->connection repo)]
              (let [{update :update} (parse-update-request request)
@@ -116,13 +131,13 @@
                                                                           (restrictions)
                                                                           restrictions))]
                (log/debug "About to execute update-query " preped-update)
-               (execute-update conn preped-update))))))
+               (execute-update conn preped-update timeouts))))))
 
-(defn live-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo (partial mgmt/live-graphs repo)))
+(defn live-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo (partial mgmt/live-graphs repo) timeouts))
 
-(defn state-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo #{mgmt/drafter-state-graph}))
+(defn state-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo #{mgmt/drafter-state-graph} timeouts))
 
-(defn raw-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo))
+(defn raw-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo nil timeouts))

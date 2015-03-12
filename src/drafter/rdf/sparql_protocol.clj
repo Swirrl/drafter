@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [grafter.rdf.repository :as repo]
             [drafter.util :refer [construct-dynamic*]]
+            [drafter.operations :refer :all]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -136,8 +137,36 @@
          ;; No op
          ))))
 
+(defn notifying-query-result-handler [notify-fn inner-handler]
+  (reify
+    TupleQueryResultHandler
+    (handleBoolean [this b]
+      (notify-fn)
+      (.handleBoolean inner-handler b))
+    (handleLinks [this links] (.handleLinks inner-handler links))
+    (startQueryResult [this binding-names] (.startQueryResult inner-handler binding-names))
+    (endQueryResult [this] (.endQueryResult inner-handler))
+    (handleSolution [this binding-set]
+      (notify-fn)
+      (.handleSolution inner-handler binding-set))))
+
+(defn notifying-rdf-handler [notify-fn inner-handler]
+  (reify
+    RDFHandler
+    (startRDF [this]
+      (.startRDF inner-handler))
+    (endRDF [this]
+      (.endRDF inner-handler))
+    (handleNamespace [this prefix uri]
+      (.handleNamespace inner-handler prefix uri))
+    (handleStatement [this statement]
+      (notify-fn)
+      (.handleStatement inner-handler statement))
+    (handleComment [this comment]
+      (.handleComment inner-handler comment))))
+
 ;result-streamer :: (OutputStream -> Writer) -> Query -> (OutputStream -> ())
-(defn result-streamer [writer-fn pquery]
+(defn result-streamer [writer-fn pquery result-notify-fn]
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
@@ -148,8 +177,9 @@
       (let [writer (writer-fn ostream)]
         (cond
          (instance? BooleanQuery pquery)
-         (let [result (.evaluate pquery)]
-           (doto writer
+         (let [notifying-handler (notifying-query-result-handler result-notify-fn writer)
+               result (.evaluate pquery)]
+           (doto notifying-handler
              (.handleBoolean result)))
 
          (and (instance? QueryResultWriter writer)
@@ -158,14 +188,16 @@
            ;; Allow CSV and other tabular writers to work with graph
            ;; queries.
            (log/debug "pquery is " pquery " writer is " writer)
-           (.evaluate pquery (result-handler-wrapper writer)))
+           (.evaluate pquery (notifying-rdf-handler result-notify-fn (result-handler-wrapper writer))))
 
          :else
          (do
            ;; Can be either a TupleQuery with TupleQueryResultHandler or a
            ;; GraphQuery with an RDFHandler.
            (log/debug "pquery (default) is " pquery " writer is " writer)
-           (.evaluate pquery writer))))
+           (cond
+            (instance? TupleQuery pquery) (.evaluate pquery (notifying-query-result-handler result-notify-fn writer))
+            (instance? GraphQuery pquery) (.evaluate pquery (notifying-rdf-handler result-notify-fn writer))))))
 
       (catch Exception ex
         ;; Note that if we error here it's now too late to return a
@@ -185,17 +217,23 @@
     "text/plain" "text/plain; charset=utf-8"
     mime-type))
 
-(defn- stream-sparql-response [pquery response-mime-type writer-fn]
-  {:status 200
-   :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
-   ;; Designed to work with piped-input-stream this fn will be run
-   ;; in another thread to stream the results to the client.
-   :body (rio/piped-input-stream (result-streamer writer-fn pquery))})
-
 (defn- unsupported-media-type-response [media-type]
   {:status 406
    :headers {"Content-Type" "text/plain; charset=utf-8"}
    :body (str "Unsupported media-type: " media-type)})
+
+(defn- stream-sparql-response [pquery response-mime-type writer-fn query-timeouts]
+  (let [{:keys [publish] :as query-operation} (create-operation)
+        streamer (result-streamer writer-fn pquery publish)
+        [write-fn input-stream] (connect-piped-output-stream streamer)]
+
+      (execute-operation query-operation write-fn query-timeouts)
+
+      {:status 200
+       :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
+       ;; Designed to work with piped-input-stream this fn will be run
+       ;; in another thread to stream the results to the client.
+       :body input-stream}))
 
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
@@ -228,11 +266,10 @@
     (let [inner (construct-dynamic* writer-class output-stream)]
       (result-rewriter pquery inner))))
 
-(defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions
-                                                 result-rewriter]
+(defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions result-rewriter query-timeouts]
                                           :or {query-creator-fn repo/prepare-query
-                                               result-rewriter (fn [query writer] writer)}}]
-
+                                               result-rewriter (fn [query writer] writer)
+                                               query-timeouts default-timeouts}}]
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
         query-str (:query params)
@@ -241,8 +278,9 @@
         media-type (negotiate-sparql-query-mime-type pquery request)]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
+    
     (if-let [result-writer-class (negotiate-content-writer pquery media-type)]
-      (stream-sparql-response pquery media-type (class->writer-fn pquery result-writer-class result-rewriter))
+      (stream-sparql-response pquery media-type (class->writer-fn pquery result-writer-class result-rewriter) query-timeouts)
       (unsupported-media-type-response media-type))))
 
 (defn wrap-sparql-errors [handler]
@@ -260,17 +298,20 @@
   to restrict both the union and named-graph queries too."
 
   ([mount-path repo] (sparql-end-point mount-path repo nil))
-  ([mount-path repo restrictions]
+  ([mount-path repo restrictions] (sparql-end-point mount-path repo restrictions nil))
+  ([mount-path repo restrictions timeouts]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
    (wrap-sparql-errors
     (routes
      (GET mount-path request
           (process-sparql-query repo request
-                                :graph-restrictions restrictions))
+                                :graph-restrictions restrictions
+                                :query-timeouts timeouts))
 
      (POST mount-path request
            (process-sparql-query repo request
-                                 :graph-restrictions restrictions))))))
+                                 :graph-restrictions restrictions
+                                 :query-timeouts timeouts))))))
 
 (comment
 
