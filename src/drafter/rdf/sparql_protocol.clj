@@ -277,8 +277,8 @@
                  (.setDataset restriction))
         media-type (negotiate-sparql-query-mime-type pquery request)]
 
-    (log/info (str "Running query\n" query-str "\nwith graph restrictions: " graph-restrictions))
-    
+    (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
+
     (if-let [result-writer-class (negotiate-content-writer pquery media-type)]
       (stream-sparql-response pquery media-type (class->writer-fn pquery result-writer-class result-rewriter) query-timeouts)
       (unsupported-media-type-response media-type))))
