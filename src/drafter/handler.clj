@@ -4,6 +4,7 @@
             [compojure.core :refer [defroutes context]]
             [compojure.route :as route]
             [drafter.middleware :as middleware]
+            [drafter.common.json-encoders :as enc]
             [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
             [drafter.rdf.sparql-rewriting :refer [function-registry
                                                   pmdfunctions
@@ -118,6 +119,7 @@
   (set-var-root! #'writer-service  (start-writer!)))
 
 (defn initialise-services! [repo-path indexes]
+  (enc/register-custom-encoders!)
   (initialise-repo! repo-path indexes)
   (initialise-write-service!)
   (initialise-app! repo))

@@ -1,11 +1,13 @@
 (ns drafter.routes.status-test
   (:require [clojure.test :refer :all]
             [ring.mock.request :refer :all]
+            [drafter.common.json-encoders :as enc]
             [drafter.routes.status :refer :all]
             [drafter.write-scheduler :refer [create-job]])
   (:import [java.util UUID]
            [java.util.concurrent.locks ReentrantLock]))
 
+(enc/register-custom-encoders!)
 (defonce restart-id (UUID/randomUUID))
 
 (def job-return-value {:type :ok})
@@ -14,6 +16,11 @@
   (let [job (create-job :batch-write (fn []))
         p (:value-p job)]
     (deliver p job-return-value)
+    job))
+
+(defn create-failed-job [ex]
+  (let [job (create-job :batch-write (fn []))]
+    (deliver (:value-p job) {:type :error :exception ex})
     job))
 
 (defn lock-responses [lock-value {:keys [status body headers]}]
@@ -41,6 +48,12 @@
 
 (def finished-jobs (atom {(:id job) (:value-p job)}))
 
+(defn status-routes-handler [jobs-map]
+  (status-routes (ReentrantLock.) (atom jobs-map) restart-id))
+
+(defn finished-job-id-path [id] (str "/finished-jobs/" id))
+(def finished-job-path (comp finished-job-id-path :id))
+
 (deftest finished-jobs-test
   (testing "GET /finished-jobs"
     (testing "with a valid finished job"
@@ -52,4 +65,18 @@
 
           (is (= 200 status))
           (is (= {:type :ok
-                  :restart-id restart-id} body))))))
+                  :restart-id restart-id} body))))
+
+    (testing "with a failed job"
+      (let [msg "job failed"
+            {:keys [id value-p] :as job} (create-failed-job (RuntimeException. msg))
+            status-route (status-routes-handler {id value-p})
+            {:keys [body status]} (status-route (request :get (finished-job-path job)))]
+        (is (= 200 status)
+            (= msg (get-in body ["exception" "message"])))))
+
+    (testing "with an unknown job"
+      (let [job-path (finished-job-id-path (UUID/randomUUID))
+            status-route (status-routes-handler {})
+            {:keys [status]} (status-route (request :get job-path))]
+        (is (= 404 status))))))
