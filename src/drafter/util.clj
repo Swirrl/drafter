@@ -8,3 +8,8 @@
   (->>
     (io/slurp-resource filename)
     (md/md-to-html-string)))
+
+(defn get-causes [ex]
+  "Returns a flattened vector containing the root exception and all
+  inner cause exceptions."
+  (take-while some? (iterate #(.getCause %) ex)))
