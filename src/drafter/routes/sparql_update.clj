@@ -1,6 +1,8 @@
 (ns drafter.routes.sparql-update
   (:require [clojure.tools.logging :as log]
             [compojure.core :refer [POST]]
+            [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.write-scheduler :as scheduler]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-rewriting :as rew]
             [grafter.rdf.repository :refer [->connection evaluate
@@ -56,17 +58,6 @@
 (defmethod parse-update-request :default [request]
   (throw (Exception. (str "Invalid Content-Type " (:content-type request)))))
 
-(defn execute-update [repo update-query]
-  (try
-    ;; (with-open [conn (->connection repo)]
-      (with-transaction repo ;;conn
-        (evaluate update-query))
-      {:status 200 :body "OK"}
-      ;; )
-    (catch Exception ex
-      (log/fatal "An exception was thrown when executing a SPARQL update!" ex)
-      {:status 500 :body (str "Unknown server error executing update" ex)})))
-
 (defn- collection-or-nil? [x]
   (or (coll? x)
       (nil? x)))
@@ -98,6 +89,25 @@
                         (resolve-restrictions graphs))]
     (prepare-update repo update-str restricted-ds)))
 
+(defn create-update-job [repo request prepare-fn]
+  (jobs/make-job :sync-write [job]
+                 (with-open [conn (->connection repo)]
+                   (let [parsed-query (parse-update-request request)
+                         prepared-update (prepare-fn parsed-query conn)]
+                     (log/debug "Executing update-query " prepared-update)
+                     (with-transaction conn
+                       (evaluate prepared-update))
+                     (scheduler/complete-job! job {:status 200 :body "OK"})))))
+
+;exec-update :: Repository -> Request -> (ParsedStatement -> Connection -> PreparedStatement) -> Response
+(defn exec-update [repo request prepare-fn]
+  (let [job (create-update-job repo request prepare-fn)]
+    (scheduler/submit-sync-job! job)))
+
+(defn prepare-update-statement [{update :update} conn restrictions]
+  (let [rs (if (fn? restrictions) (restrictions) restrictions)]
+    (prepare-restricted-update conn update rs)))
+
 (defn update-endpoint
   "Create a standard update-endpoint with no query-rewriting and
   optional restrictions on the allowed graphs; restrictions can either
@@ -107,28 +117,20 @@
      (update-endpoint mount-point repo #{}))
   ([mount-point repo restrictions]
      (POST mount-point request
-           (with-open [conn (->connection repo)]
-             (let [{update :update} (parse-update-request request)
-                   ;; prepare the update based upon the endpoints restrictions
-                   preped-update (prepare-restricted-update conn update (if (fn? restrictions)
-                                                                          (restrictions)
-                                                                          restrictions))]
-               (log/debug "About to execute update-query " preped-update)
-               (execute-update conn preped-update))))))
+           (exec-update repo request #(prepare-update-statement %1 %2 restrictions)))))
+
+(defn prepare-draft-update [{:keys [update graphs]} conn]
+  (let [graphs (lift graphs)
+        preped-update (prepare-restricted-update conn update graphs)]
+    (rew/rewrite-update-request preped-update (mgmt/graph-map conn graphs))
+    preped-update))
 
 (defn draft-update-endpoint
   "Create an update endpoint with draft query rewriting.  Restrictions
   are applied on the basis of the &graphs query parameter."
   ([mount-point repo]
    (POST mount-point request
-         (with-open [conn (->connection repo)]
-           (let [{:keys [update graphs]} (parse-update-request request)
-                 graphs (lift graphs)
-                 preped-update (prepare-restricted-update conn update graphs)]
-
-             (rew/rewrite-update-request preped-update (mgmt/graph-map conn graphs))
-             (log/debug "Executing update-query " preped-update)
-             (execute-update conn preped-update))))))
+         (exec-update repo request prepare-draft-update))))
 
 (defn draft-update-endpoint-route [mount-point repo]
   (draft-update-endpoint mount-point repo))
