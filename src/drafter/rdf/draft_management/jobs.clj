@@ -1,5 +1,6 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
+            [clojure.string :refer [trim]]
             [drafter.common.api-routes :as restapi]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.write-scheduler :refer [create-job submit-job! complete-job!]]
@@ -42,25 +43,26 @@
 
               (complete-job! job (restapi/api-response 201 {:guri draft-graph-uri})))))
 
-(defn delete-graph-job [repo graph]
-  ;; TODO consider that we should really make this batchable - as its
-  ;; mostly for deleting a draft graph and all other draft-graph
-  ;; operations (except creation are batched).
-  ;;
-  ;; Otherwise deletes could block syncs.
-  ;;
-  ;; Could possibly implement with:
-  ;;
-  ;; DELETE { GRAPH <http://foo> { ?s ?p ?o } } WHERE { SELECT ?s ?p ?o WHERE { GRAPH <http://foo> { ?s ?p ?o } LIMIT 5000 }}
-  ;;
-  ;; And loop until the graph is empty?
+(defn- delete-in-batches [repo graph restart-id job]
+  ;; Loops until the graph is empty, then deletes state graph.
+  (let [conn (->connection repo)]
+    (with-transaction conn
+                      (mgmt/delete-graph-batched! conn graph (batched-write-size)))
+    (if (mgmt/graph-exists? repo graph)
+      (let [apply-next-batch (partial delete-in-batches repo graph restart-id)]
+        (submit-job! (assoc job :function apply-next-batch) restart-id))
+      (do
+        (mgmt/delete-graph-and-draft-state! repo graph)
+        (complete-job! job restapi/ok-response)))))
 
-  (make-job :exclusive-write [job]
-            (let [conn (->connection repo)]
-              (with-transaction conn
-                (mgmt/delete-graph-and-draft-state! conn graph)))
-
-            (complete-job! job restapi/ok-response)))
+(defn delete-graph-job [repo graph restart-id]
+  "Deletes graph contents as per batch size in order to avoid blocking writes with.
+   a lock Otherwise, deletes could block syncs. "
+  (create-job :batch-write
+              (partial delete-in-batches
+                       repo
+                       (trim graph)
+                       restart-id)))
 
 (defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
@@ -68,9 +70,8 @@
 
   This operation is batched at the :batch-write level to allow
   cooperative scheduling with :sync-writes."
-
   [repo graph {:keys [tempfile size filename content-type] :as file} metadata]
-
+  ; TODO: This isn't really batched! Combine batched-delete and batched-append
   (make-job :batch-write [job]
             (log/info (str "Replacing graph " graph " with contents of file "
                            tempfile "[" filename " " size " bytes]"))
@@ -83,7 +84,7 @@
             (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))
             (complete-job! job restapi/ok-response)))
 
-(defn- append-data-in-batches [repo draft-graph metadata triples job]
+(defn- append-data-in-batches [repo draft-graph metadata triples restart-id job]
   (with-job-exception-handling job
     (let [conn (->connection repo)
           [current-batch remaining-triples] (split-at (batched-write-size) triples)]
@@ -96,8 +97,8 @@
         ;; resubmit the remaining batches under the same job to the
         ;; queue to give higher priority jobs a chance to write
         (let [apply-next-batch (partial append-data-in-batches repo draft-graph metadata
-                                        remaining-triples)]
-          (submit-job! (assoc job :function apply-next-batch)))
+                                        remaining-triples restart-id)]
+          (submit-job! (assoc job :function apply-next-batch) restart-id))
 
         (do
           (mgmt/add-metadata-to-graph conn draft-graph metadata)
@@ -120,7 +121,7 @@
   The last batch is finally responsible for signaling job completion
   via a side-effecting call to complete-job!"
 
-  [repo draft-graph {:keys [tempfile size filename content-type] :as file} metadata]
+  [repo draft-graph {:keys [tempfile size filename content-type] :as file} metadata restart-id]
 
   (let [new-triples (statements tempfile
                                 :format (mimetype->rdf-format content-type)
@@ -159,7 +160,7 @@
 
     (create-job :batch-write
                 (partial append-data-in-batches repo
-                         draft-graph metadata triples))))
+                         draft-graph metadata triples restart-id))))
 
 (defn migrate-graph-live-job [repo graph]
   (make-job :exclusive-write [job]

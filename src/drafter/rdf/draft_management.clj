@@ -36,6 +36,15 @@
                "<" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
         "}"))))
 
+(defn graph-exists? [db graph-uri]
+  (query db
+         (str "ASK WHERE {"
+              "  SELECT ?s ?p ?o WHERE {"
+              "    GRAPH <" graph-uri "> { ?s ?p ?o }"
+              "  }"
+              "  LIMIT 1"
+              "}")))
+
 (defn create-managed-graph
   "Returns some RDF statements to represent the ManagedGraphs state."
   ([graph-uri] (create-managed-graph graph-uri {}))
@@ -190,6 +199,25 @@
     (update! db
              query-str))
   (log/info (str "Deleted draft graph from state " graph-uri)))
+
+(defn delete-graph-batched!
+  "Deletes graph contents as per batch size in order to avoid blocking writes with a lock."
+  [db graph-uri batch-size]
+  (let [delete-sparql (str "DELETE  {"
+                           "  GRAPH <" graph-uri "> {"
+                           "    ?s ?p ?o"
+                           "  }"
+                           "}"
+                           "WHERE {"
+                           "  SELECT ?s ?p ?o WHERE"
+                           "  {"
+                           "    GRAPH <" graph-uri "> {"
+                           "      ?s ?p ?o"
+                           "    }"
+                           "  }"
+                           "  LIMIT " batch-size
+                           "}")]
+    (update! db delete-sparql)))
 
 (defn replace-data!
   ([db draft-graph-uri triples] (replace-data! db draft-graph-uri triples {}))

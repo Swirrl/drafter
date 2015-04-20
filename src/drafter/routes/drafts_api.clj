@@ -43,7 +43,7 @@
           (let [metadata (api-routes/meta-params query-params)]
             (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
                                     (submit-job!
-                                     (append-data-to-graph-from-file-job repo graph (override-file-format content-type file) metadata)
+                                     (append-data-to-graph-from-file-job repo graph (override-file-format content-type file) metadata restart-id)
                                      restart-id))))
 
     ;; replaces data in the graph from either source-graph or file
@@ -61,20 +61,18 @@
 
 (defn graph-management-routes [mount-point repo restart-id]
   (routes
-   ;; deletes data in the graph. This could be a live or a draft graph.
-   (DELETE mount-point {{graph :graph} :params
-                        query-params :query-params}
-           (api-routes/when-params [graph]
-                                   (submit-job! (delete-graph-job repo graph)
-                                                restart-id)))
+    ;; deletes data in the graph. This could be a live or a draft graph.
+    (DELETE mount-point {{graph :graph} :params}
+            (api-routes/when-params [graph]
+                                    (submit-job! (delete-graph-job repo graph restart-id)
+                                                 restart-id)))
    (context
-    mount-point []
-
-    ;; makes a graph live.
-    (PUT "/live" {{graph :graph} :params
-                  query-params :query-params
-                  :as request}
-         (log/info request)
-         (api-routes/when-params [graph]
-                                 (submit-job! (migrate-graph-live-job repo graph)
-                                              restart-id))))))
+     mount-point []
+     ;; makes a graph live.
+     (PUT "/live" {{graph :graph} :params
+                   query-params :query-params
+                   :as request}
+          (log/info request)
+          (api-routes/when-params [graph]
+                                  (submit-job! (migrate-graph-live-job repo graph)
+                                               restart-id))))))
