@@ -27,14 +27,15 @@
                             :error-type (str (class ex#))
                             :exception ex#}))))
 
-(defmacro make-job [write-priority [job :as args] & forms]
+(defmacro make-job [write-priority restart-id [job :as args] & forms]
   `(create-job ~write-priority
+               ~restart-id
                (fn [~job]
                  (with-job-exception-handling ~job
                    ~@forms))))
 
-(defn create-draft-job [repo live-graph params]
-  (make-job :sync-write [job]
+(defn create-draft-job [repo live-graph restart-id params]
+  (make-job :sync-write restart-id [job]
             (let [conn (->connection repo)
                   draft-graph-uri (with-transaction conn
                                     (mgmt/create-managed-graph! conn live-graph)
@@ -43,14 +44,14 @@
 
               (complete-job! job (restapi/api-response 201 {:guri draft-graph-uri})))))
 
-(defn- delete-in-batches [repo graph restart-id job]
+(defn- delete-in-batches [repo graph job]
   ;; Loops until the graph is empty, then deletes state graph.
   (let [conn (->connection repo)]
     (with-transaction conn
                       (mgmt/delete-graph-batched! conn graph (batched-write-size)))
     (if (mgmt/graph-exists? repo graph)
-      (let [apply-next-batch (partial delete-in-batches repo graph restart-id)]
-        (submit-job! (assoc job :function apply-next-batch) restart-id))
+      (let [apply-next-batch (partial delete-in-batches repo graph)]
+        (submit-job! (assoc job :function apply-next-batch)))
       (do
         (mgmt/delete-graph-and-draft-state! repo graph)
         (complete-job! job restapi/ok-response)))))
@@ -59,10 +60,10 @@
   "Deletes graph contents as per batch size in order to avoid blocking writes with.
    a lock Otherwise, deletes could block syncs. "
   (create-job :batch-write
+              restart-id
               (partial delete-in-batches
                        repo
-                       (trim graph)
-                       restart-id)))
+                       (trim graph))))
 
 (defn replace-graph-from-file-job
   "Return a function to replace the specified graph with a graph
@@ -70,9 +71,9 @@
 
   This operation is batched at the :batch-write level to allow
   cooperative scheduling with :sync-writes."
-  [repo graph {:keys [tempfile size filename content-type] :as file} metadata]
+  [repo graph restart-id {:keys [tempfile size filename content-type] :as file} metadata]
   ; TODO: This isn't really batched! Combine batched-delete and batched-append
-  (make-job :batch-write [job]
+  (make-job :batch-write restart-id [job]
             (log/info (str "Replacing graph " graph " with contents of file "
                            tempfile "[" filename " " size " bytes]"))
 
@@ -84,7 +85,7 @@
             (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))
             (complete-job! job restapi/ok-response)))
 
-(defn- append-data-in-batches [repo draft-graph metadata triples restart-id job]
+(defn- append-data-in-batches [repo draft-graph metadata triples job]
   (with-job-exception-handling job
     (let [conn (->connection repo)
           [current-batch remaining-triples] (split-at (batched-write-size) triples)]
@@ -96,9 +97,9 @@
       (if-not (empty? remaining-triples)
         ;; resubmit the remaining batches under the same job to the
         ;; queue to give higher priority jobs a chance to write
-        (let [apply-next-batch (partial append-data-in-batches repo draft-graph metadata
-                                        remaining-triples restart-id)]
-          (submit-job! (assoc job :function apply-next-batch) restart-id))
+        (let [apply-next-batch (partial append-data-in-batches
+                                        repo draft-graph metadata remaining-triples)]
+          (submit-job! (assoc job :function apply-next-batch)))
 
         (do
           (mgmt/add-metadata-to-graph conn draft-graph metadata)
@@ -159,11 +160,12 @@
                           new-triples)]
 
     (create-job :batch-write
-                (partial append-data-in-batches repo
-                         draft-graph metadata triples restart-id))))
+                restart-id
+                (partial append-data-in-batches
+                         repo draft-graph metadata triples))))
 
-(defn migrate-graph-live-job [repo graph]
-  (make-job :exclusive-write [job]
+(defn migrate-graph-live-job [repo graph restart-id]
+  (make-job :exclusive-write restart-id [job]
             (log/info "Starting make-live for graph" graph)
             (let [conn (->connection repo)]
               (with-transaction conn

@@ -13,17 +13,17 @@
 (def job-return-value {:type :ok})
 
 (defn create-finished-job []
-  (let [job (create-job :batch-write (fn []))
+  (let [job (create-job :batch-write restart-id (fn []))
         p (:value-p job)]
     (deliver p job-return-value)
     job))
 
 (defn create-failed-job [ex]
-  (let [job (create-job :batch-write (fn []))]
+  (let [job (create-job :batch-write restart-id (fn []))]
     (deliver (:value-p job) {:type :error :exception ex})
     job))
 
-(defn lock-responses [lock-value {:keys [status body headers]}]
+(defn lock-responses [lock-value {:keys [status body]}]
   (is (= 200 status))
   (is (= lock-value body)))
 

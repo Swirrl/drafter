@@ -9,8 +9,6 @@
                                                        migrate-graph-live-job]]
             [drafter.write-scheduler :refer [submit-job! submit-sync-job!]]))
 
-(def no-file-or-graph-param-error-msg {:msg "You must supply both a 'file' and 'graph' parameter."})
-
 (defn override-file-format
   "Takes a file object (hash) and if a non-nil file-format is supplied
   overrides its content-type."
@@ -26,11 +24,10 @@
 
     ;; makes a new managed/draft graph.
     ;; accepts extra meta- query string params, which are added to the state graph
-
     (POST "/create" {{live-graph :live-graph} :params
                      params :params}
           (api-routes/when-params [live-graph]
-                                  (submit-sync-job! (create-draft-job repo live-graph params)))))
+                                  (submit-sync-job! (create-draft-job repo live-graph restart-id params)))))
 
    ;; adds data to the graph from either source-graph or file
    ;; accepts extra meta- query string params, which are added to queue metadata
@@ -43,8 +40,10 @@
           (let [metadata (api-routes/meta-params query-params)]
             (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
                                     (submit-job!
-                                     (append-data-to-graph-from-file-job repo graph (override-file-format content-type file) metadata restart-id)
-                                     restart-id))))
+                                     (append-data-to-graph-from-file-job repo graph
+                                                                         (override-file-format content-type file)
+                                                                         metadata
+                                                                         restart-id)))))
 
     ;; replaces data in the graph from either source-graph or file
     ;; accepts extra meta- query string params, which are added to queue metadata
@@ -55,24 +54,23 @@
                       {file :file} :params}
          (let [metadata (api-routes/meta-params query-params)]
            (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
-                                   (submit-job!
-                                    (replace-graph-from-file-job repo graph (override-file-format content-type file) metadata)
-                                    restart-id)))))))
+                                   (submit-job! (replace-graph-from-file-job repo
+                                                                             graph
+                                                                             restart-id
+                                                                             (override-file-format content-type file)
+                                                                             metadata))))))))
 
 (defn graph-management-routes [mount-point repo restart-id]
   (routes
     ;; deletes data in the graph. This could be a live or a draft graph.
     (DELETE mount-point {{graph :graph} :params}
             (api-routes/when-params [graph]
-                                    (submit-job! (delete-graph-job repo graph restart-id)
-                                                 restart-id)))
+                                    (submit-job! (delete-graph-job repo graph restart-id))))
    (context
      mount-point []
      ;; makes a graph live.
      (PUT "/live" {{graph :graph} :params
-                   query-params :query-params
                    :as request}
           (log/info request)
           (api-routes/when-params [graph]
-                                  (submit-job! (migrate-graph-live-job repo graph)
-                                               restart-id))))))
+                                  (submit-job! (migrate-graph-live-job repo graph restart-id)))))))

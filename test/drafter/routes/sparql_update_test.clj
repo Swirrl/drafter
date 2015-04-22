@@ -73,12 +73,14 @@
    (testing "Update not available if exclusive write job running"
       (let [p (promise)
             latch (CountDownLatch. 1)
-            exclusive-job (scheduler/create-job :exclusive-write (fn [j]
-                                                                   (.countDown latch)
-                                                                   @p))]
-        
+            exclusive-job (scheduler/create-job
+                            :exclusive-write
+                            (UUID/randomUUID)
+                            (fn [j]
+                              (.countDown latch)
+                              @p))]
         ;submit exclusive job which should prevent updates from being scheduled
-        (scheduler/submit-job! exclusive-job (UUID/randomUUID))
+        (scheduler/submit-job! exclusive-job)
 
         ;wait until exclusive job is actually running (i.e. the write lock has been taken)
         (.await latch)

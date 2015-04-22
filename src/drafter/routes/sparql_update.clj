@@ -90,7 +90,7 @@
     (prepare-update repo update-str restricted-ds)))
 
 (defn create-update-job [repo request prepare-fn]
-  (jobs/make-job :sync-write [job]
+  (jobs/make-job :sync-write nil [job]
                  (with-open [conn (->connection repo)]
                    (let [parsed-query (parse-update-request request)
                          prepared-update (prepare-fn parsed-query conn)]
