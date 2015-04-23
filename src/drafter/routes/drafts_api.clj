@@ -3,7 +3,6 @@
             [compojure.core :refer [DELETE POST PUT context routes]]
             [drafter.common.api-routes :as api-routes]
             [drafter.rdf.draft-management.jobs :refer [append-data-to-graph-from-file-job
-                                                       replace-graph-from-file-job
                                                        create-draft-job
                                                        delete-graph-job
                                                        migrate-graph-live-job]]
@@ -43,22 +42,7 @@
                                      (append-data-to-graph-from-file-job repo graph
                                                                          (override-file-format content-type file)
                                                                          metadata
-                                                                         restart-id)))))
-
-    ;; replaces data in the graph from either source-graph or file
-    ;; accepts extra meta- query string params, which are added to queue metadata
-
-    (PUT mount-point {{graph :graph} :params
-                      {content-type :content-type} :params
-                      query-params :query-params
-                      {file :file} :params}
-         (let [metadata (api-routes/meta-params query-params)]
-           (api-routes/when-params [graph file] ; when source graph not supplied: replace from the file.
-                                   (submit-job! (replace-graph-from-file-job repo
-                                                                             graph
-                                                                             restart-id
-                                                                             (override-file-format content-type file)
-                                                                             metadata))))))))
+                                                                         restart-id))))))))
 
 (defn graph-management-routes [mount-point repo restart-id]
   (routes

@@ -219,19 +219,6 @@
                            "}")]
     (update! db delete-sparql)))
 
-(defn replace-data!
-  ([db draft-graph-uri triples] (replace-data! db draft-graph-uri triples {}))
-
-  ([db draft-graph-uri triples metadata]
-   (delete-graph-contents! db draft-graph-uri)
-   (add-metadata-to-graph db draft-graph-uri metadata)
-   (add db draft-graph-uri triples))
-
-  ([db draft-graph-uri format triples metadata]
-   (delete-graph-contents! db draft-graph-uri)
-   (add-metadata-to-graph db draft-graph-uri metadata)
-   (add db draft-graph-uri format triples)))
-
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
   (-> (query db

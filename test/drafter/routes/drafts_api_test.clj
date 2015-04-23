@@ -176,27 +176,7 @@
                 error-result (await-completion finished-jobs guid)]
 
             (is (= :error (:type error-result)))
-            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result))))))))
-
-  (testing "PUT /draft with a source file"
-    (make-graph-live! *test-db* "http://mygraph/graph-to-be-replaced")
-
-    (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
-        "Graph should contain initial state before it is replaced")
-
-    (let [dest-graph "http://mygraph/graph-to-be-replaced"
-          test-request (->  {:uri "/draft" :request-method :put}
-                            (add-request-graph dest-graph)
-                            (add-request-file "./test/test-triple.nt"))
-          route (draft-api-routes "/draft" *test-db* restart-id)
-          {:keys [status body headers] :as response} (route test-request)]
-
-      (job-is-accepted response)
-      (await-completion finished-jobs (:finished-job body))
-
-      (testing "replaces RDF in the graph"
-        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . } }"))
-            "The data should be replaced with the new data")))))
+            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))))
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph"
@@ -309,8 +289,6 @@
                (testing "Metadata overwritten"
                  (is (= 1 (count meta-records))
                      (= "updated" (get (first meta-records) "o")))))))))))
-
- meta-replace-with-put-file-test :put (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt"))
 
  meta-update-with-post-file-test :post (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt")))
 

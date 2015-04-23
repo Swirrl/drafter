@@ -65,26 +65,6 @@
                        repo
                        (trim graph))))
 
-(defn replace-graph-from-file-job
-  "Return a function to replace the specified graph with a graph
-  containing the tripes from the specified file.
-
-  This operation is batched at the :batch-write level to allow
-  cooperative scheduling with :sync-writes."
-  [repo graph restart-id {:keys [tempfile size filename content-type] :as file} metadata]
-  ; TODO: This isn't really batched! Combine batched-delete and batched-append
-  (make-job :batch-write restart-id [job]
-            (log/info (str "Replacing graph " graph " with contents of file "
-                           tempfile "[" filename " " size " bytes]"))
-
-            (let [conn (->connection repo)]
-              (with-transaction conn
-                (mgmt/replace-data! conn graph (mimetype->rdf-format content-type)
-                                    (:tempfile file)
-                                    metadata)))
-            (log/info (str "Replaced graph " graph " with file " tempfile "[" filename "]"))
-            (complete-job! job restapi/ok-response)))
-
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
   (with-job-exception-handling job
     (let [conn (->connection repo)
