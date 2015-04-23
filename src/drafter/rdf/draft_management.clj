@@ -201,7 +201,8 @@
   (log/info (str "Deleted draft graph from state " graph-uri)))
 
 (defn delete-graph-batched!
-  "Deletes graph contents as per batch size in order to avoid blocking writes with a lock."
+  "Deletes graph contents as per batch size in order to avoid blocking
+  writes with a lock."
   [db graph-uri batch-size]
   (let [delete-sparql (str "DELETE  {"
                            "  GRAPH <" graph-uri "> {"

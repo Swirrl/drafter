@@ -57,8 +57,8 @@
         (complete-job! job restapi/ok-response)))))
 
 (defn delete-graph-job [repo graph restart-id]
-  "Deletes graph contents as per batch size in order to avoid blocking writes with.
-   a lock Otherwise, deletes could block syncs. "
+  "Deletes graph contents as per batch size in order to avoid blocking
+   writes with a lock."
   (create-job :batch-write
               restart-id
               (partial delete-in-batches
