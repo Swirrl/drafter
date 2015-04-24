@@ -4,6 +4,7 @@
             [compojure.core :refer [defroutes context]]
             [compojure.route :as route]
             [drafter.middleware :as middleware]
+            [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
             [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
             [drafter.rdf.sparql-rewriting :refer [function-registry
@@ -53,9 +54,6 @@
 (def ^{:doc "A future to control the single write thread that performs database writes."}
   writer-service)
 
-(defmacro set-var-root! [var form]
-  `(alter-var-root ~var (fn [& _#]
-                         ~form)))
 
 (defn register-sparql-extension-functions
   "Register custom drafter SPARQL extension functions."

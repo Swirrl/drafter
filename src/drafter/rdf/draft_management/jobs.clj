@@ -1,6 +1,5 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
-            [clojure.string :refer [trim]]
             [drafter.common.api-routes :as restapi]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.write-scheduler :refer [create-job submit-job! complete-job!]]
@@ -12,8 +11,7 @@
                                             with-transaction]]
             [environ.core :refer [env]]))
 
-(defn batched-write-size []
-  (Integer/parseInt (get env :drafter-batched-write-size "10000")))
+(def batched-write-size (Integer/parseInt (get env :drafter-batched-write-size "10000")))
 
 (defmacro with-job-exception-handling [job & forms]
   `(try
@@ -48,7 +46,7 @@
   ;; Loops until the graph is empty, then deletes state graph.
   (let [conn (->connection repo)]
     (with-transaction conn
-                      (mgmt/delete-graph-batched! conn graph (batched-write-size)))
+                      (mgmt/delete-graph-batched! conn graph batched-write-size))
     (if (mgmt/graph-exists? repo graph)
       (let [apply-next-batch (partial delete-in-batches repo graph)]
         (submit-job! (assoc job :function apply-next-batch)))
@@ -56,19 +54,22 @@
         (mgmt/delete-graph-and-draft-state! repo graph)
         (complete-job! job restapi/ok-response)))))
 
-(defn delete-graph-job [repo graph restart-id]
+(defn delete-graph-job
   "Deletes graph contents as per batch size in order to avoid blocking
    writes with a lock."
-  (create-job :batch-write
-              restart-id
-              (partial delete-in-batches
-                       repo
-                       (trim graph))))
+  [repo graph restart-id]
+  (do
+    (log/info "Starting batch deletion job")
+    (create-job :batch-write
+                restart-id
+                (partial delete-in-batches
+                         repo
+                         graph))))
 
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
   (with-job-exception-handling job
     (let [conn (->connection repo)
-          [current-batch remaining-triples] (split-at (batched-write-size) triples)]
+          [current-batch remaining-triples] (split-at batched-write-size triples)]
 
       (log/info (str "Adding a batch of triples to repo" current-batch))
       (with-transaction conn
@@ -106,7 +107,7 @@
 
   (let [new-triples (statements tempfile
                                 :format (mimetype->rdf-format content-type)
-                                :buffer-size (batched-write-size))
+                                :buffer-size batched-write-size)
 
         ;; NOTE that this is technically not transactionally safe as
         ;; sesame currently only supports the READ_COMMITTED isolation
