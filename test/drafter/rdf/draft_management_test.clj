@@ -87,15 +87,6 @@
                  <http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .
                }"))))))
 
-(deftest replace-data!-test
-  (testing "replace-data!"
-    (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
-
-      (append-data! *test-db* draft-graph-uri (triplify ["http://removed/triple" ["http://is/" "http://gone/"]]))
-      (replace-data! *test-db* draft-graph-uri test-triples)
-      (is (not (ask? "<http://removed/triple>" "<http://is/>" "<http://gone/> .")))
-      (is (ask? "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .")))))
-
 (deftest lookup-live-graph-test
   (testing "lookup-live-graph"
     (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]

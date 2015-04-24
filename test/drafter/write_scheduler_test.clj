@@ -1,6 +1,7 @@
 (ns drafter.write-scheduler-test
   (:require [drafter.write-scheduler :refer :all]
-            [clojure.test :refer :all]))
+            [clojure.test :refer :all])
+  (:import [java.util UUID]))
 
 (defn t
   "Just a dummy function"

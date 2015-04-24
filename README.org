@@ -135,59 +135,6 @@ Server: Jetty(7.6.13.v20130916)
 }
 #+end_example
 
-*** Replace a draft with graph with triples from a file
-
-| Verbs | Route    | Synchronous | Priority           |
-|-------+----------+-------------+--------------------|
-| PUT   | =/draft= | No          | =1 :batched-write= |
-
-Asynchronously schedules a request to append or replace the specified
-draft graph with the contents of the provided RDF file.
-
-Enqueues a replace of the contents of the draft graph with the file
-data.
-
-It accepts the following parameters:
-
-| Parameter  | Required | Description                                                                                                                  |
-|------------+----------+------------------------------------------------------------------------------------------------------------------------------|
-| =graph=    | Yes      | The URI of the draft graph you wish to append/replace into.                                                                  |
-| =meta-???= | No       | Key/Value pair of metadata to attach to this draft in the state graph.  It will be applied with the batched write operation. |
-
-Must contain the file of triples with a correct mime-type.
-
-The file must be supplied as multi-part-form data under the key =file=.
-
-Returns a 202 if enqueued successfully, with a JSON response
-containing a path segment for the client to poll for the status of the
-job.
-
-#+BEGIN_SRC http :exports both
-PUT http://localhost:3001/draft?graph=http://publishmydata.com/graphs/drafter/draft/c1026ac2-81cf-4aa8-97d5-5eb945ef03a5
-Content-Type: multipart/form-data; boundary=AaB03x
-
---AaB03x
-Content-Disposition: form-data; name="file"; filename="mission-statement.nt"
-Content-Type: application/n-triples
-
-<http://swirrl.com/mission-statement> <http://swirrl.com/published-facts> 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 .
---AaB03x--
-#+END_SRC
-
-#+RESULTS:
-#+begin_example
-HTTP/1.1 202 Accepted
-Date: Wed, 04 Mar 2015 17:20:59 GMT
-Content-Length: 79
-Content-Type: application/json; charset=utf-8
-Server: Jetty(7.6.13.v20130916)
-
-{
-"type": "ok",
-"finished-job": "/status/finished-jobs/2b9b5c60-f5f7-4141-b21f-592886b98791"
-}
-#+end_example
-
 *** Delete a draft or live graph
 
 | Verbs  | Route    | Synchronous | Priority                                   |

@@ -23,7 +23,8 @@
             [drafter.routes.sparql-update :refer [live-update-endpoint-route
                                                   raw-update-endpoint-route
                                                   state-update-endpoint-route]]
-            [drafter.write-scheduler :refer [start-writer!
+            [drafter.write-scheduler :refer [restart-id
+                                             start-writer!
                                              global-writes-lock
                                              finished-jobs
                                              stop-writer!]]
@@ -41,8 +42,6 @@
 
   (:require [clj-logging-config.log4j :refer [set-loggers!]]))
 
-
-(defonce process-id (UUID/randomUUID))
 
 (def default-indexes "spoc,pocs,ocsp,cspo,cpos,oscp")
 
@@ -141,11 +140,11 @@
                         ;; add your application routes here
                         (-> []
                             (add-route (pages-routes repo))
-                            (add-route (draft-api-routes "/draft" repo process-id))
-                            (add-route (graph-management-routes "/graph" repo process-id))
+                            (add-route (draft-api-routes "/draft" repo))
+                            (add-route (graph-management-routes "/graph" repo))
                             (add-routes (get-sparql-routes repo))
                             (add-route (context "/status" []
-                                                (status-routes global-writes-lock finished-jobs process-id)))
+                                                (status-routes global-writes-lock finished-jobs restart-id)))
 
                             (add-route app-routes))
 

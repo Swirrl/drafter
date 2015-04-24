@@ -7,6 +7,8 @@
            (java.util.concurrent.locks ReentrantLock)
            (org.openrdf.rio RDFParseException)))
 
+(defonce restart-id (UUID/randomUUID))
+
 (def priority-levels-map {:sync-write 0 :exclusive-write 1 :batch-write 2})
 
 (def all-priority-types (into #{} (keys priority-levels-map)))
@@ -50,13 +52,10 @@
 (defn- invalid-rdf-response [job-result]
   (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
 
-(defn- submitted-job-response [job restart-id]
+(defn- submitted-job-response [job]
   (api-routes/api-response 202 {:type :ok
                                 :finished-job (finished-job-route job)
                                 :restart-id restart-id}))
-
-(defn- unknown-error-response [job-result]
-  (api-routes/api-response 500 {:msg (str "Unknown error: " job-result)}))
 
 (def ^:private temporarily-locked-for-writes-response
   {:status 503 :body {:type :error :message "Write operations are temporarily unavailable.  Please try again later."}})
@@ -86,13 +85,13 @@
 (defn submit-job!
   "Submit a write job to the job queue for execution."
 
-  [job restart-id]
+  [job]
   (log/info "Queueing job: " job)
   (if (= :exclusive-write (:priority job))
     (do
       (log/trace "Queueing :exclusive-write job on queue" writes-queue)
       (.add writes-queue job)
-      (submitted-job-response job restart-id))
+      (submitted-job-response job))
     (if (.tryLock global-writes-lock)
       ;; We try the lock, not because we need the lock, but because we
       ;; need to 503/refuse the addition of an item if the lock is
@@ -103,14 +102,14 @@
               (.unlock global-writes-lock)))
           (if (= :sync-write (:priority job))
             (blocking-response job)
-            (submitted-job-response job restart-id)))
+            (submitted-job-response job)))
 
       temporarily-locked-for-writes-response)))
 
 (defn submit-sync-job!
   [job]
   {:pre [(= :sync-write (:priority job))]}
-  (submit-job! job nil))
+  (submit-job! job))
 
 (defn complete-job!
   "Adds the job to the state map of finished-jobs and delivers the

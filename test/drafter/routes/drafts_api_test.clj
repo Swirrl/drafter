@@ -8,12 +8,10 @@
             [clojure.java.io :as io]
             [clojure.template :refer [do-template]]
             [drafter.rdf.draft-management :refer :all]
-            [drafter.write-scheduler :refer [finished-jobs]])
+            [drafter.write-scheduler :refer [finished-jobs restart-id]])
   (:import [java.util UUID]))
 
 (def test-graph-uri "http://example.org/my-graph")
-
-(defonce restart-id (UUID/fromString "00000000-0000-0000-0000-000000000000"))
 
 (defn url? [u]
   (try
@@ -88,7 +86,7 @@
 (deftest drafts-api-create-draft-test
   (testing "POST /draft/create"
     (testing "without a live-graph param returns a 400 error"
-      (let [response ((draft-api-routes "/draft" *test-db* restart-id)
+      (let [response ((draft-api-routes "/draft" *test-db*)
                                            {:uri "/draft/create"
                                             :request-method :post
                                             :headers {"accept" "application/json"}})]
@@ -96,7 +94,7 @@
 
     (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
 
-      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-db* restart-id)
+      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-db*)
                                                         {:uri "/draft/create"
                                                          :request-method :post
                                                          :params {:live-graph test-graph-uri}
@@ -105,7 +103,7 @@
 
     (testing (str "with meta data" test-graph-uri " should see meta data stored")
 
-      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db* restart-id)
+      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db*)
                                            {:uri "/draft/create"
                                             :request-method :post
                                             :params {:live-graph test-graph-uri "meta-foo" "foo" "meta-bar" "bar"}
@@ -151,7 +149,7 @@
             test-request (-> {:uri "/draft" :request-method :post}
                              (add-request-graph-source-file dest-graph "./test/test-triple.nt"))
 
-            route (draft-api-routes "/draft" *test-db* restart-id)
+            route (draft-api-routes "/draft" *test-db*)
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
@@ -166,7 +164,7 @@
                              ;; project.clj is not RDF
                              (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "project.clj"))
 
-            route (draft-api-routes "/draft" *test-db* restart-id)
+            route (draft-api-routes "/draft" *test-db*)
             {:keys [body] :as response} (route test-request)]
 
         (job-is-accepted response)
@@ -176,27 +174,7 @@
                 error-result (await-completion finished-jobs guid)]
 
             (is (= :error (:type error-result)))
-            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result))))))))
-
-  (testing "PUT /draft with a source file"
-    (make-graph-live! *test-db* "http://mygraph/graph-to-be-replaced")
-
-    (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/graph-to-be-replaced> { <http://test.com/subject-1> ?p ?o . } }")
-        "Graph should contain initial state before it is replaced")
-
-    (let [dest-graph "http://mygraph/graph-to-be-replaced"
-          test-request (->  {:uri "/draft" :request-method :put}
-                            (add-request-graph dest-graph)
-                            (add-request-file "./test/test-triple.nt"))
-          route (draft-api-routes "/draft" *test-db* restart-id)
-          {:keys [status body headers] :as response} (route test-request)]
-
-      (job-is-accepted response)
-      (await-completion finished-jobs (:finished-job body))
-
-      (testing "replaces RDF in the graph"
-        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> { <http://example.org/test/triple> ?p ?o . } }"))
-            "The data should be replaced with the new data")))))
+            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))))
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph"
@@ -206,7 +184,7 @@
         (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")
             "Graph should exist before deletion")
 
-        (let [route (graph-management-routes "/graph" *test-db* restart-id)
+        (let [route (graph-management-routes "/graph" *test-db*)
               test-request (-> {:uri "/graph" :request-method :delete}
                                (add-request-graph "http://mygraph/live-graph"))
               response (route test-request)]
@@ -224,7 +202,7 @@
       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
           "Draft graph should exist before deletion")
 
-      (let [route (graph-management-routes "/graph" *test-db* restart-id)
+      (let [route (graph-management-routes "/graph" *test-db*)
             test-request (-> {:uri "/graph/live" :request-method :put
                               :params {:graph draft-graph}})
 
@@ -242,7 +220,7 @@
     (let [draft-graph-1 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-1" (test-triples "http://test.com/subject-1"))
           draft-graph-2 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-2" (test-triples "http://test.com/subject-1"))]
 
-      (let [route (graph-management-routes "/graph" *test-db* restart-id)
+      (let [route (graph-management-routes "/graph" *test-db*)
             test-request {:uri "/graph/live"
                           :request-method :put
                           :params {:graph [draft-graph-1 draft-graph-2]}}
@@ -274,7 +252,7 @@
  (deftest test-name
    (testing "Updating draft graph with metadata"
      (testing "Adds metadata"
-       (let [route (draft-api-routes "/draft" *test-db* restart-id)
+       (let [route (draft-api-routes "/draft" *test-db*)
              source-graph-uri (make-graph-live! *test-db* "http://mygraph/source-graph")
              draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
 
@@ -309,8 +287,6 @@
                (testing "Metadata overwritten"
                  (is (= 1 (count meta-records))
                      (= "updated" (get (first meta-records) "o")))))))))))
-
- meta-replace-with-put-file-test :put (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt"))
 
  meta-update-with-post-file-test :post (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt")))
 

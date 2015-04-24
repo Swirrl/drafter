@@ -72,32 +72,34 @@
     (let [endpoint (update-endpoint "/update" *test-db*)]
       (let [p (promise)
             latch (CountDownLatch. 1)
-            exclusive-job (scheduler/create-job :exclusive-write (fn [j]
-                                                                   (.countDown latch)
-                                                                   @p))]
+            exclusive-job (scheduler/create-job
+                           :exclusive-write (fn [j]
+                                              (.countDown latch)
+                                              @p))]
 
-                                        ;submit exclusive job which should prevent updates from being scheduled
-        (scheduler/submit-job! exclusive-job (UUID/randomUUID))
+        ;; submit exclusive job which should prevent updates from being
+        ;; scheduled
+        (scheduler/submit-job! exclusive-job)
 
-                                        ;wait until exclusive job is actually running (i.e. the write lock has been taken)
+        ;; wait until exclusive job is actually running i.e. the write lock has
+        ;; been taken
         (.await latch)
 
         (let [{:keys [status]} (endpoint (application-sparql-update-request))]
           (is (= 503 status)))
 
-                                        ;complete exclusive job
+        ;; complete exclusive job
         (deliver p nil)
 
-                                        ;wait a short time for the lock to be released
+        ;; wait a short time for the lock to be released
         (wait-for-lock-ms global-writes-lock 200)
 
-                                        ;should be able to submit updates again
+        ;; should be able to submit updates again
         (let [{:keys [status]} (endpoint (application-sparql-update-request))]
           (is (= 200 status)))))))
 
 (deftest application-x-form-urlencoded-test
   (let [endpoint (update-endpoint "/update" *test-db*)]
-
     (testing "POST /update"
       (testing "with a SPARQL update"
         (let [{:keys [status body headers]} (endpoint (x-form-urlencoded-update-request))]

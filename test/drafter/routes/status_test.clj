@@ -23,7 +23,7 @@
     (deliver (:value-p job) {:type :error :exception ex})
     job))
 
-(defn lock-responses [lock-value {:keys [status body headers]}]
+(defn lock-responses [lock-value {:keys [status body]}]
   (is (= 200 status))
   (is (= lock-value body)))
 
