@@ -2,6 +2,7 @@
   (:require [clojure.walk :refer [keywordize-keys]]
             [compojure.core :refer [GET routes]]
             [drafter.layout :as layout]
+            [drafter.util :refer [map-values]]
             [drafter.rdf.draft-management :refer [drafter-state-graph
                                                   live-graphs
                                                   lookup-live-graph]]
@@ -32,9 +33,6 @@
 
 (defn parse-guid [uri]
   (.replace (str uri) (draft-uri "") ""))
-
-(defn map-values [f m]
-  (into {} (for [[k v] m] [k (f v)])))
 
 (defn all-drafts [db]
   (doall (->> (query db (str

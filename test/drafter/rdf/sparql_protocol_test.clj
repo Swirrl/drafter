@@ -22,10 +22,9 @@
   (testing "Streams sparql results into output stream"
     (let [baos (ByteArrayOutputStream.)
           preped-query (prepare-query *test-db* "SELECT * WHERE { ?s ?p ?o }")
-          streamer! (result-streamer SPARQLResultsJSONWriter
-                                     nil
+          streamer! (result-streamer #(SPARQLResultsJSONWriter. %)
                                      preped-query
-                                     "application/sparql-results+json")]
+                                     (fn []))]
 
       (streamer! baos)
 
@@ -98,10 +97,11 @@
              :as result} (end-point {:request-method :get
                                      :uri "/live/sparql"
                                      :params {:query "ASK WHERE { ?s ?p ?o }"}
-                                     :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,*/*;q=0.8"}})]
+                                     :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,*/*;q=0.8"
+                                               "Accept-Charset" "utf-8"}})]
 
         (is (= 200 status))
-        (is (= "text/plain" (headers "Content-Type")))
+        (is (= "text/plain; charset=utf-8" (headers "Content-Type")))
 
         (let [body-str (stream->string body)]
           (is (= "true" body-str)))))))
@@ -116,7 +116,7 @@
                                      :headers {"accept" "text/html"}})]
 
         (is (= 200 status))
-        (is (= "text/plain" (headers "Content-Type")))))))
+        (is (= "text/plain; charset=utf-8" (headers "Content-Type")))))))
 
 (use-fixtures :each (partial wrap-with-clean-test-db
                              add-triple-to-db))

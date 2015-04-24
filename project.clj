@@ -1,4 +1,4 @@
-(defproject drafter "0.2.0-SNAPSHOT"
+(defproject drafter "0.2.0"
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
@@ -17,7 +17,8 @@
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
 
-                 [grafter "0.3.1" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
+                 [grafter "0.4.0" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
+                 [grafter/vocabularies "0.1.0"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"]
@@ -47,6 +48,8 @@
          :init    drafter.handler/init
          :destroy drafter.handler/destroy}
 
+  :aliases {"reindex" ["run" "-m" "drafter.handler/reindex"]}
+
   :profiles
   {:uberjar {:aot :all}
    :production {:ring {:open-browser? false
@@ -69,6 +72,9 @@
 
 
   :jvm-opts ["-Djava.awt.headless=true -Dowlim-license=/Users/rick/Software/graphdb-se-6.1-Final/uberjar/GRAPHDB_SE.license"]
+  
+  ;NOTE: expected JVM version to run against is defined in the Dockerfile
+  :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
 
   :aot [drafter.repl]

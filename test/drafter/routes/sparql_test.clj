@@ -8,7 +8,7 @@
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
             [drafter.routes.sparql :refer :all]
-            [drafter.rdf.sparql-rewriting :refer [function-registry register-function]]
+            [drafter.rdf.sparql-rewriting :refer [function-registry]]
             [drafter.rdf.draft-management :refer :all]))
 
 (defn add-test-data!
@@ -64,7 +64,7 @@
 (deftest live-sparql-routes-test
   (let [test-db (make-store)
         [draft-graph-1 draft-graph-2] (add-test-data! test-db)
-        endpoint (live-sparql-routes "/sparql/live" test-db)
+        endpoint (live-sparql-routes "/sparql/live" test-db nil)
         {:keys [status headers body]
          :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
         csv-result (csv-> result)]
@@ -93,9 +93,9 @@
 
 (deftest state-sparql-routes-test
   (let [test-db (make-store)
-        ;;drafts-request (assoc-in [:headers "accept"] "text/plain")
+        ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (state-sparql-routes "/sparql/state" test-db)]
+        endpoint (state-sparql-routes "/sparql/state" test-db nil)]
 
     (testing "The state graph should be accessible"
       (let [result (endpoint (-> (state-query (str "ASK WHERE {"
@@ -103,7 +103,7 @@
                                                    "    ?s ?p ?o ."
                                                    "  }"
                                                    "}"))
-                                 (assoc-in [:headers "accept"] "text/plain")))
+                                 (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
             body (-> result :body stream->string)]
 
         (is (= "true" body))))
@@ -115,16 +115,16 @@
                                           "    ?s ?p ?o ."
                                           "  }"
                                           "}"))
-                        (assoc-in [:headers "accept"] "text/plain")))
+                        (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
             body (-> result :body stream->string)]
 
         (is (= "false" body))))))
 
 (deftest raw-sparql-routes-test
   (let [test-db (make-store)
-        ;;drafts-request (assoc-in [:headers "accept"] "text/plain")
+        ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (raw-sparql-routes "/sparql/raw" test-db)]
+        endpoint (raw-sparql-routes "/sparql/raw" test-db nil)]
 
     (testing "The state graph should be accessible"
       (let [result (endpoint (-> (raw-query (str "ASK WHERE {"
@@ -132,7 +132,7 @@
                                                    "    ?s ?p ?o ."
                                                    "  }"
                                                    "}"))
-                                 (assoc-in [:headers "accept"] "text/plain")))
+                                 (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
             body (-> result :body stream->string)]
 
         (is (= "true" body))))
@@ -144,7 +144,7 @@
                                            "    ?s ?p ?o ."
                                            "  }"
                                            "}"))
-                         (assoc-in [:headers "accept"] "text/plain")))
+                         (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
             body (-> result :body stream->string)]
 
         (is (= "true" body))))))

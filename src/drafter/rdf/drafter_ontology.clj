@@ -1,6 +1,6 @@
 (ns drafter.rdf.drafter-ontology
-  (:require [grafter.rdf :refer [prefixer]]
-            [grafter.rdf.ontologies.dcterms :refer [dcterms:issued]]))
+  (:require [grafter.rdf :refer [prefixer]])
+  (:require [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]))
 
 (def drafter (prefixer "http://publishmydata.com/def/drafter/"))
 
@@ -20,4 +20,4 @@
 
 (def drafter:createdAt dcterms:issued)
 
-(def drafter:modifiedAt dcterms:issued)
+(def drafter:modifiedAt dcterms:modified)

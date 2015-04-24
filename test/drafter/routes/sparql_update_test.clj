@@ -68,37 +68,32 @@
               "Inserts the data"))))))
 
 (deftest update-unavailable-test
-  (do-template
-   [endpoint]
-   (testing "Update not available if exclusive write job running"
+  (testing "Update not available if exclusive write job running"
+    (let [endpoint (update-endpoint "/update" *test-db*)]
       (let [p (promise)
             latch (CountDownLatch. 1)
             exclusive-job (scheduler/create-job :exclusive-write (fn [j]
                                                                    (.countDown latch)
                                                                    @p))]
-        
-        ;submit exclusive job which should prevent updates from being scheduled
+
+                                        ;submit exclusive job which should prevent updates from being scheduled
         (scheduler/submit-job! exclusive-job (UUID/randomUUID))
 
-        ;wait until exclusive job is actually running (i.e. the write lock has been taken)
+                                        ;wait until exclusive job is actually running (i.e. the write lock has been taken)
         (.await latch)
 
         (let [{:keys [status]} (endpoint (application-sparql-update-request))]
           (is (= 503 status)))
 
-        ;complete exclusive job
+                                        ;complete exclusive job
         (deliver p nil)
 
-        ;wait a short time for the lock to be released
+                                        ;wait a short time for the lock to be released
         (wait-for-lock-ms global-writes-lock 200)
 
-        ;should be able to submit updates again
+                                        ;should be able to submit updates again
         (let [{:keys [status]} (endpoint (application-sparql-update-request))]
-          (is (= 200 status)))))
-
-   ;endpoints
-   (update-endpoint "/update" *test-db*)
-   (draft-update-endpoint-route "/update" *test-db*)))
+          (is (= 200 status)))))))
 
 (deftest application-x-form-urlencoded-test
   (let [endpoint (update-endpoint "/update" *test-db*)]
@@ -112,8 +107,7 @@
               "Inserts the data"))))))
 
 (deftest live-update-endpoint-route-test
-  (let [endpoint (live-update-endpoint-route "/update" *test-db*)]
-
+  (let [endpoint (live-update-endpoint-route "/update" *test-db* nil)]
     (create-managed-graph! *test-db* "http://example.com/")
     (testing "and a graph restriction"
       (let [request (application-sparql-update-request "INSERT { GRAPH <http://example.com/> {
@@ -127,43 +121,5 @@
                    :default-graph ["http://example.com/"]
                    :union-graphs ["http://example.com/"])
             "Inserts the data")))))
-
-(deftest draft-endpoint-test
-  (let [endpoint (draft-update-endpoint-route "/update" *test-db*)
-        live-graph (create-managed-graph! *test-db* "http://example.com/")
-        draft-graph (create-draft-graph! *test-db* live-graph)]
-
-    (testing "POST /update?graph=<draft>"
-      (testing "against live graphs are stored against their draft"
-        (let [{:keys [status headers body]} (endpoint (x-form-urlencoded-update-request default-update-string
-                                                                                        [draft-graph]))]
-
-          (is (= 200 status) "Returns ok")
-          (is (query *test-db* (str "ASK { "
-                             "  GRAPH <" draft-graph "> {"
-                             "    <http://test/> <http://test/> <http://test/> ."
-                             "  }"
-                             "}")))))
-
-      (testing "dynamically rewrite to their draft"
-        (let [update "INSERT {
-                        GRAPH ?g {
-                          ?s ?p ?o .
-                        }
-                      } WHERE {
-                        BIND(URI(\"http://example.com/\") AS ?g)
-                        GRAPH ?g {
-                          ?s ?p ?o .
-                        }
-                      }"
-              {:keys [status headers body]} (endpoint (x-form-urlencoded-update-request update
-                                                                                        [draft-graph]))]
-
-          (is (= 200 status) "Returns ok")
-          (is (query *test-db* (str "ASK { "
-                             "  GRAPH <" draft-graph "> {"
-                             "    <http://test/> <http://test/> <http://test/> ."
-                             "  }"
-                             "}"))))))))
 
 (use-fixtures :each wrap-with-clean-test-db)

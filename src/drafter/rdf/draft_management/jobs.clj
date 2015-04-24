@@ -4,7 +4,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [drafter.write-scheduler :refer [create-job submit-job! complete-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.rdf.ontologies.rdf :refer :all]
+            [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [grafter.rdf.repository :refer [->connection query

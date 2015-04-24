@@ -1,8 +1,8 @@
 (ns drafter.rdf.draft-management
   (:require [clojure.tools.logging :as log]
             [grafter.rdf :refer [add s]]
+            [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.rdf.ontologies.rdf :refer :all]
             [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.repository :refer [query]]
             [grafter.rdf.templater :refer [add-properties graph]])
@@ -309,8 +309,8 @@
       (delete-graph-contents! db live-graph-uri)
 
       (let [contents (query db
-                  (str "CONSTRUCT { ?s ?p ?o } WHERE
-                         { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
+                            (str "CONSTRUCT { ?s ?p ?o } WHERE
+                                 { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
 
         (when contents
           (add db live-graph-uri contents)))

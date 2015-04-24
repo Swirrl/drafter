@@ -5,7 +5,7 @@
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer!]]
-            [drafter.rdf.sparql-rewriting :refer [function-registry register-function]])
+            [drafter.rdf.sparql-rewriting :refer [function-registry register-function!]])
   (:import [java.util Scanner]))
 
 (def ^:dynamic *test-db* (repo (memory-store)))
@@ -54,9 +54,9 @@
 (defn make-store []
   (let [store (repo)]
     ;; register the function that does the results rewriting
-    (register-function function-registry
-                       "http://publishmydata.com/def/functions#replace-live-graph-uri"
-                       (partial lookup-draft-graph-uri store))
+    (register-function! function-registry
+                        "http://publishmydata.com/def/functions#replace-live-graph-uri"
+                        (partial lookup-draft-graph-uri store))
     store))
 
 (defn make-graph-live!

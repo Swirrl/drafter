@@ -4,15 +4,16 @@
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.write-scheduler :as scheduler]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-rewriting :as rew]
-            [grafter.rdf.repository :refer [->connection evaluate
-                                            make-restricted-dataset
-                                            prepare-update
-                                            with-transaction]]
+            [ring.util.codec :as codec]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
+            [drafter.operations :as ops]
+            [clojure.tools.logging :as log]
+            [grafter.rdf.repository :refer [->connection with-transaction make-restricted-dataset prepare-update evaluate]]
             [pantomime.media :as mt]
-            [ring.util.codec :as codec])
-  (:import (org.openrdf.query Dataset)
-           (org.openrdf.repository RepositoryConnection)))
+            [drafter.common.sparql-routes :refer [supplied-drafts]])
+  (:import [java.util.concurrent FutureTask CancellationException]
+           [org.openrdf.query Dataset]
+           [org.openrdf.repository Repository RepositoryConnection]))
 
 (defn do-update [repo restrictions]
   {:status 200})
@@ -89,19 +90,39 @@
                         (resolve-restrictions graphs))]
     (prepare-update repo update-str restricted-ds)))
 
-(defn create-update-job [repo request prepare-fn]
+(defn create-update-job [repo request prepare-fn timeouts]
   (jobs/make-job :sync-write [job]
                  (with-open [conn (->connection repo)]
-                   (let [parsed-query (parse-update-request request)
-                         prepared-update (prepare-fn parsed-query conn)]
-                     (log/debug "Executing update-query " prepared-update)
-                     (with-transaction conn
-                       (evaluate prepared-update))
-                     (scheduler/complete-job! job {:status 200 :body "OK"})))))
+                   (let [timeouts (or timeouts ops/default-timeouts)
+                         parsed-query (parse-update-request request)
+                         prepared-update (prepare-fn parsed-query conn)
+                         update-future (FutureTask. (fn []
+                                                      (with-transaction conn
+                                                        (evaluate prepared-update))))]
+                     (try
+                       (log/debug "Executing update-query " prepared-update)
+                       ;; The 'reaper' framework monitors instances of the
+                       ;; Future interface and cancels them if they timeout
+                       ;; create a Future for the update, register it for
+                       ;; cancellation on timeout and then run it on this
+                       ;; thread.
+                       (ops/register-for-cancellation-on-timeout update-future timeouts)
+                       (.run update-future)
+                       (.get update-future)
+                       (scheduler/complete-job! job {:status 200 :body "OK"})
+                       (catch CancellationException cex
+                                        ;update future was run on the current thread so it was interrupted when the future was cancelled
+                                        ;clear the interrupted flag on this thread
+                         (Thread/interrupted)
+                         (log/fatal "Update operation cancelled due to timeout")
+                         {:status 500 :body "Update operation timed out"})
+                       (catch Exception ex
+                         (log/fatal "An exception was thrown when executing a SPARQL update!" ex)
+                         {:status 500 :body (str "Unknown server error executing update" ex)}))))))
 
 ;exec-update :: Repository -> Request -> (ParsedStatement -> Connection -> PreparedStatement) -> Response
-(defn exec-update [repo request prepare-fn]
-  (let [job (create-update-job repo request prepare-fn)]
+(defn exec-update [repo request prepare-fn timeouts]
+  (let [job (create-update-job repo request prepare-fn timeouts)]
     (scheduler/submit-sync-job! job)))
 
 (defn prepare-update-statement [{update :update} conn restrictions]
@@ -109,37 +130,25 @@
     (prepare-restricted-update conn update rs)))
 
 (defn update-endpoint
-  "Create a standard update-endpoint with no query-rewriting and
-  optional restrictions on the allowed graphs; restrictions can either
-  be a collection of string graph-uri's or a function that returns
-  such a collection."
+  "Create a standard update-endpoint and optional restrictions on the
+  allowed graphs; restrictions can either be a collection of string
+  graph-uri's or a function that returns such a collection."
+
   ([mount-point repo]
      (update-endpoint mount-point repo #{}))
+
   ([mount-point repo restrictions]
+   (update-endpoint mount-point repo restrictions nil))
+
+  ([mount-point repo restrictions timeouts]
      (POST mount-point request
-           (exec-update repo request #(prepare-update-statement %1 %2 restrictions)))))
+           (exec-update repo request #(prepare-update-statement %1 %2 restrictions) timeouts))))
 
-(defn prepare-draft-update [{:keys [update graphs]} conn]
-  (let [graphs (lift graphs)
-        preped-update (prepare-restricted-update conn update graphs)]
-    (rew/rewrite-update-request preped-update (mgmt/graph-map conn graphs))
-    preped-update))
+(defn live-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo (partial mgmt/live-graphs repo) timeouts))
 
-(defn draft-update-endpoint
-  "Create an update endpoint with draft query rewriting.  Restrictions
-  are applied on the basis of the &graphs query parameter."
-  ([mount-point repo]
-   (POST mount-point request
-         (exec-update repo request prepare-draft-update))))
+(defn state-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo #{mgmt/drafter-state-graph} timeouts))
 
-(defn draft-update-endpoint-route [mount-point repo]
-  (draft-update-endpoint mount-point repo))
-
-(defn live-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo (partial mgmt/live-graphs repo)))
-
-(defn state-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo #{mgmt/drafter-state-graph}))
-
-(defn raw-update-endpoint-route [mount-point repo]
-  (update-endpoint mount-point repo))
+(defn raw-update-endpoint-route [mount-point repo timeouts]
+  (update-endpoint mount-point repo nil timeouts))
