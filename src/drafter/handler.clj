@@ -6,6 +6,7 @@
             [drafter.operations :as ops]
             [drafter.middleware :as middleware]
             [drafter.configuration :as conf]
+            [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
             [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
             [drafter.rdf.sparql-rewriting :refer [function-registry
@@ -57,10 +58,6 @@
   writer-service)
 
 (def stop-reaper (fn []))
-
-(defmacro set-var-root! [var form]
-  `(alter-var-root ~var (fn [& _#]
-                         ~form)))
 
 (defn register-sparql-extension-functions
   "Register custom drafter SPARQL extension functions."

@@ -5,13 +5,25 @@
             [grafter.rdf.repository :as repo]
             [drafter.routes.drafts-api :refer :all]
             [drafter.rdf.drafter-ontology :refer [meta-uri]]
+            [grafter.rdf :refer [s add add-statement]]
+            [grafter.rdf.templater :refer [graph triplify]]
             [clojure.java.io :as io]
             [clojure.template :refer [do-template]]
             [drafter.rdf.draft-management :refer :all]
-            [drafter.write-scheduler :refer [finished-jobs restart-id]])
+            [drafter.rdf.draft-management.jobs :refer [batched-write-size]]
+            [drafter.write-scheduler :refer [finished-jobs restart-id]]
+            [drafter.util :refer [set-var-root!]])
   (:import [java.util UUID]))
 
 (def test-graph-uri "http://example.org/my-graph")
+
+(def test-triples-4 (triplify ["http://test.com/data/one"
+                             ["http://test.com/hasProperty" "http://test.com/data/1"]
+                             ["http://test.com/hasProperty" "http://test.com/data/2"]]
+
+                            ["http://test.com/data/two"
+                             ["http://test.com/hasProperty" "http://test.com/data/1"]
+                             ["http://test.com/hasProperty" "http://test.com/data/2"]]))
 
 (defn url? [u]
   (try
@@ -178,23 +190,30 @@
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph"
+    (let [graph-uri "http://mygraph/live-graph"
+          original-batch-size batched-write-size]
       (do
-        (make-graph-live! *test-db* "http://mygraph/live-graph")
+       (make-graph-live! *test-db* graph-uri)
+       (add *test-db* graph-uri test-triples-4)
 
-        (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }")
-            "Graph should exist before deletion")
+       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> { ?s ?p ?o } }"))
+           "Graph should exist before deletion")
 
-        (let [route (graph-management-routes "/graph" *test-db*)
+       (set-var-root! #'batched-write-size 1)
+
+       (let [route (graph-management-routes "/graph" *test-db*)
               test-request (-> {:uri "/graph" :request-method :delete}
                                (add-request-graph "http://mygraph/live-graph"))
-              response (route test-request)]
+             response (route test-request)]
 
-          (job-is-accepted response)
-          (await-completion finished-jobs (:finished-job (:body response)))
+         (job-is-accepted response)
+         (await-completion finished-jobs (:finished-job (:body response)))
 
-          (testing "delete job actually deletes the graph"
-            (is (not (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph/live-graph> { ?s ?p ?o } }"))
-                "Graph should be deleted"))))))
+         (set-var-root! #'batched-write-size original-batch-size)
+
+         (testing "delete job actually deletes the graph"
+           (is (not (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> { ?s ?p ?o } }")))
+               "Graph should be deleted")))))))
 
 (deftest graph-management-live-test-with-one-graph
   (testing "PUT /graph/live"
