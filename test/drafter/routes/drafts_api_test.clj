@@ -12,7 +12,8 @@
             [drafter.rdf.draft-management :refer :all]
             [drafter.rdf.draft-management.jobs :refer [batched-write-size]]
             [drafter.write-scheduler :refer [finished-jobs restart-id]]
-            [drafter.util :refer [set-var-root!]])
+            [drafter.util :refer [set-var-root!]]
+            [clojure.tools.logging :as log])
   (:import [java.util UUID]))
 
 (def test-graph-uri "http://example.org/my-graph")
@@ -189,8 +190,8 @@
             (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))))
 
 (deftest graph-management-delete-graph-test
-  (testing "DELETE /graph"
-    (let [graph-uri "http://mygraph/live-graph"
+  (testing "DELETE /graph (batched)"
+    (let [graph-uri "http://mygraph/draft-graph"
           original-batch-size batched-write-size]
       (do
        (make-graph-live! *test-db* graph-uri)
@@ -203,7 +204,7 @@
 
        (let [route (graph-management-routes "/graph" *test-db*)
               test-request (-> {:uri "/graph" :request-method :delete}
-                               (add-request-graph "http://mygraph/live-graph"))
+                               (add-request-graph "http://mygraph/draft-graph"))
              response (route test-request)]
 
          (job-is-accepted response)
@@ -211,9 +212,31 @@
 
          (set-var-root! #'batched-write-size original-batch-size)
 
-         (testing "delete job actually deletes the graph"
+         (testing "batched delete job actually deletes the graph"
            (is (not (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> { ?s ?p ?o } }")))
                "Graph should be deleted")))))))
+
+(deftest graph-delete-draft-graph-contents-test
+  (testing "DELETE /draft/contents (batched)"
+    (let [graph-uri "http://mygraph/draft-graph4"]
+      (do
+        (make-graph-live! *test-db* graph-uri)
+        (add *test-db* graph-uri test-triples-4)
+
+        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> { ?s ?p ?o } }"))
+            "Graph should exist before deletion")
+
+        (let [route (draft-api-routes "/draft" *test-db*)
+              test-request (-> {:uri "/draft/contents" :request-method :delete}
+                               (add-request-graph "http://mygraph/draft-graph4"))
+              response (route test-request)]
+
+          (job-is-accepted response)
+          (await-completion finished-jobs (:finished-job (:body response)))
+
+          (testing "contents delete job actually deletes the contents but leaves graph intact"
+            (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> {} }"))
+                "Graph should be left intact without contents")))))))
 
 (deftest graph-management-live-test-with-one-graph
   (testing "PUT /graph/live"
