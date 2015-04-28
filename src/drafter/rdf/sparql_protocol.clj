@@ -268,14 +268,15 @@
     (let [inner (construct-dynamic* writer-class output-stream)]
       (result-rewriter pquery inner))))
 
-(defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions result-rewriter query-timeouts]
-                                          :or {query-creator-fn repo/prepare-query
+(defn process-sparql-query [db request & {:keys [query-rewrite-fn graph-restrictions result-rewriter query-timeouts]
+                                          :or {query-rewrite-fn identity
                                                result-rewriter (fn [query writer] writer)
                                                query-timeouts default-timeouts}}]
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
         query-str (:query params)
-        pquery (doto (query-creator-fn db query-str)
+        rewritten-query (query-rewrite-fn query-str)
+        pquery (doto (repo/prepare-query db rewritten-query)
                  (.setDataset restriction))
         media-type (negotiate-sparql-query-mime-type pquery request)]
 

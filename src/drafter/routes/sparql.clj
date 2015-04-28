@@ -13,10 +13,11 @@
   (try
     (let [{:keys [params]} request
           graph-uris (supplied-drafts repo request)
-          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo graph-uris)]
+          live->draft (log/spy (mgmt/graph-map repo graph-uris))
+          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter live->draft)]
 
       (process-sparql-query repo request
-                            :query-creator-fn query-rewriter
+                            :query-rewrite-fn query-rewriter
                             :result-rewriter result-rewriter
                             :graph-restrictions graph-uris
                             :query-timeouts timeouts))
