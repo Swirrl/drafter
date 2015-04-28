@@ -33,14 +33,17 @@
   (query db
          (str "ASK WHERE {"
               (with-state-graph
-               "<" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
-        "}"))))
+                "<" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
+                "}")
+              )))
 
-(defn graph-exists? [db graph-uri]
+(defn draft-exists? [db graph-uri]
   (query db
          (str "ASK WHERE {"
-              "  SELECT ?s ?p ?o WHERE {"
-              "    GRAPH <" graph-uri "> { ?s ?p ?o }"
+              "  SELECT ?s WHERE {"
+              (with-state-graph
+                "    <" graph-uri "> a <" drafter:DraftGraph "> ."
+                "    ?s ?p ?o .")
               "  }"
               "  LIMIT 1"
               "}")))

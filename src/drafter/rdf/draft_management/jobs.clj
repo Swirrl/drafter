@@ -46,11 +46,14 @@
 (defn- delete-in-batches [repo graph contents-only? job]
   ;; Loops until the graph is empty, then deletes state graph if not a contents-only? deletion.
   (let [conn (->connection repo)]
-    (with-transaction conn
-                      (mgmt/delete-graph-batched! conn graph batched-write-size))
-    (if (mgmt/graph-exists? repo graph)
+    (when (mgmt/draft-exists? repo graph)
+      (with-transaction conn
+                       (mgmt/delete-graph-batched! conn graph batched-write-size)))
+    (if (mgmt/draft-exists? repo graph)
+      ;; There's more graph contents... continue deleting
       (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
         (submit-job! (assoc job :function apply-next-batch)))
+      ;; We're done, time to finish up and clean up
       (do
         (if-not contents-only?
           (mgmt/delete-graph-and-draft-state! repo graph))

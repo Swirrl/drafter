@@ -5,15 +5,15 @@
             [drafter.util :refer [map-values]]
             [drafter.rdf.draft-management :refer [drafter-state-graph
                                                   live-graphs
-                                                  lookup-live-graph]]
+                                                  lookup-live-graph
+                                                  draft-exists?]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
             [grafter.rdf.io :refer [rdf-serializer]]
             [grafter.rdf.repository :refer [->connection query]]
             [ring.util.io :as rio]
-            [ring.util.response :refer [not-found]])
-  (:import (org.openrdf.repository RepositoryConnection)))
+            [ring.util.response :refer [not-found]]))
 
 (defn query-page [params]
   (layout/render "query-page.html" params))
@@ -46,13 +46,7 @@
               (map (partial map-values str))
               (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
-(defn draft-exists? [db guid]
-  (query db
-         (str "ASK {"
-              "  GRAPH <" drafter-state-graph "> {"
-              "    <" (draft-uri guid) "> a <" drafter:DraftGraph "> ."
-              "  }"
-              "}")))
+
 
 (defn data-page [template dumps-endpoint graphs]
   (layout/render template {:dump-path dumps-endpoint :graphs graphs}))
@@ -84,7 +78,7 @@
 
    (GET "/draft/:guid" [guid]
         (with-open [conn (->connection db)]
-          (if (draft-exists? conn guid)
+          (if (draft-exists? conn (draft-uri guid))
             (let [draft (draft-uri guid)
                   live (lookup-live-graph conn draft)]
               (upload-form {:draft draft :live live}))
