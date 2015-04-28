@@ -11,6 +11,8 @@
                                             with-transaction]]
             [environ.core :refer [env]]))
 
+;; Note if we change this default value we should also change it in the
+;; drafter-client, and possibly other places too.
 (def batched-write-size (Integer/parseInt (get env :drafter-batched-write-size "10000")))
 
 (defmacro with-job-exception-handling [job & forms]
