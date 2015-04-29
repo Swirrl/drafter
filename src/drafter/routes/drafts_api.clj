@@ -22,19 +22,22 @@
       mount-point []
 
       ;; makes a new managed/draft graph.
-      ;; accepts extra meta- query string params, which are added to the state graph
+      ;; accepts extra meta- query string params, which are added to the state
+      ;; graph
       (POST "/create" {{live-graph :live-graph} :params
                        params :params}
         (api-routes/when-params [live-graph]
                                 (submit-sync-job! (create-draft-job repo live-graph params))))
 
-      ;; deletes draft graph data contents; does not delete draft the graph itself.
+      ;; deletes draft graph data contents; does not delete the draft graph
+      ;; entry from the state graph.
       (DELETE "/contents" {{graph :graph} :params}
         (api-routes/when-params [graph]
                                 (submit-job! (delete-graph-job repo graph :contents-only? true)))))
 
     ;; adds data to the graph from either source-graph or file
-    ;; accepts extra meta- query string params, which are added to queue metadata
+    ;; accepts extra meta- query string params, which are added to queue
+    ;; metadata
     (routes
       (POST mount-point {{graph :graph} :params
                          {content-type :content-type} :params
