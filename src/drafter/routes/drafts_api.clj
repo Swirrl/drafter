@@ -18,34 +18,42 @@
 
 (defn draft-api-routes [mount-point repo]
   (routes
-   (context
-    mount-point []
+    (context
+      mount-point []
 
-    ;; makes a new managed/draft graph.
-    ;; accepts extra meta- query string params, which are added to the state graph
-    (POST "/create" {{live-graph :live-graph} :params
-                     params :params}
-          (api-routes/when-params [live-graph]
-                                  (submit-sync-job! (create-draft-job repo live-graph params)))))
+      ;; makes a new managed/draft graph.
+      ;; accepts extra meta- query string params, which are added to the state
+      ;; graph
+      (POST "/create" {{live-graph :live-graph} :params
+                       params :params}
+        (api-routes/when-params [live-graph]
+                                (submit-sync-job! (create-draft-job repo live-graph params))))
 
-   ;; adds data to the graph from either source-graph or file
-   ;; accepts extra meta- query string params, which are added to queue metadata
-   (routes
-    (POST mount-point {{graph :graph} :params
-                       {content-type :content-type} :params
-                       query-params :query-params
-                       {file :file} :params}
+      ;; deletes draft graph data contents; does not delete the draft graph
+      ;; entry from the state graph.
+      (DELETE "/contents" {{graph :graph} :params}
+        (api-routes/when-params [graph]
+                                (submit-job! (delete-graph-job repo graph :contents-only? true)))))
 
-          (let [metadata (api-routes/meta-params query-params)]
-            (api-routes/when-params [graph file] ; when source graph not supplied: append from the file.
-                                    (submit-job!
-                                     (append-data-to-graph-from-file-job repo graph
-                                                                         (override-file-format content-type file)
-                                                                         metadata))))))))
+    ;; adds data to the graph from either source-graph or file
+    ;; accepts extra meta- query string params, which are added to queue
+    ;; metadata
+    (routes
+      (POST mount-point {{graph :graph} :params
+                         {content-type :content-type} :params
+                         query-params :query-params
+                         {file :file} :params}
+        (let [metadata (api-routes/meta-params query-params)]
+          ; when source graph not supplied: append from the file
+          (api-routes/when-params [graph file]
+                                  (submit-job!
+                                    (append-data-to-graph-from-file-job repo graph
+                                                                        (override-file-format content-type file)
+                                                                        metadata))))))))
 
 (defn graph-management-routes [mount-point repo]
   (routes
-    ;; deletes data in the graph. This could be a live or a draft graph.
+    ;; deletes draft graph data contents and then the draft graph itself
     (DELETE mount-point {{graph :graph} :params}
             (api-routes/when-params [graph]
                                     (submit-job! (delete-graph-job repo graph))))

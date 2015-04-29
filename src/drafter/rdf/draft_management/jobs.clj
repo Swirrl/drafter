@@ -43,26 +43,32 @@
 
               (complete-job! job (restapi/api-response 201 {:guri draft-graph-uri})))))
 
-(defn- delete-in-batches [repo graph job]
-  ;; Loops until the graph is empty, then deletes state graph.
+(defn- delete-in-batches [repo graph contents-only? job]
+  ;; Loops until the graph is empty, then deletes state graph if not a contents-only? deletion.
   (let [conn (->connection repo)]
-    (with-transaction conn
-                      (mgmt/delete-graph-batched! conn graph batched-write-size))
-    (if (mgmt/graph-exists? repo graph)
-      (let [apply-next-batch (partial delete-in-batches repo graph)]
+    (when (mgmt/draft-exists? repo graph)
+      (with-transaction conn
+        (mgmt/delete-graph-batched! conn graph batched-write-size)))
+    (if (mgmt/draft-exists? repo graph)
+      ;; There's more graph contents... continue deleting
+      (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
         (submit-job! (assoc job :function apply-next-batch)))
+      ;; Else we're done, time to finish up and clean up
       (do
-        (mgmt/delete-graph-and-draft-state! repo graph)
+        (if-not contents-only?
+          (mgmt/delete-graph-and-draft-state! repo graph))
         (complete-job! job restapi/ok-response)))))
 
-(defn delete-graph-job [repo graph]
+(defn delete-graph-job [repo graph & {:keys [contents-only?]}]
   "Deletes graph contents as per batch size in order to avoid blocking
-   writes with a lock."
+   writes with a lock. Finally the graph itself will be deleted unless
+   a value is supplied for the :contents-only? keyword argument"
   (log/info "Starting batch deletion job")
   (create-job :batch-write
               (partial delete-in-batches
                        repo
-                       graph)))
+                       graph
+                       contents-only?)))
 
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
   (with-job-exception-handling job

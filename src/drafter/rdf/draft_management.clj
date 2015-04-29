@@ -6,7 +6,7 @@
             [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.repository :refer [query]]
             [grafter.rdf.templater :refer [add-properties graph]])
-  (:import (java.util Date)
+  (:import (java.util Date UUID)
            (org.openrdf.model.impl URIImpl)))
 
 (def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
@@ -16,7 +16,7 @@
 (def to-quads (partial graph drafter-state-graph))
 
 (defn make-draft-graph-uri []
-  (str staging-base "/" (java.util.UUID/randomUUID)))
+  (str staging-base "/" (UUID/randomUUID)))
 
 (defn with-state-graph
   "Wraps the string in a SPARQL
@@ -33,14 +33,17 @@
   (query db
          (str "ASK WHERE {"
               (with-state-graph
-               "<" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
-        "}"))))
+                "<" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
+                "}")
+              )))
 
-(defn graph-exists? [db graph-uri]
+(defn draft-exists? [db graph-uri]
   (query db
          (str "ASK WHERE {"
-              "  SELECT ?s ?p ?o WHERE {"
-              "    GRAPH <" graph-uri "> { ?s ?p ?o }"
+              "  SELECT ?s WHERE {"
+              (with-state-graph
+                "    <" graph-uri "> a <" drafter:DraftGraph "> ."
+                "    ?s ?p ?o .")
               "  }"
               "  LIMIT 1"
               "}")))
@@ -336,7 +339,8 @@
       (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri))
       live-graph-uri)
 
-    (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)))))
+    (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
+                    {:error :graph-not-found}))))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
@@ -347,14 +351,3 @@
   (let [draft-graph (create-draft-graph! db graph)]
     (add db draft-graph triples)
     draft-graph))
-
-(defn copy-graph [db source destination]
-  (update! db (str "COPY <" source "> TO <" destination ">")))
-
-(defn rename-graph [db old-graph new-graph]
-  ;; lookup old-graph
-  ;; calculate new graph sha
-  ;; copy data/state to new graph name
-  ;; remove old graph name
-  ;; update subject name to new-graph uris in metadata graph.
-  )
