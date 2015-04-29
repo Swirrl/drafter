@@ -340,7 +340,7 @@
       live-graph-uri)
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
-                    {}))))
+                    {:error :graph-not-found}))))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
