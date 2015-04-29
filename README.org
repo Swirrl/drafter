@@ -177,10 +177,12 @@ Server: Jetty(7.6.13.v20130916)
 |--------+----------+-------------+--------------------|
 | DELETE | =/graph= | Yes         | =1 :batched-write= |
 
-Enqueues a delete of the specified draft graph.
+Enqueues a delete of the specified draft graph, removing both its state graph
+entry and its graph contents.
 
-Both the contents and information pertaining to the draft graph in the state
-graph is removed.
+As far as PMD is concerned this operation essentially means remove the changes
+in this =draft-graph= from my =draftset= i.e. restore this draft graph to its
+current live graph.
 
 It accepts the following parameters:
 
