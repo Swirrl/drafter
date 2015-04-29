@@ -44,7 +44,7 @@
                          query-params :query-params
                          {file :file} :params}
         (let [metadata (api-routes/meta-params query-params)]
-          ; when source graph not supplied: append from the file
+          ;; when source graph not supplied: append from the file
           (api-routes/when-params [graph file]
                                   (submit-job!
                                     (append-data-to-graph-from-file-job repo graph
