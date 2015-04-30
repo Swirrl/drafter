@@ -17,7 +17,7 @@
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
 
-                 [grafter "0.4.0" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
+                 [grafter "0.5.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
                  [grafter/vocabularies "0.1.0"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
@@ -72,7 +72,7 @@
 
 
   :jvm-opts ["-Djava.awt.headless=true -Dowlim-license=/Users/rick/Software/graphdb-se-6.1-Final/uberjar/GRAPHDB_SE.license"]
-  
+
   ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
