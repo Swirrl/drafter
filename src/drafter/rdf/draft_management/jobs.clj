@@ -126,6 +126,10 @@
         ;; operations on jobs that touch the same graphs that we're
         ;; manipulating here, or to raise an error on the batch task.
         ;;
+        ;; I think the newer versions of Sesame 1.8.x might also provide better
+        ;; support for different isolation levels, so we might want to consider
+        ;; upgrading.
+        ;;
         ;; http://en.wikipedia.org/wiki/Isolation_%28database_systems%29#Read_committed
         ;;
         ;; This can occur if a user does a make-live on a graph
