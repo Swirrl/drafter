@@ -43,6 +43,12 @@
 
               (complete-job! job (restapi/api-response 201 {:guri draft-graph-uri})))))
 
+(defn- finish-delete-job [repo graph contents-only? job]
+  (do
+    (when-not contents-only?
+      (mgmt/delete-graph-and-draft-state! repo graph))
+    (complete-job! job restapi/ok-response)))
+
 (defn- delete-in-batches [repo graph contents-only? job]
   ;; Loops until the graph is empty, then deletes state graph if not a contents-only? deletion.
   ;; Checks that graph is a draft graph - will only delete drafts
@@ -53,15 +59,12 @@
         (with-transaction conn
                           (mgmt/delete-graph-batched! conn graph batched-write-size))
 
-        (when (mgmt/graph-exists? repo graph)
+        (if (mgmt/graph-exists? repo graph)
           ;; There's more graph contents... continue deleting
           (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
-           (submit-job! (assoc job :function apply-next-batch)))))
-      ; Else we're done, time to finish up and clean up
-      (do
-        (if-not contents-only?
-          (mgmt/delete-graph-and-draft-state! repo graph))
-        (complete-job! job restapi/ok-response)))))
+            (submit-job! (assoc job :function apply-next-batch)))
+          (finish-delete-job repo graph contents-only? job)))
+      (finish-delete-job repo graph contents-only? job))))
 
 (defn delete-graph-job [repo graph & {:keys [contents-only?]}]
   "Deletes graph contents as per batch size in order to avoid blocking
@@ -93,6 +96,7 @@
         (do
           (mgmt/add-metadata-to-graph conn draft-graph metadata)
           (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
+
           (complete-job! job restapi/ok-response))))))
 
 (defn append-data-to-graph-from-file-job
