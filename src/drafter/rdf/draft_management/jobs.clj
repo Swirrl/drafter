@@ -57,7 +57,7 @@
           ;; There's more graph contents... continue deleting
           (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
            (submit-job! (assoc job :function apply-next-batch)))))
-      :else ; We're done, time to finish up and clean up
+      ; Else we're done, time to finish up and clean up
       (do
         (if-not contents-only?
           (mgmt/delete-graph-and-draft-state! repo graph))
