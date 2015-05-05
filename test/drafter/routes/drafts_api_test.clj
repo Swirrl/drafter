@@ -191,7 +191,7 @@
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph (batched)"
-    (let [graph-uri "http://mygraph/draft-graph"
+    (let [graph-uri "http://mygraph/draft-graph5"
           original-batch-size batched-write-size]
       (do
        (make-graph-live! *test-db* graph-uri)
@@ -204,7 +204,7 @@
 
        (let [route (graph-management-routes "/graph" *test-db*)
               test-request (-> {:uri "/graph" :request-method :delete}
-                               (add-request-graph "http://mygraph/draft-graph"))
+                               (add-request-graph "http://mygraph/draft-graph5"))
              response (route test-request)]
 
          (job-is-accepted response)

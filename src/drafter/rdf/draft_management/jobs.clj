@@ -43,21 +43,28 @@
 
               (complete-job! job (restapi/api-response 201 {:guri draft-graph-uri})))))
 
+(defn- finish-delete-job [repo graph contents-only? job]
+  (do
+    (when-not contents-only?
+      (mgmt/delete-graph-and-draft-state! repo graph))
+    (complete-job! job restapi/ok-response)))
+
 (defn- delete-in-batches [repo graph contents-only? job]
   ;; Loops until the graph is empty, then deletes state graph if not a contents-only? deletion.
+  ;; Checks that graph is a draft graph - will only delete drafts
   (let [conn (->connection repo)]
-    (when (mgmt/draft-exists? repo graph)
-      (with-transaction conn
-        (mgmt/delete-graph-batched! conn graph batched-write-size)))
-    (if (mgmt/draft-exists? repo graph)
-      ;; There's more graph contents... continue deleting
-      (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
-        (submit-job! (assoc job :function apply-next-batch)))
-      ;; Else we're done, time to finish up and clean up
+    (if (and (mgmt/graph-exists? repo graph)
+             (mgmt/draft-exists? repo graph))
       (do
-        (if-not contents-only?
-          (mgmt/delete-graph-and-draft-state! repo graph))
-        (complete-job! job restapi/ok-response)))))
+        (with-transaction conn
+                          (mgmt/delete-graph-batched! conn graph batched-write-size))
+
+        (if (mgmt/graph-exists? repo graph)
+          ;; There's more graph contents... continue deleting
+          (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
+            (submit-job! (assoc job :function apply-next-batch)))
+          (finish-delete-job repo graph contents-only? job)))
+      (finish-delete-job repo graph contents-only? job))))
 
 (defn delete-graph-job [repo graph & {:keys [contents-only?]}]
   "Deletes graph contents as per batch size in order to avoid blocking
@@ -89,6 +96,7 @@
         (do
           (mgmt/add-metadata-to-graph conn draft-graph metadata)
           (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
+
           (complete-job! job restapi/ok-response))))))
 
 (defn append-data-to-graph-from-file-job
@@ -125,6 +133,10 @@
         ;; storage engine or by adding code to either refuse make-live
         ;; operations on jobs that touch the same graphs that we're
         ;; manipulating here, or to raise an error on the batch task.
+        ;;
+        ;; I think the newer versions of Sesame 1.8.x might also provide better
+        ;; support for different isolation levels, so we might want to consider
+        ;; upgrading.
         ;;
         ;; http://en.wikipedia.org/wiki/Isolation_%28database_systems%29#Read_committed
         ;;

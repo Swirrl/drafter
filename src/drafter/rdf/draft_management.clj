@@ -37,13 +37,26 @@
                 "}")
               )))
 
-(defn draft-exists? [db graph-uri]
+(defn draft-exists?
+  "Checks state graph to see if a draft graph exists"
+  [db graph-uri]
+  (let [qry (str "ASK WHERE {"
+                 "  SELECT ?s WHERE {"
+                 (with-state-graph
+                 "    VALUES ?s { <" graph-uri "> }"
+                 "    ?s a <" drafter:DraftGraph "> .")
+                 "  }"
+                 "  LIMIT 1"
+                 "}")]
+    (query db qry)))
+
+(defn graph-exists?
+  "Checks that a graph exists"
+  [db graph-uri]
   (query db
          (str "ASK WHERE {"
-              "  SELECT ?s WHERE {"
-              (with-state-graph
-                "    <" graph-uri "> a <" drafter:DraftGraph "> ."
-                "    ?s ?p ?o .")
+              "  SELECT ?s ?p ?o WHERE {"
+              "    GRAPH <" graph-uri "> { ?s ?p ?o }"
               "  }"
               "  LIMIT 1"
               "}")))
