@@ -20,8 +20,8 @@
                  [grafter "0.5.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
                  [grafter/vocabularies "0.1.0"]
 
-                 [org.openrdf.sesame/sesame-queryrender "2.7.15"]
-                 [org.openrdf.sesame/sesame-runtime "2.7.15"]
+                 [org.openrdf.sesame/sesame-queryrender "2.8.1"]
+                 [org.openrdf.sesame/sesame-runtime "2.8.1" :exclusions  [commons-codec com.fasterxml.jackson.core/jackson-core]]
 
                  ;; [org.openrdf.sesame/sesame-queryrender "2.7.8"]
                  ;; [org.openrdf.sesame/sesame-runtime "2.7.8"]
