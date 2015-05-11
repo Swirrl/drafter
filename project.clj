@@ -12,13 +12,13 @@
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
-                 [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
+                 [lib-noir "0.8.4" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [ring "1.3.2" :exclusions [org.clojure/java.classpath]]
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
 
-                 [swirrl/lib-swirrl-server "0.1.0-SNAPSHOT" :exclusions [org.clojure/java.classpath]]
+                 [swirrl/lib-swirrl-server "0.1.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
                  [grafter "0.5.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
                  [grafter/vocabularies "0.1.0"]
 
