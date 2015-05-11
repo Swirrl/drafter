@@ -26,9 +26,6 @@
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"]
 
-                 ;; [org.openrdf.sesame/sesame-queryrender "2.7.8"]
-                 ;; [org.openrdf.sesame/sesame-runtime "2.7.8"]
-
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
