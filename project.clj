@@ -13,12 +13,15 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
                  [lib-noir "0.8.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
+                 [ring "1.3.2" :exclusions [org.clojure/java.classpath]]
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
 
+                 [swirrl/lib-swirrl-server "0.1.0-SNAPSHOT" :exclusions [org.clojure/java.classpath]]
                  [grafter "0.5.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
                  [grafter/vocabularies "0.1.0"]
+
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"]
@@ -62,7 +65,7 @@
                         [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
                         [org.clojure/data.json "0.2.5"]
                         [clojure-csv/clojure-csv "2.0.1"]
-                        [ring/ring-devel "1.3.0" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
+                        [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
 
          :env {:dev true}
 
