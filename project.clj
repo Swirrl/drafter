@@ -4,11 +4,11 @@
   :license {:name "Proprietary & Commercially Licensed Only"
             :url "http://swirrl.com/"}
 
-  :repositories [["swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"
-                                           :sign-releases false}]
-                 ["swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"
-                                          :sign-releases true
-                                          }]]
+  ;; :repositories [["swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"
+  ;;                                          :sign-releases false}]
+  ;;                ["swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"
+  ;;                                         :sign-releases true
+  ;;                                         }]]
 
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
