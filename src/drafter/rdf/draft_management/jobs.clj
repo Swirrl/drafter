@@ -1,8 +1,10 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
-            [drafter.common.api-routes :as restapi]
+            [swirrl-server.responses :as restapi]
+            [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.write-scheduler :refer [create-job submit-job! complete-job!]]
+            [swirrl-server.async.jobs :refer [create-job complete-job!]]
+            [drafter.write-scheduler :refer [submit-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
@@ -39,7 +41,7 @@
                   draft-graph-uri (with-transaction conn
                                     (mgmt/create-managed-graph! conn live-graph)
                                     (mgmt/create-draft-graph! conn
-                                                              live-graph (restapi/meta-params params)))]
+                                                              live-graph (meta-params params)))]
 
               (complete-job! job (restapi/api-response 201 {:guri draft-graph-uri})))))
 

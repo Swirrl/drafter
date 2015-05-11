@@ -1,13 +1,12 @@
 (ns drafter.write-scheduler
   (:require [clojure.tools.logging :as log]
-            [drafter.common.api-routes :as api-routes]
+            [swirrl-server.responses :as response]
+            [swirrl-server.async.jobs :refer [finished-jobs submitted-job-response complete-job! restart-id ->Job]]
             [drafter.routes.status :refer [finished-job-route]])
   (:import (java.util UUID)
            (java.util.concurrent PriorityBlockingQueue)
            (java.util.concurrent.locks ReentrantLock)
            (org.openrdf.rio RDFParseException)))
-
-(defonce restart-id (UUID/randomUUID))
 
 (def priority-levels-map {:sync-write 0 :exclusive-write 1 :batch-write 2})
 
@@ -26,9 +25,6 @@
 
 (defonce ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
-(defonce ^{:doc "Map of finished jobs to promises containing their results."}
-  finished-jobs (atom {}))
-
 (defmacro with-lock [& forms]
   `(do
      (log/info "Locking for an :exclusive-write")
@@ -39,8 +35,6 @@
          (log/info "Unlocking :exclusive-write lock")
          (.unlock global-writes-lock)))))
 
-(defrecord Job [id priority time function value-p])
-
 (defn create-job [priority f]
   {:pre [(all-priority-types priority)]}
   (->Job (UUID/randomUUID)
@@ -50,12 +44,7 @@
          (promise)))
 
 (defn- invalid-rdf-response [job-result]
-  (api-routes/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
-
-(defn- submitted-job-response [job]
-  (api-routes/api-response 202 {:type :ok
-                                :finished-job (finished-job-route job)
-                                :restart-id restart-id}))
+  (response/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
 
 (def ^:private temporarily-locked-for-writes-response
   {:status 503 :body {:type :error :message "Write operations are temporarily unavailable.  Please try again later."}})
@@ -110,18 +99,6 @@
   [job]
   {:pre [(= :sync-write (:priority job))]}
   (submit-job! job))
-
-(defn complete-job!
-  "Adds the job to the state map of finished-jobs and delivers the
-  supplied result to the jobs promise, which will cause blocking jobs
-  to unblock, and give job consumers the ability to receive the
-  value."
-  [job result]
-  (let [{job-id :id promis :value-p} job]
-    (deliver promis result)
-    (swap! finished-jobs assoc job-id promis)
-    (log/info "Job " job-id "complete")
-    result))
 
 (defn- write-loop
   "Start the write loop running.  Note this function does not return

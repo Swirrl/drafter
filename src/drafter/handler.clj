@@ -24,11 +24,10 @@
             [drafter.routes.sparql-update :refer [live-update-endpoint-route
                                                   raw-update-endpoint-route
                                                   state-update-endpoint-route]]
-            [drafter.write-scheduler :refer [restart-id
-                                             start-writer!
+            [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
-                                             finished-jobs
                                              stop-writer!]]
+            [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [environ.core :refer [env]]
             [grafter.rdf.repository :as repo]
             [noir.util.middleware :refer [app-handler]]
