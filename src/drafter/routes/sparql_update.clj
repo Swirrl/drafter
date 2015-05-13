@@ -2,6 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [compojure.core :refer [POST]]
             [drafter.rdf.draft-management.jobs :as jobs]
+            [swirrl-server.async.jobs :refer [complete-job!]]
             [drafter.write-scheduler :as scheduler]
             [drafter.rdf.draft-management :as mgmt]
             [ring.util.codec :as codec]
@@ -109,7 +110,7 @@
                        (ops/register-for-cancellation-on-timeout update-future timeouts)
                        (.run update-future)
                        (.get update-future)
-                       (scheduler/complete-job! job {:status 200 :body "OK"})
+                       (complete-job! job {:status 200 :body "OK"})
                        (catch CancellationException cex
                                         ;update future was run on the current thread so it was interrupted when the future was cancelled
                                         ;clear the interrupted flag on this thread

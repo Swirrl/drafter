@@ -1,6 +1,7 @@
 (ns drafter.routes.drafts-api-test
   (:require [drafter.test-common :refer [*test-db* test-triples wrap-with-clean-test-db
                                          make-store stream->string select-all-in-graph make-graph-live!]]
+            [swirrl-server.async.jobs :refer [finished-jobs]]
             [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]
             [drafter.routes.drafts-api :refer :all]
@@ -11,7 +12,7 @@
             [clojure.template :refer [do-template]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.rdf.draft-management.jobs :refer [batched-write-size]]
-            [drafter.write-scheduler :refer [finished-jobs restart-id]]
+            [swirrl-server.async.jobs :refer [restart-id]]
             [drafter.util :refer [set-var-root!]]
             [clojure.tools.logging :as log])
   (:import [java.util UUID]))
