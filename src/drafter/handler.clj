@@ -51,8 +51,6 @@
 (def repo)
 (def app)
 
-(def worker)
-
 (def ^{:doc "A future to control the single write thread that performs database writes."}
   writer-service)
 
@@ -203,7 +201,6 @@
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
   (repo/shutdown repo)
-  (future-cancel worker)
   (stop-writer! writer-service)
   (stop-reaper)
   (log/info "drafter has shut down."))
