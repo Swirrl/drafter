@@ -112,14 +112,16 @@
                        (.get update-future)
                        (complete-job! job {:status 200 :body "OK"})
                        (catch CancellationException cex
-                                        ;update future was run on the current thread so it was interrupted when the future was cancelled
-                                        ;clear the interrupted flag on this thread
+                         ;; update future was run on the current
+                         ;; thread so it was interrupted when the
+                         ;; future was cancelled clear the interrupted
+                         ;; flag on this thread
                          (Thread/interrupted)
-                         (log/fatal "Update operation cancelled due to timeout")
-                         {:status 500 :body "Update operation timed out"})
+                         (log/fatal cex "Update operation cancelled due to timeout")
+                         (throw cex))
                        (catch Exception ex
-                         (log/fatal "An exception was thrown when executing a SPARQL update!" ex)
-                         {:status 500 :body (str "Unknown server error executing update" ex)}))))))
+                         (log/fatal ex "An exception was thrown when executing a SPARQL update!")
+                         (throw ex)))))))
 
 ;exec-update :: Repository -> Request -> (ParsedStatement -> Connection -> PreparedStatement) -> Response
 (defn exec-update [repo request prepare-fn timeouts]
