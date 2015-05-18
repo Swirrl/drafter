@@ -97,9 +97,7 @@
                    (let [timeouts (or timeouts ops/default-timeouts)
                          parsed-query (parse-update-request request)
                          prepared-update (prepare-fn parsed-query conn)
-                         update-future (FutureTask. (fn []
-                                                      (with-transaction conn
-                                                        (evaluate prepared-update))))]
+                         update-future (FutureTask. (fn [] (evaluate prepared-update)))]
                      (try
                        (log/debug "Executing update-query " prepared-update)
                        ;; The 'reaper' framework monitors instances of the

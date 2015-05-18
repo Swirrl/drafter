@@ -277,7 +277,8 @@
         query-str (:query params)
         rewritten-query (query-rewrite-fn query-str)
         pquery (doto (repo/prepare-query db rewritten-query)
-                 (.setDataset restriction))
+                 (.setDataset restriction)
+                 (.setIncludeInferred false))
         media-type (negotiate-sparql-query-mime-type pquery request)]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions"))

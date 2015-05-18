@@ -58,8 +58,7 @@
     (if (and (mgmt/graph-exists? repo graph)
              (mgmt/draft-exists? repo graph))
       (do
-        (with-transaction conn
-                          (mgmt/delete-graph-batched! conn graph batched-write-size))
+        (mgmt/delete-graph-batched! repo graph batched-write-size)
 
         (if (mgmt/graph-exists? repo graph)
           ;; There's more graph contents... continue deleting

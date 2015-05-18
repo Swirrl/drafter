@@ -119,10 +119,14 @@
   (register-stardog-query-mime-types!)
   (repo/sparql-repo stardog-db-endpoint))
 
+(def default-stardog-drafter-endpoint "http://localhost:5820/drafter/query")
+
 (defn get-stardog-drafter-sparql-endpoint [env-map]
   (if-let [endpoint (:stardog-drafter-sparql-endpoint env-map)]
     endpoint
-    (throw (RuntimeException. "SPARQL endpoint for drafter database not configured"))))
+    (do
+      (log/warn  "SPARQL endpoint for drafter database not configured - using default (" default-stardog-drafter-endpoint ")")
+      default-stardog-drafter-endpoint)))
 
 (defn initialise-repo! [repo-path indexes]
   (set-var-root! #'repo (let [endpoint (get-stardog-drafter-sparql-endpoint env)

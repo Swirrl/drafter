@@ -4,7 +4,7 @@
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :refer [update!]]
-            [grafter.rdf.repository :refer [query]]
+            [grafter.rdf.repository :refer [query evaluate prepare-query]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import (java.util Date UUID)
            (org.openrdf.model.impl URIImpl)))
@@ -317,6 +317,13 @@
 
       (zipmap live-graphs
               (map #(get % "draft") results)))))
+
+(defn sparql-repo-query [repo query-string]
+  (with-open [conn (.getConnection repo)]
+    (let [q (prepare-query conn query-string)]
+      (.setIncludeInferred q false)
+      (println "inferred? " (.getIncludeInferred q))
+      (evaluate q))))
 
 (defn live-graphs [db & {:keys [online] :or {online true}}]
   "Get all live graph names.  Takes an optional boolean keyword
