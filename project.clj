@@ -50,8 +50,13 @@
 
   :aliases {"reindex" ["run" "-m" "drafter.handler/reindex"]}
 
+  :target-path "target/%s"
+  :clean-non-project-classes true
+
   :profiles
-  {:uberjar {:aot :all}
+  {:deployable {:clean-non-project-classes false
+                :aot [drafter.repl]
+                :main drafter.repl}
    :production {:ring {:open-browser? false
                        :stacktraces?  false
                        :auto-reload?  false}}
