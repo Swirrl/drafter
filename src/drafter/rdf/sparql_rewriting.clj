@@ -7,9 +7,8 @@
    [drafter.rdf.sparql-protocol :refer [result-handler-wrapper]]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
-  (:import [org.openrdf.query Update QueryResultHandler TupleQueryResultHandler BindingSet Binding]
+  (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery Update QueryResultHandler TupleQueryResultHandler BindingSet Binding]
            [org.openrdf.query.impl BindingImpl MapBindingSet]
-           [org.openrdf.query.parser ParsedGraphQuery ParsedTupleQuery ParsedBooleanQuery]
            [org.openrdf.query.algebra.evaluation.function Function FunctionRegistry]
            [drafter.rdf URIMapper Rewriters]
            [com.hp.hpl.jena.query QueryFactory Syntax]))
@@ -89,10 +88,9 @@
   (map-values (apply-map-or-default graph-map) r))
 
 (defn rewrite-graph-results [query-substitutions prepared-query]
-  (let [query-ast (.getParsedQuery prepared-query)]
-    (let [result-substitutions (set/map-invert query-substitutions)]
+  (let [result-substitutions (set/map-invert query-substitutions)]
         (->> (repo/evaluate prepared-query)
-             (map #(rewrite-result result-substitutions %))))))
+             (map #(rewrite-result result-substitutions %)))))
 
 (defn evaluate-with-graph-rewriting
   "Rewrites the results in the query."
@@ -139,9 +137,9 @@
 
 (defn- choose-result-rewriter [query-ast draft->live writer]
   (cond
-   (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
-   (instance? ParsedTupleQuery query-ast) (make-select-result-rewriter draft->live writer)
-   (instance? ParsedBooleanQuery query-ast) writer
+   (instance? GraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
+   (instance? TupleQuery query-ast) (make-select-result-rewriter draft->live writer)
+   (instance? BooleanQuery query-ast) writer
    :else writer))
 
 (def ^{:doc "The global function registry for drafter SPARQL functions."}
@@ -160,6 +158,5 @@
 
    :result-rewriter
    (fn [prepared-query writer]
-     (let [query-ast (.getParsedQuery prepared-query)
-           draft->live (set/map-invert live->draft)]
-       (choose-result-rewriter query-ast draft->live writer)))})
+     (let [draft->live (set/map-invert live->draft)]
+       (choose-result-rewriter prepared-query draft->live writer)))})
