@@ -50,16 +50,18 @@
 
   :aliases {"reindex" ["run" "-m" "drafter.handler/reindex"]}
 
-  :target-path "target/%s"
-  :clean-non-project-classes true
+  :target-path "target/%s" ;; ensure profiles don't pollute each other with
+                           ;; compiled classes etc...
 
   :profiles
-  {:deployable {:clean-non-project-classes false
-                :aot [drafter.repl]
-                :main drafter.repl}
+  {
+   :uberjar {:aot :all
+             :main drafter.repl}
+
    :production {:ring {:open-browser? false
                        :stacktraces?  false
                        :auto-reload?  false}}
+
    :dev {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                    [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
@@ -76,12 +78,9 @@
    }
 
 
-  :jvm-opts ["-Djava.awt.headless=true -Dowlim-license=/Users/rick/Software/graphdb-se-6.1-Final/uberjar/GRAPHDB_SE.license"]
+  :jvm-opts ["-Djava.awt.headless=true"]
 
   ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
-
-  :aot [drafter.repl]
-  :main drafter.repl
   )
