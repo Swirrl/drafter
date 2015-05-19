@@ -53,6 +53,8 @@
   :target-path "target/%s" ;; ensure profiles don't pollute each other with
                            ;; compiled classes etc...
 
+  :clean-targets [:target-path :compile-path]
+
   :profiles
   {
    :uberjar {:aot :all
