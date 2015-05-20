@@ -46,7 +46,8 @@
            [org.openrdf.rio.ntriples NTriplesParserFactory]
            [org.openrdf.query.resultio TupleQueryResultFormat TupleQueryResultParserFactory BooleanQueryResultParserFactory BooleanQueryResultFormat]
            [org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLParserFactory SPARQLResultsXMLParser SPARQLBooleanXMLParser]
-           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParserFactory])
+           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParserFactory]
+           [drafter.rdf DrafterSPARQLRepository])
 
   (:require [clj-logging-config.log4j :refer [set-loggers!]]))
 
@@ -135,7 +136,9 @@
   (let [query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
         update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)]
     (register-stardog-query-mime-types!)
-    (repo/sparql-repo query-endpoint update-endpoint)))
+    (let [repo (DrafterSPARQLRepository. query-endpoint update-endpoint)]
+      (.initialize repo)
+      repo)))
 
 (defn initialise-repo! [repo-path indexes]
   (set-var-root! #'repo (let [repo (get-stardog-repo env)]
