@@ -1,0 +1,2 @@
+{:dev {:env {:sparql-query-endpoint "http://localhost:5820/drafter/query"
+             :sparql-update-endpoint "http://localhost:5820/drafter/update"}}}

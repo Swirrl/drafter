@@ -192,7 +192,7 @@
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
 
 (defn delete-graph-contents! [db graph-uri]
-  (update! db (str "DROP GRAPH <" graph-uri ">"))
+  (update! db (str "DROP SILENT GRAPH <" graph-uri ">"))
   (log/info (str "Deleted graph " graph-uri)))
 
 (defn delete-graph-and-draft-state!

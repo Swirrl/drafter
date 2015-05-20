@@ -32,7 +32,8 @@
             [grafter.rdf.repository :as repo]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.verbs :refer [wrap-verbs]]
-            [selmer.parser :as parser])
+            [selmer.parser :as parser]
+            [clojure.string :as str])
 
   ;; Note that though the classes and requires below aren't used in this namespace
   ;; they are needed by the log-config file which is loaded from here.
@@ -114,23 +115,30 @@
   (set-supported-file-formats! (BooleanQueryResultParserRegistry/getInstance) [(get-sparql-boolean-xml-parser-factory)])
   (set-supported-file-formats! (RDFParserRegistry/getInstance) [(NTriplesParserFactory.)]))
 
+(defn get-required-environment-variable [var-key env-map]
+  (if-let [ev (var-key env-map)]
+    ev
+    (let [var-name (str/upper-case (str/replace (name var-key) \- \_))
+          message (str "Missing required key "
+                       var-key
+                       " in environment map. Ensure you export an environment variable "
+                       var-name
+                       " or define "
+                       var-key
+                       " in the relevant profile in profiles.clj")]
+      (do
+        (log/error message)
+        (throw (RuntimeException. message))))))
+
 ;get-stardog-repo :: String -> Repository
-(defn get-stardog-repo [stardog-db-endpoint]
-  (register-stardog-query-mime-types!)
-  (repo/sparql-repo stardog-db-endpoint))
-
-(def default-stardog-drafter-endpoint "http://localhost:5820/drafter/query")
-
-(defn get-stardog-drafter-sparql-endpoint [env-map]
-  (if-let [endpoint (:stardog-drafter-sparql-endpoint env-map)]
-    endpoint
-    (do
-      (log/warn  "SPARQL endpoint for drafter database not configured - using default (" default-stardog-drafter-endpoint ")")
-      default-stardog-drafter-endpoint)))
+(defn get-stardog-repo [env-map]
+  (let [query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
+        update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)]
+    (register-stardog-query-mime-types!)
+    (repo/sparql-repo query-endpoint update-endpoint)))
 
 (defn initialise-repo! [repo-path indexes]
-  (set-var-root! #'repo (let [endpoint (get-stardog-drafter-sparql-endpoint env)
-                              repo (get-stardog-repo endpoint)]
+  (set-var-root! #'repo (let [repo (get-stardog-repo env)]
                           (log/info "Initialised repo" repo-path)
                           repo))
 
