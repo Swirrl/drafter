@@ -6,7 +6,7 @@
    [grafter.vocabularies.rdf :refer :all]
    [grafter.rdf.repository :refer :all]
    [drafter.rdf.draft-management :refer :all]
-   [drafter.rdf.drafter-ontology :refer :all]
+   [drafter.vocabulary :refer :all]
    [clojure.test :refer :all])
   (:import [org.openrdf.model.impl URIImpl]))
 
@@ -57,7 +57,7 @@
       (let [new-graph-uri (create-draft-graph! *test-db*
                                                test-graph-uri)]
 
-        (is (.startsWith new-graph-uri staging-base))
+        (is (.startsWith new-graph-uri (draft-uri "")))
         (is (ask? "<" test-graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ; "
                                        "<" drafter:hasDraft "> <" new-graph-uri "> ."))))))
 

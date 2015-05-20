@@ -3,11 +3,10 @@
             [compojure.core :refer [GET routes]]
             [drafter.layout :as layout]
             [drafter.util :refer [map-values]]
-            [drafter.rdf.draft-management :refer [drafter-state-graph
-                                                  live-graphs
+            [drafter.rdf.draft-management :refer [live-graphs
                                                   lookup-live-graph
                                                   draft-exists?]]
-            [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.vocabulary :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
             [grafter.rdf.io :refer [rdf-serializer]]

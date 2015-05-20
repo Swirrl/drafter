@@ -19,8 +19,9 @@
                  [selmer "0.6.9"]
 
                  [swirrl/lib-swirrl-server "0.1.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
+                 [drafter-client "0.2.0-SNAPSHOT" :exclusions [clj-http org.clojure/tools.reader]]
                  [grafter "0.5.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
-                 [grafter/vocabularies "0.1.0"]
+                 [grafter/vocabularies "0.1.1-SNAPSHOT"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"]

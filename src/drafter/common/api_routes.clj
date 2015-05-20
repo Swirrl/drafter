@@ -1,5 +1,5 @@
 (ns drafter.common.api-routes
-  (:require [drafter.rdf.drafter-ontology :refer [meta-uri]]
+  (:require [drafter.vocabulary :refer [meta-uri]]
             [swirrl-server.responses :refer [error-response]]))
 
 (defmacro when-params

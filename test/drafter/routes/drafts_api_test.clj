@@ -5,7 +5,7 @@
             [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]
             [drafter.routes.drafts-api :refer :all]
-            [drafter.rdf.drafter-ontology :refer [meta-uri]]
+            [drafter.vocabulary :refer [meta-uri drafter-state-graph]]
             [grafter.rdf :refer [s add add-statement]]
             [grafter.rdf.templater :refer [graph triplify]]
             [clojure.java.io :as io]

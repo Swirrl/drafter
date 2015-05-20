@@ -7,6 +7,7 @@
             [clojure.data.json :as json]
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
+            [drafter.vocabulary :refer [drafter-state-graph]]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.sparql-rewriting :refer [function-registry]]
             [drafter.rdf.draft-management :refer :all]))
