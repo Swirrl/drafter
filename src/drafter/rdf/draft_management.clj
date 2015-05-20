@@ -2,21 +2,17 @@
   (:require [clojure.tools.logging :as log]
             [grafter.rdf :refer [add s]]
             [grafter.vocabularies.rdf :refer :all]
-            [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.vocabulary :refer :all]
             [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.repository :refer [query]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import (java.util Date UUID)
            (org.openrdf.model.impl URIImpl)))
 
-(def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
-
-(def staging-base "http://publishmydata.com/graphs/drafter/draft")
-
 (def to-quads (partial graph drafter-state-graph))
 
 (defn make-draft-graph-uri []
-  (str staging-base "/" (UUID/randomUUID)))
+  (draft-uri (UUID/randomUUID)))
 
 (defn with-state-graph
   "Wraps the string in a SPARQL

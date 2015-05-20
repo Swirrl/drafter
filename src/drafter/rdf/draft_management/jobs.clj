@@ -5,7 +5,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job complete-job!]]
             [drafter.write-scheduler :refer [submit-job!]]
-            [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.vocabulary :refer :all]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]

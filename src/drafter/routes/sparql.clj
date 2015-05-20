@@ -4,6 +4,7 @@
                                     ANY GET POST PUT DELETE HEAD]]
             [clojure.set :as set]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.vocabulary :refer [drafter-state-graph]]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
             [drafter.rdf.sparql-rewriting :refer [make-draft-query-rewriter]]
             [clojure.tools.logging :as log]
@@ -42,7 +43,7 @@
   (sparql-end-point mount-point repo (partial mgmt/live-graphs repo) timeouts))
 
 (defn state-sparql-routes [mount-point repo timeouts]
-  (sparql-end-point mount-point repo #{mgmt/drafter-state-graph} timeouts))
+  (sparql-end-point mount-point repo #{drafter-state-graph} timeouts))
 
 (defn raw-sparql-routes [mount-point repo timeouts]
   (sparql-end-point mount-point repo nil timeouts))

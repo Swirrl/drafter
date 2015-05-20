@@ -5,6 +5,7 @@
             [swirrl-server.async.jobs :refer [complete-job!]]
             [drafter.write-scheduler :as scheduler]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.vocabulary :refer [drafter-state-graph]]
             [ring.util.codec :as codec]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.operations :as ops]
@@ -151,7 +152,7 @@
   (update-endpoint mount-point repo (partial mgmt/live-graphs repo) timeouts))
 
 (defn state-update-endpoint-route [mount-point repo timeouts]
-  (update-endpoint mount-point repo #{mgmt/drafter-state-graph} timeouts))
+  (update-endpoint mount-point repo #{drafter-state-graph} timeouts))
 
 (defn raw-update-endpoint-route [mount-point repo timeouts]
   (update-endpoint mount-point repo nil timeouts))
