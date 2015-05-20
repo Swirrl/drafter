@@ -302,21 +302,23 @@
   If a draft URI is not in the database then this function will skip
   over it, i.e. it won't error if a URI is not found."
   [db draft-set]
-  (let [drafts (apply str (map #(str "<" % "> ") draft-set))
-        results (->> (query db
-                            (str "SELECT ?live ?draft WHERE {"
-                                 (with-state-graph
-                                   "  VALUES ?draft {" drafts "}"
-                                   "  ?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
-                                   "        <" drafter:hasDraft "> ?draft .")
-                                 "}")))]
-    (let [live-graphs (map #(get % "live") results)]
-      (when (has-duplicates? live-graphs)
-        (throw (ex-info "Multiple draft graphs were supplied referencing the same live graph."
-                        {:error :multiple-drafts-error})))
+  (if (empty? draft-set)
+    {}
+    (let [drafts (apply str (map #(str "<" % "> ") draft-set))
+          results (->> (query db
+                              (str "SELECT ?live ?draft WHERE {"
+                                   (with-state-graph
+                                     "  VALUES ?draft {" drafts "}"
+                                     "  ?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                                     "        <" drafter:hasDraft "> ?draft .")
+                                   "}")))]
+      (let [live-graphs (map #(get % "live") results)]
+        (when (has-duplicates? live-graphs)
+          (throw (ex-info "Multiple draft graphs were supplied referencing the same live graph."
+                          {:error :multiple-drafts-error})))
 
-      (zipmap live-graphs
-              (map #(get % "draft") results)))))
+        (zipmap live-graphs
+                (map #(get % "draft") results))))))
 
 (defn sparql-repo-query [repo query-string]
   (with-open [conn (.getConnection repo)]
