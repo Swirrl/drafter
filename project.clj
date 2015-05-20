@@ -22,7 +22,6 @@
                  [grafter "0.5.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
                  [grafter/vocabularies "0.1.0"]
 
-
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"]
 
