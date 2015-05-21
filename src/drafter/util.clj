@@ -1,5 +1,6 @@
 (ns drafter.util
-  (:require [markdown.core :as md]
+  (:require [clojure.string :as str]
+            [markdown.core :as md]
             [noir.io :as io]))
 
 ;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
@@ -35,3 +36,8 @@
 (defmacro set-var-root! [var form]
   `(alter-var-root ~var (fn [& _#]
                           ~form)))
+
+(defn make-compound-sparql-query
+  "Combines a sequence of SPARQL queries into a single query."
+  [queries]
+  (str/join "; " queries))

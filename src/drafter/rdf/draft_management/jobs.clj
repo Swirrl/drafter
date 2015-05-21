@@ -1,6 +1,7 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
             [swirrl-server.responses :as restapi]
+            [drafter.util :as util]
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job complete-job!]]
@@ -11,6 +12,7 @@
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [grafter.rdf.repository :refer [->connection query
                                             with-transaction]]
+            [grafter.rdf.protocols :refer [update!]]
             [environ.core :refer [env]]))
 
 ;; Note if we change this default value we should also change it in the
@@ -164,11 +166,9 @@
 (defn migrate-graph-live-job [repo graph]
   (make-job :exclusive-write [job]
             (log/info "Starting make-live for graph" graph)
-            (let [conn (->connection repo)]
-              (with-transaction conn
-                (if (instance? String graph)
-                  (mgmt/migrate-live! conn graph)
-                  (doseq [g graph]
-                    (mgmt/migrate-live! conn g)))))
-            (log/info "Make-live for graph" graph "done")
+            (let [graphs-to-migrate (if (instance? String graph) [graph] graph)
+                  graph-migrate-queries (mapcat #(:queries (mgmt/migrate-live-queries repo %)) graphs-to-migrate)
+                  update-str (util/make-compound-sparql-query graph-migrate-queries)]
+              (update! repo update-str))
+            (log/info "Make-live for graph(s) " graph " done")
             (complete-job! job restapi/ok-response)))
