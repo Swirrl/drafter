@@ -17,17 +17,28 @@ import java.util.Map;
 
 public class RewritingQueryVisitor implements QueryVisitor {
     private final URIMapper mapper;
+    private final boolean isTopLevel;
     private Query result;
 
-    public RewritingQueryVisitor(URIMapper mapper) { this.mapper = mapper; }
+    public RewritingQueryVisitor(URIMapper mapper) { this(mapper, false); }
+
+    public RewritingQueryVisitor(URIMapper mapper, boolean isTopLevel) {
+        this.mapper = mapper;
+        this.isTopLevel = isTopLevel;
+    }
 
     @Override public void startVisit(Query query) {
         this.result = new Query();
     }
 
     @Override public void visitPrologue(Prologue prologue) {
-        PrefixMapping newMapping = Rewriters.prefixMappingRewriter.rewrite(this.mapper, prologue.getPrefixMapping());
-        this.result.setPrefixMapping(newMapping);
+        //NOTE: All subqueries inherit the same prologue (i.e. query PREFIX declarations)
+        //but these should only be set on the top-level query otherwise an invalid SPARQL
+        //query will be generated.
+        if(this.isTopLevel) {
+            PrefixMapping newMapping = Rewriters.prefixMappingRewriter.rewrite(this.mapper, prologue.getPrefixMapping());
+            this.result.setPrefixMapping(newMapping);
+        }
     }
 
     @Override public void visitResultForm(Query query) {

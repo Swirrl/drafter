@@ -53,6 +53,12 @@ public class Rewriters {
     public static final Rewriter<SortCondition> sortConditionRewriter = new SortConditionRewriter();
     public static final Rewriter<PrefixMapping> prefixMappingRewriter = new PrefixMappingRewriter();
 
+    public static Query rewriteSPARQLQuery(URIMapper mapper, Query query) {
+        RewritingQueryVisitor visitor = new RewritingQueryVisitor(mapper, true);
+        query.visit(visitor);
+        return visitor.getResult();
+    }
+
     public static <T> List<T> rewriteList(Rewriter<T> rewriter, URIMapper mapper, List<T> sourceList) {
         List<T> destList = new ArrayList<T>();
         for(T item : sourceList) {

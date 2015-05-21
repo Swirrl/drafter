@@ -43,9 +43,7 @@
   [db graph-uri]
   (let [qry (str "ASK WHERE {"
                  "  SELECT ?s WHERE {"
-                 (with-state-graph
-                 "    VALUES ?s { <" graph-uri "> }"
-                 "    ?s a <" drafter:DraftGraph "> .")
+                 (with-state-graph "<" graph-uri ">  a <" drafter:DraftGraph "> .")
                  "  }"
                  "  LIMIT 1"
                  "}")]
