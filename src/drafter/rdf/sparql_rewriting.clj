@@ -54,7 +54,7 @@
   mapping."
   [query-ast graph-map]
   (let [uri-mapper (URIMapper/create graph-map)]
-    (.rewrite Rewriters/queryRewriter uri-mapper query-ast)))
+    (Rewriters/rewriteSPARQLQuery uri-mapper query-ast)))
 
 ;rewrite-sparql-string :: Map[Uri, Uri] -> String -> String
 (defn rewrite-sparql-string
