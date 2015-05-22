@@ -221,7 +221,7 @@
   [db graph-uri]
   (delete-graph-contents! db graph-uri)
   (delete-draft-state! db graph-uri)
-    
+
   (log/info (str "Deleted draft graph from state " graph-uri)))
 
 (defn delete-graph-batched!
@@ -348,15 +348,49 @@
           (map #(str (% "live")))
           (into #{})))
 
+(defn- move-like-tbl-wants-super-slow-on-stardog-though
+  "Move's how TBL intended.  Issues a SPARQL MOVE query.
+
+  Note this is super slow on stardog 3.1."
+  [source destination]
+  ;; Move's how TBL intended...
+  (str "MOVE SILENT <" source "> TO <" destination ">"))
+
+(defn- delete-insert-move
+  "Move source graph to destination.  Semantically the same as MOVE but done
+  with DELETE/INSERT's.
+
+  Massively quicker  on stardog than a MOVE."
+  [source destination]
+  (str
+   ;; first clear the destination, then...
+   "DELETE {"
+   "  GRAPH <" destination "> {?s ?p ?o}"
+   "} WHERE {"
+   "  GRAPH <" destination "> {?s ?p ?o} "
+   "};"
+   ;; copy the source to the destination, and...
+   "INSERT {"
+   "  GRAPH <" destination "> {?s ?p ?o}"
+   "} WHERE { "
+   "  GRAPH <" source "> {?s ?p ?o}"
+   "};"
+   ;; remove the source (draft) graph
+   "DELETE {"
+   "  GRAPH <" source "> {?s ?p ?o}"
+   "} WHERE {"
+   " GRAPH <" source "> {?s ?p ?o}"
+   "}"))
+
 ;;migrate-live-queries :: Repository -> String -> { queries: [String], live-graph-uri: String }
 (defn migrate-live-queries [db draft-graph-uri]
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
-    (let [move-query (str "MOVE SILENT <" draft-graph-uri "> TO <" live-graph-uri ">")
+    (let [move-query (delete-insert-move draft-graph-uri live-graph-uri)
           delete-state-query (delete-draft-state-query draft-graph-uri)
           live-public-query (set-isPublic-query live-graph-uri true)]
       {:queries [move-query delete-state-query live-public-query]
        :live-graph-uri live-graph-uri})
-    
+
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
                     {:error :graph-not-found}))))
 
