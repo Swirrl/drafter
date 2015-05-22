@@ -94,7 +94,7 @@
       ;; transaction string is empty. Any other operations (e.g. direct
       ;; UPDATE operations DO NOT take part in the transaction at all).
       ;; The append-data! function only adds the statements in
-      ;; current-batch to the connection and these are therefor the
+      ;; current-batch to the connection and these are therefore the
       ;; only things operating under the transaction. Do not create
       ;; a transaction if there are no statements in the curent batch
       ;; since this will throw an exception on commit.
