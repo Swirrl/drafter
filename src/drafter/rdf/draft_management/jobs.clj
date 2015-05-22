@@ -85,9 +85,23 @@
     (let [conn (->connection repo)
           [current-batch remaining-triples] (split-at batched-write-size triples)]
 
-      (log/info (str "Adding a batch of triples to repo" current-batch))
-      (with-transaction conn
-        (mgmt/append-data! conn draft-graph current-batch))
+      (log/info (str "Adding a batch of triples to repo " current-batch))
+
+      ;; WARNING: Massive hack!  When using the SPARQL repository, only
+      ;; operations which directly add or remove statements take part
+      ;; in a transaction. Attempting to submit an empty transaction
+      ;; causes an exception to be thrown as the accumulated
+      ;; transaction string is empty. Any other operations (e.g. direct
+      ;; UPDATE operations DO NOT take part in the transaction at all).
+      ;; The append-data! function only adds the statements in
+      ;; current-batch to the connection and these are therefor the
+      ;; only things operating under the transaction. Do not create
+      ;; a transaction if there are no statements in the curent batch
+      ;; since this will throw an exception on commit.
+      (if (empty? current-batch)
+        (mgmt/append-data! conn draft-graph current-batch)
+        (with-transaction conn
+          (mgmt/append-data! conn draft-graph current-batch)))
 
       (if-not (empty? remaining-triples)
         ;; resubmit the remaining batches under the same job to the
