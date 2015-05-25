@@ -4,14 +4,14 @@
    [grafter.rdf :refer [prefixer]]
    [drafter.util :refer [map-values]]
    [drafter.rdf.draft-management :as mgmt]
+   [drafter.rdf.arq :refer [sparql-string->ast ->sparql-string]]
    [drafter.rdf.sparql-protocol :refer [result-handler-wrapper]]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
   (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery Update QueryResultHandler TupleQueryResultHandler BindingSet Binding]
            [org.openrdf.query.impl BindingImpl MapBindingSet]
            [org.openrdf.query.algebra.evaluation.function Function FunctionRegistry]
-           [drafter.rdf URIMapper Rewriters]
-           [com.hp.hpl.jena.query QueryFactory Syntax]))
+           [drafter.rdf URIMapper Rewriters]))
 
 (def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
 
@@ -38,15 +38,6 @@
   [binding-set graph-map]
   (let [mapped-bindings (map #(rewrite-binding % graph-map) binding-set)]
     (binding-seq->binding-set mapped-bindings)))
-
-(defn sparql-string->ast [query-str]
-  (QueryFactory/create query-str Syntax/syntaxSPARQL_11))
-
-;->sparql-string :: AST -> String
-(defn ->sparql-string
-  "Converts a SPARQL AST back into a query string."
-  [query-ast]
-  (.serialize query-ast Syntax/syntaxSPARQL_11))
 
 ;rewrite-query-ast :: AST -> AST
 (defn rewrite-query-ast
