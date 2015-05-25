@@ -6,7 +6,8 @@
    [grafter.rdf :refer [statements]]
    [grafter.rdf.repository :refer [repo prepare-update]]
    [clojure.test :refer :all]
-   [drafter.rdf.sparql-rewriting :refer :all])
+   [drafter.rdf.sparql-rewriting :refer :all]
+   [drafter.rdf.arq :refer :all])
   (:import
            [org.openrdf.model.impl URIImpl]
            [org.openrdf.query QueryLanguage]
