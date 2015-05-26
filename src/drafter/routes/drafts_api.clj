@@ -31,10 +31,11 @@
                                 (submit-sync-job! (create-draft-job repo live-graph params))))
 
       (POST "/metadata" [graph :as {params :query-params}]
-            (let [metadata (api-routes/meta-params params)]
+            (let [metadata (api-routes/meta-params params)
+                  graphs (if (coll? graph) graph [graph])]
               (if (or (empty? graph) (empty? metadata))
                 {:status 400 :headers {} :body "At least one graph and metadata pair required"}
-                (submit-sync-job! (create-update-metadata-job repo graph metadata)))))
+                (submit-sync-job! (create-update-metadata-job repo graphs metadata)))))
 
       ;; deletes draft graph data contents; does not delete the draft graph
       ;; entry from the state graph.

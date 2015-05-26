@@ -297,13 +297,13 @@
         draft2 "http://graphs.org/2"
         meta-pairs [["foo" "bar"] ["quux" "qaal"]]
         route (draft-api-routes "" *test-db*)
-        create-meta-request (fn [meta-pairs]
+        create-meta-request (fn [graphs meta-pairs]
                               (-> {:uri "/metadata"
                                    :request-method :post
-                                   :params {:graph [draft1 draft2]}}
+                                   :params {:graph graphs}}
                                   (add-request-metadata-pairs meta-pairs)))]
     (testing "Adds new metadata"
-      (let [test-request (create-meta-request meta-pairs)
+      (let [test-request (create-meta-request [draft1 draft2] meta-pairs)
             {:keys [status]} (route test-request)]
         (is (= 200 status))
 
@@ -315,15 +315,18 @@
     (testing "Updates existing metdata"
       (let [updated-key (ffirst meta-pairs)
             updated-pair [updated-key "new-value"]
-            request (create-meta-request [updated-pair])
+            
+            ;;NOTE: ring only creates a collection if a parameter exists
+            ;;multiple times in a query string. This also tests updating
+            ;;a single graph
+            request (create-meta-request draft1 [updated-pair])
             expected-metadata (assoc meta-pairs 0 updated-pair)
             {:keys [status]} (route request)]
         
         (is (= 200 status))
 
-        (doseq [graph [draft1 draft2]
-                [k v] expected-metadata]
-          (is (repo/query *test-db* (metadata-exists-sparql graph k v))))))
+        (doseq [[k v] expected-metadata]
+          (is (repo/query *test-db* (metadata-exists-sparql draft1 k v))))))
 
     (testing "Invalid if no graphs"
       (let [request (-> {:uri "/metadata" :request-method :post}
