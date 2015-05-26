@@ -5,7 +5,8 @@
             [drafter.rdf.draft-management.jobs :refer [append-data-to-graph-from-file-job
                                                        create-draft-job
                                                        delete-graph-job
-                                                       migrate-graph-live-job]]
+                                                       migrate-graph-live-job
+                                                       create-update-metadata-job]]
             [drafter.write-scheduler :refer [submit-job! submit-sync-job!]]))
 
 (defn override-file-format
@@ -28,6 +29,12 @@
                        params :params}
         (api-routes/when-params [live-graph]
                                 (submit-sync-job! (create-draft-job repo live-graph params))))
+
+      (POST "/metadata" [graph :as {params :query-params}]
+            (let [metadata (api-routes/meta-params params)]
+              (if (or (empty? graph) (empty? metadata))
+                {:status 400 :headers {} :body "At least one graph and metadata pair required"}
+                (submit-sync-job! (create-update-metadata-job repo graph metadata)))))
 
       ;; deletes draft graph data contents; does not delete the draft graph
       ;; entry from the state graph.

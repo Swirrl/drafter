@@ -116,6 +116,23 @@
 
           (complete-job! job restapi/ok-response))))))
 
+;;update-graph-metadata :: Repository -> [URI] -> Seq [String, String] -> Job -> ()
+(defn- update-graph-metadata
+  "Updates or creates each of the the given graph metadata pairs for
+  each given graph under a job."
+  [repo graphs metadata job]
+  (with-job-exception-handling job
+    (with-open [conn (->connection repo)]
+      (doseq [draft-graph graphs]
+        (mgmt/add-metadata-to-graph conn draft-graph metadata))
+      (complete-job! job restapi/ok-response))))
+
+(defn create-update-metadata-job
+  "Creates a job to associate the given graph metadata pairs with each
+  given graph."
+  [repo graphs metadata]
+  (create-job :sync-write (partial update-graph-metadata repo graphs metadata)))
+
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
   to the specified graph.

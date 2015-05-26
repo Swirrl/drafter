@@ -289,6 +289,55 @@
            <" draft-graph-uri "> <" meta-subject "> ?o }"
         "}")))
 
+(defn add-request-metadata-pairs [request meta-pairs]
+  (reduce (fn [r [k v]] (add-request-metadata r k v)) request meta-pairs))
+
+(deftest draft-graph-metadata
+  (let [draft1 "http://graphs.org/1"
+        draft2 "http://graphs.org/2"
+        meta-pairs [["foo" "bar"] ["quux" "qaal"]]
+        route (draft-api-routes "" *test-db*)
+        create-meta-request (fn [meta-pairs]
+                              (-> {:uri "/metadata"
+                                   :request-method :post
+                                   :params {:graph [draft1 draft2]}}
+                                  (add-request-metadata-pairs meta-pairs)))]
+    (testing "Adds new metadata"
+      (let [test-request (create-meta-request meta-pairs)
+            {:keys [status]} (route test-request)]
+        (is (= 200 status))
+
+        ;;metadata exists
+        (doseq [graph [draft1 draft2]
+                [k v] meta-pairs]
+          (is (repo/query *test-db* (metadata-exists-sparql graph k v))))))
+
+    (testing "Updates existing metdata"
+      (let [updated-key (ffirst meta-pairs)
+            updated-pair [updated-key "new-value"]
+            request (create-meta-request [updated-pair])
+            expected-metadata (assoc meta-pairs 0 updated-pair)
+            {:keys [status]} (route request)]
+        
+        (is (= 200 status))
+
+        (doseq [graph [draft1 draft2]
+                [k v] expected-metadata]
+          (is (repo/query *test-db* (metadata-exists-sparql graph k v))))))
+
+    (testing "Invalid if no graphs"
+      (let [request (-> {:uri "/metadata" :request-method :post}
+                        (add-request-metadata-pairs [["foo" "bar"]]))
+            {:keys [status]} (route request)]
+        (is (= 400 status))))
+
+    (testing "Invalid if no metadata"
+      (let [request {:uri "/metadata"
+                     :request-method :post
+                     :params {:graph [draft1 draft2]}}
+            {:keys [status]} (route request)]
+        (is (= 400 status))))))
+
 (do-template
  [test-name http-method modify-request]
 
