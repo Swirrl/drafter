@@ -9,7 +9,8 @@
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.operations :as ops]
             [clojure.tools.logging :as log]
-            [grafter.rdf.repository :refer [->connection with-transaction make-restricted-dataset prepare-update evaluate]]
+            [grafter.rdf.repository :refer [with-transaction make-restricted-dataset
+                                            prepare-update evaluate ToConnection ->connection]]
             [pantomime.media :as mt]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [java.util.concurrent FutureTask CancellationException]

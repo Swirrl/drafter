@@ -9,8 +9,7 @@
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
-            [grafter.rdf.repository :refer [->connection query
-                                            with-transaction]]
+            [grafter.rdf.repository :refer [query with-transaction ToConnection ->connection]]
             [environ.core :refer [env]]))
 
 ;; Note if we change this default value we should also change it in the

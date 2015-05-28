@@ -11,7 +11,7 @@
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
             [grafter.rdf.io :refer [rdf-serializer]]
-            [grafter.rdf.repository :refer [->connection query]]
+            [grafter.rdf.repository :refer [query ToConnection ->connection]]
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]))
 
