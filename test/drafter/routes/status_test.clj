@@ -3,7 +3,7 @@
             [ring.mock.request :refer :all]
             [drafter.common.json-encoders :as enc]
             [drafter.routes.status :refer :all]
-            [drafter.write-scheduler :refer [create-job]])
+            [swirrl-server.async.jobs :refer [create-job]])
   (:import [java.util UUID]
            [java.util.concurrent.locks ReentrantLock]))
 

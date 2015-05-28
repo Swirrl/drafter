@@ -167,8 +167,7 @@
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
-        (is (= ok-response
-               (await-completion finished-jobs (:finished-job body))))
+        (is (= {:type :ok} (await-completion finished-jobs (:finished-job body))))
 
         (testing "appends RDF to the graph"
           (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))

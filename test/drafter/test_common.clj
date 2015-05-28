@@ -6,7 +6,8 @@
             [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer!]]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function!]])
-  (:import [java.util Scanner]))
+  (:import [java.util Scanner]
+           [java.util.concurrent TimeUnit]))
 
 (def ^:dynamic *test-db* (repo (memory-store)))
 
@@ -33,6 +34,11 @@
     (if (-> scanner .hasNext)
       (.next scanner)
       "")))
+
+(defn wait-for-lock-ms [lock period-ms]
+  (if (.tryLock lock period-ms (TimeUnit/MILLISECONDS))
+    (.unlock lock)
+    (throw (RuntimeException. (str "Lock not released after " period-ms "ms")))))
 
 (declare ^:dynamic *test-writer*)
 
