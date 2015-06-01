@@ -50,7 +50,7 @@
 
 (defn has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
-  than one draft in the state graph"
+  than one draft in the state graph."
   [db live-graph-uri]
   (let [qry (str "ASK WHERE {"
                  "  SELECT (COUNT(?draft) AS ?numberOfRefs)   WHERE {"
@@ -250,8 +250,8 @@
     (update! db delete-sparql)))
 
 (defn lookup-live-graph [db draft-graph-uri]
-  "Given a draft graph URI, lookup and return its live graph. Returns nil
-  if not found"
+  "Given a draft graph URI, lookup and return its live graph. Returns nil if not
+  found."
   (when-let [live-uri (-> (query db
                                  (str "SELECT ?live WHERE {"
                                       (with-state-graph
