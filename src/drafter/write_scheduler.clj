@@ -1,4 +1,15 @@
 (ns drafter.write-scheduler
+  "This namespace implements a priority job queue of pending writes, and is
+  responsible for ensuring writes are linearised without synchronous operations
+  blocking for too long.
+
+  Long running synchronous operations can be scheduled as :exclusive-writes
+  meaning any other concurrent write attempts will fail fast, rather block.
+
+  The public functions in this namespace are concerned with submitting jobs and
+  waiting for their results.
+
+  Jobs can be added to the write queue using the queue-job! function."
   (:require [clojure.tools.logging :as log]
             [swirrl-server.async.jobs :refer [finished-jobs complete-job! restart-id ->Job]])
   (:import (java.util UUID)
@@ -34,7 +45,7 @@
          (.unlock global-writes-lock)))))
 
 ;;queue-job :: Job -> ()
-(defn queue-job
+(defn queue-job!
   "Adds a write job to the job queue. If the job cannot be queued then
   an ExceptionInfo is thrown with a data map containing a :type key
   mapped to a :job-enqueue-failed value."
@@ -61,7 +72,7 @@
   complete. Returns the result of the job execution."
   [{:keys [value-p priority] :as job}]
   {:pre [(= :sync-write priority)]}
-  (queue-job job)
+  (queue-job! job)
   @value-p)
 
 (defn- write-loop

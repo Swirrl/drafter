@@ -3,7 +3,7 @@
             [swirrl-server.responses :as response]
             [drafter.rdf.draft-management.jobs :refer [is-failure-result?]]
             [swirrl-server.async.jobs :refer [submitted-job-response]]
-            [drafter.write-scheduler :refer [await-sync-job! queue-job]])
+            [drafter.write-scheduler :refer [await-sync-job! queue-job!]])
   (:import [clojure.lang ExceptionInfo]))
 
 (def ^:private temporarily-locked-for-writes-response
@@ -18,8 +18,8 @@
     (response/api-response 500 result)
     (response/api-response 200 result)))
 
-;;submit-sync-job! :: Job -> RingResponse
-;;submit-sync-job! :: Job -> (ApiResponse -> RingResponse) -> RingResponse
+;; submit-sync-job! :: Job -> RingResponse
+;; submit-sync-job! :: Job -> (ApiResponse -> RingResponse) -> RingResponse
 (defn submit-sync-job!
   "Submits a sync job, blocks waiting for it to complete and returns a
   ring response using the given handler function. The handler function
@@ -35,7 +35,7 @@
        (resp-fn job-result))
      (catch ExceptionInfo ex temporarily-locked-for-writes-response))))
 
-(defmacro handle-sync-job
+(defmacro handle-sync-job!
   "Convenience macro for submitting synchronous jobs and converting
   the results into ring responses. At least three forms are required -
   the first is for the job, the second for the job result and the
@@ -47,13 +47,13 @@
   [job result-form & response-forms]
   `(submit-sync-job! ~job (fn [~result-form] ~@response-forms)))
 
-;;submit-async-job! :: Job -> RingResponse
+;; submit-async-job! :: Job -> RingResponse
 (defn submit-async-job!
   "Submits an async job and returns a ring response indiciating the
   result of the submit operation."
   [job]
   (log/info "Submitting async job: " job)
   (try
-    (queue-job job)
+    (queue-job! job)
     (submitted-job-response job)
     (catch ExceptionInfo ex temporarily-locked-for-writes-response)))

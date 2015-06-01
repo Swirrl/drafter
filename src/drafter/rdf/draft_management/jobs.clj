@@ -4,7 +4,7 @@
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job complete-job!]]
-            [drafter.write-scheduler :refer [queue-job]]
+            [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
@@ -39,8 +39,9 @@
                  (with-job-exception-handling ~job
                    ~@forms))))
 
-(defn- complete-job-success
-  ([job] (complete-job-success job {}))
+(defn- job-succeeded!
+  "Adds the job to the set of finished-jobs as a successfully completed job."
+  ([job] (job-succeeded! job {}))
   ([job details] (complete-job! job (merge {:type :ok} details))))
 
 (defn create-draft-job [repo live-graph params]
@@ -51,17 +52,18 @@
                                     (mgmt/create-draft-graph! conn
                                                               live-graph (meta-params params)))]
 
-              (complete-job-success job {:guri draft-graph-uri}))))
+              (job-succeeded! job {:guri draft-graph-uri}))))
 
-(defn- finish-delete-job [repo graph contents-only? job]
-  (do
-    (when-not contents-only?
-      (mgmt/delete-graph-and-draft-state! repo graph))
-    (complete-job-success job)))
+(defn- finish-delete-job! [repo graph contents-only? job]
+  (when-not contents-only?
+    (mgmt/delete-graph-and-draft-state! repo graph))
+  (job-succeeded! job))
 
 (defn- delete-in-batches [repo graph contents-only? job]
-  ;; Loops until the graph is empty, then deletes state graph if not a contents-only? deletion.
-  ;; Checks that graph is a draft graph - will only delete drafts
+  ;; Loops until the graph is empty, then deletes state graph if not a
+  ;; contents-only? deletion.
+  ;;
+  ;; Checks that graph is a draft graph - will only delete drafts.
   (let [conn (->connection repo)]
     (if (and (mgmt/graph-exists? repo graph)
              (mgmt/draft-exists? repo graph))
@@ -70,11 +72,12 @@
                           (mgmt/delete-graph-batched! conn graph batched-write-size))
 
         (if (mgmt/graph-exists? repo graph)
-          ;; There's more graph contents so submit job to continue deleting
+          ;; There's more graph contents so queue another job to continue the
+          ;; deletions.
           (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
-            (queue-job (assoc job :function apply-next-batch)))
-          (finish-delete-job repo graph contents-only? job)))
-      (finish-delete-job repo graph contents-only? job))))
+            (queue-job! (assoc job :function apply-next-batch)))
+          (finish-delete-job! repo graph contents-only? job)))
+      (finish-delete-job! repo graph contents-only? job))))
 
 (defn delete-graph-job [repo graph & {:keys [contents-only?]}]
   "Deletes graph contents as per batch size in order to avoid blocking
@@ -101,13 +104,13 @@
         ;; queue to give higher priority jobs a chance to write
         (let [apply-next-batch (partial append-data-in-batches
                                         repo draft-graph metadata remaining-triples)]
-          (queue-job (assoc job :function apply-next-batch)))
+          (queue-job! (assoc job :function apply-next-batch)))
 
         (do
           (mgmt/add-metadata-to-graph conn draft-graph metadata)
           (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
 
-          (complete-job-success job))))))
+          (job-succeeded! job))))))
 
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
@@ -180,4 +183,4 @@
                   (doseq [g graph]
                     (mgmt/migrate-live! conn g)))))
             (log/info "Make-live for graph" graph "done")
-            (complete-job-success job)))
+            (job-succeeded! job)))

@@ -4,7 +4,8 @@
             [grafter.rdf.templater :refer [triplify]]
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
-            [drafter.write-scheduler :refer [start-writer! stop-writer!]]
+            [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
+                                             ]]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function!]])
   (:import [java.util Scanner]
            [java.util.concurrent TimeUnit]))
