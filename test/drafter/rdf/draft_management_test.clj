@@ -129,7 +129,7 @@
      (migrate-live! *test-db* draft-graph-uri)
      (let [managed-found? (is-graph-managed? *test-db* my-test-graph-uri)]
        (testing "migrate-live! DELETION: Deleted draft removes live graph from state graph"
-         (is (= false managed-found?)
+         (is (not managed-found?)
              "Live graph should no longer be referenced in state graph")))))
 
     (let [my-test-graph-uri "http://example.org/my-other-graph"
@@ -140,7 +140,7 @@
         (migrate-live! *test-db* draft-graph-uri-1)
         (let [managed-found? (is-graph-managed? *test-db* my-test-graph-uri)]
           (testing "migrate-live! DELETION: Doesn't delete from state graph when there's multiple drafts"
-            (is (= true managed-found?)
+            (is managed-found?
                 "Live graph shouldn't be deleted from state graph if referenced by other drafts")))))))
 
 
