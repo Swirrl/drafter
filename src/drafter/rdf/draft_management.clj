@@ -48,6 +48,21 @@
                  "}")]
     (query db qry)))
 
+(defn has-more-than-one-draft?
+  "Given a live graph uri, check to see if it is referenced by more
+  than one draft in the state graph"
+  [db live-graph-uri]
+  (let [qry (str "ASK WHERE {"
+                 "  SELECT (COUNT(?draft) AS ?numberOfRefs)   WHERE {"
+                 "    {"
+                 "      <" live-graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                 "        <" drafter:hasDraft "> ?draft ."
+                 "    }"
+                 "  }"
+                 "  HAVING (?numberOfRefs > 1)"
+                 "}")]
+    (query db qry)))
+
 (defn graph-exists?
   "Checks that a graph exists"
   [db graph-uri]
@@ -199,7 +214,7 @@
   (delete-graph-contents! db graph-uri)
 
   ; if the graph-uri is a draft graph uri,
-  ;   remove the mention of this draft uri, but leave the live graph as a managed graph.
+  ; remove the mention of this draft uri, but leave the live graph as a managed graph.
   (let [query-str (str "DELETE {"
                        (with-state-graph
                          "?live <" drafter:hasDraft "> <" graph-uri "> . "
@@ -235,16 +250,29 @@
     (update! db delete-sparql)))
 
 (defn lookup-live-graph [db draft-graph-uri]
-  "Given a draft graph URI, lookup and return its live graph."
-  (-> (query db
-             (str "SELECT ?live WHERE {"
-                  (with-state-graph
-                    "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                    "<" drafter:hasDraft "> <" draft-graph-uri "> . ")
-                  "} LIMIT 1"))
-      first
-      (get "live")
-      str))
+  "Given a draft graph URI, lookup and return its live graph. Returns nil
+  if not found"
+  (when-let [live-uri (-> (query db
+                                 (str "SELECT ?live WHERE {"
+                                      (with-state-graph
+                                        "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
+                                        "<" drafter:hasDraft "> <" draft-graph-uri "> . ")
+                                      "} LIMIT 1"))
+                          first
+                          (get "live"))]
+    (str live-uri)))
+
+(defn delete-live-graph-from-state [db live-graph-uri]
+  "Delete the live managed graph from the state graph"
+  (let [query-str (str "DELETE WHERE"
+                       "{"
+                       (with-state-graph
+                       "  ?s <" rdf:a "> <" drafter:ManagedGraph "> ."
+                       "  <" live-graph-uri "> ?p ?o ."
+                       "}"
+                       ))]
+    (update! db query-str))
+  (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
 
 (defn lookup-live-graph-uri [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
@@ -335,20 +363,20 @@
 
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (do
-      (log/debug (str "Migrating graph: " draft-graph-uri " to live graph: " live-graph-uri))
       (delete-graph-contents! db live-graph-uri)
 
       (let [contents (query db
                             (str "CONSTRUCT { ?s ?p ?o } WHERE
                                  { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
-
-        (when contents
-          (add db live-graph-uri contents)))
+        (if (empty? contents)
+          (when-not (has-more-than-one-draft? db live-graph-uri)
+            (delete-live-graph-from-state db live-graph-uri))
+          (do
+            (add db live-graph-uri contents)
+            (set-isPublic! db live-graph-uri true))))
 
       (delete-graph-and-draft-state! db draft-graph-uri)
-      (set-isPublic! db live-graph-uri true)
-      (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri))
-      live-graph-uri)
+      (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
                     {:error :graph-not-found}))))
