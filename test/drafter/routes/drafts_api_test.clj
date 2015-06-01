@@ -91,11 +91,11 @@
       (is (= restart-id (:restart-id body)))
       (is (instance? UUID (parse-guid (:finished-job body)))))))
 
-(defn is-error-response [response]
+(defn is-client-error-response [response]
   (let [{:keys [status body headers]} response]
     (is (= 400 status))
     (is (= :error (body :type)))
-    (is (instance? String (body :msg)))))
+    (is (instance? String (body :message)))))
 
 (deftest drafts-api-create-draft-test
   (testing "POST /draft/create"
@@ -104,7 +104,7 @@
                                            {:uri "/draft/create"
                                             :request-method :post
                                             :headers {"accept" "application/json"}})]
-        (is-error-response response)))
+        (is-client-error-response response)))
 
     (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
 
