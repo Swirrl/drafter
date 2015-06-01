@@ -149,8 +149,6 @@
 
         (is (= "true" body))))))
 
-;(def drafts-request (assoc default-sparql-query :uri "/sparql/draft"))
-
 (deftest drafts-sparql-routes-test
   (let [test-db (make-store)
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
@@ -206,9 +204,16 @@
                                      (assoc-in [:params :union-with-live] "true"))))]
 
 
-          (= graph-1-result (second csv-result))
+          (is (= graph-1-result (second csv-result)))
           (is (= 3 (count csv-result))
-              "There should be 3 rows in the csv (2 triples in one graph + the csv header row)"))))))
+              "There should be 3 rows in the csv (2 triples in one graph + the csv header row)")))
+
+      (testing "When no drafts are supplied & :union-with-live is not set"
+        (let [csv-result (csv-> (endpoint (draft-query "SELECT * WHERE { ?s ?p ?o }" nil)))
+              triple-from-state-graph? (fn [triple]
+                                         (.endsWith (last triple) "ManagedGraph"))]
+          (is (not-any? triple-from-state-graph? csv-result)
+              "Data should not contain triples from the state graph"))))))
 
 
 (deftest drafts-sparql-routes-distinct-test
