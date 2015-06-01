@@ -262,16 +262,17 @@
                           (get "live"))]
     (str live-uri)))
 
-(defn delete-live-graph-from-state [db live-graph-uri]
+(defn- delete-live-graph-from-state [db live-graph-uri]
+  (str "DELETE WHERE"
+       "{"
+       (with-state-graph
+         "  ?s <" rdf:a "> <" drafter:ManagedGraph "> ."
+         "  <" live-graph-uri "> ?p ?o .")
+       "}"))
+
+(defn delete-live-graph-from-state! [db live-graph-uri]
   "Delete the live managed graph from the state graph"
-  (let [query-str (str "DELETE WHERE"
-                       "{"
-                       (with-state-graph
-                       "  ?s <" rdf:a "> <" drafter:ManagedGraph "> ."
-                       "  <" live-graph-uri "> ?p ?o ."
-                       "}"
-                       ))]
-    (update! db query-str))
+  (update! db (delete-live-graph-from-state db live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
 
 (defn lookup-live-graph-uri [db draft-graph-uri]
