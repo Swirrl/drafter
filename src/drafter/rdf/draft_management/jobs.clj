@@ -28,8 +28,8 @@
                             :error-type (str (class ex#))
                             :exception ex#}))))
 
-(defn is-failure-result?
-  "Indicates whether the given job result represents a failed job."
+(defn failed-job-result?
+  "Indicates whether the given result object is a failed job result."
   [{:keys [type] :as result}]
   (= :error type))
 

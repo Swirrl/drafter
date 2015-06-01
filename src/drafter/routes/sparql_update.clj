@@ -125,13 +125,15 @@
                          (log/fatal ex "An exception was thrown when executing a SPARQL update!")
                          (throw ex)))))))
 
+(def ^:private  sparql-update-applied-response {:status 200 :body "OK"})
+
 ;exec-update :: Repository -> Request -> (ParsedStatement -> Connection -> PreparedStatement) -> Response
 (defn exec-update [repo request prepare-fn timeouts]
   (let [job (create-update-job repo request prepare-fn timeouts)]
     (submit-sync-job! job (fn [result]
-                            (if (jobs/is-failure-result? result)
+                            (if (jobs/failed-job-result? result)
                               (response/api-response 500 result)
-                              {:status 200 :body "OK"})))))
+                              sparql-update-applied-response)))))
 
 (defn prepare-update-statement [{update :update} conn restrictions]
   (let [rs (if (fn? restrictions) (restrictions) restrictions)]

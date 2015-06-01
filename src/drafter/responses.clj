@@ -1,7 +1,7 @@
 (ns drafter.responses
   (:require [clojure.tools.logging :as log]
             [swirrl-server.responses :as response]
-            [drafter.rdf.draft-management.jobs :refer [is-failure-result?]]
+            [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
             [swirrl-server.async.jobs :refer [submitted-job-response]]
             [drafter.write-scheduler :refer [await-sync-job! queue-job!]])
   (:import [clojure.lang ExceptionInfo]))
@@ -14,7 +14,7 @@
   the job succeeded then a 200 response is returned, otherwise a 500
   response."
   [result]
-  (if (is-failure-result? result)
+  (if (failed-job-result? result)
     (response/api-response 500 result)
     (response/api-response 200 result)))
 
@@ -43,7 +43,8 @@
   form can be used to destructure the map used to complete the job.
 
   (handle-sync-job (create-job)
-    {:keys [message] :as result} (create-response message))"
+     {:keys [message] :as result} (create-response message))"
+
   [job result-form & response-forms]
   `(submit-sync-job! ~job (fn [~result-form] ~@response-forms)))
 

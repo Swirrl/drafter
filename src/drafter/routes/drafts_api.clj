@@ -6,7 +6,7 @@
                                                        create-draft-job
                                                        delete-graph-job
                                                        migrate-graph-live-job
-                                                       is-failure-result?]]
+                                                       failed-job-result?]]
             [drafter.responses :refer [submit-sync-job! submit-async-job!]]
             [swirrl-server.responses :as response]))
 
@@ -31,7 +31,7 @@
         (api-routes/when-params [live-graph]
                                 (submit-sync-job! (create-draft-job repo live-graph params)
                                                     (fn [result]
-                                                      (if (is-failure-result? result)
+                                                      (if (failed-job-result? result)
                                                         (response/api-response 500 result)
                                                         (response/api-response 201 result))))))
 
