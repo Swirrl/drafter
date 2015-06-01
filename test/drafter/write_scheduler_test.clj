@@ -1,10 +1,9 @@
 (ns drafter.write-scheduler-test
   (:require [drafter.write-scheduler :refer :all]
             [clojure.test :refer :all]
-            [drafter.test-common :refer [wait-for-lock-ms wrap-with-clean-test-db]]
+            [drafter.test-common :refer [wait-for-lock-ms during-exclusive-write wrap-with-clean-test-db]]
             [swirrl-server.async.jobs :refer [create-job complete-job! ->Job]])
   (:import [java.util UUID]
-           [java.util.concurrent CountDownLatch]
            [clojure.lang ExceptionInfo]))
 
 (defn t
@@ -16,34 +15,6 @@
 
 (defn const-job [priority ret]
   (create-job priority (fn [job] (complete-job! job ret))))
-
-(defn during-exclusive-write-f [f]
-  (let [p (promise)
-        latch (CountDownLatch. 1)
-        exclusive-job (create-job :exclusive-write
-                                  (fn [j]
-                                    (.countDown latch)
-                                    @p))]
-
-    ;; submit exclusive job which should prevent updates from being
-    ;; scheduled
-    (queue-job exclusive-job)
-
-    ;; wait until exclusive job is actually running i.e. the write lock has
-    ;; been taken
-    (.await latch)
-
-    (try
-      (f)
-      (finally
-        ;; complete exclusive job
-        (deliver p nil)
-
-        ;; wait a short time for the lock to be released
-        (wait-for-lock-ms global-writes-lock 200)))))
-
-(defmacro during-exclusive-write [& forms]
-  `(during-exclusive-write-f (fn [] ~@forms)))
 
 (deftest job-sort-order-test
   (let [unordered-jobs [(mock-job 6 :batch-write 2)

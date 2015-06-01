@@ -5,8 +5,7 @@
             [clojure.test :refer :all]
             [clojure.template :refer [do-template]]
             [ring.util.codec :as codec]
-            [drafter.test-common :refer [*test-db* wrap-with-clean-test-db stream->string select-all-in-graph make-store]]
-            [drafter.write-scheduler-test :refer [during-exclusive-write]]
+            [drafter.test-common :refer [*test-db* wrap-with-clean-test-db stream->string select-all-in-graph make-store during-exclusive-write]]
             [grafter.rdf.repository :refer [query]])
   (:import [java.util UUID]
            [java.util.concurrent CountDownLatch TimeUnit]

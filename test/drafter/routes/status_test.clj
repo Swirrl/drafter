@@ -2,8 +2,7 @@
   (:require [clojure.test :refer :all]
             [ring.mock.request :refer :all]
             [drafter.common.json-encoders :as enc]
-            [drafter.routes.status :refer :all]
-            [swirrl-server.async.jobs :refer [create-job]])
+            [drafter.routes.status :refer :all])
   (:import [java.util UUID]
            [java.util.concurrent.locks ReentrantLock]))
 

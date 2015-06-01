@@ -5,10 +5,12 @@
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
+                                             global-writes-lock
                                              ]]
+            [swirrl-server.async.jobs :refer [create-job]]
             [drafter.rdf.sparql-rewriting :refer [function-registry register-function!]])
   (:import [java.util Scanner]
-           [java.util.concurrent TimeUnit]))
+           [java.util.concurrent CountDownLatch TimeUnit]))
 
 (def ^:dynamic *test-db* (repo (memory-store)))
 
@@ -74,3 +76,31 @@
      (let [draft-guri (import-data-to-draft! db live-guri data)]
        (migrate-live! db draft-guri))
      live-guri))
+
+(defn during-exclusive-write-f [f]
+  (let [p (promise)
+        latch (CountDownLatch. 1)
+        exclusive-job (create-job :exclusive-write
+                                  (fn [j]
+                                    (.countDown latch)
+                                    @p))]
+
+    ;; submit exclusive job which should prevent updates from being
+    ;; scheduled
+    (queue-job! exclusive-job)
+
+    ;; wait until exclusive job is actually running i.e. the write lock has
+    ;; been taken
+    (.await latch)
+
+    (try
+      (f)
+      (finally
+        ;; complete exclusive job
+        (deliver p nil)
+
+        ;; wait a short time for the lock to be released
+        (wait-for-lock-ms global-writes-lock 200)))))
+
+(defmacro during-exclusive-write [& forms]
+  `(during-exclusive-write-f (fn [] ~@forms)))
