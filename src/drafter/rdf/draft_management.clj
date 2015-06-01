@@ -367,10 +367,13 @@
 
       (let [contents (query db
                             (str "CONSTRUCT { ?s ?p ?o } WHERE
-                                 { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))]
-        (if (empty? contents)
-          (when-not (has-more-than-one-draft? db live-graph-uri)
-            (delete-live-graph-from-state db live-graph-uri))
+                                 { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
+            has-only-one-draft-that-is-empty? (fn [live-graph-uri]
+                                                (and (empty? contents)
+                                                     (not (has-more-than-one-draft? db live-graph-uri))))]
+
+        (if (has-only-one-draft-that-is-empty? live-graph-uri)
+          (delete-live-graph-from-state! db live-graph-uri)
           (do
             (add db live-graph-uri contents)
             (set-isPublic! db live-graph-uri true))))
