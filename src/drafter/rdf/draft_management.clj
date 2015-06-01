@@ -208,13 +208,14 @@
   (update! db (str "DROP GRAPH <" graph-uri ">"))
   (log/info (str "Deleted graph " graph-uri)))
 
-(defn delete-graph-and-draft-state!
-  "Deletes graph data and the state"
+(defn delete-draft-graph-and-its-state!
+  "Deletes a draft graph and removes the reference to it from its live graph"
   [db graph-uri]
+
   (delete-graph-contents! db graph-uri)
 
-  ; if the graph-uri is a draft graph uri,
-  ; remove the mention of this draft uri, but leave the live graph as a managed graph.
+  ;; if the graph-uri is a draft graph uri, remove the mention of this draft
+  ;; uri, but leave the live graph as a managed graph.
   (let [query-str (str "DELETE {"
                        (with-state-graph
                          "?live <" drafter:hasDraft "> <" graph-uri "> . "
@@ -225,8 +226,7 @@
                                "<" drafter:hasDraft "> <" graph-uri "> . "
                                "<" graph-uri "> ?p ?o . ")
                        "}")]
-    (update! db
-             query-str))
+    (update! db query-str))
   (log/info (str "Deleted draft graph from state " graph-uri)))
 
 (defn delete-graph-batched!
@@ -375,7 +375,7 @@
             (add db live-graph-uri contents)
             (set-isPublic! db live-graph-uri true))))
 
-      (delete-graph-and-draft-state! db draft-graph-uri)
+      (delete-draft-graph-and-its-state! db draft-graph-uri)
       (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)

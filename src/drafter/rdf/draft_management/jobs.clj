@@ -48,7 +48,7 @@
 (defn- finish-delete-job [repo graph contents-only? job]
   (do
     (when-not contents-only?
-      (mgmt/delete-graph-and-draft-state! repo graph))
+      (mgmt/delete-draft-graph-and-its-state! repo graph))
     (complete-job! job restapi/ok-response)))
 
 (defn- delete-in-batches [repo graph contents-only? job]
