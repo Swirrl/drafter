@@ -1,6 +1,7 @@
 (ns drafter.routes.drafts-api
   (:require [clojure.tools.logging :as log]
             [compojure.core :refer [DELETE POST PUT context routes]]
+            [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
             [drafter.rdf.draft-management.jobs :refer [append-data-to-graph-from-file-job
                                                        create-draft-job
@@ -48,14 +49,17 @@
       (POST mount-point {{graph :graph} :params
                          {content-type :content-type} :params
                          query-params :query-params
-                         {file :file} :params}
-        (let [metadata (api-routes/meta-params query-params)]
+                         {{file-part-content-type :content-type data :tempfile} :file} :params}
+        (let [metadata (api-routes/meta-params query-params)
+              data-content-type (or content-type file-part-content-type)]
           ;; when source graph not supplied: append from the file
-          (api-routes/when-params [graph file]
-                                  (submit-async-job!
-                                    (append-data-to-graph-from-file-job repo graph
-                                                                        (override-file-format content-type file)
-                                                                        metadata))))))))
+          (api-routes/when-params [graph data-content-type]
+                                  (if-let [rdf-format (mimetype->rdf-format data-content-type)]
+                                    (submit-async-job!
+                                       (append-data-to-graph-from-file-job repo graph
+                                                                           data rdf-format
+                                                                           metadata))
+                                    (response/error-response 400 {:msg  (str "Unknown RDF format for content type " data-content-type)}))))))))
 
 (defn graph-management-routes [mount-point repo]
   (routes

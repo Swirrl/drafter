@@ -187,7 +187,24 @@
                 error-result (await-completion finished-jobs guid)]
 
             (is (= :error (:type error-result)))
-            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))))
+            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))
+
+    (testing "with a missing content type"
+      (let [test-request (-> {:uri "/draft" :request-method :post}
+                             (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "./test/test-triple.nt")
+                             (update-in [:params :file] dissoc :content-type))
+            route (draft-api-routes "/draft" *test-db*)
+            {:keys [status] :as response} (route test-request)]
+        (is (= 400 status) "Bad request")))
+
+    (testing "with an unknown content type"
+      (let [test-request (-> {:uri "/draft" :request-method :post}
+                             (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "./test/test-triple.nt")
+                             (assoc-in [:params :file :content-type] "text/not-a-real-content-type"))
+            route (draft-api-routes "/draft" *test-db*)
+            {:keys [status] :as response} (route test-request)]
+        
+        (is (= 400 status) "Bad request")))))
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph (batched)"
