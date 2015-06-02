@@ -2,6 +2,16 @@
   (:require [clojure.set :as set]
             [drafter.rdf.draft-management :as mgmt :refer [live-graphs]]))
 
+(defn- lift->col [col]
+  (if (instance? String col)
+    #{col}
+    col))
+
+(defn- calculate-graph-restriction [public-live-graphs live-graph-drafts supplied-draft-graphs]
+  (set/union
+   (set/difference public-live-graphs live-graph-drafts)
+   supplied-draft-graphs))
+
 (defn supplied-drafts
   "Parses out the set of \"graph\"s supplied on the request.
 
@@ -14,19 +24,16 @@
 
   (let [graphs (get params :graph)
         union-with-live? (get params :union-with-live false)
-        draft-set (if (instance? String graphs)
-                    #{graphs}
-                    graphs)
+        supplied-draftset (lift->col graphs)
         ;; get the graphs with drafts from graph-map
         graphs-with-drafts (into #{}
                                  (map str
-                                      (keys (mgmt/graph-map repo draft-set))))
-        live-graphs (if union-with-live?
-                      (live-graphs repo)
-                      #{})
-        supplied-graphs (if (instance? String graphs)
-                          #{graphs}
-                          graphs)]
-    (set/union
-      (set/difference live-graphs graphs-with-drafts)
-      supplied-graphs)))
+                                      (keys (mgmt/graph-map repo supplied-draftset))))
+
+        public-live-graphs (if union-with-live?
+                             (live-graphs repo)
+                             #{})]
+
+    (calculate-graph-restriction public-live-graphs
+                                 graphs-with-drafts
+                                 supplied-draftset)))
