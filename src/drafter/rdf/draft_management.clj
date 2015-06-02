@@ -357,12 +357,6 @@
         (zipmap live-graphs
                 (map #(get % "draft") results))))))
 
-(defn sparql-repo-query [repo query-string]
-  (with-open [conn (.getConnection repo)]
-    (let [q (prepare-query conn query-string)]
-      (.setIncludeInferred q false)
-      (evaluate q))))
-
 (defn live-graphs [db & {:keys [online] :or {online true}}]
   "Get all live graph names.  Takes an optional boolean keyword
   argument of :online to allow querying for all online/offline live
