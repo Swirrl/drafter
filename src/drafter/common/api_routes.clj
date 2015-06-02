@@ -1,18 +1,5 @@
 (ns drafter.common.api-routes
-  (:require [drafter.rdf.drafter-ontology :refer [meta-uri]]
-            [swirrl-server.responses :refer [error-response]]))
-
-(defmacro when-params
-  "Simple macro that takes a set of paramaters and tests that they're
-  all truthy.  If any are falsey it returns an appropriate ring
-  response with an error message.  The error message assumes that the
-  symbol name is the same as the HTTP parameter name."
-  [params & form]
-  `(if (every? identity ~params)
-     ~@form
-     (error-response 400 {:msg (str "You must supply the parameters " ~(->> params
-                                                                            (interpose ", ")
-                                                                            (apply str)))})))
+  (:require [drafter.rdf.drafter-ontology :refer [meta-uri]]))
 
 (defn meta-params
   "Given a hashmap of query parameters grab the ones prefixed meta-, strip that

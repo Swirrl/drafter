@@ -1,12 +1,15 @@
 (ns drafter.routes.drafts-api
   (:require [clojure.tools.logging :as log]
             [compojure.core :refer [DELETE POST PUT context routes]]
+            [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
             [drafter.rdf.draft-management.jobs :refer [append-data-to-graph-from-file-job
                                                        create-draft-job
                                                        delete-graph-job
-                                                       migrate-graph-live-job]]
-            [drafter.write-scheduler :refer [submit-job! submit-sync-job!]]))
+                                                       migrate-graph-live-job
+                                                       failed-job-result?]]
+            [drafter.responses :refer [submit-sync-job! submit-async-job!]]
+            [swirrl-server.responses :as response]))
 
 (defn override-file-format
   "Takes a file object (hash) and if a non-nil file-format is supplied
@@ -26,14 +29,18 @@
       ;; graph
       (POST "/create" {{live-graph :live-graph} :params
                        params :params}
-        (api-routes/when-params [live-graph]
-                                (submit-sync-job! (create-draft-job repo live-graph params))))
+        (response/when-params [live-graph]
+                              (submit-sync-job! (create-draft-job repo live-graph params)
+                                                (fn [result]
+                                                  (if (failed-job-result? result)
+                                                    (response/api-response 500 result)
+                                                    (response/api-response 201 result))))))
 
       ;; deletes draft graph data contents; does not delete the draft graph
       ;; entry from the state graph.
       (DELETE "/contents" {{graph :graph} :params}
-        (api-routes/when-params [graph]
-                                (submit-job! (delete-graph-job repo graph :contents-only? true)))))
+        (response/when-params [graph]
+                              (submit-async-job! (delete-graph-job repo graph :contents-only? true)))))
 
     ;; adds data to the graph from either source-graph or file
     ;; accepts extra meta- query string params, which are added to queue
@@ -42,26 +49,29 @@
       (POST mount-point {{graph :graph} :params
                          {content-type :content-type} :params
                          query-params :query-params
-                         {file :file} :params}
-        (let [metadata (api-routes/meta-params query-params)]
+                         {{file-part-content-type :content-type data :tempfile} :file} :params}
+        (let [metadata (api-routes/meta-params query-params)
+              data-content-type (or content-type file-part-content-type)]
           ;; when source graph not supplied: append from the file
-          (api-routes/when-params [graph file]
-                                  (submit-job!
-                                    (append-data-to-graph-from-file-job repo graph
-                                                                        (override-file-format content-type file)
-                                                                        metadata))))))))
+          (response/when-params [graph data-content-type]
+                                (if-let [rdf-format (mimetype->rdf-format data-content-type)]
+                                  (submit-async-job!
+                                   (append-data-to-graph-from-file-job repo graph
+                                                                       data rdf-format
+                                                                       metadata))
+                                  (response/bad-request-response (str "Unknown RDF format for content type " data-content-type)))))))))
 
 (defn graph-management-routes [mount-point repo]
   (routes
     ;; deletes draft graph data contents and then the draft graph itself
     (DELETE mount-point {{graph :graph} :params}
-            (api-routes/when-params [graph]
-                                    (submit-job! (delete-graph-job repo graph))))
+            (response/when-params [graph]
+                                  (submit-async-job! (delete-graph-job repo graph))))
    (context
      mount-point []
      ;; makes a graph live.
      (PUT "/live" {{graph :graph} :params
                    :as request}
           (log/info request)
-          (api-routes/when-params [graph]
-                                  (submit-job! (migrate-graph-live-job repo graph)))))))
+          (response/when-params [graph]
+                                (submit-async-job! (migrate-graph-live-job repo graph)))))))

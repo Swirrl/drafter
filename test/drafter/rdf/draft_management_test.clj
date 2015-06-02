@@ -77,7 +77,9 @@
                }"))))
 
     (testing "with live graph with existing data, copies data into draft"
-      (let [live-uri (make-graph-live! *test-db* "http://clones/original/data" (triplify ["http://starting/data" ["http://starting/data" "http://starting/data"]]))
+      (let [live-uri (make-graph-live! *test-db*
+                                       "http://clones/original/data"
+                                       (triplify ["http://starting/data" ["http://starting/data" "http://starting/data"]]))
             draft-graph-uri (create-managed-graph-with-draft! live-uri)]
 
         (append-data! *test-db* draft-graph-uri test-triples)
@@ -102,21 +104,45 @@
         "should set the boolean value")))
 
 (deftest migrate-live!-test
-  (testing "migrate-live!"
-    (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
-          expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
-      (append-data! *test-db* draft-graph-uri test-triples)
-      (migrate-live! *test-db* draft-graph-uri)
-
+  (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
+       expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
+    (append-data! *test-db* draft-graph-uri test-triples)
+    (migrate-live! *test-db* draft-graph-uri)
+    (testing "migrate-live! data is migrated"
       (is (not (ask? "GRAPH <" draft-graph-uri "> {"
                      expected-triple-pattern
                      "}"))
-          "Draft graph no longer exists.")
+          "Draft graph contents no longer exist.")
 
       (is (ask? "GRAPH <" test-graph-uri "> {"
                 expected-triple-pattern
                 "}")
-          "Live graph contains the migrated triples"))))
+          "Live graph contains the migrated triples")
+
+      (is (= true (is-graph-managed? *test-db* test-graph-uri))
+          "Live graph reference shouldn't have been deleted from state graph"))
+
+ (let [my-test-graph-uri "http://example.org/my-other-graph"
+       draft-graph-uri (create-managed-graph-with-draft! my-test-graph-uri)]
+   (do
+     ;; We are migrating empty graph, so this is deleting.
+     (migrate-live! *test-db* draft-graph-uri)
+     (let [managed-found? (is-graph-managed? *test-db* my-test-graph-uri)]
+       (testing "migrate-live! DELETION: Deleted draft removes live graph from state graph"
+         (is (not managed-found?)
+             "Live graph should no longer be referenced in state graph")))))
+
+    (let [my-test-graph-uri "http://example.org/my-other-graph"
+          draft-graph-uri-1 (create-managed-graph-with-draft! my-test-graph-uri)
+          _ (create-managed-graph-with-draft! my-test-graph-uri)]
+      (do
+        ;; We are migrating empty graph, so this is deleting.
+        (migrate-live! *test-db* draft-graph-uri-1)
+        (let [managed-found? (is-graph-managed? *test-db* my-test-graph-uri)]
+          (testing "migrate-live! DELETION: Doesn't delete from state graph when there's multiple drafts"
+            (is managed-found?
+                "Live graph shouldn't be deleted from state graph if referenced by other drafts")))))))
+
 
 (deftest graph-restricted-queries-test
   (testing "query"
@@ -210,6 +236,8 @@
         predicate "http://example.com/predicate"]
     (add db (triplify [subject [predicate (s "initial")]]))
     (upsert-single-object! db subject predicate "updated")
-    (is (query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <" subject "> <" predicate "> \"updated\"} }")))))
+    (is (query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
+                       "<" subject "> <" predicate "> \"updated\""
+                       "} }")))))
 
 (use-fixtures :each wrap-with-clean-test-db)
