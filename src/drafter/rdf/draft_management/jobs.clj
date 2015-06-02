@@ -128,10 +128,10 @@
   The last batch is finally responsible for signaling job completion
   via a side-effecting call to complete-job!"
 
-  [repo draft-graph {:keys [tempfile size filename content-type] :as file} metadata]
+  [repo draft-graph tempfile rdf-format metadata]
 
   (let [new-triples (statements tempfile
-                                :format (mimetype->rdf-format content-type)
+                                :format rdf-format
                                 :buffer-size batched-write-size)
 
         ;; NOTE that this is technically not transactionally safe as
