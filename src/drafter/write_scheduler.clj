@@ -1,8 +1,17 @@
 (ns drafter.write-scheduler
+  "This namespace implements a priority job queue of pending writes, and is
+  responsible for ensuring writes are linearised without synchronous operations
+  blocking for too long.
+
+  Long running synchronous operations can be scheduled as :exclusive-writes
+  meaning any other concurrent write attempts will fail fast, rather block.
+
+  The public functions in this namespace are concerned with submitting jobs and
+  waiting for their results.
+
+  Jobs can be added to the write queue using the queue-job! function."
   (:require [clojure.tools.logging :as log]
-            [swirrl-server.responses :as response]
-            [swirrl-server.async.jobs :refer [finished-jobs submitted-job-response complete-job! restart-id ->Job]]
-            [drafter.routes.status :refer [finished-job-route]])
+            [swirrl-server.async.jobs :refer [finished-jobs complete-job! restart-id ->Job]])
   (:import (java.util UUID)
            (java.util.concurrent PriorityBlockingQueue)
            (java.util.concurrent.locks ReentrantLock)
@@ -35,70 +44,36 @@
          (log/info "Unlocking :exclusive-write lock")
          (.unlock global-writes-lock)))))
 
-(defn create-job [priority f]
-  {:pre [(all-priority-types priority)]}
-  (->Job (UUID/randomUUID)
-         priority
-         (System/currentTimeMillis)
-         f
-         (promise)))
-
-(defn- invalid-rdf-response [job-result]
-  (response/api-response 400 {:msg (str "Invalid RDF provided: " job-result)}))
-
-(def ^:private temporarily-locked-for-writes-response
-  {:status 503 :body {:type :error :message "Write operations are temporarily unavailable.  Please try again later."}})
-
-(defn blocking-response
-  "Block and await the delivery of the jobs result.  When it arrives
-  return an appropriate HTTP response."
-
-  [job]
-  (let [job-result @(:value-p job)]
-    (condp = (class job-result)
-      RDFParseException
-      (invalid-rdf-response job-result)
-
-      clojure.lang.ExceptionInfo
-      (if (= :reading-aborted (-> job-result ex-data :type))
-        (invalid-rdf-response job-result)
-        (do
-          (log/error "Unknown error " job-result)
-          (submitted-job-response job-result)))
-
-      Exception
-      (submitted-job-response job-result)
-
-      job-result)))
-
-(defn submit-job!
-  "Submit a write job to the job queue for execution."
-
+;;queue-job :: Job -> ()
+(defn queue-job!
+  "Adds a write job to the job queue. If the job cannot be queued then
+  an ExceptionInfo is thrown with a data map containing a :type key
+  mapped to a :job-enqueue-failed value."
   [job]
   (log/info "Queueing job: " job)
   (if (= :exclusive-write (:priority job))
     (do
       (log/trace "Queueing :exclusive-write job on queue" writes-queue)
-      (.add writes-queue job)
-      (submitted-job-response job))
+      (.add writes-queue job))
     (if (.tryLock global-writes-lock)
       ;; We try the lock, not because we need the lock, but because we
       ;; need to 503/refuse the addition of an item if the lock is
       ;; taken.
-      (do (try
-            (.add writes-queue job)
-            (finally
-              (.unlock global-writes-lock)))
-          (if (= :sync-write (:priority job))
-            (blocking-response job)
-            (submitted-job-response job)))
+      (try
+        (.add writes-queue job)
+        (finally
+          (.unlock global-writes-lock)))
 
-      temporarily-locked-for-writes-response)))
+      (throw (ex-info "Failed to queue job" {:type :job-enqueue-failed})))))
 
-(defn submit-sync-job!
-  [job]
-  {:pre [(= :sync-write (:priority job))]}
-  (submit-job! job))
+;;await-sync-job! :: Job -> ApiResponse
+(defn await-sync-job!
+  "Submits a sync job to the queue and blocks waiting for it to
+  complete. Returns the result of the job execution."
+  [{:keys [value-p priority] :as job}]
+  {:pre [(= :sync-write priority)]}
+  (queue-job! job)
+  @value-p)
 
 (defn- write-loop
   "Start the write loop running.  Note this function does not return

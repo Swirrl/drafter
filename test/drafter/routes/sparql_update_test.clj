@@ -1,12 +1,11 @@
 (ns drafter.routes.sparql-update-test
   (:require [drafter.routes.sparql-update :refer :all]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!]]
-            [drafter.write-scheduler :as scheduler]
+            [swirrl-server.async.jobs :as jobs]
             [clojure.test :refer :all]
             [clojure.template :refer [do-template]]
             [ring.util.codec :as codec]
-            [drafter.write-scheduler :refer [global-writes-lock]]
-            [drafter.test-common :refer [*test-db* wrap-with-clean-test-db stream->string select-all-in-graph make-store]]
+            [drafter.test-common :refer [*test-db* wrap-with-clean-test-db stream->string select-all-in-graph make-store during-exclusive-write]]
             [grafter.rdf.repository :refer [query]])
   (:import [java.util UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
@@ -51,11 +50,6 @@
          (assoc-in base-req [:form-params "graph"] graphs)
          base-req))))
 
-(defn wait-for-lock-ms [lock period-ms]
-  (if (.tryLock lock period-ms (TimeUnit/MILLISECONDS))
-          (.unlock lock)
-          (throw (RuntimeException. (str "Lock not released after " period-ms "ms")))))
-
 (deftest application-sparql-update-test
   (let [endpoint (update-endpoint "/update" *test-db*)]
 
@@ -70,33 +64,15 @@
 (deftest update-unavailable-test
   (testing "Update not available if exclusive write job running"
     (let [endpoint (update-endpoint "/update" *test-db*)]
-      (let [p (promise)
-            latch (CountDownLatch. 1)
-            exclusive-job (scheduler/create-job
-                           :exclusive-write (fn [j]
-                                              (.countDown latch)
-                                              @p))]
 
-        ;; submit exclusive job which should prevent updates from being
-        ;; scheduled
-        (scheduler/submit-job! exclusive-job)
+      ;; update should fail while exclusive write is in progress
+      (during-exclusive-write
+       (let [{:keys [status]} (endpoint (application-sparql-update-request))]
+          (is (= 503 status))))
 
-        ;; wait until exclusive job is actually running i.e. the write lock has
-        ;; been taken
-        (.await latch)
-
-        (let [{:keys [status]} (endpoint (application-sparql-update-request))]
-          (is (= 503 status)))
-
-        ;; complete exclusive job
-        (deliver p nil)
-
-        ;; wait a short time for the lock to be released
-        (wait-for-lock-ms global-writes-lock 200)
-
-        ;; should be able to submit updates again
-        (let [{:keys [status]} (endpoint (application-sparql-update-request))]
-          (is (= 200 status)))))))
+      ;; should be able to submit updates again
+      (let [{:keys [status]} (endpoint (application-sparql-update-request))]
+        (is (= 200 status))))))
 
 (deftest application-x-form-urlencoded-test
   (let [endpoint (update-endpoint "/update" *test-db*)]

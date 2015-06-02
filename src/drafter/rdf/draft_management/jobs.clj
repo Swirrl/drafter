@@ -5,13 +5,13 @@
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job complete-job!]]
-            [drafter.write-scheduler :refer [submit-job!]]
+            [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [grafter.rdf.repository :refer [->connection query
-                                            with-transaction]]
+                                            with-transaction ToConnection]]
             [grafter.rdf.protocols :refer [update!]]
             [environ.core :refer [env]]))
 
@@ -31,11 +31,21 @@
                             :error-type (str (class ex#))
                             :exception ex#}))))
 
+(defn failed-job-result?
+  "Indicates whether the given result object is a failed job result."
+  [{:keys [type] :as result}]
+  (= :error type))
+
 (defmacro make-job [write-priority [job :as args] & forms]
   `(create-job ~write-priority
                (fn [~job]
                  (with-job-exception-handling ~job
                    ~@forms))))
+
+(defn- job-succeeded!
+  "Adds the job to the set of finished-jobs as a successfully completed job."
+  ([job] (job-succeeded! job {}))
+  ([job details] (complete-job! job (merge {:type :ok} details))))
 
 (defn create-draft-job [repo live-graph params]
   (make-job :sync-write [job]
@@ -45,17 +55,18 @@
                                     (mgmt/create-draft-graph! conn
                                                               live-graph (meta-params params)))]
 
-              (complete-job! job (restapi/api-response 201 {:guri draft-graph-uri})))))
+              (job-succeeded! job {:guri draft-graph-uri}))))
 
-(defn- finish-delete-job [repo graph contents-only? job]
-  (do
-    (when-not contents-only?
-      (mgmt/delete-graph-and-draft-state! repo graph))
-    (complete-job! job restapi/ok-response)))
+(defn- finish-delete-job! [repo graph contents-only? job]
+  (when-not contents-only?
+    (mgmt/delete-draft-graph-and-its-state! repo graph))
+  (job-succeeded! job))
 
 (defn- delete-in-batches [repo graph contents-only? job]
-  ;; Loops until the graph is empty, then deletes state graph if not a contents-only? deletion.
-  ;; Checks that graph is a draft graph - will only delete drafts
+  ;; Loops until the graph is empty, then deletes state graph if not a
+  ;; contents-only? deletion.
+  ;;
+  ;; Checks that graph is a draft graph - will only delete drafts.
   (let [conn (->connection repo)]
     (if (and (mgmt/graph-exists? repo graph)
              (mgmt/draft-exists? repo graph))
@@ -63,11 +74,12 @@
         (mgmt/delete-graph-batched! repo graph batched-write-size)
 
         (if (mgmt/graph-exists? repo graph)
-          ;; There's more graph contents... continue deleting
+          ;; There's more graph contents so queue another job to continue the
+          ;; deletions.
           (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
-            (submit-job! (assoc job :function apply-next-batch)))
-          (finish-delete-job repo graph contents-only? job)))
-      (finish-delete-job repo graph contents-only? job))))
+            (queue-job! (assoc job :function apply-next-batch)))
+          (finish-delete-job! repo graph contents-only? job)))
+      (finish-delete-job! repo graph contents-only? job))))
 
 (defn delete-graph-job [repo graph & {:keys [contents-only?]}]
   "Deletes graph contents as per batch size in order to avoid blocking
@@ -108,13 +120,13 @@
         ;; queue to give higher priority jobs a chance to write
         (let [apply-next-batch (partial append-data-in-batches
                                         repo draft-graph metadata remaining-triples)]
-          (submit-job! (assoc job :function apply-next-batch)))
+          (queue-job! (assoc job :function apply-next-batch)))
 
         (do
           (mgmt/add-metadata-to-graph conn draft-graph metadata)
           (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
 
-          (complete-job! job restapi/ok-response))))))
+          (job-succeeded! job))))))
 
 ;;update-graph-metadata :: Repository -> [URI] -> Seq [String, String] -> Job -> ()
 (defn- update-graph-metadata
@@ -149,10 +161,10 @@
   The last batch is finally responsible for signaling job completion
   via a side-effecting call to complete-job!"
 
-  [repo draft-graph {:keys [tempfile size filename content-type] :as file} metadata]
+  [repo draft-graph tempfile rdf-format metadata]
 
   (let [new-triples (statements tempfile
-                                :format (mimetype->rdf-format content-type)
+                                :format rdf-format
                                 :buffer-size batched-write-size)
 
         ;; NOTE that this is technically not transactionally safe as
@@ -202,4 +214,4 @@
                   update-str (util/make-compound-sparql-query graph-migrate-queries)]
               (update! repo update-str))
             (log/info "Make-live for graph(s) " graph " done")
-            (complete-job! job restapi/ok-response)))
+            (job-succeeded! job)))

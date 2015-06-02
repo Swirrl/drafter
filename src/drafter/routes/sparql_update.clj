@@ -3,13 +3,15 @@
             [compojure.core :refer [POST]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [swirrl-server.async.jobs :refer [complete-job!]]
-            [drafter.write-scheduler :as scheduler]
+            [swirrl-server.responses :as response]
+            [drafter.responses :refer [default-job-result-handler submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
             [ring.util.codec :as codec]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
             [drafter.operations :as ops]
             [clojure.tools.logging :as log]
-            [grafter.rdf.repository :refer [->connection with-transaction make-restricted-dataset prepare-update evaluate]]
+            [grafter.rdf.repository :refer [with-transaction make-restricted-dataset
+                                            prepare-update evaluate ToConnection ->connection]]
             [pantomime.media :as mt]
             [drafter.common.sparql-routes :refer [supplied-drafts]])
   (:import [java.util.concurrent FutureTask CancellationException]
@@ -108,7 +110,7 @@
                        (ops/register-for-cancellation-on-timeout update-future timeouts)
                        (.run update-future)
                        (.get update-future)
-                       (complete-job! job {:status 200 :body "OK"})
+                       (complete-job! job {:type :ok})
                        (catch CancellationException cex
                          ;; update future was run on the current
                          ;; thread so it was interrupted when the
@@ -121,10 +123,15 @@
                          (log/fatal ex "An exception was thrown when executing a SPARQL update!")
                          (throw ex)))))))
 
+(def ^:private  sparql-update-applied-response {:status 200 :body "OK"})
+
 ;exec-update :: Repository -> Request -> (ParsedStatement -> Connection -> PreparedStatement) -> Response
 (defn exec-update [repo request prepare-fn timeouts]
   (let [job (create-update-job repo request prepare-fn timeouts)]
-    (scheduler/submit-sync-job! job)))
+    (submit-sync-job! job (fn [result]
+                            (if (jobs/failed-job-result? result)
+                              (response/api-response 500 result)
+                              sparql-update-applied-response)))))
 
 (defn prepare-update-statement [{update :update} conn restrictions]
   (let [rs (if (fn? restrictions) (restrictions) restrictions)]

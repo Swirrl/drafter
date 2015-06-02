@@ -91,11 +91,11 @@
       (is (= restart-id (:restart-id body)))
       (is (instance? UUID (parse-guid (:finished-job body)))))))
 
-(defn is-error-response [response]
+(defn is-client-error-response [response]
   (let [{:keys [status body headers]} response]
     (is (= 400 status))
     (is (= :error (body :type)))
-    (is (instance? String (body :msg)))))
+    (is (instance? String (body :message)))))
 
 (deftest drafts-api-create-draft-test
   (testing "POST /draft/create"
@@ -104,7 +104,7 @@
                                            {:uri "/draft/create"
                                             :request-method :post
                                             :headers {"accept" "application/json"}})]
-        (is-error-response response)))
+        (is-client-error-response response)))
 
     (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
 
@@ -167,8 +167,7 @@
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
-        (is (= ok-response
-               (await-completion finished-jobs (:finished-job body))))
+        (is (= {:type :ok} (await-completion finished-jobs (:finished-job body))))
 
         (testing "appends RDF to the graph"
           (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
@@ -188,7 +187,24 @@
                 error-result (await-completion finished-jobs guid)]
 
             (is (= :error (:type error-result)))
-            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))))
+            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))
+
+    (testing "with a missing content type"
+      (let [test-request (-> {:uri "/draft" :request-method :post}
+                             (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "./test/test-triple.nt")
+                             (update-in [:params :file] dissoc :content-type))
+            route (draft-api-routes "/draft" *test-db*)
+            {:keys [status] :as response} (route test-request)]
+        (is (= 400 status) "Bad request")))
+
+    (testing "with an unknown content type"
+      (let [test-request (-> {:uri "/draft" :request-method :post}
+                             (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "./test/test-triple.nt")
+                             (assoc-in [:params :file :content-type] "text/not-a-real-content-type"))
+            route (draft-api-routes "/draft" *test-db*)
+            {:keys [status] :as response} (route test-request)]
+        
+        (is (= 400 status) "Bad request")))))
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph (batched)"

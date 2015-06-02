@@ -49,6 +49,21 @@
                  "}")]
     (query db qry)))
 
+(defn has-more-than-one-draft?
+  "Given a live graph uri, check to see if it is referenced by more
+  than one draft in the state graph."
+  [db live-graph-uri]
+  (let [qry (str "ASK WHERE {"
+                 "  SELECT (COUNT(?draft) AS ?numberOfRefs)   WHERE {"
+                 "    {"
+                 "      <" live-graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                 "        <" drafter:hasDraft "> ?draft ."
+                 "    }"
+                 "  }"
+                 "  HAVING (?numberOfRefs > 1)"
+                 "}")]
+    (query db qry)))
+
 (defn graph-exists?
   "Checks that a graph exists"
   [db graph-uri]
@@ -216,7 +231,7 @@
   (let [query-str (delete-draft-state-query draft-graph-uri)]
     (update! db query-str)))
 
-(defn delete-graph-and-draft-state!
+(defn delete-draft-graph-and-its-state!
   "Deletes graph data and the state"
   [db graph-uri]
   (delete-graph-contents! db graph-uri)
@@ -245,16 +260,30 @@
     (update! db delete-sparql)))
 
 (defn lookup-live-graph [db draft-graph-uri]
-  "Given a draft graph URI, lookup and return its live graph."
-  (-> (query db
-             (str "SELECT ?live WHERE {"
-                  (with-state-graph
-                    "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                    "<" drafter:hasDraft "> <" draft-graph-uri "> . ")
-                  "} LIMIT 1"))
-      first
-      (get "live")
-      str))
+  "Given a draft graph URI, lookup and return its live graph. Returns nil if not
+  found."
+  (when-let [live-uri (-> (query db
+                                 (str "SELECT ?live WHERE {"
+                                      (with-state-graph
+                                        "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
+                                        "<" drafter:hasDraft "> <" draft-graph-uri "> . ")
+                                      "} LIMIT 1"))
+                          first
+                          (get "live"))]
+    (str live-uri)))
+
+(defn- delete-live-graph-from-state-query [live-graph-uri]
+  (str "DELETE WHERE"
+       "{"
+       (with-state-graph
+         "  ?s <" rdf:a "> <" drafter:ManagedGraph "> ."
+         "  <" live-graph-uri "> ?p ?o .")
+       "}"))
+
+(defn delete-live-graph-from-state! [db live-graph-uri]
+  "Delete the live managed graph from the state graph"
+  (update! db (delete-live-graph-from-state-query live-graph-uri))
+  (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
 
 (defn lookup-live-graph-uri [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph."
@@ -332,7 +361,6 @@
   (with-open [conn (.getConnection repo)]
     (let [q (prepare-query conn query-string)]
       (.setIncludeInferred q false)
-      (println "inferred? " (.getIncludeInferred q))
       (evaluate q))))
 
 (defn live-graphs [db & {:keys [online] :or {online true}}]
@@ -382,13 +410,46 @@
    " GRAPH <" source "> {?s ?p ?o}"
    "}"))
 
+(defn graph-non-empty-query [graph-uri]
+  (str
+   "ASK WHERE {
+    SELECT * WHERE {
+      GRAPH <" graph-uri "> { ?s ?p ?o }
+    } LIMIT 1
+  }"))
+
+(defn graph-non-empty?
+  "Returns true if the graph contains any statements."
+  [repo graph-uri]
+  (query repo (graph-non-empty-query graph-uri)))
+
+(defn graph-empty?
+  "Returns true if there are no statements in the associated graph."
+  [repo graph-uri]
+  (not (graph-non-empty? repo graph-uri)))
+
+(defn should-delete-live-graph-from-state-after-draft-migrate?
+  "When migrating a draft graph to live, the associated 'is managed
+  graph' statement should be removed from the state if graph if:
+  1. The migrate operation is a delete (i.e. the draft graph is empty)
+  2. The migrated graph is the only draft associated with the live
+  graph."
+  [repo draft-graph-uri live-graph-uri]
+  (and
+   (graph-empty? repo draft-graph-uri)
+   (not (has-more-than-one-draft? repo live-graph-uri))))
+
 ;;migrate-live-queries :: Repository -> String -> { queries: [String], live-graph-uri: String }
 (defn migrate-live-queries [db draft-graph-uri]
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (let [move-query (delete-insert-move draft-graph-uri live-graph-uri)
           delete-state-query (delete-draft-state-query draft-graph-uri)
-          live-public-query (set-isPublic-query live-graph-uri true)]
-      {:queries [move-query delete-state-query live-public-query]
+          live-public-query (set-isPublic-query live-graph-uri true)
+          queries [move-query delete-state-query live-public-query]
+          queries (if (should-delete-live-graph-from-state-after-draft-migrate? db draft-graph-uri live-graph-uri)
+                    (conj queries (delete-live-graph-from-state-query live-graph-uri))
+                    queries)]
+      {:queries queries
        :live-graph-uri live-graph-uri})
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
