@@ -20,4 +20,4 @@ VOLUME ["/drafter/logs", "/data/drafter-database"]
 # serve nginx
 EXPOSE 3001
 
-CMD ["/usr/bin/start-server-production"]
+CMD ["/usr/bin/start-server-stardog-production"]
