@@ -6,8 +6,10 @@
             [swirrl-server.async.jobs :refer [create-job complete-job!]]
             [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.util :as util]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
+            [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [grafter.rdf.repository :refer [query with-transaction ToConnection ->connection]]
             [environ.core :refer [env]]))
@@ -112,6 +114,73 @@
 
           (job-succeeded! job))))))
 
+(defn copy-graph-batch-query
+  "Query to copy a range of data in a source graph into a destination
+  graph."
+  [source-graph dest-graph offset limit]
+  (str "INSERT {
+          GRAPH <" dest-graph "> {
+            ?s ?p ?o
+          }
+        } WHERE {
+          SELECT ?s ?p ?o WHERE {
+            GRAPH <" source-graph "> {
+              ?s ?p ?o
+            }
+          } LIMIT " limit " OFFSET " offset "
+       }"))
+
+(defn copy-graph-batch
+  "Copies the data segmented by offset and limit in the source graph
+  into the given destination graph."
+  [repo source-graph dest-graph offset limit]
+  (let [query (copy-graph-batch-query source-graph dest-graph offset limit)]
+    (update! repo query)))
+
+(defn update-job-fn
+  "Updates the function associated with a job. This is used to create
+  a continuation job to be queued."
+  [job f]
+  (assoc job :function f))
+
+(defn clone-graph-and-append-in-batches
+  "Clones a source graph and then appends the given metadata and
+  statements to it in batches."
+  [repo source-graph dest-graph batches metadata triples job]
+  (with-job-exception-handling job
+    (if-let [[offset limit] (first batches)]
+      (do
+        (copy-graph-batch repo source-graph dest-graph offset limit)
+        (let [next-fn (partial clone-graph-and-append-in-batches repo source-graph dest-graph (rest batches) metadata triples)]
+          (queue-job! (update-job-fn job next-fn))))
+      (let [write-job-fn (partial append-data-in-batches repo dest-graph metadata triples)]
+        (queue-job! (update-job-fn job write-job-fn))))))
+
+;;clone-batches :: Int -> Int -> Seq (Int, Int)
+(defn clone-batches
+  "Given a total number of items and a batch size, returns a sequence
+  of [offset limit] pairs for segmenting the source collection into
+  batches."
+  [count batch-size]
+  (letfn [(next-batch [offset]
+            (if (< offset count)
+              (let [limit (min batch-size (- count offset))
+                    next-offset (+ offset limit)]
+                [[offset limit] next-offset])))]
+    (util/unfold next-batch 0)))
+
+(defn graph-count-query [graph]
+  (str "SELECT (COUNT(*) as ?c) WHERE {
+          GRAPH <" graph "> { ?s ?p ?o }
+        }"))
+
+(defn get-graph-clone-batches
+  ([repo graph-uri] (get-graph-clone-batches repo graph-uri batched-write-size))
+  ([repo graph-uri batch-size]
+   (let [m (first (query repo (graph-count-query graph-uri)))
+         graph-count (Integer/parseInt (.stringValue (get m "c")))]
+     (clone-batches graph-count batch-size))))
+
 ;;update-graph-metadata :: Repository -> [URI] -> Seq [String, String] -> Job -> ()
 (defn- update-graph-metadata
   "Updates or creates each of the the given graph metadata pairs for
@@ -172,23 +241,16 @@
         ;;
         ;; This can occur if a user does a make-live on a graph
         ;; which is being written to in a batch job.
+    ]
 
-        triples (lazy-cat (query repo
-                                 (str "CONSTRUCT { ?s ?p ?o } "
-                                      "WHERE { "
-                                      (mgmt/with-state-graph
-                                        "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
-                                        "      <" drafter:hasDraft "> <" draft-graph "> .")
-                                      "  GRAPH ?live { "
-                                      "    ?s ?p ?o . "
-                                      "  }"
-                                      "}"))
-
-                          new-triples)]
-
-    (create-job :batch-write
-                (partial append-data-in-batches
-                         repo draft-graph metadata triples))))
+    (make-job :batch-write [job]
+              ;;copy the live graph (if it exists) and then append the file data
+              (if-let [live-graph-uri (mgmt/lookup-live-graph repo draft-graph)]
+                (let [batches (get-graph-clone-batches repo live-graph-uri)
+                      clone-fn (partial clone-graph-and-append-in-batches repo live-graph-uri draft-graph batches metadata new-triples)]
+                  (queue-job! (update-job-fn job clone-fn)))
+                (let [append-fn (partial append-data-in-batches repo draft-graph metadata new-triples)]
+                  (queue-job! (update-job-fn job append-fn)))))))
 
 (defn migrate-graph-live-job [repo graph]
   (make-job :exclusive-write [job]

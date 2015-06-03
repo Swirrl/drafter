@@ -5,6 +5,7 @@
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.vocabularies.rdf :refer :all]
    [grafter.rdf.repository :refer :all]
+   [grafter.rdf.protocols :refer [update!]]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
    [clojure.test :refer :all])
@@ -19,6 +20,32 @@
                             (.replace "< " "<"))
 
                         "}")))
+
+(defn clone-data-from-live-to-draft-query [draft-graph-uri]
+  (str
+   "INSERT {"
+   "  GRAPH <" draft-graph-uri "> {"
+   "    ?s ?p ?o ."
+   "  }"
+   "} WHERE { "
+   (with-state-graph
+     "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+     "      <" drafter:hasDraft "> <" draft-graph-uri "> .")
+   "  GRAPH ?live {"
+   "    ?s ?p ?o ."
+   "  }"
+   "}"))
+
+(defn clone-data-from-live-to-draft!
+  "Copy all of the data found in the drafts live graph into the
+  specified draft."
+
+  [repo draft-graph-uri]
+  (update! repo (clone-data-from-live-to-draft-query draft-graph-uri)))
+
+(defn clone-and-append-data! [db draft-graph-uri triples]
+  (clone-data-from-live-to-draft! db draft-graph-uri)
+  (append-data! db draft-graph-uri triples))
 
 (def test-triples (triplify ["http://test.com/data/one"
                              ["http://test.com/hasProperty" "http://test.com/data/1"]
@@ -82,7 +109,7 @@
                                        (triplify ["http://starting/data" ["http://starting/data" "http://starting/data"]]))
             draft-graph-uri (create-managed-graph-with-draft! live-uri)]
 
-        (append-data! *test-db* draft-graph-uri test-triples)
+        (clone-and-append-data! *test-db* draft-graph-uri test-triples)
 
         (is (ask? "GRAPH <" draft-graph-uri "> {
                  <http://starting/data> <http://starting/data> <http://starting/data> .
