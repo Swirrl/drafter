@@ -13,7 +13,7 @@
   (try
     (let [{:keys [params]} request
           graph-uris (supplied-drafts repo request)
-          live->draft (log/spy (mgmt/graph-map repo graph-uris))
+          live->draft (log/spy(mgmt/graph-map repo graph-uris))
           {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter live->draft)]
 
       (process-sparql-query repo request

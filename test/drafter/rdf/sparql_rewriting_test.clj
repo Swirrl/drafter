@@ -16,51 +16,6 @@
            [org.openrdf.query.algebra Var StatementPattern Extension ExtensionElem FunctionCall]
            [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
 
-(defn rewrite-sparql-graph-query
-  "Rewrite graph clauses in the supplied SPARQL query and return an AST"
-  [query graph-map]
-  (let [query-ast (sparql-string->ast query)]
-    (rewrite-query-ast query-ast graph-map)))
-
-(deftest rewrite-graphs-test
-  (let [graph-map {(URIImpl. "http://live-graph.com/graph1") (URIImpl. "http://draft-graph.com/graph1")}]
-    (testing "graph clauses are substituted"
-      (let [query "SELECT * WHERE {
-                   GRAPH ?g {
-                      ?s ?p ?o .
-                   }
-
-                   GRAPH <http://live-graph.com/graph1> {
-                      ?s ?p2 ?o2 .
-                   }
-                }"]
-
-        (is (= "http://draft-graph.com/graph1" (second (->> (rewrite-sparql-graph-query query graph-map)
-                                                            ->sparql-string
-                                                            (re-find #"<(.+)>")))))))
-
-    (testing "multiple graph clauses are substituted"
-      ;; Note that in this test we need to add an additional SELECT to
-      ;; prevent the query being rewritten (optimised) to contain only
-      ;; one graph clause.
-      (let [query "SELECT * WHERE {
-                   GRAPH <http://live-graph.com/graph1> {
-                      ?s ?p ?o .
-                   }
-                   {
-                     SELECT ?s2 WHERE {
-                       GRAPH <http://live-graph.com/graph1> {
-                          ?s2 ?p2 ?o2 .
-                       }
-                     }
-                   }
-                }"]
-
-        (is (= ["http://draft-graph.com/graph1" "http://draft-graph.com/graph1"] (->> (rewrite-sparql-graph-query query graph-map)
-                                                                                      ->sparql-string
-                                                                                      (re-seq #"<(.+)>")
-                                                                                      (map second))))))))
-
 (def uri-query
   "SELECT * WHERE {
      BIND(URI(\"http://frogs.com/live-graph\") AS ?g)

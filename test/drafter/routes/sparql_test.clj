@@ -246,10 +246,10 @@
           (let [{status :status headers :headers :as response} (endpoint count-request)]
 
             (is (= 200 status))
-
+            (println (csv-> response))
             (let [[header & results] (csv-> response)]
-              (is (= "1" (ffirst results))
-                  "There should be a count of 1 returned"))))
+              (is (= "2" (ffirst results))
+                  "There should be a count of 2 returned"))))
 
         (testing "as application/sparql-results+json"
           (let [count-request-as-json (assoc-in count-request [:headers "accept"] "application/sparql-results+json")
