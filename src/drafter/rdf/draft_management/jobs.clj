@@ -156,18 +156,17 @@
       (let [write-job-fn (partial append-data-in-batches repo dest-graph metadata triples)]
         (queue-job! (update-job-fn job write-job-fn))))))
 
-;;clone-batches :: Int -> Int -> Seq (Int, Int)
-(defn clone-batches
+
+(defn calculate-offsets [count batch-size]
   "Given a total number of items and a batch size, returns a sequence
   of [offset limit] pairs for segmenting the source collection into
-  batches."
-  [count batch-size]
-  (letfn [(next-batch [offset]
-            (if (< offset count)
-              (let [limit (min batch-size (- count offset))
-                    next-offset (+ offset limit)]
-                [[offset limit] next-offset])))]
-    (util/unfold next-batch 0)))
+  batches.
+
+  The limit will always be set to batch-size."
+  (take (/ count batch-size)
+        (iterate (fn [[offset batch-size]]
+                   [(+ offset batch-size) batch-size])
+                 [0 batch-size])))
 
 (defn graph-count-query [graph]
   (str "SELECT (COUNT(*) as ?c) WHERE {
@@ -179,7 +178,7 @@
   ([repo graph-uri batch-size]
    (let [m (first (query repo (graph-count-query graph-uri)))
          graph-count (Integer/parseInt (.stringValue (get m "c")))]
-     (clone-batches graph-count batch-size))))
+     (calculate-offsets graph-count batch-size))))
 
 ;;update-graph-metadata :: Repository -> [URI] -> Seq [String, String] -> Job -> ()
 (defn- update-graph-metadata
