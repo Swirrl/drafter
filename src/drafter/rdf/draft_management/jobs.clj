@@ -156,9 +156,10 @@
                         (copy-graph-batch! repo source-graph dest-graph offset limit)
                         next-fn)
 
-                      ;; else if there are no (more) batches start the appending
-                      ;; the file to the graph.
-                      (partial append-data-in-batches repo dest-graph metadata new-triples))))))
+                      ;; else if there are no (more) batches start appending the
+                      ;; file to the graph.
+                      (fn [job]
+                        (append-data-in-batches repo dest-graph metadata new-triples job)))))))
 
 (defn calculate-offsets [count batch-size]
   "Given a total number of items and a batch size, returns a sequence
