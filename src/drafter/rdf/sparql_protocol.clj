@@ -3,6 +3,7 @@
             [compojure.core :refer [GET POST routes]]
             [drafter.util :refer [construct-dynamic*]]
             [drafter.operations :refer :all]
+            [drafter.rdf.arq :refer [->sparql-string sparql-string->ast]]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -43,9 +44,9 @@
            [org.openrdf.query.resultio QueryResultWriter]
            [org.openrdf.query.impl DatasetImpl MapBindingSet]
            [javax.xml.datatype XMLGregorianCalendar DatatypeFactory]
+           [com.hp.hpl.jena.query QueryParseException]
            [java.util GregorianCalendar Date]
            [org.openrdf.rio RDFFormat]))
-
 
 (defn negotiate-content-writer
   "Given a prepared query and a mime-type return the appropriate
@@ -268,14 +269,21 @@
     (let [inner (construct-dynamic* writer-class output-stream)]
       (result-rewriter pquery inner))))
 
-(defn process-sparql-query [db request & {:keys [query-creator-fn graph-restrictions result-rewriter query-timeouts]
-                                          :or {query-creator-fn repo/prepare-query
+(defn validate-query [query-str]
+  "Validates a query by parsing it using ARQ. If the query is invalid
+  a QueryParseException is thrown."
+  (sparql-string->ast query-str)
+  query-str)
+
+(defn process-sparql-query [db request & {:keys [query-rewrite-fn graph-restrictions result-rewriter query-timeouts]
+                                          :or {query-rewrite-fn validate-query
                                                result-rewriter (fn [query writer] writer)
                                                query-timeouts default-timeouts}}]
   (let [restriction (restricted-dataset graph-restrictions)
         {:keys [headers params]} request
         query-str (:query params)
-        pquery (doto (query-creator-fn db query-str)
+        rewritten-query (query-rewrite-fn query-str)
+        pquery (doto (repo/prepare-query db rewritten-query)
                  (.setDataset restriction))
         media-type (negotiate-sparql-query-mime-type pquery request)]
 
@@ -289,7 +297,7 @@
   (fn [request]
     (try
       (handler request)
-      (catch MalformedQueryException ex
+      (catch QueryParseException ex
         (let [error-message (.getMessage ex)]
           (log/info "Malformed query: " error-message)
           {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))

@@ -4,71 +4,16 @@
    [grafter.rdf :refer [prefixer]]
    [drafter.util :refer [map-values]]
    [drafter.rdf.draft-management :as mgmt]
+   [drafter.rdf.arq :refer [sparql-string->ast ->sparql-string]]
    [drafter.rdf.sparql-protocol :refer [result-handler-wrapper]]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
-  (:import [org.openrdf.model Statement Value Resource Literal URI BNode ValueFactory]
-           [org.openrdf.model.impl CalendarLiteralImpl ValueFactoryImpl URIImpl
-            BooleanLiteralImpl LiteralImpl IntegerLiteralImpl NumericLiteralImpl
-            StatementImpl BNodeImpl ContextStatementImpl]
-           [org.openrdf.query QueryLanguage Update Query QueryResultHandler TupleQueryResultHandler BindingSet Binding]
+  (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery Update QueryResultHandler TupleQueryResultHandler BindingSet Binding]
            [org.openrdf.query.impl BindingImpl MapBindingSet]
-           [org.openrdf.repository.sail SailUpdate]
-           [org.openrdf.query.parser QueryParserUtil ParsedQuery ParsedUpdate ParsedGraphQuery ParsedTupleQuery ParsedBooleanQuery]
-           [org.openrdf.queryrender.sparql SPARQLQueryRenderer]
-           [org.openrdf.query.algebra.evaluation.function Function]
-           [org.openrdf.query.algebra UpdateExpr TupleExpr Var StatementPattern Extension ExtensionElem FunctionCall IRIFunction ValueExpr
-            BindingSetAssignment ValueConstant]
-           [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]
-           [org.openrdf.query.algebra.evaluation.function FunctionRegistry]))
+           [org.openrdf.query.algebra.evaluation.function Function FunctionRegistry]
+           [drafter.rdf URIMapper Rewriters]))
 
 (def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
-
-(defn ->sparql-ast
-  "Converts a SPARQL query string into a mutable Sesame SPARQL AST."
-
-  ([query-string]
-     (->sparql-ast query-string nil))
-  ([query-string base-uri]
-     (QueryParserUtil/parseQuery QueryLanguage/SPARQL query-string base-uri)))
-
-(defprotocol ISparqlAst
-  (->root-node [query]))
-
-(extend-protocol ISparqlAst
-  Query
-  (->root-node [this] (.getParsedQuery this))
-
-  ;getTupleExpr :: ParsedQuery -> TupleExpr
-  ParsedQuery
-  (->root-node [this] (->root-node (.getTupleExpr this)))
-
-  ;TupleExpr extends QueryModelNode
-  TupleExpr
-  (->root-node [this] this)
-
-  ;getParsedUpdate :: SailUpdate -> ParsedUpdate
-  SailUpdate
-  (->root-node [this] (->root-node (.getParsedUpdate this)))
-
-  ;getUpdateExprs :: ParsedUpdate -> List<UdateExpr>
-  ParsedUpdate
-    ;; TODO find out in what situation
-    ;; there may be multiple
-    ;; UpdateExprs.  I'm assuming there
-    ;; will only ever be one.
-  (->root-node [this]
-    (->root-node (first (.getUpdateExprs this))))
-
-  ;UpdateExpr extends QueryModelNode
-  UpdateExpr
-  (->root-node [this] this))
-
-(defn flatten-ast [ast-like]
-  (->> (->root-node ast-like)
-       drafter.rdf.ClojureCollector/process
-       ;; use distinct to preserve order of nodes instead of (into #{} ...)
-       distinct))
 
 (defn rewrite-binding
   "Rewrites the value of a Binding if it appears in the given graph map"
@@ -94,95 +39,28 @@
   (let [mapped-bindings (map #(rewrite-binding % graph-map) binding-set)]
     (binding-seq->binding-set mapped-bindings)))
 
-;update-binding-set-assignment :: BindingSetAssignment -> Map[URI, URI] -> ()
-(defn update-binding-set-assignment!
-  "Modifies all the BindingSets in a BindingSetAssignment according to
-  the given graph mapping."
-  [bsa graph-map]
-  (let [rewritten-bindings (mapv #(rewrite-binding-set % graph-map) (.getBindingSets bsa))]
-    (.setBindingSets bsa rewritten-bindings)))
-
-(defn get-query-nodes-of-type [type query-ast]
-  (filter #(instance? type %) (flatten-ast query-ast)))
-
-;rewrite-binding-set-assignments :: ISparqlAst -> Map[URI, URI] -> ()
-(defn rewrite-binding-set-assignments!
-  "Rewrites all BindingSets in all BindingSetAssignment instances
-  inside the given query AST."
+;rewrite-query-ast :: AST -> AST
+(defn rewrite-query-ast
+  "Rewrites a query AST according to the given live->draft graph
+  mapping."
   [query-ast graph-map]
-  (doseq [bsa (get-query-nodes-of-type BindingSetAssignment query-ast)]
-    (update-binding-set-assignment! bsa graph-map)))
+  (let [uri-mapper (URIMapper/create graph-map)]
+    (Rewriters/rewriteSPARQLQuery uri-mapper query-ast)))
 
-(defn rewrite-constant-vars
-  "Rewrites the values of any constant Var nodes if they are mapped in
-  the given graph mapping."
-  [graph-map context-set]
-  (doseq [context context-set]
-    (when (.isConstant context)
-      (when-let [new-uri (get graph-map (.getValue context))]
-        (log/info "Rewriting constant " context " with new-uri " new-uri)
-        (.setValue context new-uri)))))
-
-(defn rewrite-query-vars!
-  "Rewrites all the constant Var nodes in the query AST according to a
-  graph mapping."
-  [query-ast graph-map]
-  (let [vars (get-query-nodes-of-type Var query-ast)]
-    (rewrite-constant-vars graph-map vars)))
-
-(defn rewrite-query-value-constants!
-  "Rewrites all the ValueConstant nodes in a query AST according to a
-  graph mapping."
-  [query-ast graph-map]
-  (let [value-constants (get-query-nodes-of-type ValueConstant query-ast)]
-    (doseq [c value-constants]
-      (when-let [rewritten (get graph-map (.getValue c))]
-        (.setValue c rewritten)))))
-
-(defn replace-values [uri-map]
-  "Return a function that replaces arbitrary values supplied values.
-  If a value is not replaced the original value is returned."
-  (fn [arg]
-    (get uri-map arg arg)))
-
-(defn ->sparql-string
-  "Converts a SPARQL AST back into a query string."
-  [query-ast]
-  (.render (SPARQLQueryRenderer.)
-           query-ast))
-
-(defn compose-graph-replacer [sparql-function-uri query-ast]
-  ;; todo do this for each node.
-  (let [qnodes (get-query-nodes-of-type IRIFunction query-ast)]
-    (doseq [qnode qnodes]
-      (let [parent (.getParentNode qnode)
-            replacement-node (FunctionCall. sparql-function-uri (into-array ValueExpr  [(.clone qnode)]))]
-        (.replaceWith qnode
-                      replacement-node)))
-    query-ast))
-
-(defn substitute-results [substitution-map graph-var-names result]
-  (reduce (fn [acc-res var-name]
-            (let [original (get result var-name)]
-              (assoc acc-res var-name
-                     (get substitution-map original))))
-          result
-          graph-var-names))
-
-(defn rewrite-query-ast! [query-ast graph-map]
-  ;; NOTE the AST is mutable and referenced from the prepared-query
-  (compose-graph-replacer (pmdfunctions "replace-live-graph-uri") query-ast)
-  (rewrite-binding-set-assignments! query-ast graph-map)
-  (rewrite-query-vars! query-ast graph-map)
-  (rewrite-query-value-constants! query-ast graph-map)
-  nil)
-
-(defn rewrite-graph-query [repo query-str graph-map]
-  (let [prepared-query (repo/prepare-query repo query-str)
-        binding-set (.getBindings prepared-query)
-        query-ast (.getParsedQuery prepared-query)]
-    (rewrite-query-ast! query-ast graph-map)
-    prepared-query))
+;rewrite-sparql-string :: Map[Uri, Uri] -> String -> String
+(defn rewrite-sparql-string
+  "Parses a SPARQL query string, rewrites it according to the given
+  live->draft graph mapping and then returns the re-written query
+  serialised as a string."
+  [live->draft query-str]
+  (log/info "Rewriting query " query-str)
+  (log/info "Mapping: " live->draft)
+  
+  (let [query-ast (sparql-string->ast query-str)
+        rewritten-ast (rewrite-query-ast query-ast live->draft)
+        rewritten-query (->sparql-string rewritten-ast)]
+    (log/info "Re-written query: " rewritten-query)
+    rewritten-query))
 
 ;apply-map-or-default :: Map[a, a] -> (a -> a)
 (defn apply-map-or-default
@@ -201,17 +79,17 @@
   (map-values (apply-map-or-default graph-map) r))
 
 (defn rewrite-graph-results [query-substitutions prepared-query]
-  (let [query-ast (.getParsedQuery prepared-query)]
-    (let [result-substitutions (set/map-invert query-substitutions)]
+  (let [result-substitutions (set/map-invert query-substitutions)]
         (->> (repo/evaluate prepared-query)
-             (map #(rewrite-result result-substitutions %))))))
+             (map #(rewrite-result result-substitutions %)))))
 
 (defn evaluate-with-graph-rewriting
   "Rewrites the results in the query."
   ([repo query-str query-substitutions]
    (evaluate-with-graph-rewriting repo query-str query-substitutions nil))
   ([repo query-str query-substitutions dataset]
-   (let [prepared-query (doto (rewrite-graph-query repo query-str query-substitutions)
+   (let [rewritten-query (rewrite-sparql-string query-substitutions query-str)
+         prepared-query (doto (repo/prepare-query repo rewritten-query)
                           (.setDataset dataset))]
      (rewrite-graph-results query-substitutions prepared-query))))
 
@@ -250,9 +128,9 @@
 
 (defn- choose-result-rewriter [query-ast draft->live writer]
   (cond
-   (instance? ParsedGraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
-   (instance? ParsedTupleQuery query-ast) (make-select-result-rewriter draft->live writer)
-   (instance? ParsedBooleanQuery query-ast) writer
+   (instance? GraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
+   (instance? TupleQuery query-ast) (make-select-result-rewriter draft->live writer)
+   (instance? BooleanQuery query-ast) writer
    :else writer))
 
 (def ^{:doc "The global function registry for drafter SPARQL functions."}
@@ -266,16 +144,10 @@
      (doto function-registry
        (.add sesame-f)))))
 
-(defn make-draft-query-rewriter [repo draft-uris]
-  (let [live->draft (log/spy (mgmt/graph-map repo draft-uris))]
-    {:query-rewriter
-     (fn [repo query-str]
-       (log/info "Using mapping: " live->draft)
-       (rewrite-graph-query repo query-str live->draft))
+(defn make-draft-query-rewriter [live->draft]
+  {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
 
-     :result-rewriter
-     (fn [prepared-query writer]
-       (let [query-ast (.getParsedQuery prepared-query)
-             draft->live (set/map-invert live->draft)]
-         (choose-result-rewriter query-ast draft->live writer)))
-     }))
+   :result-rewriter
+   (fn [prepared-query writer]
+     (let [draft->live (set/map-invert live->draft)]
+       (choose-result-rewriter prepared-query draft->live writer)))})

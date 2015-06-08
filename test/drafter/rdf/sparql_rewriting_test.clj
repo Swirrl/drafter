@@ -6,7 +6,8 @@
    [grafter.rdf :refer [statements]]
    [grafter.rdf.repository :refer [repo prepare-update]]
    [clojure.test :refer :all]
-   [drafter.rdf.sparql-rewriting :refer :all])
+   [drafter.rdf.sparql-rewriting :refer :all]
+   [drafter.rdf.arq :refer :all])
   (:import
            [org.openrdf.model.impl URIImpl]
            [org.openrdf.query QueryLanguage]
@@ -18,9 +19,8 @@
 (defn rewrite-sparql-graph-query
   "Rewrite graph clauses in the supplied SPARQL query and return an AST"
   [query graph-map]
-  (let [query-ast (->sparql-ast query)]
-    (rewrite-query-ast! query-ast graph-map)
-    query-ast))
+  (let [query-ast (sparql-string->ast query)]
+    (rewrite-query-ast query-ast graph-map)))
 
 (deftest rewrite-graphs-test
   (let [graph-map {(URIImpl. "http://live-graph.com/graph1") (URIImpl. "http://draft-graph.com/graph1")}]
