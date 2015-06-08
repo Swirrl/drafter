@@ -135,6 +135,26 @@ Server: Jetty(7.6.13.v20130916)
 }
 #+end_example
 
+*** Create/Update draft metadata
+
+| Verbs  | Route             | Synchronous | Priority           |
+|--------+-------------------+-------------+--------------------|
+| POST   | =/metadata=       | Yes         | =0 :sync-write=    |
+
+Updates or creates metadata for a set of draft graphs.
+This route allows draft metadata only to be updated without needing
+to construct an append request with an empty set of triples.
+
+It accepts the following parameters:
+
+| Parameter | Required | Description                                               |
+|-----------+----------+-----------------------------------------------------------|
+| =graph=   | Yes      | One or more draft graphs to associate the metadata with.  |
+| =meta-?=  | Yes      | One or more key/value pairs to associate with each graph. |
+
+Multiple graphs can be specified and each will be associated with the metadata defined
+by the collection of meta-[key]=value pairs in the query string.
+
 *** Delete draft contents
 
 | Verbs  | Route             | Synchronous | Priority           |

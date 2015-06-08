@@ -7,6 +7,7 @@
                                                        create-draft-job
                                                        delete-graph-job
                                                        migrate-graph-live-job
+                                                       create-update-metadata-job
                                                        failed-job-result?]]
             [drafter.responses :refer [submit-sync-job! submit-async-job!]]
             [swirrl-server.responses :as response]))
@@ -35,6 +36,13 @@
                                                   (if (failed-job-result? result)
                                                     (response/api-response 500 result)
                                                     (response/api-response 201 result))))))
+
+      (POST "/metadata" [graph :as {params :query-params}]
+            (let [metadata (api-routes/meta-params params)
+                  graphs (if (coll? graph) graph [graph])]
+              (if (or (empty? graph) (empty? metadata))
+                {:status 400 :headers {} :body "At least one graph and metadata pair required"}
+                (submit-sync-job! (create-update-metadata-job repo graphs metadata)))))
 
       ;; deletes draft graph data contents; does not delete the draft graph
       ;; entry from the state graph.
