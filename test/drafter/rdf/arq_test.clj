@@ -2,10 +2,10 @@
   (:require [drafter.rdf.arq :refer :all]
             [clojure.test :refer :all]
             [clojure.string :refer [trim]])
-  (:import [com.hp.hpl.jena.query Query]
-           [com.hp.hpl.jena.sparql.sse Item ItemList]
-           [com.hp.hpl.jena.sparql.algebra Op]
-           [com.hp.hpl.jena.graph NodeFactory]))
+  (:import [org.apache.jena.query Query]
+           [org.apache.jena.sparql.sse Item ItemList]
+           [org.apache.jena.sparql.algebra Op]
+           [org.apache.jena.graph NodeFactory]))
 
 (defn rewrite [rewriter q]
   (-> q

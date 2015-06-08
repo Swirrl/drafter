@@ -1,9 +1,9 @@
 (ns drafter.rdf.arq
   (:require [clojure.zip :as z])
-  (:import [com.hp.hpl.jena.query QueryFactory Query Syntax]
-           [com.hp.hpl.jena.sparql.sse SSE Item ItemList]
-           [com.hp.hpl.jena.sparql.algebra Op OpAsQuery Algebra]
-           [com.hp.hpl.jena.graph NodeFactory Node Node_URI]))
+  (:import [org.apache.jena.query QueryFactory Query Syntax]
+           [org.apache.jena.sparql.sse SSE Item ItemList]
+           [org.apache.jena.sparql.algebra Op OpAsQuery Algebra]
+           [org.apache.jena.graph NodeFactory Node Node_URI]))
 
 (defprotocol ToArqQuery
   (sparql-string->arq-query [this]

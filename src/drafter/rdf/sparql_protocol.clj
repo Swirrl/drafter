@@ -44,7 +44,7 @@
            [org.openrdf.query.resultio QueryResultWriter]
            [org.openrdf.query.impl DatasetImpl MapBindingSet]
            [javax.xml.datatype XMLGregorianCalendar DatatypeFactory]
-           [com.hp.hpl.jena.query QueryParseException]
+           [org.apache.jena.query QueryParseException]
            [java.util GregorianCalendar Date]
            [org.openrdf.rio RDFFormat]))
 
