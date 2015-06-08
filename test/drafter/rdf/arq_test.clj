@@ -48,7 +48,7 @@
         .isReduced                 "SELECT REDUCED ?s WHERE { ?s ?p ?o }"
         .isOrdered                 "SELECT ?s WHERE { ?s ?p ?o } ORDER BY ?s"
         .hasLimit                  "SELECT * WHERE { ?s ?p ?o } LIMIT 10"
-        .hasOffset                  "SELECT * WHERE { ?s ?p ?o } OFFSET 10"
+        .hasOffset                 "SELECT * WHERE { ?s ?p ?o } OFFSET 10"
         .hasDatasetDescription     "SELECT * FROM <http://foo.com> WHERE { ?s ?p ?o }"
         .hasDatasetDescription     "SELECT * FROM NAMED <http://foo.com> WHERE { ?s ?p ?o }"
         .isAskType                 "ASK WHERE { ?s ?p ?o }"
@@ -58,10 +58,16 @@
         has-prefix-mapping?        "PREFIX foo: <http://foo.com> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
         has-prefix-mapping?        "PREFIX foo: <http://foo.com> SELECT * WHERE { ?s ?p ?o }"
         has-prefix-mapping?        "PREFIX foo: <http://foo.com> ASK WHERE { ?s ?p ?o }"
-        has-prefix-mapping?        "PREFIX foo: <http://foo.com> DESCRIBE <http://foo.com>"
+        has-prefix-mapping?        "PREFIX foo: <http://foo.com> DESCRIBE <http://foo.com>")
 
-        ;; TODO test .getPrefixMappings on all query types
-        ))))
+      (are [query-str]
+        (= {"foo" "http://foo.com" "bar" "http://bar.com"}
+           (into {} (.getNsPrefixMap (.getPrefixMapping (rewrite->query query-str)))))
+
+        "PREFIX foo: <http://foo.com> PREFIX bar: <http://bar.com> SELECT * WHERE { foo:baz ?p ?o }"
+        "PREFIX foo: <http://foo.com> PREFIX bar: <http://bar.com> ASK { foo:baz ?p ?o }"
+        "PREFIX foo: <http://foo.com> PREFIX bar: <http://bar.com> CONSTRUCT { foo:boo bar:baz ?p} WHERE { foo:baz bar:baz ?o }"
+        "PREFIX foo: <http://foo.com> PREFIX bar: <http://bar.com> DESCRIBE foo:bar"))))
 
 (deftest primitive-describe-rewriting
   (let [rewritten-describe (trim (str (apply-rewriter substitute-uris
@@ -96,32 +102,46 @@
                  GRAPH <http://unaltered.com/> {
                    ?s ?p ?o
                  }
-               }"))
+               }")))
 
-      (testing "URI constants in VALUES clauses are rewritten"
-        (is-tree= "SELECT * WHERE {
+    (testing "Rewrites subqueries"
+      (is-tree= "SELECT (COUNT(*) as ?count) {
+                   SELECT DISTINCT ?uri ?graph WHERE {
+                     GRAPH <http://foo.com/replaced> {
+                       ?uri ?p ?o .
+                     }
+                   }
+                 }"
+                (rewrite "SELECT (COUNT(*) as ?count) {
+                   SELECT DISTINCT ?uri ?graph WHERE {
+                     GRAPH <http://foo.com/> {
+                       ?uri ?p ?o .
+                     }
+                   }
+                 }")))
+
+    (testing "URI constants in VALUES clauses are rewritten"
+      (is-tree= "SELECT * WHERE {
                      VALUES ?g { <http://foo.com/replaced> <http://bar.com/replaced> <http://unaltered.com/> }
                      GRAPH ?g { ?s ?p ?o }
                   }"
-                  (rewrite
-                   "SELECT * WHERE {
+                (rewrite
+                 "SELECT * WHERE {
                      VALUES ?g { <http://foo.com/> <http://bar.com/> <http://unaltered.com/> }
                      GRAPH ?g { ?s ?p ?o }
                   }")))
 
-      (testing "Literals are left alone"
-        (let [q "SELECT * WHERE {
+    (testing "Literals are left alone"
+      (let [q "SELECT * WHERE {
                      VALUES ?g { <http://foo.com/replaced> <http://bar.com/replaced> <http://unaltered.com/> }
                      GRAPH ?g { ?s ?p \"http://unaltered.com/\" }
                   }"]
-          (is-tree= q (rewrite q))))
+        (is-tree= q (rewrite q))))
 
-      (testing "sparql functions"
-        (is-tree= "SELECT ?s WHERE {
+    (testing "sparql functions"
+      (is-tree= "SELECT ?s WHERE {
                      BIND(URI(\"http://foo.com/\") AS ?s)
                   }"
-                  (rewrite "SELECT ?s WHERE {
+                (rewrite "SELECT ?s WHERE {
                      BIND(URI(\"http://foo.com/\") AS ?s)
-                  }"))))
-
-        ))
+                  }")))))
