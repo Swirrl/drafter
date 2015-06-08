@@ -9,9 +9,6 @@
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
             [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
-            [drafter.rdf.sparql-rewriting :refer [function-registry
-                                                  pmdfunctions
-                                                  register-function!]]
             [drafter.routes.drafts-api :refer [draft-api-routes
                                                graph-management-routes]]
             [drafter.routes.status :refer [status-routes]]
@@ -56,22 +53,10 @@
 
 (def stop-reaper (fn []))
 
-(defn register-sparql-extension-functions
-  "Register custom drafter SPARQL extension functions."
-  []
-
-  ;; This function converts draft graphs into live graph URI's and is
-  ;; necessary for drafters query/result rewriting to work.
-  (register-function! function-registry
-                      (pmdfunctions "replace-live-graph")
-                      (partial lookup-live-graph-uri repo)))
-
 (defn initialise-repo! [repo-path indexes]
   (set-var-root! #'repo (let [repo (repo/repo (repo/native-store repo-path indexes))]
                           (log/info "Initialised repo" repo-path)
-                          repo))
-
-  (register-sparql-extension-functions))
+                          repo)))
 
 (defroutes app-routes
   (route/resources "/")

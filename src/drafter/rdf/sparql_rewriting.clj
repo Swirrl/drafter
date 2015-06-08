@@ -13,8 +13,6 @@
            [org.openrdf.query.impl BindingImpl MapBindingSet]
            [org.openrdf.query.algebra.evaluation.function Function FunctionRegistry]))
 
-(def pmdfunctions (prefixer "http://publishmydata.com/def/functions#"))
-
 (defn- rewrite-binding
   "Rewrites the value of a Binding if it appears in the given graph map"
   [binding graph-map]
@@ -39,14 +37,6 @@
   (let [mapped-bindings (map #(rewrite-binding % graph-map) binding-set)]
     (binding-seq->binding-set mapped-bindings)))
 
-;rewrite-query-ast :: AST -> AST
-(comment (defn- rewrite-query-ast
-  "Rewrites a query AST according to the given live->draft graph
-  mapping."
-  [query-ast graph-map]
-  (let [uri-mapper (URIMapper/create graph-map)]
-    (Rewriters/rewriteSPARQLQuery uri-mapper query-ast))))
-
 ;rewrite-sparql-string :: Map[Uri, Uri] -> String -> String
 (defn- rewrite-sparql-string
   "Parses a SPARQL query string, rewrites it according to the given
@@ -57,7 +47,7 @@
 
   (let [live->draft (zipmap (map str (keys live->draft))
                             (map str (vals live->draft)))]
-    (log/spy (str (apply-rewriter (partial named-graphs-rewriter live->draft) query-str)))))
+    (str (apply-rewriter (partial named-graphs-rewriter live->draft) query-str))))
 
 ;apply-map-or-default :: Map[a, a] -> (a -> a)
 (defn- apply-map-or-default
@@ -129,17 +119,6 @@
    (instance? TupleQuery query-ast) (make-select-result-rewriter draft->live writer)
    (instance? BooleanQuery query-ast) writer
    :else writer))
-
-(def ^{:doc "The global function registry for drafter SPARQL functions."}
-  function-registry (FunctionRegistry/getInstance))
-
-(defn register-function!
-  "Register an arbitrary custom function with the global SPARQL engine registry."
-  [function-registry uri f]
-  (comment (io!
-            (let [sesame-f (drafter.rdf.SesameFunction. uri f)]
-              (doto function-registry
-                (.add sesame-f))))))
 
 (defn make-draft-query-rewriter [live->draft]
   {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
