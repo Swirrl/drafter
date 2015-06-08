@@ -3,7 +3,7 @@
             [compojure.core :refer [GET POST routes]]
             [drafter.util :refer [construct-dynamic*]]
             [drafter.operations :refer :all]
-            [drafter.rdf.arq :refer [->sparql-string sparql-string->arq-query]]
+            [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]

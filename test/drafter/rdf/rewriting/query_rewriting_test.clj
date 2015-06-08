@@ -1,5 +1,6 @@
-(ns drafter.rdf.arq-test
-  (:require [drafter.rdf.arq :refer :all]
+(ns drafter.rdf.rewriting.query-rewriting-test
+  (:require [drafter.rdf.rewriting.query-rewriting :refer :all]
+            [drafter.rdf.rewriting.arq :refer :all]
             [clojure.test :refer :all]
             [clojure.string :refer [trim]])
   (:import [org.apache.jena.query Query]
@@ -29,7 +30,7 @@
   [expected test]
   (is (= (as-ast-str expected) (str (->sse-item test)))))
 
-(def substitute-uris (partial named-graphs-rewriter substitutions))
+(def substitute-uris (partial uri-constant-rewriter substitutions))
 
 (defn has-prefix-mapping? [q]
   (not (empty? (.getNsPrefixMap (.getPrefixMapping q)))))
@@ -74,7 +75,7 @@
                                                       "DESCRIBE <http://foo.com/> <http://bar.com/> <http://unreplaced.com/>")))]
     (is (= "DESCRIBE <http://foo.com/replaced> <http://bar.com/replaced> <http://unreplaced.com/>" rewritten-describe))))
 
-(deftest named-graphs-rewriter-test
+(deftest uri-rewriter-test
   (let [rewrite (partial rewrite substitute-uris)]
     (testing "Simple queries are unaltered"
       (let [q "SELECT DISTINCT * WHERE { ?s ?p ?o } OFFSET 0 LIMIT 100"]

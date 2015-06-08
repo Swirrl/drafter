@@ -8,7 +8,6 @@
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
             [drafter.routes.sparql :refer :all]
-            [drafter.rdf.sparql-rewriting :refer [function-registry]]
             [drafter.rdf.draft-management :refer :all]))
 
 (defn add-test-data!

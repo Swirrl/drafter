@@ -1,4 +1,6 @@
-(ns drafter.rdf.arq
+(ns drafter.rdf.rewriting.arq
+  "Library of functions for syntactically rewriting queries using Jena ARQ.  Of
+  particular interest are sse-zipper and apply-rewriter."
   (:require [clojure.zip :as z])
   (:import [org.apache.jena.query QueryFactory Query Syntax]
            [org.apache.jena.sparql.sse SSE Item ItemList]
@@ -64,7 +66,10 @@
   (and (instance? Item i)
        (.isList i)))
 
-(defn sse-zipper [sse-item]
+(defn sse-zipper
+  "Construct a zipper on a Sparql SExpression Item, that allows easy persistent
+  walking of the sparql algebra tree."
+  [sse-item]
   (z/zipper sse-list-item?
             #(-> % .getList seq)
             (fn [node children]
@@ -78,7 +83,9 @@
 (defn- uri-str->item [uri]
   (Item/createNode uri))
 
-(defn- apply-rewriter-to-describe-uris [rewriter uris]
+(defn- apply-rewriter-to-describe-uris
+  "Special case for rewriting of primitive DESCRIBE :uri queries."
+  [rewriter uris]
   (map (fn [uri]
          (str "<" (-> uri
                       uri-str->item
@@ -146,39 +153,9 @@
               (.setQueryAskType)))
       (.setPrefixMapping (.getPrefixMapping q)))))
 
-(defn is-subtree? [sym n]
-  (when (sse-list-item? n)
-    (let [fitem (first (.getList n))]
-      (.isSymbol fitem sym))))
-
-(defn uri-node? [i]
-  (and (instance? Item i)
-       (.isNodeURI i)))
-
-(defn named-graphs-rewriter
-  "Takes a map from URI-string to URI-string representing the syntactic
-  substitutions to perform and an SSE tree.
-
-  We walk the SSE tree performing substitutions and return a transformed SSE
-  tree.
-
-  Note: this function should normally be wrapped with the apply-rewriter
-  function to rebuild the rest of the SPARQL string, including any prefixes
-  and the query type (SELECT/CONSTRUCT etc)."
-  [m ssez]
-
-  (let [ssez (if (uri-node? (z/node ssez))
-               (z/edit ssez
-                       (fn [guri]
-                         (NodeFactory/createURI (let [graph-uri (str (.getNode guri))]
-                                                  (get m graph-uri graph-uri)))))
-               ssez)]
-    (if (z/end? ssez)
-      (z/root ssez)
-      (recur m (z/next ssez)))))
-
 (comment
 
+  ;; Playing with zippers
 
   (let [item (->sse-item (sparql-string->arq-query "SELECT * WHERE { GRAPH <http://replace-me.com> { ?s ?p ?o } GRAPH <http://bar.com> { ?s ?p ?o } }"))]
     (-> item
@@ -197,49 +174,34 @@
         SSE/parseOp
         OpAsQuery/asQuery))
 
+;; constructs are different...
+(str ( (query->rewritable "PREFIX : <http://foo> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . ?s2 ?p ?o2 }") identity))
 
-  )
+;; NOTE it returns a SELECT... weird... I think it's because select/construct/ask is decided outside the algebra
+;; => "PREFIX  :     <http://foo>\n\nSELECT  *\nWHERE\n  { ?s ?p ?o .\n    ?s2 ?p ?o2\n  }\n"
 
-(comment
+;; https://jena.apache.org/documentation/query/algebra.html
 
+;; round tripping from sparql string -> sse algebra -> sparql string
+(-> (QueryFactory/create "PREFIX dcterms: <http://purl.org/dc/terms/> SELECT * WHERE { ?s ?p ?o }")
+    Algebra/compile
+    OpAsQuery/asQuery)
 
+(-> (QueryFactory/create "PREFIX dcterms: <http://purl.org/dc/terms/>   SELECT * WHERE { ?s ?p ?o }")
+    Algebra/compile
+    OpAsQuery/asQuery
+    str
+    SSE/parseItem
+    .getList
+    seq)
 
-  ;; constructs are different...
-  (str ( (query->rewritable "PREFIX : <http://foo> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . ?s2 ?p ?o2 }") identity))
+(QueryFactory/create "PREFIX : <http://foo> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . ?s2 ?p ?o2 }")
 
-  ;; NOTE it returns a SELECT... weird... I think it's because select/construct/ask is decided outside the algebra
-  ;; => "PREFIX  :     <http://foo>\n\nSELECT  *\nWHERE\n  { ?s ?p ?o .\n    ?s2 ?p ?o2\n  }\n"
+(Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
 
-  ;; https://jena.apache.org/documentation/query/algebra.html
+(Algebra/optimize (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }")))
 
-  ;; round tripping from sparql string -> sse algebra -> sparql string
-  (-> (QueryFactory/create "PREFIX dcterms: <http://purl.org/dc/terms/> SELECT * WHERE { ?s ?p ?o }")
-      Algebra/compile
-      OpAsQuery/asQuery)
+(Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
 
-
-
-
-  (-> (QueryFactory/create "PREFIX dcterms: <http://purl.org/dc/terms/>   SELECT * WHERE { ?s ?p ?o }")
-      Algebra/compile
-      OpAsQuery/asQuery
-      str
-      SSE/parseItem
-      .getList
-      seq)
-
-
-  (QueryFactory/create "PREFIX : <http://foo> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . ?s2 ?p ?o2 }")
-
-  (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
-
-  (Algebra/optimize (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }")))
-
-  (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
-
-
-  (last (.getList (SSE/parseItem "(graph :foo (bgp (triple ?s ?p ?o)))")))
-
-
-
-  )
+(last (.getList (SSE/parseItem "(graph :foo (bgp (triple ?s ?p ?o)))")))
+)

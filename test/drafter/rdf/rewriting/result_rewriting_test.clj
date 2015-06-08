@@ -1,4 +1,4 @@
-(ns drafter.rdf.sparql-rewriting-test
+(ns drafter.rdf.rewriting.result-rewriting-test
   (:require
    [drafter.test-common :refer [test-triples]]
    [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph! append-data!]]
@@ -6,8 +6,7 @@
    [grafter.rdf :refer [statements]]
    [grafter.rdf.repository :refer [repo prepare-update]]
    [clojure.test :refer :all]
-   [drafter.rdf.sparql-rewriting :refer :all]
-   [drafter.rdf.arq :refer :all])
+   [drafter.rdf.rewriting.result-rewriting :refer [evaluate-with-graph-rewriting]])
   (:import
            [org.openrdf.model.impl URIImpl]
            [org.openrdf.query QueryLanguage]

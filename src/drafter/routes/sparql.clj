@@ -5,9 +5,21 @@
             [clojure.set :as set]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
-            [drafter.rdf.sparql-rewriting :refer [make-draft-query-rewriter]]
+            [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter]]
+            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [clojure.tools.logging :as log]
             [drafter.common.sparql-routes :refer [supplied-drafts]]))
+
+(defn- make-draft-query-rewriter
+  "Build both a query rewriter and an accompanying result rewriter tied together
+  in a hash-map, for supplying to our draft SPARQL endpoints as configuration."
+
+  [live->draft]
+  {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
+   :result-rewriter
+   (fn [prepared-query writer]
+     (let [draft->live (set/map-invert live->draft)]
+       (choose-result-rewriter prepared-query draft->live writer)))})
 
 (defn- draft-query-endpoint [repo request timeouts]
   (try

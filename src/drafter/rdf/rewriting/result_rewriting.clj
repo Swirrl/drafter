@@ -1,11 +1,12 @@
-(ns drafter.rdf.sparql-rewriting
+(ns drafter.rdf.rewriting.result-rewriting
+  "The other side of query rewriting; result rewriting.  Result rewriting
+  rewrites results and solutions."
   (:require
    [grafter.rdf.repository :as repo]
    [grafter.rdf :refer [prefixer]]
    [drafter.util :refer [map-values]]
    [drafter.rdf.draft-management :as mgmt]
-   [drafter.rdf.arq :refer [sparql-string->arq-query ->sparql-string
-                            named-graphs-rewriter apply-rewriter]]
+   [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
    [drafter.rdf.sparql-protocol :refer [result-handler-wrapper]]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
@@ -36,18 +37,6 @@
   [binding-set graph-map]
   (let [mapped-bindings (map #(rewrite-binding % graph-map) binding-set)]
     (binding-seq->binding-set mapped-bindings)))
-
-;rewrite-sparql-string :: Map[Uri, Uri] -> String -> String
-(defn- rewrite-sparql-string
-  "Parses a SPARQL query string, rewrites it according to the given
-  live->draft graph mapping and then returns the re-written query
-  serialised as a string."
-  [live->draft query-str]
-  (log/info "Rewriting query " query-str)
-
-  (let [live->draft (zipmap (map str (keys live->draft))
-                            (map str (vals live->draft)))]
-    (str (apply-rewriter (partial named-graphs-rewriter live->draft) query-str))))
 
 ;apply-map-or-default :: Map[a, a] -> (a -> a)
 (defn- apply-map-or-default
@@ -81,7 +70,7 @@
      (rewrite-graph-results query-substitutions prepared-query))))
 
 ;Map[Uri, Uri] -> QueryResultHandler -> QueryResultHandler
-(defn- make-select-result-rewriter
+(defn make-select-result-rewriter
   "Creates a new SPARQLResultWriter that rewrites values in solutions
   according to the given graph mapping."
   [graph-map handler]
@@ -105,7 +94,7 @@
     (startQueryResult [this binding-names]
       (.startQueryResult handler binding-names))))
 
-(defn- make-construct-result-rewriter
+(defn make-construct-result-rewriter
   "Creates a result-rewriter for construct queries - not a tautology
   honest!"
   [writer draft->live]
@@ -113,17 +102,9 @@
     (result-handler-wrapper writer draft->live)
     writer))
 
-(defn- choose-result-rewriter [query-ast draft->live writer]
+(defn choose-result-rewriter [query-ast draft->live writer]
   (cond
    (instance? GraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
    (instance? TupleQuery query-ast) (make-select-result-rewriter draft->live writer)
    (instance? BooleanQuery query-ast) writer
    :else writer))
-
-(defn make-draft-query-rewriter [live->draft]
-  {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
-
-   :result-rewriter
-   (fn [prepared-query writer]
-     (let [draft->live (set/map-invert live->draft)]
-       (choose-result-rewriter prepared-query draft->live writer)))})
