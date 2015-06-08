@@ -4,18 +4,20 @@
             [swirrl-server.async.jobs :refer [finished-jobs]]
             [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]
+            [grafter.rdf.protocols :refer [->Triple]]
             [drafter.routes.drafts-api :refer :all]
             [drafter.rdf.drafter-ontology :refer [meta-uri]]
-            [grafter.rdf :refer [s add add-statement]]
+            [grafter.rdf :refer [s add add-statement statements]]
             [grafter.rdf.templater :refer [graph triplify]]
             [clojure.java.io :as io]
             [clojure.template :refer [do-template]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.rdf.draft-management.jobs :refer [batched-write-size]]
             [swirrl-server.async.jobs :refer [restart-id]]
-            [drafter.util :refer [set-var-root!]]
+            [drafter.util :refer [set-var-root! map-values]]
             [clojure.tools.logging :as log])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           [org.openrdf.model.impl URIImpl]))
 
 (def test-graph-uri "http://example.org/my-graph")
 
@@ -356,6 +358,37 @@
                      :params {:graph [draft1 draft2]}}
             {:keys [status]} (route request)]
         (is (= 400 status))))))
+
+(defn ->triple [{:keys [s p o] :as quad}]
+  (->Triple s p o))
+
+(defn uriify-values [m]
+  (map-values #(and % (URIImpl. %)) m))
+
+(deftest append-clones-source-graph-test
+  (let [live-triples (triplify [(URIImpl. "http://subj")
+                                [(URIImpl. "http://p1") (URIImpl. "http://o1")]
+                                [(URIImpl. "http://p2") (URIImpl. "http://o2")]])
+        route (draft-api-routes "/draft" *test-db*)
+        live-graph (create-managed-graph! *test-db* "http://live")
+        draft-graph-uri (create-draft-graph! *test-db* live-graph)
+        nt-file "./test/test-triple.nt"
+        append-request (-> {:uri "/draft" :request-method :post}
+                           (add-request-graph-source-file draft-graph-uri nt-file))]
+
+    (add *test-db* live-graph live-triples)
+
+    (let [{:keys [status body] :as response} (route append-request)
+          job-path (:finished-job body)]
+      (is (= 202 status))
+
+      (await-completion finished-jobs job-path)
+
+      (let [file-triples (map (comp ->triple uriify-values) (statements nt-file))
+            draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-db*))))
+            expected-triples (set (concat file-triples live-triples))]
+
+        (is (= draft-triples expected-triples))))))
 
 (do-template
  [test-name http-method modify-request]
