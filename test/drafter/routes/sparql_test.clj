@@ -324,7 +324,7 @@
     (testing "Queries can be written against their live graph URI"
         (let [found-graph (-> (endpoint
                                (draft-query
-                                "SELECT ?g ?s ?p ?o WHERE { BIND(URI(\"http://test.com/graph-2\") AS ?g) GRAPH ?g { ?s ?p ?o . } } LIMIT 1"
+                                "SELECT ?g ?s ?p ?o WHERE {BIND(<http://test.com/graph-2> AS ?g) GRAPH ?g { ?s ?p ?o . } } LIMIT 1"
                                 draft-graph-2))
                               csv->
                               second

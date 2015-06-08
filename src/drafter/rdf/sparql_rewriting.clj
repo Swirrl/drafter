@@ -136,10 +136,10 @@
 (defn register-function!
   "Register an arbitrary custom function with the global SPARQL engine registry."
   [function-registry uri f]
-  (io!
-   (let [sesame-f (drafter.rdf.SesameFunction. uri f)]
-     (doto function-registry
-       (.add sesame-f)))))
+  (comment (io!
+            (let [sesame-f (drafter.rdf.SesameFunction. uri f)]
+              (doto function-registry
+                (.add sesame-f))))))
 
 (defn make-draft-query-rewriter [live->draft]
   {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
