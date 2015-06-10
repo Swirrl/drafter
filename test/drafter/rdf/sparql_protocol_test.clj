@@ -118,5 +118,15 @@
         (is (= 200 status))
         (is (= "text/plain; charset=utf-8" (headers "Content-Type")))))))
 
+(deftest sparlq-endpoint-invalid-query
+  (testing "SPARQL endpoint returns client error if SPARQL query invalid"
+    (let [endpoint (sparql-end-point "/live/sparql" *test-db*)
+          request {:request-method :get
+                   :uri "/live/sparql"
+                   :params {:query "NOT A VALID SPARQL QUERY"}
+                   :headers {"accept" "text/plain"}}
+          {:keys [status]} (endpoint request)]
+      (is (= 400 status)))))
+
 (use-fixtures :each (partial wrap-with-clean-test-db
                              add-triple-to-db))

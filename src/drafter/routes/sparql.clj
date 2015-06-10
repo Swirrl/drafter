@@ -5,18 +5,31 @@
             [clojure.set :as set]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
-            [drafter.rdf.sparql-rewriting :refer [make-draft-query-rewriter]]
+            [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter]]
+            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [clojure.tools.logging :as log]
             [drafter.common.sparql-routes :refer [supplied-drafts]]))
+
+(defn- make-draft-query-rewriter
+  "Build both a query rewriter and an accompanying result rewriter tied together
+  in a hash-map, for supplying to our draft SPARQL endpoints as configuration."
+
+  [live->draft]
+  {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
+   :result-rewriter
+   (fn [prepared-query writer]
+     (let [draft->live (set/map-invert live->draft)]
+       (choose-result-rewriter prepared-query draft->live writer)))})
 
 (defn- draft-query-endpoint [repo request timeouts]
   (try
     (let [{:keys [params]} request
           graph-uris (supplied-drafts repo request)
-          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter repo graph-uris)]
+          live->draft (log/spy(mgmt/graph-map repo graph-uris))
+          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter live->draft)]
 
       (process-sparql-query repo request
-                            :query-creator-fn query-rewriter
+                            :query-rewrite-fn query-rewriter
                             :result-rewriter result-rewriter
                             :graph-restrictions graph-uris
                             :query-timeouts timeouts))
