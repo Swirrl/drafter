@@ -192,19 +192,18 @@
                                "<" drafter:hasDraft "> <" graph-uri "> . "
                                "<" graph-uri "> ?p ?o . ")
                        "}")]
-    (update! db query-str)))
+    
+    ;; if the graph-uri is a draft graph uri, remove the mention of
+    ;; this draft uri, but leave the live graph as a managed graph.
+    (update! db query-str)
+    (log/info (str "Deleted draft graph from state " graph-uri))))
 
-(defn delete-draft-graph-and-its-state!
+(defn delete-draft-contents-and-its-state!
   "Deletes a draft graph and removes the reference to it from its live graph"
   [db graph-uri]
 
   (delete-graph-contents! db graph-uri)
-  (delete-draft-graph-state! db graph-uri)
-
-  ;; if the graph-uri is a draft graph uri, remove the mention of this draft
-  ;; uri, but leave the live graph as a managed graph.
-  
-  (log/info (str "Deleted draft graph from state " graph-uri)))
+  (delete-draft-graph-state! db graph-uri))
 
 (defn delete-graph-batched!
   "Deletes graph contents as per batch size in order to avoid blocking
