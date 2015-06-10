@@ -339,8 +339,6 @@
     (do
       (delete-graph-contents! db live-graph-uri)
 
-      (delete-draft-graph-and-its-state! db draft-graph-uri)
-
       (let [contents (query db
                             (str "CONSTRUCT { ?s ?p ?o } WHERE
                                  { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
@@ -354,6 +352,7 @@
             (add db live-graph-uri contents)
             (set-isPublic! db live-graph-uri true))))
 
+      (delete-draft-graph-and-its-state! db draft-graph-uri)
       (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
