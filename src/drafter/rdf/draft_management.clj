@@ -181,14 +181,7 @@
   (update! db (str "DROP GRAPH <" graph-uri ">"))
   (log/info (str "Deleted graph " graph-uri)))
 
-(defn delete-draft-graph-and-its-state!
-  "Deletes a draft graph and removes the reference to it from its live graph"
-  [db graph-uri]
-
-  (delete-graph-contents! db graph-uri)
-
-  ;; if the graph-uri is a draft graph uri, remove the mention of this draft
-  ;; uri, but leave the live graph as a managed graph.
+(defn delete-draft-graph-state! [db graph-uri]
   (let [query-str (str "DELETE {"
                        (with-state-graph
                          "?live <" drafter:hasDraft "> <" graph-uri "> . "
@@ -199,7 +192,18 @@
                                "<" drafter:hasDraft "> <" graph-uri "> . "
                                "<" graph-uri "> ?p ?o . ")
                        "}")]
-    (update! db query-str))
+    (update! db query-str)))
+
+(defn delete-draft-graph-and-its-state!
+  "Deletes a draft graph and removes the reference to it from its live graph"
+  [db graph-uri]
+
+  (delete-graph-contents! db graph-uri)
+  (delete-draft-graph-state! db graph-uri)
+
+  ;; if the graph-uri is a draft graph uri, remove the mention of this draft
+  ;; uri, but leave the live graph as a managed graph.
+  
   (log/info (str "Deleted draft graph from state " graph-uri)))
 
 (defn delete-graph-batched!
@@ -337,22 +341,48 @@
 
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (do
+      ;;DELETE the target (live) graph and copy the draft to it
+      ;;TODO: Use MOVE query?
       (delete-graph-contents! db live-graph-uri)
 
       (let [contents (query db
                             (str "CONSTRUCT { ?s ?p ?o } WHERE
                                  { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
-            has-only-one-draft-that-is-empty? (fn [live-graph-uri]
-                                                (and (empty? contents)
-                                                     (not (has-more-than-one-draft? db live-graph-uri))))]
 
-        (if (has-only-one-draft-that-is-empty? live-graph-uri)
-          (delete-live-graph-from-state! db live-graph-uri)
+            ;;If the source (draft) graph is empty then the migration
+            ;;is a deletion. If it is the only draft of the live graph
+            ;;then all references to the live graph are being removed
+            ;;from the data. In this case the reference to the live
+            ;;graph should be removed from the state graph. Note this
+            ;;case and use it when cleaning up the state graph below.
+            is-only-draft? (not (has-more-than-one-draft? db live-graph-uri))]
+
+        ;;if the source (draft) graph has data then copy it to the live graph and
+        ;;make it public.
+        (if (not (empty? contents))
           (do
             (add db live-graph-uri contents)
-            (set-isPublic! db live-graph-uri true))))
+            (set-isPublic! db live-graph-uri true)))
 
-      (delete-draft-graph-and-its-state! db draft-graph-uri)
+        ;;delete draft data
+        (delete-graph-contents! db draft-graph-uri)
+
+        ;;NOTE: At this point all the live and draft graph data has
+        ;;been updated: the live graph contents match those of the
+        ;;published draft, and the draft data has been deleted.
+
+        ;;Clean up the state graph - all references to the draft graph should always be removed.
+        ;;The live graph should be removed if the draft was empty (operation was a deletion) and
+        ;;it was the only draft of the live graph
+
+        ;;WARNING: Draft graph state must be deleted before the live graph state!
+        ;;DELETE query depends on the existence of the live->draft connection in the state
+        ;;graph
+        (delete-draft-graph-state! db draft-graph-uri)
+
+        (if (and is-only-draft? (empty? contents))
+          (delete-live-graph-from-state! db live-graph-uri)))
+      
       (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
