@@ -4,13 +4,14 @@
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job complete-job!]]
-            [drafter.write-scheduler :refer [submit-job!]]
+            [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.util :as util]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
+            [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
-            [grafter.rdf.repository :refer [->connection query
-                                            with-transaction]]
+            [grafter.rdf.repository :refer [query with-transaction ToConnection ->connection]]
             [environ.core :refer [env]]))
 
 ;; Note if we change this default value we should also change it in the
@@ -29,11 +30,21 @@
                             :error-type (str (class ex#))
                             :exception ex#}))))
 
+(defn failed-job-result?
+  "Indicates whether the given result object is a failed job result."
+  [{:keys [type] :as result}]
+  (= :error type))
+
 (defmacro make-job [write-priority [job :as args] & forms]
   `(create-job ~write-priority
                (fn [~job]
                  (with-job-exception-handling ~job
                    ~@forms))))
+
+(defn- job-succeeded!
+  "Adds the job to the set of finished-jobs as a successfully completed job."
+  ([job] (job-succeeded! job {}))
+  ([job details] (complete-job! job (merge {:type :ok} details))))
 
 (defn create-draft-job [repo live-graph params]
   (make-job :sync-write [job]
@@ -43,17 +54,18 @@
                                     (mgmt/create-draft-graph! conn
                                                               live-graph (meta-params params)))]
 
-              (complete-job! job (restapi/api-response 201 {:guri draft-graph-uri})))))
+              (job-succeeded! job {:guri draft-graph-uri}))))
 
-(defn- finish-delete-job [repo graph contents-only? job]
-  (do
-    (when-not contents-only?
-      (mgmt/delete-graph-and-draft-state! repo graph))
-    (complete-job! job restapi/ok-response)))
+(defn- finish-delete-job! [repo graph contents-only? job]
+  (when-not contents-only?
+    (mgmt/delete-draft-contents-and-its-state! repo graph))
+  (job-succeeded! job))
 
 (defn- delete-in-batches [repo graph contents-only? job]
-  ;; Loops until the graph is empty, then deletes state graph if not a contents-only? deletion.
-  ;; Checks that graph is a draft graph - will only delete drafts
+  ;; Loops until the graph is empty, then deletes state graph if not a
+  ;; contents-only? deletion.
+  ;;
+  ;; Checks that graph is a draft graph - will only delete drafts.
   (let [conn (->connection repo)]
     (if (and (mgmt/graph-exists? repo graph)
              (mgmt/draft-exists? repo graph))
@@ -62,11 +74,12 @@
                           (mgmt/delete-graph-batched! conn graph batched-write-size))
 
         (if (mgmt/graph-exists? repo graph)
-          ;; There's more graph contents... continue deleting
+          ;; There's more graph contents so queue another job to continue the
+          ;; deletions.
           (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
-            (submit-job! (assoc job :function apply-next-batch)))
-          (finish-delete-job repo graph contents-only? job)))
-      (finish-delete-job repo graph contents-only? job))))
+            (queue-job! (assoc job :function apply-next-batch)))
+          (finish-delete-job! repo graph contents-only? job)))
+      (finish-delete-job! repo graph contents-only? job))))
 
 (defn delete-graph-job [repo graph & {:keys [contents-only?]}]
   "Deletes graph contents as per batch size in order to avoid blocking
@@ -93,13 +106,100 @@
         ;; queue to give higher priority jobs a chance to write
         (let [apply-next-batch (partial append-data-in-batches
                                         repo draft-graph metadata remaining-triples)]
-          (submit-job! (assoc job :function apply-next-batch)))
+          (queue-job! (assoc job :function apply-next-batch)))
 
         (do
           (mgmt/add-metadata-to-graph conn draft-graph metadata)
           (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
 
-          (complete-job! job restapi/ok-response))))))
+          (job-succeeded! job))))))
+
+(defn copy-graph-batch-query
+  "Query to copy a range of data in a source graph into a destination
+  graph."
+  [source-graph dest-graph offset limit]
+  (str "INSERT {
+          GRAPH <" dest-graph "> {
+            ?s ?p ?o
+          }
+        } WHERE {
+          SELECT ?s ?p ?o WHERE {
+            GRAPH <" source-graph "> {
+              ?s ?p ?o
+            }
+          } LIMIT " limit " OFFSET " offset "
+       }"))
+
+(defn copy-graph-batch!
+  "Copies the data segmented by offset and limit in the source graph
+  into the given destination graph."
+  [repo source-graph dest-graph offset limit]
+  (let [query (copy-graph-batch-query source-graph dest-graph offset limit)]
+    (update! repo query)))
+
+(defn update-job-fn
+  "Updates the function associated with a job. This is used to create
+  a continuation job to be queued."
+  [job f]
+  (assoc job :function f))
+
+(defn clone-graph-and-append-in-batches
+  "Clones a source graph and then appends the given metadata and
+  statements to it in batches."
+  [repo source-graph dest-graph batches metadata new-triples job]
+  (with-job-exception-handling job
+    (queue-job!
+     (update-job-fn job
+                    (if-let [[offset limit] (first batches)]
+                      (let [next-fn (fn [job]
+                                      (clone-graph-and-append-in-batches repo source-graph dest-graph (rest batches) metadata new-triples job))]
+                        (copy-graph-batch! repo source-graph dest-graph offset limit)
+                        next-fn)
+
+                      ;; else if there are no (more) batches start appending the
+                      ;; file to the graph.
+                      (fn [job]
+                        (append-data-in-batches repo dest-graph metadata new-triples job)))))))
+
+(defn calculate-offsets [count batch-size]
+  "Given a total number of items and a batch size, returns a sequence
+  of [offset limit] pairs for segmenting the source collection into
+  batches.
+
+  The limit will always be set to batch-size."
+  (take (/ count batch-size)
+        (iterate (fn [[offset batch-size]]
+                   [(+ offset batch-size) batch-size])
+                 [0 batch-size])))
+
+(defn graph-count-query [graph]
+  (str "SELECT (COUNT(*) as ?c) WHERE {
+          GRAPH <" graph "> { ?s ?p ?o }
+        }"))
+
+(defn get-graph-clone-batches
+  ([repo graph-uri] (get-graph-clone-batches repo graph-uri batched-write-size))
+  ([repo graph-uri batch-size]
+   (let [m (first (query repo (graph-count-query graph-uri)))
+         graph-count (Integer/parseInt (.stringValue (get m "c")))]
+     (calculate-offsets graph-count batch-size))))
+
+;;update-graph-metadata :: Repository -> [URI] -> Seq [String, String] -> Job -> ()
+(defn- update-graph-metadata
+  "Updates or creates each of the the given graph metadata pairs for
+  each given graph under a job."
+  [repo graphs metadata job]
+  (with-job-exception-handling job
+    (with-open [conn (->connection repo)]
+      (doseq [draft-graph graphs]
+        (mgmt/add-metadata-to-graph conn draft-graph metadata))
+      (complete-job! job restapi/ok-response))))
+
+(defn create-update-metadata-job
+  "Creates a job to associate the given graph metadata pairs with each
+  given graph."
+  [repo graphs metadata]
+  (create-job :sync-write (partial update-graph-metadata repo graphs metadata)))
 
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
@@ -117,10 +217,10 @@
   The last batch is finally responsible for signaling job completion
   via a side-effecting call to complete-job!"
 
-  [repo draft-graph {:keys [tempfile size filename content-type] :as file} metadata]
+  [repo draft-graph tempfile rdf-format metadata]
 
   (let [new-triples (statements tempfile
-                                :format (mimetype->rdf-format content-type)
+                                :format rdf-format
                                 :buffer-size batched-write-size)
 
         ;; NOTE that this is technically not transactionally safe as
@@ -144,23 +244,16 @@
         ;;
         ;; This can occur if a user does a make-live on a graph
         ;; which is being written to in a batch job.
+    ]
 
-        triples (lazy-cat (query repo
-                                 (str "CONSTRUCT { ?s ?p ?o } "
-                                      "WHERE { "
-                                      (mgmt/with-state-graph
-                                        "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
-                                        "      <" drafter:hasDraft "> <" draft-graph "> .")
-                                      "  GRAPH ?live { "
-                                      "    ?s ?p ?o . "
-                                      "  }"
-                                      "}"))
-
-                          new-triples)]
-
-    (create-job :batch-write
-                (partial append-data-in-batches
-                         repo draft-graph metadata triples))))
+    (make-job :batch-write [job]
+              ;;copy the live graph (if it exists) and then append the file data
+              (queue-job! (update-job-fn job
+                                         (let [live-graph-uri (mgmt/lookup-live-graph repo draft-graph)
+                                               batch-sizes (and live-graph-uri
+                                                                (get-graph-clone-batches repo live-graph-uri))]
+                                           (fn [job]
+                                             (clone-graph-and-append-in-batches repo live-graph-uri draft-graph batch-sizes metadata new-triples job))))))))
 
 (defn migrate-graph-live-job [repo graph]
   (make-job :exclusive-write [job]
@@ -172,4 +265,4 @@
                   (doseq [g graph]
                     (mgmt/migrate-live! conn g)))))
             (log/info "Make-live for graph" graph "done")
-            (complete-job! job restapi/ok-response)))
+            (job-succeeded! job)))

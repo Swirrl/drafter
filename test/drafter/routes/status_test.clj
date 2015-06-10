@@ -2,8 +2,7 @@
   (:require [clojure.test :refer :all]
             [ring.mock.request :refer :all]
             [drafter.common.json-encoders :as enc]
-            [drafter.routes.status :refer :all]
-            [drafter.write-scheduler :refer [create-job]])
+            [drafter.routes.status :refer :all])
   (:import [java.util UUID]
            [java.util.concurrent.locks ReentrantLock]))
 
@@ -30,4 +29,12 @@
         (is-unlocked (status-route (request :get "/writes-locked")))
         (testing "when locked"
           (.lock lock)
-          (is-locked (status-route (request :get "/writes-locked"))))))))
+          (is-locked (status-route (request :get "/writes-locked"))))))
+
+    (testing "GET /status"
+      (testing "when not found"
+        (let [response (status-route (request :get "/finished-jobs/00000000-0000-0000-0000-000000000000"))]
+          (is (= restart-id
+                 (get-in response [:body :restart-id])))
+          (is (= :not-found
+                 (get-in response [:body :type]))))))))

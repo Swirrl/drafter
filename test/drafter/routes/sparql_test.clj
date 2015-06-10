@@ -5,6 +5,7 @@
             [clojure.tools.logging :as log]
             [clojure-csv.core :as csv]
             [clojure.data.json :as json]
+            [grafter.rdf :refer [subject predicate object context]]
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
             [drafter.routes.sparql :refer :all]
@@ -148,8 +149,6 @@
 
         (is (= "true" body))))))
 
-;(def drafts-request (assoc default-sparql-query :uri "/sparql/draft"))
-
 (deftest drafts-sparql-routes-test
   (let [test-db (make-store)
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
@@ -205,9 +204,46 @@
                                      (assoc-in [:params :union-with-live] "true"))))]
 
 
-          (= graph-1-result (second csv-result))
+          (is (= graph-1-result (second csv-result)))
           (is (= 3 (count csv-result))
-              "There should be 3 rows in the csv (2 triples in one graph + the csv header row)"))))))
+              "There should be 3 rows in the csv (2 triples in one graph + the csv header row)")))
+
+      (testing "When no drafts are supplied & :union-with-live is not set"
+        (let [csv-result (csv-> (endpoint (draft-query "SELECT * WHERE { ?s ?p ?o }" nil)))
+              triple-from-state-graph? (fn [triple]
+                                         (.endsWith (object triple) "ManagedGraph"))]
+          (is (not-any? triple-from-state-graph? csv-result)
+              "Data should not contain triples from the state graph"))))))
+
+;; This test attempts to capture the rationale behind the calculation of graph
+;; restrictions.
+;;
+;; These tests attempt to recreate the various permutations of what will happen
+;; when union-with-live=true/false and when there are drafts specified or not.
+(deftest calculate-graph-restriction-test
+  (let [calculate-graph-restriction @#'drafter.common.sparql-routes/calculate-graph-restriction]
+    (testing "union-with-live=true"
+      (testing "with no drafts specified"
+        (is (= #{:l1 :l2}
+               (calculate-graph-restriction #{:l1 :l2} #{} #{}))
+            "Restriction should be the set of public live graphs"))
+
+      (testing "with drafts specified"
+        (is (= #{:l1 :d2 :d3 :d4}
+               (calculate-graph-restriction #{:l1 :l2} #{:l3 :l4 :l2} #{:d2 :d3 :d4}))
+            "Restriction should be the set of live graphs plus drafts from the
+            draftset.  Live graphs for the specified drafts should not be
+            included as we want to use their draft graphs.")))
+
+    (testing "union-with-live=false"
+      (testing "with no drafts specified"
+        (is (= #{}
+               (calculate-graph-restriction #{} #{} #{}))
+            "Restriction should be the set of public live graphs"))
+      (testing "with drafts specified"
+        (is (= #{:d1 :d2}
+               (calculate-graph-restriction #{} #{:l1 :l2} #{:d1 :d2}))
+            "Restriction should be the set of drafts (as live graph queries will be rewritten to their draft graphs)")))))
 
 
 (deftest drafts-sparql-routes-distinct-test

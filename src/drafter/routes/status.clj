@@ -1,8 +1,6 @@
 (ns drafter.routes.status
   (:require [compojure.core :refer [GET routes]]
-            [ring.util.io :as rio]
             [ring.util.response :refer [not-found response]]
-            [drafter.common.api-routes :as api]
             [swirrl-server.async.status-routes :as st])
   (:import [java.util UUID]))
 

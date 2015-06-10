@@ -4,18 +4,20 @@
             [swirrl-server.async.jobs :refer [finished-jobs]]
             [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]
+            [grafter.rdf.protocols :refer [->Triple]]
             [drafter.routes.drafts-api :refer :all]
             [drafter.rdf.drafter-ontology :refer [meta-uri]]
-            [grafter.rdf :refer [s add add-statement]]
+            [grafter.rdf :refer [s add add-statement statements]]
             [grafter.rdf.templater :refer [graph triplify]]
             [clojure.java.io :as io]
             [clojure.template :refer [do-template]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.rdf.draft-management.jobs :refer [batched-write-size]]
             [swirrl-server.async.jobs :refer [restart-id]]
-            [drafter.util :refer [set-var-root!]]
+            [drafter.util :refer [set-var-root! map-values]]
             [clojure.tools.logging :as log])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           [org.openrdf.model.impl URIImpl]))
 
 (def test-graph-uri "http://example.org/my-graph")
 
@@ -91,11 +93,11 @@
       (is (= restart-id (:restart-id body)))
       (is (instance? UUID (parse-guid (:finished-job body)))))))
 
-(defn is-error-response [response]
+(defn is-client-error-response [response]
   (let [{:keys [status body headers]} response]
     (is (= 400 status))
     (is (= :error (body :type)))
-    (is (instance? String (body :msg)))))
+    (is (instance? String (body :message)))))
 
 (deftest drafts-api-create-draft-test
   (testing "POST /draft/create"
@@ -104,7 +106,7 @@
                                            {:uri "/draft/create"
                                             :request-method :post
                                             :headers {"accept" "application/json"}})]
-        (is-error-response response)))
+        (is-client-error-response response)))
 
     (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
 
@@ -167,8 +169,7 @@
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
-        (is (= ok-response
-               (await-completion finished-jobs (:finished-job body))))
+        (is (= {:type :ok} (await-completion finished-jobs (:finished-job body))))
 
         (testing "appends RDF to the graph"
           (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
@@ -188,7 +189,24 @@
                 error-result (await-completion finished-jobs guid)]
 
             (is (= :error (:type error-result)))
-            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))))
+            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))
+
+    (testing "with a missing content type"
+      (let [test-request (-> {:uri "/draft" :request-method :post}
+                             (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "./test/test-triple.nt")
+                             (update-in [:params :file] dissoc :content-type))
+            route (draft-api-routes "/draft" *test-db*)
+            {:keys [status] :as response} (route test-request)]
+        (is (= 400 status) "Bad request")))
+
+    (testing "with an unknown content type"
+      (let [test-request (-> {:uri "/draft" :request-method :post}
+                             (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "./test/test-triple.nt")
+                             (assoc-in [:params :file :content-type] "text/not-a-real-content-type"))
+            route (draft-api-routes "/draft" *test-db*)
+            {:keys [status] :as response} (route test-request)]
+        
+        (is (= 400 status) "Bad request")))))
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph (batched)"
@@ -288,6 +306,89 @@
     (str "SELECT ?o WHERE { GRAPH <" drafter-state-graph "> {
            <" draft-graph-uri "> <" meta-subject "> ?o }"
         "}")))
+
+(defn add-request-metadata-pairs [request meta-pairs]
+  (reduce (fn [r [k v]] (add-request-metadata r k v)) request meta-pairs))
+
+(deftest draft-graph-metadata
+  (let [draft1 "http://graphs.org/1"
+        draft2 "http://graphs.org/2"
+        meta-pairs [["foo" "bar"] ["quux" "qaal"]]
+        route (draft-api-routes "" *test-db*)
+        create-meta-request (fn [graphs meta-pairs]
+                              (-> {:uri "/metadata"
+                                   :request-method :post
+                                   :params {:graph graphs}}
+                                  (add-request-metadata-pairs meta-pairs)))]
+    (testing "Adds new metadata"
+      (let [test-request (create-meta-request [draft1 draft2] meta-pairs)
+            {:keys [status]} (route test-request)]
+        (is (= 200 status))
+
+        ;;metadata exists
+        (doseq [graph [draft1 draft2]
+                [k v] meta-pairs]
+          (is (repo/query *test-db* (metadata-exists-sparql graph k v))))))
+
+    (testing "Updates existing metdata"
+      (let [updated-key (ffirst meta-pairs)
+            updated-pair [updated-key "new-value"]
+            
+            ;;NOTE: ring only creates a collection if a parameter exists
+            ;;multiple times in a query string. This also tests updating
+            ;;a single graph
+            request (create-meta-request draft1 [updated-pair])
+            expected-metadata (assoc meta-pairs 0 updated-pair)
+            {:keys [status]} (route request)]
+        
+        (is (= 200 status))
+
+        (doseq [[k v] expected-metadata]
+          (is (repo/query *test-db* (metadata-exists-sparql draft1 k v))))))
+
+    (testing "Invalid if no graphs"
+      (let [request (-> {:uri "/metadata" :request-method :post}
+                        (add-request-metadata-pairs [["foo" "bar"]]))
+            {:keys [status]} (route request)]
+        (is (= 400 status))))
+
+    (testing "Invalid if no metadata"
+      (let [request {:uri "/metadata"
+                     :request-method :post
+                     :params {:graph [draft1 draft2]}}
+            {:keys [status]} (route request)]
+        (is (= 400 status))))))
+
+(defn ->triple [{:keys [s p o] :as quad}]
+  (->Triple s p o))
+
+(defn uriify-values [m]
+  (map-values #(and % (URIImpl. %)) m))
+
+(deftest append-clones-source-graph-test
+  (let [live-triples (triplify [(URIImpl. "http://subj")
+                                [(URIImpl. "http://p1") (URIImpl. "http://o1")]
+                                [(URIImpl. "http://p2") (URIImpl. "http://o2")]])
+        route (draft-api-routes "/draft" *test-db*)
+        live-graph (create-managed-graph! *test-db* "http://live")
+        draft-graph-uri (create-draft-graph! *test-db* live-graph)
+        nt-file "./test/test-triple.nt"
+        append-request (-> {:uri "/draft" :request-method :post}
+                           (add-request-graph-source-file draft-graph-uri nt-file))]
+
+    (add *test-db* live-graph live-triples)
+
+    (let [{:keys [status body] :as response} (route append-request)
+          job-path (:finished-job body)]
+      (is (= 202 status))
+
+      (await-completion finished-jobs job-path)
+
+      (let [file-triples (map (comp ->triple uriify-values) (statements nt-file))
+            draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-db*))))
+            expected-triples (set (concat file-triples live-triples))]
+
+        (is (= draft-triples expected-triples))))))
 
 (do-template
  [test-name http-method modify-request]
