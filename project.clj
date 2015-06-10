@@ -4,13 +4,25 @@
   :license {:name "Proprietary & Commercially Licensed Only"
             :url "http://swirrl.com/"}
 
-  ;; :repositories [["swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"
-  ;;                                          :sign-releases false}]
-  ;;                ["swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"
-  ;;                                         :sign-releases true
-  ;;                                         }]]
+  ;; SNAPSHOT repository for JENA builds
+  :repositories [["jena-snapshots" {:url "https://repository.apache.org/content/repositories/snapshots/"
+                                    :releases false}]]
 
-  :dependencies [[org.clojure/clojure "1.6.0"]
+  :dependencies [
+                 ;; Lock to a snapshot release of 3.0.0 as it has the JENA-954
+                 ;; bug fix that we depend upon for rewriting.
+                 ;;
+                 ;; TODO: Update to JENA 3.0.0 when it is released.
+                 [org.apache.jena/jena-arq "3.0.0-20150607.095307-44" :exclusions [org.slf4j/slf4j-api
+                                                                                   com.fasterxml.jackson.core/jackson-core
+                                                                                   org.slf4j/jcl-over-slf4j
+                                                                                   org.slf4j/slf4j-api]]
+
+                 [org.apache.jena/jena-core "3.0.0-20150607.095157-44" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-base "3.0.0-20150607.095120-41" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-iri "3.0.0-20150607.095039-43" :exclusions [org.slf4j/slf4j-api]]
+
+                 [org.clojure/clojure "1.6.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
                  [lib-noir "0.8.4" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [ring "1.3.2" :exclusions [org.clojure/java.classpath]]
@@ -18,25 +30,19 @@
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
 
-                 [swirrl/lib-swirrl-server "0.1.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
+                 [swirrl/lib-swirrl-server "0.2.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
                  [grafter "0.5.0-SNAPSHOT" :exclusions [[org.openrdf.sesame/sesame-runtime]]]
                  [grafter/vocabularies "0.1.0"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"]
 
-                 ;; [org.openrdf.sesame/sesame-queryrender "2.7.8"]
-                 ;; [org.openrdf.sesame/sesame-runtime "2.7.8"]
 
-                 [org.apache.jena/jena-arq "2.13.0" :exclusions [org.slf4j/slf4j-api
-                                                                 com.fasterxml.jackson.core/jackson-core
-                                                                 org.slf4j/jcl-over-slf4j
-                                                                 org.slf4j/slf4j-api]]
 
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
-                 [org.slf4j/slf4j-log4j12 "1.7.7" :exclusions [log4j org.slf4j/slf4j-api]]
+                 [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
                  [ring-middleware-accept "2.0.2"]
                  [environ "1.0.0"]]
 
@@ -71,6 +77,8 @@
                        :stacktraces?  false
                        :auto-reload?  false}}
 
+
+
    :dev {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                    [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
@@ -82,7 +90,8 @@
 
          :env {:dev true}
 
-         ;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
+         ;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
+         ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
          }
    }
 

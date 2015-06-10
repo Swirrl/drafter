@@ -5,10 +5,8 @@
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
-                                             global-writes-lock
-                                             ]]
-            [swirrl-server.async.jobs :refer [create-job]]
-            [drafter.rdf.sparql-rewriting :refer [function-registry register-function!]])
+                                             global-writes-lock]]
+            [swirrl-server.async.jobs :refer [create-job]])
   (:import [java.util Scanner]
            [java.util.concurrent CountDownLatch TimeUnit]))
 
@@ -61,12 +59,7 @@
          (stop-writer! *test-writer*))))))
 
 (defn make-store []
-  (let [store (repo)]
-    ;; register the function that does the results rewriting
-    (register-function! function-registry
-                        "http://publishmydata.com/def/functions#replace-live-graph-uri"
-                        (partial lookup-draft-graph-uri store))
-    store))
+  (repo))
 
 (defn make-graph-live!
   ([db live-guri]

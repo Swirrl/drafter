@@ -1,10 +1,12 @@
 (ns drafter.repl
   (:require [drafter.handler :as service]
             [environ.core :refer [env]]
+            [clojure.string :as s]
             [ring.middleware.file-info :refer :all]
             [ring.middleware.resource :refer :all]
             [ring.server.standalone :refer [serve]])
-  (:gen-class))
+  (:gen-class)
+  (:import (java.lang.management ManagementFactory)))
 
 (defonce server (atom nil))
 
@@ -19,19 +21,28 @@
       ; Content-Type, Content-Length, and Last Modified headers for files in body
       (wrap-file-info)))
 
+(defn- get-pid []
+  (-> (ManagementFactory/getRuntimeMXBean)
+      (.getName)
+      (s/split #"@")
+      (first)
+      (read-string)))
+
 (defn start-server
   "Used for starting the server in development mode from REPL"
   [port]
-  (reset! server
-          (serve (get-handler)
-                 {:port port
-                  :init service/init
-                  :auto-reload? true
-                  :open-browser? (:dev env)
-                  :destroy service/destroy
-                  :join? false}))
+  (do
+    (reset! server
+            (serve (get-handler)
+                   {:port          port
+                    :init          service/init
+                    :auto-reload?  true
+                    :open-browser? (:dev env)
+                    :destroy       service/destroy
+                    :join?         false}))
+    (println (str "Started with PID: " (get-pid)))
+    (println (str "You can view the site at http://localhost:" port))))
 
-  (println (str "You can view the site at http://localhost:" port)))
 
 (defn stop-server []
   (service/destroy)

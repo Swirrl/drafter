@@ -3,7 +3,7 @@
             [compojure.core :refer [GET POST routes]]
             [drafter.util :refer [construct-dynamic*]]
             [drafter.operations :refer :all]
-            [drafter.rdf.arq :refer [->sparql-string sparql-string->ast]]
+            [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -44,7 +44,7 @@
            [org.openrdf.query.resultio QueryResultWriter]
            [org.openrdf.query.impl DatasetImpl MapBindingSet]
            [javax.xml.datatype XMLGregorianCalendar DatatypeFactory]
-           [com.hp.hpl.jena.query QueryParseException]
+           [org.apache.jena.query QueryParseException]
            [java.util GregorianCalendar Date]
            [org.openrdf.rio RDFFormat]))
 
@@ -272,7 +272,7 @@
 (defn validate-query [query-str]
   "Validates a query by parsing it using ARQ. If the query is invalid
   a QueryParseException is thrown."
-  (sparql-string->ast query-str)
+  (sparql-string->arq-query query-str)
   query-str)
 
 (defn process-sparql-query [db request & {:keys [query-rewrite-fn graph-restrictions result-rewriter query-timeouts]
