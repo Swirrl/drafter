@@ -2,10 +2,16 @@ FROM ubuntu:14.04
 
 MAINTAINER Ric Roberts "ric@swirrl.com"
 
-RUN add-apt-repository ppa:openjdk-r/ppa -y
+ENV DEBIAN_FRONTEND noninteractive
+
 RUN apt-get update -qq
 RUN apt-get upgrade -qq
-RUN apt-get -qq -y install wget
+
+RUN apt-get install -qq -y software-properties-common wget
+RUN add-apt-repository ppa:openjdk-r/ppa -y
+
+RUN apt-get update -qq
+
 RUN apt-get -qq -y install --no-install-recommends openjdk-8-jdk
 
 ADD docker/start-server-production.sh /usr/bin/start-server-production
