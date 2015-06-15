@@ -71,7 +71,9 @@
   :profiles
   {
    :uberjar {:aot :all
-             :main drafter.repl}
+             :main drafter.repl
+             :uberjar [:swirrl-private-repos
+                        { :project-config-stuff "goes here"}]}
 
    :production {:ring {:open-browser? false
                        :stacktraces?  false

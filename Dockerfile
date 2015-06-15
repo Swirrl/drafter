@@ -1,10 +1,11 @@
-FROM ubuntu:14.04
+ah FROM ubuntu:14.04
 
 MAINTAINER Ric Roberts "ric@swirrl.com"
 
-RUN apt-get update
-
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y install openjdk-7-jdk wget
+RUN add-apt-repository ppa:openjdk-r/ppa
+RUN apt-get update -qq
+RUN apt-get upgrade -qq
+RUN apt-get -qq -y install openjdk-8-jdk wget
 
 ADD docker/start-server-production.sh /usr/bin/start-server-production
 RUN chmod +x /usr/bin/start-server-production
