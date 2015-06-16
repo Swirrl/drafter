@@ -58,7 +58,7 @@
 
 (defn- finish-delete-job! [repo graph contents-only? job]
   (when-not contents-only?
-    (mgmt/delete-draft-contents-and-its-state! repo graph))
+    (mgmt/delete-draft-graph-state! repo graph))
   (job-succeeded! job))
 
 (defn- delete-in-batches [repo graph contents-only? job]

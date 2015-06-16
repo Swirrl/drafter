@@ -211,51 +211,54 @@
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph (batched)"
     (let [graph-uri "http://mygraph/draft-graph5"
+          _ (create-managed-graph! *test-db* graph-uri)
+          draft-graph-uri (import-data-to-draft! *test-db* graph-uri test-triples-4)
           original-batch-size batched-write-size]
-      (do
-       (make-graph-live! *test-db* graph-uri)
-       (add *test-db* graph-uri test-triples-4)
+      
+      (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
+          "Graph should exist before deletion")
 
-       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> { ?s ?p ?o } }"))
-           "Graph should exist before deletion")
+      (set-var-root! #'batched-write-size 1)
 
-       (set-var-root! #'batched-write-size 1)
+      (let [route (graph-management-routes "/graph" *test-db*)
+            test-request (-> {:uri "/graph" :request-method :delete}
+                             (add-request-graph draft-graph-uri))
+            response (route test-request)]
 
-       (let [route (graph-management-routes "/graph" *test-db*)
-              test-request (-> {:uri "/graph" :request-method :delete}
-                               (add-request-graph "http://mygraph/draft-graph5"))
-             response (route test-request)]
+        (job-is-accepted response)
+        (await-completion finished-jobs (:finished-job (:body response)))
 
-         (job-is-accepted response)
-         (await-completion finished-jobs (:finished-job (:body response)))
+        (set-var-root! #'batched-write-size original-batch-size)
 
-         (set-var-root! #'batched-write-size original-batch-size)
+        (testing "batched delete job actually deletes the graph"
+          (is (not (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
+              "Graph should be deleted"))
 
-         (testing "batched delete job actually deletes the graph"
-           (is (not (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> { ?s ?p ?o } }")))
-               "Graph should be deleted")))))))
+        (testing "draft removed from state graph"
+          (is (not (draft-exists? *test-db* draft-graph-uri))))))))
 
 (deftest graph-delete-draft-graph-contents-test
   (testing "DELETE /draft/contents (batched)"
-    (let [graph-uri "http://mygraph/draft-graph4"]
-      (do
-        (make-graph-live! *test-db* graph-uri)
-        (add *test-db* graph-uri test-triples-4)
+    (let [graph-uri "http://mygraph/draft-graph4"
+          _ (create-managed-graph! *test-db* graph-uri)
+          draft-graph-uri (import-data-to-draft! *test-db* graph-uri test-triples-4)]
+        
+      (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
+          "Graph should exist before deletion")
 
-        (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> { ?s ?p ?o } }"))
-            "Graph should exist before deletion")
+      (let [route (draft-api-routes "/draft" *test-db*)
+            test-request (-> {:uri "/draft/contents" :request-method :delete}
+                             (add-request-graph draft-graph-uri))
+            response (route test-request)]
 
-        (let [route (draft-api-routes "/draft" *test-db*)
-              test-request (-> {:uri "/draft/contents" :request-method :delete}
-                               (add-request-graph "http://mygraph/draft-graph4"))
-              response (route test-request)]
+        (job-is-accepted response)
+        (await-completion finished-jobs (:finished-job (:body response)))
 
-          (job-is-accepted response)
-          (await-completion finished-jobs (:finished-job (:body response)))
+        (testing "contents delete job actually deletes the contents but leaves graph intact"
+          (is (not (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
+              "Graph should be left intact without contents")
 
-          (testing "contents delete job actually deletes the contents but leaves graph intact"
-            (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" graph-uri "> {} }"))
-                "Graph should be left intact without contents")))))))
+          (is (draft-exists? *test-db* draft-graph-uri)))))))
 
 (deftest graph-management-live-test-with-one-graph
   (testing "PUT /graph/live"
