@@ -4,7 +4,7 @@
             [drafter.util :as util]
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
-            [swirrl-server.async.jobs :refer [create-job complete-job!]]
+            [swirrl-server.async.jobs :refer [create-job complete-job! create-child-job]]
             [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
@@ -79,7 +79,7 @@
           ;; There's more graph contents so queue another job to continue the
           ;; deletions.
           (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
-            (queue-job! (assoc job :function apply-next-batch)))
+            (queue-job! (create-child-job job apply-next-batch)))
           (finish-delete-job! repo graph contents-only? job)))
       (finish-delete-job! repo graph contents-only? job))))
 
@@ -122,7 +122,7 @@
         ;; queue to give higher priority jobs a chance to write
         (let [apply-next-batch (partial append-data-in-batches
                                         repo draft-graph metadata remaining-triples)]
-          (queue-job! (assoc job :function apply-next-batch)))
+          (queue-job! (create-child-job job apply-next-batch)))
 
         (do
           (mgmt/add-metadata-to-graph conn draft-graph metadata)
@@ -153,19 +153,13 @@
   (let [query (copy-graph-batch-query source-graph dest-graph offset limit)]
     (update! repo query)))
 
-(defn update-job-fn
-  "Updates the function associated with a job. This is used to create
-  a continuation job to be queued."
-  [job f]
-  (assoc job :function f))
-
 (defn clone-graph-and-append-in-batches
   "Clones a source graph and then appends the given metadata and
   statements to it in batches."
   [repo source-graph dest-graph batches metadata new-triples job]
   (with-job-exception-handling job
     (queue-job!
-     (update-job-fn job
+     (create-child-job job
                     (if-let [[offset limit] (first batches)]
                       (let [next-fn (fn [job]
                                       (clone-graph-and-append-in-batches repo source-graph dest-graph (rest batches) metadata new-triples job))]
@@ -264,7 +258,7 @@
 
     (make-job :batch-write [job]
               ;;copy the live graph (if it exists) and then append the file data
-              (queue-job! (update-job-fn job
+              (queue-job! (create-child-job job
                                          (let [live-graph-uri (mgmt/lookup-live-graph repo draft-graph)
                                                batch-sizes (and live-graph-uri
                                                                 (get-graph-clone-batches repo live-graph-uri))]
