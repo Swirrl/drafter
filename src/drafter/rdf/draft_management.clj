@@ -208,13 +208,6 @@
     ;; this draft uri, but leave the live graph as a managed graph.
     (log/info (str "Deleted draft graph from state "draft-graph-uri))))
 
-(defn delete-draft-contents-and-its-state!
-  "Deletes a draft graph and removes the reference to it from its live graph"
-  [db graph-uri]
-
-  (delete-graph-contents! db graph-uri)
-  (delete-draft-graph-state! db graph-uri))
-
 (defn delete-graph-batched!
   "Deletes graph contents as per batch size in order to avoid blocking
   writes with a lock."
