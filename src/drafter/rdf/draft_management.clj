@@ -37,6 +37,7 @@
                 "}")
               )))
 
+;; TODO - This could return false positives
 (defn draft-exists?
   "Checks state graph to see if a draft graph exists"
   [db graph-uri]
@@ -44,6 +45,10 @@
                  "  SELECT ?s WHERE {"
                  (with-state-graph "<" graph-uri ">  a <" drafter:DraftGraph "> .")
                  "  }"
+                 ;; TODO - check that there is a dataset, live is managed and has draft d
+                 ;; live - a - managed
+                 ;;   | has draft -> d
+                 ;;   | d draft
                  "  LIMIT 1"
                  "}")]
     (query db qry)))
@@ -231,7 +236,7 @@
                           (get "live"))]
     (str live-uri)))
 
-(defn- delete-live-graph-from-state [db live-graph-uri]
+(defn- delete-live-graph-from-state [live-graph-uri]
   (str "DELETE WHERE"
        "{"
        (with-state-graph
@@ -241,7 +246,7 @@
 
 (defn delete-live-graph-from-state! [db live-graph-uri]
   "Delete the live managed graph from the state graph"
-  (update! db (delete-live-graph-from-state db live-graph-uri))
+  (update! db (delete-live-graph-from-state live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
 
 (defn lookup-live-graph-uri [db draft-graph-uri]
