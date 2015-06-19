@@ -192,7 +192,7 @@
                                "<" drafter:hasDraft "> <" graph-uri "> . "
                                "<" graph-uri "> ?p ?o . ")
                        "}")]
-    
+
     ;; if the graph-uri is a draft graph uri, remove the mention of
     ;; this draft uri, but leave the live graph as a managed graph.
     (update! db query-str)
@@ -235,8 +235,8 @@
   (str "DELETE WHERE"
        "{"
        (with-state-graph
-         "  ?s <" rdf:a "> <" drafter:ManagedGraph "> ."
-         "  <" live-graph-uri "> ?p ?o .")
+         "<" live-graph-uri "> a <" drafter:ManagedGraph "> ;"
+         "   ?p ?o .")
        "}"))
 
 (defn delete-live-graph-from-state! [db live-graph-uri]
