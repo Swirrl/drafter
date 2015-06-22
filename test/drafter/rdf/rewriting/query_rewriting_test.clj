@@ -145,4 +145,27 @@
                   }"
                 (rewrite "SELECT ?s WHERE {
                      BIND(URI(\"http://foo.com/\") AS ?s)
-                  }")))))
+                  }")))
+
+    (testing "uri rewriting"
+      (is-tree= "PREFIX qb: <http://purl.org/linked-data/cube#>
+                 SELECT ?obs
+                 WHERE {
+                   ?obs a qb:Observation ;
+                          qb:measureType ?measure ;
+                          ?measure ?value ;
+                          .
+                 }
+                 GROUP BY ?obs
+                 HAVING (COUNT(?value) > 1)"
+
+                (rewrite "PREFIX qb: <http://purl.org/linked-data/cube#>
+                          SELECT ?obs
+                          WHERE {
+                            ?obs a qb:Observation ;
+                                   qb:measureType ?measure ;
+                                   ?measure ?value ;
+                                   .
+                          }
+                          GROUP BY ?obs
+                          HAVING (COUNT(?value) > 1)")))))
