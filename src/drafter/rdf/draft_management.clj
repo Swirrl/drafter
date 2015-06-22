@@ -43,8 +43,11 @@
   [db graph-uri]
   (let [qry (str "ASK WHERE {"
                  "  SELECT ?s WHERE {"
-                 (with-state-graph "<" graph-uri ">  a <" drafter:DraftGraph "> .")
-                 "  }"
+                 (with-state-graph
+                 "      ?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                 "        <" drafter:hasDraft "> <" graph-uri "> ."
+                 "        <" graph-uri "> a <" drafter:DraftGraph "> ."
+                 "  }")
                  "  LIMIT 1"
                  "}")]
     (query db qry)))
@@ -245,8 +248,8 @@
   (str "DELETE WHERE"
        "{"
        (with-state-graph
-         "  ?s <" rdf:a "> <" drafter:ManagedGraph "> ."
-         "  <" live-graph-uri "> ?p ?o .")
+         "<" live-graph-uri "> a <" drafter:ManagedGraph "> ;"
+         "   ?p ?o .")
        "}"))
 
 (defn delete-live-graph-from-state! [db live-graph-uri]

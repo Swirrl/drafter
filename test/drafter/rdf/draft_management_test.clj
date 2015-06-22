@@ -131,11 +131,11 @@
         "should set the boolean value")))
 
 (deftest migrate-live!-test
-  (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
-       expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
-    (append-data! *test-db* draft-graph-uri test-triples)
-    (migrate-live! *test-db* draft-graph-uri)
-    (testing "migrate-live! data is migrated"
+  (testing "migrate-live! data is migrated"
+    (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
+          expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
+      (append-data! *test-db* draft-graph-uri test-triples)
+      (migrate-live! *test-db* draft-graph-uri)
       (is (not (ask? "GRAPH <" draft-graph-uri "> {"
                      expected-triple-pattern
                      "}"))
@@ -150,34 +150,69 @@
           "Draft graph should be removed from the state graph")
 
       (is (= true (is-graph-managed? *test-db* test-graph-uri))
-          "Live graph reference shouldn't have been deleted from state graph"))
+          "Live graph reference shouldn't have been deleted from state graph"))))
 
- (let [my-test-graph-uri "http://example.org/my-other-graph"
-       draft-graph-uri (create-managed-graph-with-draft! my-test-graph-uri)]
-   (do
-     ;; We are migrating empty graph, so this is deleting.
-     (migrate-live! *test-db* draft-graph-uri)
-     (let [managed-found? (is-graph-managed? *test-db* my-test-graph-uri)]
-       (testing "migrate-live! DELETION: Deleted draft removes live graph from state graph"
-         (is (not managed-found?)
-             "Live graph should no longer be referenced in state graph")
+(deftest migrate-live!-remove-live-aswell-test
+  (testing "migrate-live! DELETION: Deleted draft removes live graph from state graph"
+    (let [test-graph-to-delete-uri "http://example.org/my-other-graph1"
+          graph-to-keep-uri "http://example.org/keep-me-a1"
+          graph-to-keep-uri2 "http://example.org/keep-me-a2"
+          draft-graph-to-del-uri (create-managed-graph-with-draft!
+                                  test-graph-to-delete-uri)
+          draft-graph-to-keep-uri (create-managed-graph-with-draft! graph-to-keep-uri)
+          draft-graph-to-keep-uri2 (create-managed-graph-with-draft! graph-to-keep-uri2)]
 
-         (is (= false (draft-exists? *test-db* draft-graph-uri))
-          "Draft graph should be removed from the state graph")))))
+      (append-data! *test-db* draft-graph-to-keep-uri test-triples)
+      (append-data! *test-db* draft-graph-to-keep-uri2 test-triples)
+      (append-data! *test-db* draft-graph-to-del-uri test-triples)
 
-    (let [my-test-graph-uri "http://example.org/my-other-graph"
-          draft-graph-uri-1 (create-managed-graph-with-draft! my-test-graph-uri)
-          _ (create-managed-graph-with-draft! my-test-graph-uri)]
-      (do
-        ;; We are migrating empty graph, so this is deleting.
-        (migrate-live! *test-db* draft-graph-uri-1)
-        (let [managed-found? (is-graph-managed? *test-db* my-test-graph-uri)]
-          (testing "migrate-live! DELETION: Doesn't delete from state graph when there's multiple drafts"
-            (is managed-found?
-                "Live graph shouldn't be deleted from state graph if referenced by other drafts")
+      (migrate-live! *test-db* draft-graph-to-keep-uri)
+      (migrate-live! *test-db* draft-graph-to-del-uri)
 
-            (is (= false (draft-exists? *test-db* draft-graph-uri))
-                "Draft graph should be removed from the state graph")))))))
+      ;; Draft for deletion has had data published. Now lets create a delete and publish
+      (let [draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)]
+        ;; We are migrating an empty graph, so this is deleting.
+        (migrate-live! *test-db* draft-graph-to-del-uri)
+        (let [managed-found? (is-graph-managed? *test-db* test-graph-to-delete-uri)
+              keep-managed-found? (is-graph-managed? *test-db* graph-to-keep-uri)]
+          (is (not managed-found?)
+              "Live graph should no longer be referenced in state graph")
+
+          (is (= false (draft-exists? *test-db* draft-graph-to-del-uri))
+              "Draft graph should be removed from the state graph")
+          (testing "Unrelated draft and live graphs should be not be removed from the state graph"
+            (is keep-managed-found?)
+            (is (draft-exists? *test-db* draft-graph-to-keep-uri2))))))))
+
+(deftest migrate-live!-dont-remove-state-when-other-drafts-test
+  (testing "migrate-live! DELETION: Doesn't delete from state graph when there's multiple drafts"
+    (let [test-graph-to-delete-uri "http://example.org/my-other-graph2"
+          draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)
+          _ (create-managed-graph-with-draft! test-graph-to-delete-uri)
+          graph-to-keep-uri2 "http://example.org/keep-me-b2"
+          graph-to-keep-uri3 "http://example.org/keep-me-b3"
+          draft-graph-to-keep-uri2 (create-managed-graph-with-draft! graph-to-keep-uri2)
+          draft-graph-to-keep-uri3 (create-managed-graph-with-draft! graph-to-keep-uri3)]
+
+      (append-data! *test-db* draft-graph-to-keep-uri2 test-triples)
+      (append-data! *test-db* draft-graph-to-keep-uri3 test-triples)
+      (migrate-live! *test-db* draft-graph-to-keep-uri2)
+      (is (graph-exists? *test-db* graph-to-keep-uri2))
+
+      ;; We are migrating an empty graph, so this is deleting.
+      (migrate-live! *test-db* draft-graph-to-del-uri)
+      (let [draft-managed-found? (is-graph-managed? *test-db* test-graph-to-delete-uri)
+            keep-managed-found? (is-graph-managed? *test-db* graph-to-keep-uri2)]
+        (is draft-managed-found?
+            "Live graph shouldn't be deleted from state graph if referenced by other drafts")
+
+        (is (= false (draft-exists? *test-db* draft-graph-to-del-uri))
+            "Draft graph should be removed from the state graph")
+
+        (testing "Unrelated live & draft graphs should be not be removed from the state graph"
+          (is keep-managed-found?)
+          (is (draft-exists? *test-db* draft-graph-to-keep-uri3)))))))
+
 
 
 (deftest graph-restricted-queries-test
