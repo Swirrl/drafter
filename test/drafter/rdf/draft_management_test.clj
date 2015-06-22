@@ -211,7 +211,6 @@
 
         (testing "Unrelated live & draft graphs should be not be removed from the state graph"
           (is keep-managed-found?)
-          ;; TODO: Improve draft-exists? - could return false positives
           (is (draft-exists? *test-db* draft-graph-to-keep-uri3)))))))
 
 

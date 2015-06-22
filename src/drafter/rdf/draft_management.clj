@@ -37,18 +37,16 @@
                 "}")
               )))
 
-;; TODO - This could return false positives
 (defn draft-exists?
   "Checks state graph to see if a draft graph exists"
   [db graph-uri]
   (let [qry (str "ASK WHERE {"
                  "  SELECT ?s WHERE {"
-                 (with-state-graph "<" graph-uri ">  a <" drafter:DraftGraph "> .")
-                 "  }"
-                 ;; TODO - check that there is a dataset, live is managed and has draft d
-                 ;; live - a - managed
-                 ;;   | has draft -> d
-                 ;;   | d draft
+                 (with-state-graph
+                 "      ?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+                 "        <" drafter:hasDraft "> <" graph-uri "> ."
+                 "        <" graph-uri "> a <" drafter:DraftGraph "> ."
+                 "  }")
                  "  LIMIT 1"
                  "}")]
     (query db qry)))
