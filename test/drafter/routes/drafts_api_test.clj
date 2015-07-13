@@ -103,9 +103,9 @@
   (testing "POST /draft/create"
     (testing "without a live-graph param returns a 400 error"
       (let [response ((draft-api-routes "/draft" *test-db*)
-                                           {:uri "/draft/create"
-                                            :request-method :post
-                                            :headers {"accept" "application/json"}})]
+                      {:uri "/draft/create"
+                       :request-method :post
+                       :headers {"accept" "application/json"}})]
         (is-client-error-response response)))
 
     (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
@@ -116,6 +116,14 @@
                                                          :params {:live-graph test-graph-uri}
                                                          :headers {"accept" "application/json"}})]
         (is-created response)))
+
+    (testing (str "with live-graph=" drafter-state-graph " is forbidden")
+      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-db*)
+                                                        {:uri "/draft/create"
+                                                         :request-method :post
+                                                         :params {:live-graph drafter-state-graph}
+                                                         :headers {"accept" "application/json"}})]
+        (is (= 403 status))))
 
     (testing (str "with meta data" test-graph-uri " should see meta data stored")
 
@@ -205,7 +213,7 @@
                              (assoc-in [:params :file :content-type] "text/not-a-real-content-type"))
             route (draft-api-routes "/draft" *test-db*)
             {:keys [status] :as response} (route test-request)]
-        
+
         (is (= 400 status) "Bad request")))))
 
 (deftest graph-management-delete-graph-test
@@ -214,7 +222,7 @@
           _ (create-managed-graph! *test-db* graph-uri)
           draft-graph-uri (import-data-to-draft! *test-db* graph-uri test-triples-4)
           original-batch-size batched-write-size]
-      
+
       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
           "Graph should exist before deletion")
 
@@ -242,7 +250,7 @@
     (let [graph-uri "http://mygraph/draft-graph4"
           _ (create-managed-graph! *test-db* graph-uri)
           draft-graph-uri (import-data-to-draft! *test-db* graph-uri test-triples-4)]
-        
+
       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
           "Graph should exist before deletion")
 
@@ -336,14 +344,14 @@
     (testing "Updates existing metdata"
       (let [updated-key (ffirst meta-pairs)
             updated-pair [updated-key "new-value"]
-            
+
             ;;NOTE: ring only creates a collection if a parameter exists
             ;;multiple times in a query string. This also tests updating
             ;;a single graph
             request (create-meta-request draft1 [updated-pair])
             expected-metadata (assoc meta-pairs 0 updated-pair)
             {:keys [status]} (route request)]
-        
+
         (is (= 200 status))
 
         (doseq [[k v] expected-metadata]
