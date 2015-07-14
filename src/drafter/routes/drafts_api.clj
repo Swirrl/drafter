@@ -40,7 +40,7 @@
                                                           (response/api-response 500 result)
                                                           (response/api-response 201 result)))))))
 
-      (POST "/metadata" [graph :as {params :query-params}]
+      (POST "/metadata" [graph :as {params :params}]
             (let [metadata (api-routes/meta-params params)
                   graphs (if (coll? graph) graph [graph])]
               (if (or (empty? graph) (empty? metadata))
@@ -59,9 +59,9 @@
     (routes
       (POST mount-point {{graph :graph} :params
                          {content-type :content-type} :params
-                         query-params :query-params
+                         params :params
                          {{file-part-content-type :content-type data :tempfile} :file} :params}
-        (let [metadata (api-routes/meta-params query-params)
+        (let [metadata (api-routes/meta-params params)
               data-content-type (or content-type file-part-content-type)]
           ;; when source graph not supplied: append from the file
           (response/when-params [graph data-content-type]
