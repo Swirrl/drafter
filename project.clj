@@ -4,10 +4,6 @@
   :license {:name "Proprietary & Commercially Licensed Only"
             :url "http://swirrl.com/"}
 
-  ;; SNAPSHOT repository for JENA builds
-  :repositories [["jena-snapshots" {:url "https://repository.apache.org/content/repositories/snapshots/"
-                                    :releases false}]]
-
   :dependencies [
                  ;; Lock to a snapshot release of 3.0.0 as it has the JENA-954
                  ;; bug fix that we depend upon for rewriting.
