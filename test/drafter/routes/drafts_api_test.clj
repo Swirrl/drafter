@@ -50,7 +50,7 @@
   (add-request-file-data request (get-file-request-data path)))
 
 (defn add-request-metadata [request meta-name value]
-  (assoc-in request [:query-params (str "meta-" meta-name)] value))
+  (assoc-in request [:params (str "meta-" meta-name)] value))
 
 (defn add-request-graph [request graph]
   (assoc-in request [:params :graph] graph))
