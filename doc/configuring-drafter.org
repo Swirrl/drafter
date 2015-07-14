@@ -7,9 +7,9 @@ variables from the environment.
 Configurable properties and their defaults are:
 
 #+BEGIN_EXAMPLE
+SPARQL_QUERY_ENDPOINT         REQUIRED
+SPARQL_UPDATE_ENDPOINT        REQUIRED
 DRAFTER_HTTP_PORT:            (default 3001)
-DRAFTER_REPO_PATH:            (default "drafter-db")
-DRAFTER_INDEXES:              spoc,posc,cosp (Best for query performance, slowest for insert)
 DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
 #+END_EXAMPLE
 
