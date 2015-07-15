@@ -7,8 +7,8 @@ variables from the environment.
 Configurable properties and their defaults are:
 
 #+BEGIN_EXAMPLE
-SPARQL_QUERY_ENDPOINT         REQUIRED
-SPARQL_UPDATE_ENDPOINT        REQUIRED
+SPARQL_QUERY_ENDPOINT         REQUIRED http://$STARDOG_PORT_5820_TCP_ADDR:5820/${DATABASE_NAME:-pmd-data}/query
+SPARQL_UPDATE_ENDPOINT        REQUIRED http://$STARDOG_PORT_5820_TCP_ADDR:5820/${DATABASE_NAME:-pmd-data}/update
 DRAFTER_HTTP_PORT:            (default 3001)
 DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
 #+END_EXAMPLE
