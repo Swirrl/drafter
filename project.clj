@@ -5,14 +5,15 @@
             :url "http://swirrl.com/"}
 
   :dependencies [
-                 ;; Lock to a snapshot release of 3.0.0 as it has the JENA-954
-                 ;; bug fix that we depend upon for rewriting.
+                 ;; NOTE jena 3.0.0-SNAPSHOT was compiled from source with maven
+                 ;; and pushed into our private repo at commit:
+                 ;; d58c1a1abc7dfb2a58ce5b8c04e176940fecbb9a
                  ;;
-                 ;; TODO: Update to JENA 3.0.0 when it is released.
+                 ;; This is necessary for the new rewriting stuff.
                  [org.apache.jena/jena-arq "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api
-                                                                                   com.fasterxml.jackson.core/jackson-core
-                                                                                   org.slf4j/jcl-over-slf4j
-                                                                                   org.slf4j/slf4j-api]]
+                                                                         com.fasterxml.jackson.core/jackson-core
+                                                                         org.slf4j/jcl-over-slf4j
+                                                                         org.slf4j/slf4j-api]]
 
                  [org.apache.jena/jena-core "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-base "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]

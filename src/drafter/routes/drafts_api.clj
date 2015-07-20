@@ -3,6 +3,7 @@
             [compojure.core :refer [DELETE POST PUT context routes]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
+            [drafter.rdf.draft-management :refer [drafter-state-graph]]
             [drafter.rdf.draft-management.jobs :refer [append-data-to-graph-from-file-job
                                                        create-draft-job
                                                        delete-graph-job
@@ -30,14 +31,16 @@
       ;; graph
       (POST "/create" {{live-graph :live-graph} :params
                        params :params}
-        (response/when-params [live-graph]
-                              (submit-sync-job! (create-draft-job repo live-graph params)
-                                                (fn [result]
-                                                  (if (failed-job-result? result)
-                                                    (response/api-response 500 result)
-                                                    (response/api-response 201 result))))))
+            (response/when-params [live-graph]
+                                  (if (= live-graph drafter-state-graph)
+                                    (response/error-response 403 {:message "This graph is reserved, the create request was forbidden."})
+                                    (submit-sync-job! (create-draft-job repo live-graph params)
+                                                      (fn [result]
+                                                        (if (failed-job-result? result)
+                                                          (response/api-response 500 result)
+                                                          (response/api-response 201 result)))))))
 
-      (POST "/metadata" [graph :as {params :query-params}]
+      (POST "/metadata" [graph :as {params :params}]
             (let [metadata (api-routes/meta-params params)
                   graphs (if (coll? graph) graph [graph])]
               (if (or (empty? graph) (empty? metadata))
@@ -56,9 +59,9 @@
     (routes
       (POST mount-point {{graph :graph} :params
                          {content-type :content-type} :params
-                         query-params :query-params
+                         params :params
                          {{file-part-content-type :content-type data :tempfile} :file} :params}
-        (let [metadata (api-routes/meta-params query-params)
+        (let [metadata (api-routes/meta-params params)
               data-content-type (or content-type file-part-content-type)]
           ;; when source graph not supplied: append from the file
           (response/when-params [graph data-content-type]
