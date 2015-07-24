@@ -12,7 +12,8 @@
             [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [grafter.rdf.repository :refer [query with-transaction ToConnection ->connection]]
-            [environ.core :refer [env]]))
+            [environ.core :refer [env]]
+            [clojure.string :as string]))
 
 ;; Note if we change this default value we should also change it in the
 ;; drafter-client, and possibly other places too.
@@ -194,6 +195,37 @@
   given graph."
   [repo graphs metadata]
   (create-job :sync-write (partial update-graph-metadata repo graphs metadata)))
+
+(defn- sparql-uri-list [uris]
+  (string/join " " (map #(str "<" % ">") uris)))
+
+(defn- delete-graph-metadata-query [graph-uris meta-uris]
+  (str
+   "DELETE {"
+   (mgmt/with-state-graph "?g ?meta ?o")
+   "} WHERE {"
+   (mgmt/with-state-graph
+     (str
+      "?g ?meta ?o
+       VALUES ?g {" (sparql-uri-list graph-uris) "}
+       VALUES ?meta {" (sparql-uri-list meta-uris) "}"))
+   "}"))
+
+(defn- delete-graph-metadata
+  "Deletes all metadata values associated with the given keys across
+  all the given graph URIs."
+  [repo graphs meta-keys job]
+  (with-job-exception-handling job
+    (let [meta-uris (map meta-uri meta-keys)
+          delete-query (delete-graph-metadata-query graphs meta-uris)]
+      (update! repo delete-query)
+      (complete-job! job restapi/ok-response))))
+
+(defn create-delete-metadata-job
+  "Create a job to delete the given metadata keys from a collection of
+  draft graphs."
+  [repo graphs meta-keys]
+  (create-job :sync-write (partial delete-graph-metadata repo graphs meta-keys)))
 
 (defn append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file

@@ -308,7 +308,11 @@
           (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
-(defn metadata-exists-sparql [draft-graph-uri name value]
+(defn metadata-exists-sparql [draft-graph-uri name]
+  (let [meta-subject (meta-uri name)]
+    (str "ASK WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> ?v } }")))
+
+(defn metadata-has-value-sparql [draft-graph-uri name value]
   (let [meta-subject (meta-uri name)]
     (str "ASK WHERE { GRAPH <" drafter-state-graph "> { <" draft-graph-uri "> <" meta-subject "> \"" value "\" } }")))
 
@@ -339,7 +343,7 @@
         ;;metadata exists
         (doseq [graph [draft1 draft2]
                 [k v] meta-pairs]
-          (is (repo/query *test-db* (metadata-exists-sparql graph k v))))))
+          (is (repo/query *test-db* (metadata-has-value-sparql graph k v))))))
 
     (testing "Updates existing metdata"
       (let [updated-key (ffirst meta-pairs)
@@ -355,7 +359,19 @@
         (is (= 200 status))
 
         (doseq [[k v] expected-metadata]
-          (is (repo/query *test-db* (metadata-exists-sparql draft1 k v))))))
+          (is (repo/query *test-db* (metadata-has-value-sparql draft1 k v))))))
+
+    (testing "Deletes metadata"
+      (let [delete-request {:uri "/metadata"
+                            :request-method :delete
+                            :params {:graph [draft1 draft2]
+                                     :meta-key ["foo" "quux"]}}
+            {:keys [status]} (route delete-request)]
+        (is (= 200 status))
+
+        (doseq [g [draft1 draft2]
+                m ["foo" "quux"]]
+          (is (= false (repo/query *test-db* (metadata-exists-sparql g m)))))))
 
     (testing "Invalid if no graphs"
       (let [request (-> {:uri "/metadata" :request-method :post}
@@ -422,7 +438,7 @@
 
          (await-completion finished-jobs (:finished-job body))
 
-         (let [sparql (metadata-exists-sparql draft-graph-uri "uploaded-by" "fido")]
+         (let [sparql (metadata-has-value-sparql draft-graph-uri "uploaded-by" "fido")]
            (is (repo/query *test-db* sparql)))
 
          (testing "Overwrites metadata"
