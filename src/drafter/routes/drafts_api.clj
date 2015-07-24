@@ -9,6 +9,7 @@
                                                        delete-graph-job
                                                        migrate-graph-live-job
                                                        create-update-metadata-job
+                                                       create-delete-metadata-job
                                                        failed-job-result?]]
             [drafter.responses :refer [submit-sync-job! submit-async-job!]]
             [swirrl-server.responses :as response]))
@@ -20,6 +21,9 @@
   (if file-format
     (assoc file-obj :content-type file-format)
     file-obj))
+
+(defn to-coll [x]
+  (if (coll? x) x [x]))
 
 (defn draft-api-routes [mount-point repo]
   (routes
@@ -42,10 +46,17 @@
 
       (POST "/metadata" [graph :as {params :params}]
             (let [metadata (api-routes/meta-params params)
-                  graphs (if (coll? graph) graph [graph])]
+                  graphs (to-coll graph)]
               (if (or (empty? graph) (empty? metadata))
                 {:status 400 :headers {} :body "At least one graph and metadata pair required"}
                 (submit-sync-job! (create-update-metadata-job repo graphs metadata)))))
+
+      (DELETE "/metadata" [graph meta-key]
+              (let [meta-keys (to-coll meta-key)
+                    graphs (to-coll graph)]
+                (if (or (empty? graphs) (empty? meta-keys))
+                  {:status 400 :headers {} :body "At least one graph and metadata key required"}
+                  (submit-sync-job! (create-delete-metadata-job repo graphs meta-keys)))))
 
       ;; deletes draft graph data contents; does not delete the draft graph
       ;; entry from the state graph.
