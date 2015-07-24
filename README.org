@@ -155,6 +155,21 @@ It accepts the following parameters:
 Multiple graphs can be specified and each will be associated with the metadata defined
 by the collection of meta-[key]=value pairs in the query string.
 
+*** Delete draft metadata
+
+| Verbs  | Route             | Synchronous | Priority           |
+|--------+-------------------+-------------+--------------------|
+| DELETE | =/metadata=       | Yes         | =0 :sync-write=    |
+
+Deletes all metadata keys associated with a collection of graphs from the state graph.
+
+
+| Parameter  | Required | Description                                       |
+|------------+----------+---------------------------------------------------|
+| =graph=    | Yes      | One or more draft graphs to delete metadata from. |
+| =meta-key= | Yes      | One or more keys to delete from each graph.       |
+
+
 *** Delete draft contents
 
 | Verbs  | Route             | Synchronous | Priority           |
