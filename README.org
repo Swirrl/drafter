@@ -135,6 +135,21 @@ Server: Jetty(7.6.13.v20130916)
 }
 #+end_example
 
+*** Append live graph data into draft
+
+| Verbs | Route              | Synchronous | Priority           |
+|-------+--------------------+-------------+--------------------|
+| POST  | =/draft/copy-live= | No          | =1 :batched-write= |
+
+Appends all data from the associated live graph into a draft graph.
+
+It accepts the following parameter:
+
+| Parameter  | Required | Description                                                                    |
+|------------+----------+--------------------------------------------------------------------------------|
+| =graph=    | Yes      | The URI of the draft graph you wish to populate from the associated live graph |
+
+
 *** Create/Update draft metadata
 
 | Verbs  | Route             | Synchronous | Priority           |
