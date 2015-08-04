@@ -10,6 +10,7 @@
                                                        migrate-graph-live-job
                                                        create-update-metadata-job
                                                        create-delete-metadata-job
+                                                       create-copy-from-live-graph-job
                                                        failed-job-result?]]
             [drafter.responses :refer [submit-sync-job! submit-async-job!]]
             [swirrl-server.responses :as response]))
@@ -62,7 +63,10 @@
       ;; entry from the state graph.
       (DELETE "/contents" {{graph :graph} :params}
         (response/when-params [graph]
-                              (submit-async-job! (delete-graph-job repo graph :contents-only? true)))))
+                              (submit-async-job! (delete-graph-job repo graph :contents-only? true))))
+
+      (POST "/copy-live" {{graph :graph} :params}
+            (submit-async-job! (create-copy-from-live-graph-job repo graph))))
 
     ;; adds data to the graph from either source-graph or file
     ;; accepts extra meta- query string params, which are added to queue

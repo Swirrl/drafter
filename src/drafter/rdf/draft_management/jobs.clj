@@ -138,24 +138,6 @@
   (let [query (copy-graph-batch-query source-graph dest-graph offset limit)]
     (update! repo query)))
 
-(defn clone-graph-and-append-in-batches
-  "Clones a source graph and then appends the given metadata and
-  statements to it in batches."
-  [repo source-graph dest-graph batches metadata new-triples job]
-  (with-job-exception-handling job
-    (queue-job!
-     (create-child-job job
-                    (if-let [[offset limit] (first batches)]
-                      (let [next-fn (fn [job]
-                                      (clone-graph-and-append-in-batches repo source-graph dest-graph (rest batches) metadata new-triples job))]
-                        (copy-graph-batch! repo source-graph dest-graph offset limit)
-                        next-fn)
-
-                      ;; else if there are no (more) batches start appending the
-                      ;; file to the graph.
-                      (fn [job]
-                        (append-data-in-batches repo dest-graph metadata new-triples job)))))))
-
 (defn calculate-offsets [count batch-size]
   "Given a total number of items and a batch size, returns a sequence
   of [offset limit] pairs for segmenting the source collection into
@@ -273,13 +255,23 @@
     ]
 
     (make-job :batch-write [job]
-              ;;copy the live graph (if it exists) and then append the file data
-              (queue-job! (create-child-job job
-                                         (let [live-graph-uri (mgmt/lookup-live-graph repo draft-graph)
-                                               batch-sizes (and live-graph-uri
-                                                                (get-graph-clone-batches repo live-graph-uri))]
-                                           (fn [job]
-                                             (clone-graph-and-append-in-batches repo live-graph-uri draft-graph batch-sizes metadata new-triples job))))))))
+              (append-data-in-batches repo draft-graph metadata new-triples job))))
+
+(defn- copy-from-live-graph [repo live-graph-uri dest-graph-uri batches job]
+  (with-job-exception-handling job
+    (if-let [[offset limit] (first batches)]
+      (let [next-fn (fn [job]
+                      (copy-from-live-graph repo live-graph-uri dest-graph-uri (rest batches) job))]
+        (copy-graph-batch! repo live-graph-uri dest-graph-uri offset limit)
+        (queue-job! (create-child-job job next-fn)))
+      (job-succeeded! job))))
+
+(defn create-copy-from-live-graph-job [repo draft-graph-uri]
+    (make-job :batch-write [job]
+              (let [live-graph-uri (mgmt/lookup-live-graph repo draft-graph-uri)
+                    batch-sizes (and live-graph-uri
+                                     (get-graph-clone-batches repo live-graph-uri))]
+                (copy-from-live-graph repo live-graph-uri draft-graph-uri batch-sizes job))))
 
 (defn migrate-graph-live-job [repo graph]
   (make-job :exclusive-write [job]
