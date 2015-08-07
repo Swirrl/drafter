@@ -7,8 +7,8 @@
             [grafter.rdf.formats :refer :all]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [rdf-serializer]]
-            [drafter.rdf.draft-management :refer [import-data-to-draft! migrate-live!]]
-            [drafter.test-common :refer [test-triples
+            [drafter.rdf.draft-management :refer [migrate-live!]]
+            [drafter.test-common :refer [test-triples import-data-to-draft!
                                          make-store stream->string select-all-in-graph make-graph-live!]]))
 
 (def dumps-request {:request-method :get

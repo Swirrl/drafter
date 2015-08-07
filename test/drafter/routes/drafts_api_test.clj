@@ -1,6 +1,7 @@
 (ns drafter.routes.drafts-api-test
   (:require [drafter.test-common :refer [*test-db* test-triples wrap-with-clean-test-db
-                                         make-store stream->string select-all-in-graph make-graph-live!]]
+                                         make-store stream->string select-all-in-graph make-graph-live!
+                                         import-data-to-draft!]]
             [swirrl-server.async.jobs :refer [finished-jobs]]
             [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]

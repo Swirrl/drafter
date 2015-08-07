@@ -382,13 +382,3 @@
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
                     {:error :graph-not-found}))))
-
-(defn import-data-to-draft!
-  "Imports the data from the triples into a draft graph associated
-  with the specified graph.  Returns the draft graph uri."
-  [db graph triples]
-
-  (create-managed-graph! db graph)
-  (let [draft-graph (create-draft-graph! db graph)]
-    (add db draft-graph triples)
-    draft-graph))

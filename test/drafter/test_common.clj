@@ -1,9 +1,11 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
             [grafter.rdf.repository :refer :all]
+            [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
             [me.raynes.fs :as fs]
-            [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
+            [drafter.rdf.draft-management :refer [lookup-draft-graph-uri create-managed-graph! create-draft-graph!
+                                                  migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
             [swirrl-server.async.jobs :refer [create-job]])
@@ -60,6 +62,16 @@
 
 (defn make-store []
   (repo))
+
+(defn import-data-to-draft!
+  "Imports the data from the triples into a draft graph associated
+  with the specified graph.  Returns the draft graph uri."
+  [db graph triples]
+
+  (create-managed-graph! db graph)
+  (let [draft-graph (create-draft-graph! db graph)]
+    (add db draft-graph triples)
+    draft-graph))
 
 (defn make-graph-live!
   ([db live-guri]

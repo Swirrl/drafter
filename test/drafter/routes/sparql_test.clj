@@ -1,5 +1,5 @@
 (ns drafter.routes.sparql-test
-  (:require [drafter.test-common :refer [test-triples
+  (:require [drafter.test-common :refer [test-triples import-data-to-draft!
                                          make-store stream->string select-all-in-graph make-graph-live!]]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
