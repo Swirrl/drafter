@@ -1,5 +1,6 @@
 (ns drafter.routes.drafts-api
   (:require [clojure.tools.logging :as log]
+            [drafter.util :refer [to-coll]]
             [compojure.core :refer [DELETE POST PUT context routes]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
@@ -21,9 +22,6 @@
   (if file-format
     (assoc file-obj :content-type file-format)
     file-obj))
-
-(defn to-coll [x]
-  (if (coll? x) x [x]))
 
 (defn draft-api-routes [mount-point repo]
   (routes

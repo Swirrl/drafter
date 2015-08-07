@@ -1,11 +1,7 @@
 (ns drafter.common.sparql-routes
   (:require [clojure.set :as set]
+            [drafter.util :refer [to-coll]]
             [drafter.rdf.draft-management :as mgmt :refer [live-graphs]]))
-
-(defn- lift->col [col]
-  (if (instance? String col)
-    #{col}
-    col))
 
 (defn- calculate-graph-restriction [public-live-graphs live-graph-drafts supplied-draft-graphs]
   (set/union
@@ -24,7 +20,7 @@
 
   (let [graphs (get params :graph)
         union-with-live? (get params :union-with-live false)
-        supplied-draftset (lift->col graphs)
+        supplied-draftset (to-coll graphs)
         ;; get the graphs with drafts from graph-map
         graphs-with-drafts (into #{}
                                  (map str

@@ -83,11 +83,6 @@
       (make-restricted-dataset :default-graph restrictions
                                :union-graph restrictions))))
 
-(defn- lift [g]
-  (if (instance? String g)
-    [g]
-    g))
-
 (defn prepare-restricted-update [repo update-str graphs]
   (let [restricted-ds (when (seq graphs)
                         (resolve-restrictions graphs))]
@@ -125,7 +120,7 @@
                          (log/fatal ex "An exception was thrown when executing a SPARQL update!")
                          (throw ex)))))))
 
-(def ^:private  sparql-update-applied-response {:status 200 :body "OK"})
+(def ^:private sparql-update-applied-response {:status 200 :body "OK"})
 
 ;exec-update :: Repository -> Request -> (ParsedStatement -> Connection -> PreparedStatement) -> Response
 (defn exec-update [repo request prepare-fn timeouts]
