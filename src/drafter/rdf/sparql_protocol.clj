@@ -23,7 +23,7 @@
            [org.openrdf.sail.nativerdf NativeStore]
            [org.openrdf.query TupleQuery TupleQueryResult
             TupleQueryResultHandler BooleanQueryResultHandler
-            BindingSet QueryLanguage BooleanQuery GraphQuery]
+            BindingSet QueryLanguage BooleanQuery GraphQuery Update]
            [org.openrdf.rio.ntriples NTriplesWriter]
            [org.openrdf.rio.nquads NQuadsWriter]
            [org.openrdf.rio.n3 N3Writer]
@@ -168,8 +168,42 @@
     (handleComment [this comment]
       (.handleComment inner-handler comment))))
 
-;result-streamer :: (OutputStream -> Writer) -> Query -> (OutputStream -> ())
-(defn result-streamer [writer-fn pquery result-notify-fn]
+(defn- exec-ask-query [writer pquery result-notify-fn]
+  (let [notifying-handler (notifying-query-result-handler result-notify-fn writer)
+           result (.evaluate pquery)]
+       (doto notifying-handler
+         (.handleBoolean result))))
+
+(defn- exec-tuple-query [writer pquery result-notify-fn]
+  (log/debug "pquery (default) is " pquery " writer is " writer)
+  (.evaluate pquery (notifying-query-result-handler result-notify-fn writer)))
+
+(defn- get-graph-query-handler [writer]
+  (if (instance? QueryResultWriter writer)
+    (result-handler-wrapper writer)
+    writer))
+
+(defn- exec-graph-query [writer pquery result-notify-fn]
+  (log/debug "pquery is " pquery " writer is " writer)
+  (let [handler (get-graph-query-handler writer)
+        notifying-handler (notifying-rdf-handler result-notify-fn handler)]
+    (.evaluate pquery handler)))
+
+(defn- get-exec-query [pquery writer-fn]
+  (fn [ostream notifier-fn]
+    (let [writer (writer-fn ostream)]
+      (cond
+       (instance? BooleanQuery pquery)
+       (exec-ask-query writer pquery notifier-fn)
+
+       (instance? TupleQuery pquery)
+       (exec-tuple-query writer pquery notifier-fn)
+
+       :else
+       (exec-graph-query writer pquery notifier-fn)))))
+
+;result-streamer :: (OutputStream -> NotifierFn -> ()) -> NotifierFn -> (OutputStream -> ())
+(defn result-streamer [exec-fn result-notify-fn]
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
@@ -177,30 +211,7 @@
   logged."
   (fn [ostream]
     (try
-      (let [writer (writer-fn ostream)]
-        (cond
-         (instance? BooleanQuery pquery)
-         (let [notifying-handler (notifying-query-result-handler result-notify-fn writer)
-               result (.evaluate pquery)]
-           (doto notifying-handler
-             (.handleBoolean result)))
-
-         (and (instance? QueryResultWriter writer)
-              (instance? GraphQuery pquery))
-         (do
-           ;; Allow CSV and other tabular writers to work with graph
-           ;; queries.
-           (log/debug "pquery is " pquery " writer is " writer)
-           (.evaluate pquery (notifying-rdf-handler result-notify-fn (result-handler-wrapper writer))))
-
-         :else
-         (do
-           ;; Can be either a TupleQuery with TupleQueryResultHandler or a
-           ;; GraphQuery with an RDFHandler.
-           (log/debug "pquery (default) is " pquery " writer is " writer)
-           (cond
-            (instance? TupleQuery pquery) (.evaluate pquery (notifying-query-result-handler result-notify-fn writer))
-            (instance? GraphQuery pquery) (.evaluate pquery (notifying-rdf-handler result-notify-fn writer))))))
+      (exec-fn ostream result-notify-fn)
 
       (catch Exception ex
         ;; Note that if we error here it's now too late to return a
@@ -225,18 +236,13 @@
    :headers {"Content-Type" "text/plain; charset=utf-8"}
    :body (str "Unsupported media-type: " media-type)})
 
-(defn- stream-sparql-response [pquery response-mime-type writer-fn query-timeouts]
+(defn- stream-sparql-response [exec-fn query-timeouts]
   (let [{:keys [publish] :as query-operation} (create-operation)
-        streamer (result-streamer writer-fn pquery publish)
+        streamer (result-streamer exec-fn publish)
         [write-fn input-stream] (connect-piped-output-stream streamer)]
 
       (execute-operation query-operation write-fn query-timeouts)
-
-      {:status 200
-       :headers {"Content-Type" (get-sparql-response-content-type response-mime-type)}
-       ;; Designed to work with piped-input-stream this fn will be run
-       ;; in another thread to stream the results to the client.
-       :body input-stream}))
+      input-stream))
 
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
@@ -251,23 +257,23 @@
       (repo/make-restricted-dataset :default-graph graph-restrictions
                                    :named-graphs graph-restrictions))))
 
-(defn get-query-mime-preferences [query]
-  (condp instance? query
-    TupleQuery tuple-query-mime-preferences
-    BooleanQuery boolean-query-mime-preferences
-    GraphQuery graph-query-mime-preferences
+(defn get-query-mime-preferences [query-type]
+  (case query-type
+    :select tuple-query-mime-preferences
+    :ask boolean-query-mime-preferences
+    :construct graph-query-mime-preferences
     nil))
 
-(defn negotiate-sparql-query-mime-type [query request]
-  (let [mime-preferences (get-query-mime-preferences query)
+(defn negotiate-sparql-query-mime-type [query-type request]
+  (let [mime-preferences (get-query-mime-preferences query-type)
         accept-handler (wrap-accept identity {:mime mime-preferences})
         mime (get-in (accept-handler request) [:accept :mime])]
     mime))
 
-(defn class->writer-fn [pquery writer-class result-rewriter]
+;class->writer-fn :: Class[T] -> (OutputStream -> T)
+(defn class->writer-fn [writer-class]
   (fn [output-stream]
-    (let [inner (construct-dynamic* writer-class output-stream)]
-      (result-rewriter pquery inner))))
+    (construct-dynamic* writer-class output-stream)))
 
 (defn validate-query [query-str]
   "Validates a query by parsing it using ARQ. If the query is invalid
@@ -275,22 +281,70 @@
   (sparql-string->arq-query query-str)
   query-str)
 
-(defn process-sparql-query [db request & {:keys [query-rewrite-fn graph-restrictions result-rewriter query-timeouts]
-                                          :or {query-rewrite-fn validate-query
-                                               result-rewriter (fn [query writer] writer)
-                                               query-timeouts default-timeouts}}]
-  (let [restriction (restricted-dataset graph-restrictions)
-        {:keys [headers params]} request
-        query-str (:query params)
-        rewritten-query (query-rewrite-fn query-str)
-        pquery (doto (repo/prepare-query db rewritten-query)
-                 (.setDataset restriction))
-        media-type (negotiate-sparql-query-mime-type pquery request)]
+(defprotocol SparqlExecutor
+  (prepare-query [this sparql-string restrictions])
+  (get-query-type [this prepared-query])
+  (negotiate-result-writer [this prepared-query media-type])
+  (create-query-executor [this writer pquery]))
+
+(defrecord SesameSparqlExecutor [repo]
+  SparqlExecutor
+  (prepare-query [_ sparql-string graph-restrictions]
+    (let [validated-query-string (validate-query sparql-string)
+          dataset (restricted-dataset graph-restrictions)
+          pquery (repo/prepare-query repo validated-query-string)]
+      (.setDataset pquery dataset)
+      pquery))
+
+  (get-query-type [_ pquery]
+    (condp instance? pquery
+      TupleQuery :select
+      BooleanQuery :ask
+      GraphQuery :construct
+      Update :update
+      nil))
+
+  (negotiate-result-writer [_ pquery media-type]
+    (if-let [writer-class (negotiate-content-writer pquery media-type)]
+      (class->writer-fn writer-class)))
+
+  (create-query-executor [_ writer-fn pquery]
+    (get-exec-query pquery writer-fn)))
+
+(defrecord RewritingSesameSparqlExecutor [inner query-rewriter result-rewriter]
+  SparqlExecutor
+  (prepare-query [_ sparql-string restrictions]
+    (prepare-query inner (query-rewriter sparql-string) restrictions))
+
+  (get-query-type [_ pquery]
+    (get-query-type inner pquery))
+
+  (negotiate-result-writer [_ pquery media-type]
+    (if-let [inner-writer (negotiate-result-writer inner pquery media-type)]
+      #(result-rewriter pquery (inner-writer %))))
+
+  (create-query-executor [_ writer-fn pquery]
+    (create-query-executor inner writer-fn pquery)))
+
+(defn process-sparql-query [executor request & {:keys [graph-restrictions query-timeouts]
+                                                :or {query-timeouts default-timeouts}}]
+  (let [query-str (get-in request [:params :query])
+        pquery (prepare-query executor query-str graph-restrictions)
+        query-type (get-query-type executor pquery)
+        media-type (negotiate-sparql-query-mime-type query-type request)]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
 
-    (if-let [result-writer-class (negotiate-content-writer pquery media-type)]
-      (stream-sparql-response pquery media-type (class->writer-fn pquery result-writer-class result-rewriter) query-timeouts)
+    (if-let [writer (negotiate-result-writer executor pquery media-type)]
+      (let [exec-fn (create-query-executor executor writer pquery)
+            body (stream-sparql-response exec-fn query-timeouts)
+            response-content-type (get-sparql-response-content-type media-type)]
+        {:status 200
+         :headers {"Content-Type" response-content-type}
+         ;; Designed to work with piped-input-stream this fn will be run
+         ;; in another thread to stream the results to the client.
+         :body body})
+      
       (unsupported-media-type-response media-type))))
 
 (defn wrap-sparql-errors [handler]
@@ -314,12 +368,12 @@
    (wrap-sparql-errors
     (routes
      (GET mount-path request
-          (process-sparql-query repo request
+          (process-sparql-query (->SesameSparqlExecutor repo) request
                                 :graph-restrictions restrictions
                                 :query-timeouts timeouts))
 
      (POST mount-path request
-           (process-sparql-query repo request
+           (process-sparql-query (->SesameSparqlExecutor repo) request
                                  :graph-restrictions restrictions
                                  :query-timeouts timeouts))))))
 

@@ -7,7 +7,7 @@
             [drafter.responses :refer [default-job-result-handler submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
             [ring.util.codec :as codec]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point]]
             [drafter.operations :as ops]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository :refer [with-transaction make-restricted-dataset

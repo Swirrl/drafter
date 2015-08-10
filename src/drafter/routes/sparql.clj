@@ -4,7 +4,8 @@
                                     ANY GET POST PUT DELETE HEAD]]
             [clojure.set :as set]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors ->SesameSparqlExecutor
+                                                 ->RewritingSesameSparqlExecutor]]
             [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [clojure.tools.logging :as log]
@@ -26,11 +27,11 @@
     (let [{:keys [params]} request
           graph-uris (supplied-drafts repo request)
           live->draft (log/spy(mgmt/graph-map repo graph-uris))
-          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter live->draft)]
+          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter live->draft)
+          inner-executor (->SesameSparqlExecutor repo)
+          executor (->RewritingSesameSparqlExecutor inner-executor query-rewriter result-rewriter)]
 
-      (process-sparql-query repo request
-                            :query-rewrite-fn query-rewriter
-                            :result-rewriter result-rewriter
+      (process-sparql-query executor request
                             :graph-restrictions graph-uris
                             :query-timeouts timeouts))
 
