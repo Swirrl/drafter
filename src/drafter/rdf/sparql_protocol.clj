@@ -248,6 +248,11 @@
   "Returns a restricted dataset or nil when given either a 0-arg
   function or a collection of graph uris."
   [graph-restrictions]
+  {:pre [(or (nil? graph-restrictions)
+             (coll? graph-restrictions)
+             (fn? graph-restrictions))]
+   :post [(or (instance? Dataset %)
+              (nil? %))]}
   (let [graph-restrictions (cond
                             (coll? graph-restrictions) graph-restrictions
                             (fn? graph-restrictions) (graph-restrictions)

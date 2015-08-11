@@ -7,7 +7,7 @@
             [drafter.responses :refer [default-job-result-handler submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
             [ring.util.codec :as codec]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point restricted-dataset]]
             [drafter.operations :as ops]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository :refer [with-transaction make-restricted-dataset
@@ -62,30 +62,9 @@
 (defmethod parse-update-request :default [request]
   (throw (Exception. (str "Invalid Content-Type " (:content-type request)))))
 
-(defn- collection-or-nil? [x]
-  (or (coll? x)
-      (nil? x)))
-
-(defn- collection-nil-or-fn? [x]
-  (or (collection-or-nil? x)
-      (ifn? x)))
-
-(defn resolve-restrictions
-  "If restrictions is a sequence or nil return it, otherwise assume
-  it's a 0 arg function and call it returning its parameters."
-  [restrictions-or-f]
-  {:pre [(collection-nil-or-fn? restrictions-or-f)]
-   :post [(or (instance? Dataset %) (nil?  %))]}
-  (let [restrictions (if (collection-or-nil? restrictions-or-f)
-                       restrictions-or-f
-                       (restrictions-or-f))]
-    (when (seq restrictions)
-      (make-restricted-dataset :default-graph restrictions
-                               :union-graph restrictions))))
-
 (defn prepare-restricted-update [repo update-str graphs]
   (let [restricted-ds (when (seq graphs)
-                        (resolve-restrictions graphs))]
+                        (restricted-dataset graphs))]
     (prepare-update repo update-str restricted-ds)))
 
 (defn create-update-job [repo request prepare-fn timeouts]
