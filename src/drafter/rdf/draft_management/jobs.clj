@@ -1,6 +1,7 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
             [swirrl-server.responses :as restapi]
+            [drafter.backend.protocols :refer :all]
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job complete-job! create-child-job]]
@@ -13,7 +14,8 @@
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [grafter.rdf.repository :refer [query with-transaction ToConnection ->connection]]
             [environ.core :refer [env]]
-            [clojure.string :as string]))
+            [clojure.string :as string])
+  (:import [drafter.backend.sesame SesameSparqlExecutor]))
 
 ;; Note if we change this default value we should also change it in the
 ;; drafter-client, and possibly other places too.
@@ -47,7 +49,7 @@
   ([job] (job-succeeded! job {}))
   ([job details] (complete-job! job (merge {:type :ok} details))))
 
-(defn create-draft-job [repo live-graph params]
+(defn- create-draft-job [repo live-graph params]
   (make-job :sync-write [job]
             (let [conn (->connection repo)
                   draft-graph-uri (with-transaction conn
@@ -81,17 +83,6 @@
             (queue-job! (create-child-job job apply-next-batch)))
           (finish-delete-job! repo graph contents-only? job)))
       (finish-delete-job! repo graph contents-only? job))))
-
-(defn delete-graph-job [repo graph & {:keys [contents-only?]}]
-  "Deletes graph contents as per batch size in order to avoid blocking
-   writes with a lock. Finally the graph itself will be deleted unless
-   a value is supplied for the :contents-only? keyword argument"
-  (log/info "Starting batch deletion job")
-  (create-job :batch-write
-              (partial delete-in-batches
-                       repo
-                       graph
-                       contents-only?)))
 
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
   (with-job-exception-handling job
@@ -190,7 +181,7 @@
         (mgmt/add-metadata-to-graph conn draft-graph metadata))
       (complete-job! job restapi/ok-response))))
 
-(defn create-update-metadata-job
+(defn- create-update-metadata-job
   "Creates a job to associate the given graph metadata pairs with each
   given graph."
   [repo graphs metadata]
@@ -221,13 +212,13 @@
       (update! repo delete-query)
       (complete-job! job restapi/ok-response))))
 
-(defn create-delete-metadata-job
+(defn- create-delete-metadata-job
   "Create a job to delete the given metadata keys from a collection of
   draft graphs."
   [repo graphs meta-keys]
   (create-job :sync-write (partial delete-graph-metadata repo graphs meta-keys)))
 
-(defn append-data-to-graph-from-file-job
+(defn- append-data-to-graph-from-file-job
   "Return a job function that adds the triples from the specified file
   to the specified graph.
 
@@ -281,14 +272,40 @@
                                            (fn [job]
                                              (clone-graph-and-append-in-batches repo live-graph-uri draft-graph batch-sizes metadata new-triples job))))))))
 
-(defn migrate-graph-live-job [repo graph]
+(defn migrate-graph-live-job [repo graphs]
   (make-job :exclusive-write [job]
-            (log/info "Starting make-live for graph" graph)
+            (log/info "Starting make-live for graph" graphs)
             (let [conn (->connection repo)]
               (with-transaction conn
-                (if (instance? String graph)
-                  (mgmt/migrate-live! conn graph)
-                  (doseq [g graph]
-                    (mgmt/migrate-live! conn g)))))
-            (log/info "Make-live for graph" graph "done")
+                (doseq [g graphs]
+                  (mgmt/migrate-live! conn g))))
+            (log/info "Make-live for graphs " graphs " done")
             (job-succeeded! job)))
+
+(extend-type SesameSparqlExecutor
+  ApiOperations
+  (new-draft-job [{:keys [repo]} live-graph-uri params]
+    (create-draft-job repo live-graph-uri params))
+  
+  (append-data-to-graph-job [{:keys [repo]} graph data rdf-format metadata]
+    (append-data-to-graph-from-file-job repo graph data rdf-format metadata))
+  
+  (migrate-graphs-to-live-job [{:keys [repo]} graphs]
+    (migrate-graph-live-job repo graphs))
+
+  (delete-metadata-job [{:keys [repo]} graphs meta-keys]
+    (create-delete-metadata-job repo graphs meta-keys))
+
+  (update-metadata-job [{:keys [repo]} graphs metadata]
+    (create-update-metadata-job repo graphs metadata))
+
+  (delete-graph-job [{:keys [repo]} graph contents-only?]
+    "Deletes graph contents as per batch size in order to avoid
+   blocking writes with a lock. Finally the graph itself will be
+   deleted unless contents-only? is true"
+    (log/info "Starting batch deletion job")
+    (create-job :batch-write
+                (partial delete-in-batches
+                         repo
+                         graph
+                         contents-only?))))

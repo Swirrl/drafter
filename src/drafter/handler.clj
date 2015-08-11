@@ -6,6 +6,7 @@
             [drafter.operations :as ops]
             [drafter.middleware :as middleware]
             [drafter.configuration :as conf]
+            [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
             [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
@@ -119,8 +120,8 @@
                         ;; add your application routes here
                         (-> []
                             (add-route (pages-routes repo))
-                            (add-route (draft-api-routes "/draft" repo))
-                            (add-route (graph-management-routes "/graph" repo))
+                            (add-route (draft-api-routes "/draft" (->SesameSparqlExecutor repo)))
+                            (add-route (graph-management-routes "/graph" (->SesameSparqlExecutor repo)))
                             (add-routes (get-sparql-routes repo))
                             (add-route (context "/status" []
                                                 (status-routes global-writes-lock finished-jobs restart-id)))

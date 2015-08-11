@@ -3,6 +3,7 @@
             [grafter.rdf.repository :refer :all]
             [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
+            [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [lookup-draft-graph-uri create-managed-graph! create-draft-graph!
                                                   migrate-live!]]
@@ -13,6 +14,7 @@
            [java.util.concurrent CountDownLatch TimeUnit]))
 
 (def ^:dynamic *test-db* (repo (memory-store)))
+(def ^:dynamic *test-backend* (->SesameSparqlExecutor *test-db*))
 
 (def test-db-path "drafter-test-db")
 
@@ -53,12 +55,13 @@
   ([setup-state-fn test-fn]
    (binding [*test-db* (repo (native-store test-db-path))
              *test-writer* (start-writer!)]
-     (try
-       (setup-state-fn *test-db*)
-       (test-fn)
-       (finally
-         (fs/delete-dir test-db-path)
-         (stop-writer! *test-writer*))))))
+     (binding [*test-backend* (->SesameSparqlExecutor *test-db*)]
+       (try
+         (setup-state-fn *test-db*)
+         (test-fn)
+         (finally
+           (fs/delete-dir test-db-path)
+           (stop-writer! *test-writer*)))))))
 
 (defn make-store []
   (repo))

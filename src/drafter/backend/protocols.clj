@@ -8,3 +8,11 @@
 
 (defprotocol SparqlUpdateExecutor
   (execute-update [this update-query restrictions]))
+
+(defprotocol ApiOperations
+  (new-draft-job [this live-graph-uri params])
+  (append-data-to-graph-job [this graph data rdf-format metadata])
+  (migrate-graphs-to-live-job [this graphs])
+  (delete-metadata-job [this graphs meta-keys])
+  (update-metadata-job [this graphs metadata])
+  (delete-graph-job [this graph contents-only?]))

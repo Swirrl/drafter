@@ -1,5 +1,5 @@
 (ns drafter.routes.drafts-api-test
-  (:require [drafter.test-common :refer [*test-db* test-triples wrap-with-clean-test-db
+  (:require [drafter.test-common :refer [*test-db* *test-backend* test-triples wrap-with-clean-test-db
                                          make-store stream->string select-all-in-graph make-graph-live!
                                          import-data-to-draft!]]
             [swirrl-server.async.jobs :refer [finished-jobs]]
@@ -103,7 +103,7 @@
 (deftest drafts-api-create-draft-test
   (testing "POST /draft/create"
     (testing "without a live-graph param returns a 400 error"
-      (let [response ((draft-api-routes "/draft" *test-db*)
+      (let [response ((draft-api-routes "/draft" *test-backend*)
                       {:uri "/draft/create"
                        :request-method :post
                        :headers {"accept" "application/json"}})]
@@ -111,7 +111,7 @@
 
     (testing (str "with live-graph=" test-graph-uri " should create a new managed graph and draft")
 
-      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-db*)
+      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-backend*)
                                                         {:uri "/draft/create"
                                                          :request-method :post
                                                          :params {:live-graph test-graph-uri}
@@ -119,7 +119,7 @@
         (is-created response)))
 
     (testing (str "with live-graph=" drafter-state-graph " is forbidden")
-      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-db*)
+      (let [{:keys [status body headers] :as response} ((draft-api-routes "/draft" *test-backend*)
                                                         {:uri "/draft/create"
                                                          :request-method :post
                                                          :params {:live-graph drafter-state-graph}
@@ -128,7 +128,7 @@
 
     (testing (str "with meta data" test-graph-uri " should see meta data stored")
 
-      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-db*)
+      (let [{:keys [status body headers]} ((draft-api-routes "/draft" *test-backend*)
                                            {:uri "/draft/create"
                                             :request-method :post
                                             :params {:live-graph test-graph-uri "meta-foo" "foo" "meta-bar" "bar"}
@@ -174,7 +174,7 @@
             test-request (-> {:uri "/draft" :request-method :post}
                              (add-request-graph-source-file dest-graph "./test/test-triple.nt"))
 
-            route (draft-api-routes "/draft" *test-db*)
+            route (draft-api-routes "/draft" *test-backend*)
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
@@ -188,7 +188,7 @@
                              ;; project.clj is not RDF
                              (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "project.clj"))
 
-            route (draft-api-routes "/draft" *test-db*)
+            route (draft-api-routes "/draft" *test-backend*)
             {:keys [body] :as response} (route test-request)]
 
         (job-is-accepted response)
@@ -204,7 +204,7 @@
       (let [test-request (-> {:uri "/draft" :request-method :post}
                              (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "./test/test-triple.nt")
                              (update-in [:params :file] dissoc :content-type))
-            route (draft-api-routes "/draft" *test-db*)
+            route (draft-api-routes "/draft" *test-backend*)
             {:keys [status] :as response} (route test-request)]
         (is (= 400 status) "Bad request")))
 
@@ -212,7 +212,7 @@
       (let [test-request (-> {:uri "/draft" :request-method :post}
                              (add-request-graph-source-file "http://mygraph/graph-to-be-appended-to" "./test/test-triple.nt")
                              (assoc-in [:params :file :content-type] "text/not-a-real-content-type"))
-            route (draft-api-routes "/draft" *test-db*)
+            route (draft-api-routes "/draft" *test-backend*)
             {:keys [status] :as response} (route test-request)]
 
         (is (= 400 status) "Bad request")))))
@@ -229,7 +229,7 @@
 
       (set-var-root! #'batched-write-size 1)
 
-      (let [route (graph-management-routes "/graph" *test-db*)
+      (let [route (graph-management-routes "/graph" *test-backend*)
             test-request (-> {:uri "/graph" :request-method :delete}
                              (add-request-graph draft-graph-uri))
             response (route test-request)]
@@ -255,7 +255,7 @@
       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
           "Graph should exist before deletion")
 
-      (let [route (draft-api-routes "/draft" *test-db*)
+      (let [route (draft-api-routes "/draft" *test-backend*)
             test-request (-> {:uri "/draft/contents" :request-method :delete}
                              (add-request-graph draft-graph-uri))
             response (route test-request)]
@@ -275,7 +275,7 @@
       (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
           "Draft graph should exist before deletion")
 
-      (let [route (graph-management-routes "/graph" *test-db*)
+      (let [route (graph-management-routes "/graph" *test-backend*)
             test-request (-> {:uri "/graph/live" :request-method :put
                               :params {:graph draft-graph}})
 
@@ -293,7 +293,7 @@
     (let [draft-graph-1 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-1" (test-triples "http://test.com/subject-1"))
           draft-graph-2 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-2" (test-triples "http://test.com/subject-1"))]
 
-      (let [route (graph-management-routes "/graph" *test-db*)
+      (let [route (graph-management-routes "/graph" *test-backend*)
             test-request {:uri "/graph/live"
                           :request-method :put
                           :params {:graph [draft-graph-1 draft-graph-2]}}
@@ -330,7 +330,7 @@
   (let [draft1 "http://graphs.org/1"
         draft2 "http://graphs.org/2"
         meta-pairs [["foo" "bar"] ["quux" "qaal"]]
-        route (draft-api-routes "" *test-db*)
+        route (draft-api-routes "" *test-backend*)
         create-meta-request (fn [graphs meta-pairs]
                               (-> {:uri "/metadata"
                                    :request-method :post
@@ -397,7 +397,7 @@
   (let [live-triples (triplify [(URIImpl. "http://subj")
                                 [(URIImpl. "http://p1") (URIImpl. "http://o1")]
                                 [(URIImpl. "http://p2") (URIImpl. "http://o2")]])
-        route (draft-api-routes "/draft" *test-db*)
+        route (draft-api-routes "/draft" *test-backend*)
         live-graph (create-managed-graph! *test-db* "http://live")
         draft-graph-uri (create-draft-graph! *test-db* live-graph)
         nt-file "./test/test-triple.nt"
@@ -424,7 +424,7 @@
  (deftest test-name
    (testing "Updating draft graph with metadata"
      (testing "Adds metadata"
-       (let [route (draft-api-routes "/draft" *test-db*)
+       (let [route (draft-api-routes "/draft" *test-backend*)
              source-graph-uri (make-graph-live! *test-db* "http://mygraph/source-graph")
              draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
 
