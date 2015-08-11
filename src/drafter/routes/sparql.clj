@@ -4,8 +4,8 @@
                                     ANY GET POST PUT DELETE HEAD]]
             [clojure.set :as set]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors ->SesameSparqlExecutor
-                                                 ->RewritingSesameSparqlExecutor]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
+            [drafter.backend.sesame :refer [->SesameSparqlExecutor ->RewritingSesameSparqlExecutor]]
             [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [clojure.tools.logging :as log]

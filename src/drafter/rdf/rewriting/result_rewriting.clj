@@ -7,7 +7,7 @@
    [drafter.util :refer [map-values]]
    [drafter.rdf.draft-management :as mgmt]
    [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-   [drafter.rdf.sparql-protocol :refer [result-handler-wrapper]]
+   [drafter.backend.sesame :refer [result-handler-wrapper]]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
   (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery Update QueryResultHandler TupleQueryResultHandler BindingSet Binding]
