@@ -292,6 +292,9 @@
   (negotiate-result-writer [this prepared-query media-type])
   (create-query-executor [this writer pquery]))
 
+(defprotocol SparqlUpdateExecutor
+  (execute-update [this update-query restrictions]))
+
 (defrecord SesameSparqlExecutor [repo]
   SparqlExecutor
   (prepare-query [_ sparql-string graph-restrictions]
@@ -314,7 +317,15 @@
       (class->writer-fn writer-class)))
 
   (create-query-executor [_ writer-fn pquery]
-    (get-exec-query pquery writer-fn)))
+    (get-exec-query pquery writer-fn))
+
+  SparqlUpdateExecutor
+  (execute-update [_ update-query restrictions]
+    (with-open [conn (repo/->connection repo)]
+      (let [dataset (restricted-dataset restrictions)
+            pquery (repo/prepare-update conn update-query dataset)]
+        (repo/with-transaction conn
+          (repo/evaluate pquery))))))
 
 (defrecord RewritingSesameSparqlExecutor [inner query-rewriter result-rewriter]
   SparqlExecutor

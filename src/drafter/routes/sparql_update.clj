@@ -6,37 +6,10 @@
             [swirrl-server.responses :as response]
             [drafter.responses :refer [default-job-result-handler submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
-            [ring.util.codec :as codec]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point restricted-dataset]]
+            [drafter.rdf.sparql-protocol :refer [sparql-end-point execute-update ->SesameSparqlExecutor]]
             [drafter.operations :as ops]
-            [clojure.tools.logging :as log]
-            [grafter.rdf.repository :refer [with-transaction make-restricted-dataset
-                                            prepare-update evaluate ToConnection ->connection]]
-            [pantomime.media :as mt]
-            [drafter.common.sparql-routes :refer [supplied-drafts]])
-  (:import [java.util.concurrent FutureTask CancellationException]
-           [org.openrdf.query Dataset]
-           [org.openrdf.repository Repository RepositoryConnection]))
-
-(defn do-update [repo restrictions]
-  {:status 200})
-
-(defn decode-x-form-urlencoded-parameters
-  "Decodes application/x-www-form-urlencoded parameter strings and returns
-  a hashmap mapping.  If a value occurs multiple times the repeated
-  values are stored under that key in a vector.
-
-  This is necessary to support the presence of multiple graph
-  parameters."
-  [s]
-  (letfn [(multi-value-merge [existing new]
-            (if (vector? existing) (conj existing new) [existing new]))]
-
-    (->> (clojure.string/split s #"&")
-         (map codec/url-decode)
-         (map (fn [s] (clojure.string/split s #"=")))
-         (map (partial apply hash-map))
-         (apply merge-with multi-value-merge))))
+            [pantomime.media :as mt])
+  (:import [java.util.concurrent FutureTask CancellationException]))
 
 (defmulti parse-update-request
   "Convert a request into an String representing the SPARQL update
@@ -62,56 +35,44 @@
 (defmethod parse-update-request :default [request]
   (throw (Exception. (str "Invalid Content-Type " (:content-type request)))))
 
-(defn prepare-restricted-update [repo update-str graphs]
-  (let [restricted-ds (when (seq graphs)
-                        (restricted-dataset graphs))]
-    (prepare-update repo update-str restricted-ds)))
-
-(defn create-update-job [repo request prepare-fn timeouts]
+(defn create-update-job [executor request restrictions timeouts]
   (jobs/make-job :sync-write [job]
-                 (with-open [conn (->connection repo)]
-                   (let [timeouts (or timeouts ops/default-timeouts)
-                         parsed-query (parse-update-request request)
-                         prepared-update (prepare-fn parsed-query conn)
-                         update-future (FutureTask. (fn []
-                                                      (with-transaction conn
-                                                        (evaluate prepared-update))))]
-                     (try
-                       (log/debug "Executing update-query " prepared-update)
-                       ;; The 'reaper' framework monitors instances of the
-                       ;; Future interface and cancels them if they timeout
-                       ;; create a Future for the update, register it for
-                       ;; cancellation on timeout and then run it on this
-                       ;; thread.
-                       (ops/register-for-cancellation-on-timeout update-future timeouts)
-                       (.run update-future)
-                       (.get update-future)
-                       (complete-job! job {:type :ok})
-                       (catch CancellationException cex
-                         ;; update future was run on the current
-                         ;; thread so it was interrupted when the
-                         ;; future was cancelled clear the interrupted
-                         ;; flag on this thread
-                         (Thread/interrupted)
-                         (log/fatal cex "Update operation cancelled due to timeout")
-                         (throw cex))
-                       (catch Exception ex
-                         (log/fatal ex "An exception was thrown when executing a SPARQL update!")
-                         (throw ex)))))))
+                 (let [timeouts (or timeouts ops/default-timeouts)
+                       parsed-query (parse-update-request request)
+                       query-string (:update parsed-query)
+                       update-future (FutureTask. #(execute-update executor query-string restrictions))]
+                   (try
+                     (log/debug "Executing update-query " parsed-query)
+                     ;; The 'reaper' framework monitors instances of the
+                     ;; Future interface and cancels them if they timeout
+                     ;; create a Future for the update, register it for
+                     ;; cancellation on timeout and then run it on this
+                     ;; thread.
+                     (ops/register-for-cancellation-on-timeout update-future timeouts)
+                     (.run update-future)
+                     (.get update-future)
+                     (complete-job! job {:type :ok})
+                     (catch CancellationException cex
+                       ;; update future was run on the current
+                       ;; thread so it was interrupted when the
+                       ;; future was cancelled clear the interrupted
+                       ;; flag on this thread
+                       (Thread/interrupted)
+                       (log/fatal cex "Update operation cancelled due to timeout")
+                       (throw cex))
+                     (catch Exception ex
+                       (log/fatal ex "An exception was thrown when executing a SPARQL update!")
+                       (throw ex))))))
 
 (def ^:private sparql-update-applied-response {:status 200 :body "OK"})
 
-;exec-update :: Repository -> Request -> (ParsedStatement -> Connection -> PreparedStatement) -> Response
-(defn exec-update [repo request prepare-fn timeouts]
-  (let [job (create-update-job repo request prepare-fn timeouts)]
+;exec-update :: SparqlUpdateExecutor -> Request -> GraphRestrictions -> Response
+(defn exec-update [executor request restrictions timeouts]
+  (let [job (create-update-job executor request restrictions timeouts)]
     (submit-sync-job! job (fn [result]
                             (if (jobs/failed-job-result? result)
                               (response/api-response 500 result)
                               sparql-update-applied-response)))))
-
-(defn prepare-update-statement [{update :update} conn restrictions]
-  (let [rs (if (fn? restrictions) (restrictions) restrictions)]
-    (prepare-restricted-update conn update rs)))
 
 (defn update-endpoint
   "Create a standard update-endpoint and optional restrictions on the
@@ -126,7 +87,7 @@
 
   ([mount-point repo restrictions timeouts]
      (POST mount-point request
-           (exec-update repo request #(prepare-update-statement %1 %2 restrictions) timeouts))))
+           (exec-update (->SesameSparqlExecutor repo) request restrictions timeouts))))
 
 (defn live-update-endpoint-route [mount-point repo timeouts]
   (update-endpoint mount-point repo (partial mgmt/live-graphs repo) timeouts))
