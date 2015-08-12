@@ -2,7 +2,6 @@
   (:require [clojure.tools.logging :as log]
             [drafter.operations :refer :all]
             [drafter.backend.protocols :refer :all]
-            [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]

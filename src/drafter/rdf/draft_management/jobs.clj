@@ -4,6 +4,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.backend.sesame]
             [swirrl-server.async.jobs :refer [create-job complete-job! create-child-job]]
             [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]

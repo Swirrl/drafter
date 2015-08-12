@@ -11,6 +11,9 @@
 
 (defprotocol DraftManagement)
 
+(defprotocol Stoppable
+  (stop [this]))
+
 (defprotocol ApiOperations
   (new-draft-job [this live-graph-uri params])
   (append-data-to-graph-job [this graph data rdf-format metadata])

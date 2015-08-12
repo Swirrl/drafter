@@ -6,7 +6,8 @@
             [drafter.operations :as ops]
             [drafter.middleware :as middleware]
             [drafter.configuration :as conf]
-            [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
+            [drafter.backend.protocols :refer [stop]]
+            [drafter.backend.configuration :refer [get-backend]]
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
             [drafter.routes.drafts-api :refer [draft-api-routes
@@ -26,7 +27,6 @@
                                              stop-writer!]]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [environ.core :refer [env]]
-            [grafter.rdf.repository :as repo]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.verbs :refer [wrap-verbs]]
             [selmer.parser :as parser])
@@ -39,24 +39,14 @@
 
   (:require [clj-logging-config.log4j :refer [set-loggers!]]))
 
-
-(def default-indexes "spoc,pocs,ocsp,cspo,cpos,oscp")
-
-(def default-repo-path "drafter-db")
-
 ;; Set these values later when we start the server
-(def repo)
+(def backend)
 (def app)
 
 (def ^{:doc "A future to control the single write thread that performs database writes."}
   writer-service)
 
 (def stop-reaper (fn []))
-
-(defn initialise-repo! [repo-path indexes]
-  (set-var-root! #'repo (let [repo (repo/repo (repo/native-store repo-path indexes))]
-                          (log/info "Initialised repo" repo-path)
-                          repo)))
 
 (defroutes app-routes
   (route/resources "/")
@@ -141,12 +131,18 @@
 (defn initialise-write-service! []
   (set-var-root! #'writer-service  (start-writer!)))
 
-(defn initialise-services! [repo-path indexes]
+(defn- init-backend!
+  "Creates the backend for the current configuration and sets the
+  backend var."
+  []
+  (set-var-root! #'backend (get-backend)))
+
+(defn initialise-services! []
   (enc/register-custom-encoders!)
-  (initialise-repo! repo-path indexes)
 
   (initialise-write-service!)
-  (initialise-app! (->SesameSparqlExecutor repo))
+  (init-backend!)
+  (initialise-app! backend)
   (set-var-root! #'stop-reaper (ops/start-reaper 2000)))
 
 (defn- load-logging-configuration [config-file]
@@ -173,10 +169,7 @@
     (parser/cache-off!))
 
   (log/info "Initialising repository")
-  (initialise-services! (get env :drafter-repo-path default-repo-path)
-                        ;; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
-                        ;; (but we have to specify 4 char strings, so in some cases last chars don't matter
-                        (get env :drafter-indexes default-indexes))
+  (initialise-services!)
 
   (log/info "drafter started successfully"))
 
@@ -185,18 +178,8 @@
    shuts down, put any clean up code here"
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
-  (repo/shutdown repo)
+  (stop backend)
   (stop-writer! writer-service)
   (stop-reaper)
   (log/info "drafter has shut down."))
 
-(defn reindex
-  "Reindex the database according to the DRAFTER_INDEXES set at
-  DRAFTER_REPO_PATH in the environment.  If no environment variables
-  are set for these values the defaults are used."
-  []
-  (let [indexes (get env :drafter-indexes default-indexes)
-        repo-path (get env :drafter-repo-path default-repo-path)]
-    (log/info "Reindexing database at" repo-path " with indexes" indexes)
-    (repo/repo (repo/native-store repo-path indexes))
-    (log/info "Reindexing finished")))

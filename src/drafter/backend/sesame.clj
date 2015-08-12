@@ -225,7 +225,11 @@
       (let [dataset (restricted-dataset restrictions)
             pquery (repo/prepare-update conn update-query dataset)]
         (repo/with-transaction conn
-          (repo/evaluate pquery))))))
+          (repo/evaluate pquery)))))
+
+  Stoppable
+  (stop [this]
+    (repo/shutdown repo)))
 
 (defrecord RewritingSesameSparqlExecutor [inner query-rewriter result-rewriter]
   SparqlExecutor
