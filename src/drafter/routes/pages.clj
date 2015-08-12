@@ -1,10 +1,9 @@
 (ns drafter.routes.pages
-  (:require [clojure.walk :refer [keywordize-keys]]
-            [compojure.core :refer [GET routes]]
+  (:require [compojure.core :refer [GET routes]]
             [drafter.layout :as layout]
-            [drafter.util :refer [map-values]]
             [drafter.rdf.draft-management :refer [drafter-state-graph
                                                   live-graphs
+                                                  all-drafts
                                                   lookup-live-graph
                                                   draft-exists?]]
             [drafter.rdf.drafter-ontology :refer :all]
@@ -30,23 +29,6 @@
   databases as it will be loaded into memory."
   [db ostream]
   (add (rdf-serializer ostream :format rdf-trig) (statements db)))
-
-(defn parse-guid [uri]
-  (.replace (str uri) (draft-uri "") ""))
-
-(defn all-drafts [db]
-  (doall (->> (query db (str
-                         "SELECT ?draft ?live WHERE {"
-                         "   GRAPH <" drafter-state-graph "> {"
-                         "     ?draft a <" drafter:DraftGraph "> . "
-                         "     ?live <" drafter:hasDraft "> ?draft . "
-                         "   }"
-                         "}"))
-              (map keywordize-keys)
-              (map (partial map-values str))
-              (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
-
-
 
 (defn data-page [template dumps-endpoint graphs]
   (layout/render template {:dump-path dumps-endpoint :graphs graphs}))

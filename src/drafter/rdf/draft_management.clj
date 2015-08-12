@@ -1,6 +1,8 @@
 (ns drafter.rdf.draft-management
   (:require [clojure.tools.logging :as log]
             [grafter.rdf :refer [add s]]
+            [drafter.util :refer [map-values]]
+            [clojure.walk :refer [keywordize-keys]]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :refer [update!]]
@@ -309,6 +311,21 @@
                       "}"))
           (map #(str (% "live")))
           (into #{})))
+
+(defn- parse-guid [uri]
+  (.replace (str uri) (draft-uri "") ""))
+
+(defn all-drafts [db]
+  (doall (->> (query db (str
+                         "SELECT ?draft ?live WHERE {"
+                         "   GRAPH <" drafter-state-graph "> {"
+                         "     ?draft a <" drafter:DraftGraph "> . "
+                         "     ?live <" drafter:hasDraft "> ?draft . "
+                         "   }"
+                         "}"))
+              (map keywordize-keys)
+              (map (partial map-values str))
+              (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
 (defn migrate-live!
   "Moves the triples from the draft graph to the draft graphs live destination."
