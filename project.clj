@@ -48,7 +48,8 @@
   :pedantic? :abort
 
   :repl-options {:init-ns drafter.repl
-                 :init (-main)}
+                 :init (-main)
+                 :timeout 180000}
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
             [lein-environ "1.0.0"]
