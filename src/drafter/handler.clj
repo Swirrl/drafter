@@ -114,14 +114,14 @@
                    :state state-endpoint-spec}]
     (create-sparql-routes endpoints backend)))
 
-(defn initialise-app! [repo]
+(defn initialise-app! [backend]
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         (-> []
-                            (add-route (pages-routes repo))
-                            (add-route (draft-api-routes "/draft" (->SesameSparqlExecutor repo)))
-                            (add-route (graph-management-routes "/graph" (->SesameSparqlExecutor repo)))
-                            (add-routes (get-sparql-routes (->SesameSparqlExecutor repo)))
+                            (add-route (pages-routes backend))
+                            (add-route (draft-api-routes "/draft" backend))
+                            (add-route (graph-management-routes "/graph" backend))
+                            (add-routes (get-sparql-routes backend))
                             (add-route (context "/status" []
                                                 (status-routes global-writes-lock finished-jobs restart-id)))
 
@@ -146,7 +146,7 @@
   (initialise-repo! repo-path indexes)
 
   (initialise-write-service!)
-  (initialise-app! repo)
+  (initialise-app! (->SesameSparqlExecutor repo))
   (set-var-root! #'stop-reaper (ops/start-reaper 2000)))
 
 (defn- load-logging-configuration [config-file]

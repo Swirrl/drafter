@@ -188,6 +188,10 @@
   (query-dataset [_ sparql-string model]
     (proto/query-dataset repo sparql-string model))
 
+  proto/ITripleReadable
+  (to-statements [this options]
+    (proto/to-statements repo options))
+
   proto/ISPARQLUpdateable
   (update! [this sparql-string]
     (proto/update! repo sparql-string))
