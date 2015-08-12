@@ -80,21 +80,21 @@
   allowed graphs; restrictions can either be a collection of string
   graph-uri's or a function that returns such a collection."
 
-  ([mount-point repo]
-     (update-endpoint mount-point repo #{}))
+  ([mount-point executor]
+     (update-endpoint mount-point executor #{}))
 
-  ([mount-point repo restrictions]
-   (update-endpoint mount-point repo restrictions nil))
+  ([mount-point executor restrictions]
+   (update-endpoint mount-point executor restrictions nil))
 
-  ([mount-point repo restrictions timeouts]
+  ([mount-point executor restrictions timeouts]
      (POST mount-point request
-           (exec-update (->SesameSparqlExecutor repo) request restrictions timeouts))))
+           (exec-update executor request restrictions timeouts))))
 
-(defn live-update-endpoint-route [mount-point repo timeouts]
-  (update-endpoint mount-point repo (partial mgmt/live-graphs repo) timeouts))
+(defn live-update-endpoint-route [mount-point backend timeouts]
+  (update-endpoint mount-point backend (partial mgmt/live-graphs backend) timeouts))
 
-(defn state-update-endpoint-route [mount-point repo timeouts]
-  (update-endpoint mount-point repo #{mgmt/drafter-state-graph} timeouts))
+(defn state-update-endpoint-route [mount-point backend timeouts]
+  (update-endpoint mount-point backend #{mgmt/drafter-state-graph} timeouts))
 
-(defn raw-update-endpoint-route [mount-point repo timeouts]
-  (update-endpoint mount-point repo nil timeouts))
+(defn raw-update-endpoint-route [mount-point backend timeouts]
+  (update-endpoint mount-point backend nil timeouts))

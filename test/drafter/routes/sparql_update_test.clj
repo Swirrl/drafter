@@ -5,7 +5,8 @@
             [clojure.test :refer :all]
             [clojure.template :refer [do-template]]
             [ring.util.codec :as codec]
-            [drafter.test-common :refer [*test-db* wrap-with-clean-test-db stream->string select-all-in-graph make-store during-exclusive-write]]
+            [drafter.test-common :refer [*test-db* *test-backend* wrap-with-clean-test-db stream->string
+                                         select-all-in-graph make-store during-exclusive-write]]
             [grafter.rdf.repository :refer [query]])
   (:import [java.util UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
@@ -51,7 +52,7 @@
          base-req))))
 
 (deftest application-sparql-update-test
-  (let [endpoint (update-endpoint "/update" *test-db*)]
+  (let [endpoint (update-endpoint "/update" *test-backend*)]
 
     (testing "POST /update"
       (testing "with a valid SPARQL update"
@@ -63,7 +64,7 @@
 
 (deftest update-unavailable-test
   (testing "Update not available if exclusive write job running"
-    (let [endpoint (update-endpoint "/update" *test-db*)]
+    (let [endpoint (update-endpoint "/update" *test-backend*)]
 
       ;; update should fail while exclusive write is in progress
       (during-exclusive-write
@@ -75,7 +76,7 @@
         (is (= 200 status))))))
 
 (deftest application-x-form-urlencoded-test
-  (let [endpoint (update-endpoint "/update" *test-db*)]
+  (let [endpoint (update-endpoint "/update" *test-backend*)]
     (testing "POST /update"
       (testing "with a SPARQL update"
         (let [{:keys [status body headers]} (endpoint (x-form-urlencoded-update-request))]
@@ -85,7 +86,7 @@
               "Inserts the data"))))))
 
 (deftest live-update-endpoint-route-test
-  (let [endpoint (live-update-endpoint-route "/update" *test-db* nil)]
+  (let [endpoint (live-update-endpoint-route "/update" *test-backend* nil)]
     (create-managed-graph! *test-db* "http://example.com/")
     (testing "and a graph restriction"
       (let [request (application-sparql-update-request "INSERT { GRAPH <http://example.com/> {
