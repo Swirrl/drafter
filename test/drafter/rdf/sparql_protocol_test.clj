@@ -31,7 +31,7 @@
         (is (map? output))))))
 
 (deftest sparql-end-point-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
+  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "Standard SPARQL query with no dataset restrictions"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -54,7 +54,7 @@
   (set (map (fn [{:keys [s p o]}] [s p o]) triples)))
 
 (deftest sparql-end-point-graph-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
+  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "Standard SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -72,7 +72,7 @@
           (is (= expected-triples triples)))))))
 
 (deftest sparql-end-point-tuple-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
+  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "Tuple SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -90,7 +90,7 @@
           (is (= expected-triples triples)))))))
 
 (deftest sparql-end-point-boolean-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
+  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "Boolean SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -106,7 +106,7 @@
           (is (= "true" body-str)))))))
 
 (deftest sparql-endpoint-sets-content-type-text-plain-if-html-requested
-  (let [end-point (sparql-end-point "/live/sparql" *test-db*)]
+  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "SPARQL endpoint sets content type to text/plain if text/html requested"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -119,7 +119,7 @@
 
 (deftest sparlq-endpoint-invalid-query
   (testing "SPARQL endpoint returns client error if SPARQL query invalid"
-    (let [endpoint (sparql-end-point "/live/sparql" *test-db*)
+    (let [endpoint (sparql-end-point "/live/sparql" *test-backend*)
           request {:request-method :get
                    :uri "/live/sparql"
                    :params {:query "NOT A VALID SPARQL QUERY"}

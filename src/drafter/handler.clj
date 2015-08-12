@@ -81,16 +81,16 @@
     (log-endpoint-config route-name route-type timeouts)
     (endpoint-fn path repo timeouts)))
 
-(defn- dumps-route [route-name query-fn timeout-config]
+(defn- create-dumps-route [route-name query-fn backend timeout-config]
   (let [dump-path (str "/data/" (name route-name))
         query-timeouts (conf/get-endpoint-timeout route-name :query timeout-config)
         dump-fn #(query-fn %1 %2 query-timeouts)]
-    (dumps-endpoint dump-path dump-fn repo)))
+    (dumps-endpoint dump-path dump-fn backend)))
 
-(defn create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? repo timeout-config]
-  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query repo timeout-config)
-        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update repo timeout-config))
-        dumps-route (if add-dumps? (dumps-route route-name query-fn timeout-config) nil)
+(defn create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? backend timeout-config]
+  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query backend timeout-config)
+        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update backend timeout-config))
+        dumps-route (if add-dumps? (create-dumps-route route-name query-fn backend timeout-config) nil)
         routes [query-route update-route]]
     (vec (remove nil? [query-route update-route dumps-route]))))
 
@@ -102,18 +102,18 @@
 (def draft-endpoint-spec (specify-endpoint draft-sparql-routes nil true))
 (def state-endpoint-spec (specify-endpoint state-sparql-routes state-update-endpoint-route false))
 
-(defn create-sparql-routes [endpoint-map repo]
+(defn create-sparql-routes [endpoint-map backend]
   (let [timeout-conf (conf/get-timeout-config env (keys endpoint-map) ops/default-timeouts)
         ep-routes (fn [[ep-name {:keys [query-fn update-fn has-dump]}]]
-                    (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump repo timeout-conf))]
+                    (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump backend timeout-conf))]
     (mapcat ep-routes endpoint-map)))
 
-(defn get-sparql-routes [repo]
+(defn get-sparql-routes [backend]
   (let [endpoints {:live live-endpoint-spec
                    :raw raw-endpoint-spec
                    :draft draft-endpoint-spec
                    :state state-endpoint-spec}]
-    (create-sparql-routes endpoints repo)))
+    (create-sparql-routes endpoints backend)))
 
 (defn initialise-app! [repo]
   (set-var-root! #'app (app-handler
@@ -122,7 +122,7 @@
                             (add-route (pages-routes repo))
                             (add-route (draft-api-routes "/draft" (->SesameSparqlExecutor repo)))
                             (add-route (graph-management-routes "/graph" (->SesameSparqlExecutor repo)))
-                            (add-routes (get-sparql-routes repo))
+                            (add-routes (get-sparql-routes (->SesameSparqlExecutor repo)))
                             (add-route (context "/status" []
                                                 (status-routes global-writes-lock finished-jobs restart-id)))
 

@@ -66,6 +66,10 @@
 (defn make-store []
   (repo))
 
+(defn make-backend []
+  (let [repo (make-store)]
+    [repo (->SesameSparqlExecutor repo)]))
+
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
   with the specified graph.  Returns the draft graph uri."

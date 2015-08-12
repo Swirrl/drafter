@@ -128,22 +128,22 @@
           {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
 
 (defn sparql-end-point
-  "Builds a SPARQL end point from a mount-path, a sesame repository and
+  "Builds a SPARQL end point from a mount-path, a SPARQL executor and
   an optional restriction function which returns a list of graph uris
   to restrict both the union and named-graph queries too."
 
-  ([mount-path repo] (sparql-end-point mount-path repo nil))
-  ([mount-path repo restrictions] (sparql-end-point mount-path repo restrictions nil))
-  ([mount-path repo restrictions timeouts]
+  ([mount-path executor] (sparql-end-point mount-path executor nil))
+  ([mount-path executor restrictions] (sparql-end-point mount-path executor restrictions nil))
+  ([mount-path executor restrictions timeouts]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
    (wrap-sparql-errors
     (routes
      (GET mount-path request
-          (process-sparql-query (->SesameSparqlExecutor repo) request
+          (process-sparql-query executor request
                                 :graph-restrictions restrictions
                                 :query-timeouts timeouts))
 
      (POST mount-path request
-           (process-sparql-query (->SesameSparqlExecutor repo) request
+           (process-sparql-query executor request
                                  :graph-restrictions restrictions
                                  :query-timeouts timeouts))))))

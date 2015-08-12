@@ -2,6 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer :all]
             [grafter.rdf.repository :as repo]
+            [grafter.rdf.protocols :as proto]
             [drafter.util :refer [construct-dynamic*]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
@@ -179,6 +180,14 @@
        (exec-graph-query writer pquery notifier-fn)))))
 
 (defrecord SesameSparqlExecutor [repo]
+  proto/ISPARQLable
+  (query-dataset [_ sparql-string model]
+    (proto/query-dataset repo sparql-string model))
+
+  proto/ISPARQLUpdateable
+  (update! [this sparql-string]
+    (proto/update! repo sparql-string))
+  
   SparqlExecutor
   (prepare-query [_ sparql-string graph-restrictions]
     (let [validated-query-string (validate-query sparql-string)

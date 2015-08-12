@@ -7,7 +7,6 @@
             [drafter.responses :refer [default-job-result-handler submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :refer [execute-update]]
-            [drafter.rdf.sparql-protocol :refer [sparql-end-point]]
             [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
             [drafter.operations :as ops]
             [pantomime.media :as mt])
