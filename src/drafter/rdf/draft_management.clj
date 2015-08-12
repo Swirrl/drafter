@@ -51,7 +51,7 @@
                  "}")]
     (query db qry)))
 
-(defn has-more-than-one-draft?
+(defn- has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
   [db live-graph-uri]
@@ -234,7 +234,7 @@
                           (get "live"))]
     (str live-uri)))
 
-(defn- delete-live-graph-from-state [live-graph-uri]
+(defn- delete-live-graph-from-state-query [live-graph-uri]
   (str "DELETE WHERE"
        "{"
        (with-state-graph
@@ -242,16 +242,10 @@
          "   ?p ?o .")
        "}"))
 
-(defn delete-live-graph-from-state! [db live-graph-uri]
+(defn- delete-live-graph-from-state! [db live-graph-uri]
   "Delete the live managed graph from the state graph"
-  (update! db (delete-live-graph-from-state live-graph-uri))
+  (update! db (delete-live-graph-from-state-query live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
-
-(defn lookup-live-graph-uri [db draft-graph-uri]
-  "Given a draft graph URI, lookup and return its live graph."
-
-  (-> (log/spy (lookup-live-graph db draft-graph-uri))
-      (URIImpl.)))
 
 (defn draft-graphs
   "Get all the draft graph URIs"
@@ -275,20 +269,6 @@
     (throw (ex-info
             "Multiple drafts were found, when only one is expected.  The context is likely too broad."
             {:error :multiple-drafts-error}))))
-
-(defn lookup-draft-graph-uri
-  "Get all the draft graph URIs.  Assumes there will be at most one
-  draft found."
-  [db live-graph-uri]
-  (let [res (->> (query db
-                        (str "SELECT ?draft WHERE {"
-                             (with-state-graph
-                               "<" live-graph-uri ">" " <" drafter:hasDraft "> ?draft .")
-                             "} LIMIT 2"))
-                 (map #(str (get % "draft")))
-                 return-one-or-zero-uris)]
-    (log/debug "Live->Draft mapping: " live-graph-uri " -> " res)
-    res))
 
 (defn- has-duplicates? [col]
   (not= col

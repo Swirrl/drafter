@@ -5,7 +5,7 @@
             [grafter.rdf.templater :refer [triplify]]
             [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
             [me.raynes.fs :as fs]
-            [drafter.rdf.draft-management :refer [lookup-draft-graph-uri create-managed-graph! create-draft-graph!
+            [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!
                                                   migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]

@@ -9,7 +9,6 @@
             [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
-            [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
             [drafter.routes.drafts-api :refer [draft-api-routes
                                                graph-management-routes]]
             [drafter.routes.status :refer [status-routes]]
