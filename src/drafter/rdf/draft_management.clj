@@ -6,7 +6,7 @@
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :refer [update!]]
-            [grafter.rdf.repository :refer [query]]
+            [grafter.rdf.repository :refer [query ->connection]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import (java.util Date UUID)
            (org.openrdf.model.impl URIImpl)))
@@ -236,6 +236,15 @@
                           (get "live"))]
     (str live-uri)))
 
+(defn get-live-graph-for-draft
+  "Gets the live graph URI corresponding to a draft graph. Returns nil
+  if the draft URI does not have an associated managed graph or if the
+  live graph does not exist."
+  [db draft-graph-uri]
+  (with-open [conn (->connection db)]
+    (if (draft-exists? conn (draft-graph-uri))
+      (lookup-live-graph conn draft-graph-uri))))
+
 (defn- delete-live-graph-from-state-query [live-graph-uri]
   (str "DELETE WHERE"
        "{"
@@ -316,16 +325,17 @@
   (.replace (str uri) (draft-uri "") ""))
 
 (defn all-drafts [db]
-  (doall (->> (query db (str
-                         "SELECT ?draft ?live WHERE {"
-                         "   GRAPH <" drafter-state-graph "> {"
-                         "     ?draft a <" drafter:DraftGraph "> . "
-                         "     ?live <" drafter:hasDraft "> ?draft . "
-                         "   }"
-                         "}"))
-              (map keywordize-keys)
-              (map (partial map-values str))
-              (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
+  (with-open [conn (->connection db)]
+    (doall (->> (query conn (str
+                           "SELECT ?draft ?live WHERE {"
+                           "   GRAPH <" drafter-state-graph "> {"
+                           "     ?draft a <" drafter:DraftGraph "> . "
+                           "     ?live <" drafter:hasDraft "> ?draft . "
+                           "   }"
+                           "}"))
+                (map keywordize-keys)
+                (map (partial map-values str))
+                (map (fn [m] (assoc m :guid (parse-guid (:draft m)))))))))
 
 (defn migrate-live!
   "Moves the triples from the draft graph to the draft graphs live destination."

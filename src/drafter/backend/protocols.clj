@@ -9,6 +9,8 @@
 (defprotocol SparqlUpdateExecutor
   (execute-update [this update-query restrictions]))
 
+(defprotocol DraftManagement)
+
 (defprotocol ApiOperations
   (new-draft-job [this live-graph-uri params])
   (append-data-to-graph-job [this graph data rdf-format metadata])

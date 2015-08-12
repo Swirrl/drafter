@@ -4,13 +4,11 @@
             [drafter.rdf.draft-management :refer [drafter-state-graph
                                                   live-graphs
                                                   all-drafts
-                                                  lookup-live-graph
-                                                  draft-exists?]]
+                                                  get-live-graph-for-draft]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
             [grafter.rdf.io :refer [rdf-serializer]]
-            [grafter.rdf.repository :refer [query ToConnection ->connection]]
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]))
 
@@ -44,26 +42,24 @@
                                 :update-endpoint "/sparql/live/update"
                                 :dump-path "/live/data"
                                 :name "Live" }))
-   (GET "/draft" [] (with-open [conn (->connection db)]
-                      (draft-management-page {:endpoint "/sparql/draft"
-                                              :update-endpoint "/sparql/draft/update"
-                                              :name "Draft"
-                                              :drafts (all-drafts conn)
-                                              :dump-path "/draft/data"
-                                              })))
+   (GET "/draft" []
+        (draft-management-page {:endpoint "/sparql/draft"
+                                :update-endpoint "/sparql/draft/update"
+                                :name "Draft"
+                                :drafts (all-drafts db)
+                                :dump-path "/draft/data"
+                                }))
 
    (GET "/live/data" request
         (live-dumps-form "/data/live" (doall (live-graphs db))))
 
    (GET "/draft/data" request
-        (draft-dumps-form "/data/draft" (doall (all-drafts db))))
+        (draft-dumps-form "/data/draft" (all-drafts db)))
 
    (GET "/draft/:guid" [guid]
-        (with-open [conn (->connection db)]
-          (if (draft-exists? conn (draft-uri guid))
-            (let [draft (draft-uri guid)
-                  live (lookup-live-graph conn draft)]
-              (upload-form {:draft draft :live live}))
+        (let [draft (draft-uri guid)]
+          (if-let [live-uri (get-live-graph-for-draft draft)]
+            (upload-form {:draft draft :live live-uri})
             (not-found (str "No such Draft:" guid)))))
 
    (GET "/state" [] (query-page {:endpoint "/sparql/state"

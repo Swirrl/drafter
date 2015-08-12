@@ -180,6 +180,10 @@
        (exec-graph-query writer pquery notifier-fn)))))
 
 (defrecord SesameSparqlExecutor [repo]
+  repo/ToConnection
+  (->connection [_]
+    (repo/->connection repo))
+  
   proto/ISPARQLable
   (query-dataset [_ sparql-string model]
     (proto/query-dataset repo sparql-string model))
