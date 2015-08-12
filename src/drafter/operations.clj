@@ -134,6 +134,7 @@
   (let [executor-service (Executors/newSingleThreadScheduledExecutor)
         task-future (.scheduleWithFixedDelay executor-service (create-repeating-task-fn f) delay-ms delay-ms TimeUnit/MILLISECONDS)]
     (fn []
+      (timbre/warn "Terminating long running operation as it has exceeded the time out.")
       (future-cancel task-future)
       (.shutdown executor-service))))
 
@@ -229,4 +230,3 @@
   intermediate values the timeout is effectively the operation
   timeout"
   (create-timeouts 60000 240000))
-
