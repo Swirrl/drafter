@@ -68,12 +68,13 @@
   ;; contents-only? deletion.
   ;;
   ;; Checks that graph is a draft graph - will only delete drafts.
-  (let [conn (->connection repo)]
-    (if (and (mgmt/graph-exists? repo graph)
-             (mgmt/draft-exists? repo graph))
+  (if (and (mgmt/graph-exists? repo graph)
+           (mgmt/draft-exists? repo graph))
       (do
-        (with-transaction conn
-                          (mgmt/delete-graph-batched! conn graph batched-write-size))
+        (with-open [conn (->connection repo)]
+          (with-transaction conn
+            (mgmt/delete-graph-batched! conn graph batched-write-size)))
+        
 
         (if (mgmt/graph-exists? repo graph)
           ;; There's more graph contents so queue another job to continue the
@@ -81,7 +82,7 @@
           (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
             (queue-job! (create-child-job job apply-next-batch)))
           (finish-delete-job! repo graph contents-only? job)))
-      (finish-delete-job! repo graph contents-only? job))))
+      (finish-delete-job! repo graph contents-only? job)))
 
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
   (with-job-exception-handling job
