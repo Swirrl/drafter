@@ -242,7 +242,7 @@
   live graph does not exist."
   [db draft-graph-uri]
   (with-open [conn (->connection db)]
-    (if (draft-exists? conn (draft-graph-uri))
+    (if (draft-exists? conn draft-graph-uri)
       (lookup-live-graph conn draft-graph-uri))))
 
 (defn- delete-live-graph-from-state-query [live-graph-uri]

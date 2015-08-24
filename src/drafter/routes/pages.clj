@@ -58,7 +58,7 @@
 
    (GET "/draft/:guid" [guid]
         (let [draft (draft-uri guid)]
-          (if-let [live-uri (get-live-graph-for-draft draft)]
+          (if-let [live-uri (get-live-graph-for-draft db draft)]
             (upload-form {:draft draft :live live-uri})
             (not-found (str "No such Draft:" guid)))))
 
