@@ -20,6 +20,7 @@
 (defprotocol ApiOperations
   (new-draft-job [this live-graph-uri params])
   (append-data-to-graph-job [this graph data rdf-format metadata])
+  (copy-from-live-graph-job [this draft-graph-uri])
   (migrate-graphs-to-live-job [this graphs])
   (delete-metadata-job [this graphs meta-keys])
   (update-metadata-job [this graphs metadata])

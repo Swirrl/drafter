@@ -55,7 +55,10 @@
       ;; entry from the state graph.
       (DELETE "/contents" {{graph :graph} :params}
         (response/when-params [graph]
-                              (submit-async-job! (delete-graph-job operations graph true)))))
+                              (submit-async-job! (delete-graph-job operations graph true))))
+
+      (POST "/copy-live" {{graph :graph} :params}
+            (submit-async-job! (copy-from-live-graph-job operations graph))))
 
     ;; adds data to the graph from either source-graph or file
     ;; accepts extra meta- query string params, which are added to queue

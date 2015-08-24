@@ -262,6 +262,9 @@
    
    :append-data-to-graph-job (fn [this graph data rdf-format metadata]
                                (jobs/append-data-to-graph-from-file-job (get-repo this) graph data rdf-format metadata))
+
+   :copy-from-live-graph-job (fn [this draft-graph-uri]
+                               (jobs/create-copy-from-live-graph-job (get-repo this) draft-graph-uri))
    
    :migrate-graphs-to-live-job (fn [this graphs]
                                  (jobs/migrate-graph-live-job (get-repo this) graphs))

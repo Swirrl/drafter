@@ -393,30 +393,26 @@
 (defn uriify-values [m]
   (map-values #(and % (URIImpl. %)) m))
 
-(deftest append-clones-source-graph-test
+(deftest copy-from-live-graph-test
   (let [live-triples (triplify [(URIImpl. "http://subj")
                                 [(URIImpl. "http://p1") (URIImpl. "http://o1")]
                                 [(URIImpl. "http://p2") (URIImpl. "http://o2")]])
         route (draft-api-routes "/draft" *test-backend*)
         live-graph (create-managed-graph! *test-db* "http://live")
         draft-graph-uri (create-draft-graph! *test-db* live-graph)
-        nt-file "./test/test-triple.nt"
-        append-request (-> {:uri "/draft" :request-method :post}
-                           (add-request-graph-source-file draft-graph-uri nt-file))]
+        copy-request (-> {:uri "/draft/copy-live" :request-method :post}
+                           (add-request-graph draft-graph-uri))]
 
     (add *test-db* live-graph live-triples)
 
-    (let [{:keys [status body] :as response} (route append-request)
+    (let [{:keys [status body] :as response} (route copy-request)
           job-path (:finished-job body)]
       (is (= 202 status))
 
-      (await-completion finished-jobs job-path)
-
-      (let [file-triples (map (comp ->triple uriify-values) (statements nt-file))
-            draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-db*))))
-            expected-triples (set (concat file-triples live-triples))]
-
-        (is (= draft-triples expected-triples))))))
+      (let [{job-status :type} (await-completion finished-jobs job-path)
+            draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-db*))))]
+        (is (= :ok job-status))
+        (is (= draft-triples (set live-triples)))))))
 
 (do-template
  [test-name http-method modify-request]

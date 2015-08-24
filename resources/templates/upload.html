@@ -9,7 +9,14 @@
 	<button type="submit" class="btn btn-success">Make Graph Live</button>
 </form>
 
-<h1>Append RDF to Draft</h1>
+<h2>Copy Live Graph Data</h2>
+<p>Append all live graph triples into the draft graph.</p>
+<form method="POST" action="/draft/copy-live">
+  <input type="hidden" name="graph" value="{{ draft }}"/>
+  <button type="submit" class="btn btn-success">Copy Live Graph</button>
+</form>
+
+<h2>Append RDF to Draft</h2>
 <form class="col-sm-4" method="POST" role="form" action="/draft?graph={{ draft }}" enctype="multipart/form-data">
 	<div class="form-group">
 		<select class="form-control" name="content-type">
