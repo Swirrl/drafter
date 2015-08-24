@@ -1,7 +1,11 @@
 (ns drafter.backend.sesame-common
   (:require [grafter.rdf.repository :as repo]
+            [clojure.set :as set]
             [clojure.tools.logging :as log]
+            [drafter.backend.protocols :as backend]
             [grafter.rdf.protocols :as proto]
+            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
+            [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter result-handler-wrapper]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
             [drafter.util :refer [construct-dynamic*]])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
@@ -113,31 +117,6 @@
     (handleComment [this comment]
       (.handleComment inner-handler comment))))
 
-(defn result-handler-wrapper
-  ([writer] (result-handler-wrapper writer {}))
-  ([writer draft->live]
-     (reify
-       RDFHandler
-       (startRDF [this]
-         (.startQueryResult writer '("s" "p" "o")))
-       (endRDF [this]
-         (.endQueryResult writer))
-       (handleNamespace [this prefix uri]
-         ;; No op
-         )
-       (handleStatement [this statement]
-         (let [s (.getSubject statement)
-               p (.getPredicate statement)
-               o (.getObject statement)
-               bs (doto (MapBindingSet.)
-                    (.addBinding "s" (get draft->live s s))
-                    (.addBinding "p" (get draft->live p p))
-                    (.addBinding "o" (get draft->live o o)))]
-           (.handleSolution writer bs)))
-       (handleComment [this comment]
-         ;; No op
-         ))))
-
 (defn- exec-ask-query [writer pquery result-notify-fn]
   (let [notifying-handler (notifying-query-result-handler result-notify-fn writer)
            result (.evaluate pquery)]
@@ -206,8 +185,39 @@
         (repo/with-transaction conn
           (repo/evaluate pquery)))))
 
+(defn- make-draft-query-rewriter
+  "Build both a query rewriter and an accompanying result rewriter tied together
+  in a hash-map, for supplying to our draft SPARQL endpoints as configuration."
+
+  [live->draft]
+  {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
+   :result-rewriter
+   (fn [prepared-query writer]
+     (let [draft->live (set/map-invert live->draft)]
+       (choose-result-rewriter prepared-query draft->live writer))
+     )})
+
+(defrecord RewritingSesameSparqlExecutor [inner live->draft]
+  backend/SparqlExecutor
+  (prepare-query [_ sparql-string restrictions]
+    (let [rewritten-query (rewrite-sparql-string live->draft sparql-string)]
+      (backend/prepare-query inner rewritten-query restrictions)))
+
+  (get-query-type [_ pquery]
+    (backend/get-query-type inner pquery))
+
+  (negotiate-result-writer [_ prepared-query media-type]
+    (if-let [inner-writer-fn (backend/negotiate-result-writer inner prepared-query media-type)]
+      (fn [ostream]
+        (let [draft->live (set/map-invert live->draft)
+              writer (inner-writer-fn ostream)]
+          (choose-result-rewriter prepared-query draft->live writer)))))
+
+  (create-query-executor [_ writer-fn pquery]
+    (backend/create-query-executor inner writer-fn pquery)))
+
 (def default-to-connection-impl
-  {:to-connection (comp repo/->connection get-repo)})
+  {:->connection (comp repo/->connection get-repo)})
 
 (def default-triple-readable-impl
   {:to-statements (fn [this options]
@@ -232,6 +242,9 @@
 
    :create-query-executor (fn [_ writer-fn prepared-query]
                             (get-exec-query prepared-query writer-fn))})
+
+(def default-query-rewritable-impl
+  {:create-rewriter ->RewritingSesameSparqlExecutor})
 
 (def default-sparql-update-impl
   {:execute-update (fn [this query-string restrictions]

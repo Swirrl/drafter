@@ -6,6 +6,9 @@
   (negotiate-result-writer [this prepared-query media-type])
   (create-query-executor [this writer pquery]))
 
+(defprotocol QueryRewritable
+  (create-rewriter [this live->draft]))
+
 (defprotocol SparqlUpdateExecutor
   (execute-update [this update-query restrictions]))
 
