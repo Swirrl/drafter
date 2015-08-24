@@ -3,6 +3,8 @@
             [clojure.set :as set]
             [clojure.tools.logging :as log]
             [drafter.backend.protocols :as backend]
+            [swirrl-server.async.jobs :refer [create-job]]
+            [drafter.rdf.draft-management.jobs :as jobs]
             [grafter.rdf.protocols :as proto]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter result-handler-wrapper]]
@@ -252,3 +254,27 @@
 
 (def default-stoppable-impl
   {:stop (comp repo/shutdown get-repo)})
+
+;;draft API
+(def default-api-operations-impl
+  {:new-draft-job (fn [this live-graph-uri params]
+                    (jobs/create-draft-job (get-repo this) live-graph-uri params))
+   
+   :append-data-to-graph-job (fn [this graph data rdf-format metadata]
+                               (jobs/append-data-to-graph-from-file-job (get-repo this) graph data rdf-format metadata))
+   
+   :migrate-graphs-to-live-job (fn [this graphs]
+                                 (jobs/migrate-graph-live-job (get-repo this) graphs))
+   :delete-metadata-job (fn [this graphs meta-keys]
+                          (jobs/create-delete-metadata-job (get-repo this) graphs meta-keys))
+   
+   :update-metadata-job (fn [this graphs metadata]
+                          (jobs/create-update-metadata-job (get-repo this) graphs metadata))
+   
+   :delete-graph-job (fn [this graph contents-only?]
+                       (log/info "Starting batch deletion job")
+                       (create-job :batch-write
+                                   (partial jobs/delete-in-batches
+                                            (get-repo this)
+                                            graph
+                                            contents-only?)))})

@@ -23,4 +23,7 @@
   (migrate-graphs-to-live-job [this graphs])
   (delete-metadata-job [this graphs meta-keys])
   (update-metadata-job [this graphs metadata])
-  (delete-graph-job [this graph contents-only?]))
+  (delete-graph-job [this graph contents-only?]
+    "Deletes graph contents as per batch size in order to avoid
+   blocking writes with a lock. Finally the graph itself will be
+   deleted unless contents-only? is true"))

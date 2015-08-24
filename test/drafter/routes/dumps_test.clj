@@ -2,7 +2,6 @@
   (:require [clojure.test :refer :all]
             [drafter.routes.dumps :refer :all]
             [clojure.template :refer [do-template]]
-            [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
             [drafter.routes.sparql :refer [draft-sparql-routes]]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point]]
             [grafter.rdf.formats :refer :all]
@@ -19,7 +18,6 @@
 
 (defn make-store-with-draft []
   (let [[test-db test-backend] (make-backend)
-        test-backend (->SesameSparqlExecutor test-db)
         draft-graph (import-data-to-draft! test-db "http://capybara.com/capybara-data-1" (test-triples "http://test.com/subject-1"))]
     [test-db test-backend draft-graph]))
 

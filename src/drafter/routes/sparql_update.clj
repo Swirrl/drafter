@@ -7,7 +7,6 @@
             [drafter.responses :refer [default-job-result-handler submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :refer [execute-update]]
-            [drafter.backend.sesame :refer [->SesameSparqlExecutor]]
             [drafter.operations :as ops]
             [pantomime.media :as mt])
   (:import [java.util.concurrent FutureTask CancellationException]))
