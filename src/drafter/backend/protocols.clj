@@ -19,7 +19,10 @@
   (append-graph-metadata! [this draft-graph-uri metadata]
     "Takes a hash-map of metadata key/value pairs and adds them as
   metadata to the graphs state graph, converting keys into drafter
-  URIs as necessary.  Assumes all values are strings."))
+  URIs as necessary.  Assumes all values are strings.")
+
+  (get-all-drafts [this]
+    "Gets a sequence of descriptors for all draft graphs"))
 
 (defprotocol Stoppable
   (stop [this]))

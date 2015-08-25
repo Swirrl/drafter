@@ -305,18 +305,20 @@
 (defn- parse-guid [uri]
   (.replace (str uri) (draft-uri "") ""))
 
-(defn all-drafts [db]
-  (with-open [conn (->connection db)]
-    (doall (->> (query conn (str
+(def ^:private get-all-drafts-query (str
                            "SELECT ?draft ?live WHERE {"
                            "   GRAPH <" drafter-state-graph "> {"
                            "     ?draft a <" drafter:DraftGraph "> . "
                            "     ?live <" drafter:hasDraft "> ?draft . "
                            "   }"
                            "}"))
+
+;;SPARQLable -> Map{Keyword String}
+(defn query-all-drafts [queryable]
+  (doall (->> (query queryable get-all-drafts-query)
                 (map keywordize-keys)
                 (map (partial map-values str))
-                (map (fn [m] (assoc m :guid (parse-guid (:draft m)))))))))
+                (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
 (defn migrate-live!
   "Moves the triples from the draft graph to the draft graphs live destination."

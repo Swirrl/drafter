@@ -417,7 +417,12 @@
     (doseq [[meta-name value] metadata]
       (mgmt/upsert-single-object! repo graph-uri meta-name value))))
 
+(defn- get-all-drafts [backend]
+  (with-open [conn (repo/->connection (get-repo backend))]
+    (mgmt/query-all-drafts conn)))
+
 ;;draft management
 (def default-draft-management-impl
   {:append-data-batch! append-data-batch
-   :append-graph-metadata! append-graph-metadata})
+   :append-graph-metadata! append-graph-metadata
+   :get-all-drafts get-all-drafts})
