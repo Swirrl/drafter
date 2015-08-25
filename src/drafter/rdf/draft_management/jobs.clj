@@ -46,7 +46,7 @@
                  (with-job-exception-handling ~job
                    ~@forms))))
 
-(defn- job-succeeded!
+(defn job-succeeded!
   "Adds the job to the set of finished-jobs as a successfully completed job."
   ([job] (job-succeeded! job {}))
   ([job details] (complete-job! job (merge {:type :ok} details))))

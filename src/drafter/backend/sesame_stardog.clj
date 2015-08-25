@@ -2,12 +2,16 @@
   (:require [environ.core :refer [env]]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [drafter.util :as util]
             [drafter.backend.protocols :refer :all]
             [drafter.backend.sesame-common :refer [create-execute-update-fn
                                                    default-sparql-update-impl default-stoppable-impl default-sparql-query-impl
                                                    default-to-connection-impl default-sparqlable-impl default-triple-readable-impl
                                                    default-isparql-updatable-impl default-query-rewritable-impl default-api-operations-impl]]
             [grafter.rdf.repository :as repo]
+            [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.draft-management.jobs :as jobs]
+            [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.protocols :as proto])
   (:import [java.nio.charset Charset]
            [org.openrdf.query.resultio BooleanQueryResultParserRegistry TupleQueryResultParserRegistry]
@@ -92,6 +96,22 @@
 (def ^:private execute-update-fn
   (create-execute-update-fn get-repo (fn [conn pquery] (repo/evaluate pquery))))
 
+(defn- batch-migrate-graphs-to-live-job
+  "Migrates a collection of draft graphs to live through a single
+  compound SPARQL update statement. This overrides the default sesame
+  implementation which uses a transaction to coordinate the
+  updates. Explicit UPDATE statements do not take part in transactions
+  on the remote sesame SPARQL client."
+  [backend graphs]
+  (jobs/make-job :exclusive-write [job]
+            (log/info "Starting make-live for graph" graphs)
+            (let [repo (get-repo backend)
+                  graph-migrate-queries (mapcat #(:queries (mgmt/migrate-live-queries repo %)) graphs)
+                  update-str (util/make-compound-sparql-query graph-migrate-queries)]
+              (update! repo update-str))
+            (log/info "Make-live for graph(s) " graphs " done")
+            (jobs/job-succeeded! job)))
+
 (extend SesameStardogBackend
   repo/ToConnection default-to-connection-impl
   proto/ITripleReadable default-triple-readable-impl
@@ -100,7 +120,7 @@
   SparqlExecutor default-sparql-query-impl
   QueryRewritable default-query-rewritable-impl
   SparqlUpdateExecutor {:execute-update execute-update-fn}
-  ApiOperations default-api-operations-impl
+  ApiOperations (assoc default-api-operations-impl :migrate-graphs-to-live-job batch-migrate-graphs-to-live-job)
   Stoppable default-stoppable-impl)
 
 (defn get-stardog-backend [env-map]

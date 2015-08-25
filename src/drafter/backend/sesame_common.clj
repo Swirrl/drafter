@@ -4,6 +4,7 @@
             [clojure.tools.logging :as log]
             [drafter.backend.protocols :as backend]
             [swirrl-server.async.jobs :refer [create-job]]
+            [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :as jobs]
             [grafter.rdf.protocols :as proto]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
@@ -259,6 +260,16 @@
 (def default-stoppable-impl
   {:stop (comp repo/shutdown get-repo)})
 
+(defn- migrate-graphs-to-live-job [backend graphs]
+  (jobs/make-job :exclusive-write [job]
+                 (log/info "Starting make-live for graph" graphs)
+                 (with-open [conn (repo/->connection (get-repo backend))]
+                   (repo/with-transaction conn
+                     (doseq [g graphs]
+                       (mgmt/migrate-live! conn g))))
+                 (log/info "Make-live for graphs " graphs " done")
+                 (jobs/job-succeeded! job)))
+
 ;;draft API
 (def default-api-operations-impl
   {:new-draft-job (fn [this live-graph-uri params]
@@ -270,8 +281,7 @@
    :copy-from-live-graph-job (fn [this draft-graph-uri]
                                (jobs/create-copy-from-live-graph-job (get-repo this) draft-graph-uri))
    
-   :migrate-graphs-to-live-job (fn [this graphs]
-                                 (jobs/migrate-graph-live-job (get-repo this) graphs))
+   :migrate-graphs-to-live-job migrate-graphs-to-live-job
    :delete-metadata-job (fn [this graphs meta-keys]
                           (jobs/create-delete-metadata-job (get-repo this) graphs meta-keys))
    
