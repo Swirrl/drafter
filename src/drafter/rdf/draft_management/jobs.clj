@@ -11,7 +11,7 @@
             [grafter.rdf :refer [statements]]
             [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
-            [grafter.rdf.repository :refer [query with-transaction ToConnection ->connection]]
+            [grafter.rdf.repository :refer [query]]
             [environ.core :refer [env]]
             [clojure.string :as string]))
 
