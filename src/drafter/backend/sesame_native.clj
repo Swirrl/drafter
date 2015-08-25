@@ -2,10 +2,7 @@
   (:require [environ.core :refer [env]]
             [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer :all]
-            [drafter.backend.sesame-common :refer [default-sparql-update-impl default-stoppable-impl default-sparql-query-impl
-                                                   default-to-connection-impl default-sparqlable-impl default-triple-readable-impl
-                                                   default-isparql-updatable-impl default-query-rewritable-impl default-api-operations-impl
-                                                   default-draft-management-impl]]
+            [drafter.backend.sesame-common :refer :all]
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as proto]))
 
@@ -40,7 +37,9 @@
   SparqlUpdateExecutor default-sparql-update-impl
   ApiOperations default-api-operations-impl
   DraftManagement default-draft-management-impl
-  Stoppable default-stoppable-impl)
+  Stoppable default-stoppable-impl
+
+  SesameBatchOperations default-sesame-batch-operations-impl)
 
 (def get-backend-for-repo ->SesameNativeBackend)
 

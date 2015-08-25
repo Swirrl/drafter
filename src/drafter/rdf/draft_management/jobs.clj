@@ -2,7 +2,6 @@
   (:require [clojure.tools.logging :as log]
             [swirrl-server.responses :as restapi]
             [drafter.backend.protocols :refer :all]
-            [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job complete-job! create-child-job]]
             [drafter.write-scheduler :refer [queue-job!]]
@@ -47,42 +46,6 @@
   "Adds the job to the set of finished-jobs as a successfully completed job."
   ([job] (job-succeeded! job {}))
   ([job details] (complete-job! job (merge {:type :ok} details))))
-
-(defn create-draft-job [repo live-graph params]
-  (make-job :sync-write [job]
-            (let [conn (->connection repo)
-                  draft-graph-uri (with-transaction conn
-                                    (mgmt/create-managed-graph! conn live-graph)
-                                    (mgmt/create-draft-graph! conn
-                                                              live-graph (meta-params params)))]
-
-              (job-succeeded! job {:guri draft-graph-uri}))))
-
-(defn- finish-delete-job! [repo graph contents-only? job]
-  (when-not contents-only?
-    (mgmt/delete-draft-graph-state! repo graph))
-  (job-succeeded! job))
-
-(defn delete-in-batches [repo graph contents-only? job]
-  ;; Loops until the graph is empty, then deletes state graph if not a
-  ;; contents-only? deletion.
-  ;;
-  ;; Checks that graph is a draft graph - will only delete drafts.
-  (if (and (mgmt/graph-exists? repo graph)
-           (mgmt/draft-exists? repo graph))
-      (do
-        (with-open [conn (->connection repo)]
-          (with-transaction conn
-            (mgmt/delete-graph-batched! conn graph batched-write-size)))
-        
-
-        (if (mgmt/graph-exists? repo graph)
-          ;; There's more graph contents so queue another job to continue the
-          ;; deletions.
-          (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
-            (queue-job! (create-child-job job apply-next-batch)))
-          (finish-delete-job! repo graph contents-only? job)))
-      (finish-delete-job! repo graph contents-only? job)))
 
 (defn copy-graph-batch-query
   "Query to copy a range of data in a source graph into a destination

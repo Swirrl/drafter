@@ -61,7 +61,7 @@
   (fn [output-stream]
     (construct-dynamic* writer-class output-stream)))
 
-(defn negotiate-content-writer
+(defn- negotiate-content-writer
   "Given a prepared query and a mime-type return the appropriate
   Sesame SPARQLResultsWriter class, according to the SPARQL protocols
   content negotiation rules."
@@ -180,7 +180,7 @@
       Update :update
       nil))
 
-(defn negotiate-result-writer [pquery media-type]
+(defn- negotiate-result-writer [pquery media-type]
     (if-let [writer-class (negotiate-content-writer pquery media-type)]
       (class->writer-fn writer-class)))
 
@@ -345,6 +345,48 @@
                                       (mgmt/create-draft-graph! conn live-graph (meta-params params)))]
                 (jobs/job-succeeded! job {:guri draft-graph-uri})))))
 
+(defprotocol SesameBatchOperations
+  (delete-graph-batch! [this graph-uri batch-size]
+    "Deletes batch-size triples from the given graph uri. Most sesame
+    backends delete graphs in batches rather than DROPping the target
+    graph since it may be slow. The default delete graph job deletes
+    the source graph in batches so backends wishing to use the default
+    implementation should also implement this protocol."))
+
+(def default-sesame-batch-operations-impl
+  {:delete-graph-batch! (fn [backend graph-uri batch-size]
+                            (with-open [conn (repo/->connection (get-repo backend))]
+                              (repo/with-transaction conn
+                                (mgmt/delete-graph-batched! conn graph-uri batch-size))))})
+
+(defn- finish-delete-job! [backend graph contents-only? job]
+  (when-not contents-only?
+    (mgmt/delete-draft-graph-state! backend graph))
+  (jobs/job-succeeded! job))
+
+(defn- delete-in-batches [backend graph contents-only? job]
+  ;; Loops until the graph is empty, then deletes state graph if not a
+  ;; contents-only? deletion.
+  ;;
+  ;; Checks that graph is a draft graph - will only delete drafts.
+  (if (and (mgmt/graph-exists? backend graph)
+           (mgmt/draft-exists? backend graph))
+      (do
+        (delete-graph-batch! backend graph jobs/batched-write-size)
+
+        (if (mgmt/graph-exists? backend graph)
+          ;; There's more graph contents so queue another job to continue the
+          ;; deletions.
+          (let [apply-next-batch (partial delete-in-batches backend graph contents-only?)]
+            (scheduler/queue-job! (create-child-job job apply-next-batch)))
+          (finish-delete-job! backend graph contents-only? job)))
+      (finish-delete-job! backend graph contents-only? job)))
+
+(defn- delete-graph-job [this graph-uri contents-only?]
+  (log/info "Starting batch deletion job")
+  (create-job :batch-write
+              (partial delete-in-batches this graph-uri contents-only?)))
+
 ;;draft API
 (def default-api-operations-impl
   {:new-draft-job new-draft-job
@@ -361,13 +403,7 @@
    
    :update-metadata-job jobs/create-update-metadata-job
    
-   :delete-graph-job (fn [this graph contents-only?]
-                       (log/info "Starting batch deletion job")
-                       (create-job :batch-write
-                                   (partial jobs/delete-in-batches
-                                            (get-repo this)
-                                            graph
-                                            contents-only?)))})
+   :delete-graph-job delete-graph-job})
 
 (defn- append-data-batch [backend graph-uri triple-batch]
   (let [repo (get-repo backend)]
