@@ -134,18 +134,17 @@
 (defn- update-graph-metadata
   "Updates or creates each of the the given graph metadata pairs for
   each given graph under a job."
-  [repo graphs metadata job]
+  [backend graphs metadata job]
   (with-job-exception-handling job
-    (with-open [conn (->connection repo)]
-      (doseq [draft-graph graphs]
-        (mgmt/add-metadata-to-graph conn draft-graph metadata))
-      (complete-job! job restapi/ok-response))))
+    (doseq [draft-graph graphs]
+      (append-graph-metadata! backend draft-graph metadata))
+    (complete-job! job restapi/ok-response)))
 
 (defn create-update-metadata-job
   "Creates a job to associate the given graph metadata pairs with each
   given graph."
-  [repo graphs metadata]
-  (create-job :sync-write (partial update-graph-metadata repo graphs metadata)))
+  [backend graphs metadata]
+  (create-job :sync-write (partial update-graph-metadata backend graphs metadata)))
 
 (defn- sparql-uri-list [uris]
   (string/join " " (map #(str "<" % ">") uris)))

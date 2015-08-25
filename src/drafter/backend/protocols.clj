@@ -17,8 +17,9 @@
     "Appends a sequence of triples to the given draft graph.")
 
   (append-graph-metadata! [this draft-graph-uri metadata]
-    "Associates a sequence of metadata key-value pairs with the given
-    graph."))
+    "Takes a hash-map of metadata key/value pairs and adds them as
+  metadata to the graphs state graph, converting keys into drafter
+  URIs as necessary.  Assumes all values are strings."))
 
 (defprotocol Stoppable
   (stop [this]))

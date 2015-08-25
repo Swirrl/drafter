@@ -260,8 +260,7 @@
 
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
   (jobs/with-job-exception-handling job
-    (let [conn (repo/->connection repo)
-          [current-batch remaining-triples] (split-at jobs/batched-write-size triples)]
+    (let [[current-batch remaining-triples] (split-at jobs/batched-write-size triples)]
 
       (log/info (str "Adding a batch of triples to repo" current-batch))
       (backend/append-data-batch! repo draft-graph current-batch)
@@ -274,7 +273,7 @@
           (scheduler/queue-job! (create-child-job job apply-next-batch)))
 
         (do
-          (mgmt/add-metadata-to-graph conn draft-graph metadata)
+          (backend/append-graph-metadata! repo draft-graph metadata)
           (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
 
           (jobs/job-succeeded! job))))))
@@ -342,8 +341,7 @@
    :delete-metadata-job (fn [this graphs meta-keys]
                           (jobs/create-delete-metadata-job (get-repo this) graphs meta-keys))
    
-   :update-metadata-job (fn [this graphs metadata]
-                          (jobs/create-update-metadata-job (get-repo this) graphs metadata))
+   :update-metadata-job jobs/create-update-metadata-job
    
    :delete-graph-job (fn [this graph contents-only?]
                        (log/info "Starting batch deletion job")

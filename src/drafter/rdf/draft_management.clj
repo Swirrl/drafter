@@ -160,14 +160,6 @@
   (let [sparql (upsert-single-object-sparql subject predicate object)]
     (update! db sparql)))
 
-(defn add-metadata-to-graph
-  "Takes a hash-map of metadata key/value pairs and adds them as
-  metadata to the graphs state graph, converting keys into drafter
-  URIs as necessary.  Assumes all values are strings."
-  [db graph-uri metadata]
-  (doseq [[meta-name value] metadata]
-    (upsert-single-object! db graph-uri meta-name value)))
-
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
 
