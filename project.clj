@@ -59,7 +59,7 @@
          :init    drafter.handler/init
          :destroy drafter.handler/destroy}
 
-  :aliases {"reindex" ["run" "-m" "drafter.handler/reindex"]}
+  :aliases {"reindex" ["run" "-m" "drafter.backend.sesame-native/reindex"]}
 
   :target-path "target/%s" ;; ensure profiles don't pollute each other with
                            ;; compiled classes etc...

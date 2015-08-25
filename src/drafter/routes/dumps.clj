@@ -33,7 +33,7 @@
   functionality on a query-rewriting endpoint, a restricted
   endpoint (e.g. only drafter public/live graphs) a raw endpoint, or
   any other."
-  [mount-path make-endpoint-f repo]
+  [mount-path make-endpoint-f backend]
   (GET mount-path request
        (let [{graph-uri :graph-uri} (:params request)]
          (if-not graph-uri
@@ -42,7 +42,7 @@
            (let [construct-request (assoc-in request
                                              [:params :query]
                                              (str "CONSTRUCT { ?s ?p ?o . } WHERE { GRAPH <" graph-uri "> { ?s ?p ?o . } }"))
-                 endpoint (make-endpoint-f mount-path repo)
+                 endpoint (make-endpoint-f mount-path backend)
                  response (endpoint construct-request)]
 
              (add-content-disposition response graph-uri (get-in request [:headers "accept"])))))))

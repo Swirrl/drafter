@@ -1,9 +1,12 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
             [grafter.rdf.repository :refer :all]
+            [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
+            [drafter.backend.sesame-native :refer [get-backend-for-repo]]
             [me.raynes.fs :as fs]
-            [drafter.rdf.draft-management :refer [lookup-draft-graph-uri import-data-to-draft! migrate-live!]]
+            [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!
+                                                  migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
             [swirrl-server.async.jobs :refer [create-job]])
@@ -11,6 +14,7 @@
            [java.util.concurrent CountDownLatch TimeUnit]))
 
 (def ^:dynamic *test-db* (repo (memory-store)))
+(def ^:dynamic *test-backend* (get-backend-for-repo *test-db*))
 
 (def test-db-path "drafter-test-db")
 
@@ -51,15 +55,31 @@
   ([setup-state-fn test-fn]
    (binding [*test-db* (repo (native-store test-db-path))
              *test-writer* (start-writer!)]
-     (try
-       (setup-state-fn *test-db*)
-       (test-fn)
-       (finally
-         (fs/delete-dir test-db-path)
-         (stop-writer! *test-writer*))))))
+     (binding [*test-backend* (get-backend-for-repo *test-db*)]
+       (try
+         (setup-state-fn *test-db*)
+         (test-fn)
+         (finally
+           (fs/delete-dir test-db-path)
+           (stop-writer! *test-writer*)))))))
 
 (defn make-store []
   (repo))
+
+(defn make-backend []
+  (let [repo (make-store)
+        backend (get-backend-for-repo repo)]
+    [repo backend]))
+
+(defn import-data-to-draft!
+  "Imports the data from the triples into a draft graph associated
+  with the specified graph.  Returns the draft graph uri."
+  [db graph triples]
+
+  (create-managed-graph! db graph)
+  (let [draft-graph (create-draft-graph! db graph)]
+    (add db draft-graph triples)
+    draft-graph))
 
 (defn make-graph-live!
   ([db live-guri]

@@ -1,6 +1,7 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
             [swirrl-server.responses :as restapi]
+            [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.rdf.draft-management :as mgmt]
@@ -65,14 +66,13 @@
     (mgmt/delete-draft-graph-state! repo graph))
   (job-succeeded! job))
 
-(defn- delete-in-batches [repo graph contents-only? job]
+(defn delete-in-batches [repo graph contents-only? job]
   ;; Loops until the graph is empty, then deletes state graph if not a
   ;; contents-only? deletion.
   ;;
   ;; Checks that graph is a draft graph - will only delete drafts.
-  (let [conn (->connection repo)]
-    (if (and (mgmt/graph-exists? repo graph)
-             (mgmt/draft-exists? repo graph))
+  (if (and (mgmt/graph-exists? repo graph)
+           (mgmt/draft-exists? repo graph))
       (do
         (mgmt/delete-graph-batched! repo graph batched-write-size)
 
@@ -82,18 +82,7 @@
           (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
             (queue-job! (create-child-job job apply-next-batch)))
           (finish-delete-job! repo graph contents-only? job)))
-      (finish-delete-job! repo graph contents-only? job))))
-
-(defn delete-graph-job [repo graph & {:keys [contents-only?]}]
-  "Deletes graph contents as per batch size in order to avoid blocking
-   writes with a lock. Finally the graph itself will be deleted unless
-   a value is supplied for the :contents-only? keyword argument"
-  (log/info "Starting batch deletion job")
-  (create-job :batch-write
-              (partial delete-in-batches
-                       repo
-                       graph
-                       contents-only?)))
+      (finish-delete-job! repo graph contents-only? job)))
 
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
   (with-job-exception-handling job
@@ -289,12 +278,11 @@
                                      (get-graph-clone-batches repo live-graph-uri))]
                 (copy-from-live-graph repo live-graph-uri draft-graph-uri batch-sizes job))))
 
-(defn migrate-graph-live-job [repo graph]
+(defn migrate-graph-live-job [repo graphs]
   (make-job :exclusive-write [job]
-            (log/info "Starting make-live for graph" graph)
-            (let [graphs-to-migrate (if (instance? String graph) [graph] graph)
-                  graph-migrate-queries (mapcat #(:queries (mgmt/migrate-live-queries repo %)) graphs-to-migrate)
+            (log/info "Starting make-live for graph" graphs)
+            (let [graph-migrate-queries (mapcat #(:queries (mgmt/migrate-live-queries repo %)) graphs)
                   update-str (util/make-compound-sparql-query graph-migrate-queries)]
               (update! repo update-str))
-            (log/info "Make-live for graph(s) " graph " done")
+            (log/info "Make-live for graph(s) " graphs " done")
             (job-succeeded! job)))

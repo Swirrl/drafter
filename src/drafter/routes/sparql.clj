@@ -2,35 +2,20 @@
   (:require [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
-            [clojure.set :as set]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.backend.protocols :refer :all]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
-            [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter]]
-            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [clojure.tools.logging :as log]
             [drafter.common.sparql-routes :refer [supplied-drafts]]))
 
-(defn- make-draft-query-rewriter
-  "Build both a query rewriter and an accompanying result rewriter tied together
-  in a hash-map, for supplying to our draft SPARQL endpoints as configuration."
-
-  [live->draft]
-  {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
-   :result-rewriter
-   (fn [prepared-query writer]
-     (let [draft->live (set/map-invert live->draft)]
-       (choose-result-rewriter prepared-query draft->live writer)))})
-
-(defn- draft-query-endpoint [repo request timeouts]
+(defn- draft-query-endpoint [executor request timeouts]
   (try
     (let [{:keys [params]} request
-          graph-uris (supplied-drafts repo request)
-          live->draft (log/spy(mgmt/graph-map repo graph-uris))
-          {:keys [result-rewriter query-rewriter]} (make-draft-query-rewriter live->draft)]
+          graph-uris (supplied-drafts executor request)
+          live->draft (log/spy(mgmt/graph-map executor graph-uris))
+          rewriting-executor (create-rewriter executor live->draft)]
 
-      (process-sparql-query repo request
-                            :query-rewrite-fn query-rewriter
-                            :result-rewriter result-rewriter
+      (process-sparql-query rewriting-executor request
                             :graph-restrictions graph-uris
                             :query-timeouts timeouts))
 
@@ -41,21 +26,21 @@
         {:status status :body (.getMessage ex)}))))
 
 (defn draft-sparql-routes
-  ([mount-point repo] (draft-sparql-routes mount-point repo nil))
-  ([mount-point repo timeouts]
+  ([mount-point executor] (draft-sparql-routes mount-point executor nil))
+  ([mount-point executor timeouts]
      (wrap-sparql-errors
       (routes
        (GET mount-point request
-            (draft-query-endpoint repo request timeouts))
+            (draft-query-endpoint executor request timeouts))
 
        (POST mount-point request
-             (draft-query-endpoint repo request timeouts))))))
+             (draft-query-endpoint executor request timeouts))))))
 
-(defn live-sparql-routes [mount-point repo timeouts]
-  (sparql-end-point mount-point repo (partial mgmt/live-graphs repo) timeouts))
+(defn live-sparql-routes [mount-point executor timeouts]
+  (sparql-end-point mount-point executor (partial mgmt/live-graphs executor) timeouts))
 
-(defn state-sparql-routes [mount-point repo timeouts]
-  (sparql-end-point mount-point repo #{mgmt/drafter-state-graph} timeouts))
+(defn state-sparql-routes [mount-point executor timeouts]
+  (sparql-end-point mount-point executor #{mgmt/drafter-state-graph} timeouts))
 
-(defn raw-sparql-routes [mount-point repo timeouts]
-  (sparql-end-point mount-point repo nil timeouts))
+(defn raw-sparql-routes [mount-point executor timeouts]
+  (sparql-end-point mount-point executor nil timeouts))

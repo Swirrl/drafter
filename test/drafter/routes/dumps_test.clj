@@ -7,9 +7,9 @@
             [grafter.rdf.formats :refer :all]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [rdf-serializer]]
-            [drafter.rdf.draft-management :refer [import-data-to-draft! migrate-live!]]
-            [drafter.test-common :refer [test-triples
-                                         make-store stream->string select-all-in-graph make-graph-live!]]))
+            [drafter.rdf.draft-management :refer [migrate-live!]]
+            [drafter.test-common :refer [test-triples import-data-to-draft!
+                                         make-backend stream->string select-all-in-graph make-graph-live!]]))
 
 (def dumps-request {:request-method :get
                     :uri "/data/live"
@@ -17,9 +17,9 @@
                     :headers {"accept" "application/n-triples"}})
 
 (defn make-store-with-draft []
-  (let [test-db (make-store)
+  (let [[test-db test-backend] (make-backend)
         draft-graph (import-data-to-draft! test-db "http://capybara.com/capybara-data-1" (test-triples "http://test.com/subject-1"))]
-    [test-db draft-graph]))
+    [test-db test-backend draft-graph]))
 
 (defn count-statements [response-data]
   (count (statements (:body response-data)
@@ -27,10 +27,9 @@
 
 (deftest dumps-route-raw-test
   (testing "dumps-endpoint with live endpoint"
-    (let [[test-db draft-graph] (make-store-with-draft)]
+    (let [[test-db test-backend draft-graph] (make-store-with-draft)]
       (migrate-live! test-db draft-graph)
-
-      (let [dumps (dumps-endpoint "/data/live" sparql-end-point test-db)
+      (let [dumps (dumps-endpoint "/data/live" sparql-end-point test-backend)
             response (dumps dumps-request)]
 
         (is (= 2 (count-statements response)))
@@ -38,9 +37,9 @@
 
 (deftest dumps-route-draft-test
   (testing "dumps-endpoint with draft endpoint"
-    (let [[test-db draft-graph] (make-store-with-draft)]
+    (let [[test-db test-backend draft-graph] (make-store-with-draft)]
 
-      (let [dumps (dumps-endpoint "/data/live" draft-sparql-routes test-db)
+      (let [dumps (dumps-endpoint "/data/live" draft-sparql-routes test-backend)
             response (dumps (assoc-in dumps-request [:params :graph] draft-graph))]
 
         (is (= 2 (count-statements response)))))))

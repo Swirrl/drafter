@@ -1,6 +1,6 @@
 (ns drafter.routes.sparql-test
-  (:require [drafter.test-common :refer [test-triples
-                                         make-store stream->string select-all-in-graph make-graph-live!]]
+  (:require [drafter.test-common :refer [test-triples import-data-to-draft!
+                                         make-store make-backend stream->string select-all-in-graph make-graph-live!]]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
             [clojure-csv.core :as csv]
@@ -62,9 +62,9 @@
 
 ;; TODO uncomment these as soon as I get the draft one working again
 (deftest live-sparql-routes-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         [draft-graph-1 draft-graph-2] (add-test-data! test-db)
-        endpoint (live-sparql-routes "/sparql/live" test-db nil)
+        endpoint (live-sparql-routes "/sparql/live" backend nil)
         {:keys [status headers body]
          :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
         csv-result (csv-> result)]
@@ -92,10 +92,10 @@
         (is (not= graph-1-result (second csv-result)))))))
 
 (deftest state-sparql-routes-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (state-sparql-routes "/sparql/state" test-db nil)]
+        endpoint (state-sparql-routes "/sparql/state" backend nil)]
 
     (testing "The state graph should be accessible"
       (let [result (endpoint (-> (state-query (str "ASK WHERE {"
@@ -121,10 +121,10 @@
         (is (= "false" body))))))
 
 (deftest raw-sparql-routes-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (raw-sparql-routes "/sparql/raw" test-db nil)]
+        endpoint (raw-sparql-routes "/sparql/raw" backend nil)]
 
     (testing "The state graph should be accessible"
       (let [result (endpoint (-> (raw-query (str "ASK WHERE {"
@@ -150,9 +150,9 @@
         (is (= "true" body))))))
 
 (deftest drafts-sparql-routes-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "draft graphs that are made live can no longer be queried on their draft GURI"
       (let [csv-result (csv-> (endpoint
@@ -247,9 +247,9 @@
 
 
 (deftest drafts-sparql-routes-distinct-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "SELECT DISTINCT queries on drafts"
       (let [csv-result (csv-> (endpoint
@@ -264,9 +264,9 @@
 
 
 (deftest drafts-sparql-routes-distinct-subselect-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "SELECT DISTINCT subqueries with count on drafts"
       (let [count-request (draft-query
@@ -297,9 +297,9 @@
                 "There should be a count of 1 returned")))))))
 
 (deftest drafts-sparql-routes-with-construct-queries-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "Can do a construct query without a graph"
       (let [csv-result (csv-> (endpoint
@@ -326,9 +326,9 @@
                (second csv-result)))))))
 
 (deftest drafts-sparql-routes-with-desribe-queries-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
     (testing "Can do a describe query with a graph"
       (let [csv-result (csv-> (endpoint
                                (-> (draft-query "DESCRIBE ?s WHERE { graph <http://test.com/graph-2> { ?s ?p ?o . } }" draft-graph-2)
@@ -337,9 +337,9 @@
                (-> csv-result first first)))))))
 
 (deftest drafts-sparql-route-rewrites-constants
-  (let [db (make-store)
+  (let [[db backend] (make-backend)
         [_ draft-graph-2 draft-graph-3] (add-test-data! db)
-        endpoint (draft-sparql-routes "/sparql/draft" db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "Query constants in graph position are rewritten to their draft graph URI"
       (let [s-p-o-result (-> (endpoint
@@ -352,9 +352,9 @@
                  s-p-o-result))))))
 
 (deftest drafts-sparql-routes-with-results-rewriting-test
-  (let [db (make-store)
+  (let [[db backend] (make-backend)
         [_ draft-graph-2 draft-graph-3] (add-test-data! db)
-        endpoint (draft-sparql-routes "/sparql/draft" db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "Queries can be written against their live graph URI"
         (let [found-graph (-> (endpoint
@@ -380,8 +380,8 @@
 
 (deftest put-two-graphs-live-and-check-they-stay-isolated-test
   (let [state (atom {})
-        db (make-store)
-        endpoint (draft-sparql-routes "/sparql/draft" db)]
+        [db backend] (make-backend)
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     ;; Put two graphs live
     (let [graph-a (make-graph-live! db "http://graph.com/a" (test-triples "http://test.com/a"))
@@ -404,9 +404,9 @@
         (is (nil? result))))))
 
 (deftest drafts-unioned-with-live-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         [draft-graph-1-made-live draft-graph-2 draft-graph-3] (add-test-data! test-db)
-        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (is (= #{"http://test.com/graph-2"
              "http://test.com/made-live-and-deleted-1"}
@@ -419,11 +419,11 @@
                 (into #{}))))))
 
 (deftest state-graph-is-hidden-test
-  (let [test-db (make-store)
+  (let [[test-db backend] (make-backend)
         test-graph (let [draft-graph (import-data-to-draft! test-db "http://test.com/test-graph" (test-triples "http://test.com/subject-1"))]
                      (pr/add test-db draft-graph (test-triples "http://test.com/subject-2"))
                      draft-graph)
-        endpoint (draft-sparql-routes "/sparql/draft" test-db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (is (= #{"http://test.com/subject-1" "http://test.com/subject-2"}
            (->> (-> (log/spy (draft-query "SELECT ?s WHERE { GRAPH ?g { ?s ?p ?o } . }" [test-graph]))
@@ -435,10 +435,10 @@
                 (into #{}))))))
 
 (deftest error-on-invalid-context
-  (let [db (make-store)
+  (let [[db backend] (make-backend)
         draft-one (import-data-to-draft! db "http://test.com/made-live-and-deleted-1" (test-triples "http://test.com/subject-1"))
         draft-two (import-data-to-draft! db "http://test.com/made-live-and-deleted-1" (test-triples "http://test.com/subject-1"))
-        endpoint (draft-sparql-routes "/sparql/draft" db)]
+        endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "When the context is set to two drafts which represent the same live graph an error should be raised."
       (let [{:keys [status headers body] :as result} (endpoint

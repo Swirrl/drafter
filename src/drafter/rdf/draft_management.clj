@@ -2,10 +2,12 @@
   (:require [clojure.tools.logging :as log]
             [drafter.util :as util]
             [grafter.rdf :refer [add s]]
+            [drafter.util :refer [map-values]]
+            [clojure.walk :refer [keywordize-keys]]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :refer [update!]]
-            [grafter.rdf.repository :refer [query evaluate prepare-query]]
+            [grafter.rdf.repository :refer [query evaluate prepare-query ->connection]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import (java.util Date UUID)
            (org.openrdf.model.impl URIImpl)))
@@ -52,7 +54,7 @@
                  "}")]
     (query db qry)))
 
-(defn has-more-than-one-draft?
+(defn- has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
   [db live-graph-uri]
@@ -244,6 +246,15 @@
                           (get "live"))]
     (str live-uri)))
 
+(defn get-live-graph-for-draft
+  "Gets the live graph URI corresponding to a draft graph. Returns nil
+  if the draft URI does not have an associated managed graph or if the
+  live graph does not exist."
+  [db draft-graph-uri]
+  (with-open [conn (->connection db)]
+    (if (draft-exists? conn draft-graph-uri)
+      (lookup-live-graph conn draft-graph-uri))))
+
 (defn- delete-live-graph-from-state-query [live-graph-uri]
   (str "DELETE WHERE"
        "{"
@@ -252,16 +263,10 @@
          "   ?p ?o .")
        "}"))
 
-(defn delete-live-graph-from-state! [db live-graph-uri]
+(defn- delete-live-graph-from-state! [db live-graph-uri]
   "Delete the live managed graph from the state graph"
   (update! db (delete-live-graph-from-state-query live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
-
-(defn lookup-live-graph-uri [db draft-graph-uri]
-  "Given a draft graph URI, lookup and return its live graph."
-
-  (-> (log/spy (lookup-live-graph db draft-graph-uri))
-      (URIImpl.)))
 
 (defn draft-graphs
   "Get all the draft graph URIs"
@@ -285,20 +290,6 @@
     (throw (ex-info
             "Multiple drafts were found, when only one is expected.  The context is likely too broad."
             {:error :multiple-drafts-error}))))
-
-(defn lookup-draft-graph-uri
-  "Get all the draft graph URIs.  Assumes there will be at most one
-  draft found."
-  [db live-graph-uri]
-  (let [res (->> (query db
-                        (str "SELECT ?draft WHERE {"
-                             (with-state-graph
-                               "<" live-graph-uri ">" " <" drafter:hasDraft "> ?draft .")
-                             "} LIMIT 2"))
-                 (map #(str (get % "draft")))
-                 return-one-or-zero-uris)]
-    (log/debug "Live->Draft mapping: " live-graph-uri " -> " res)
-    res))
 
 (defn- has-duplicates? [col]
   (not= col
@@ -342,9 +333,26 @@
           (map #(str (% "live")))
           (into #{})))
 
+(defn- parse-guid [uri]
+  (.replace (str uri) (draft-uri "") ""))
+
+
+(defn all-drafts [db]
+  (with-open [conn (->connection db)]
+    (doall (->> (query conn (str
+                           "SELECT ?draft ?live WHERE {"
+                           "   GRAPH <" drafter-state-graph "> {"
+                           "     ?draft a <" drafter:DraftGraph "> . "
+                           "     ?live <" drafter:hasDraft "> ?draft . "
+                           "   }"
+                           "}"))
+                (map keywordize-keys)
+                (map (partial map-values str))
+                (map (fn [m] (assoc m :guid (parse-guid (:draft m)))))))))
+
+
 (defn- move-like-tbl-wants-super-slow-on-stardog-though
   "Move's how TBL intended.  Issues a SPARQL MOVE query.
-
   Note this is super slow on stardog 3.1."
   [source destination]
   ;; Move's how TBL intended...
@@ -420,7 +428,6 @@
 
     (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
                     {:error :graph-not-found}))))
-
 (defn migrate-live!
   "Moves the triples from the draft graph to the draft graphs live destination."
   [db draft-graph-uri]
@@ -429,13 +436,3 @@
         query-str (util/make-compound-sparql-query queries)]
     (update! db query-str)
     (log/info (str "Migrated graph: " draft-graph-uri " to live graph " live-graph-uri))))
-
-(defn import-data-to-draft!
-  "Imports the data from the triples into a draft graph associated
-  with the specified graph.  Returns the draft graph uri."
-  [db graph triples]
-
-  (create-managed-graph! db graph)
-  (let [draft-graph (create-draft-graph! db graph)]
-    (add db draft-graph triples)
-    draft-graph))

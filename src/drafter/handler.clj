@@ -6,9 +6,10 @@
             [drafter.operations :as ops]
             [drafter.middleware :as middleware]
             [drafter.configuration :as conf]
+            [drafter.backend.protocols :refer [stop]]
+            [drafter.backend.configuration :refer [get-backend]]
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
-            [drafter.rdf.draft-management :refer [lookup-live-graph-uri]]
             [drafter.routes.drafts-api :refer [draft-api-routes
                                                graph-management-routes]]
             [drafter.routes.status :refer [status-routes]]
@@ -26,7 +27,6 @@
                                              stop-writer!]]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [environ.core :refer [env]]
-            [grafter.rdf.repository :as repo]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.verbs :refer [wrap-verbs]]
             [selmer.parser :as parser]
@@ -48,13 +48,8 @@
 
   (:require [clj-logging-config.log4j :refer [set-loggers!]]))
 
-
-(def default-indexes "spoc,pocs,ocsp,cspo,cpos,oscp")
-
-(def default-repo-path "drafter-db")
-
 ;; Set these values later when we start the server
-(def repo)
+(def backend)
 (def app)
 
 (def ^{:doc "A future to control the single write thread that performs database writes."}
@@ -128,9 +123,9 @@
       repo)))
 
 (defn initialise-repo! [repo-path indexes]
-  (set-var-root! #'repo (let [repo (get-stardog-repo env)]
-                          (log/info "Initialised repo" repo-path)
-                          repo)))
+  (let [repo (get-stardog-repo env)]
+    (log/info "Initialised repo" repo-path)
+    repo))
 
 (defroutes app-routes
   (route/resources "/")
@@ -154,16 +149,16 @@
     (log-endpoint-config route-name route-type timeouts)
     (endpoint-fn path repo timeouts)))
 
-(defn- dumps-route [route-name query-fn timeout-config]
+(defn- create-dumps-route [route-name query-fn backend timeout-config]
   (let [dump-path (str "/data/" (name route-name))
         query-timeouts (conf/get-endpoint-timeout route-name :query timeout-config)
         dump-fn #(query-fn %1 %2 query-timeouts)]
-    (dumps-endpoint dump-path dump-fn repo)))
+    (dumps-endpoint dump-path dump-fn backend)))
 
-(defn create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? repo timeout-config]
-  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query repo timeout-config)
-        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update repo timeout-config))
-        dumps-route (if add-dumps? (dumps-route route-name query-fn timeout-config) nil)
+(defn create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? backend timeout-config]
+  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query backend timeout-config)
+        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update backend timeout-config))
+        dumps-route (if add-dumps? (create-dumps-route route-name query-fn backend timeout-config) nil)
         routes [query-route update-route]]
     (vec (remove nil? [query-route update-route dumps-route]))))
 
@@ -175,27 +170,27 @@
 (def draft-endpoint-spec (specify-endpoint draft-sparql-routes nil true))
 (def state-endpoint-spec (specify-endpoint state-sparql-routes state-update-endpoint-route false))
 
-(defn create-sparql-routes [endpoint-map repo]
+(defn create-sparql-routes [endpoint-map backend]
   (let [timeout-conf (conf/get-timeout-config env (keys endpoint-map) ops/default-timeouts)
         ep-routes (fn [[ep-name {:keys [query-fn update-fn has-dump]}]]
-                    (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump repo timeout-conf))]
+                    (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump backend timeout-conf))]
     (mapcat ep-routes endpoint-map)))
 
-(defn get-sparql-routes [repo]
+(defn get-sparql-routes [backend]
   (let [endpoints {:live live-endpoint-spec
                    :raw raw-endpoint-spec
                    :draft draft-endpoint-spec
                    :state state-endpoint-spec}]
-    (create-sparql-routes endpoints repo)))
+    (create-sparql-routes endpoints backend)))
 
-(defn initialise-app! [repo]
+(defn initialise-app! [backend]
   (set-var-root! #'app (app-handler
                         ;; add your application routes here
                         (-> []
-                            (add-route (pages-routes repo))
-                            (add-route (draft-api-routes "/draft" repo))
-                            (add-route (graph-management-routes "/graph" repo))
-                            (add-routes (get-sparql-routes repo))
+                            (add-route (pages-routes backend))
+                            (add-route (draft-api-routes "/draft" backend))
+                            (add-route (graph-management-routes "/graph" backend))
+                            (add-routes (get-sparql-routes backend))
                             (add-route (context "/status" []
                                                 (status-routes global-writes-lock finished-jobs restart-id)))
 
@@ -215,12 +210,18 @@
 (defn initialise-write-service! []
   (set-var-root! #'writer-service  (start-writer!)))
 
-(defn initialise-services! [repo-path indexes]
+(defn- init-backend!
+  "Creates the backend for the current configuration and sets the
+  backend var."
+  []
+  (set-var-root! #'backend (get-backend)))
+
+(defn initialise-services! []
   (enc/register-custom-encoders!)
-  (initialise-repo! repo-path indexes)
 
   (initialise-write-service!)
-  (initialise-app! repo)
+  (init-backend!)
+  (initialise-app! backend)
   (set-var-root! #'stop-reaper (ops/start-reaper 2000)))
 
 (defn- load-logging-configuration [config-file]
@@ -247,10 +248,7 @@
     (parser/cache-off!))
 
   (log/info "Initialising repository")
-  (initialise-services! (get env :drafter-repo-path default-repo-path)
-                        ;; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
-                        ;; (but we have to specify 4 char strings, so in some cases last chars don't matter
-                        (get env :drafter-indexes default-indexes))
+  (initialise-services!)
 
   (log/info "drafter started successfully"))
 
@@ -259,18 +257,8 @@
    shuts down, put any clean up code here"
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
-  (repo/shutdown repo)
+  (stop backend)
   (stop-writer! writer-service)
   (stop-reaper)
   (log/info "drafter has shut down."))
 
-(defn reindex
-  "Reindex the database according to the DRAFTER_INDEXES set at
-  DRAFTER_REPO_PATH in the environment.  If no environment variables
-  are set for these values the defaults are used."
-  []
-  (let [indexes (get env :drafter-indexes default-indexes)
-        repo-path (get env :drafter-repo-path default-repo-path)]
-    (log/info "Reindexing database at" repo-path " with indexes" indexes)
-    (repo/repo (repo/native-store repo-path indexes))
-    (log/info "Reindexing finished")))

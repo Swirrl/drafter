@@ -1,17 +1,12 @@
 (ns drafter.routes.drafts-api
   (:require [clojure.tools.logging :as log]
+            [drafter.util :refer [to-coll]]
             [compojure.core :refer [DELETE POST PUT context routes]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
+            [drafter.backend.protocols :refer :all]
             [drafter.rdf.draft-management :refer [drafter-state-graph]]
-            [drafter.rdf.draft-management.jobs :refer [append-data-to-graph-from-file-job
-                                                       create-draft-job
-                                                       delete-graph-job
-                                                       migrate-graph-live-job
-                                                       create-update-metadata-job
-                                                       create-delete-metadata-job
-                                                       create-copy-from-live-graph-job
-                                                       failed-job-result?]]
+            [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
             [drafter.responses :refer [submit-sync-job! submit-async-job!]]
             [swirrl-server.responses :as response]))
 
@@ -23,10 +18,7 @@
     (assoc file-obj :content-type file-format)
     file-obj))
 
-(defn to-coll [x]
-  (if (coll? x) x [x]))
-
-(defn draft-api-routes [mount-point repo]
+(defn draft-api-routes [mount-point operations]
   (routes
     (context
       mount-point []
@@ -39,7 +31,7 @@
             (response/when-params [live-graph]
                                   (if (= live-graph drafter-state-graph)
                                     (response/error-response 403 {:message "This graph is reserved, the create request was forbidden."})
-                                    (submit-sync-job! (create-draft-job repo live-graph params)
+                                    (submit-sync-job! (new-draft-job operations live-graph params)
                                                       (fn [result]
                                                         (if (failed-job-result? result)
                                                           (response/api-response 500 result)
@@ -50,23 +42,23 @@
                   graphs (to-coll graph)]
               (if (or (empty? graph) (empty? metadata))
                 {:status 400 :headers {} :body "At least one graph and metadata pair required"}
-                (submit-sync-job! (create-update-metadata-job repo graphs metadata)))))
+                (submit-sync-job! (update-metadata-job operations graphs metadata)))))
 
       (DELETE "/metadata" [graph meta-key]
               (let [meta-keys (to-coll meta-key)
                     graphs (to-coll graph)]
                 (if (or (empty? graphs) (empty? meta-keys))
                   {:status 400 :headers {} :body "At least one graph and metadata key required"}
-                  (submit-sync-job! (create-delete-metadata-job repo graphs meta-keys)))))
+                  (submit-sync-job! (delete-metadata-job operations graphs meta-keys)))))
 
       ;; deletes draft graph data contents; does not delete the draft graph
       ;; entry from the state graph.
       (DELETE "/contents" {{graph :graph} :params}
         (response/when-params [graph]
-                              (submit-async-job! (delete-graph-job repo graph :contents-only? true))))
+                              (submit-async-job! (delete-graph-job operations graph true))))
 
       (POST "/copy-live" {{graph :graph} :params}
-            (submit-async-job! (create-copy-from-live-graph-job repo graph))))
+            (submit-async-job! (copy-from-live-graph-job operations graph))))
 
     ;; adds data to the graph from either source-graph or file
     ;; accepts extra meta- query string params, which are added to queue
@@ -82,17 +74,17 @@
           (response/when-params [graph data-content-type]
                                 (if-let [rdf-format (mimetype->rdf-format data-content-type)]
                                   (submit-async-job!
-                                   (append-data-to-graph-from-file-job repo graph
-                                                                       data rdf-format
-                                                                       metadata))
+                                   (append-data-to-graph-job operations graph
+                                                             data rdf-format
+                                                             metadata))
                                   (response/bad-request-response (str "Unknown RDF format for content type " data-content-type)))))))))
 
-(defn graph-management-routes [mount-point repo]
+(defn graph-management-routes [mount-point operations]
   (routes
     ;; deletes draft graph data contents and then the draft graph itself
     (DELETE mount-point {{graph :graph} :params}
             (response/when-params [graph]
-                                  (submit-async-job! (delete-graph-job repo graph))))
+                                  (submit-async-job! (delete-graph-job operations graph false))))
    (context
      mount-point []
      ;; makes a graph live.
@@ -100,4 +92,5 @@
                    :as request}
           (log/info request)
           (response/when-params [graph]
-                                (submit-async-job! (migrate-graph-live-job repo graph)))))))
+                                (let [graphs (to-coll graph)]
+                                  (submit-async-job! (migrate-graphs-to-live-job operations graphs))))))))
