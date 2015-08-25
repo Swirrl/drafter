@@ -3,7 +3,8 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer :all]
-            [drafter.backend.sesame-common :refer [default-sparql-update-impl default-stoppable-impl default-sparql-query-impl
+            [drafter.backend.sesame-common :refer [create-execute-update-fn
+                                                   default-sparql-update-impl default-stoppable-impl default-sparql-query-impl
                                                    default-to-connection-impl default-sparqlable-impl default-triple-readable-impl
                                                    default-isparql-updatable-impl default-query-rewritable-impl default-api-operations-impl]]
             [grafter.rdf.repository :as repo]
@@ -84,6 +85,12 @@
       repo)))
 
 (defrecord SesameStardogBackend [repo])
+(defn- get-repo [backend] (:repo backend))
+
+;;default sesame implementation execute UPDATE queries in a transaction which the remote SPARQL
+;;client does not like
+(def ^:private execute-update-fn
+  (create-execute-update-fn get-repo (fn [conn pquery] (repo/evaluate pquery))))
 
 (extend SesameStardogBackend
   repo/ToConnection default-to-connection-impl
@@ -92,7 +99,7 @@
   proto/ISPARQLUpdateable default-isparql-updatable-impl
   SparqlExecutor default-sparql-query-impl
   QueryRewritable default-query-rewritable-impl
-  SparqlUpdateExecutor default-sparql-update-impl
+  SparqlUpdateExecutor {:execute-update execute-update-fn}
   ApiOperations default-api-operations-impl
   Stoppable default-stoppable-impl)
 

@@ -180,12 +180,17 @@
     (if-let [writer-class (negotiate-content-writer pquery media-type)]
       (class->writer-fn writer-class)))
 
-(defn- exec-update [repo update-query restrictions]
-  (with-open [conn (repo/->connection repo)]
-      (let [dataset (restricted-dataset restrictions)
-            pquery (repo/prepare-update conn update-query dataset)]
-        (repo/with-transaction conn
-          (repo/evaluate pquery)))))
+(defn create-execute-update-fn [repo-fn exec-prepared-update-fn]
+  (fn [this update-query-string restrictions]
+    (let [repo (repo-fn this)]
+      (with-open [conn (repo/->connection repo)]
+        (let [dataset (restricted-dataset restrictions)
+              pquery (repo/prepare-update conn update-query-string dataset)]
+          (exec-prepared-update-fn conn pquery))))))
+
+(defn- execute-prepared-update-in-transaction [conn prepared-query]
+  (repo/with-transaction conn
+    (repo/evaluate prepared-query)))
 
 (defn- make-draft-query-rewriter
   "Build both a query rewriter and an accompanying result rewriter tied together
@@ -249,8 +254,7 @@
   {:create-rewriter ->RewritingSesameSparqlExecutor})
 
 (def default-sparql-update-impl
-  {:execute-update (fn [this query-string restrictions]
-                     (exec-update (get-repo this) query-string restrictions))})
+  {:execute-update (create-execute-update-fn get-repo execute-prepared-update-in-transaction)})
 
 (def default-stoppable-impl
   {:stop (comp repo/shutdown get-repo)})
