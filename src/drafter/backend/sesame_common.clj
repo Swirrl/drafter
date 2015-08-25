@@ -425,4 +425,7 @@
 (def default-draft-management-impl
   {:append-data-batch! append-data-batch
    :append-graph-metadata! append-graph-metadata
-   :get-all-drafts get-all-drafts})
+   :get-all-drafts get-all-drafts
+   :get-live-graph-for-draft (fn [this draft-graph-uri]
+                               (with-open [conn (repo/->connection (get-repo this))]
+                                 (mgmt/get-live-graph-for-draft conn)))})

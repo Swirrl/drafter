@@ -6,7 +6,7 @@
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :refer [update!]]
-            [grafter.rdf.repository :refer [query ->connection]]
+            [grafter.rdf.repository :refer [query]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import (java.util Date UUID)
            (org.openrdf.model.impl URIImpl)))
@@ -222,9 +222,8 @@
   if the draft URI does not have an associated managed graph or if the
   live graph does not exist."
   [db draft-graph-uri]
-  (with-open [conn (->connection db)]
-    (if (draft-exists? conn draft-graph-uri)
-      (lookup-live-graph conn draft-graph-uri))))
+  (if (draft-exists? db draft-graph-uri)
+    (lookup-live-graph db draft-graph-uri)))
 
 (defn- delete-live-graph-from-state-query [live-graph-uri]
   (str "DELETE WHERE"
