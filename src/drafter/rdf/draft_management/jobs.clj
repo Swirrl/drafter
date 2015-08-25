@@ -193,13 +193,3 @@
                     batch-sizes (and live-graph-uri
                                      (get-graph-clone-batches repo live-graph-uri))]
                 (copy-from-live-graph repo live-graph-uri draft-graph-uri batch-sizes job))))
-
-(defn migrate-graph-live-job [repo graphs]
-  (make-job :exclusive-write [job]
-            (log/info "Starting make-live for graph" graphs)
-            (let [conn (->connection repo)]
-              (with-transaction conn
-                (doseq [g graphs]
-                  (mgmt/migrate-live! conn g))))
-            (log/info "Make-live for graphs " graphs " done")
-            (job-succeeded! job)))

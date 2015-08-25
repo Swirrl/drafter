@@ -3,6 +3,7 @@
             [grafter.rdf :refer [add statements]]
             [clojure.set :as set]
             [clojure.tools.logging :as log]
+            [drafter.common.api-routes :refer [meta-params]]
             [drafter.backend.protocols :as backend]
             [drafter.write-scheduler :as scheduler]
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
@@ -326,18 +327,35 @@
     (jobs/make-job :batch-write [job]
               (append-data-in-batches backend draft-graph metadata new-triples job))))
 
+(defn- migrate-graphs-to-live-job [backend graphs]
+  (jobs/make-job :exclusive-write [job]
+            (log/info "Starting make-live for graph" graphs)
+            (with-open [conn (repo/->connection (get-repo backend))]
+              (repo/with-transaction conn
+                (doseq [g graphs]
+                  (mgmt/migrate-live! conn g))))
+            (log/info "Make-live for graphs " graphs " done")
+            (jobs/job-succeeded! job)))
+
+(defn- new-draft-job [backend live-graph params]
+  (jobs/make-job :sync-write [job]
+            (with-open [conn (repo/->connection (get-repo backend))]
+              (let [draft-graph-uri (repo/with-transaction conn
+                                      (mgmt/create-managed-graph! conn live-graph)
+                                      (mgmt/create-draft-graph! conn live-graph (meta-params params)))]
+                (jobs/job-succeeded! job {:guri draft-graph-uri})))))
+
 ;;draft API
 (def default-api-operations-impl
-  {:new-draft-job (fn [this live-graph-uri params]
-                    (jobs/create-draft-job (get-repo this) live-graph-uri params))
+  {:new-draft-job new-draft-job
    
    :append-data-to-graph-job append-data-to-graph-job
 
    :copy-from-live-graph-job (fn [this draft-graph-uri]
                                (jobs/create-copy-from-live-graph-job (get-repo this) draft-graph-uri))
    
-   :migrate-graphs-to-live-job (fn [this graphs]
-                                 (jobs/migrate-graph-live-job (get-repo this) graphs))
+   :migrate-graphs-to-live-job migrate-graphs-to-live-job
+   
    :delete-metadata-job (fn [this graphs meta-keys]
                           (jobs/create-delete-metadata-job (get-repo this) graphs meta-keys))
    
