@@ -168,13 +168,6 @@
   (doseq [[meta-name value] metadata]
     (upsert-single-object! db graph-uri meta-name value)))
 
-(defn append-data!
-  ([db draft-graph-uri triples]
-   (add db draft-graph-uri triples))
-
-  ([db draft-graph-uri format triple-stream]
-   (add db draft-graph-uri format triple-stream)))
-
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
 

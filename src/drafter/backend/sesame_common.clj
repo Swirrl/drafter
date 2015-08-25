@@ -1,10 +1,13 @@
 (ns drafter.backend.sesame-common
   (:require [grafter.rdf.repository :as repo]
+            [grafter.rdf :refer [add statements]]
             [clojure.set :as set]
             [clojure.tools.logging :as log]
             [drafter.backend.protocols :as backend]
-            [swirrl-server.async.jobs :refer [create-job]]
+            [drafter.write-scheduler :as scheduler]
+            [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.rdf.draft-management :as mgmt]
             [grafter.rdf.protocols :as proto]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter result-handler-wrapper]]
@@ -255,13 +258,81 @@
 (def default-stoppable-impl
   {:stop (comp repo/shutdown get-repo)})
 
+(defn- append-data-in-batches [repo draft-graph metadata triples job]
+  (jobs/with-job-exception-handling job
+    (let [conn (repo/->connection repo)
+          [current-batch remaining-triples] (split-at jobs/batched-write-size triples)]
+
+      (log/info (str "Adding a batch of triples to repo" current-batch))
+      (backend/append-data-batch! repo draft-graph current-batch)
+
+      (if-not (empty? remaining-triples)
+        ;; resubmit the remaining batches under the same job to the
+        ;; queue to give higher priority jobs a chance to write
+        (let [apply-next-batch (partial append-data-in-batches
+                                        repo draft-graph metadata remaining-triples)]
+          (scheduler/queue-job! (create-child-job job apply-next-batch)))
+
+        (do
+          (mgmt/add-metadata-to-graph conn draft-graph metadata)
+          (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
+
+          (jobs/job-succeeded! job))))))
+
+(defn- append-data-to-graph-job
+  "Return a job function that adds the triples from the specified file
+  to the specified graph.
+
+  This operation is batched at the :batch-write level to allow
+  cooperative scheduling with :sync-writes.
+
+  It works by concatenating the existing live quads with a lazy-seq on
+  the uploaded file.  This combined lazy sequence is then split into
+  the current batch and remaining, with the current batch being
+  applied before the job is resubmitted (under the same ID) with the
+  remaining triples.
+
+  The last batch is finally responsible for signaling job completion
+  via a side-effecting call to complete-job!"
+
+  [backend draft-graph tempfile rdf-format metadata]
+
+  (let [new-triples (statements tempfile
+                                :format rdf-format
+                                :buffer-size jobs/batched-write-size)
+
+        ;; NOTE that this is technically not transactionally safe as
+        ;; sesame currently only supports the READ_COMMITTED isolation
+        ;; level.
+        ;;
+        ;; As there is no read lock or support for (repeatable reads)
+        ;; this means that the CONSTRUCT below can witness data
+        ;; changing underneath it.
+        ;;
+        ;; TODO: protect against this, either by adopting a better
+        ;; storage engine or by adding code to either refuse make-live
+        ;; operations on jobs that touch the same graphs that we're
+        ;; manipulating here, or to raise an error on the batch task.
+        ;;
+        ;; I think the newer versions of Sesame 1.8.x might also provide better
+        ;; support for different isolation levels, so we might want to consider
+        ;; upgrading.
+        ;;
+        ;; http://en.wikipedia.org/wiki/Isolation_%28database_systems%29#Read_committed
+        ;;
+        ;; This can occur if a user does a make-live on a graph
+        ;; which is being written to in a batch job.
+    ]
+
+    (jobs/make-job :batch-write [job]
+              (append-data-in-batches backend draft-graph metadata new-triples job))))
+
 ;;draft API
 (def default-api-operations-impl
   {:new-draft-job (fn [this live-graph-uri params]
                     (jobs/create-draft-job (get-repo this) live-graph-uri params))
    
-   :append-data-to-graph-job (fn [this graph data rdf-format metadata]
-                               (jobs/append-data-to-graph-from-file-job (get-repo this) graph data rdf-format metadata))
+   :append-data-to-graph-job append-data-to-graph-job
 
    :copy-from-live-graph-job (fn [this draft-graph-uri]
                                (jobs/create-copy-from-live-graph-job (get-repo this) draft-graph-uri))
@@ -281,3 +352,20 @@
                                             (get-repo this)
                                             graph
                                             contents-only?)))})
+
+(defn- append-data-batch [backend graph-uri triple-batch]
+  (let [repo (get-repo backend)]
+    (with-open [conn (repo/->connection repo)]
+      (repo/with-transaction conn
+        (add conn graph-uri triple-batch)))))
+
+(defn- append-graph-metadata [backend graph-uri metadata]
+  (let [repo (get-repo backend)]
+    ;;TODO: Update in transaction?
+    (doseq [[meta-name value] metadata]
+      (mgmt/upsert-single-object! repo graph-uri meta-name value))))
+
+;;draft management
+(def default-draft-management-impl
+  {:append-data-batch! append-data-batch
+   :append-graph-metadata! append-graph-metadata})

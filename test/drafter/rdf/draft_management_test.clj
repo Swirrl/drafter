@@ -1,10 +1,11 @@
 (ns drafter.rdf.draft-management-test
   (:require
-   [drafter.test-common :refer [*test-db* wrap-with-clean-test-db make-graph-live!]]
+   [drafter.test-common :refer [*test-db* *test-backend* wrap-with-clean-test-db make-graph-live!]]
    [grafter.rdf :refer [s add add-statement]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.vocabularies.rdf :refer :all]
    [grafter.rdf.repository :refer :all]
+   [drafter.backend.protocols :refer [append-data-batch!]]
    [grafter.rdf.protocols :refer [update!]]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
@@ -45,7 +46,7 @@
 
 (defn clone-and-append-data! [db draft-graph-uri triples]
   (clone-data-from-live-to-draft! db draft-graph-uri)
-  (append-data! db draft-graph-uri triples))
+  (append-data-batch! db draft-graph-uri triples))
 
 (def test-triples (triplify ["http://test.com/data/one"
                              ["http://test.com/hasProperty" "http://test.com/data/1"]
@@ -92,12 +93,12 @@
   (create-managed-graph! *test-db* test-graph-uri)
   (create-draft-graph! *test-db* test-graph-uri))
 
-(deftest append-data!-test
-  (testing "append-data!"
+(deftest append-data-batch!-test
+  (testing "append-data-batch!"
     (testing "on an empty live graph"
       (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
 
-        (append-data! *test-db* draft-graph-uri test-triples)
+        (append-data-batch! *test-backend* draft-graph-uri test-triples)
 
         (is (ask? "GRAPH <" draft-graph-uri "> {
                  <http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .
@@ -109,7 +110,7 @@
                                        (triplify ["http://starting/data" ["http://starting/data" "http://starting/data"]]))
             draft-graph-uri (create-managed-graph-with-draft! live-uri)]
 
-        (clone-and-append-data! *test-db* draft-graph-uri test-triples)
+        (clone-and-append-data! *test-backend* draft-graph-uri test-triples)
 
         (is (ask? "GRAPH <" draft-graph-uri "> {
                  <http://starting/data> <http://starting/data> <http://starting/data> .
@@ -134,7 +135,7 @@
   (testing "migrate-live! data is migrated"
     (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
           expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
-      (append-data! *test-db* draft-graph-uri test-triples)
+      (append-data-batch! *test-backend* draft-graph-uri test-triples)
       (migrate-live! *test-db* draft-graph-uri)
       (is (not (ask? "GRAPH <" draft-graph-uri "> {"
                      expected-triple-pattern
@@ -162,9 +163,9 @@
           draft-graph-to-keep-uri (create-managed-graph-with-draft! graph-to-keep-uri)
           draft-graph-to-keep-uri2 (create-managed-graph-with-draft! graph-to-keep-uri2)]
 
-      (append-data! *test-db* draft-graph-to-keep-uri test-triples)
-      (append-data! *test-db* draft-graph-to-keep-uri2 test-triples)
-      (append-data! *test-db* draft-graph-to-del-uri test-triples)
+      (append-data-batch! *test-backend* draft-graph-to-keep-uri test-triples)
+      (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
+      (append-data-batch! *test-backend* draft-graph-to-del-uri test-triples)
 
       (migrate-live! *test-db* draft-graph-to-keep-uri)
       (migrate-live! *test-db* draft-graph-to-del-uri)
@@ -194,8 +195,8 @@
           draft-graph-to-keep-uri2 (create-managed-graph-with-draft! graph-to-keep-uri2)
           draft-graph-to-keep-uri3 (create-managed-graph-with-draft! graph-to-keep-uri3)]
 
-      (append-data! *test-db* draft-graph-to-keep-uri2 test-triples)
-      (append-data! *test-db* draft-graph-to-keep-uri3 test-triples)
+      (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
+      (append-data-batch! *test-backend* draft-graph-to-keep-uri3 test-triples)
       (migrate-live! *test-db* draft-graph-to-keep-uri2)
       (is (graph-exists? *test-db* graph-to-keep-uri2))
 

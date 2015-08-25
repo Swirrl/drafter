@@ -1,7 +1,8 @@
 (ns drafter.rdf.rewriting.result-rewriting-test
   (:require
-   [drafter.test-common :refer [test-triples]]
-   [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph! append-data!]]
+   [drafter.test-common :refer [test-triples make-backend]]
+   [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph!]]
+   [drafter.backend.protocols :refer [append-data-batch!]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.rdf :refer [statements]]
    [grafter.rdf.repository :refer [repo prepare-update]]
@@ -60,11 +61,11 @@
   (result-keys (first results) ks))
 
 (deftest query-and-result-rewriting-test
-  (let [db (repo)
+  (let [[db backend] (make-backend)
         draft-graph (create-draft-graph! db "http://frogs.com/live-graph")
         graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
 
-    (append-data! db draft-graph (test-triples "http://kermit.org/the-frog"))
+    (append-data-batch! backend draft-graph (test-triples "http://kermit.org/the-frog"))
 
     (testing "rewrites subject URIs"
       (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { <http://kermit.org/the-frog> ?p ?o } }"
@@ -73,7 +74,7 @@
             po ["http://predicate" "http://object"]
             mapped-triples (triplify [mapped-subject po])]
 
-        (append-data! db draft-graph mapped-triples)
+        (append-data-batch! backend draft-graph mapped-triples)
 
         (is (= po
                (-> db
@@ -86,7 +87,7 @@
             graph-map (assoc graph-map (URIImpl. "http://source-predicate") (URIImpl. mapped-predicate))
             mapped-triples (triplify ["http://kermit.org/the-frog" [mapped-predicate "http://object"]])]
 
-        (append-data! db draft-graph mapped-triples)
+        (append-data-batch! backend draft-graph mapped-triples)
 
         (is (= ["http://kermit.org/the-frog" "http://object"]
                (-> db
@@ -99,7 +100,7 @@
             graph-map (assoc graph-map (URIImpl. "http://source-object") (URIImpl. mapped-object))
             mapped-triples (triplify ["http://kermit.org/the-frog" ["http://predicate" mapped-object]])]
 
-        (append-data! db draft-graph mapped-triples)
+        (append-data-batch! backend draft-graph mapped-triples)
 
         (is (= ["http://kermit.org/the-frog" "http://predicate"]
                (-> db
@@ -108,14 +109,14 @@
 
     (testing "rewrites all result URIs"
       (let [query "SELECT * WHERE { ?s ?p ?o }"
-            db (repo)
+            [db backend] (make-backend)
             live-triple ["http://live-subject" "http://live-predicate" "http://live-object"]
             draft-triple ["http://draft-subject" "http://draft-predicate" "http://draft-object"]
             [live-subject live-predicate live-object] live-triple
             [draft-subject draft-predicate draft-object] draft-triple
             graph-map (apply hash-map (map #(URIImpl. %) (interleave live-triple draft-triple)))]
 
-        (append-data! db draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
+        (append-data-batch! backend draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
 
         (is (= live-triple
                (-> db

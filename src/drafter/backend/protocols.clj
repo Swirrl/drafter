@@ -12,7 +12,13 @@
 (defprotocol SparqlUpdateExecutor
   (execute-update [this update-query restrictions]))
 
-(defprotocol DraftManagement)
+(defprotocol DraftManagement
+  (append-data-batch! [this draft-graph-uri triple-batch]
+    "Appends a sequence of triples to the given draft graph.")
+
+  (append-graph-metadata! [this draft-graph-uri metadata]
+    "Associates a sequence of metadata key-value pairs with the given
+    graph."))
 
 (defprotocol Stoppable
   (stop [this]))

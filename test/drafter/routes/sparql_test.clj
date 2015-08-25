@@ -8,6 +8,7 @@
             [grafter.rdf :refer [subject predicate object context]]
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
+            [drafter.backend.protocols :refer [append-data-batch!]]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.draft-management :refer :all]))
 
@@ -369,12 +370,12 @@
           (is (= "http://test.com/graph-2" found-graph))))))
 
 
-(defn make-new-draft-from-graph! [db live-guri]
+(defn make-new-draft-from-graph! [backend db live-guri]
   (let [draft-guri (create-draft-graph! db live-guri)
         query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" live-guri "> { ?s ?p ?o } }")
         source-data (repo/query db query-str)]
-    (append-data! db draft-guri source-data)
+    (append-data-batch! backend draft-guri source-data)
 
     draft-guri))
 
@@ -387,9 +388,9 @@
     (let [graph-a (make-graph-live! db "http://graph.com/a" (test-triples "http://test.com/a"))
           graph-b (make-graph-live! db "http://graph.com/b" (test-triples "http://test.com/b"))
           ;; and then change one of them... a'
-          draft-graph-a' (make-new-draft-from-graph! db graph-a)]
+          draft-graph-a' (make-new-draft-from-graph! backend db graph-a)]
 
-      (append-data! db draft-graph-a' (test-triples "http://test.com/a-prime"))
+      (append-data-batch! backend draft-graph-a' (test-triples "http://test.com/a-prime"))
 
       ;;(make-graph-live! db draft-graph-a')
 
