@@ -391,7 +391,7 @@
 
 (defn- migrate-graphs-to-live-job [backend graphs]
   (jobs/make-job :exclusive-write [job]
-                 (migrate-graphs-to-live! backend graphs)
+                 (backend/migrate-graphs-to-live! backend graphs)
                  (jobs/job-succeeded! job)))
 
 (defn- new-draft-job [backend live-graph params]
