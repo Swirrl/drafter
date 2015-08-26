@@ -105,7 +105,7 @@
                }"))))
 
     (testing "with live graph with existing data, copies data into draft"
-      (let [live-uri (make-graph-live! *test-db*
+      (let [live-uri (make-graph-live! *test-backend*
                                        "http://clones/original/data"
                                        (triplify ["http://starting/data" ["http://starting/data" "http://starting/data"]]))
             draft-graph-uri (create-managed-graph-with-draft! live-uri)]
@@ -136,7 +136,7 @@
     (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
           expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
       (append-data-batch! *test-backend* draft-graph-uri test-triples)
-      (migrate-live! *test-db* draft-graph-uri)
+      (migrate-live! *test-backend* draft-graph-uri)
       (is (not (ask? "GRAPH <" draft-graph-uri "> {"
                      expected-triple-pattern
                      "}"))
@@ -167,13 +167,13 @@
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-del-uri test-triples)
 
-      (migrate-live! *test-db* draft-graph-to-keep-uri)
-      (migrate-live! *test-db* draft-graph-to-del-uri)
+      (migrate-live! *test-backend* draft-graph-to-keep-uri)
+      (migrate-live! *test-backend* draft-graph-to-del-uri)
 
       ;; Draft for deletion has had data published. Now lets create a delete and publish
       (let [draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)]
         ;; We are migrating an empty graph, so this is deleting.
-        (migrate-live! *test-db* draft-graph-to-del-uri)
+        (migrate-live! *test-backend* draft-graph-to-del-uri)
         (let [managed-found? (is-graph-managed? *test-db* test-graph-to-delete-uri)
               keep-managed-found? (is-graph-managed? *test-db* graph-to-keep-uri)]
           (is (not managed-found?)
@@ -197,11 +197,11 @@
 
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-keep-uri3 test-triples)
-      (migrate-live! *test-db* draft-graph-to-keep-uri2)
+      (migrate-live! *test-backend* draft-graph-to-keep-uri2)
       (is (graph-exists? *test-db* graph-to-keep-uri2))
 
       ;; We are migrating an empty graph, so this is deleting.
-      (migrate-live! *test-db* draft-graph-to-del-uri)
+      (migrate-live! *test-backend* draft-graph-to-del-uri)
       (let [draft-managed-found? (is-graph-managed? *test-db* test-graph-to-delete-uri)
             keep-managed-found? (is-graph-managed? *test-db* graph-to-keep-uri2)]
         (is draft-managed-found?

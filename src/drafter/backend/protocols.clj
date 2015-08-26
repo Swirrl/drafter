@@ -22,7 +22,14 @@
   URIs as necessary.  Assumes all values are strings.")
 
   (get-all-drafts [this]
-    "Gets a sequence of descriptors for all draft graphs"))
+    "Gets a sequence of descriptors for all draft graphs")
+
+  (get-live-graph-for-draft [this draft-graph-uri]
+    "Gets the live graph associated with the given draft graph URI, or
+    nil if the draft does not exist.")
+
+  (migrate-graphs-to-live! [this graph-uris]
+    "Migrates the given collections of draft graphs to live"))
 
 (defprotocol Stoppable
   (stop [this]))

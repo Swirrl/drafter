@@ -9,7 +9,7 @@
             [grafter.rdf.io :refer [rdf-serializer]]
             [drafter.rdf.draft-management :refer [migrate-live!]]
             [drafter.test-common :refer [test-triples import-data-to-draft!
-                                         make-backend stream->string select-all-in-graph make-graph-live!]]))
+                                         make-backend stream->string select-all-in-graph]]))
 
 (def dumps-request {:request-method :get
                     :uri "/data/live"
@@ -28,7 +28,7 @@
 (deftest dumps-route-raw-test
   (testing "dumps-endpoint with live endpoint"
     (let [[test-db test-backend draft-graph] (make-store-with-draft)]
-      (migrate-live! test-db draft-graph)
+      (migrate-live! test-backend draft-graph)
       (let [dumps (dumps-endpoint "/data/live" sparql-end-point test-backend)
             response (dumps dumps-request)]
 

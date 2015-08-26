@@ -421,7 +421,7 @@
    (testing "Updating draft graph with metadata"
      (testing "Adds metadata"
        (let [route (draft-api-routes "/draft" *test-backend*)
-             source-graph-uri (make-graph-live! *test-db* "http://mygraph/source-graph")
+             source-graph-uri (make-graph-live! *test-backend* "http://mygraph/source-graph")
              draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
 
              request (-> {:uri "/draft" :request-method http-method}

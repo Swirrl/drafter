@@ -7,6 +7,7 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.repository :refer [query]]
+            [drafter.backend.protocols :refer [migrate-graphs-to-live!]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import (java.util Date UUID)
            (org.openrdf.model.impl URIImpl)))
@@ -53,7 +54,7 @@
                  "}")]
     (query db qry)))
 
-(defn- has-more-than-one-draft?
+(defn has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
   [db live-graph-uri]
@@ -233,7 +234,7 @@
          "   ?p ?o .")
        "}"))
 
-(defn- delete-live-graph-from-state! [db live-graph-uri]
+(defn delete-live-graph-from-state! [db live-graph-uri]
   "Delete the live managed graph from the state graph"
   (update! db (delete-live-graph-from-state-query live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
@@ -319,55 +320,5 @@
                 (map (partial map-values str))
                 (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
-(defn migrate-live!
-  "Moves the triples from the draft graph to the draft graphs live destination."
-  [db draft-graph-uri]
-
-  (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
-    (do
-      ;;DELETE the target (live) graph and copy the draft to it
-      ;;TODO: Use MOVE query?
-      (delete-graph-contents! db live-graph-uri)
-
-      (let [contents (query db
-                            (str "CONSTRUCT { ?s ?p ?o } WHERE
-                                 { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
-
-            ;;If the source (draft) graph is empty then the migration
-            ;;is a deletion. If it is the only draft of the live graph
-            ;;then all references to the live graph are being removed
-            ;;from the data. In this case the reference to the live
-            ;;graph should be removed from the state graph. Note this
-            ;;case and use it when cleaning up the state graph below.
-            is-only-draft? (not (has-more-than-one-draft? db live-graph-uri))]
-
-        ;;if the source (draft) graph has data then copy it to the live graph and
-        ;;make it public.
-        (if (not (empty? contents))
-          (do
-            (add db live-graph-uri contents)
-            (set-isPublic! db live-graph-uri true)))
-
-        ;;delete draft data
-        (delete-graph-contents! db draft-graph-uri)
-
-        ;;NOTE: At this point all the live and draft graph data has
-        ;;been updated: the live graph contents match those of the
-        ;;published draft, and the draft data has been deleted.
-
-        ;;Clean up the state graph - all references to the draft graph should always be removed.
-        ;;The live graph should be removed if the draft was empty (operation was a deletion) and
-        ;;it was the only draft of the live graph
-
-        ;;WARNING: Draft graph state must be deleted before the live graph state!
-        ;;DELETE query depends on the existence of the live->draft connection in the state
-        ;;graph
-        (delete-draft-graph-state! db draft-graph-uri)
-
-        (if (and is-only-draft? (empty? contents))
-          (delete-live-graph-from-state! db live-graph-uri)))
-      
-      (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
-
-    (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
-                    {:error :graph-not-found}))))
+(defn migrate-live! [backend graph]
+  (migrate-graphs-to-live! backend [graph]))

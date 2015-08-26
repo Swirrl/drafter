@@ -327,15 +327,71 @@
     (jobs/make-job :batch-write [job]
               (append-data-in-batches backend draft-graph metadata new-triples job))))
 
+(defn- migrate-graph-to-live!
+  "Moves the triples from the draft graph to the draft graphs live destination."
+  [db draft-graph-uri]
+
+  (if-let [live-graph-uri (mgmt/lookup-live-graph db draft-graph-uri)]
+    (do
+      ;;DELETE the target (live) graph and copy the draft to it
+      ;;TODO: Use MOVE query?
+      (mgmt/delete-graph-contents! db live-graph-uri)
+
+      (let [contents (repo/query db
+                            (str "CONSTRUCT { ?s ?p ?o } WHERE
+                                 { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
+
+            ;;If the source (draft) graph is empty then the migration
+            ;;is a deletion. If it is the only draft of the live graph
+            ;;then all references to the live graph are being removed
+            ;;from the data. In this case the reference to the live
+            ;;graph should be removed from the state graph. Note this
+            ;;case and use it when cleaning up the state graph below.
+            is-only-draft? (not (mgmt/has-more-than-one-draft? db live-graph-uri))]
+
+        ;;if the source (draft) graph has data then copy it to the live graph and
+        ;;make it public.
+        (if (not (empty? contents))
+          (do
+            (add db live-graph-uri contents)
+            (mgmt/set-isPublic! db live-graph-uri true)))
+
+        ;;delete draft data
+        (mgmt/delete-graph-contents! db draft-graph-uri)
+
+        ;;NOTE: At this point all the live and draft graph data has
+        ;;been updated: the live graph contents match those of the
+        ;;published draft, and the draft data has been deleted.
+
+        ;;Clean up the state graph - all references to the draft graph should always be removed.
+        ;;The live graph should be removed if the draft was empty (operation was a deletion) and
+        ;;it was the only draft of the live graph
+
+        ;;WARNING: Draft graph state must be deleted before the live graph state!
+        ;;DELETE query depends on the existence of the live->draft connection in the state
+        ;;graph
+        (mgmt/delete-draft-graph-state! db draft-graph-uri)
+
+        (if (and is-only-draft? (empty? contents))
+          (mgmt/delete-live-graph-from-state! db live-graph-uri)))
+      
+      (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
+
+    (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
+                    {:error :graph-not-found}))))
+
+(defn- migrate-graphs-to-live! [backend graphs]
+  (log/info "Starting make-live for graphs " graphs)
+  (with-open [conn (repo/->connection (get-repo backend))]
+    (repo/with-transaction conn
+      (doseq [g graphs]
+        (migrate-graph-to-live! conn g))))
+  (log/info "Make-live for graphs " graphs " done"))
+
 (defn- migrate-graphs-to-live-job [backend graphs]
   (jobs/make-job :exclusive-write [job]
-            (log/info "Starting make-live for graph" graphs)
-            (with-open [conn (repo/->connection (get-repo backend))]
-              (repo/with-transaction conn
-                (doseq [g graphs]
-                  (mgmt/migrate-live! conn g))))
-            (log/info "Make-live for graphs " graphs " done")
-            (jobs/job-succeeded! job)))
+                 (migrate-graphs-to-live! backend graphs)
+                 (jobs/job-succeeded! job)))
 
 (defn- new-draft-job [backend live-graph params]
   (jobs/make-job :sync-write [job]
@@ -426,6 +482,22 @@
   {:append-data-batch! append-data-batch
    :append-graph-metadata! append-graph-metadata
    :get-all-drafts get-all-drafts
+   :migrate-graphs-to-live! migrate-graphs-to-live!
    :get-live-graph-for-draft (fn [this draft-graph-uri]
                                (with-open [conn (repo/->connection (get-repo this))]
                                  (mgmt/get-live-graph-for-draft conn)))})
+
+(defn- add-statement-impl
+  ([this statement] (proto/add-statement (get-repo this) statement))
+  ([this graph statement] (proto/add-statement (get-repo this) graph statement)))
+
+(defn- add-impl
+  ([this triples] (proto/add (get-repo this) triples))
+  ([this graph triples] (proto/add (get-repo this) graph triples))
+  ([this graph format triple-stream] (proto/add (get-repo this) format triple-stream))
+  ([this graph base-uri format triple-stream] (proto/add (get-repo this) format triple-stream)))
+
+;;ITripleWritable
+(def default-triple-writeable-impl
+  {:add-statement add-statement-impl
+   :add add-impl})
