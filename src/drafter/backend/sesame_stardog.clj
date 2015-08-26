@@ -95,23 +95,17 @@
   (create-execute-update-fn get-repo (fn [conn pquery] (repo/evaluate pquery))))
 
 (defn- migrate-graphs-to-live-impl! [backend graphs]
+  "Migrates a collection of draft graphs to live through a single
+  compound SPARQL update statement. This overrides the default sesame
+  implementation which uses a transaction to coordinate the
+  updates. Explicit UPDATE statements do not take part in transactions
+  on the remote sesame SPARQL client."
   (log/info "Starting make-live for graph" graphs)
   (let [repo (get-repo backend)
         graph-migrate-queries (mapcat #(:queries (mgmt/migrate-live-queries repo %)) graphs)
         update-str (util/make-compound-sparql-query graph-migrate-queries)]
     (update! repo update-str))
   (log/info "Make-live for graph(s) " graphs " done"))
-
-(defn- batch-migrate-graphs-to-live-job
-  "Migrates a collection of draft graphs to live through a single
-  compound SPARQL update statement. This overrides the default sesame
-  implementation which uses a transaction to coordinate the
-  updates. Explicit UPDATE statements do not take part in transactions
-  on the remote sesame SPARQL client."
-  [backend graphs]
-  (jobs/make-job :exclusive-write [job]
-                 (migrate-graphs-to-live-impl! backend graphs)
-                 (jobs/job-succeeded! job)))
 
 (defn- append-data-batch [backend graph-uri triple-batch]
   ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
@@ -130,7 +124,7 @@
   QueryRewritable default-query-rewritable-impl
   SparqlUpdateExecutor {:execute-update execute-update-fn}
   DraftManagement (assoc default-draft-management-impl :append-data-batch! append-data-batch :migrate-graphs-to-live! migrate-graphs-to-live-impl!)
-  ApiOperations (assoc default-api-operations-impl :migrate-graphs-to-live-job batch-migrate-graphs-to-live-job)
+  ApiOperations default-api-operations-impl
   Stoppable default-stoppable-impl
 
   ;TODO: remove? required by the default delete-graph-job implementation which deletes
