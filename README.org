@@ -13,7 +13,7 @@ environment variables (and/or java properties) to pass configuration
 variables from the environment.
 
 The defaults should work for most cases, but for further details on
-the options drafter supports you should see the [[https://github.com/Swirrl/drafter/blob/master/doc/configuring-drafter.md][Configuring Drafter]]
+the options drafter supports you should see the [[https://github.com/Swirrl/drafter/blob/master/doc/configuring-drafter.org][Configuring Drafter]]
 page.
 
  You may also wish to configure drafter logging by putting a

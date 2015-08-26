@@ -4,14 +4,42 @@ Drafter uses [[https://github.com/weavejester/environ][environ]] for its configu
 environment variables (and/or java properties) to pass configuration
 variables from the environment.
 
-Configurable properties and their defaults are:
+** Backends
+
+Drafter supports multiple backends for storing RDF data.
+
+#+BEGIN_EXAMPLE
+DRAFTER_BACKEND               (default SESAME_BACKEND)
+#+END_EXAMPLE
+
+The currently there are two supported backends: SESAME_NATIVE and SESAME_STARDOG. Different backends have their own
+configuration options. There are also common configuration settings which apply across all backends:
+
+#+BEGIN_EXAMPLE
+DRAFTER_HTTP_PORT:            (default 3001)
+DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
+#+END_EXAMPLE
+
+*** Sesame native backend
+
+The Sesame native backend stores the data in a Sesame native repository backed by files on a local disk. The location
+of the data directory and the indexes to create can be configured:
+
+#+BEGIN_EXAMPLE
+DRAFTER_INDEXES
+DEFAULT_REPO_PATH
+#+END_EXAMPLE
+
+*** Sesame Stardog backend
+The Sesame stardog backend accesses a remote Stardog instance through a Sesame SPARQL repository. The location of the 
+query and update endpoints for the Stardog database to use must be configured.
 
 #+BEGIN_EXAMPLE
 SPARQL_QUERY_ENDPOINT         REQUIRED http://$STARDOG_PORT_5820_TCP_ADDR:5820/${DATABASE_NAME:-pmd-data}/query
 SPARQL_UPDATE_ENDPOINT        REQUIRED http://$STARDOG_PORT_5820_TCP_ADDR:5820/${DATABASE_NAME:-pmd-data}/update
-DRAFTER_HTTP_PORT:            (default 3001)
-DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
 #+END_EXAMPLE
+
+** Examples
 
 Some examples of supplying these properties are provided below:
 
@@ -32,10 +60,6 @@ As environment variables via a built application jar:
 #+BEGIN_SRC shell :exports code
 $ env DRAFTER_HTTP_PORT=3050 DRAFTER_REPO_PATH=./drafter-database java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 #+END_SRC
-
-Indexes can be configured via the property =DRAFTER_INDEXES=, we use
-the same default indexes as sesame. =spoc,posc,cosp= which covers all
-possible
 
 ** Configuring Timeouts
 
