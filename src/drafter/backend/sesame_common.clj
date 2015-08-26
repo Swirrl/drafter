@@ -489,7 +489,7 @@
    :migrate-graphs-to-live! migrate-graphs-to-live!
    :get-live-graph-for-draft (fn [this draft-graph-uri]
                                (with-open [conn (repo/->connection (get-repo this))]
-                                 (mgmt/get-live-graph-for-draft conn)))})
+                                 (mgmt/get-live-graph-for-draft conn draft-graph-uri)))})
 
 (defn- add-statement-impl
   ([this statement] (proto/add-statement (get-repo this) statement))
