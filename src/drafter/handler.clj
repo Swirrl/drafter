@@ -136,7 +136,7 @@
   "Creates the backend for the current configuration and sets the
   backend var."
   []
-  (set-var-root! #'backend (get-backend)))
+  (set-var-root! #'backend (get-backend env)))
 
 (defn initialise-services! []
   (enc/register-custom-encoders!)

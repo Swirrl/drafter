@@ -44,8 +44,8 @@
 
 (def get-backend-for-repo ->SesameNativeBackend)
 
-(defn get-native-backend []
-  (get-backend-for-repo (get-repo env)))
+(defn get-native-backend [env-map]
+  (get-backend-for-repo (get-repo env-map)))
 
 (defn reindex
   "Reindex the database according to the DRAFTER_INDEXES set at
