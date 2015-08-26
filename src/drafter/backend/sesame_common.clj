@@ -227,9 +227,6 @@
   (create-query-executor [_ writer-fn pquery]
     (backend/create-query-executor inner writer-fn pquery)))
 
-(def default-to-connection-impl
-  {:->connection (comp repo/->connection get-repo)})
-
 (def default-triple-readable-impl
   {:to-statements (fn [this options]
                     (proto/to-statements (get-repo this) options))})

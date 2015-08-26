@@ -116,7 +116,6 @@
         (add conn graph-uri triple-batch)))))
 
 (extend SesameStardogBackend
-  repo/ToConnection default-to-connection-impl
   proto/ITripleReadable default-triple-readable-impl
   proto/ISPARQLable default-sparqlable-impl
   proto/ISPARQLUpdateable default-isparql-updatable-impl

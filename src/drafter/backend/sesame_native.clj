@@ -28,7 +28,6 @@
 (defrecord SesameNativeBackend [repo])
 
 (extend SesameNativeBackend
-  repo/ToConnection default-to-connection-impl
   proto/ITripleReadable default-triple-readable-impl
   proto/ITripleWriteable default-triple-writeable-impl
   proto/ISPARQLable default-sparqlable-impl
