@@ -2,9 +2,8 @@
   (:require [compojure.core :refer [GET routes]]
             [drafter.layout :as layout]
             [drafter.rdf.draft-management :refer [drafter-state-graph
-                                                  live-graphs
-                                                  all-drafts
-                                                  get-live-graph-for-draft]]
+                                                  live-graphs]]
+            [drafter.backend.protocols :refer [get-all-drafts get-live-graph-for-draft]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
@@ -46,7 +45,7 @@
         (draft-management-page {:endpoint "/sparql/draft"
                                 :update-endpoint "/sparql/draft/update"
                                 :name "Draft"
-                                :drafts (all-drafts db)
+                                :drafts (get-all-drafts db)
                                 :dump-path "/draft/data"
                                 }))
 
@@ -54,7 +53,7 @@
         (live-dumps-form "/data/live" (doall (live-graphs db))))
 
    (GET "/draft/data" request
-        (draft-dumps-form "/data/draft" (all-drafts db)))
+        (draft-dumps-form "/data/draft" (get-all-drafts db)))
 
    (GET "/draft/:guid" [guid]
         (let [draft (draft-uri guid)]

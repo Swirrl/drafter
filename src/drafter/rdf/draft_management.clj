@@ -7,7 +7,8 @@
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :refer [update!]]
-            [grafter.rdf.repository :refer [query evaluate prepare-query ->connection]]
+            [grafter.rdf.repository :refer [query]]
+            [drafter.backend.protocols :refer [migrate-graphs-to-live!]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import (java.util Date UUID)
            (org.openrdf.model.impl URIImpl)))
@@ -54,7 +55,7 @@
                  "}")]
     (query db qry)))
 
-(defn- has-more-than-one-draft?
+(defn has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
   [db live-graph-uri]
@@ -161,25 +162,6 @@
   (let [sparql (upsert-single-object-sparql subject predicate object)]
     (update! db sparql)))
 
-(defn add-metadata-to-graph
-  "Takes a hash-map of metadata key/value pairs and adds them as
-  metadata to the graphs state graph, converting keys into drafter
-  URIs as necessary.  Assumes all values are strings."
-  [db graph-uri metadata]
-  (doseq [[meta-name value] metadata]
-    (upsert-single-object! db graph-uri meta-name value)))
-
-(defn append-data!
-  ([db draft-graph-uri triples] (append-data! db draft-graph-uri triples {}))
-
-  ([db draft-graph-uri triples metadata]
-   (add-metadata-to-graph db draft-graph-uri metadata)
-   (add db draft-graph-uri triples))
-
-  ([db draft-graph-uri format triple-stream metadata]
-   (add-metadata-to-graph db draft-graph-uri metadata)
-   (add db draft-graph-uri format triple-stream)))
-
 (defn set-isPublic-query [live-graph-uri is-public]
   (upsert-single-object-sparql live-graph-uri drafter:isPublic is-public))
 
@@ -251,9 +233,8 @@
   if the draft URI does not have an associated managed graph or if the
   live graph does not exist."
   [db draft-graph-uri]
-  (with-open [conn (->connection db)]
-    (if (draft-exists? conn draft-graph-uri)
-      (lookup-live-graph conn draft-graph-uri))))
+  (if (draft-exists? db draft-graph-uri)
+    (lookup-live-graph db draft-graph-uri)))
 
 (defn- delete-live-graph-from-state-query [live-graph-uri]
   (str "DELETE WHERE"
@@ -263,7 +244,7 @@
          "   ?p ?o .")
        "}"))
 
-(defn- delete-live-graph-from-state! [db live-graph-uri]
+(defn delete-live-graph-from-state! [db live-graph-uri]
   "Delete the live managed graph from the state graph"
   (update! db (delete-live-graph-from-state-query live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
@@ -336,20 +317,23 @@
 (defn- parse-guid [uri]
   (.replace (str uri) (draft-uri "") ""))
 
-
-(defn all-drafts [db]
-  (with-open [conn (->connection db)]
-    (doall (->> (query conn (str
+(def ^:private get-all-drafts-query (str
                            "SELECT ?draft ?live WHERE {"
                            "   GRAPH <" drafter-state-graph "> {"
                            "     ?draft a <" drafter:DraftGraph "> . "
                            "     ?live <" drafter:hasDraft "> ?draft . "
                            "   }"
                            "}"))
+
+;;SPARQLable -> Map{Keyword String}
+(defn query-all-drafts [queryable]
+  (doall (->> (query queryable get-all-drafts-query)
                 (map keywordize-keys)
                 (map (partial map-values str))
-                (map (fn [m] (assoc m :guid (parse-guid (:draft m)))))))))
+                (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
+(defn migrate-live! [backend graph]
+  (migrate-graphs-to-live! backend [graph]))
 
 (defn- move-like-tbl-wants-super-slow-on-stardog-though
   "Move's how TBL intended.  Issues a SPARQL MOVE query.
@@ -424,10 +408,8 @@
                     (conj queries (delete-live-graph-from-state-query live-graph-uri))
                     queries)]
       {:queries queries
-       :live-graph-uri live-graph-uri})
+       :live-graph-uri live-graph-uri})))
 
-    (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
-                    {:error :graph-not-found}))))
 (defn migrate-live!
   "Moves the triples from the draft graph to the draft graphs live destination."
   [db draft-graph-uri]

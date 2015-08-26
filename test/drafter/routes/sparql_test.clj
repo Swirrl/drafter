@@ -8,6 +8,7 @@
             [grafter.rdf :refer [subject predicate object context]]
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
+            [drafter.backend.protocols :refer [append-data-batch!]]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.draft-management :refer :all]))
 
@@ -63,7 +64,7 @@
 ;; TODO uncomment these as soon as I get the draft one working again
 (deftest live-sparql-routes-test
   (let [[test-db backend] (make-backend)
-        [draft-graph-1 draft-graph-2] (add-test-data! test-db)
+        [draft-graph-1 draft-graph-2] (add-test-data! backend)
         endpoint (live-sparql-routes "/sparql/live" backend nil)
         {:keys [status headers body]
          :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
@@ -94,7 +95,7 @@
 (deftest state-sparql-routes-test
   (let [[test-db backend] (make-backend)
         ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (state-sparql-routes "/sparql/state" backend nil)]
 
     (testing "The state graph should be accessible"
@@ -123,7 +124,7 @@
 (deftest raw-sparql-routes-test
   (let [[test-db backend] (make-backend)
         ;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (raw-sparql-routes "/sparql/raw" backend nil)]
 
     (testing "The state graph should be accessible"
@@ -151,7 +152,7 @@
 
 (deftest drafts-sparql-routes-test
   (let [[test-db backend] (make-backend)
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "draft graphs that are made live can no longer be queried on their draft GURI"
@@ -248,7 +249,7 @@
 
 (deftest drafts-sparql-routes-distinct-test
   (let [[test-db backend] (make-backend)
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "SELECT DISTINCT queries on drafts"
@@ -265,7 +266,7 @@
 
 (deftest drafts-sparql-routes-distinct-subselect-test
   (let [[test-db backend] (make-backend)
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "SELECT DISTINCT subqueries with count on drafts"
@@ -298,7 +299,7 @@
 
 (deftest drafts-sparql-routes-with-construct-queries-test
   (let [[test-db backend] (make-backend)
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "Can do a construct query without a graph"
@@ -327,7 +328,7 @@
 
 (deftest drafts-sparql-routes-with-desribe-queries-test
   (let [[test-db backend] (make-backend)
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
     (testing "Can do a describe query with a graph"
       (let [csv-result (csv-> (endpoint
@@ -338,7 +339,7 @@
 
 (deftest drafts-sparql-route-rewrites-constants
   (let [[db backend] (make-backend)
-        [_ draft-graph-2 draft-graph-3] (add-test-data! db)
+        [_ draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "Query constants in graph position are rewritten to their draft graph URI"
@@ -353,7 +354,7 @@
 
 (deftest drafts-sparql-routes-with-results-rewriting-test
   (let [[db backend] (make-backend)
-        [_ draft-graph-2 draft-graph-3] (add-test-data! db)
+        [_ draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (testing "Queries can be written against their live graph URI"
@@ -369,12 +370,12 @@
           (is (= "http://test.com/graph-2" found-graph))))))
 
 
-(defn make-new-draft-from-graph! [db live-guri]
+(defn make-new-draft-from-graph! [backend db live-guri]
   (let [draft-guri (create-draft-graph! db live-guri)
         query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
                          { GRAPH <" live-guri "> { ?s ?p ?o } }")
         source-data (repo/query db query-str)]
-    (append-data! db draft-guri source-data)
+    (append-data-batch! backend draft-guri source-data)
 
     draft-guri))
 
@@ -384,14 +385,12 @@
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     ;; Put two graphs live
-    (let [graph-a (make-graph-live! db "http://graph.com/a" (test-triples "http://test.com/a"))
-          graph-b (make-graph-live! db "http://graph.com/b" (test-triples "http://test.com/b"))
+    (let [graph-a (make-graph-live! backend "http://graph.com/a" (test-triples "http://test.com/a"))
+          graph-b (make-graph-live! backend "http://graph.com/b" (test-triples "http://test.com/b"))
           ;; and then change one of them... a'
-          draft-graph-a' (make-new-draft-from-graph! db graph-a)]
+          draft-graph-a' (make-new-draft-from-graph! backend db graph-a)]
 
-      (append-data! db draft-graph-a' (test-triples "http://test.com/a-prime"))
-
-      ;;(make-graph-live! db draft-graph-a')
+      (append-data-batch! backend draft-graph-a' (test-triples "http://test.com/a-prime"))
 
       (let [result (-> (endpoint (draft-query (str "SELECT * WHERE {
                                                         GRAPH <" graph-b "> {
@@ -405,7 +404,7 @@
 
 (deftest drafts-unioned-with-live-test
   (let [[test-db backend] (make-backend)
-        [draft-graph-1-made-live draft-graph-2 draft-graph-3] (add-test-data! test-db)
+        [draft-graph-1-made-live draft-graph-2 draft-graph-3] (add-test-data! backend)
         endpoint (draft-sparql-routes "/sparql/draft" backend)]
 
     (is (= #{"http://test.com/graph-2"

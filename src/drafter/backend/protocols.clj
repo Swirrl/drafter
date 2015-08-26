@@ -12,7 +12,24 @@
 (defprotocol SparqlUpdateExecutor
   (execute-update [this update-query restrictions]))
 
-(defprotocol DraftManagement)
+(defprotocol DraftManagement
+  (append-data-batch! [this draft-graph-uri triple-batch]
+    "Appends a sequence of triples to the given draft graph.")
+
+  (append-graph-metadata! [this draft-graph-uri metadata]
+    "Takes a hash-map of metadata key/value pairs and adds them as
+  metadata to the graphs state graph, converting keys into drafter
+  URIs as necessary.  Assumes all values are strings.")
+
+  (get-all-drafts [this]
+    "Gets a sequence of descriptors for all draft graphs")
+
+  (get-live-graph-for-draft [this draft-graph-uri]
+    "Gets the live graph associated with the given draft graph URI, or
+    nil if the draft does not exist.")
+
+  (migrate-graphs-to-live! [this graph-uris]
+    "Migrates the given collections of draft graphs to live"))
 
 (defprotocol Stoppable
   (stop [this]))

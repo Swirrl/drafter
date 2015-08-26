@@ -4,11 +4,9 @@
             [clojure.tools.logging :as log]
             [drafter.util :as util]
             [drafter.backend.protocols :refer :all]
-            [drafter.backend.sesame-common :refer [create-execute-update-fn
-                                                   default-sparql-update-impl default-stoppable-impl default-sparql-query-impl
-                                                   default-to-connection-impl default-sparqlable-impl default-triple-readable-impl
-                                                   default-isparql-updatable-impl default-query-rewritable-impl default-api-operations-impl]]
+            [drafter.backend.sesame-common :refer :all]
             [grafter.rdf.repository :as repo]
+            [grafter.rdf :refer [add]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :as jobs]
             [grafter.rdf.protocols :refer [update!]]
@@ -96,6 +94,14 @@
 (def ^:private execute-update-fn
   (create-execute-update-fn get-repo (fn [conn pquery] (repo/evaluate pquery))))
 
+(defn- migrate-graphs-to-live-impl! [backend graphs]
+  (log/info "Starting make-live for graph" graphs)
+  (let [repo (get-repo backend)
+        graph-migrate-queries (mapcat #(:queries (mgmt/migrate-live-queries repo %)) graphs)
+        update-str (util/make-compound-sparql-query graph-migrate-queries)]
+    (update! repo update-str))
+  (log/info "Make-live for graph(s) " graphs " done"))
+
 (defn- batch-migrate-graphs-to-live-job
   "Migrates a collection of draft graphs to live through a single
   compound SPARQL update statement. This overrides the default sesame
@@ -104,13 +110,16 @@
   on the remote sesame SPARQL client."
   [backend graphs]
   (jobs/make-job :exclusive-write [job]
-            (log/info "Starting make-live for graph" graphs)
-            (let [repo (get-repo backend)
-                  graph-migrate-queries (mapcat #(:queries (mgmt/migrate-live-queries repo %)) graphs)
-                  update-str (util/make-compound-sparql-query graph-migrate-queries)]
-              (update! repo update-str))
-            (log/info "Make-live for graph(s) " graphs " done")
-            (jobs/job-succeeded! job)))
+                 (migrate-graphs-to-live-impl! backend graphs)
+                 (jobs/job-succeeded! job)))
+
+(defn- append-data-batch [backend graph-uri triple-batch]
+  ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
+  ;;so only create one if there is data in the batch
+  (if-not (empty? triple-batch)
+    (with-open [conn (repo/->connection (get-repo backend))]
+      (repo/with-transaction conn
+        (add conn graph-uri triple-batch)))))
 
 (extend SesameStardogBackend
   repo/ToConnection default-to-connection-impl
@@ -120,8 +129,13 @@
   SparqlExecutor default-sparql-query-impl
   QueryRewritable default-query-rewritable-impl
   SparqlUpdateExecutor {:execute-update execute-update-fn}
+  DraftManagement (assoc default-draft-management-impl :append-data-batch! append-data-batch :migrate-graphs-to-live! migrate-graphs-to-live-impl!)
   ApiOperations (assoc default-api-operations-impl :migrate-graphs-to-live-job batch-migrate-graphs-to-live-job)
-  Stoppable default-stoppable-impl)
+  Stoppable default-stoppable-impl
+
+  ;TODO: remove? required by the default delete-graph-job implementation which deletes
+  ;;in batches. This could be a simple DROP on Stardog
+  SesameBatchOperations default-sesame-batch-operations-impl)
 
 (defn get-stardog-backend [env-map]
   (let [repo (get-stardog-repo env-map)]
