@@ -7,9 +7,9 @@
             [drafter.backend.sesame.sparql.sparql-execution :refer [execute-update-fn]]
             [drafter.backend.sesame.common :refer :all]))
 
-(defrecord SesameStardogBackend [repo])
+(defrecord StardogSesameBackend [repo])
 
-(extend SesameStardogBackend
+(extend StardogSesameBackend
   proto/ITripleReadable default-triple-readable-impl
   proto/ISPARQLable default-sparqlable-impl
   proto/ISPARQLUpdateable default-isparql-updatable-impl
@@ -29,4 +29,4 @@
 
 (defn get-stardog-backend [env-map]
   (let [repo (get-stardog-repo env-map)]
-    (->SesameStardogBackend repo)))
+    (->StardogSesameBackend repo)))
