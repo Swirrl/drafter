@@ -3,7 +3,7 @@
             [grafter.rdf.repository :refer :all]
             [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
-            [drafter.backend.sesame-native :refer [get-backend-for-repo]]
+            [drafter.backend.sesame.native :refer [get-backend-for-repo]]
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!
                                                   migrate-live!]]
