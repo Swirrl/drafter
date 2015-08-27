@@ -1,15 +1,13 @@
 (ns drafter.backend.stardog.sesame.repository
-  (:require [environ.core :refer [env]]
-            [clojure.string :as str]
-            [clojure.tools.logging :as log])
+  (:require [clojure.tools.logging :as log]
+            [drafter.backend.sesame.sparql.repository :refer [get-configured-sparql-endpoints create-sparql-repository]])
   (:import [java.nio.charset Charset]
            [org.openrdf.query.resultio BooleanQueryResultParserRegistry TupleQueryResultParserRegistry]
            [org.openrdf.rio RDFParserRegistry]
            [org.openrdf.rio.ntriples NTriplesParserFactory]
            [org.openrdf.query.resultio TupleQueryResultFormat TupleQueryResultParserFactory BooleanQueryResultParserFactory BooleanQueryResultFormat]
            [org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLParserFactory SPARQLResultsXMLParser SPARQLBooleanXMLParser]
-           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParserFactory]
-           [drafter.rdf DrafterSPARQLRepository]))
+           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParserFactory]))
 
 (defn- set-supported-file-formats! [registry formats]
   ;clear registry
@@ -52,27 +50,8 @@
   (set-supported-file-formats! (BooleanQueryResultParserRegistry/getInstance) [(get-sparql-boolean-xml-parser-factory)])
   (set-supported-file-formats! (RDFParserRegistry/getInstance) [(NTriplesParserFactory.)]))
 
-(defn get-required-environment-variable [var-key env-map]
-  (if-let [ev (var-key env-map)]
-    ev
-    (let [var-name (str/upper-case (str/replace (name var-key) \- \_))
-          message (str "Missing required key "
-                       var-key
-                       " in environment map. Ensure you export an environment variable "
-                       var-name
-                       " or define "
-                       var-key
-                       " in the relevant profile in profiles.clj")]
-      (do
-        (log/error message)
-        (throw (RuntimeException. message))))))
-
 ;get-stardog-repo :: {String String} -> Repository
 (defn get-stardog-repo [env-map]
-  (let [query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
-        update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)]
+  (let [{:keys [query-endpoint update-endpoint]} (get-configured-sparql-endpoints env-map)]
     (register-stardog-query-mime-types!)
-    (let [repo (DrafterSPARQLRepository. query-endpoint update-endpoint)]
-      (.initialize repo)
-      (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
-      repo)))
+    (create-sparql-repository query-endpoint update-endpoint)))
