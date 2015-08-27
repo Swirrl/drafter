@@ -1,6 +1,7 @@
 (ns drafter.backend.sesame.native
   (:require [drafter.backend.protocols :refer :all]
-            [drafter.backend.sesame-common :refer :all]
+            [drafter.backend.sesame.common :refer :all]
+            [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.backend.sesame.native.repository :refer [get-repository]]
             [drafter.backend.sesame.native.draft-management :as mgmt]
             [grafter.rdf.protocols :as proto]))
