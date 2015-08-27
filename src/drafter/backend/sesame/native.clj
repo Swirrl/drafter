@@ -20,7 +20,8 @@
   DraftManagement (assoc default-draft-management-impl :migrate-graphs-to-live! mgmt/migrate-graphs-to-live!)
   Stoppable default-stoppable-impl
 
-  SesameBatchOperations default-sesame-batch-operations-impl)
+  SesameBatchOperations default-sesame-batch-operations-impl
+  ToRepository {:->sesame-repo :repo})
 
 (def get-backend-for-repo ->SesameNativeBackend)
 

@@ -3,6 +3,7 @@
             [grafter.rdf.repository :as repo]
             [clojure.set :as set]
             [drafter.backend.protocols :as backend]
+            [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter result-handler-wrapper]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
@@ -30,8 +31,6 @@
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
            [org.openrdf.query Dataset]
            [org.openrdf.query.impl MapBindingSet]))
-
-(defn- get-repo [this] (:repo this))
 
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
@@ -162,7 +161,7 @@
   query-str)
 
 (defn prepare-query [backend sparql-string graph-restrictions]
-    (let [repo (get-repo backend)
+    (let [repo (->sesame-repo backend)
           validated-query-string (validate-query sparql-string)
           dataset (restricted-dataset graph-restrictions)
           pquery (repo/prepare-query repo validated-query-string)]
@@ -199,7 +198,9 @@
   (repo/with-transaction conn
     (repo/evaluate prepared-query)))
 
-(def execute-update (create-execute-update-fn get-repo execute-prepared-update-in-transaction))
+;;WARNING: ->sesame-repo needs to be wrapped in a fn so the resolution of the protocol method is defered
+;;until the update is executed.
+(def execute-update (create-execute-update-fn #(->sesame-repo %) execute-prepared-update-in-transaction))
 
 (defn- make-draft-query-rewriter
   "Build both a query rewriter and an accompanying result rewriter tied together

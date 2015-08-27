@@ -8,9 +8,8 @@
             [drafter.backend.sesame.common.draft-api :as api]
             [drafter.backend.sesame.common.batching :as batching]
             [grafter.rdf.protocols :as proto]
+            [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.backend.sesame.common.sparql-execution :as sparql]))
-
-(defn- get-repo [this] (:repo this))
 
 ;;SPARQL execution
 (def default-sparql-query-impl
@@ -27,7 +26,7 @@
 
 ;;stoppable
 (def default-stoppable-impl
-  {:stop (comp repo/shutdown get-repo)})
+  {:stop (comp repo/shutdown ->sesame-repo)})
 
 ;;TODO: move to backend.common
 (defn- migrate-graphs-to-live-job [backend graphs]
@@ -42,6 +41,8 @@
    :get-all-drafts mgmt/get-all-drafts
    :get-live-graph-for-draft mgmt/get-live-graph-for-draft})
 
+;;Sesame protocols
+;;SesameBatchOperations
 (def default-sesame-batch-operations-impl
   {:delete-graph-batch! batching/delete-graph-batch!})
 
@@ -60,27 +61,27 @@
 ;;ITripleReadable
 (def default-triple-readable-impl
   {:to-statements (fn [this options]
-                    (proto/to-statements (get-repo this) options))})
+                    (proto/to-statements (->sesame-repo this) options))})
 
 ;;ISPARQLable
 (def default-sparqlable-impl
   {:query-dataset (fn [this sparql-string model]
-                    (proto/query-dataset (get-repo this) sparql-string model))})
+                    (proto/query-dataset (->sesame-repo this) sparql-string model))})
 
 (def default-isparql-updatable-impl
   {:update! (fn [this sparql-string]
-              (proto/update! (get-repo this) sparql-string))})
+              (proto/update! (->sesame-repo this) sparql-string))})
 
 ;;ITripleWritable
 (defn- add-statement-impl
-  ([this statement] (proto/add-statement (get-repo this) statement))
-  ([this graph statement] (proto/add-statement (get-repo this) graph statement)))
+  ([this statement] (proto/add-statement (->sesame-repo this) statement))
+  ([this graph statement] (proto/add-statement (->sesame-repo this) graph statement)))
 
 (defn- add-impl
-  ([this triples] (proto/add (get-repo this) triples))
-  ([this graph triples] (proto/add (get-repo this) graph triples))
-  ([this graph format triple-stream] (proto/add (get-repo this) format triple-stream))
-  ([this graph base-uri format triple-stream] (proto/add (get-repo this) format triple-stream)))
+  ([this triples] (proto/add (->sesame-repo this) triples))
+  ([this graph triples] (proto/add (->sesame-repo this) graph triples))
+  ([this graph format triple-stream] (proto/add (->sesame-repo this) format triple-stream))
+  ([this graph base-uri format triple-stream] (proto/add (->sesame-repo this) format triple-stream)))
 
 (def default-triple-writeable-impl
   {:add-statement add-statement-impl

@@ -89,12 +89,11 @@
       repo)))
 
 (defrecord SesameStardogBackend [repo])
-(defn- get-repo [backend] (:repo backend))
 
 ;;default sesame implementation execute UPDATE queries in a transaction which the remote SPARQL
 ;;client does not like
 (def ^:private execute-update-fn
-  (create-execute-update-fn get-repo (fn [conn pquery] (repo/evaluate pquery))))
+  (create-execute-update-fn ->sesame-repo (fn [conn pquery] (repo/evaluate pquery))))
 
 (defn- move-like-tbl-wants-super-slow-on-stardog-though
   "Move's how TBL intended.  Issues a SPARQL MOVE query.
@@ -178,7 +177,7 @@
   updates. Explicit UPDATE statements do not take part in transactions
   on the remote sesame SPARQL client."
   (log/info "Starting make-live for graphs " graphs)
-  (let [repo (get-repo backend)
+  (let [repo (->sesame-repo backend)
         graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo %)) graphs)
         update-str (util/make-compound-sparql-query graph-migrate-queries)]
     (update! repo update-str))
@@ -188,7 +187,7 @@
   ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
   ;;so only create one if there is data in the batch
   (if-not (empty? triple-batch)
-    (with-open [conn (repo/->connection (get-repo backend))]
+    (with-open [conn (repo/->connection (->sesame-repo backend))]
       (repo/with-transaction conn
         (add conn graph-uri triple-batch)))))
 
@@ -202,6 +201,7 @@
   DraftManagement (assoc default-draft-management-impl :append-data-batch! append-data-batch :migrate-graphs-to-live! migrate-graphs-to-live-impl!)
   ApiOperations default-api-operations-impl
   Stoppable default-stoppable-impl
+  ToRepository {:->sesame-repo :repo}
 
   ;TODO: remove? required by the default delete-graph-job implementation which deletes
   ;;in batches. This could be a simple DROP on Stardog
