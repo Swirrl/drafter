@@ -1,17 +1,7 @@
-(ns drafter.backend.sesame-stardog
+(ns drafter.backend.stardog.sesame.repository
   (:require [environ.core :refer [env]]
             [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [drafter.util :as util]
-            [drafter.backend.protocols :refer :all]
-            [drafter.backend.sesame.common :refer :all]
-            [drafter.backend.sesame.common.protocols :refer :all]
-            [grafter.rdf.repository :as repo]
-            [grafter.rdf :refer [add]]
-            [drafter.backend.sesame.sparql.draft-management :as sparqlmgmt]
-            [drafter.backend.sesame.sparql.sparql-execution :refer [execute-update-fn]]
-            [grafter.rdf.protocols :refer [update!]]
-            [grafter.rdf.protocols :as proto])
+            [clojure.tools.logging :as log])
   (:import [java.nio.charset Charset]
            [org.openrdf.query.resultio BooleanQueryResultParserRegistry TupleQueryResultParserRegistry]
            [org.openrdf.rio RDFParserRegistry]
@@ -78,7 +68,7 @@
         (throw (RuntimeException. message))))))
 
 ;get-stardog-repo :: {String String} -> Repository
-(defn- get-stardog-repo [env-map]
+(defn get-stardog-repo [env-map]
   (let [query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
         update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)]
     (register-stardog-query-mime-types!)
@@ -86,27 +76,3 @@
       (.initialize repo)
       (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
       repo)))
-
-(defrecord SesameStardogBackend [repo])
-
-(extend SesameStardogBackend
-  proto/ITripleReadable default-triple-readable-impl
-  proto/ISPARQLable default-sparqlable-impl
-  proto/ISPARQLUpdateable default-isparql-updatable-impl
-  SparqlExecutor default-sparql-query-impl
-  QueryRewritable default-query-rewritable-impl
-  SparqlUpdateExecutor {:execute-update execute-update-fn}
-  DraftManagement (assoc default-draft-management-impl
-                    :append-data-batch! sparqlmgmt/append-data-batch
-                    :migrate-graphs-to-live! sparqlmgmt/migrate-graphs-to-live!)
-  ApiOperations default-api-operations-impl
-  Stoppable default-stoppable-impl
-  ToRepository {:->sesame-repo :repo}
-
-  ;TODO: remove? required by the default delete-graph-job implementation which deletes
-  ;;in batches. This could be a simple DROP on Stardog
-  SesameBatchOperations default-sesame-batch-operations-impl)
-
-(defn get-stardog-backend [env-map]
-  (let [repo (get-stardog-repo env-map)]
-    (->SesameStardogBackend repo)))
