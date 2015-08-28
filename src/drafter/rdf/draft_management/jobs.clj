@@ -124,8 +124,7 @@
   each given graph under a job."
   [backend graphs metadata job]
   (with-job-exception-handling job
-    (doseq [draft-graph graphs]
-      (append-graph-metadata! backend draft-graph metadata))
+    (append-metadata-to-graphs! backend graphs metadata)
     (complete-job! job restapi/ok-response)))
 
 (defn create-update-metadata-job
