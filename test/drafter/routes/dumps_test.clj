@@ -17,9 +17,9 @@
                     :headers {"accept" "application/n-triples"}})
 
 (defn make-store-with-draft []
-  (let [[test-db test-backend] (make-backend)
-        draft-graph (import-data-to-draft! test-db "http://capybara.com/capybara-data-1" (test-triples "http://test.com/subject-1"))]
-    [test-db test-backend draft-graph]))
+  (let [test-backend (make-backend)
+        draft-graph (import-data-to-draft! test-backend "http://capybara.com/capybara-data-1" (test-triples "http://test.com/subject-1"))]
+    [test-backend draft-graph]))
 
 (defn count-statements [response-data]
   (count (statements (:body response-data)
@@ -27,7 +27,7 @@
 
 (deftest dumps-route-raw-test
   (testing "dumps-endpoint with live endpoint"
-    (let [[test-db test-backend draft-graph] (make-store-with-draft)]
+    (let [[test-backend draft-graph] (make-store-with-draft)]
       (migrate-live! test-backend draft-graph)
       (let [dumps (dumps-endpoint "/data/live" sparql-end-point test-backend)
             response (dumps dumps-request)]
@@ -37,7 +37,7 @@
 
 (deftest dumps-route-draft-test
   (testing "dumps-endpoint with draft endpoint"
-    (let [[test-db test-backend draft-graph] (make-store-with-draft)]
+    (let [[test-backend draft-graph] (make-store-with-draft)]
 
       (let [dumps (dumps-endpoint "/data/live" draft-sparql-routes test-backend)
             response (dumps (assoc-in dumps-request [:params :graph] draft-graph))]

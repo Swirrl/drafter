@@ -186,18 +186,18 @@
 (defn negotiate-result-writer [backend prepared-query media-type]
   (negotiate-query-result-writer prepared-query media-type))
 
-(defn create-execute-update-fn [exec-prepared-update-fn]
-  (fn [backend update-query-string restrictions]
-    (with-open [conn (->repo-connection backend)]
+(defn execute-update-with [exec-prepared-update-fn backend update-query restrictions]
+  (with-open [conn (->repo-connection backend)]
       (let [dataset (restricted-dataset restrictions)
-            pquery (repo/prepare-update conn update-query-string dataset)]
-        (exec-prepared-update-fn conn pquery)))))
+            pquery (repo/prepare-update conn update-query dataset)]
+        (exec-prepared-update-fn conn pquery))))
 
 (defn- execute-prepared-update-in-transaction [conn prepared-query]
   (repo/with-transaction conn
     (repo/evaluate prepared-query)))
 
-(def execute-update (create-execute-update-fn execute-prepared-update-in-transaction))
+(defn execute-update [backend update-query restrictions]
+  (execute-update-with execute-prepared-update-in-transaction backend update-query restrictions))
 
 (defn- make-draft-query-rewriter
   "Build both a query rewriter and an accompanying result rewriter tied together

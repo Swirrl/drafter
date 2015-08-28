@@ -1,13 +1,15 @@
 (ns drafter.rdf.rewriting.result-rewriting-test
   (:require
    [drafter.test-common :refer [test-triples make-backend]]
+   [clojure.set :as set]
+   [drafter.util :refer [map-values]]
    [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph!]]
-   [drafter.backend.protocols :refer [append-data-batch!]]
+   [drafter.backend.protocols :refer [append-data-batch! prepare-query]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.rdf :refer [statements]]
-   [grafter.rdf.repository :refer [repo prepare-update]]
-   [clojure.test :refer :all]
-   [drafter.rdf.rewriting.result-rewriting :refer [evaluate-with-graph-rewriting]])
+   [grafter.rdf.repository :refer [repo prepare-update] :as repo]
+   [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
+   [clojure.test :refer :all])
   (:import
            [org.openrdf.model.impl URIImpl]
            [org.openrdf.query QueryLanguage]
@@ -47,6 +49,38 @@
     FILTER( ?g = <http://frogs.com/live-graph> )
     }")
 
+;apply-map-or-default :: Map[a, a] -> (a -> a)
+(defn- apply-map-or-default
+  "Returns a function with a single argument. When applied, it sees if
+  the value is a key in the source map - if it exists, the
+  corresponding value is returned, otherwise the argument is
+  returned."
+  [m]
+  (fn [r] (get m r r)))
+
+;rewrite-result :: Map[Uri, Uri] -> Map[a, Uri] -> Map[a, Uri]
+(defn- rewrite-result
+  "Rewrites all the values in a result based on the given draft->live
+  graph mapping."
+  [graph-map r]
+  (map-values (apply-map-or-default graph-map) r))
+
+(defn- rewrite-graph-results [query-substitutions prepared-query]
+  "Executes the given prepared query and rewrites the results
+  according to the given subtstitutions. WARNING: This assumes the
+  prepared query is a Sesame query type! Consider adding a method to
+  execute prepared queries on the SPARQLExecutor protocol!"
+  (let [result-substitutions (set/map-invert query-substitutions)
+        result (repo/evaluate prepared-query)]
+    (map #(rewrite-result result-substitutions %) result)))
+
+(defn evaluate-with-graph-rewriting
+  "Rewrites the results in the query."
+  [db query-str query-substitutions]
+  (let [rewritten-query (rewrite-sparql-string query-substitutions query-str)
+        prepared-query (prepare-query db rewritten-query nil)]
+    (rewrite-graph-results query-substitutions prepared-query)))
+
 (defn first-result [results key]
   (-> results first (get key) str))
 
@@ -61,8 +95,8 @@
   (result-keys (first results) ks))
 
 (deftest query-and-result-rewriting-test
-  (let [[db backend] (make-backend)
-        draft-graph (create-draft-graph! db "http://frogs.com/live-graph")
+  (let [backend (make-backend)
+        draft-graph (create-draft-graph! backend "http://frogs.com/live-graph")
         graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
 
     (append-data-batch! backend draft-graph (test-triples "http://kermit.org/the-frog"))
@@ -77,7 +111,7 @@
         (append-data-batch! backend draft-graph mapped-triples)
 
         (is (= po
-               (-> db
+               (-> backend
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["p" "o"]))))))
 
@@ -90,7 +124,7 @@
         (append-data-batch! backend draft-graph mapped-triples)
 
         (is (= ["http://kermit.org/the-frog" "http://object"]
-               (-> db
+               (-> backend
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["s" "o"]))))))
 
@@ -103,13 +137,13 @@
         (append-data-batch! backend draft-graph mapped-triples)
 
         (is (= ["http://kermit.org/the-frog" "http://predicate"]
-               (-> db
+               (-> backend
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["s" "p"]))))))
 
     (testing "rewrites all result URIs"
       (let [query "SELECT * WHERE { ?s ?p ?o }"
-            [db backend] (make-backend)
+            backend (make-backend)
             live-triple ["http://live-subject" "http://live-predicate" "http://live-object"]
             draft-triple ["http://draft-subject" "http://draft-predicate" "http://draft-object"]
             [live-subject live-predicate live-object] live-triple
@@ -119,14 +153,14 @@
         (append-data-batch! backend draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
 
         (is (= live-triple
-               (-> db
+               (-> backend
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["s" "p" "o"]))))))
 
     (testing "rewrites query to query draft graph"
       ;; NOTE this query rewrites the URI constant <http://frogs.com/live-graph>
       (is (= "http://kermit.org/the-frog"
-             (-> db
+             (-> backend
                  (evaluate-with-graph-rewriting graph-constant-query graph-map)
                  (first-result "s"))))
 
@@ -138,7 +172,7 @@
         ;; the constant string "http://frogs.com/live-graph" but instead
         ;; rewrites it at runtime via the function composition.
         (is (= "http://kermit.org/the-frog"
-               (-> db
+               (-> backend
                    (evaluate-with-graph-rewriting uri-query graph-map)
                    (first-result "s"))))
 
@@ -147,18 +181,18 @@
           ;; the constant string "http://frogs.com/live-graph" but instead
           ;; rewrites it at runtime via the function composition.
           (is (= "http://frogs.com/live-graph"
-                 (-> db
+                 (-> backend
                      (evaluate-with-graph-rewriting uri-query graph-map)
                      (first-result "g"))))))
 
       (testing "rewrites source graphs in VALUES clause"
         (is (= "http://frogs.com/live-graph"
-               (-> db
+               (-> backend
                    (evaluate-with-graph-rewriting graph-values-query graph-map)
                    (first-result "g")))))
 
       (testing "rewrites source graph literals in FILTER clause"
         (is (= "http://frogs.com/live-graph"
-               (-> db
+               (-> backend
                    (evaluate-with-graph-rewriting graph-filter-query graph-map)
                    (first-result "g")))))))))

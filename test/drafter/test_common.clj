@@ -67,9 +67,8 @@
   (repo))
 
 (defn make-backend []
-  (let [repo (make-store)
-        backend (get-backend-for-repo repo)]
-    [repo backend]))
+  (let [repo (make-store)]
+    (get-backend-for-repo repo)))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
