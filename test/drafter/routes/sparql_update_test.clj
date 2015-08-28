@@ -5,7 +5,7 @@
             [clojure.test :refer :all]
             [clojure.template :refer [do-template]]
             [ring.util.codec :as codec]
-            [drafter.test-common :refer [*test-db* *test-backend* wrap-with-clean-test-db stream->string
+            [drafter.test-common :refer [*test-backend* wrap-with-clean-test-db stream->string
                                          select-all-in-graph make-store during-exclusive-write]]
             [grafter.rdf.repository :refer [query]])
   (:import [java.util UUID]
@@ -59,7 +59,7 @@
         (let [{:keys [status body headers]} (endpoint (application-sparql-update-request))]
           (is (= 200 status)
               "returns 200 success")
-          (is (query *test-db* "ASK { <http://test/> <http://test/> <http://test/> . }")
+          (is (query *test-backend* "ASK { <http://test/> <http://test/> <http://test/> . }")
               "Inserts the data"))))))
 
 (deftest update-unavailable-test
@@ -82,12 +82,12 @@
         (let [{:keys [status body headers]} (endpoint (x-form-urlencoded-update-request))]
           (is (= 200 status)
               "returns 200 success")
-          (is (query *test-db* "ASK { <http://test/> <http://test/> <http://test/> . }")
+          (is (query *test-backend* "ASK { <http://test/> <http://test/> <http://test/> . }")
               "Inserts the data"))))))
 
 (deftest live-update-endpoint-route-test
   (let [endpoint (live-update-endpoint-route "/update" *test-backend* nil)]
-    (create-managed-graph! *test-db* "http://example.com/")
+    (create-managed-graph! *test-backend* "http://example.com/")
     (testing "and a graph restriction"
       (let [request (application-sparql-update-request "INSERT { GRAPH <http://example.com/> {
                                                           <http://test/> <http://test/> <http://test/> .
@@ -96,7 +96,7 @@
         (is (= 200 status)
             "returns 200 success")
 
-        (is (query *test-db* "ASK { <http://test/> <http://test/> <http://test/> . }"
+        (is (query *test-backend* "ASK { <http://test/> <http://test/> <http://test/> . }"
                    :default-graph ["http://example.com/"]
                    :union-graphs ["http://example.com/"])
             "Inserts the data")))))

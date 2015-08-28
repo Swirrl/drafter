@@ -13,8 +13,7 @@
   (:import [java.util Scanner]
            [java.util.concurrent CountDownLatch TimeUnit]))
 
-(def ^:dynamic *test-db* (repo (memory-store)))
-(def ^:dynamic *test-backend* (get-backend-for-repo *test-db*))
+(def ^:dynamic *test-backend*)
 
 (def test-db-path "drafter-test-db")
 
@@ -53,15 +52,14 @@
   the scope is closed."
   ([test-fn] (wrap-with-clean-test-db identity test-fn))
   ([setup-state-fn test-fn]
-   (binding [*test-db* (repo (native-store test-db-path))
+   (binding [*test-backend* (get-backend-for-repo (repo (native-store test-db-path)))
              *test-writer* (start-writer!)]
-     (binding [*test-backend* (get-backend-for-repo *test-db*)]
-       (try
-         (setup-state-fn *test-db*)
-         (test-fn)
-         (finally
-           (fs/delete-dir test-db-path)
-           (stop-writer! *test-writer*)))))))
+     (try
+       (setup-state-fn *test-backend*)
+       (test-fn)
+       (finally
+         (fs/delete-dir test-db-path)
+         (stop-writer! *test-writer*))))))
 
 (defn make-store []
   (repo))

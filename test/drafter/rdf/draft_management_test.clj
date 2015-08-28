@@ -1,6 +1,6 @@
 (ns drafter.rdf.draft-management-test
   (:require
-   [drafter.test-common :refer [*test-db* *test-backend* wrap-with-clean-test-db make-graph-live!]]
+   [drafter.test-common :refer [*test-backend* wrap-with-clean-test-db make-graph-live!]]
    [grafter.rdf :refer [s add add-statement]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.vocabularies.rdf :refer :all]
@@ -14,7 +14,7 @@
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
-  (query *test-db* (str "ASK WHERE {"
+  (query *test-backend* (str "ASK WHERE {"
 
                         (-> (apply str (interpose " " graphpatterns))
                             (.replace " >" ">")
@@ -73,16 +73,16 @@
 (deftest create-managed-graph!-test
   (testing "create-managed-graph!"
     (testing "stores the details of the managed graph"
-      (create-managed-graph! *test-db* test-graph-uri)
-      (is (is-graph-managed? *test-db* test-graph-uri)))))
+      (create-managed-graph! *test-backend* test-graph-uri)
+      (is (is-graph-managed? *test-backend* test-graph-uri)))))
 
 (deftest create-draft-graph!-test
   (testing "create-draft-graph!"
 
-    (create-managed-graph! *test-db* test-graph-uri)
+    (create-managed-graph! *test-backend* test-graph-uri)
 
     (testing "returns the draft-graph-uri, stores data about it and associates it with the live graph"
-      (let [new-graph-uri (create-draft-graph! *test-db*
+      (let [new-graph-uri (create-draft-graph! *test-backend*
                                                test-graph-uri)]
 
         (is (.startsWith new-graph-uri staging-base))
@@ -90,8 +90,8 @@
                                        "<" drafter:hasDraft "> <" new-graph-uri "> ."))))))
 
 (defn create-managed-graph-with-draft! [test-graph-uri]
-  (create-managed-graph! *test-db* test-graph-uri)
-  (create-draft-graph! *test-db* test-graph-uri))
+  (create-managed-graph! *test-backend* test-graph-uri)
+  (create-draft-graph! *test-backend* test-graph-uri))
 
 (deftest append-data-batch!-test
   (testing "append-data-batch!"
@@ -120,14 +120,14 @@
 (deftest lookup-live-graph-test
   (testing "lookup-live-graph"
     (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
-      (is (= test-graph-uri (lookup-live-graph *test-db* draft-graph-uri))))))
+      (is (= test-graph-uri (lookup-live-graph *test-backend* draft-graph-uri))))))
 
 (deftest set-isPublic!-test
   (testing "set-isPublic!"
     (create-managed-graph-with-draft! test-graph-uri)
     (is (ask? "<" test-graph-uri "> <" drafter:isPublic "> " false " .")
         "Graphs are initialsed as non-public")
-    (set-isPublic! *test-db* test-graph-uri true)
+    (set-isPublic! *test-backend* test-graph-uri true)
     (is (ask? "<" test-graph-uri "> <" drafter:isPublic "> " true " .")
         "should set the boolean value")))
 
@@ -147,10 +147,10 @@
                 "}")
           "Live graph contains the migrated triples")
 
-      (is (= false (draft-exists? *test-db* draft-graph-uri))
+      (is (= false (draft-exists? *test-backend* draft-graph-uri))
           "Draft graph should be removed from the state graph")
 
-      (is (= true (is-graph-managed? *test-db* test-graph-uri))
+      (is (= true (is-graph-managed? *test-backend* test-graph-uri))
           "Live graph reference shouldn't have been deleted from state graph"))))
 
 (deftest migrate-live!-remove-live-aswell-test
@@ -174,16 +174,16 @@
       (let [draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)]
         ;; We are migrating an empty graph, so this is deleting.
         (migrate-live! *test-backend* draft-graph-to-del-uri)
-        (let [managed-found? (is-graph-managed? *test-db* test-graph-to-delete-uri)
-              keep-managed-found? (is-graph-managed? *test-db* graph-to-keep-uri)]
+        (let [managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
+              keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri)]
           (is (not managed-found?)
               "Live graph should no longer be referenced in state graph")
 
-          (is (= false (draft-exists? *test-db* draft-graph-to-del-uri))
+          (is (= false (draft-exists? *test-backend* draft-graph-to-del-uri))
               "Draft graph should be removed from the state graph")
           (testing "Unrelated draft and live graphs should be not be removed from the state graph"
             (is keep-managed-found?)
-            (is (draft-exists? *test-db* draft-graph-to-keep-uri2))))))))
+            (is (draft-exists? *test-backend* draft-graph-to-keep-uri2))))))))
 
 (deftest migrate-live!-dont-remove-state-when-other-drafts-test
   (testing "migrate-live! DELETION: Doesn't delete from state graph when there's multiple drafts"
@@ -198,34 +198,32 @@
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-keep-uri3 test-triples)
       (migrate-live! *test-backend* draft-graph-to-keep-uri2)
-      (is (graph-exists? *test-db* graph-to-keep-uri2))
+      (is (graph-exists? *test-backend* graph-to-keep-uri2))
 
       ;; We are migrating an empty graph, so this is deleting.
       (migrate-live! *test-backend* draft-graph-to-del-uri)
-      (let [draft-managed-found? (is-graph-managed? *test-db* test-graph-to-delete-uri)
-            keep-managed-found? (is-graph-managed? *test-db* graph-to-keep-uri2)]
+      (let [draft-managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
+            keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri2)]
         (is draft-managed-found?
             "Live graph shouldn't be deleted from state graph if referenced by other drafts")
 
-        (is (= false (draft-exists? *test-db* draft-graph-to-del-uri))
+        (is (= false (draft-exists? *test-backend* draft-graph-to-del-uri))
             "Draft graph should be removed from the state graph")
 
         (testing "Unrelated live & draft graphs should be not be removed from the state graph"
           (is keep-managed-found?)
-          (is (draft-exists? *test-db* draft-graph-to-keep-uri3)))))))
-
-
+          (is (draft-exists? *test-backend* draft-graph-to-keep-uri3)))))))
 
 (deftest graph-restricted-queries-test
   (testing "query"
     (testing "supports graph restriction"
-      (add *test-db* "http://example.org/graph/1"
+      (add *test-backend* "http://example.org/graph/1"
               test-triples)
 
-      (add *test-db* "http://example.org/graph/2"
+      (add *test-backend* "http://example.org/graph/2"
               test-triples-2)
 
-      (is (query *test-db*
+      (is (query *test-backend*
                  (str "ASK WHERE {
                          GRAPH <http://example.org/graph/2> {
                            ?s ?p ?o .
@@ -233,7 +231,7 @@
                       }") :named-graphs ["http://example.org/graph/2"])
           "Can query triples in named graph 2")
 
-      (is (query *test-db*
+      (is (query *test-backend*
                  (str "ASK WHERE {
                          GRAPH <http://example.org/graph/1> {
                            <http://test.com/data/one>  ?p1 ?o1 .
@@ -244,7 +242,7 @@
                       }") :named-graphs ["http://example.org/graph/1" "http://example.org/graph/2"])
           "Can specify many named graphs as a query restriction.")
 
-      (is (= false (query *test-db*
+      (is (= false (query *test-backend*
                           (str "ASK WHERE {
                                   GRAPH <http://example.org/graph/2> {
                                     ?s ?p ?o .
@@ -253,19 +251,19 @@
                           :named-graphs ["http://example.org/graph/1"]))
           "Can't query triples in named graph 2")
 
-      (is (= false (query *test-db*
+      (is (= false (query *test-backend*
                           (str "ASK WHERE {
                            ?s ?p ?o .
                       }") :default-graph []))
           "Can't query triples in union graph")
 
-      (is (query *test-db*
+      (is (query *test-backend*
                  (str "ASK WHERE {
                            ?s ?p ?o .
                       }") :default-graph ["http://example.org/graph/1"])
           "Can query triples in union graph")
 
-      (is (query *test-db*
+      (is (query *test-backend*
                  (str "ASK WHERE {
                            <http://test.com/data/one>  ?p1 ?o1 .
                            <http://test2.com/data/one> ?p2 ?o2 .
@@ -277,11 +275,11 @@
         draft-2 (create-managed-graph-with-draft! "http://real/graph/2")]
 
        (testing "draft-graphs returns all draft graphs"
-         (is (= #{draft-1 draft-2} (draft-graphs *test-db*))))
+         (is (= #{draft-1 draft-2} (draft-graphs *test-backend*))))
 
        (testing "live-graphs returns all live graphs"
          (is (= #{"http://real/graph/1" "http://real/graph/2"}
-                (live-graphs *test-db* :online false))))))
+                (live-graphs *test-backend* :online false))))))
 
 (deftest build-draft-map-test
   (let [db (repo)]

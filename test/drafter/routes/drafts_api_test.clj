@@ -1,5 +1,5 @@
 (ns drafter.routes.drafts-api-test
-  (:require [drafter.test-common :refer [*test-db* *test-backend* test-triples wrap-with-clean-test-db
+  (:require [drafter.test-common :refer [*test-backend* test-triples wrap-with-clean-test-db
                                          make-store stream->string select-all-in-graph make-graph-live!
                                          import-data-to-draft!]]
             [swirrl-server.async.jobs :refer [finished-jobs]]
@@ -135,7 +135,7 @@
                                             :headers {"accept" "application/json"}})]
         (is (= 201 status))
         (is (url? (-> body :guri)))
-        (is (repo/query *test-db* (str "ASK WHERE {"
+        (is (repo/query *test-backend* (str "ASK WHERE {"
                                        "  GRAPH <" drafter-state-graph "> {"
                                        "     ?graph <" (meta-uri "foo") "> ?foo ."
                                        "     ?graph <" (meta-uri "bar") "> ?bar ."
@@ -181,7 +181,7 @@
         (is (= {:type :ok} (await-completion finished-jobs (:finished-job body))))
 
         (testing "appends RDF to the graph"
-          (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
+          (is (repo/query *test-backend* (str "ASK WHERE { GRAPH <" dest-graph "> {<http://example.org/test/triple> ?p ?o . }}"))))))
 
     (testing "with an invalid RDF file"
       (let [test-request (-> {:uri "/draft" :request-method :post}
@@ -220,11 +220,11 @@
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph (batched)"
     (let [graph-uri "http://mygraph/draft-graph5"
-          _ (create-managed-graph! *test-db* graph-uri)
-          draft-graph-uri (import-data-to-draft! *test-db* graph-uri test-triples-4)
+          _ (create-managed-graph! *test-backend* graph-uri)
+          draft-graph-uri (import-data-to-draft! *test-backend* graph-uri test-triples-4)
           original-batch-size batched-write-size]
 
-      (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
+      (is (repo/query *test-backend* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
           "Graph should exist before deletion")
 
       (set-var-root! #'batched-write-size 1)
@@ -240,19 +240,19 @@
         (set-var-root! #'batched-write-size original-batch-size)
 
         (testing "batched delete job actually deletes the graph"
-          (is (not (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
+          (is (not (repo/query *test-backend* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
               "Graph should be deleted"))
 
         (testing "draft removed from state graph"
-          (is (not (draft-exists? *test-db* draft-graph-uri))))))))
+          (is (not (draft-exists? *test-backend* draft-graph-uri))))))))
 
 (deftest graph-delete-draft-graph-contents-test
   (testing "DELETE /draft/contents (batched)"
     (let [graph-uri "http://mygraph/draft-graph4"
-          _ (create-managed-graph! *test-db* graph-uri)
-          draft-graph-uri (import-data-to-draft! *test-db* graph-uri test-triples-4)]
+          _ (create-managed-graph! *test-backend* graph-uri)
+          draft-graph-uri (import-data-to-draft! *test-backend* graph-uri test-triples-4)]
 
-      (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
+      (is (repo/query *test-backend* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }"))
           "Graph should exist before deletion")
 
       (let [route (draft-api-routes "/draft" *test-backend*)
@@ -264,15 +264,15 @@
         (await-completion finished-jobs (:finished-job (:body response)))
 
         (testing "contents delete job actually deletes the contents but leaves graph intact"
-          (is (not (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
+          (is (not (repo/query *test-backend* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
               "Graph should be left intact without contents")
 
-          (is (draft-exists? *test-db* draft-graph-uri)))))))
+          (is (draft-exists? *test-backend* draft-graph-uri)))))))
 
 (deftest graph-management-live-test-with-one-graph
   (testing "PUT /graph/live"
-    (let [draft-graph (import-data-to-draft! *test-db* "http://mygraph.com/live-graph" (test-triples "http://test.com/subject-1"))]
-      (is (repo/query *test-db* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
+    (let [draft-graph (import-data-to-draft! *test-backend* "http://mygraph.com/live-graph" (test-triples "http://test.com/subject-1"))]
+      (is (repo/query *test-backend* (str "ASK WHERE { GRAPH <" draft-graph "> { <http://test.com/subject-1> ?p ?o } }"))
           "Draft graph should exist before deletion")
 
       (let [route (graph-management-routes "/graph" *test-backend*)
@@ -285,13 +285,13 @@
         (await-completion finished-jobs (:finished-job body))
 
         (testing "moves the draft to live"
-          (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }")
+          (is (repo/query *test-backend* "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
 (deftest graph-management-live-test-multiple-graphs
   (testing "PUT /graph/live"
-    (let [draft-graph-1 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-1" (test-triples "http://test.com/subject-1"))
-          draft-graph-2 (import-data-to-draft! *test-db* "http://mygraph.com/live-graph-2" (test-triples "http://test.com/subject-1"))]
+    (let [draft-graph-1 (import-data-to-draft! *test-backend* "http://mygraph.com/live-graph-1" (test-triples "http://test.com/subject-1"))
+          draft-graph-2 (import-data-to-draft! *test-backend* "http://mygraph.com/live-graph-2" (test-triples "http://test.com/subject-1"))]
 
       (let [route (graph-management-routes "/graph" *test-backend*)
             test-request {:uri "/graph/live"
@@ -304,9 +304,9 @@
         (await-completion finished-jobs (:finished-job body))
 
         (testing "moves the draft to live"
-          (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-1> { <http://test.com/subject-1> ?p ?o } }")
+          (is (repo/query *test-backend* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-1> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples")
-          (is (repo/query *test-db* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
+          (is (repo/query *test-backend* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-2> { <http://test.com/subject-1> ?p ?o } }")
               "Live graph should contain our triples"))))))
 
 (defn metadata-exists-sparql [draft-graph-uri name]
@@ -344,7 +344,7 @@
         ;;metadata exists
         (doseq [graph [draft1 draft2]
                 [k v] meta-pairs]
-          (is (repo/query *test-db* (metadata-has-value-sparql graph k v))))))
+          (is (repo/query *test-backend* (metadata-has-value-sparql graph k v))))))
 
     (testing "Updates existing metdata"
       (let [updated-key (ffirst meta-pairs)
@@ -360,7 +360,7 @@
         (is (= 200 status))
 
         (doseq [[k v] expected-metadata]
-          (is (repo/query *test-db* (metadata-has-value-sparql draft1 k v))))))
+          (is (repo/query *test-backend* (metadata-has-value-sparql draft1 k v))))))
 
     (testing "Deletes metadata"
       (let [delete-request {:uri "/metadata"
@@ -372,7 +372,7 @@
 
         (doseq [g [draft1 draft2]
                 m ["foo" "quux"]]
-          (is (= false (repo/query *test-db* (metadata-exists-sparql g m)))))))
+          (is (= false (repo/query *test-backend* (metadata-exists-sparql g m)))))))
 
     (testing "Invalid if no graphs"
       (let [request (-> {:uri "/metadata" :request-method :post}
@@ -398,19 +398,19 @@
                                 [(URIImpl. "http://p1") (URIImpl. "http://o1")]
                                 [(URIImpl. "http://p2") (URIImpl. "http://o2")]])
         route (draft-api-routes "/draft" *test-backend*)
-        live-graph (create-managed-graph! *test-db* "http://live")
-        draft-graph-uri (create-draft-graph! *test-db* live-graph)
+        live-graph (create-managed-graph! *test-backend* "http://live")
+        draft-graph-uri (create-draft-graph! *test-backend* live-graph)
         copy-request (-> {:uri "/draft/copy-live" :request-method :post}
                            (add-request-graph draft-graph-uri))]
 
-    (add *test-db* live-graph live-triples)
+    (add *test-backend* live-graph live-triples)
 
     (let [{:keys [status body] :as response} (route copy-request)
           job-path (:finished-job body)]
       (is (= 202 status))
 
       (let [{job-status :type} (await-completion finished-jobs job-path)
-            draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-db*))))]
+            draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-backend*))))]
         (is (= :ok job-status))
         (is (= draft-triples (set live-triples)))))))
 
@@ -422,7 +422,7 @@
      (testing "Adds metadata"
        (let [route (draft-api-routes "/draft" *test-backend*)
              source-graph-uri (make-graph-live! *test-backend* "http://mygraph/source-graph")
-             draft-graph-uri (create-draft-graph! *test-db* "http://mygraph/dest-graph")
+             draft-graph-uri (create-draft-graph! *test-backend* "http://mygraph/dest-graph")
 
              request (-> {:uri "/draft" :request-method http-method}
                          (add-request-metadata "uploaded-by" "fido")
@@ -436,7 +436,7 @@
          (await-completion finished-jobs (:finished-job body))
 
          (let [sparql (metadata-has-value-sparql draft-graph-uri "uploaded-by" "fido")]
-           (is (repo/query *test-db* sparql)))
+           (is (repo/query *test-backend* sparql)))
 
          (testing "Overwrites metadata"
            ;; try overwriting the value we've just written i.e. replacing
@@ -451,7 +451,7 @@
              (await-completion finished-jobs (:finished-job body))
 
              (let [meta-query (metadata-values-sparql draft-graph-uri "uploaded-by")
-                   meta-records (repo/query *test-db* meta-query)]
+                   meta-records (repo/query *test-backend* meta-query)]
                (testing "Metadata overwritten"
                  (is (= 1 (count meta-records))
                      (= "updated" (get (first meta-records) "o")))))))))))

@@ -5,6 +5,7 @@
    [grafter.rdf :as rdf]
    [grafter.rdf.protocols :as pr]
    [grafter.rdf.repository :as repo]
+   [drafter.backend.protocols :as backend]
    [drafter.rdf.sparql-protocol :refer :all]
    [clojure.java.io :as io]
    [clojure.data.json :as json]
@@ -21,7 +22,7 @@
 (deftest results-streamer-test
   (testing "Streams sparql results into output stream"
     (let [baos (ByteArrayOutputStream.)
-          preped-query (repo/prepare-query *test-db* "SELECT * WHERE { ?s ?p ?o }")
+          preped-query (backend/prepare-query *test-backend* "SELECT * WHERE { ?s ?p ?o }" nil)
           streamer! (result-streamer (fn [ostream notify] (.evaluate preped-query (SPARQLResultsJSONWriter. ostream)))
                                      (fn []))]
 
