@@ -186,9 +186,9 @@
 (defn negotiate-result-writer [backend prepared-query media-type]
   (negotiate-query-result-writer prepared-query media-type))
 
-(defn create-execute-update-fn [repo-fn exec-prepared-update-fn]
-  (fn [this update-query-string restrictions]
-    (let [repo (repo-fn this)]
+(defn create-execute-update-fn [exec-prepared-update-fn]
+  (fn [backend update-query-string restrictions]
+    (let [repo (->sesame-repo backend)]
       (with-open [conn (repo/->connection repo)]
         (let [dataset (restricted-dataset restrictions)
               pquery (repo/prepare-update conn update-query-string dataset)]
@@ -198,9 +198,7 @@
   (repo/with-transaction conn
     (repo/evaluate prepared-query)))
 
-;;WARNING: ->sesame-repo needs to be wrapped in a fn so the resolution of the protocol method is defered
-;;until the update is executed.
-(def execute-update (create-execute-update-fn #(->sesame-repo %) execute-prepared-update-in-transaction))
+(def execute-update (create-execute-update-fn execute-prepared-update-in-transaction))
 
 (defn- make-draft-query-rewriter
   "Build both a query rewriter and an accompanying result rewriter tied together
