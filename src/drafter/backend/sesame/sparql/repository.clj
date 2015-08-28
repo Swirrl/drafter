@@ -18,12 +18,17 @@
         (log/error message)
         (throw (RuntimeException. message))))))
 
-(defn get-configured-sparql-endpoints [env-map]
-  {:query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
-   :update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)})
-
 (defn create-sparql-repository [query-endpoint update-endpoint]
+  "Creates a new SPARQL repository with the given query and update
+  endpoints."
   (let [repo (DrafterSPARQLRepository. query-endpoint update-endpoint)]
       (.initialize repo)
       (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
       repo))
+
+(defn create-repository-for-environment [env-map]
+  "Creates a new SPARQL repository with the query and update endpoints
+  configured in the given environment map."
+  (let [query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
+        update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)]
+    (create-sparql-repository query-endpoint update-endpoint)))

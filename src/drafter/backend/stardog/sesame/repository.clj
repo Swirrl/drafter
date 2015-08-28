@@ -1,6 +1,6 @@
 (ns drafter.backend.stardog.sesame.repository
   (:require [clojure.tools.logging :as log]
-            [drafter.backend.sesame.sparql.repository :refer [get-configured-sparql-endpoints create-sparql-repository]])
+            [drafter.backend.sesame.sparql.repository :refer [create-repository-for-environment]])
   (:import [java.nio.charset Charset]
            [org.openrdf.query.resultio BooleanQueryResultParserRegistry TupleQueryResultParserRegistry]
            [org.openrdf.rio RDFParserRegistry]
@@ -52,6 +52,6 @@
 
 ;get-stardog-repo :: {String String} -> Repository
 (defn get-stardog-repo [env-map]
-  (let [{:keys [query-endpoint update-endpoint]} (get-configured-sparql-endpoints env-map)]
+  (let [repo (create-repository-for-environment env-map)]
     (register-stardog-query-mime-types!)
-    (create-sparql-repository query-endpoint update-endpoint)))
+    repo))
