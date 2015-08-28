@@ -16,10 +16,11 @@
   (append-data-batch! [this draft-graph-uri triple-batch]
     "Appends a sequence of triples to the given draft graph.")
 
-  (append-graph-metadata! [this draft-graph-uri metadata]
+  (append-metadata-to-graphs! [this graph-uris metadata]
     "Takes a hash-map of metadata key/value pairs and adds them as
-  metadata to the graphs state graph, converting keys into drafter
-  URIs as necessary.  Assumes all values are strings.")
+  metadata to the state graphs of each of the given graphs, converting
+  keys into drafter URIs as necessary. Assumes all values are
+  strings.")
 
   (get-all-drafts [this]
     "Gets a sequence of descriptors for all draft graphs")
@@ -30,6 +31,12 @@
 
   (migrate-graphs-to-live! [this graph-uris]
     "Migrates the given collections of draft graphs to live"))
+
+(defn append-graph-metadata! [backend graph-uri metadata]
+  "Takes a hash-map of metadata key/value pairs and adds them as
+  metadata to the graphs state graph, converting keys into drafter
+  URIs as necessary. Assumes all values are strings."
+  (append-metadata-to-graphs! backend [graph-uri] metadata))
 
 (defprotocol Stoppable
   (stop [this]))

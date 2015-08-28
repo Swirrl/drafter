@@ -9,10 +9,11 @@
     (repo/with-transaction conn
       (add conn graph-uri triple-batch))))
 
-(defn append-graph-metadata [backend graph-uri metadata]
+(defn append-metadata-to-graphs! [backend graph-uris metadata]
   (let [repo (->sesame-repo backend)]
     ;;TODO: Update in transaction?
-    (doseq [[meta-name value] metadata]
+    (doseq [graph-uri graph-uris
+            [meta-name value] metadata]
       (mgmt/upsert-single-object! repo graph-uri meta-name value))))
 
 (defn get-all-drafts [backend]

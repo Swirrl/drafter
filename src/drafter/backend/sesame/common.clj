@@ -31,7 +31,7 @@
 ;;draft management
 (def default-draft-management-impl
   {:append-data-batch! mgmt/append-data-batch
-   :append-graph-metadata! mgmt/append-graph-metadata
+   :append-metadata-to-graphs! mgmt/append-metadata-to-graphs!
    :get-all-drafts mgmt/get-all-drafts
    :get-live-graph-for-draft mgmt/get-live-graph-for-draft})
 
