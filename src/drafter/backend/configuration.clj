@@ -2,11 +2,13 @@
   (:require [clojure.tools.logging :as log]
             [clojure.string :as string]
             [drafter.backend.sesame.native :as native]
+            [drafter.backend.sesame.sparql :as sesame-sparql]
             [drafter.backend.stardog.sesame :as stardog]))
 
 (def ^:private backend-fns
   {:sesame-native native/get-native-backend
-   :sesame-stardog stardog/get-stardog-backend})
+   :sesame-sparql sesame-sparql/get-sesame-sparql-backend
+   :stardog-sesame stardog/get-stardog-backend})
 
 (defn- backend-key->name [backend-key]
   (-> backend-key
