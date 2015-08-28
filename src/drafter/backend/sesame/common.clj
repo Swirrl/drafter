@@ -2,8 +2,8 @@
   (:require [grafter.rdf.repository :as repo]
             [grafter.rdf :refer [add statements]]
             [clojure.tools.logging :as log]
-            [drafter.backend.protocols :as backend]
             [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.backend.common.draft-api :as api-common]
             [drafter.backend.sesame.common.draft-management :as mgmt]
             [drafter.backend.sesame.common.draft-api :as api]
             [drafter.backend.sesame.common.batching :as batching]
@@ -28,12 +28,6 @@
 (def default-stoppable-impl
   {:stop (comp repo/shutdown ->sesame-repo)})
 
-;;TODO: move to backend.common
-(defn- migrate-graphs-to-live-job [backend graphs]
-  (jobs/make-job :exclusive-write [job]
-                 (backend/migrate-graphs-to-live! backend graphs)
-                 (jobs/job-succeeded! job)))
-
 ;;draft management
 (def default-draft-management-impl
   {:append-data-batch! mgmt/append-data-batch
@@ -51,7 +45,7 @@
   {:new-draft-job api/new-draft-job
    :append-data-to-graph-job api/append-data-to-graph-job
    :copy-from-live-graph-job api/copy-from-live-graph-job
-   :migrate-graphs-to-live-job migrate-graphs-to-live-job
+   :migrate-graphs-to-live-job api-common/migrate-graphs-to-live-job
    :delete-metadata-job api/delete-metadata-job
    :update-metadata-job api/create-update-metadata-job
    :delete-graph-job api/delete-graph-job})
