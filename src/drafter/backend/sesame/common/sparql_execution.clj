@@ -188,11 +188,10 @@
 
 (defn create-execute-update-fn [exec-prepared-update-fn]
   (fn [backend update-query-string restrictions]
-    (let [repo (->sesame-repo backend)]
-      (with-open [conn (repo/->connection repo)]
-        (let [dataset (restricted-dataset restrictions)
-              pquery (repo/prepare-update conn update-query-string dataset)]
-          (exec-prepared-update-fn conn pquery))))))
+    (with-open [conn (->repo-connection backend)]
+      (let [dataset (restricted-dataset restrictions)
+            pquery (repo/prepare-update conn update-query-string dataset)]
+        (exec-prepared-update-fn conn pquery)))))
 
 (defn- execute-prepared-update-in-transaction [conn prepared-query]
   (repo/with-transaction conn

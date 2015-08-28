@@ -5,10 +5,9 @@
             [drafter.backend.sesame.common.protocols :refer :all]))
 
 (defn append-data-batch [backend graph-uri triple-batch]
-  (let [repo (->sesame-repo backend)]
-    (with-open [conn (repo/->connection repo)]
-      (repo/with-transaction conn
-        (add conn graph-uri triple-batch)))))
+  (with-open [conn (->repo-connection backend)]
+    (repo/with-transaction conn
+      (add conn graph-uri triple-batch))))
 
 (defn append-graph-metadata [backend graph-uri metadata]
   (let [repo (->sesame-repo backend)]
@@ -17,9 +16,9 @@
       (mgmt/upsert-single-object! repo graph-uri meta-name value))))
 
 (defn get-all-drafts [backend]
-  (with-open [conn (repo/->connection (->sesame-repo backend))]
+  (with-open [conn (->repo-connection backend)]
     (mgmt/query-all-drafts conn)))
 
 (defn get-live-graph-for-draft [backend draft-graph-uri]
-  (with-open [conn (repo/->connection (->sesame-repo backend))]
+  (with-open [conn (->repo-connection backend)]
     (mgmt/get-live-graph-for-draft conn draft-graph-uri)))

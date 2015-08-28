@@ -6,6 +6,6 @@
 (defn delete-graph-batch!
   "Default implementation for deleting a batch statements from a graph"
   [backend graph-uri batch-size]
-  (with-open [conn (repo/->connection (proto/->sesame-repo backend))]
+  (with-open [conn (proto/->repo-connection backend)]
     (repo/with-transaction conn
       (mgmt/delete-graph-batched! conn graph-uri batch-size))))

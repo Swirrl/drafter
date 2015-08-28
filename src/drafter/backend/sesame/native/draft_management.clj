@@ -2,7 +2,8 @@
   (:require [clojure.tools.logging :as log]
             [drafter.rdf.draft-management :as mgmt]
             [grafter.rdf.repository :as repo]
-            [grafter.rdf :refer [add]]))
+            [grafter.rdf :refer [add]]
+            [drafter.backend.sesame.common.protocols :refer [->repo-connection]]))
 
 (defn- migrate-graph-to-live!
   "Moves the triples from the draft graph to the draft graphs live destination."
@@ -59,7 +60,7 @@
 
 (defn migrate-graphs-to-live! [backend graphs]
   (log/info "Starting make-live for graphs " graphs)
-  (with-open [conn (repo/->connection (:repo backend))]
+  (with-open [conn (->repo-connection backend)]
     (repo/with-transaction conn
       (doseq [g graphs]
         (migrate-graph-to-live! conn g))))

@@ -5,13 +5,13 @@
             [grafter.rdf.protocols :refer [update!]]
             [drafter.util :as util]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]))
+            [drafter.backend.sesame.common.protocols :refer [->sesame-repo ->repo-connection]]))
 
 (defn append-data-batch [backend graph-uri triple-batch]
   ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
   ;;so only create one if there is data in the batch
   (if-not (empty? triple-batch)
-    (with-open [conn (repo/->connection (->sesame-repo backend))]
+    (with-open [conn (->repo-connection backend)]
       (repo/with-transaction conn
         (add conn graph-uri triple-batch)))))
 
