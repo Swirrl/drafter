@@ -3,8 +3,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.backend.stardog.sesame.repository :refer [get-stardog-repo]]
-            [drafter.backend.sesame.sparql.draft-management :as sparqlmgmt]
-            [drafter.backend.sesame.sparql.sparql-execution :as sparqlexec]
+            [drafter.backend.sesame.sparql.impl :as sparql-impl]
             [drafter.backend.sesame.common :refer :all]))
 
 (defrecord StardogSesameBackend [repo])
@@ -15,11 +14,8 @@
   proto/ISPARQLUpdateable default-isparql-updatable-impl
   SparqlExecutor default-sparql-query-impl
   QueryRewritable default-query-rewritable-impl
-  SparqlUpdateExecutor {:execute-update sparqlexec/execute-update}
-  DraftManagement (assoc default-draft-management-impl
-                    :append-data-batch! sparqlmgmt/append-data-batch
-                    :append-metadata-to-graphs! sparqlmgmt/append-metadata-to-graphs!
-                    :migrate-graphs-to-live! sparqlmgmt/migrate-graphs-to-live!)
+  SparqlUpdateExecutor sparql-impl/sparql-update-executor-impl
+  DraftManagement sparql-impl/draft-management-impl
   ApiOperations default-api-operations-impl
   Stoppable default-stoppable-impl
   ToRepository {:->sesame-repo :repo}
