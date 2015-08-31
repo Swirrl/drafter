@@ -18,6 +18,7 @@
   SparqlUpdateExecutor {:execute-update sparqlexec/execute-update}
   DraftManagement (assoc default-draft-management-impl
                     :append-data-batch! sparqlmgmt/append-data-batch
+                    :append-metadata-to-graphs! sparqlmgmt/append-metadata-to-graphs!
                     :migrate-graphs-to-live! sparqlmgmt/migrate-graphs-to-live!)
   ApiOperations default-api-operations-impl
   Stoppable default-stoppable-impl
