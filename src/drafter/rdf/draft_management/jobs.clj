@@ -26,7 +26,6 @@
      (catch clojure.lang.ExceptionInfo exi#
        (complete-job! ~job {:type :error
                             :error-type (str (class exi#))
-                            :wat exi#
                             :exception (.getCause exi#)}))
      (catch Exception ex#
        (complete-job! ~job {:type :error

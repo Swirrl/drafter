@@ -167,6 +167,15 @@
 
 (def ok-response {:status 200 :headers {"Content-Type" "application/json"} :body {:type :ok}})
 
+(defmacro await-success
+  "Waits for the job with the given path to be present in the given
+  job state atom and then asserts the job succeeded. Returns the job
+  result map."
+  [state-atom job-path]
+  `(let [job-result# (await-completion ~state-atom ~job-path)]
+     (is (= :ok (:type job-result#)) (str "job failed: " (:exception job-result#)))
+     job-result#))
+
 (deftest drafts-api-routes-test
   (testing "POST /draft"
     (testing "with a file"
@@ -235,7 +244,7 @@
             response (route test-request)]
 
         (job-is-accepted response)
-        (await-completion finished-jobs (:finished-job (:body response)))
+        (await-success finished-jobs (:finished-job (:body response)))
 
         (set-var-root! #'batched-write-size original-batch-size)
 
@@ -261,7 +270,7 @@
             response (route test-request)]
 
         (job-is-accepted response)
-        (await-completion finished-jobs (:finished-job (:body response)))
+        (await-success finished-jobs (:finished-job (:body response)))
 
         (testing "contents delete job actually deletes the contents but leaves graph intact"
           (is (not (repo/query *test-backend* (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
@@ -282,7 +291,7 @@
             {:keys [body] :as response} (route test-request)]
 
         (job-is-accepted response)
-        (await-completion finished-jobs (:finished-job body))
+        (await-success finished-jobs (:finished-job body))
 
         (testing "moves the draft to live"
           (is (repo/query *test-backend* "ASK WHERE { GRAPH <http://mygraph.com/live-graph> { <http://test.com/subject-1> ?p ?o } }")
@@ -301,7 +310,7 @@
             {:keys [status body headers] :as response} (route test-request)]
 
         (job-is-accepted response)
-        (await-completion finished-jobs (:finished-job body))
+        (await-success finished-jobs (:finished-job body))
 
         (testing "moves the draft to live"
           (is (repo/query *test-backend* "ASK WHERE { GRAPH <http://mygraph.com/live-graph-1> { <http://test.com/subject-1> ?p ?o } }")
@@ -409,9 +418,9 @@
           job-path (:finished-job body)]
       (is (= 202 status))
 
-      (let [{job-status :type} (await-completion finished-jobs job-path)
-            draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-backend*))))]
-        (is (= :ok job-status))
+      (await-success finished-jobs job-path)
+
+      (let [draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-backend*))))]
         (is (= draft-triples (set live-triples)))))))
 
 (do-template
@@ -433,7 +442,7 @@
          (testing "Accepts job"
            (is (= 202 status)))
 
-         (await-completion finished-jobs (:finished-job body))
+         (await-success finished-jobs (:finished-job body))
 
          (let [sparql (metadata-has-value-sparql draft-graph-uri "uploaded-by" "fido")]
            (is (repo/query *test-backend* sparql)))
@@ -448,7 +457,7 @@
              (testing "Accepts job"
                (is (= 202 status)))
 
-             (await-completion finished-jobs (:finished-job body))
+             (await-success finished-jobs (:finished-job body))
 
              (let [meta-query (metadata-values-sparql draft-graph-uri "uploaded-by")
                    meta-records (repo/query *test-backend* meta-query)]
