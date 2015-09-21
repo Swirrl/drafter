@@ -3,7 +3,7 @@
             [grafter.rdf.repository :refer :all]
             [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
-            [drafter.backend.sesame.native :refer [get-backend-for-repo]]
+            [drafter.backend.sesame.native :as native]
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!
                                                   migrate-live!]]
@@ -52,7 +52,7 @@
   the scope is closed."
   ([test-fn] (wrap-with-clean-test-db identity test-fn))
   ([setup-state-fn test-fn]
-   (binding [*test-backend* (get-backend-for-repo (repo (native-store test-db-path)))
+   (binding [*test-backend* (native/get-backend-for-repo (repo (native-store test-db-path)))
              *test-writer* (start-writer!)]
      (try
        (setup-state-fn *test-backend*)
@@ -66,7 +66,7 @@
 
 (defn make-backend []
   (let [repo (make-store)]
-    (get-backend-for-repo repo)))
+    (native/get-backend-for-repo repo)))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated

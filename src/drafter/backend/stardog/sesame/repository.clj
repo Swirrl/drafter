@@ -1,6 +1,6 @@
 (ns drafter.backend.stardog.sesame.repository
   (:require [clojure.tools.logging :as log]
-            [drafter.backend.sesame.sparql.repository :refer [create-repository-for-environment]])
+            [drafter.backend.sesame.remote.repository :refer [create-repository-for-environment]])
   (:import [java.nio.charset Charset]
            [org.openrdf.query.resultio BooleanQueryResultParserRegistry TupleQueryResultParserRegistry]
            [org.openrdf.rio RDFParserRegistry]

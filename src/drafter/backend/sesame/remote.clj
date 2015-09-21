@@ -1,14 +1,14 @@
-(ns drafter.backend.sesame.sparql
+(ns drafter.backend.sesame.remote
   (:require [grafter.rdf.protocols :as proto]
             [drafter.backend.protocols :refer :all]
             [drafter.backend.sesame.common.protocols :refer :all]
-            [drafter.backend.sesame.sparql.repository :refer [create-repository-for-environment]]
-            [drafter.backend.sesame.sparql.impl :as sparql-impl]
+            [drafter.backend.sesame.remote.repository :refer [create-repository-for-environment]]
+            [drafter.backend.sesame.remote.impl :as sparql-impl]
             [drafter.backend.sesame.common :refer :all]))
 
-(defrecord SesameSparqlBackend [repo])
+(defrecord SesameRemoteSparqlBackend [repo])
 
-(extend SesameSparqlBackend
+(extend SesameRemoteSparqlBackend
   proto/ITripleReadable default-triple-readable-impl
   proto/ISPARQLable default-sparqlable-impl
   proto/ISPARQLUpdateable default-isparql-updatable-impl
@@ -23,4 +23,4 @@
 
 (defn get-sesame-sparql-backend [env-map]
   (let [repo (create-repository-for-environment env-map)]
-    (->SesameSparqlBackend repo)))
+    (->SesameRemoteSparqlBackend repo)))

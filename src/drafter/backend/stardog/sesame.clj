@@ -3,7 +3,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.backend.stardog.sesame.repository :refer [get-stardog-repo]]
-            [drafter.backend.sesame.sparql.impl :as sparql-impl]
+            [drafter.backend.sesame.remote.impl :as sparql-impl]
             [drafter.backend.sesame.common :refer :all]))
 
 (defrecord StardogSesameBackend [repo])

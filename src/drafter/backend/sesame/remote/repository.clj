@@ -1,4 +1,4 @@
-(ns drafter.backend.sesame.sparql.repository
+(ns drafter.backend.sesame.remote.repository
   (:require [clojure.string :as str]
             [clojure.tools.logging :as log])
   (:import [drafter.rdf DrafterSPARQLRepository]))

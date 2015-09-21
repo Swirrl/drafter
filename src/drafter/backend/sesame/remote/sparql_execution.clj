@@ -1,4 +1,4 @@
-(ns drafter.backend.sesame.sparql.sparql-execution
+(ns drafter.backend.sesame.remote.sparql-execution
   (:require [grafter.rdf.repository :as repo]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.sesame.common.sparql-execution :refer [execute-update-with]]))

@@ -2,7 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [clojure.string :as string]
             [drafter.backend.sesame.native :as native]
-            [drafter.backend.sesame.sparql :as sesame-sparql]
+            [drafter.backend.sesame.remote :as sesame-sparql]
             [drafter.backend.stardog.sesame :as stardog]))
 
 (def ^:private backend-fns
