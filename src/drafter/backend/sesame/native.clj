@@ -1,29 +1,26 @@
 (ns drafter.backend.sesame.native
-  (:require [drafter.backend.protocols :refer :all]
+  (:require [drafter.backend.protocols :as backproto]
             [drafter.backend.sesame.common :refer :all]
-            [drafter.backend.sesame.common.protocols :refer :all]
+            [drafter.backend.sesame.common.protocols :as sesproto]
             [drafter.backend.sesame.native.repository :refer [get-repository]]
             [drafter.backend.sesame.native.draft-management :as mgmt]
             [grafter.rdf.protocols :as proto]))
 
-(defrecord SesameNativeBackend [repo])
+(defrecord SesameNativeStoreBackend [repo])
 
-(extend SesameNativeBackend
+(extend drafter.backend.sesame.native.SesameNativeStoreBackend
   proto/ITripleReadable default-triple-readable-impl
   proto/ITripleWriteable default-triple-writeable-impl
   proto/ISPARQLable default-sparqlable-impl
   proto/ISPARQLUpdateable default-isparql-updatable-impl
-  SparqlExecutor default-sparql-query-impl
-  QueryRewritable default-query-rewritable-impl
-  SparqlUpdateExecutor default-sparql-update-impl
-  ApiOperations default-api-operations-impl
-  DraftManagement (assoc default-draft-management-impl :migrate-graphs-to-live! mgmt/migrate-graphs-to-live!)
-  Stoppable default-stoppable-impl
+  backproto/SparqlExecutor default-sparql-query-impl
+  backproto/QueryRewritable default-query-rewritable-impl
+  backproto/SparqlUpdateExecutor default-sparql-update-impl
+  backproto/ApiOperations default-api-operations-impl
+  backproto/DraftManagement (assoc default-draft-management-impl :migrate-graphs-to-live! mgmt/migrate-graphs-to-live!)
+  sesproto/ToRepository {:->sesame-repo :repo}
+  backproto/Stoppable default-stoppable-impl
+  sesproto/SesameBatchOperations default-sesame-batch-operations-impl)
 
-  SesameBatchOperations default-sesame-batch-operations-impl
-  ToRepository {:->sesame-repo :repo})
-
-(def get-backend-for-repo ->SesameNativeBackend)
-
-(defn get-native-backend [env-map]
-  (get-backend-for-repo (get-repository env-map)))
+(defn get-backend [env-map]
+  (->SesameNativeStoreBackend (get-repository env-map)))

@@ -1,7 +1,7 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.tools.logging :as log]
             [drafter.operations :refer :all]
-            [drafter.backend.protocols :refer :all]
+            [drafter.backend.protocols :refer [create-query-executor prepare-query get-query-type negotiate-result-writer]]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -114,7 +114,7 @@
          ;; Designed to work with piped-input-stream this fn will be run
          ;; in another thread to stream the results to the client.
          :body body})
-      
+
       (unsupported-media-type-response media-type))))
 
 (defn wrap-sparql-errors [handler]

@@ -8,7 +8,7 @@
 
 (defrecord SesameRemoteSparqlBackend [repo])
 
-(extend SesameRemoteSparqlBackend
+(extend drafter.backend.sesame.remote.SesameRemoteSparqlBackend
   proto/ITripleReadable default-triple-readable-impl
   proto/ISPARQLable default-sparqlable-impl
   proto/ISPARQLUpdateable default-isparql-updatable-impl
@@ -21,6 +21,6 @@
   ToRepository {:->sesame-repo :repo}
   SesameBatchOperations default-sesame-batch-operations-impl)
 
-(defn get-sesame-sparql-backend [env-map]
+(defn get-backend [env-map]
   (let [repo (create-repository-for-environment env-map)]
     (->SesameRemoteSparqlBackend repo)))

@@ -9,18 +9,23 @@ variables from the environment.
 Drafter supports multiple backends for storing RDF data.
 
 #+BEGIN_EXAMPLE
-DRAFTER_BACKEND               (default SESAME_BACKEND)
+DRAFTER_BACKEND               (default drafter.backend.sesame.native)
 #+END_EXAMPLE
 
-The currently there are two supported backends: SESAME_NATIVE and SESAME_STARDOG. Different backends have their own
-configuration options. There are also common configuration settings which apply across all backends:
+| Namespace                      | Description                                                      |
+|--------------------------------+------------------------------------------------------------------|
+| drafter.backend.sesame.native  | Sesame Native Store Backend                                      |
+| drafter.backend.stardog.sesame | Stardog optimised queries via the Sesame SparqlRepository client |
+
+Different backends have their own configuration options. There are also common
+configuration settings which apply across all backends:
 
 #+BEGIN_EXAMPLE
 DRAFTER_HTTP_PORT:            (default 3001)
 DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
 #+END_EXAMPLE
 
-*** Sesame native backend
+*** drafter.backend.sesame.native
 
 The Sesame native backend stores the data in a Sesame native repository backed by files on a local disk. The location
 of the data directory and the indexes to create can be configured:
@@ -30,8 +35,9 @@ DRAFTER_INDEXES
 DEFAULT_REPO_PATH
 #+END_EXAMPLE
 
-*** Sesame Stardog backend
-The Sesame stardog backend accesses a remote Stardog instance through a Sesame SPARQL repository. The location of the 
+*** drafter.backend.stardog.sesame
+
+The Sesame stardog backend accesses a remote Stardog instance through a Sesame SPARQL repository. The location of the
 query and update endpoints for the Stardog database to use must be configured.
 
 #+BEGIN_EXAMPLE

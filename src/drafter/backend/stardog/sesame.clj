@@ -8,7 +8,8 @@
 
 (defrecord StardogSesameBackend [repo])
 
-(extend StardogSesameBackend
+(extend drafter.backend.stardog.sesame.StardogSesameBackend
+  proto/ITripleWriteable default-triple-writeable-impl
   proto/ITripleReadable default-triple-readable-impl
   proto/ISPARQLable default-sparqlable-impl
   proto/ISPARQLUpdateable default-isparql-updatable-impl
@@ -24,6 +25,6 @@
   ;;in batches. This could be a simple DROP on Stardog
   SesameBatchOperations default-sesame-batch-operations-impl)
 
-(defn get-stardog-backend [env-map]
+(defn get-backend [env-map]
   (let [repo (get-stardog-repo env-map)]
     (->StardogSesameBackend repo)))

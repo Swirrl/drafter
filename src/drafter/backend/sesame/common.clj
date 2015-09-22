@@ -8,7 +8,7 @@
             [drafter.backend.sesame.common.draft-api :as api]
             [drafter.backend.sesame.common.batching :as batching]
             [grafter.rdf.protocols :as proto]
-            [drafter.backend.sesame.common.protocols :refer :all]
+            [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.sesame.common.sparql-execution :as sparql]))
 
 ;;SPARQL execution
@@ -26,7 +26,7 @@
 
 ;;stoppable
 (def default-stoppable-impl
-  {:stop (comp repo/shutdown ->sesame-repo)})
+  {:stop (fn [x] (repo/shutdown (->sesame-repo x)))})
 
 ;;draft management
 (def default-draft-management-impl
