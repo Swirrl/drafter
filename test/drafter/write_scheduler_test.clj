@@ -1,7 +1,7 @@
 (ns drafter.write-scheduler-test
   (:require [drafter.write-scheduler :refer :all]
             [clojure.test :refer :all]
-            [drafter.test-common :refer [wait-for-lock-ms during-exclusive-write wrap-with-clean-test-db]]
+            [drafter.test-common :refer [wait-for-lock-ms during-exclusive-write wrap-clean-test-db wrap-db-setup]]
             [swirrl-server.async.jobs :refer [create-job complete-job! ->Job]])
   (:import [java.util UUID]
            [clojure.lang ExceptionInfo]))
@@ -39,4 +39,5 @@
       (during-exclusive-write
        (is (thrown? ExceptionInfo (await-sync-job! sync-job)))))))
 
-(use-fixtures :each wrap-with-clean-test-db)
+(use-fixtures :once wrap-db-setup)
+(use-fixtures :each wrap-clean-test-db)

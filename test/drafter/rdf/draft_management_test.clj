@@ -1,11 +1,12 @@
 (ns drafter.rdf.draft-management-test
   (:require
-   [drafter.test-common :refer [*test-backend* wrap-with-clean-test-db make-graph-live!]]
+   [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live!]]
    [grafter.rdf :refer [s add add-statement]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.vocabularies.rdf :refer :all]
    [grafter.rdf.repository :refer :all]
    [drafter.backend.protocols :refer [append-data-batch!]]
+   [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
    [grafter.rdf.protocols :refer [update!]]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
@@ -310,4 +311,5 @@
                        "<" subject "> <" predicate "> \"updated\""
                        "} }")))))
 
-(use-fixtures :each wrap-with-clean-test-db)
+(use-fixtures :once wrap-db-setup)
+(use-fixtures :each wrap-clean-test-db)

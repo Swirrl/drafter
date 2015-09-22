@@ -19,3 +19,4 @@ user_repl.clj
 .idea/
 drafter.iml
 profiles.clj
+/test-drafter-db/

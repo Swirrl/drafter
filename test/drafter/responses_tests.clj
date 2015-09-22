@@ -1,7 +1,7 @@
 (ns drafter.responses-tests
   (:require [clojure.test :refer :all]
           [drafter.responses :refer :all]
-          [drafter.test-common :refer [wrap-with-clean-test-db during-exclusive-write]]
+          [drafter.test-common :refer [wrap-db-setup wrap-clean-test-db during-exclusive-write]]
           [drafter.write-scheduler-test :refer [const-job]]))
 
 (deftest submit-async-job-test
@@ -30,4 +30,5 @@
            {:keys [status]} (submit-sync-job! job)]
        (is (= 503 status))))))
 
-(use-fixtures :each wrap-with-clean-test-db)
+(use-fixtures :once wrap-db-setup)
+(use-fixtures :each wrap-clean-test-db)

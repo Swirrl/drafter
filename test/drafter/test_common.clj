@@ -1,9 +1,14 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
             [grafter.rdf.repository :refer :all]
-            [grafter.rdf.protocols :refer [add]]
+            [grafter.rdf.protocols :refer [add update!]]
             [grafter.rdf.templater :refer [triplify]]
-            [drafter.backend.sesame.native :as native]
+            [environ.core :refer [env]]
+            [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
+            [drafter.backend.configuration :refer [get-backend]]
+            ;; [drafter.backend.sesame.native]
+            ;; [drafter.backend.sesame.remote]
+            [drafter.backend.protocols :refer [stop]]
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!
                                                   migrate-live!]]
@@ -46,27 +51,32 @@
 
 (declare ^:dynamic *test-writer*)
 
-(defn wrap-with-clean-test-db
-  "Sets up a native store and starts a drafter-writer thread to ensure
-  operations are written.  The writer should be stopped and GC'd when
-  the scope is closed."
-  ([test-fn] (wrap-with-clean-test-db identity test-fn))
+(defn wrap-db-setup [test-fn]
+  (let [backend (get-backend (assoc env :drafter-repo-path "test-drafter-db"))]
+    (println "backend: " backend)
+    (binding [*test-backend* backend
+              *test-writer* (start-writer!)]
+
+      (try
+          (test-fn)
+          (finally
+            (stop backend)
+            (stop-writer! *test-writer*))))))
+
+(defn wrap-clean-test-db
+  ([test-fn] (wrap-clean-test-db identity test-fn))
   ([setup-state-fn test-fn]
-   (binding [*test-backend* (native/get-backend-for-repo (repo (native-store test-db-path)))
-             *test-writer* (start-writer!)]
-     (try
-       (setup-state-fn *test-backend*)
-       (test-fn)
-       (finally
-         (fs/delete-dir test-db-path)
-         (stop-writer! *test-writer*))))))
+   (update! *test-backend*
+            "DROP ALL ;")
+   (setup-state-fn *test-backend*)
+   (test-fn)))
+
 
 (defn make-store []
   (repo))
 
 (defn make-backend []
-  (let [repo (make-store)]
-    (native/get-backend-for-repo repo)))
+  (get-backend env))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated

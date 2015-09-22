@@ -128,5 +128,7 @@
           {:keys [status]} (endpoint request)]
       (is (= 400 status)))))
 
-(use-fixtures :each (partial wrap-with-clean-test-db
+(use-fixtures :once wrap-db-setup)
+
+(use-fixtures :each (partial wrap-clean-test-db
                              add-triple-to-db))

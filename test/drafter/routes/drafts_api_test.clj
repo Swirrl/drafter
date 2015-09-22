@@ -1,6 +1,6 @@
 (ns drafter.routes.drafts-api-test
-  (:require [drafter.test-common :refer [*test-backend* test-triples wrap-with-clean-test-db
-                                         make-store stream->string select-all-in-graph make-graph-live!
+  (:require [drafter.test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-db-setup
+                                         stream->string select-all-in-graph make-graph-live!
                                          import-data-to-draft!]]
             [swirrl-server.async.jobs :refer [finished-jobs]]
             [clojure.test :refer :all]
@@ -467,4 +467,5 @@
 
  meta-update-with-post-file-test :post (fn [req graph] (add-request-graph-source-file req graph "./test/test-triple.nt")))
 
-(use-fixtures :each wrap-with-clean-test-db)
+(use-fixtures :once wrap-db-setup)
+(use-fixtures :each wrap-clean-test-db)

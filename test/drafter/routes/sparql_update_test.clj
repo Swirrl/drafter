@@ -5,8 +5,8 @@
             [clojure.test :refer :all]
             [clojure.template :refer [do-template]]
             [ring.util.codec :as codec]
-            [drafter.test-common :refer [*test-backend* wrap-with-clean-test-db stream->string
-                                         select-all-in-graph make-store during-exclusive-write]]
+            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db stream->string
+                                         select-all-in-graph during-exclusive-write]]
             [grafter.rdf.repository :refer [query]])
   (:import [java.util UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
@@ -101,4 +101,5 @@
                    :union-graphs ["http://example.com/"])
             "Inserts the data")))))
 
-(use-fixtures :each wrap-with-clean-test-db)
+(use-fixtures :once wrap-db-setup)
+(use-fixtures :each wrap-clean-test-db)

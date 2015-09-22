@@ -79,4 +79,4 @@
 
 (def default-triple-writeable-impl
   {:add-statement add-statement-impl
-   :add add-impl})
+   :add add-imp})

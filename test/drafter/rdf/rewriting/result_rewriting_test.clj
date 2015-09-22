@@ -1,6 +1,7 @@
 (ns drafter.rdf.rewriting.result-rewriting-test
   (:require
-   [drafter.test-common :refer [test-triples make-backend]]
+   [drafter.test-common :refer [test-triples *test-backend* wrap-with-clean-test-db]]
+   [drafter.test-common :refer [test-triples *test-backend* wrap-db-setup wrap-clean-test-db]]
    [clojure.set :as set]
    [drafter.util :refer [map-values]]
    [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph!]]
@@ -95,11 +96,10 @@
   (result-keys (first results) ks))
 
 (deftest query-and-result-rewriting-test
-  (let [backend (make-backend)
-        draft-graph (create-draft-graph! backend "http://frogs.com/live-graph")
+  (let [draft-graph (create-draft-graph! *test-backend* "http://frogs.com/live-graph")
         graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
 
-    (append-data-batch! backend draft-graph (test-triples "http://kermit.org/the-frog"))
+    (append-data-batch! *test-backend* draft-graph (test-triples "http://kermit.org/the-frog"))
 
     (testing "rewrites subject URIs"
       (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { <http://kermit.org/the-frog> ?p ?o } }"
@@ -108,10 +108,10 @@
             po ["http://predicate" "http://object"]
             mapped-triples (triplify [mapped-subject po])]
 
-        (append-data-batch! backend draft-graph mapped-triples)
+        (append-data-batch! *test-backend* draft-graph mapped-triples)
 
         (is (= po
-               (-> backend
+               (-> *test-backend*
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["p" "o"]))))))
 
@@ -121,10 +121,10 @@
             graph-map (assoc graph-map (URIImpl. "http://source-predicate") (URIImpl. mapped-predicate))
             mapped-triples (triplify ["http://kermit.org/the-frog" [mapped-predicate "http://object"]])]
 
-        (append-data-batch! backend draft-graph mapped-triples)
+        (append-data-batch! *test-backend* draft-graph mapped-triples)
 
         (is (= ["http://kermit.org/the-frog" "http://object"]
-               (-> backend
+               (-> *test-backend*
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["s" "o"]))))))
 
@@ -134,33 +134,34 @@
             graph-map (assoc graph-map (URIImpl. "http://source-object") (URIImpl. mapped-object))
             mapped-triples (triplify ["http://kermit.org/the-frog" ["http://predicate" mapped-object]])]
 
-        (append-data-batch! backend draft-graph mapped-triples)
+        (append-data-batch! *test-backend* draft-graph mapped-triples)
 
         (is (= ["http://kermit.org/the-frog" "http://predicate"]
-               (-> backend
+               (-> *test-backend*
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["s" "p"]))))))
 
     (testing "rewrites all result URIs"
       (let [query "SELECT * WHERE { ?s ?p ?o }"
-            backend (make-backend)
             live-triple ["http://live-subject" "http://live-predicate" "http://live-object"]
             draft-triple ["http://draft-subject" "http://draft-predicate" "http://draft-object"]
             [live-subject live-predicate live-object] live-triple
             [draft-subject draft-predicate draft-object] draft-triple
-            graph-map (apply hash-map (map #(URIImpl. %) (interleave live-triple draft-triple)))]
+            graph-map (zipmap (map #(URIImpl. %) live-triple)
+                              (map #(URIImpl. %) draft-triple))]
 
-        (append-data-batch! backend draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
+        (append-data-batch! *test-backend* draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
 
+        (println (grafter.rdf/statements *test-backend*))
         (is (= live-triple
-               (-> backend
+               (-> *test-backend*
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["s" "p" "o"]))))))
 
     (testing "rewrites query to query draft graph"
       ;; NOTE this query rewrites the URI constant <http://frogs.com/live-graph>
       (is (= "http://kermit.org/the-frog"
-             (-> backend
+             (-> *test-backend*
                  (evaluate-with-graph-rewriting graph-constant-query graph-map)
                  (first-result "s"))))
 
@@ -172,7 +173,7 @@
         ;; the constant string "http://frogs.com/live-graph" but instead
         ;; rewrites it at runtime via the function composition.
         (is (= "http://kermit.org/the-frog"
-               (-> backend
+               (-> *test-backend*
                    (evaluate-with-graph-rewriting uri-query graph-map)
                    (first-result "s"))))
 
@@ -181,18 +182,21 @@
           ;; the constant string "http://frogs.com/live-graph" but instead
           ;; rewrites it at runtime via the function composition.
           (is (= "http://frogs.com/live-graph"
-                 (-> backend
+                 (-> *test-backend*
                      (evaluate-with-graph-rewriting uri-query graph-map)
                      (first-result "g"))))))
 
       (testing "rewrites source graphs in VALUES clause"
         (is (= "http://frogs.com/live-graph"
-               (-> backend
+               (-> *test-backend*
                    (evaluate-with-graph-rewriting graph-values-query graph-map)
                    (first-result "g")))))
 
       (testing "rewrites source graph literals in FILTER clause"
         (is (= "http://frogs.com/live-graph"
-               (-> backend
+               (-> *test-backend*
                    (evaluate-with-graph-rewriting graph-filter-query graph-map)
                    (first-result "g")))))))))
+
+(use-fixtures :once wrap-db-setup)
+(use-fixtures :each wrap-clean-test-db)
