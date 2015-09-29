@@ -1,8 +1,15 @@
-(defproject drafter "0.3.0-SNAPSHOT"
+(defproject drafter "0.4.0-SNAPSHOT"
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
             :url "http://swirrl.com/"}
+
+  :repositories [["snapshots" {:url "s3p://swirrl-jars/snapshots/"
+                               :sign-releases false
+                               :releases false}]
+                 ["releases" {:url "s3p://swirrl-jars/releases/"
+                              :sign-releases true
+                              :snapshots false}]]
 
   :dependencies [
                  ;; NOTE jena 3.0.0-SNAPSHOT was compiled from source with maven
@@ -51,6 +58,7 @@
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
             [lein-environ "1.0.0"]
+            [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]
             [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
 
   :ring {:handler drafter.handler/app
