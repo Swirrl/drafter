@@ -6,7 +6,6 @@
             [drafter.backend.common.draft-api :as api-common]
             [drafter.backend.sesame.common.draft-management :as mgmt]
             [drafter.backend.sesame.common.draft-api :as api]
-            [drafter.backend.sesame.common.batching :as batching]
             [grafter.rdf.protocols :as proto]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.sesame.common.sparql-execution :as sparql]))
@@ -34,11 +33,6 @@
    :append-metadata-to-graphs! mgmt/append-metadata-to-graphs!
    :get-all-drafts mgmt/get-all-drafts
    :get-live-graph-for-draft mgmt/get-live-graph-for-draft})
-
-;;Sesame protocols
-;;SesameBatchOperations
-(def default-sesame-batch-operations-impl
-  {:delete-graph-batch! batching/delete-graph-batch!})
 
 ;;draft API
 (def default-api-operations-impl
@@ -79,4 +73,4 @@
 
 (def default-triple-writeable-impl
   {:add-statement add-statement-impl
-   :add add-imp})
+   :add add-impl})

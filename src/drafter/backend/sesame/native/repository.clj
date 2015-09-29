@@ -9,18 +9,23 @@
 
 (def default-repo-path "drafter-db")
 
+(def default-store "native-store")
+
 (defn- get-repo-at [repo-path indexes]
   (let [repo (repo/repo (repo/native-store repo-path indexes))]
     (log/info "Initialised repo" repo-path)
     repo))
 
 (defn- get-repo-config [env-map]
-  {:indexes (get env-map :drafter-indexes default-indexes)
+  {:sesame-store (get env-map :sesame-store default-store)
+   :indexes (get env-map :drafter-indexes default-indexes)
    :repo-path (get env-map :drafter-repo-path default-repo-path)})
 
 (defn get-repository [env-map]
-  (let [{:keys [indexes repo-path]} (get-repo-config env)]
-    (get-repo-at repo-path indexes)))
+  (let [{:keys [indexes repo-path sesame-store]} (get-repo-config env-map)]
+    (condp = sesame-store
+      "native-store" (get-repo-at repo-path indexes)
+      "memory-store" (repo/repo))))
 
 (defn reindex
   "Reindex the database according to the DRAFTER_INDEXES set at

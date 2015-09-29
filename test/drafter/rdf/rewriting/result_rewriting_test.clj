@@ -1,6 +1,5 @@
 (ns drafter.rdf.rewriting.result-rewriting-test
   (:require
-   [drafter.test-common :refer [test-triples *test-backend* wrap-with-clean-test-db]]
    [drafter.test-common :refer [test-triples *test-backend* wrap-db-setup wrap-clean-test-db]]
    [clojure.set :as set]
    [drafter.util :refer [map-values]]
@@ -141,23 +140,6 @@
                    (evaluate-with-graph-rewriting query graph-map)
                    (first-result-keys ["s" "p"]))))))
 
-    (testing "rewrites all result URIs"
-      (let [query "SELECT * WHERE { ?s ?p ?o }"
-            live-triple ["http://live-subject" "http://live-predicate" "http://live-object"]
-            draft-triple ["http://draft-subject" "http://draft-predicate" "http://draft-object"]
-            [live-subject live-predicate live-object] live-triple
-            [draft-subject draft-predicate draft-object] draft-triple
-            graph-map (zipmap (map #(URIImpl. %) live-triple)
-                              (map #(URIImpl. %) draft-triple))]
-
-        (append-data-batch! *test-backend* draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
-
-        (println (grafter.rdf/statements *test-backend*))
-        (is (= live-triple
-               (-> *test-backend*
-                   (evaluate-with-graph-rewriting query graph-map)
-                   (first-result-keys ["s" "p" "o"]))))))
-
     (testing "rewrites query to query draft graph"
       ;; NOTE this query rewrites the URI constant <http://frogs.com/live-graph>
       (is (= "http://kermit.org/the-frog"
@@ -197,6 +179,24 @@
                (-> *test-backend*
                    (evaluate-with-graph-rewriting graph-filter-query graph-map)
                    (first-result "g")))))))))
+
+(deftest more-query-and-result-rewriting-test
+  (testing "rewrites all result URIs"
+    (let [draft-graph (create-draft-graph! *test-backend* "http://frogs.com/live-graph")
+          live-triple ["http://live-subject" "http://live-predicate" "http://live-object"]
+          draft-triple ["http://draft-subject" "http://draft-predicate" "http://draft-object"]
+          [live-subject live-predicate live-object] live-triple
+          [draft-subject draft-predicate draft-object] draft-triple
+          graph-map (zipmap (map #(URIImpl. %) live-triple)      ;; live-uri -> draft-uri
+                            (map #(URIImpl. %) draft-triple))]
+
+      (append-data-batch! *test-backend* draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
+
+      (let [query "SELECT * WHERE { ?s ?p ?o }"
+            results (evaluate-with-graph-rewriting *test-backend* query graph-map)]
+
+        (is (some #{live-triple}
+                  (map #(result-keys % ["s" "p" "o"]) results)))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

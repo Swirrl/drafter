@@ -1,7 +1,8 @@
 (ns drafter.backend.stardog.sesame
   (:require [grafter.rdf.protocols :as proto]
             [drafter.backend.protocols :refer :all]
-            [drafter.backend.sesame.common.protocols :refer :all]
+            [drafter.backend.stardog.draft-api :as api]
+            [drafter.backend.sesame.common.protocols :as sesproto]
             [drafter.backend.stardog.sesame.repository :refer [get-stardog-repo]]
             [drafter.backend.sesame.remote.impl :as sparql-impl]
             [drafter.backend.sesame.common :refer :all]))
@@ -17,13 +18,10 @@
   QueryRewritable default-query-rewritable-impl
   SparqlUpdateExecutor sparql-impl/sparql-update-executor-impl
   DraftManagement sparql-impl/draft-management-impl
-  ApiOperations default-api-operations-impl
+  ApiOperations (assoc default-api-operations-impl
+                       :delete-graph-job api/delete-graph-job)
   Stoppable default-stoppable-impl
-  ToRepository {:->sesame-repo :repo}
-
-  ;TODO: remove? required by the default delete-graph-job implementation which deletes
-  ;;in batches. This could be a simple DROP on Stardog
-  SesameBatchOperations default-sesame-batch-operations-impl)
+  sesproto/ToRepository {:->sesame-repo :repo})
 
 (defn get-backend [env-map]
   (let [repo (get-stardog-repo env-map)]

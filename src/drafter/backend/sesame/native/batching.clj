@@ -1,4 +1,4 @@
-(ns drafter.backend.sesame.common.batching
+(ns drafter.backend.sesame.native.batching
   (:require [grafter.rdf.repository :as repo]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.sesame.common.protocols :as proto]))
