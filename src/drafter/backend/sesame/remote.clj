@@ -19,7 +19,7 @@
   DraftManagement sparql-impl/sparql-update-executor-impl
   ApiOperations default-api-operations-impl
   Stoppable default-stoppable-impl
-  ToRepository {:->sesame-repo :repo}
+  sesproto/ToRepository {:->sesame-repo :repo}
   sesproto/SesameBatchOperations {:delete-graph-batch! batching/delete-graph-batch!})
 
 (defn get-backend [env-map]
