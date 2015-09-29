@@ -1,4 +1,4 @@
-(let [log-pattern "%d{ABSOLUTE} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"]
+(let [log-pattern "%d{ISO8601} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"]
      (set-loggers!
        ["org.openrdf" "drafter"]
        {:name "drafter"
