@@ -38,17 +38,29 @@
   URIs as necessary. Assumes all values are strings."
   (append-metadata-to-graphs! backend [graph-uri] metadata))
 
+;; NOTE: We should eventually replace this when we migrate to using Stuart
+;; Sierra's Component.
 (defprotocol Stoppable
   (stop [this]))
 
 (defprotocol ApiOperations
-  (new-draft-job [this live-graph-uri params])
-  (append-data-to-graph-job [this graph data rdf-format metadata])
-  (copy-from-live-graph-job [this draft-graph-uri])
-  (migrate-graphs-to-live-job [this graphs])
-  (delete-metadata-job [this graphs meta-keys])
-  (update-metadata-job [this graphs metadata])
+  (new-draft-job [this live-graph-uri params]
+    "Return a job that makes a new draft associated with the given live-graph in
+    the state graph.")
+  (append-data-to-graph-job [this graph data rdf-format metadata]
+    "Return a job that appends RDF data in the specified format to the specified graph.")
+  (copy-from-live-graph-job [this draft-graph-uri]
+    "Retrun a job to Copy the data from the draft graphs live graph into the
+    given draft graph.")
+  (migrate-graphs-to-live-job [this graphs]
+    "Return a job to migrate the supplied set of draft graphs to live.")
+  (delete-metadata-job [this graphs meta-keys]
+    "Create a job to delete the given metadata keys from a collection of draft
+  graphs.")
+  (update-metadata-job [this graphs metadata]
+    "Create a job to update or creates each of the the given graph metadata
+  pairs for each given graph under a job.")
   (delete-graph-job [this graph contents-only?]
-    "Deletes graph contents as per batch size in order to avoid
-   blocking writes with a lock. Finally the graph itself will be
-   deleted unless contents-only? is true"))
+    "Create a job to delete graph contents as per batch size in order to avoid
+   blocking writes with a lock. Finally the graph itself will be deleted unless
+   contents-only? is true"))
