@@ -24,10 +24,12 @@
   `(try
      ~@forms
      (catch clojure.lang.ExceptionInfo exi#
+       (log/warn exi# "Error whilst executing job")
        (complete-job! ~job {:type :error
                             :error-type (str (class exi#))
                             :exception (.getCause exi#)}))
      (catch Exception ex#
+       (log/warn ex# "Error whilst executing job")
        (complete-job! ~job {:type :error
                             :error-type (str (class ex#))
                             :exception ex#}))))
@@ -180,5 +182,3 @@
                                      (get-graph-clone-batches repo live-graph-uri))]
                 (copy-from-live-graph repo live-graph-uri draft-graph-uri batch-sizes job)
                 (job-succeeded! job))))
-            
-            

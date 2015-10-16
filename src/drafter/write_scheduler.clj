@@ -87,6 +87,7 @@
             priority :priority
             job-id :id
             promis :value-p :as job} (.take writes-queue)]
+
       (try
         ;; Note that task functions are responsible for the delivery
         ;; of the promise and the setting of DONE and also preserve

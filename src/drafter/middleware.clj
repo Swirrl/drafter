@@ -21,6 +21,7 @@
       (try
         (handler request)
         (catch clojure.lang.ExceptionInfo ex
+          (log/warn ex)
           (let [{:keys [type error-template] :as data} (ex-data ex)]
             (if (= :selmer-validation-error type)
               {:status 500
