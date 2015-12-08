@@ -35,8 +35,18 @@
                  [selmer "0.6.9"]
 
                  [swirrl/lib-swirrl-server "0.2.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
-                 [grafter "0.5.0-SNAPSHOT" :exclusions [org.openrdf.sesame/sesame-runtime org.clojure/tools.reader]]
-                 [grafter/vocabularies "0.1.0"]
+                 ;; TODO:
+                 ;;
+                 ;; When this sesame bug about streaming sparql XML
+                 ;; results is fixed:
+                 ;;
+                 ;; https://openrdf.atlassian.net/browse/SES-2119
+                 ;;
+                 ;; we can remove this exclusion.
+                 [grafter "0.6.0-alpha4" :exclusions [org.openrdf.sesame/sesame-queryresultio-sparqlxml org.clojure/tools.nrepl]]
+                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.7.16-with-ses-memfix" :exclusions [org.openrdf.sesame/sesame-rio-api]]
+
+                 [grafter/vocabularies "0.1.3"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.14"]
                  [org.openrdf.sesame/sesame-runtime "2.7.14"]
@@ -50,7 +60,7 @@
 
   :java-source-paths ["src-java"]
   :resource-paths ["resources"]
-  :pedantic? :abort
+  :pedantic :abort
 
   :repl-options {:init-ns drafter.repl
                  :init (-main)

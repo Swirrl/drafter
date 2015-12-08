@@ -208,7 +208,8 @@
       (testing "When no drafts are supplied & :union-with-live is not set"
         (let [csv-result (csv-> (endpoint (draft-query "SELECT * WHERE { ?s ?p ?o }" nil)))
               triple-from-state-graph? (fn [triple]
-                                         (.endsWith (object triple) "ManagedGraph"))]
+                                         (when-let [o (get triple "o")]
+                                           (.endsWith o "ManagedGraph")))]
           (is (not-any? triple-from-state-graph? csv-result)
               "Data should not contain triples from the state graph"))))))
 

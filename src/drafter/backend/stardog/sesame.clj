@@ -3,7 +3,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.backend.stardog.draft-api :as api]
             [drafter.backend.sesame.common.protocols :as sesproto]
-            [drafter.backend.stardog.sesame.repository :refer [get-stardog-repo]]
+            [drafter.backend.sesame.remote.repository :refer [create-repository-for-environment]]
             [drafter.backend.sesame.remote.impl :as sparql-impl]
             [drafter.backend.sesame.common :refer :all]))
 
@@ -24,5 +24,5 @@
   sesproto/ToRepository {:->sesame-repo :repo})
 
 (defn get-backend [env-map]
-  (let [repo (get-stardog-repo env-map)]
+  (let [repo (create-repository-for-environment env-map)]
     (->StardogSesameBackend repo)))
