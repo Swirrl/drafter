@@ -5,7 +5,7 @@
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
             [drafter.backend.protocols :refer :all]
-            [drafter.rdf.draft-management :refer [drafter-state-graph]]
+            [drafter.rdf.draft-management :refer [drafter-state-graph create-draftset!]]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
             [drafter.responses :refer [submit-sync-job! submit-async-job!]]
             [swirrl-server.responses :as response]))
@@ -17,6 +17,16 @@
   (if file-format
     (assoc file-obj :content-type file-format)
     file-obj))
+
+(defn draftset-api-routes [mount-point backend]
+  (routes
+   (context
+    mount-point []
+
+    ;;create a new draftset
+    (POST "/" [title]
+          (let [draftset-id (create-draftset! backend title)]
+            {:status 200 :headers {} :body {:draftset-uri (str mount-point "/" draftset-id)}})))))
 
 (defn draft-api-routes [mount-point operations]
   (routes

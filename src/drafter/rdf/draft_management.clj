@@ -81,6 +81,25 @@
               "  LIMIT 1"
               "}")))
 
+(defn- create-draftset-statements [title draftset-uri created-date]
+  [draftset-uri
+   [rdf:a drafter:DraftSet]
+   [rdfs:label (s title)]
+   [drafter:createdAt created-date]])
+
+(defn create-draftset!
+  "Creates a new draftset in the given database and returns its id. If
+  no title is provided (i.e. it is nil) a default title will be used
+  for the new draftset."
+  ([db] (create-draftset! db nil))
+  ([db title] (create-draftset! db title (UUID/randomUUID) (Date.)))
+  ([db title draftset-id created-date]
+   (let [title (or title "New draft set")
+         template (create-draftset-statements title (draftset-uri draftset-id) created-date)
+         quads (to-quads template)]
+     (add db quads)
+     draftset-id)))
+
 (defn create-managed-graph
   "Returns some RDF statements to represent the ManagedGraphs state."
   ([graph-uri] (create-managed-graph graph-uri {}))

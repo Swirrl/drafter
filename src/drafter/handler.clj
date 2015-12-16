@@ -11,6 +11,7 @@
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
             [drafter.routes.drafts-api :refer [draft-api-routes
+                                               draftset-api-routes
                                                graph-management-routes]]
             [drafter.routes.status :refer [status-routes]]
             [drafter.routes.dumps :refer [dumps-endpoint]]
@@ -110,6 +111,7 @@
                         ;; add your application routes here
                         (-> []
                             (add-route (pages-routes backend))
+                            (add-route (draftset-api-routes "/draftset" backend))
                             (add-route (draft-api-routes "/draft" backend))
                             (add-route (graph-management-routes "/graph" backend))
                             (add-routes (get-sparql-routes backend))

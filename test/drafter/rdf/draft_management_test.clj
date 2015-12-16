@@ -77,6 +77,14 @@
       (create-managed-graph! *test-backend* test-graph-uri)
       (is (is-graph-managed? *test-backend* test-graph-uri)))))
 
+(deftest create-draftset!-test
+  (let [title "Test draftset!"
+        draftset-id (create-draftset! *test-backend* title)
+        ds-uri (draftset-uri draftset-id)]
+    (is (ask? "<" ds-uri "> <" rdf:a "> <" drafter:DraftSet ">"))
+    (is (query *test-backend* (str "ASK WHERE { <" ds-uri "> <" rdfs:label "> \"" title "\" }")))
+    (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))
+
 (deftest create-draft-graph!-test
   (testing "create-draft-graph!"
 

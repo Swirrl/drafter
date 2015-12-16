@@ -176,6 +176,14 @@
      (is (= :ok (:type job-result#)) (str "job failed: " (:exception job-result#)))
      job-result#))
 
+(deftest draftset-api-routes-test
+  (let [mount-point "/draftset"
+        route (draftset-api-routes mount-point *test-backend*)]
+    (testing "Create draftset"
+      (let [{:keys [status body]} (route {:uri mount-point :request-method :post})]
+        (is (= 200 status))
+        (is (contains? body :draftset-uri))))))
+
 (deftest drafts-api-routes-test
   (testing "POST /draft"
     (testing "with a file"

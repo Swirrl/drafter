@@ -8,9 +8,15 @@
 
 (def meta-uri (prefixer "http://publishmydata.com/def/drafter/meta/"))
 
+(def draftset-uri (prefixer "http://publishmydata.com/def/drafter/draftset/"))
+
 (def drafter:ManagedGraph (drafter "ManagedGraph"))
 
 (def drafter:DraftGraph (drafter "DraftGraph"))
+
+(def drafter:DraftSet (drafter "DraftSet"))
+
+(def drafter:inDraftSet (drafter "inDraftSet"))
 
 (def drafter:isPublic (drafter "isPublic"))
 
