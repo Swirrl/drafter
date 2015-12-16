@@ -11,7 +11,8 @@
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
    [clojure.test :refer :all])
-  (:import [org.openrdf.model.impl URIImpl]))
+  (:import [java.util UUID]
+           [org.openrdf.model.impl URIImpl]))
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
@@ -96,7 +97,14 @@
 
         (is (.startsWith new-graph-uri staging-base))
         (is (ask? "<" test-graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                                       "<" drafter:hasDraft "> <" new-graph-uri "> ."))))))
+                                       "<" drafter:hasDraft "> <" new-graph-uri "> .")))))
+
+  (testing "within draft set"
+    (create-managed-graph! *test-backend* test-graph-uri)
+    (let [draftset-id (UUID/randomUUID)
+          ds-uri (draftset-uri draftset-id)
+          draft-graph-uri (create-draft-graph! *test-backend* test-graph-uri {} ds-uri)]
+      (is (ask? "<" draft-graph-uri "> <" drafter:inDraftSet "> <" ds-uri ">")))))
 
 (defn create-managed-graph-with-draft! [test-graph-uri]
   (create-managed-graph! *test-backend* test-graph-uri)

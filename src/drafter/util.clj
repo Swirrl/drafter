@@ -53,3 +53,11 @@
   "Combines a sequence of SPARQL queries into a single query."
   [queries]
   (str/join "; " queries))
+
+(defmacro conj-if
+  "Returns (conj col x) if test evaluates to true, otherwise returns
+  col."
+  [test col x]
+  `(if ~test
+     (conj ~col ~x)
+     ~col))

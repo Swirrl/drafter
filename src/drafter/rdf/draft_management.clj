@@ -126,14 +126,17 @@
 
 (defn create-draft-graph
   ([live-graph-uri draft-graph-uri time]
-     (create-draft-graph live-graph-uri draft-graph-uri time {}))
+   (create-draft-graph live-graph-uri draft-graph-uri time {}))
   ([live-graph-uri draft-graph-uri time opts]
+   (create-draft-graph live-graph-uri draft-graph-uri time opts nil))
+  ([live-graph-uri draft-graph-uri time opts draftset-uri]
 
      (let [live-graph-triples [live-graph-uri
                                [drafter:hasDraft draft-graph-uri]]
            draft-graph-triples  [draft-graph-uri
                                  [rdf:a drafter:DraftGraph]
                                  [drafter:modifiedAt time]]
+           draft-graph-triples (util/conj-if (some? draftset-uri) draft-graph-triples [drafter:inDraftSet draftset-uri])
            triples [live-graph-triples (add-properties draft-graph-triples
                                                        ;; we need to make the values of the opts into strings by calling `s`.
                                                        (into {} (for [[k v] opts]
@@ -146,14 +149,20 @@
   was created.
 
   Converts the optional opts hash into drafter meta-data triples
-  attached to the draft graph resource in the drafter state graph."
+  attached to the draft graph resource in the drafter state graph.
+
+  If draftset-uri is provided (i.e. is not nil) a statement will be
+  added connecting the created draft graph to the given draft set. No
+  validation is done that the draftset actually exists."
   ([db live-graph-uri]
-     (create-draft-graph! db live-graph-uri {}))
+   (create-draft-graph! db live-graph-uri {}))
   ([db live-graph-uri opts]
+   (create-draft-graph! db live-graph-uri opts nil))
+  ([db live-graph-uri opts draftset-uri]
      (let [now (Date.)
            draft-graph-uri (make-draft-graph-uri)]
        ;; adds the triples returned by crate-draft-graph to the state graph
-       (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now opts)
+       (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now opts draftset-uri)
                     (apply to-quads)))
 
        draft-graph-uri)))
