@@ -48,13 +48,6 @@
    (backend/append-graph-metadata! repo draft-graph metadata)
     (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))))
 
-(defn- append-data-in-batches [repo draft-graph metadata triples job]
-  (let [batches (partition-all jobs/batched-write-size triples)
-        batch-joblets (map #(append-data-batch-joblet repo draft-graph %) batches)
-        metadata-joblet (append-graph-metadata-joblet repo draft-graph metadata)
-        all-joblets (concat batch-joblets [metadata-joblet])]
-    (jobs/exec-joblets all-joblets job)))
-
 (defn append-data-to-graph-job
   "Return a job function that adds the triples from the specified file
   to the specified graph.
@@ -98,10 +91,12 @@
         ;;
         ;; This can occur if a user does a make-live on a graph
         ;; which is being written to in a batch job.
+        batches (partition-all jobs/batched-write-size new-triples)
+        batch-joblets (map #(append-data-batch-joblet backend draft-graph %) batches)
+        metadata-joblet (append-graph-metadata-joblet backend draft-graph metadata)
+        all-joblets (concat batch-joblets [metadata-joblet])
     ]
-
-    (jobs/make-job :batch-write [job]
-              (append-data-in-batches backend draft-graph metadata new-triples job))))
+    (jobs/joblet-seq->job all-joblets :batch-write)))
 
 (defn new-draft-job [backend live-graph params]
   (jobs/make-job :sync-write [job]
