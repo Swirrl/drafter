@@ -38,25 +38,22 @@
   (create-job :batch-write
               (partial delete-in-batches this graph-uri contents-only?)))
 
+(defn- append-data-batch-joblet [repo draft-graph batch]
+  (jobs/action-joblet
+    (log/info "Adding a batch of triples to repo")
+    (backend/append-data-batch! repo draft-graph batch)))
+
+(defn- append-graph-metadata-joblet [repo draft-graph metadata]
+  (jobs/action-joblet
+   (backend/append-graph-metadata! repo draft-graph metadata)
+    (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))))
+
 (defn- append-data-in-batches [repo draft-graph metadata triples job]
-  (jobs/with-job-exception-handling job
-    (let [[current-batch remaining-triples] (split-at jobs/batched-write-size triples)]
-
-      (log/info (str "Adding a batch of triples to repo" current-batch))
-      (backend/append-data-batch! repo draft-graph current-batch)
-
-      (if-not (empty? remaining-triples)
-        ;; resubmit the remaining batches under the same job to the
-        ;; queue to give higher priority jobs a chance to write
-        (let [apply-next-batch (partial append-data-in-batches
-                                        repo draft-graph metadata remaining-triples)]
-          (scheduler/queue-job! (create-child-job job apply-next-batch)))
-
-        (do
-          (backend/append-graph-metadata! repo draft-graph metadata)
-          (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))
-
-          (jobs/job-succeeded! job))))))
+  (let [batches (partition-all jobs/batched-write-size triples)
+        batch-joblets (map #(append-data-batch-joblet repo draft-graph %) batches)
+        metadata-joblet (append-graph-metadata-joblet repo draft-graph metadata)
+        all-joblets (concat batch-joblets [metadata-joblet])]
+    (jobs/exec-joblets all-joblets job)))
 
 (defn append-data-to-graph-job
   "Return a job function that adds the triples from the specified file
