@@ -95,6 +95,7 @@ paths:
         - $ref: "#/parameters/id"
         - $ref: '#/parameters/rdfdata'
         - $ref: '#/parameters/graph'
+        - $ref: '#/parameters/message'
       consumes:
         - application/n-quads
         - application/trig
@@ -122,6 +123,7 @@ paths:
         - $ref: "#/parameters/id"
         - $ref: '#/parameters/rdfdata'
         - $ref: '#/parameters/graph'
+        - $ref: '#/parameters/message'
       consumes:
         - application/n-quads
         - application/trig
@@ -150,6 +152,7 @@ paths:
         Requests that this Draftset is published asynchronously to the live site.  If a job is successfully scheduled then an AsyncJob object will be returned.
       parameters:
         - $ref: '#/parameters/id'
+        - $ref: '#/parameters/message'
       tags:
         - Draftsets
         - Release1
@@ -214,6 +217,12 @@ parameters:
   draftset-description:
     name: Draftset description
     description: A description of the Draftset
+    in: query
+    required: false
+    type: string
+  message:
+    name: Message
+    description: A log message to be associated with the performed action.
     in: query
     required: false
     type: string
