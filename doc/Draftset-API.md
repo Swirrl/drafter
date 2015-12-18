@@ -2,6 +2,10 @@
 
 `PREFIX : <http://publishmydata.com/def/drafter/>`
 
+## State Diagram
+
+![State Diagram](Draftset-States.png)
+
 ## Ownership
 
 At creation a draftset's `:state` property is set to `:drafting`, and
