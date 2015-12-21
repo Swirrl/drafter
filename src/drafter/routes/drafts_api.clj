@@ -38,15 +38,18 @@
     (POST "/:id/data" {{draftset-id :id
                         request-content-type :content-type
                         {file-part-content-type :content-type data :tempfile} :file} :params}
-          (let [draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)]
-            (if-let [content-type (or file-part-content-type request-content-type)]
-              (if-let [rdf-format (mimetype->rdf-format content-type)]
-                (if (is-quads-content-type? rdf-format)
-                  (let [append-job (append-data-to-draftset-job backend draftset-uri data rdf-format)]
-                    (submit-async-job! append-job))
-                  (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads")))
-                (unknown-rdf-content-type-response content-type))
-              (response/bad-request-response "Content type required")))))))
+          (if-let [content-type (or file-part-content-type request-content-type)]
+            (let [rdf-format (mimetype->rdf-format content-type)
+                  draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)]
+              (cond (nil? rdf-format)
+                    (unknown-rdf-content-type-response content-type)
+                    
+                    (is-quads-content-type? rdf-format)
+                    (let [append-job (append-data-to-draftset-job backend draftset-uri data rdf-format)]
+                      (submit-async-job! append-job))
+
+                    :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
+            (response/bad-request-response "Content type required"))))))
 
 (defn draft-api-routes [mount-point operations]
   (routes
