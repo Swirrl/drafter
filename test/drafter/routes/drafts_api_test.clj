@@ -176,6 +176,15 @@
      (is (= :ok (:type job-result#)) (str "job failed: " (:exception job-result#)))
      job-result#))
 
+(defn- is-client-error-response? [{:keys [status] :as response}]
+  (and (>= status 400)
+       (< status 500)))
+
+(defn- append-to-draftset-request [mount-point draftset-id file-part]
+  {:uri (str mount-point "/" draftset-id "/data")
+   :request-method :post
+   :params {:file file-part}})
+
 (deftest draftset-api-routes-test
   (let [mount-point "/draftset"
         route (draftset-api-routes mount-point *test-backend*)]
@@ -192,9 +201,7 @@
               draftset-uri (ontology/draftset-uri draftset-id)]
           (with-open [fs (io/input-stream data-file-path)]
             (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
-                  request {:uri (str mount-point "/" draftset-id "/data")
-                           :request-method :post
-                           :params {:file file-part}}
+                  request (append-to-draftset-request mount-point draftset-id file-part)
                   {:keys [status body] :as response} (route request)]
               (await-success finished-jobs (:finished-job body))
 
@@ -213,9 +220,8 @@
         (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
           (let [draftset-id (create-draftset! *test-backend* "Test draftset")
                 file-part {:tempfile fs :filename "test-draftset.trig"}
-                request {:uri (str mount-point "/" draftset-id "/data")
-                         :request-method :post
-                         :params {:file file-part :content-type "application/x-trig"}}
+                request (-> (append-to-draftset-request mount-point draftset-id file-part)
+                            (assoc-in [:params :content-type] "application/x-trig"))
                 response (route request)]
             (await-success finished-jobs (:finished-job (:body response))))))
 
@@ -223,21 +229,17 @@
         (with-open [fs (io/input-stream "test/test-triple.nt")]
           (let [draftset-id (create-draftset! *test-backend* "Test draftset")
                 file-part {:tempfile fs :filename "test-triple.nt" :content-type "application/n-triples"}
-                request {:uri (str mount-point "/" draftset-id "/data")
-                         :request-method :post
-                         :params {:file file-part}}
-                {:keys [status] :as response} (route request)]
-            (is (= 400 status)))))
+                request (append-to-draftset-request mount-point draftset-id file-part)
+                response (route request)]
+            (is (is-client-error-response? response)))))
 
       (testing "Quad data without content type"
         (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
           (let [draftset-id (create-draftset! *test-backend* "Test draftset")
                 file-part {:tempfile fs :filename "test-dataset.trig"}
-                request {:uri (str mount-point "/" draftset-id "/data")
-                         :request-method :post
-                         :params {:file file-part}}
-                {:keys [status] :as response} (route request)]
-            (is (= 400 status))))))))
+                request (append-to-draftset-request mount-point draftset-id file-part)
+                response (route request)]
+            (is (is-client-error-response? response))))))))
 
 (deftest drafts-api-routes-test
   (testing "POST /draft"
