@@ -18,6 +18,13 @@
     (assoc file-obj :content-type file-format)
     file-obj))
 
+(defn- unknown-rdf-content-type-response [content-type]
+  (response/bad-request-response
+   (str "Unknown RDF format for content type " content-type)))
+
+(defn- is-quads-content-type? [rdf-format]
+  (.supportsContexts rdf-format))
+
 (defn draftset-api-routes [mount-point backend]
   (routes
    (context
@@ -29,11 +36,17 @@
             {:status 200 :headers {} :body {:draftset-uri (str mount-point "/" draftset-id)}}))
 
     (POST "/:id/data" {{draftset-id :id
-                         {file-part-content-type :content-type data :tempfile} :file} :params}
-          (let [draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)
-                rdf-format (mimetype->rdf-format file-part-content-type)
-                append-job (append-data-to-draftset-job backend draftset-uri data rdf-format)]
-            (submit-async-job! append-job))))))
+                        request-content-type :content-type
+                        {file-part-content-type :content-type data :tempfile} :file} :params}
+          (let [draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)]
+            (if-let [content-type (or file-part-content-type request-content-type)]
+              (if-let [rdf-format (mimetype->rdf-format content-type)]
+                (if (is-quads-content-type? rdf-format)
+                  (let [append-job (append-data-to-draftset-job backend draftset-uri data rdf-format)]
+                    (submit-async-job! append-job))
+                  (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads")))
+                (unknown-rdf-content-type-response content-type))
+              (response/bad-request-response "Content type required")))))))
 
 (defn draft-api-routes [mount-point operations]
   (routes
@@ -94,7 +107,7 @@
                                    (append-data-to-graph-job operations graph
                                                              data rdf-format
                                                              metadata))
-                                  (response/bad-request-response (str "Unknown RDF format for content type " data-content-type)))))))))
+                                  (unknown-rdf-content-type-response data-content-type))))))))
 
 (defn graph-management-routes [mount-point operations]
   (routes
