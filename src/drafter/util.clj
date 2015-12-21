@@ -1,7 +1,8 @@
 (ns drafter.util
   (:require [clojure.string :as str]
             [markdown.core :as md]
-            [noir.io :as io]))
+            [noir.io :as io])
+  (:import [org.openrdf.model.impl URIImpl]))
 
 ;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
 (defn map-values
@@ -61,3 +62,32 @@
   `(if ~test
      (conj ~col ~x)
      ~col))
+
+(defn batch-partition-by
+  "Partitions an input sequence into a sequence of batches, partitions
+  each batch by the given partition function and flattens the result
+  into a sequence of batches where each element is considered equal by
+  the partition function. Each of these sequences are then partitioned
+  again into batches no more than output-batch-size in length.
+
+  Examples:
+  (batch-partition-by [:a :a :a] identity 2 10
+  => [[:a :a] [:a]]
+
+  (batch-partition-by [:a :b :a :b] identity 5 10
+  => [[:a :a] [:b :b]]
+
+  batch-partition-by [:a :b :a :b :a] identity 2 10
+  => [[:a :a] [:a] [:b :b]]
+
+  batch-patition-by [:a :b :a :b :a] identity 2 4
+  => [[:a :a] [:b :b] [:a]]"
+  ([seq partition-fn output-batch-size] (batch-partition-by seq partition-fn output-batch-size (* 4 output-batch-size)))
+  ([seq partition-fn output-batch-size take-batch-size]
+   (let [take-batches (partition-all take-batch-size seq)
+         grouped-batches (map #(group-by partition-fn %) take-batches)
+         batches (mapcat vals grouped-batches)]
+     (mapcat #(partition-all output-batch-size %) batches))))
+
+(defn string->sesame-uri [s]
+  (URIImpl. s))

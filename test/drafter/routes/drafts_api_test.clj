@@ -5,9 +5,9 @@
             [swirrl-server.async.jobs :refer [finished-jobs]]
             [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]
-            [grafter.rdf.protocols :refer [->Triple]]
+            [grafter.rdf.protocols :refer [->Triple map->Triple]]
             [drafter.routes.drafts-api :refer :all]
-            [drafter.rdf.drafter-ontology :refer [meta-uri]]
+            [drafter.rdf.drafter-ontology :refer [meta-uri] :as ontology]
             [grafter.rdf :refer [s add add-statement statements]]
             [grafter.rdf.templater :refer [graph triplify]]
             [clojure.java.io :as io]
@@ -182,7 +182,31 @@
     (testing "Create draftset"
       (let [{:keys [status body]} (route {:uri mount-point :request-method :post})]
         (is (= 200 status))
-        (is (contains? body :draftset-uri))))))
+        (is (contains? body :draftset-uri))))
+
+    (testing "Appending data to draftset"
+      (let [data-file-path "test/resources/test-draftset.trig"
+            quads (statements data-file-path)
+            draftset-id (create-draftset! *test-backend* "Test draftset")
+            draftset-uri (ontology/draftset-uri draftset-id)]
+        (with-open [fs (io/input-stream data-file-path)]
+          (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
+                request {:uri (str mount-point "/" draftset-id "/data")
+                         :request-method :post
+                         :params {:file file-part}}
+                {:keys [status body] :as response} (route request)]
+            (await-success finished-jobs (:finished-job body))
+
+            (let [draftset-graph-map (get-draftset-graph-mapping *test-backend* draftset-uri)
+                  graph-statements (group-by :c quads)]
+              (doseq [[live-graph graph-quads] graph-statements]
+                (let [draft-graph (get draftset-graph-map live-graph)
+                      q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)
+                      draft-statements (repo/query *test-backend* q)
+                      expected-statements (map map->Triple graph-quads)]
+                  (is (is-graph-managed? *test-backend* live-graph))
+                  (is (draft-exists? *test-backend* draft-graph))
+                  (is (set expected-statements) (set draft-statements)))))))))))
 
 (deftest drafts-api-routes-test
   (testing "POST /draft"
@@ -404,9 +428,6 @@
             {:keys [status]} (route request)]
         (is (= 400 status))))))
 
-(defn ->triple [{:keys [s p o] :as quad}]
-  (->Triple s p o))
-
 (defn uriify-values [m]
   (map-values #(and % (URIImpl. %)) m))
 
@@ -428,7 +449,7 @@
 
       (await-success finished-jobs job-path)
 
-      (let [draft-triples (set (map ->triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-backend*))))]
+      (let [draft-triples (set (map map->Triple (filter #(= (URIImpl. draft-graph-uri) (:c %)) (statements *test-backend*))))]
         (is (= draft-triples (set live-triples)))))))
 
 (do-template

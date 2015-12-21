@@ -1,6 +1,6 @@
 (ns drafter.routes.drafts-api
   (:require [clojure.tools.logging :as log]
-            [drafter.util :refer [to-coll]]
+            [drafter.util :refer [to-coll] :as util]
             [compojure.core :refer [DELETE POST PUT context routes]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
@@ -26,7 +26,14 @@
     ;;create a new draftset
     (POST "/" [title]
           (let [draftset-id (create-draftset! backend title)]
-            {:status 200 :headers {} :body {:draftset-uri (str mount-point "/" draftset-id)}})))))
+            {:status 200 :headers {} :body {:draftset-uri (str mount-point "/" draftset-id)}}))
+
+    (POST "/:id/data" {{draftset-id :id
+                         {file-part-content-type :content-type data :tempfile} :file} :params}
+          (let [draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)
+                rdf-format (mimetype->rdf-format file-part-content-type)
+                append-job (append-data-to-draftset-job backend draftset-uri data rdf-format)]
+            (submit-async-job! append-job))))))
 
 (defn draft-api-routes [mount-point operations]
   (routes

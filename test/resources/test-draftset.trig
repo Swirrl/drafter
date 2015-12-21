@@ -1,0 +1,15 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix animal: <http://example.org/animals/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+<http://graph1>
+{
+	<http://s1> rdf:a animal:kitten .
+	<http://s1> foaf:name "Fluffy" .
+}
+
+<http://graph2>
+{
+	<http://s2> rdf:a animal:dog .
+	<http://s2> foaf:name "Beethoven" .
+}

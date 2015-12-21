@@ -38,6 +38,7 @@
 (def default-api-operations-impl
   {:new-draft-job api/new-draft-job
    :append-data-to-graph-job api/append-data-to-graph-job
+   :append-data-to-draftset-job api/append-data-to-draftset-job
    :copy-from-live-graph-job api/copy-from-live-graph-job
    :migrate-graphs-to-live-job api-common/migrate-graphs-to-live-job
    :delete-metadata-job api/delete-metadata-job

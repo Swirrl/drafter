@@ -10,6 +10,7 @@
    [grafter.rdf.protocols :refer [update!]]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
+   [drafter.util :as util]
    [clojure.test :refer :all])
   (:import [java.util UUID]
            [org.openrdf.model.impl URIImpl]))
@@ -326,6 +327,32 @@
     (is (query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
                        "<" subject "> <" predicate "> \"updated\""
                        "} }")))))
+
+(deftest ensure-draft-graph-exists-for-test
+  (testing "Draft graph already exists for live graph"
+    (let [draft-graph-uri "http://draft"
+          live-graph-uri  "http://live"
+          ds-uri "http://draftset"
+          initial-mapping {live-graph-uri draft-graph-uri}
+          {found-draft-uri :draft-graph-uri graph-map :graph-map} (ensure-draft-exists-for *test-backend* live-graph-uri initial-mapping ds-uri)]
+      (is (= draft-graph-uri found-draft-uri))
+      (is (= initial-mapping graph-map))))
+
+  (testing "Live graph exists without draft"
+    (let [live-graph-uri (create-managed-graph! *test-backend* "http://live")
+          ds-uri "http://draftset"
+          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
+      (is (= {live-graph-uri draft-graph-uri} graph-map))
+      (is (is-graph-managed? *test-backend*  live-graph-uri))
+      (is (draft-exists? *test-backend* draft-graph-uri))))
+
+  (testing "Live graph does not exist"
+    (let [live-graph-uri "http://live"
+          ds-uri "http://draftset"
+          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
+      (is (= {live-graph-uri draft-graph-uri} graph-map))
+      (is (is-graph-managed? *test-backend* live-graph-uri))
+      (is (draft-exists? *test-backend* draft-graph-uri)))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

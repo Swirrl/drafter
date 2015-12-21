@@ -1,13 +1,15 @@
 (ns drafter.backend.sesame.common.draft-api
   (:require [clojure.tools.logging :as log]
             [grafter.rdf.repository :as repo]
-            [grafter.rdf :refer [add statements]]
+            [grafter.rdf :refer [add statements context]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.write-scheduler :as scheduler]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :as backend]
+            [drafter.util :as util]
+            [drafter.backend.common.draft-api :refer [quad-batch->graph-triples]]
             [drafter.backend.sesame.common.protocols :refer :all]))
 
 (defn- finish-delete-job! [backend graph contents-only? job]
@@ -48,6 +50,25 @@
    (backend/append-graph-metadata! repo draft-graph metadata)
     (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))))
 
+(defn- file->statements [tempfile rdf-format]
+  (statements tempfile
+              :format rdf-format
+              :buffer-size jobs/batched-write-size))
+
+(defn- append-data-to-draftset-graph-joblet [backend draftset-uri quad-batch]
+  (fn [graph-map]
+    (let [{:keys [graph-uri triples]} (quad-batch->graph-triples quad-batch)
+          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend graph-uri graph-map draftset-uri)]
+      (backend/append-data-batch! backend draft-graph-uri quad-batch)
+      graph-map)))
+
+(defn append-data-to-draftset-job [backend draftset-uri tempfile rdf-format]
+  (let [quads (file->statements tempfile rdf-format)
+        graph-map (mgmt/get-draftset-graph-mapping backend draftset-uri)
+        quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
+        batch-joblets (map #(append-data-to-draftset-graph-joblet backend draftset-uri %) quad-batches)]
+    (jobs/joblet-seq->job batch-joblets :batch-write graph-map)))
+
 (defn append-data-to-graph-job
   "Return a job function that adds the triples from the specified file
   to the specified graph.
@@ -66,9 +87,7 @@
 
   [backend draft-graph tempfile rdf-format metadata]
 
-  (let [new-triples (statements tempfile
-                                :format rdf-format
-                                :buffer-size jobs/batched-write-size)
+  (let [new-triples (file->statements tempfile rdf-format)
 
         ;; NOTE that this is technically not transactionally safe as
         ;; sesame currently only supports the READ_COMMITTED isolation

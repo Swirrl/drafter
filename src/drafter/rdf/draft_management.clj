@@ -100,6 +100,22 @@
      (add db quads)
      draftset-id)))
 
+(defn- get-draftset-graph-mapping-query [draftset-uri]
+  (str
+   "SELECT ?lg ?dg WHERE { "
+   (with-state-graph
+     "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+     "?dg <" drafter:inDraftSet "> <" draftset-uri "> ."
+     "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+     "?lg <" drafter:hasDraft "> ?dg .")
+   "}"))
+
+;;Repository -> String -> Map {URI URI}
+(defn get-draftset-graph-mapping [repo draftset-uri]
+  (let [mapping-query (get-draftset-graph-mapping-query draftset-uri)
+        results (query repo mapping-query)]
+    (into {} (map (fn [{:strs [lg dg]}] [(.stringValue lg) (.stringValue dg)]) results))))
+
 (defn create-managed-graph
   "Returns some RDF statements to represent the ManagedGraphs state."
   ([graph-uri] (create-managed-graph graph-uri {}))
@@ -166,6 +182,13 @@
                     (apply to-quads)))
 
        draft-graph-uri)))
+
+(defn ensure-draft-exists-for [repo live-graph graph-map draftset-uri]
+  (if-let [draft-graph (get graph-map live-graph)]
+    {:draft-graph-uri draft-graph :graph-map graph-map}
+    (let [live-graph-uri (create-managed-graph! repo live-graph)
+          draft-graph-uri (create-draft-graph! repo live-graph-uri {} draftset-uri)]
+      {:draft-graph-uri draft-graph-uri :graph-map (assoc graph-map live-graph-uri draft-graph-uri)})))
 
 (defn- escape-sparql-value [val]
   (if (string? val)
