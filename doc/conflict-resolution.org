@@ -39,15 +39,41 @@ draftset they effectively create a 'virtual copy' of the sites
 data in which they can safely make, review and query changes
 before publishing them to the live site.
 
-[[file:Draftsets-1.png][file:./Draftsets-1.png]]
-
-[[file:Draftsets-2.png][file:./Draftsets-2.png]]
 
 * Proposal: Merging with Live
 
 We propose an extension to Publish My Data's [[http://api.grafter.org/scratch/swagger/][Drafter API]] that supports
 an optimistic locking strategy for publishing changes to RDF graphs by
 comparing graph revisions.
+
+** Merging Example
+
+The diagram below describes the evolution of a single graph of data,
+being edited by two users, via two Draftsets =A= and =B=.
+
+First we see how a user starts making changes (in blue) to the graph
+in their =Draftset B=.  To do this a clone of the graph is made in
+their Draftset, which they apply their changes to.
+
+They then publish these changes to the live site for all to see.
+However, just before they publish, another user starts editing the
+same graph in a new =Draftset A=.  When this user tries to publish the
+graph, Drafter prevents the publication; because it detects a prior
+change to the graph that needs resolved.
+
+[[file:Draftsets-1.png][file:./Draftsets-1.png]]
+
+There are effectively three options available to the user, they can
+choose one of the two sets of changes in their entirity, electing to
+lose one set of edits, or they can attempt to merge both sets of
+changes at publish those.
+
+blah blah blah two graphs
+
+[[file:Draftsets-2.png][file:./Draftsets-2.png]]
+
+
+** Implementation
 
 Firstly we propose to extend GraphSet metadata to include a
 =derived-from= revision-identifier that represents the version of the
@@ -163,8 +189,9 @@ The draftset above shows that the draftset
 draftset with the id =bd6069c8-3da6-421b-845e-5ee289aba788=.
 
 In a similar vein, if changes to the live graph have occured since the
-draft snapshot was taken, drafter could provide a boolean property to
-indicate explicitly that the live graph has changed:
+draft snapshot was taken, drafter could provide a boolean property
+(=has-unmerged-changes=) to indicate explicitly that the live graph
+has changed, e.g.
 
 #+BEGIN_SRC json
 {
