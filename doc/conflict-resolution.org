@@ -68,15 +68,14 @@ choose one of the two sets of changes in their entirity, electing to
 lose one set of edits, or they can attempt to merge both sets of
 changes at publish those.
 
-It's worth noting that changes need to be managed on a per graph
-basis.  The following diagram shows how =Draft A= contains edits to
-only one graph, whilst =Draft B= contains edits to both of the live
-graphs.  In this case, the user publishing =Draft A= gets to
+It's worth noting that changes are tracked and managed on a per graph
+basis, so it's common for merge scenarios to involve multiple graphs,
+as shown in the following diagram.
 
-^^^--- TODO TODO TODO TODO
+Here we see how =Draft A= contains edits to only one graph, whilst
+=Draft B= contains edits to both of the graphs.
 
 [[file:Draftsets-2.png][file:./Draftsets-2.png]]
-
 
 ** Implementation
 
