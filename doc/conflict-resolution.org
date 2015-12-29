@@ -27,7 +27,7 @@ delivery dates are yet associated with this proposal.
 We propose two new mechanisms to resolve these issues.  The first is
 concerned with conflict detection when merging a draftset with the
 live site, whilst the second provides users greater visibility about
-when other draftsets contain changes to graphs they have ammendments on.
+when other draftsets contain changes to graphs they have amendments on.
 
 Both of these mechanisms build on the PMD Draftset concept.
 
@@ -35,7 +35,7 @@ Both of these mechanisms build on the PMD Draftset concept.
 
 Draftsets are essentially, private working copies, or branches of
 work, that contain changes to RDF data.  When a user creates a
-draftset they effectively create a 'virtual copy' of the sites
+draftset they effectively create a 'virtual copy' of the site's
 data in which they can safely make, review and query changes
 before publishing them to the live site.
 
@@ -80,11 +80,11 @@ graphs.  In this case, the user publishing =Draft A= gets to
 
 ** Implementation
 
-Firstly we propose to extend GraphSet metadata to include a
+Firstly we propose to extend Draftset metadata to include a
 =derived-from= revision-identifier that represents the version of the
 live graph the graph in the draftset was branched from.
 
-This data is stored in a Graph object under the draftsets =data=
+This data is stored in a Graph object under the draftset's =data=
 property, e.g.
 
 #+BEGIN_SRC json
@@ -105,10 +105,10 @@ property, e.g.
 #+END_SRC
 
 When graphs are published on the live site =revision-identifiers= are
-stored with the live-graphs metadata.  These identifiers have a number
+stored with the live-graph's metadata.  These identifiers have a number
 of potential uses, the primary reason being change detection.  With
 =revision-identifiers= changes to live graphs between publications can
-be detected by comparing at publication time the draft graphs
+be detected by comparing at publication time the draft graph's
 =derived-from= =revision-identifer= with the =revision-identifier= of
 the live graph.  If the identifiers differ then a publication to the
 live graph has occurred, and there is a risk that publishing the graph
@@ -143,10 +143,11 @@ provide much more fine-grained merging and conflict resolution.
 
 ** Revision Identifiers
 
-Revisions are identifiers that represent the state of a graph at a
-particular point in time.  =revision-identifiers= are used as an
-efficient way to compare draft graphs and their corresponding live
-graphs for potential conflicts.
+Revision identifiers are used to represent the state of a graph at a
+particular point in time.  Rather than comparing the changes
+themselves =revision-identifiers= can be used as an efficient way to
+compare draft graphs and their corresponding live graphs for potential
+conflicts.
 
 UUIDs will likely be used instead of content based hashes in the first
 instance, due to the complexities associated with efficiently
@@ -163,7 +164,7 @@ when several draftsets contain changes to the same live graph.
 
 This information could be exposed via Drafters API so that
 applications including PMD can make use of it.  This could be done via
-a =changed-in-draftsets= key in the GraphSet object:
+a =changed-in-draftsets= key in the Draftset object:
 
 #+BEGIN_SRC json
 {

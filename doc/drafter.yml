@@ -198,7 +198,7 @@ paths:
       description: Deletes the draftset and its contents.
       parameters:
         - $ref: '#/parameters/id'
-        - $ref: '#/parameters/message'
+        - $ref: '#/parameters/messagenonote'
       tags:
         - Draftsets
       responses:
@@ -210,14 +210,16 @@ paths:
       description: Removes the graph and its contents from the Draftset.
       parameters:
         - $ref: '#/parameters/id'
-        - $ref: '#/parameters/graph'
+        - $ref: '#/parameters/reqgraph'
       tags:
         - Updating Data
       responses:
         '200':
           description: The graph was deleted successfully
           schema:
-            $ref: '#/definitions/Draftset'
+            - $ref: '#/definitions/Draftset'
+            - $ref: '#/parameters/messagenonote'
+
   /draftset/{id}/data:
     put:
       summary: Append the supplied RDF data to this Draftset
@@ -237,7 +239,7 @@ paths:
         - $ref: "#/parameters/id"
         - $ref: '#/parameters/rdfdata'
         - $ref: '#/parameters/graph'
-        - $ref: '#/parameters/message'
+        - $ref: '#/parameters/messagenonote'
       consumes:
         - application/n-quads
         - application/trig
@@ -273,7 +275,7 @@ paths:
         - $ref: "#/parameters/id"
         - $ref: '#/parameters/rdfdata'
         - $ref: '#/parameters/graph'
-        - $ref: '#/parameters/message'
+        - $ref: '#/parameters/messagenonote'
       consumes:
         - application/n-quads
         - application/trig
@@ -297,11 +299,17 @@ paths:
       parameters:
         - $ref: "#/parameters/id"
         - $ref: '#/parameters/graph'
+        - $ref: '#/parameters/union-with-live'
       summary: Access the quads inside this Draftset
       description: |
         Request the contents of this draftset in any supported RDF
-        serialisation.  If the chosen serialisation is a triple based
-        one then the graph query string parameter must be provided.
+        serialisation.
+
+        If the chosen serialisation is a triple based one then the
+        graph query string parameter must be provided.  If a quad
+        based serialisation is chosen then the graph parameter must be
+        omitted or a 415 error will be returned.
+
       produces:
         - application/n-quads
         - application/trig
@@ -360,7 +368,7 @@ paths:
         Draftset.
       parameters:
         - $ref: '#/parameters/id'
-        - $ref: '#/parameters/message'
+        - $ref: '#/parameters/messagenonote'
       tags:
         - Draftsets
       responses:
@@ -375,7 +383,7 @@ paths:
         Requests that this Draftset is published asynchronously to the live site.  If a job is successfully scheduled then an AsyncJob object will be returned.
       parameters:
         - $ref: '#/parameters/id'
-        - $ref: '#/parameters/message'
+        - $ref: '#/parameters/messagenonote'
       tags:
         - Draftsets
       responses:
@@ -501,6 +509,13 @@ parameters:
     in: query
     required: false
     type: string
+  messagenonote:
+    name: message
+    description: |
+      A log message to be associated with the performed action.
+    in: query
+    required: false
+    type: string
   note:
     name: note
     description: |
@@ -534,6 +549,14 @@ parameters:
       assumed to be in this graph.
     in: query
     required: false
+    type: string
+  reqgraph:
+    name: graph
+    description: |
+      The URI of the named graph that the operation should be
+      performed on.
+    in: query
+    required: true
     type: string
   query:
     name: query
