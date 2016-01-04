@@ -81,21 +81,22 @@
               "  LIMIT 1"
               "}")))
 
-(defn- create-draftset-statements [title draftset-uri created-date]
-  [draftset-uri
-   [rdf:a drafter:DraftSet]
-   [rdfs:label (s title)]
-   [drafter:createdAt created-date]])
+(defn- create-draftset-statements [title description draftset-uri created-date]
+  (let [base-quads [draftset-uri
+                    [rdf:a drafter:DraftSet]
+                    [rdfs:label (s title)]
+                    [drafter:createdAt created-date]]]
+    (util/conj-if (some? description) base-quads [rdfs:comment (s description)])))
 
 (defn create-draftset!
   "Creates a new draftset in the given database and returns its id. If
   no title is provided (i.e. it is nil) a default title will be used
   for the new draftset."
-  ([db] (create-draftset! db nil))
-  ([db title] (create-draftset! db title (UUID/randomUUID) (Date.)))
-  ([db title draftset-id created-date]
+  ([db title] (create-draftset! db title nil))
+  ([db title description] (create-draftset! db title description (UUID/randomUUID) (Date.)))
+  ([db title description draftset-id created-date]
    (let [title (or title "New draft set")
-         template (create-draftset-statements title (draftset-uri draftset-id) created-date)
+         template (create-draftset-statements title description (draftset-uri draftset-id) created-date)
          quads (to-quads template)]
      (add db quads)
      draftset-id)))

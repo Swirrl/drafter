@@ -188,10 +188,14 @@
 (deftest draftset-api-routes-test
   (let [mount-point "/draftset"
         route (draftset-api-routes mount-point *test-backend*)]
-    (testing "Create draftset"
-      (let [{:keys [status body]} (route {:uri mount-point :request-method :post})]
+    (testing "Create draftset with title"
+      (let [{:keys [status body]} (route {:uri mount-point :request-method :post :params {:display-name "Test title!"}})]
         (is (= 200 status))
         (is (contains? body :draftset-uri))))
+
+    (testing "Create draftset without title"
+      (let [{:keys [status body]} (route {:uri mount-point :request-method :post})]
+        (is (= 406 status))))
 
     (testing "Appending data to draftset"
       (testing "Quad data with valid content type for file part"

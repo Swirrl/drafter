@@ -31,9 +31,11 @@
     mount-point []
 
     ;;create a new draftset
-    (POST "/" [title]
-          (let [draftset-id (create-draftset! backend title)]
-            {:status 200 :headers {} :body {:draftset-uri (str mount-point "/" draftset-id)}}))
+    (POST "/" [display-name description]
+          (if (some? display-name)
+            (let [draftset-id (create-draftset! backend display-name description)]
+              {:status 200 :headers {} :body {:draftset-uri (str mount-point "/" draftset-id)}})
+            {:status 406 :headers {} :body "dispaly-name parameter required"}))
 
     (POST "/:id/data" {{draftset-id :id
                         request-content-type :content-type

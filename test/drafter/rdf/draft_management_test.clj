@@ -79,13 +79,29 @@
       (create-managed-graph! *test-backend* test-graph-uri)
       (is (is-graph-managed? *test-backend* test-graph-uri)))))
 
+(defn- has-uri-object? [s p uri-o]
+  (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
+
+(defn- has-string-object? [s p str-o]
+  (query *test-backend* (str "ASK WHERE { <" s "> <" p "> \"" str-o "\" }")))
+
 (deftest create-draftset!-test
-  (let [title "Test draftset!"
-        draftset-id (create-draftset! *test-backend* title)
-        ds-uri (draftset-uri draftset-id)]
-    (is (ask? "<" ds-uri "> <" rdf:a "> <" drafter:DraftSet ">"))
-    (is (query *test-backend* (str "ASK WHERE { <" ds-uri "> <" rdfs:label "> \"" title "\" }")))
-    (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))
+  (let [title "Test draftset"
+        description "Test description"]
+    (testing "Without description"
+      (let [draftset-id (create-draftset! *test-backend* title)
+            ds-uri (draftset-uri draftset-id)]
+        (is (has-uri-object? ds-uri rdf:a drafter:DraftSet))
+        (is (has-string-object? ds-uri rdfs:label title))
+        (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))
+
+    (testing "With description"
+      (let [draftset-id (create-draftset! *test-backend* title description)
+            ds-uri (draftset-uri draftset-id)]
+        (is (has-uri-object? ds-uri rdf:a drafter:DraftSet))
+        (is (has-string-object? ds-uri rdfs:label title))
+        (is (has-string-object? ds-uri rdfs:comment description))
+        (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))))
 
 (deftest create-draft-graph!-test
   (testing "create-draft-graph!"
