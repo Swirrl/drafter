@@ -95,8 +95,7 @@
   ([db title] (create-draftset! db title nil))
   ([db title description] (create-draftset! db title description (UUID/randomUUID) (Date.)))
   ([db title description draftset-id created-date]
-   (let [title (or title "New draft set")
-         template (create-draftset-statements title description (draftset-uri draftset-id) created-date)
+   (let [template (create-draftset-statements title description (draftset-uri draftset-id) created-date)
          quads (to-quads template)]
      (add db quads)
      draftset-id)))
