@@ -9,6 +9,12 @@
 (def ^:private temporarily-locked-for-writes-response
   {:status 503 :body {:type :error :message "Write operations are temporarily unavailable.  Please try again later."}})
 
+(defn see-other-response
+  "Creates a ring map representing a HTTP 'see other' redirection
+  response."
+  [location]
+  {:status 303 :headers {"Location" location} :body ""})
+
 (defn default-job-result-handler
   "Default handler for creating ring responses from job results. If
   the job succeeded then a 200 response is returned, otherwise a 500

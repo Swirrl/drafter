@@ -7,7 +7,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.rdf.draft-management :refer [drafter-state-graph create-draftset! get-draftset-info]]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
-            [drafter.responses :refer [submit-sync-job! submit-async-job!]]
+            [drafter.responses :refer [submit-sync-job! submit-async-job! see-other-response]]
             [swirrl-server.responses :as response]))
 
 (defn override-file-format
@@ -34,7 +34,7 @@
     (POST "/" [display-name description]
           (if (some? display-name)
             (let [draftset-id (create-draftset! backend display-name description)]
-              {:status 200 :headers {} :body {:draftset-uri (str mount-point "/" draftset-id)}})
+              (see-other-response (str mount-point "/" draftset-id)))
             {:status 406 :headers {} :body "dispaly-name parameter required"}))
 
     (GET "/:id" [id]

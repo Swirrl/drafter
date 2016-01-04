@@ -202,9 +202,9 @@
   (let [mount-point "/draftset"
         route (draftset-api-routes mount-point *test-backend*)]
     (testing "Create draftset with title"
-      (let [{:keys [status body]} (route {:uri mount-point :request-method :post :params {:display-name "Test title!"}})]
-        (is (= 200 status))
-        (is (contains? body :draftset-uri))))
+      (let [{:keys [status headers]} (route {:uri mount-point :request-method :post :params {:display-name "Test title!"}})]
+        (is (= 303 status))
+        (is (contains? headers "Location"))))
 
     (testing "Create draftset without title"
       (let [{:keys [status body]} (route {:uri mount-point :request-method :post})]
@@ -218,9 +218,9 @@
       (let [display-name "Test title!"
             create-request (create-draftset-request mount-point display-name)
             create-response (route create-request)]
-        (is (= 200 (:status create-response)))
+        (is (= 303 (:status create-response)))
 
-        (let [draftset-location (get-in create-response [:body :draftset-uri])
+        (let [draftset-location (get-in create-response [:headers "Location"])
               get-request {:uri draftset-location :request-method :get}
               {:keys [status body]} (route get-request)]
           (is (= 200 status))
@@ -234,9 +234,9 @@
             description "Draftset used in a test"
             create-request (create-draftset-request mount-point display-name description)
             create-response (route create-request)]
-        (is (= 200 (:status create-response)))
+        (is (= 303 (:status create-response)))
 
-        (let [draftset-location (get-in create-response [:body :draftset-uri])
+        (let [draftset-location (get-in create-response [:headers "Location"])
               get-request {:uri draftset-location :request-method :get}
               {:keys [status body]} (route get-request)]
           (is (= 200 status))
@@ -248,10 +248,10 @@
     (testing "Get draftset containing data"
       (let [display-name "Test title!"
             create-request (create-draftset-request mount-point display-name)
-            {create-status :status {draftset-location :draftset-uri} :body} (route create-request)
+            {create-status :status {draftset-location "Location"} :headers} (route create-request)
             quads (statements "test/resources/test-draftset.trig")
             live-graphs (set (keys (group-by context quads)))]
-        (is (= 200 create-status))
+        (is (= 303 create-status))
         (let [append-response (make-append-data-to-draftset-request route draftset-location "test/resources/test-draftset.trig")]
           (await-success finished-jobs (get-in append-response [:body :finished-job]))
           (let [get-request {:uri draftset-location :request-method :get}
