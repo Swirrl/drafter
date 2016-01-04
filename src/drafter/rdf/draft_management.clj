@@ -11,6 +11,7 @@
             [drafter.backend.protocols :refer [migrate-graphs-to-live!]]
             [grafter.rdf.templater :refer [add-properties graph]])
   (:import (java.util Date UUID)
+           (java.net URI)
            (org.openrdf.model.impl URIImpl)))
 
 (def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
@@ -115,6 +116,41 @@
   (let [mapping-query (get-draftset-graph-mapping-query draftset-uri)
         results (query repo mapping-query)]
     (into {} (map (fn [{:strs [lg dg]}] [(.stringValue lg) (.stringValue dg)]) results))))
+
+(defn- get-draftset-properties-query [draftset-uri]
+  (str
+   "SELECT * WHERE { "
+   (with-state-graph
+     "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+     "<" draftset-uri "> <" rdfs:label "> ?title ."
+     "<" draftset-uri "> <" drafter:createdAt "> ?created ."
+     "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description }")
+   "}"))
+
+(defn- calendar-literal->date [literal]
+  (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
+
+(defn- draftset-uri->id [draftset-uri]
+  (let [base-uri (URI. (drafter.rdf.drafter-ontology/draftset-uri ""))
+        relative (.relativize base-uri (URI. draftset-uri))]
+    (.toString relative)))
+
+(defn- get-draftset-properties [repo draftset-uri]
+  (let [draftset-id (draftset-uri->id draftset-uri)
+        properties-query (get-draftset-properties-query draftset-uri)
+        results (query repo properties-query)]
+    (if-let [{:strs [created title description]} (first results)]
+      (util/conj-if (some? description)
+                    {:display-name (.stringValue title)
+                     :created-at (calendar-literal->date created)
+                     :id draftset-id}
+                    [:description (.stringValue description)]))))
+
+(defn get-draftset-info [repo draftset-uri]
+  (if-let [ds-properties (get-draftset-properties repo draftset-uri)]
+    (let [ds-graph-mapping (get-draftset-graph-mapping repo draftset-uri)
+          live-graph-info (util/map-values (constantly {}) ds-graph-mapping)]
+      (assoc ds-properties :data live-graph-info))))
 
 (defn create-managed-graph
   "Returns some RDF statements to represent the ManagedGraphs state."

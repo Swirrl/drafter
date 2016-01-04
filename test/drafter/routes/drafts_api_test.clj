@@ -8,7 +8,7 @@
             [grafter.rdf.protocols :refer [->Triple map->Triple]]
             [drafter.routes.drafts-api :refer :all]
             [drafter.rdf.drafter-ontology :refer [meta-uri] :as ontology]
-            [grafter.rdf :refer [s add add-statement statements]]
+            [grafter.rdf :refer [s add add-statement statements context]]
             [grafter.rdf.templater :refer [graph triplify]]
             [clojure.java.io :as io]
             [clojure.template :refer [do-template]]
@@ -185,6 +185,19 @@
    :request-method :post
    :params {:file file-part}})
 
+(defn- create-draftset-request
+  ([mount-point display-name] (create-draftset-request mount-point display-name nil))
+  ([mount-point display-name description]
+   (let [base-params {:display-name display-name}
+         params (if (some? description) (assoc base-params :description description) base-params)]
+     {:uri mount-point :request-method :post :params params})))
+
+(defn- make-append-data-to-draftset-request [route draftset-endpoint-uri data-file-path]
+  (with-open [fs (io/input-stream data-file-path)]
+    (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
+          request {:uri (str draftset-endpoint-uri "/data") :request-method :post :params {:file file-part}}]
+      (route request))))
+
 (deftest draftset-api-routes-test
   (let [mount-point "/draftset"
         route (draftset-api-routes mount-point *test-backend*)]
@@ -196,6 +209,59 @@
     (testing "Create draftset without title"
       (let [{:keys [status body]} (route {:uri mount-point :request-method :post})]
         (is (= 406 status))))
+
+    (testing "Get non-existent draftset"
+      (let [{:keys [status body]} (route {:uri (str mount-point "/missing") :request-method :get})]
+        (is (= 404 status))))
+
+    (testing "Get empty draftset without description"
+      (let [display-name "Test title!"
+            create-request (create-draftset-request mount-point display-name)
+            create-response (route create-request)]
+        (is (= 200 (:status create-response)))
+
+        (let [draftset-location (get-in create-response [:body :draftset-uri])
+              get-request {:uri draftset-location :request-method :get}
+              {:keys [status body]} (route get-request)]
+          (is (= 200 status))
+          (is (contains? body :id))
+          (is (= display-name (:display-name body)))
+          (is (contains? body :created-at))
+          (is (not (contains? body :description))))))
+
+    (testing "Get empty draftset with description"
+      (let [display-name "Test title!"
+            description "Draftset used in a test"
+            create-request (create-draftset-request mount-point display-name description)
+            create-response (route create-request)]
+        (is (= 200 (:status create-response)))
+
+        (let [draftset-location (get-in create-response [:body :draftset-uri])
+              get-request {:uri draftset-location :request-method :get}
+              {:keys [status body]} (route get-request)]
+          (is (= 200 status))
+          (is (contains? body :id))
+          (is (= display-name (:display-name body)))
+          (is (contains? body :created-at))
+          (is (= description (:description body))))))
+
+    (testing "Get draftset containing data"
+      (let [display-name "Test title!"
+            create-request (create-draftset-request mount-point display-name)
+            {create-status :status {draftset-location :draftset-uri} :body} (route create-request)
+            quads (statements "test/resources/test-draftset.trig")
+            live-graphs (set (keys (group-by context quads)))]
+        (is (= 200 create-status))
+        (let [append-response (make-append-data-to-draftset-request route draftset-location "test/resources/test-draftset.trig")]
+          (await-success finished-jobs (get-in append-response [:body :finished-job]))
+          (let [get-request {:uri draftset-location :request-method :get}
+                {:keys [status body]} (route get-request)]
+            (is (= 200 status))
+            (is (contains? body :id))
+            (is (= display-name (:display-name body)))
+            (is (contains? body :created-at))
+            (is (not (contains? body :description)))
+            (is (= live-graphs (set (keys (:data body)))))))))
 
     (testing "Appending data to draftset"
       (testing "Quad data with valid content type for file part"
@@ -210,7 +276,7 @@
               (await-success finished-jobs (:finished-job body))
 
               (let [draftset-graph-map (get-draftset-graph-mapping *test-backend* draftset-uri)
-                    graph-statements (group-by :c quads)]
+                    graph-statements (group-by context quads)]
                 (doseq [[live-graph graph-quads] graph-statements]
                   (let [draft-graph (get draftset-graph-map live-graph)
                         q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)

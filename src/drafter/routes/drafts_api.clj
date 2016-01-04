@@ -1,11 +1,11 @@
 (ns drafter.routes.drafts-api
   (:require [clojure.tools.logging :as log]
             [drafter.util :refer [to-coll] :as util]
-            [compojure.core :refer [DELETE POST PUT context routes]]
+            [compojure.core :refer [GET DELETE POST PUT context routes]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
             [drafter.backend.protocols :refer :all]
-            [drafter.rdf.draft-management :refer [drafter-state-graph create-draftset!]]
+            [drafter.rdf.draft-management :refer [drafter-state-graph create-draftset! get-draftset-info]]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
             [drafter.responses :refer [submit-sync-job! submit-async-job!]]
             [swirrl-server.responses :as response]))
@@ -36,6 +36,11 @@
             (let [draftset-id (create-draftset! backend display-name description)]
               {:status 200 :headers {} :body {:draftset-uri (str mount-point "/" draftset-id)}})
             {:status 406 :headers {} :body "dispaly-name parameter required"}))
+
+    (GET "/:id" [id]
+         (if-let [info (get-draftset-info backend (drafter.rdf.drafter-ontology/draftset-uri id))]
+           {:status 200 :headers {} :body info}
+           {:status 404 :headers {} :body ""}))
 
     (POST "/:id/data" {{draftset-id :id
                         request-content-type :content-type
