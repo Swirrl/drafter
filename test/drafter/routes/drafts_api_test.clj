@@ -13,6 +13,7 @@
             [clojure.java.io :as io]
             [clojure.template :refer [do-template]]
             [drafter.rdf.draft-management :refer :all]
+            [drafter.rdf.draftset-management :refer [get-draftset-graph-mapping]]
             [drafter.rdf.draft-management.jobs :refer [batched-write-size]]
             [swirrl-server.async.jobs :refer [restart-id]]
             [drafter.util :refer [set-var-root! map-values]]
@@ -180,8 +181,8 @@
   (and (>= status 400)
        (< status 500)))
 
-(defn- append-to-draftset-request [mount-point draftset-id file-part]
-  {:uri (str mount-point "/draftset/" draftset-id "/data")
+(defn- append-to-draftset-request [mount-point draftset-location file-part]
+  {:uri (str mount-point draftset-location "/data")
    :request-method :post
    :params {:file file-part}})
 
@@ -197,6 +198,12 @@
     (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
           request {:uri (str draftset-endpoint-uri "/data") :request-method :post :params {:file file-part}}]
       (route request))))
+
+(defn- create-draftset-through-api [mount-point route display-name]
+  (let [request (create-draftset-request mount-point display-name)
+        {:keys [status headers]} (route request)]
+    (is (= 303 status))
+    (get headers "Location")))
 
 (deftest draftset-api-routes-test
   (let [mount-point ""
@@ -280,47 +287,50 @@
       (testing "Quad data with valid content type for file part"
         (let [data-file-path "test/resources/test-draftset.trig"
               quads (statements data-file-path)
-              draftset-id (create-draftset! *test-backend* "Test draftset")
-              draftset-uri (ontology/draftset-uri draftset-id)]
+              create-request (create-draftset-request mount-point "Test draftset")
+              create-response (route create-request)
+              draftset-location (create-draftset-through-api mount-point route "Test draftset")
+              draftset-id (.substring draftset-location (inc (.lastIndexOf draftset-location "/")))
+              draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)]
           (with-open [fs (io/input-stream data-file-path)]
-            (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
-                  request (append-to-draftset-request mount-point draftset-id file-part)
-                  {:keys [status body] :as response} (route request)]
-              (await-success finished-jobs (:finished-job body))
+              (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
+                    request (append-to-draftset-request mount-point draftset-location file-part)
+                    {:keys [status body] :as response} (route request)]
+                (await-success finished-jobs (:finished-job body))
 
-              (let [draftset-graph-map (get-draftset-graph-mapping *test-backend* draftset-uri)
-                    graph-statements (group-by context quads)]
-                (doseq [[live-graph graph-quads] graph-statements]
-                  (let [draft-graph (get draftset-graph-map live-graph)
-                        q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)
-                        draft-statements (repo/query *test-backend* q)
-                        expected-statements (map map->Triple graph-quads)]
-                    (is (is-graph-managed? *test-backend* live-graph))
-                    (is (draft-exists? *test-backend* draft-graph))
-                    (is (set expected-statements) (set draft-statements)))))))))
+                (let [draftset-graph-map (get-draftset-graph-mapping *test-backend* draftset-uri)
+                      graph-statements (group-by context quads)]
+                  (doseq [[live-graph graph-quads] graph-statements]
+                    (let [draft-graph (get draftset-graph-map live-graph)
+                          q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)
+                          draft-statements (repo/query *test-backend* q)
+                          expected-statements (map map->Triple graph-quads)]
+                      (is (is-graph-managed? *test-backend* live-graph))
+                      (is (draft-exists? *test-backend* draft-graph))
+                      (is (set expected-statements) (set draft-statements)))))))))
 
       (testing "Quad data with valid content type for request"
         (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-          (let [draftset-id (create-draftset! *test-backend* "Test draftset")
+          (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
                 file-part {:tempfile fs :filename "test-draftset.trig"}
-                request (-> (append-to-draftset-request mount-point draftset-id file-part)
+                request (-> (append-to-draftset-request mount-point draftset-location file-part)
                             (assoc-in [:params :content-type] "application/x-trig"))
                 response (route request)]
             (await-success finished-jobs (:finished-job (:body response))))))
 
       (testing "Triple data"
         (with-open [fs (io/input-stream "test/test-triple.nt")]
-          (let [draftset-id (create-draftset! *test-backend* "Test draftset")
+          (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
                 file-part {:tempfile fs :filename "test-triple.nt" :content-type "application/n-triples"}
-                request (append-to-draftset-request mount-point draftset-id file-part)
+                request (append-to-draftset-request mount-point draftset-location file-part)
                 response (route request)]
             (is (is-client-error-response? response)))))
 
       (testing "Quad data without content type"
         (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-          (let [draftset-id (create-draftset! *test-backend* "Test draftset")
+          (let [draftset-location (create-draftset-through-api mount-point route "Test draftset!")
                 file-part {:tempfile fs :filename "test-dataset.trig"}
-                request (append-to-draftset-request mount-point draftset-id file-part)
+                request (append-to-draftset-request mount-point draftset-location file-part)
                 response (route request)]
             (is (is-client-error-response? response))))))))
 

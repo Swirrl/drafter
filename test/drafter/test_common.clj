@@ -124,3 +124,13 @@
 
 (defmacro during-exclusive-write [& forms]
   `(during-exclusive-write-f (fn [] ~@forms)))
+
+(defn ask? [& graphpatterns]
+  "Bodgy convenience function for ask queries"
+  (query *test-backend* (str "ASK WHERE {"
+
+                        (-> (apply str (interpose " " graphpatterns))
+                            (.replace " >" ">")
+                            (.replace "< " "<"))
+
+                        "}")))

@@ -7,6 +7,7 @@
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.write-scheduler :as scheduler]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.protocols :as backend]
             [drafter.util :as util]
             [drafter.backend.common.draft-api :refer [quad-batch->graph-triples]]
@@ -64,7 +65,7 @@
 
 (defn append-data-to-draftset-job [backend draftset-uri tempfile rdf-format]
   (let [quads (file->statements tempfile rdf-format)
-        graph-map (mgmt/get-draftset-graph-mapping backend draftset-uri)
+        graph-map (dsmgmt/get-draftset-graph-mapping backend draftset-uri)
         quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
         batch-joblets (map #(append-data-to-draftset-graph-joblet backend draftset-uri %) quad-batches)]
     (jobs/joblet-seq->job batch-joblets :batch-write graph-map)))

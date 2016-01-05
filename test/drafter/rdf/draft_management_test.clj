@@ -1,6 +1,6 @@
 (ns drafter.rdf.draft-management-test
   (:require
-   [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live!]]
+   [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live! ask?]]
    [grafter.rdf :refer [s add add-statement]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.vocabularies.rdf :refer :all]
@@ -14,16 +14,6 @@
    [clojure.test :refer :all])
   (:import [java.util UUID]
            [org.openrdf.model.impl URIImpl]))
-
-(defn ask? [& graphpatterns]
-  "Bodgy convenience function for ask queries"
-  (query *test-backend* (str "ASK WHERE {"
-
-                        (-> (apply str (interpose " " graphpatterns))
-                            (.replace " >" ">")
-                            (.replace "< " "<"))
-
-                        "}")))
 
 (defn clone-data-from-live-to-draft-query [draft-graph-uri]
   (str
@@ -78,30 +68,6 @@
     (testing "stores the details of the managed graph"
       (create-managed-graph! *test-backend* test-graph-uri)
       (is (is-graph-managed? *test-backend* test-graph-uri)))))
-
-(defn- has-uri-object? [s p uri-o]
-  (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
-
-(defn- has-string-object? [s p str-o]
-  (query *test-backend* (str "ASK WHERE { <" s "> <" p "> \"" str-o "\" }")))
-
-(deftest create-draftset!-test
-  (let [title "Test draftset"
-        description "Test description"]
-    (testing "Without description"
-      (let [draftset-id (create-draftset! *test-backend* title)
-            ds-uri (draftset-uri draftset-id)]
-        (is (has-uri-object? ds-uri rdf:a drafter:DraftSet))
-        (is (has-string-object? ds-uri rdfs:label title))
-        (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))
-
-    (testing "With description"
-      (let [draftset-id (create-draftset! *test-backend* title description)
-            ds-uri (draftset-uri draftset-id)]
-        (is (has-uri-object? ds-uri rdf:a drafter:DraftSet))
-        (is (has-string-object? ds-uri rdfs:label title))
-        (is (has-string-object? ds-uri rdfs:comment description))
-        (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))))
 
 (deftest create-draft-graph!-test
   (testing "create-draft-graph!"
@@ -320,7 +286,6 @@
     (testing "graph-map associates live graphs with their drafts"
       (create-managed-graph! db "http://frogs.com/")
       (create-managed-graph! db "http://dogs.com/")
-
       (let [frogs-draft (create-draft-graph! db "http://frogs.com/")
             dogs-draft (create-draft-graph! db "http://dogs.com/")]
 
