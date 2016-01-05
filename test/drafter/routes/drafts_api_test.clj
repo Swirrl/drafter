@@ -1,7 +1,7 @@
 (ns drafter.routes.drafts-api-test
   (:require [drafter.test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-db-setup
                                          stream->string select-all-in-graph make-graph-live!
-                                         import-data-to-draft! await-completion await-success parse-guid]]
+                                         import-data-to-draft! await-completion await-success job-path->job-id]]
             [swirrl-server.async.jobs :refer [finished-jobs]]
             [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]
@@ -88,7 +88,7 @@
       (is (= 202 status))
       (is (= :ok (:type body)))
       (is (= restart-id (:restart-id body)))
-      (is (instance? UUID (parse-guid (:finished-job body)))))))
+      (is (instance? UUID (job-path->job-id (:finished-job body)))))))
 
 (defn is-client-error-response [response]
   (let [{:keys [status body headers]} response]

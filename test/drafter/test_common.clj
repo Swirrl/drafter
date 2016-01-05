@@ -139,7 +139,7 @@
 
 (def job-id-path #"/status/finished-jobs/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})")
 
-(defn parse-guid [job-path]
+(defn job-path->job-id [job-path]
   (if-let [uid (second (re-matches job-id-path job-path))]
     (UUID/fromString uid)))
 
@@ -154,7 +154,7 @@
   ([state-atom path timeout]
    (let [start (System/currentTimeMillis)]
      (loop [state-atom state-atom
-            guid (parse-guid path)]
+            guid (job-path->job-id path)]
        (if-let [value (@state-atom guid)]
          @value
          (if (> (System/currentTimeMillis) (+ start (or timeout default-timeout) ))
