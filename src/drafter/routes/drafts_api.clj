@@ -30,22 +30,22 @@
    (context
     mount-point []
 
-    (GET "/all" []
+    (GET "/draftsets" []
          {:status 200 :headers {} :body (get-all-draftsets-info backend)})
 
     ;;create a new draftset
-    (POST "/" [display-name description]
+    (POST "/draftset" [display-name description]
           (if (some? display-name)
             (let [draftset-id (create-draftset! backend display-name description)]
-              (see-other-response (str mount-point "/" draftset-id)))
+              (see-other-response (str mount-point "/draftset/" draftset-id)))
             {:status 406 :headers {} :body "dispaly-name parameter required"}))
 
-    (GET "/:id" [id]
+    (GET "/draftset/:id" [id]
          (if-let [info (get-draftset-info backend (drafter.rdf.drafter-ontology/draftset-uri id))]
            {:status 200 :headers {} :body info}
            {:status 404 :headers {} :body ""}))
 
-    (POST "/:id/data" {{draftset-id :id
+    (POST "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type
                         {file-part-content-type :content-type data :tempfile} :file} :params}
           (if-let [content-type (or file-part-content-type request-content-type)]

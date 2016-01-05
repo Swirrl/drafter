@@ -111,7 +111,7 @@
                         ;; add your application routes here
                         (-> []
                             (add-route (pages-routes backend))
-                            (add-route (draftset-api-routes "/draftset" backend))
+                            (add-route (draftset-api-routes "" backend))
                             (add-route (draft-api-routes "/draft" backend))
                             (add-route (graph-management-routes "/graph" backend))
                             (add-routes (get-sparql-routes backend))

@@ -181,7 +181,7 @@
        (< status 500)))
 
 (defn- append-to-draftset-request [mount-point draftset-id file-part]
-  {:uri (str mount-point "/" draftset-id "/data")
+  {:uri (str mount-point "/draftset/" draftset-id "/data")
    :request-method :post
    :params {:file file-part}})
 
@@ -190,7 +190,7 @@
   ([mount-point display-name description]
    (let [base-params {:display-name display-name}
          params (if (some? description) (assoc base-params :description description) base-params)]
-     {:uri mount-point :request-method :post :params params})))
+     {:uri (str mount-point "/draftset") :request-method :post :params params})))
 
 (defn- make-append-data-to-draftset-request [route draftset-endpoint-uri data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
@@ -199,7 +199,7 @@
       (route request))))
 
 (deftest draftset-api-routes-test
-  (let [mount-point "/draftset"
+  (let [mount-point ""
         route (draftset-api-routes mount-point *test-backend*)]
 
     (testing "Get all draftsets"
@@ -209,22 +209,22 @@
         (doseq [r create-responses]
           (is (= 303 (:status r))))
 
-        (let [get-all-request {:uri (str mount-point "/all") :request-method :get}
+        (let [get-all-request {:uri (str mount-point "/draftsets") :request-method :get}
               {:keys [status body]} (route get-all-request)]
           (is (= 200 status))
           (is (= 10 (count body))))))
 
     (testing "Create draftset with title"
-      (let [{:keys [status headers]} (route {:uri mount-point :request-method :post :params {:display-name "Test title!"}})]
+      (let [{:keys [status headers]} (route (create-draftset-request mount-point "Test Title!"))]
         (is (= 303 status))
         (is (contains? headers "Location"))))
 
     (testing "Create draftset without title"
-      (let [{:keys [status body]} (route {:uri mount-point :request-method :post})]
+      (let [{:keys [status body]} (route {:uri (str mount-point "/draftset") :request-method :post})]
         (is (= 406 status))))
 
     (testing "Get non-existent draftset"
-      (let [{:keys [status body]} (route {:uri (str mount-point "/missing") :request-method :get})]
+      (let [{:keys [status body]} (route {:uri (str mount-point "/draftset/missing") :request-method :get})]
         (is (= 404 status))))
 
     (testing "Get empty draftset without description"
