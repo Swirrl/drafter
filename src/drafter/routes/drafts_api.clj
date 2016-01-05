@@ -1,7 +1,6 @@
 (ns drafter.routes.drafts-api
   (:require [clojure.tools.logging :as log]
             [drafter.util :refer [to-coll] :as util]
-            [ring.util.response :refer [redirect-after-post]]
             [compojure.core :refer [GET DELETE POST PUT context routes]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
@@ -9,7 +8,7 @@
             [drafter.rdf.draft-management :refer [drafter-state-graph]]
             [drafter.rdf.draftset-management :refer [create-draftset! get-draftset-info get-all-draftsets-info]]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
-            [drafter.responses :refer [submit-sync-job! submit-async-job!]]
+            [drafter.responses :refer [submit-sync-job! submit-async-job! unknown-rdf-content-type-response]]
             [swirrl-server.responses :as response]))
 
 (defn override-file-format
@@ -19,49 +18,6 @@
   (if file-format
     (assoc file-obj :content-type file-format)
     file-obj))
-
-(defn- unknown-rdf-content-type-response [content-type]
-  (response/bad-request-response
-   (str "Unknown RDF format for content type " content-type)))
-
-(defn- is-quads-content-type? [rdf-format]
-  (.supportsContexts rdf-format))
-
-(defn draftset-api-routes [mount-point backend]
-  (routes
-   (context
-    mount-point []
-
-    (GET "/draftsets" []
-         {:status 200 :headers {} :body (get-all-draftsets-info backend)})
-
-    ;;create a new draftset
-    (POST "/draftset" [display-name description]
-          (if (some? display-name)
-            (let [draftset-id (create-draftset! backend display-name description)]
-              (redirect-after-post (str mount-point "/draftset/" draftset-id)))
-            {:status 406 :headers {} :body "dispaly-name parameter required"}))
-
-    (GET "/draftset/:id" [id]
-         (if-let [info (get-draftset-info backend (drafter.rdf.drafter-ontology/draftset-uri id))]
-           {:status 200 :headers {} :body info}
-           {:status 404 :headers {} :body ""}))
-
-    (POST "/draftset/:id/data" {{draftset-id :id
-                        request-content-type :content-type
-                        {file-part-content-type :content-type data :tempfile} :file} :params}
-          (if-let [content-type (or file-part-content-type request-content-type)]
-            (let [rdf-format (mimetype->rdf-format content-type)
-                  draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)]
-              (cond (nil? rdf-format)
-                    (unknown-rdf-content-type-response content-type)
-                    
-                    (is-quads-content-type? rdf-format)
-                    (let [append-job (append-data-to-draftset-job backend draftset-uri data rdf-format)]
-                      (submit-async-job! append-job))
-
-                    :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
-            (response/bad-request-response "Content type required"))))))
 
 (defn draft-api-routes [mount-point operations]
   (routes

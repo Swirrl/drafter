@@ -9,6 +9,10 @@
 (def ^:private temporarily-locked-for-writes-response
   {:status 503 :body {:type :error :message "Write operations are temporarily unavailable.  Please try again later."}})
 
+(defn unknown-rdf-content-type-response [content-type]
+  (response/bad-request-response
+   (str "Unknown RDF format for content type " content-type)))
+
 (defn default-job-result-handler
   "Default handler for creating ring responses from job results. If
   the job succeeded then a 200 response is returned, otherwise a 500
@@ -58,3 +62,9 @@
     (queue-job! job)
     (submitted-job-response job)
     (catch ExceptionInfo ex temporarily-locked-for-writes-response)))
+
+(defn is-client-error-response?
+  "Whether the given ring response map represents a client error."
+  [{:keys [status] :as response}]
+  (and (>= status 400)
+       (< status 500)))

@@ -15,7 +15,7 @@
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
             [swirrl-server.async.jobs :refer [create-job]])
-  (:import [java.util Scanner]
+  (:import [java.util Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]))
 
 (def ^:dynamic *test-backend*)
@@ -134,3 +134,40 @@
                             (.replace "< " "<"))
 
                         "}")))
+
+(def default-timeout 5000)
+
+(def job-id-path #"/status/finished-jobs/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})")
+
+(defn parse-guid [job-path]
+  (if-let [uid (second (re-matches job-id-path job-path))]
+    (UUID/fromString uid)))
+
+(defn await-completion
+  "Test helper to await for an async operation to complete.  Takes the
+  state atom a GUID for the job id and waits until timeout for the job
+  to appear.
+
+  If the job doesn't appear before timeout time has passed an
+  exception is raised."
+  ([state-atom path] (await-completion state-atom path default-timeout))
+  ([state-atom path timeout]
+   (let [start (System/currentTimeMillis)]
+     (loop [state-atom state-atom
+            guid (parse-guid path)]
+       (if-let [value (@state-atom guid)]
+         @value
+         (if (> (System/currentTimeMillis) (+ start (or timeout default-timeout) ))
+           (throw (RuntimeException. "Timed out awaiting test value"))
+           (do
+             (Thread/sleep 5)
+             (recur state-atom guid))))))))
+
+(defmacro await-success
+  "Waits for the job with the given path to be present in the given
+  job state atom and then asserts the job succeeded. Returns the job
+  result map."
+  [state-atom job-path]
+  `(let [job-result# (await-completion ~state-atom ~job-path)]
+     (is (= :ok (:type job-result#)) (str "job failed: " (:exception job-result#)))
+     job-result#))

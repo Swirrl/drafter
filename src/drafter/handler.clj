@@ -11,8 +11,8 @@
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
             [drafter.routes.drafts-api :refer [draft-api-routes
-                                               draftset-api-routes
                                                graph-management-routes]]
+            [drafter.routes.draftsets-api :refer [draftset-api-routes]]
             [drafter.routes.status :refer [status-routes]]
             [drafter.routes.dumps :refer [dumps-endpoint]]
             [drafter.routes.pages :refer [pages-routes]]
