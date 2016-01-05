@@ -201,6 +201,19 @@
 (deftest draftset-api-routes-test
   (let [mount-point "/draftset"
         route (draftset-api-routes mount-point *test-backend*)]
+
+    (testing "Get all draftsets"
+      (let [titles (map #(str "Title" %) (range 1 11))
+            create-requests (map #(create-draftset-request mount-point %) titles)
+            create-responses (doall (map route create-requests))]
+        (doseq [r create-responses]
+          (is (= 303 (:status r))))
+
+        (let [get-all-request {:uri (str mount-point "/all") :request-method :get}
+              {:keys [status body]} (route get-all-request)]
+          (is (= 200 status))
+          (is (= 10 (count body))))))
+
     (testing "Create draftset with title"
       (let [{:keys [status headers]} (route {:uri mount-point :request-method :post :params {:display-name "Test title!"}})]
         (is (= 303 status))

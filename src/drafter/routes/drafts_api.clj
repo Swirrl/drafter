@@ -5,7 +5,7 @@
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [drafter.common.api-routes :as api-routes]
             [drafter.backend.protocols :refer :all]
-            [drafter.rdf.draft-management :refer [drafter-state-graph create-draftset! get-draftset-info]]
+            [drafter.rdf.draft-management :refer [drafter-state-graph create-draftset! get-draftset-info get-all-draftsets-info]]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
             [drafter.responses :refer [submit-sync-job! submit-async-job! see-other-response]]
             [swirrl-server.responses :as response]))
@@ -29,6 +29,9 @@
   (routes
    (context
     mount-point []
+
+    (GET "/all" []
+         {:status 200 :headers {} :body (get-all-draftsets-info backend)})
 
     ;;create a new draftset
     (POST "/" [display-name description]
