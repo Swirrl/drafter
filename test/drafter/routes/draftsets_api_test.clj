@@ -37,22 +37,11 @@
     (is (= 303 status))
     (get headers "Location")))
 
-(deftest draftset-api-routes-test
-  (let [mount-point ""
-        route (draftset-api-routes mount-point *test-backend*)]
+(defn- create-routes []
+  {:mount-point "" :route (draftset-api-routes "" *test-backend*)})
 
-    (testing "Get all draftsets"
-      (let [titles (map #(str "Title" %) (range 1 11))
-            create-requests (map #(create-draftset-request mount-point %) titles)
-            create-responses (doall (map route create-requests))]
-        (doseq [r create-responses]
-          (is (= 303 (:status r))))
-
-        (let [get-all-request {:uri (str mount-point "/draftsets") :request-method :get}
-              {:keys [status body]} (route get-all-request)]
-          (is (= 200 status))
-          (is (= 10 (count body))))))
-
+(deftest create-draftset-test
+  (let [{:keys [mount-point route]} (create-routes)]
     (testing "Create draftset with title"
       (let [{:keys [status headers]} (route (create-draftset-request mount-point "Test Title!"))]
         (is (= 303 status))
@@ -64,8 +53,23 @@
 
     (testing "Get non-existent draftset"
       (let [{:keys [status body]} (route {:uri (str mount-point "/draftset/missing") :request-method :get})]
-        (is (= 404 status))))
+        (is (= 404 status))))))
 
+(deftest get-all-draftsets-test
+  (let [{:keys [mount-point route]} (create-routes)]
+    (let [titles (map #(str "Title" %) (range 1 11))
+            create-requests (map #(create-draftset-request mount-point %) titles)
+            create-responses (doall (map route create-requests))]
+        (doseq [r create-responses]
+          (is (= 303 (:status r))))
+
+        (let [get-all-request {:uri (str mount-point "/draftsets") :request-method :get}
+              {:keys [status body]} (route get-all-request)]
+          (is (= 200 status))
+          (is (= 10 (count body)))))))
+
+(deftest get-draftset-test
+  (let [{:keys [mount-point route]} (create-routes)]
     (testing "Get empty draftset without description"
       (let [display-name "Test title!"
             create-request (create-draftset-request mount-point display-name)
@@ -113,8 +117,10 @@
             (is (= display-name (:display-name body)))
             (is (contains? body :created-at))
             (is (not (contains? body :description)))
-            (is (= live-graphs (set (keys (:data body)))))))))
+            (is (= live-graphs (set (keys (:data body)))))))))))
 
+(deftest append-data-to-draftset-test
+  (let [{:keys [mount-point route]} (create-routes)]
     (testing "Appending data to draftset"
       (testing "Quad data with valid content type for file part"
         (let [data-file-path "test/resources/test-draftset.trig"
