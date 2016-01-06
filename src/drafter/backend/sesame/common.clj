@@ -6,6 +6,7 @@
             [drafter.backend.common.draft-api :as api-common]
             [drafter.backend.sesame.common.draft-management :as mgmt]
             [drafter.backend.sesame.common.draft-api :as api]
+            [drafter.backend.sesame.common.draftset-api :as dsapi]
             [grafter.rdf.protocols :as proto]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.sesame.common.sparql-execution :as sparql]))
@@ -39,6 +40,7 @@
   {:new-draft-job api/new-draft-job
    :append-data-to-graph-job api/append-data-to-graph-job
    :append-data-to-draftset-job api/append-data-to-draftset-job
+   :publish-draftset-job dsapi/publish-draftset-job
    :copy-from-live-graph-job api/copy-from-live-graph-job
    :migrate-graphs-to-live-job api-common/migrate-graphs-to-live-job
    :delete-metadata-job api/delete-metadata-job

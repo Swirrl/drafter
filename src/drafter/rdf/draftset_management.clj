@@ -4,7 +4,7 @@
             [grafter.rdf.repository :refer [query]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
-            [drafter.rdf.draft-management :refer [to-quads with-state-graph]])
+            [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph]])
   (:import [java.net URI]
            [java.util Date UUID]))
 
@@ -26,6 +26,15 @@
          quads (to-quads template)]
      (add db quads)
      draftset-id)))
+
+(defn- delete-statements-for-subject-query [graph-uri subject-uri]
+  (str "DELETE { GRAPH <" graph-uri "> { <" subject-uri "> ?p ?o } } WHERE {"
+       "  GRAPH <" graph-uri "> { <" subject-uri "> ?p ?o }"
+       "}"))
+
+(defn delete-draftset-statements! [db draftset-uri]
+  (let [delete-query (delete-statements-for-subject-query drafter-state-graph draftset-uri)]
+    (grafter.rdf.protocols/update! db delete-query)))
 
 (defn- get-draftset-graph-mapping-query [draftset-uri]
   (str

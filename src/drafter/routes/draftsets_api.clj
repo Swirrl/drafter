@@ -44,4 +44,8 @@
                       (submit-async-job! append-job))
 
                     :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
-            (response/bad-request-response "Content type required"))))))
+            (response/bad-request-response "Content type required")))
+
+    (POST "/draftset/:id/publish" [id]
+          ;;TODO: check draftset exists!
+          (submit-async-job! (publish-draftset-job backend id))))))

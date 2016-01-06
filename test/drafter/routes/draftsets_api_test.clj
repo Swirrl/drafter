@@ -9,6 +9,7 @@
             [grafter.rdf :refer [statements context]]
             [grafter.rdf.protocols :refer [->Triple map->Triple]]
             [grafter.rdf.repository :as repo]
+            [drafter.util :as util]
             [drafter.responses :refer [is-client-error-response?]]
             [clojure.java.io :as io]
             [schema.core :as s]
@@ -208,6 +209,33 @@
                 request (append-to-draftset-request mount-point draftset-location file-part)
                 response (route request)]
             (is (is-client-error-response? response))))))))
+
+(deftest publish-draftset-test
+  (let [{:keys [mount-point route]} (create-routes)
+        draftset-location (create-draftset-through-api mount-point route "Test draftset")
+        rdf-data-file "test/resources/test-draftset.trig"]
+    (with-open [fs (io/input-stream rdf-data-file)]
+      (let [file-part {:tempfile fs :filename "test-draftset.trig" :content-type "application/x-trig"}
+            append-request (append-to-draftset-request mount-point draftset-location file-part)
+            append-response (route append-request)]
+        (await-success finished-jobs (:finished-job (:body append-response)))
+
+        (let [publish-request {:uri (str draftset-location "/publish") :request-method :post}
+              publish-response (route publish-request)]
+          (await-success finished-jobs (:finished-job (:body publish-response)))
+
+          (let [live-statements (repo/query *test-backend* "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")
+                expected-statements (statements rdf-data-file)
+                graph-statements (group-by context expected-statements)]
+            (doseq [[live-graph contents] graph-statements]
+              (let [q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" live-graph)
+                    result-triples (set (map #(util/map-values str %) (repo/query *test-backend* q)))
+                    graph-triples (set (map (comp #(util/map-values str %) map->Triple) contents))]
+                (is (= graph-triples result-triples))))
+
+            ;;draftset should no longer exist
+            (let [get-response (route {:uri draftset-location :request-method :get})]
+              (assert-is-not-found-response get-response))))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
