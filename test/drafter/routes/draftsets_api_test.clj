@@ -11,7 +11,9 @@
             [grafter.rdf.repository :as repo]
             [drafter.responses :refer [is-client-error-response?]]
             [clojure.java.io :as io]
-            [swirrl-server.async.jobs :refer [finished-jobs]]))
+            [schema.core :as s]
+            [swirrl-server.async.jobs :refer [finished-jobs]])
+  (:import [java.util Date]))
 
 (defn- append-to-draftset-request [mount-point draftset-location file-part]
   {:uri (str mount-point draftset-location "/data")
@@ -31,10 +33,48 @@
           request {:uri (str draftset-endpoint-uri "/data") :request-method :post :params {:file file-part}}]
       (route request))))
 
+(def ring-response-schema
+  {:status s/Int
+   :headers {s/Str s/Str}
+   :body s/Any})
+
+(def see-other-response-schema
+  (merge ring-response-schema
+         {:status (s/eq 303)
+          :headers {(s/required-key "Location") s/Str}}))
+
+(defn- response-code-schema [code]
+  (assoc ring-response-schema :status (s/eq code)))
+
+(def ^:private draftset-without-description-info-schema
+  {:id s/Str
+   :data {s/Str {s/Any s/Any}}
+   :display-name s/Str
+   :created-at Date})
+
+(def ^:private draftset-with-description-info-schema
+  (assoc draftset-without-description-info-schema :description s/Str))
+
+(defn- assert-schema [schema value]
+  (if-let [errors (s/check schema value)]
+    (is false errors)))
+
+(defn- assert-is-see-other-response [response]
+  (assert-schema see-other-response-schema response))
+
+(defn- assert-is-ok-response [response]
+  (assert-schema (response-code-schema 200) response))
+
+(defn- assert-is-not-found-response [response]
+  (assert-schema (response-code-schema 404) response))
+
+(defn- assert-is-not-acceptable-response [response]
+  (assert-schema (response-code-schema 406) response))
+
 (defn- create-draftset-through-api [mount-point route display-name]
   (let [request (create-draftset-request mount-point display-name)
-        {:keys [status headers]} (route request)]
-    (is (= 303 status))
+        {:keys [headers] :as response} (route request)]
+    (assert-is-see-other-response response)
     (get headers "Location")))
 
 (defn- create-routes []
@@ -43,30 +83,31 @@
 (deftest create-draftset-test
   (let [{:keys [mount-point route]} (create-routes)]
     (testing "Create draftset with title"
-      (let [{:keys [status headers]} (route (create-draftset-request mount-point "Test Title!"))]
-        (is (= 303 status))
-        (is (contains? headers "Location"))))
+      (let [response (route (create-draftset-request mount-point "Test Title!"))]
+        (assert-is-see-other-response response)))
 
     (testing "Create draftset without title"
-      (let [{:keys [status body]} (route {:uri (str mount-point "/draftset") :request-method :post})]
-        (is (= 406 status))))
+      (let [response (route {:uri (str mount-point "/draftset") :request-method :post})]
+        (assert-is-not-acceptable-response response)))
 
     (testing "Get non-existent draftset"
-      (let [{:keys [status body]} (route {:uri (str mount-point "/draftset/missing") :request-method :get})]
-        (is (= 404 status))))))
+      (let [response (route {:uri (str mount-point "/draftset/missing") :request-method :get})]
+        (assert-is-not-found-response response)))))
 
 (deftest get-all-draftsets-test
   (let [{:keys [mount-point route]} (create-routes)]
-    (let [titles (map #(str "Title" %) (range 1 11))
-            create-requests (map #(create-draftset-request mount-point %) titles)
-            create-responses (doall (map route create-requests))]
+    (let [draftset-count 10
+          titles (map #(str "Title" %) (range 1 (inc draftset-count)))
+          create-requests (map #(create-draftset-request mount-point %) titles)
+          create-responses (doall (map route create-requests))]
         (doseq [r create-responses]
-          (is (= 303 (:status r))))
+          (assert-is-see-other-response r))
 
         (let [get-all-request {:uri (str mount-point "/draftsets") :request-method :get}
-              {:keys [status body]} (route get-all-request)]
-          (is (= 200 status))
-          (is (= 10 (count body)))))))
+              {:keys [body] :as response} (route get-all-request)]
+          (assert-is-ok-response response)
+          (is (= draftset-count (count body)))
+          (assert-schema [draftset-without-description-info-schema] body)))))
 
 (deftest get-draftset-test
   (let [{:keys [mount-point route]} (create-routes)]
@@ -74,49 +115,45 @@
       (let [display-name "Test title!"
             create-request (create-draftset-request mount-point display-name)
             create-response (route create-request)]
-        (is (= 303 (:status create-response)))
+        (assert-is-see-other-response create-response)
 
         (let [draftset-location (get-in create-response [:headers "Location"])
               get-request {:uri draftset-location :request-method :get}
-              {:keys [status body]} (route get-request)]
-          (is (= 200 status))
-          (is (contains? body :id))
-          (is (= display-name (:display-name body)))
-          (is (contains? body :created-at))
-          (is (not (contains? body :description))))))
+              {:keys [body] :as response} (route get-request)]
+          (assert-is-ok-response response)
+          (assert-schema draftset-without-description-info-schema body)
+          (is (= display-name (:display-name body))))))
 
     (testing "Get empty draftset with description"
       (let [display-name "Test title!"
             description "Draftset used in a test"
             create-request (create-draftset-request mount-point display-name description)
             create-response (route create-request)]
-        (is (= 303 (:status create-response)))
+        (assert-is-see-other-response create-response)
 
         (let [draftset-location (get-in create-response [:headers "Location"])
               get-request {:uri draftset-location :request-method :get}
-              {:keys [status body]} (route get-request)]
-          (is (= 200 status))
-          (is (contains? body :id))
+              {:keys [body] :as response} (route get-request)]
+          (assert-is-ok-response response)
+          (assert-schema draftset-with-description-info-schema body)
           (is (= display-name (:display-name body)))
-          (is (contains? body :created-at))
           (is (= description (:description body))))))
 
     (testing "Get draftset containing data"
       (let [display-name "Test title!"
             create-request (create-draftset-request mount-point display-name)
-            {create-status :status {draftset-location "Location"} :headers} (route create-request)
+            {create-status :status {draftset-location "Location"} :headers :as create-response} (route create-request)
             quads (statements "test/resources/test-draftset.trig")
             live-graphs (set (keys (group-by context quads)))]
-        (is (= 303 create-status))
+        (assert-is-see-other-response create-response)
         (let [append-response (make-append-data-to-draftset-request route draftset-location "test/resources/test-draftset.trig")]
           (await-success finished-jobs (get-in append-response [:body :finished-job]))
           (let [get-request {:uri draftset-location :request-method :get}
-                {:keys [status body]} (route get-request)]
-            (is (= 200 status))
-            (is (contains? body :id))
+                {:keys [body] :as response} (route get-request)]
+            (assert-is-ok-response response)
+            (assert-schema draftset-without-description-info-schema body)
+            
             (is (= display-name (:display-name body)))
-            (is (contains? body :created-at))
-            (is (not (contains? body :description)))
             (is (= live-graphs (set (keys (:data body)))))))))))
 
 (deftest append-data-to-draftset-test

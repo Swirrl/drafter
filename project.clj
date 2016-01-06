@@ -102,6 +102,7 @@
                         [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
                         [org.clojure/data.json "0.2.5"]
                         [clojure-csv/clojure-csv "2.0.1"]
+                        [prismatic/schema "1.0.4"]
                         [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
 
          :env {:dev true}
