@@ -47,5 +47,6 @@
             (response/bad-request-response "Content type required")))
 
     (POST "/draftset/:id/publish" [id]
-          ;;TODO: check draftset exists!
-          (submit-async-job! (publish-draftset-job backend id))))))
+          (if (dsmgmt/draftset-exists? backend id)
+            (submit-async-job! (publish-draftset-job backend id))
+            (not-found ""))))))

@@ -27,6 +27,16 @@
      (add db quads)
      draftset-id)))
 
+(defn- draftset-exists-query [draftset-uri]
+  (str "ASK WHERE {"
+       (with-state-graph
+         "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet ">")
+       "}"))
+
+(defn draftset-exists? [db draftset-id]
+  (let [q (draftset-exists-query (draftset-uri draftset-id))]
+    (query db q)))
+
 (defn- delete-statements-for-subject-query [graph-uri subject-uri]
   (str "DELETE { GRAPH <" graph-uri "> { <" subject-uri "> ?p ?o } } WHERE {"
        "  GRAPH <" graph-uri "> { <" subject-uri "> ?p ?o }"
