@@ -13,6 +13,10 @@
   (response/bad-request-response
    (str "Unknown RDF format for content type " content-type)))
 
+(defn not-acceptable-response
+  ([] (not-acceptable-response ""))
+  ([body] {:status 406 :headers {} :body body}))
+
 (defn default-job-result-handler
   "Default handler for creating ring responses from job results. If
   the job succeeded then a 200 response is returned, otherwise a 500

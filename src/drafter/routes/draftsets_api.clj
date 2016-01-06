@@ -1,7 +1,7 @@
 (ns drafter.routes.draftsets-api
   (:require [compojure.core :refer [GET POST PUT context routes]]
-            [ring.util.response :refer [redirect-after-post]]
-            [drafter.responses :refer [unknown-rdf-content-type-response submit-async-job!]]
+            [ring.util.response :refer [redirect-after-post not-found response]]
+            [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response submit-async-job!]]
             [swirrl-server.responses :as response]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.protocols :refer :all]
@@ -16,19 +16,19 @@
     mount-point []
 
     (GET "/draftsets" []
-         {:status 200 :headers {} :body (dsmgmt/get-all-draftsets-info backend)})
+         (response (dsmgmt/get-all-draftsets-info backend)))
 
     ;;create a new draftset
     (POST "/draftset" [display-name description]
           (if (some? display-name)
             (let [draftset-id (dsmgmt/create-draftset! backend display-name description)]
               (redirect-after-post (str mount-point "/draftset/" draftset-id)))
-            {:status 406 :headers {} :body "dispaly-name parameter required"}))
+            (not-acceptable-response "display-name parameter required")))
 
     (GET "/draftset/:id" [id]
          (if-let [info (dsmgmt/get-draftset-info backend (drafter.rdf.drafter-ontology/draftset-uri id))]
-           {:status 200 :headers {} :body info}
-           {:status 404 :headers {} :body ""}))
+           (response info)
+           (not-found "")))
 
     (POST "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type
