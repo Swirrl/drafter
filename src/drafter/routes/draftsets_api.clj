@@ -26,7 +26,7 @@
             (not-acceptable-response "display-name parameter required")))
 
     (GET "/draftset/:id" [id]
-         (if-let [info (dsmgmt/get-draftset-info backend (drafter.rdf.drafter-ontology/draftset-uri id))]
+         (if-let [info (dsmgmt/get-draftset-info backend (dsmgmt/->DraftsetId id))]
            (response info)
            (not-found "")))
 
@@ -34,19 +34,19 @@
                         request-content-type :content-type
                         {file-part-content-type :content-type data :tempfile} :file} :params}
           (if-let [content-type (or file-part-content-type request-content-type)]
-            (let [rdf-format (mimetype->rdf-format content-type)
-                  draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)]
+            (let [rdf-format (mimetype->rdf-format content-type)]
               (cond (nil? rdf-format)
                     (unknown-rdf-content-type-response content-type)
                     
                     (is-quads-content-type? rdf-format)
-                    (let [append-job (append-data-to-draftset-job backend draftset-uri data rdf-format)]
+                    (let [append-job (append-data-to-draftset-job backend (dsmgmt/->DraftsetId draftset-id) data rdf-format)]
                       (submit-async-job! append-job))
 
                     :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
             (response/bad-request-response "Content type required")))
 
     (POST "/draftset/:id/publish" [id]
-          (if (dsmgmt/draftset-exists? backend id)
-            (submit-async-job! (publish-draftset-job backend id))
-            (not-found ""))))))
+          (let [id (dsmgmt/->DraftsetId id)]
+            (if (dsmgmt/draftset-exists? backend id)
+              (submit-async-job! (publish-draftset-job backend id))
+              (not-found "")))))))

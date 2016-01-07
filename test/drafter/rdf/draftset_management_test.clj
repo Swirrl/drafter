@@ -17,14 +17,14 @@
         description "Test description"]
     (testing "Without description"
       (let [draftset-id (create-draftset! *test-backend* title)
-            ds-uri (ont/draftset-uri draftset-id)]
+            ds-uri (->draftset-uri draftset-id)]
         (is (has-uri-object? ds-uri rdf:a drafter:DraftSet))
         (is (has-string-object? ds-uri rdfs:label title))
         (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))
 
     (testing "With description"
       (let [draftset-id (create-draftset! *test-backend* title description)
-            ds-uri (draftset-uri draftset-id)]
+            ds-uri (->draftset-uri draftset-id)]
         (is (has-uri-object? ds-uri rdf:a drafter:DraftSet))
         (is (has-string-object? ds-uri rdfs:label title))
         (is (has-string-object? ds-uri rdfs:comment description))
@@ -36,12 +36,11 @@
       (is (draftset-exists? *test-backend* draftset-id))))
 
   (testing "Non-existent draftset"
-    (is (= false (draftset-exists? *test-backend* "missing")))))
+    (is (= false (draftset-exists? *test-backend* (->DraftsetId "missing"))))))
 
 (deftest delete-draftset-statements!-test
-  (let [draftset-id (create-draftset! *test-backend* "Test draftset")
-        draftset-uri (ont/draftset-uri draftset-id)]
-    (delete-draftset-statements! *test-backend* draftset-uri)
+  (let [draftset-id (create-draftset! *test-backend* "Test draftset")]
+    (delete-draftset-statements! *test-backend* draftset-id)
     (is (= false (ask? (str "<" draftset-uri ">") "?p" "?o")))))
 
 (use-fixtures :once wrap-db-setup)

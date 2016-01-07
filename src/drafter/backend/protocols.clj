@@ -49,9 +49,9 @@
     the state graph.")
   (append-data-to-graph-job [this graph data rdf-format metadata]
     "Return a job that appends RDF data in the specified format to the specified graph.")
-  (append-data-to-draftset-job [this draftset-uri tempfile rdf-format]
+  (append-data-to-draftset-job [this draftset-ref tempfile rdf-format]
     "Return a job that appends RDF data to the given draftset")
-  (publish-draftset-job [this draftset-id]
+  (publish-draftset-job [this draftset-ref]
     "Return a job that publishes the graphs in a draftset to live and
     then deletes the draftset.")
   (copy-from-live-graph-job [this draft-graph-uri]

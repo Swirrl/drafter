@@ -56,18 +56,19 @@
               :format rdf-format
               :buffer-size jobs/batched-write-size))
 
-(defn- append-data-to-draftset-graph-joblet [backend draftset-uri quad-batch]
-  (fn [graph-map]
-    (let [{:keys [graph-uri triples]} (quad-batch->graph-triples quad-batch)
-          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend graph-uri graph-map draftset-uri)]
-      (backend/append-data-batch! backend draft-graph-uri quad-batch)
-      graph-map)))
+(defn- append-data-to-draftset-graph-joblet [backend draftset-ref quad-batch]
+  (let [draftset-uri (str (dsmgmt/->draftset-uri draftset-ref))]
+    (fn [graph-map]
+      (let [{:keys [graph-uri triples]} (quad-batch->graph-triples quad-batch)
+            {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend graph-uri graph-map draftset-uri)]
+        (backend/append-data-batch! backend draft-graph-uri quad-batch)
+        graph-map))))
 
-(defn append-data-to-draftset-job [backend draftset-uri tempfile rdf-format]
+(defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
   (let [quads (file->statements tempfile rdf-format)
-        graph-map (dsmgmt/get-draftset-graph-mapping backend draftset-uri)
+        graph-map (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
         quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-        batch-joblets (map #(append-data-to-draftset-graph-joblet backend draftset-uri %) quad-batches)]
+        batch-joblets (map #(append-data-to-draftset-graph-joblet backend draftset-ref %) quad-batches)]
     (jobs/joblet-seq->job batch-joblets :batch-write graph-map)))
 
 (defn append-data-to-graph-job

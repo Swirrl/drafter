@@ -165,15 +165,14 @@
               create-request (create-draftset-request mount-point "Test draftset")
               create-response (route create-request)
               draftset-location (create-draftset-through-api mount-point route "Test draftset")
-              draftset-id (.substring draftset-location (inc (.lastIndexOf draftset-location "/")))
-              draftset-uri (drafter.rdf.drafter-ontology/draftset-uri draftset-id)]
+              draftset-id (.substring draftset-location (inc (.lastIndexOf draftset-location "/")))]
           (with-open [fs (io/input-stream data-file-path)]
               (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
                     request (append-to-draftset-request mount-point draftset-location file-part)
                     {:keys [status body] :as response} (route request)]
                 (await-success finished-jobs (:finished-job body))
 
-                (let [draftset-graph-map (dsmgmt/get-draftset-graph-mapping *test-backend* draftset-uri)
+                (let [draftset-graph-map (dsmgmt/get-draftset-graph-mapping *test-backend* (dsmgmt/->DraftsetId draftset-id))
                       graph-statements (group-by context quads)]
                   (doseq [[live-graph graph-quads] graph-statements]
                     (let [draft-graph (get draftset-graph-map live-graph)

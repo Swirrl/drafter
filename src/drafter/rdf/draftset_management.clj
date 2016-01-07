@@ -8,6 +8,30 @@
   (:import [java.net URI]
            [java.util Date UUID]))
 
+(defprotocol DraftsetRef
+  (->draftset-uri [this])
+  (->draftset-id [this]))
+
+(defrecord DraftsetURI [uri]
+  Object
+  (toString [this] uri))
+
+(defrecord DraftsetId [id]
+  DraftsetRef
+  (->draftset-uri [this] (->DraftsetURI (drafter.rdf.drafter-ontology/draftset-uri id)))
+  (->draftset-id [this] this)
+
+  Object
+  (toString [this] id))
+
+(extend-type DraftsetURI
+  DraftsetRef
+  (->draftset-uri [this] this)
+  (->draftset-id [{:keys [uri]}]
+    (let [base-uri (URI. (drafter.rdf.drafter-ontology/draftset-uri ""))
+          relative (.relativize base-uri (URI. uri))]
+      (->DraftsetId (.toString relative)))))
+
 (defn- create-draftset-statements [title description draftset-uri created-date]
   (let [base-quads [draftset-uri
                     [rdf:a drafter:DraftSet]
@@ -25,16 +49,16 @@
    (let [template (create-draftset-statements title description (draftset-uri draftset-id) created-date)
          quads (to-quads template)]
      (add db quads)
-     draftset-id)))
+     (->DraftsetId (str draftset-id)))))
 
-(defn- draftset-exists-query [draftset-uri]
+(defn- draftset-exists-query [draftset-ref]
   (str "ASK WHERE {"
        (with-state-graph
-         "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet ">")
+         "<" (->draftset-uri draftset-ref) "> <" rdf:a "> <" drafter:DraftSet ">")
        "}"))
 
-(defn draftset-exists? [db draftset-id]
-  (let [q (draftset-exists-query (draftset-uri draftset-id))]
+(defn draftset-exists? [db draftset-ref]
+  (let [q (draftset-exists-query draftset-ref)]
     (query db q)))
 
 (defn- delete-statements-for-subject-query [graph-uri subject-uri]
@@ -42,19 +66,21 @@
        "  GRAPH <" graph-uri "> { <" subject-uri "> ?p ?o }"
        "}"))
 
-(defn delete-draftset-statements! [db draftset-uri]
-  (let [delete-query (delete-statements-for-subject-query drafter-state-graph draftset-uri)]
+(defn delete-draftset-statements! [db draftset-ref]
+  (let [ds-uri (str (->draftset-uri draftset-ref))
+        delete-query (delete-statements-for-subject-query drafter-state-graph ds-uri)]
     (grafter.rdf.protocols/update! db delete-query)))
 
-(defn- get-draftset-graph-mapping-query [draftset-uri]
-  (str
-   "SELECT ?lg ?dg WHERE { "
-   (with-state-graph
-     "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-     "?dg <" drafter:inDraftSet "> <" draftset-uri "> ."
-     "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-     "?lg <" drafter:hasDraft "> ?dg .")
-   "}"))
+(defn- get-draftset-graph-mapping-query [draftset-ref]
+  (let [ds-uri (str (->draftset-uri draftset-ref))]
+    (str
+     "SELECT ?lg ?dg WHERE { "
+     (with-state-graph
+       "<" ds-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "?dg <" drafter:inDraftSet "> <" ds-uri "> ."
+       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+       "?lg <" drafter:hasDraft "> ?dg .")
+     "}")))
 
 (defn- get-all-draftset-graph-mappings-query []
   (str
@@ -71,8 +97,8 @@
   (into {} (map (fn [{:strs [lg dg]}] [(.stringValue lg) (.stringValue dg)]) mapping-results)))
 
 ;;Repository -> String -> Map {String String}
-(defn get-draftset-graph-mapping [repo draftset-uri]
-  (let [mapping-query (get-draftset-graph-mapping-query draftset-uri)
+(defn get-draftset-graph-mapping [repo draftset-ref]
+  (let [mapping-query (get-draftset-graph-mapping-query draftset-ref)
         results (query repo mapping-query)]
     (graph-mapping-result-seq->map results)))
 
@@ -84,15 +110,16 @@
                     [(.stringValue ds-uri) (graph-mapping-result-seq->map mappings)])
                   draftset-grouped-results))))
 
-(defn- get-draftset-properties-query [draftset-uri]
-  (str
-   "SELECT * WHERE { "
-   (with-state-graph
-     "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-     "<" draftset-uri "> <" rdfs:label "> ?title ."
-     "<" draftset-uri "> <" drafter:createdAt "> ?created ."
-     "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description }")
-   "}"))
+(defn- get-draftset-properties-query [draftset-ref]
+  (let [draftset-uri (str (->draftset-uri draftset-ref))]
+    (str
+     "SELECT * WHERE { "
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" rdfs:label "> ?title ."
+       "<" draftset-uri "> <" drafter:createdAt "> ?created ."
+       "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description }")
+     "}")))
 
 (defn- get-all-draftsets-properties-query []
   (str
@@ -107,32 +134,26 @@
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
-(defn- draftset-uri->id [draftset-uri]
-  (let [base-uri (URI. (drafter.rdf.drafter-ontology/draftset-uri ""))
-        relative (.relativize base-uri (URI. draftset-uri))]
-    (.toString relative)))
-
-(defn- draftset-properties-result->properties [draftset-id {:strs [created title description]}]
+(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description]}]
   (util/conj-if (some? description)
                 {:display-name (.stringValue title)
                  :created-at (calendar-literal->date created)
-                 :id draftset-id}
+                 :id (str (->draftset-id draftset-ref))}
                 [:description (.stringValue description)]))
 
-(defn- get-draftset-properties [repo draftset-uri]
-  (let [draftset-id (draftset-uri->id draftset-uri)
-        properties-query (get-draftset-properties-query draftset-uri)
+(defn- get-draftset-properties [repo draftset-ref]
+  (let [properties-query (get-draftset-properties-query draftset-ref)
         results (query repo properties-query)]
     (if-let [result (first results)]
-      (draftset-properties-result->properties draftset-id result))))
+      (draftset-properties-result->properties draftset-ref result))))
 
 (defn- combine-draftset-properties-and-graphs [properties graph-mapping]
   (let [live-graph-info (util/map-values (constantly {}) graph-mapping)]
       (assoc properties :data live-graph-info)))
 
-(defn get-draftset-info [repo draftset-uri]
-  (if-let [ds-properties (get-draftset-properties repo draftset-uri)]
-    (let [ds-graph-mapping (get-draftset-graph-mapping repo draftset-uri)]
+(defn get-draftset-info [repo draftset-ref]
+  (if-let [ds-properties (get-draftset-properties repo draftset-ref)]
+    (let [ds-graph-mapping (get-draftset-graph-mapping repo draftset-ref)]
       (combine-draftset-properties-and-graphs ds-properties ds-graph-mapping))))
 
 (defn get-all-draftsets-info [repo]
@@ -140,8 +161,7 @@
         all-graph-mappings (get-all-draftset-graph-mappings repo)
         all-infos (map (fn [{ds-uri "ds" :as result}]
                          (let [ds-uri (.stringValue ds-uri)
-                               draftset-id (draftset-uri->id ds-uri)
-                               properties (draftset-properties-result->properties draftset-id result)
+                               properties (draftset-properties-result->properties (->DraftsetURI ds-uri) result)
                                graph-mapping (get all-graph-mappings ds-uri)]
                            (combine-draftset-properties-and-graphs properties graph-mapping)))
                        all-properties)]
