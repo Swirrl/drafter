@@ -30,5 +30,19 @@
         (is (has-string-object? ds-uri rdfs:comment description))
         (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))))
 
+(deftest draftset-exists-test
+  (testing "Existing draftset"
+    (let [draftset-id (create-draftset! *test-backend* "Test draftset")]
+      (is (draftset-exists? *test-backend* draftset-id))))
+
+  (testing "Non-existent draftset"
+    (is (= false (draftset-exists? *test-backend* "missing")))))
+
+(deftest delete-draftset-statements!-test
+  (let [draftset-id (create-draftset! *test-backend* "Test draftset")
+        draftset-uri (ont/draftset-uri draftset-id)]
+    (delete-draftset-statements! *test-backend* draftset-uri)
+    (is (= false (ask? (str "<" draftset-uri ">") "?p" "?o")))))
+
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
