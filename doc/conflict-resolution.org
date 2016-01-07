@@ -1,0 +1,217 @@
+#+TITLE: Handing Conflicting Edits - a proposal
+
+RFC022 included a request to improve the design of how concurrent
+edits are managed in Publish My Data.
+
+The statement was:
+
+#+BEGIN_QUOTE
+Two different draftsets can include modifications to the same
+graph. Currently, if both draftsets are published, a ‘last save wins’
+strategy is used.  While offering flexibility, this approach includes
+the risk that one user can accidentally overwrite or undo the edits of
+another.  The workflow should be reviewed to reduce this risk.  The
+design phase of the project will include analysis and presentation of
+the options and a recommendation for an updated approach.
+#+END_QUOTE
+
+This document outlines a proposed strategy for handling this, with a
+particular focus on reducing the risk of concurrent edits and merges
+resulting in unexpected errors.
+
+The proposal outlined in this document has been carefully designed to
+be compatible with the API work [[http://api.grafter.org/scratch/swagger/][specified]] for delivery towards the end
+of Q1 2016, and it builds upon concepts described in that work.  No
+delivery dates are yet associated with this proposal.
+
+We propose two new mechanisms to resolve these issues.  The first is
+concerned with conflict detection when merging a draftset with the
+live site, whilst the second provides users greater visibility about
+when other draftsets contain changes to graphs they have amendments on.
+
+Both of these mechanisms build on the PMD Draftset concept.
+
+* What are Draftsets?
+
+Draftsets are essentially, private working copies, or branches of
+work, that contain changes to RDF data.  When a user creates a
+draftset they effectively create a 'virtual copy' of the site's
+data in which they can safely make, review and query changes
+before publishing them to the live site.
+
+
+* Proposal: Merging with Live
+
+We propose an extension to Publish My Data's [[http://api.grafter.org/scratch/swagger/][Drafter API]] that supports
+an optimistic locking strategy for publishing changes to RDF graphs by
+comparing graph revisions.
+
+** Merging Example
+
+The diagram below describes the evolution of a single graph of data,
+being edited by two users, via two Draftsets =A= and =B=.
+
+First we see how a user starts making changes (in blue) to the graph
+in their =Draftset B=.  To do this a clone of the graph is made in
+their Draftset, which they apply their changes to.
+
+They then publish these changes to the live site for all to see.
+However, just before they publish, another user starts editing the
+same graph in a new =Draftset A=.  When this user tries to publish the
+graph, Drafter prevents the publication; because it detects a prior
+change to the graph that needs resolved.
+
+[[file:Draftsets-1.png][file:./Draftsets-1.png]]
+
+There are effectively three options available to the user, they can
+choose one of the two sets of changes in their entirity, electing to
+lose one set of edits, or they can attempt to merge both sets of
+changes at publish those.
+
+It's worth noting that changes are tracked and managed on a per graph
+basis, so it's common for merge scenarios to involve multiple graphs,
+as shown in the following diagram.
+
+Here we see how =Draft A= contains edits to only one graph, whilst
+=Draft B= contains edits to both of the graphs.
+
+[[file:Draftsets-2.png][file:./Draftsets-2.png]]
+
+** Implementation
+
+Firstly we propose to extend Draftset metadata to include a
+=derived-from= revision-identifier that represents the version of the
+live graph the graph in the draftset was branched from.
+
+This data is stored in a Graph object under the draftset's =data=
+property, e.g.
+
+#+BEGIN_SRC json
+{
+    "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
+    "data": {
+        "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
+            "derived-from": "ff6410cf1eadd4c41a7a5d29a35b4cd413e33212"
+        }
+    },
+    "display-name": "New Temporary Housing Figures",
+    "description": "Quarterly updates for Q4 2015",
+    "updated-at": "2016-01-04T13:35:21.000Z",
+    "created-at": "2016-01-01T13:35:21.000Z",
+    "current-owner": "admin@opendatacommunities.org",
+    "submitted-by": "editor@opendatacommunities.org"
+}
+#+END_SRC
+
+When graphs are published on the live site =revision-identifiers= are
+stored with the live-graph's metadata.  These identifiers have a number
+of potential uses, the primary reason being change detection.  With
+=revision-identifiers= changes to live graphs between publications can
+be detected by comparing at publication time the draft graph's
+=derived-from= =revision-identifer= with the =revision-identifier= of
+the live graph.  If the identifiers differ then a publication to the
+live graph has occurred, and there is a risk that publishing the graph
+might lose changes.  In this situation the Drafter service will
+prevent the application from making the change and will return an
+appropriate error, alerting the user to handle the potential conflict.
+
+Conflicts can then be handled by users and applications, on a graph by
+graph basis.  Broadly speaking users have the following options:
+
+1) Overwrite the changes in live with the graph from their draftset.
+2) Discard the graphs that they have changed in their draftset.
+3) Merge the live graph into their draftset to combine both sets of
+   changes and further refine them
+
+Various additional API routes may need to be added to implement these
+different merge strategies.
+
+After the user has decided how to resolve the potential conflict they
+can then safely resubmit their draftset for publication, with the
+=revision-identifiers= from the current live graphs (to allow for the
+chance that other changes have sneaked in whilst they were revising),
+or alternatively with a special flag to force their changes over live.
+
+We hope to explore ways to implement this strategy using standard HTTP
+headers; in particular through the use of HTTP Etags and conditional
+requests as defined in [[https://tools.ietf.org/html/rfc7232][RFC 7232]], or via the 409 (Conflict) status
+code ([[https://tools.ietf.org/html/rfc7231#section-6.5.8][RFC 7231]]).
+
+We believe that this model will also support future extensions to
+provide much more fine-grained merging and conflict resolution.
+
+** Revision Identifiers
+
+Revision identifiers are used to represent the state of a graph at a
+particular point in time.  Rather than comparing the changes
+themselves =revision-identifiers= can be used as an efficient way to
+compare draft graphs and their corresponding live graphs for potential
+conflicts.
+
+UUIDs will likely be used instead of content based hashes in the first
+instance, due to the complexities associated with efficiently
+generating content hashes of RDF triple-sets.
+
+We hope to persue methods of efficiently computing content hashes for
+triple-sets, that will lead to a reduced number of false positive
+conflict errors.
+
+* Proposal: Potential conflicts Alerts
+
+As Drafter tracks the state of all Draftsets in the system it knows
+when several draftsets contain changes to the same live graph.
+
+This information could be exposed via Drafters API so that
+applications including PMD can make use of it.  This could be done via
+a =changed-in-draftsets= key in the Draftset object:
+
+#+BEGIN_SRC json
+{
+    "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
+    "data": {
+        "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
+            "derived-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8",
+            "changed-in-draftsets": [
+                {
+                    "id": "bd6069c8-3da6-421b-845e-5ee289aba788",
+                    "current-owner": "editor@opendatacommunities.org"
+                }
+            ]
+        }
+    },
+    "display-name": "New Temporary Housing Figures",
+    "description": "Quarterly updates for Q4 2015",
+    "updated-at": "2016-01-04T13:35:21.000Z",
+    "created-at": "2016-01-01T13:35:21.000Z",
+    "current-owner": "admin@opendatacommunities.org",
+    "submitted-by": "editor@opendatacommunities.org"
+}
+#+END_SRC
+
+The draftset above shows that the draftset
+=de305d54-75b4-431b-adb2-eb6b9e546014= contains changes to the
+=temporary-housing-types= graph, which is also modified in another
+draftset with the id =bd6069c8-3da6-421b-845e-5ee289aba788=.
+
+In a similar vein, if changes to the live graph have occured since the
+draft snapshot was taken, drafter could provide a boolean property
+(=has-unmerged-changes=) to indicate explicitly that the live graph
+has changed, e.g.
+
+#+BEGIN_SRC json
+{
+    "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
+    "data": {
+        "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
+            "has-unmerged-changes": true,
+            "derived-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8"
+        }
+    },
+    "display-name": "New Temporary Housing Figures",
+    "description": "Quarterly updates for Q4 2015",
+    "updated-at": "2016-01-04T13:35:21.000Z",
+    "created-at": "2016-01-01T13:35:21.000Z",
+    "current-owner": "admin@opendatacommunities.org",
+    "submitted-by": "editor@opendatacommunities.org"
+}
+#+END_SRC

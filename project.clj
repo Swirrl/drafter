@@ -48,8 +48,8 @@
 
                  [grafter/vocabularies "0.1.3"]
 
-                 [org.openrdf.sesame/sesame-queryrender "2.7.14"]
-                 [org.openrdf.sesame/sesame-runtime "2.7.14"]
+                 [org.openrdf.sesame/sesame-queryrender "2.7.16"]
+                 [org.openrdf.sesame/sesame-runtime "2.7.16"]
 
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
