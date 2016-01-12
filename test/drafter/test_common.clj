@@ -12,6 +12,7 @@
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!
                                                   migrate-live!]]
+            [drafter.rdf.draftset-management :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
             [swirrl-server.async.jobs :refer [create-job]])
@@ -81,12 +82,14 @@
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
   with the specified graph.  Returns the draft graph uri."
-  [db graph triples]
+  ([db graph triples] (import-data-to-draft! db graph triples nil))
+  ([db graph triples draftset-ref]
 
-  (create-managed-graph! db graph)
-  (let [draft-graph (create-draft-graph! db graph)]
-    (add db draft-graph triples)
-    draft-graph))
+   (create-managed-graph! db graph)
+   (let [draftset-uri (and draftset-ref (str (->draftset-uri draftset-ref)))
+         draft-graph (create-draft-graph! db graph {} draftset-uri)]
+     (add db draft-graph triples)
+     draft-graph)))
 
 (defn make-graph-live!
   ([db live-guri]
