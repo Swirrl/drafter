@@ -155,7 +155,7 @@ We hope to persue methods of efficiently computing content hashes for
 triple-sets, that will lead to a reduced number of false positive
 conflict errors.
 
-* Proposal: Potential conflicts Alerts
+* Proposal: Conflict notifications
 
 As Drafter tracks the state of all Draftsets in the system it knows
 when several draftsets contain changes to the same live graph.
