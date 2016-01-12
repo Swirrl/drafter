@@ -232,6 +232,12 @@ on =bd6069c8-3da6-421b-845e-5ee289aba788= might imply to a user that
 those changes are experimental and are not intended to ever be merged
 into live.
 
+NOTE: Also that each draftset object includes an array of other
+draftsets that have changes to it.  Whilst a little redundant when
+calling =GET /draftsets= this information is useful when querying
+routes for individual draftsets, e.g. =GET
+/draftset/bd6069c8-3da6-421b-845e-5ee289aba788=.
+
 In a similar vein, if changes to the live graph have occured since the
 draft snapshot was taken, drafter could provide a boolean property
 (=has-unmerged-changes=) to indicate explicitly that the live graph
