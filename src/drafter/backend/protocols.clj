@@ -54,6 +54,8 @@
   (publish-draftset-job [this draftset-ref]
     "Return a job that publishes the graphs in a draftset to live and
     then deletes the draftset.")
+  (delete-draftset! [this draftset-ref]
+    "Deletes a draftset and all of its constituent graphs")
   (copy-from-live-graph-job [this draft-graph-uri]
     "Retrun a job to Copy the data from the draft graphs live graph into the
     given draft graph.")

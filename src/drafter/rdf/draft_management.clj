@@ -212,6 +212,11 @@
     ;; this draft uri, but leave the live graph as a managed graph.
     (log/info (str "Deleted draft graph from state "draft-graph-uri))))
 
+(defn delete-draft-graph-and-remove-from-state-query [draft-graph-uri]
+  (let [drop-query (format "DROP SILENT GRAPH <%s>" draft-graph-uri)
+        delete-from-state-query (delete-draft-state-query draft-graph-uri)]
+    (util/make-compound-sparql-query [drop-query delete-from-state-query])))
+
 (defn delete-graph-batched!
   "Deletes graph contents as per batch size in order to avoid blocking
   writes with a lock."

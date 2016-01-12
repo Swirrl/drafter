@@ -1,5 +1,5 @@
 (ns drafter.routes.draftsets-api
-  (:require [compojure.core :refer [GET POST PUT context routes]]
+  (:require [compojure.core :refer [GET POST PUT DELETE context routes]]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response submit-async-job!]]
             [swirrl-server.responses :as response]
@@ -29,6 +29,10 @@
          (if-let [info (dsmgmt/get-draftset-info backend (dsmgmt/->DraftsetId id))]
            (response info)
            (not-found "")))
+
+    (DELETE "/draftset/:id" [id]
+            (delete-draftset! backend (dsmgmt/->DraftsetId id))
+            (response ""))
 
     (POST "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type

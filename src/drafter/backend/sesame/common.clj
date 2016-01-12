@@ -3,6 +3,7 @@
             [grafter.rdf :refer [add statements]]
             [clojure.tools.logging :as log]
             [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.common.draft-api :as api-common]
             [drafter.backend.sesame.common.draft-management :as mgmt]
             [drafter.backend.sesame.common.draft-api :as api]
@@ -41,6 +42,7 @@
    :append-data-to-graph-job api/append-data-to-graph-job
    :append-data-to-draftset-job api/append-data-to-draftset-job
    :publish-draftset-job dsapi/publish-draftset-job
+   :delete-draftset! dsmgmt/delete-draftset!
    :copy-from-live-graph-job api/copy-from-live-graph-job
    :migrate-graphs-to-live-job api-common/migrate-graphs-to-live-job
    :delete-metadata-job api/delete-metadata-job

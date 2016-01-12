@@ -1,10 +1,11 @@
 (ns drafter.rdf.draftset-management
   (:require [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [add s]]
+            [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.repository :refer [query]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
-            [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph]])
+            [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph] :as mgmt])
   (:import [java.net URI]
            [java.util Date UUID]))
 
@@ -66,9 +67,12 @@
        "  GRAPH <" graph-uri "> { <" subject-uri "> ?p ?o }"
        "}"))
 
+(defn- delete-draftset-statements-query [draftset-ref]
+  (let [ds-uri (str (->draftset-uri draftset-ref))]
+    (delete-statements-for-subject-query drafter-state-graph ds-uri)))
+
 (defn delete-draftset-statements! [db draftset-ref]
-  (let [ds-uri (str (->draftset-uri draftset-ref))
-        delete-query (delete-statements-for-subject-query drafter-state-graph ds-uri)]
+  (let [delete-query (delete-draftset-statements-query draftset-ref)]
     (grafter.rdf.protocols/update! db delete-query)))
 
 (defn- get-draftset-graph-mapping-query [draftset-ref]
@@ -101,6 +105,20 @@
   (let [mapping-query (get-draftset-graph-mapping-query draftset-ref)
         results (query repo mapping-query)]
     (graph-mapping-result-seq->map results)))
+
+(defn- graph-mapping-draft-graphs [graph-mapping]
+  (vals graph-mapping))
+
+(defn- delete-draftset-query [draftset-ref draft-graph-uris]
+  (let [delete-drafts-query (map mgmt/delete-draft-graph-and-remove-from-state-query draft-graph-uris)
+        delete-draftset-query (delete-draftset-statements-query draftset-ref)]
+    (util/make-compound-sparql-query (conj delete-drafts-query delete-draftset-query))))
+
+(defn delete-draftset! [db draftset-ref]
+  (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)
+        draft-graphs (graph-mapping-draft-graphs graph-mapping)
+        delete-query (delete-draftset-query draftset-ref draft-graphs)]
+    (update! db delete-query)))
 
 ;;Repository -> Map {DraftSetURI -> {String String}}
 (defn- get-all-draftset-graph-mappings [repo]
