@@ -1,8 +1,9 @@
 (ns drafter.routes.draftsets-api
-  (:require [compojure.core :refer [GET POST PUT DELETE context routes]]
+  (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes]]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response submit-async-job!]]
             [swirrl-server.responses :as response]
+            [drafter.rdf.sparql-protocol :refer [process-sparql-query]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.protocols :refer :all]
             [grafter.rdf.io :refer [mimetype->rdf-format]]))
@@ -48,6 +49,20 @@
 
                     :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
             (response/bad-request-response "Content type required")))
+
+    (ANY "/draftset/:id/query" [id query :as request]
+         (cond (not (#{:get :post} (:request-method request)))
+               (not-found "")
+
+               (nil? query) (not-acceptable-response "query parameter required")
+
+               :else
+               (let [id (dsmgmt/->DraftsetId id)]
+               (if (dsmgmt/draftset-exists? backend id)
+                 (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend id)
+                       rewriting-executor (create-rewriter backend graph-mapping)]
+                   (process-sparql-query rewriting-executor request :graph-restrictions (vals graph-mapping)))
+                 (not-found "")))))
 
     (POST "/draftset/:id/publish" [id]
           (let [id (dsmgmt/->DraftsetId id)]

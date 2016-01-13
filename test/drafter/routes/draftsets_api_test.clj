@@ -256,5 +256,42 @@
     (let [get-response (route {:uri draftset-location :request-method :get})]
       (assert-is-not-found-response get-response))))
 
+(deftest query-draftset-test
+  (let [{:keys [mount-point route]} (create-routes)]
+    (testing "Draftset with data"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            draftset-data-file "test/resources/test-draftset.trig"
+            append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
+        (await-success finished-jobs (:finished-job (:body append-response)) )
+        (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
+              query-request {:uri (str draftset-location "/query")
+                             :headers {"Accept" "application/n-triples"}
+                             :request-method :post
+                             :params {:query query}}
+              query-response (route query-request)
+              response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format grafter.rdf.formats/rdf-ntriples)) )
+              expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
+          (assert-is-ok-response query-response)
+
+          (is (= expected-triples response-triples)))))
+    
+    (testing "Missing draftset"
+      (let [response (route {:uri "/draftset/missing/query" :params {:query "SELECT * WHERE { ?s ?p ?o }"} :request-method :post})]
+        (assert-is-not-found-response response)))
+
+    (testing "Missing query parameter"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            response (route {:uri (str draftset-location "/query") :request-method :post})]
+        (assert-is-not-acceptable-response response)))
+
+    (testing "Invalid HTTP method"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            query-request {:uri (str draftset-location "/query")
+                           :request-method :put
+                           :headers {"Accept" "text/plain"}
+                           :params {:query "SELECT * WHERE { ?s ?p ?o }"}}
+            response (route query-request)]
+        (assert-is-not-found-response response)))))
+
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
