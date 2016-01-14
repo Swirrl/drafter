@@ -55,6 +55,20 @@
   (fn [output-stream]
     (construct-dynamic* writer-class output-stream)))
 
+(def negotiate-graph-query-content-writer {
+                       "application/n-triples" NTriplesWriter
+                       "application/n-quads" NQuadsWriter
+                       "text/x-nquads" NQuadsWriter
+                       "text/n3" N3Writer
+                       "application/trig" TriGWriter
+                       "application/trix" TriXWriter
+                       "text/turtle" TurtleWriter
+                       "text/html" TurtleWriter
+                       "application/rdf+xml" RDFXMLWriter
+                       "text/csv" SPARQLResultsCSVWriter
+                       "text/tab-separated-values" SPARQLResultsTSVWriter
+                       })
+
 (defn- negotiate-content-writer
   "Given a prepared query and a mime-type return the appropriate
   Sesame SPARQLResultsWriter class, according to the SPARQL protocols
@@ -75,18 +89,7 @@
                         "text/plain" BooleanTextWriter
                         "text/html" BooleanTextWriter
                         }
-         GraphQuery   {
-                       "application/n-triples" NTriplesWriter
-                       "application/n-quads" NQuadsWriter
-                       "text/n3" N3Writer
-                       "application/trig" TriGWriter
-                       "application/trix" TriXWriter
-                       "text/turtle" TurtleWriter
-                       "text/html" TurtleWriter
-                       "application/rdf+xml" RDFXMLWriter
-                       "text/csv" SPARQLResultsCSVWriter
-                       "text/tab-separated-values" SPARQLResultsTSVWriter
-                       }
+         GraphQuery   negotiate-graph-query-content-writer
          nil) format))
 
 (defn notifying-query-result-handler [notify-fn inner-handler]

@@ -293,5 +293,62 @@
             response (route query-request)]
         (assert-is-not-found-response response)))))
 
+(defn- append-data-to-draftset-through-api [route draftset-location draftset-data-file]
+  (let [append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
+    (await-success finished-jobs (:finished-job (:body append-response)))))
+
+(defn- eval-statement [s]
+  (util/map-values str s))
+
+(defn- eval-statements [ss]
+  (map eval-statement ss))
+
+(deftest get-draftset-data-test
+  (let [{:keys [mount-point route]} (create-routes)]
+    (testing "Get graph triples from draftset"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            draftset-data-file "test/resources/test-draftset.trig"
+            input-quads (statements draftset-data-file)
+            append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
+        (await-success finished-jobs (:finished-job (:body append-response)))
+
+        (doseq [[graph quads] (group-by context input-quads)]
+          (let [data-request {:uri (str draftset-location "/data")
+                              :request-method :get
+                              :params {:graph graph}
+                              :headers {"Accept" "application/n-triples"}}
+                data-response (route data-request)
+                graph-triples (set (map (comp #(util/map-values str %) map->Triple) quads))
+                response-triples (statements (:body data-response) :format grafter.rdf.formats/rdf-ntriples)
+                response-triples (set (map (comp #(util/map-values str %) map->Triple) response-triples))]
+            (assert-is-ok-response data-response)
+            (is (= graph-triples response-triples))))))
+
+    (testing "Get all draftset quads"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            draftset-data-file "test/resources/test-draftset.trig"]
+        (append-data-to-draftset-through-api route draftset-location draftset-data-file)
+        (let [data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
+              data-response (route data-request)]
+          (assert-is-ok-response data-response)
+
+          (let [response-quads (set (eval-statements (statements (:body data-response) :format grafter.rdf.formats/rdf-nquads)))
+                input-quads (set (eval-statements (statements draftset-data-file)))]
+            (is (= input-quads response-quads))))))
+
+    (testing "Triples request without graph"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            append-response (make-append-data-to-draftset-request route draftset-location "test/resources/test-draftset.trig")]
+        (await-success finished-jobs (:finished-job (:body append-response)))
+        (let [data-request {:uri (str draftset-location "/data")
+                            :request-method :get
+                            :headers {"Accept" "application/n-triples"}}
+              data-response (route data-request)]
+          (assert-is-not-acceptable-response data-response))))
+
+    (testing "Missing draftset"
+      (let [response (route {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}})]
+        (assert-is-not-found-response response)))))
+
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

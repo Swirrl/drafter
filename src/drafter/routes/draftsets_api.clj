@@ -1,15 +1,68 @@
 (ns drafter.routes.draftsets-api
   (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes]]
+            [clojure.set :as set]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response submit-async-job!]]
             [swirrl-server.responses :as response]
-            [drafter.rdf.sparql-protocol :refer [process-sparql-query]]
+            [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
+            [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
             [drafter.rdf.draftset-management :as dsmgmt]
+            [drafter.rdf.rewriting.result-rewriting :refer [make-select-result-rewriter]]
             [drafter.backend.protocols :refer :all]
-            [grafter.rdf.io :refer [mimetype->rdf-format]]))
+            [drafter.util :as util]
+            [grafter.rdf.io :refer [mimetype->rdf-format]])
+  (:import [org.openrdf.query TupleQueryResultHandler]
+           [org.openrdf.model.impl ContextStatementImpl URIImpl]))
 
 (defn- is-quads-content-type? [rdf-format]
   (.supportsContexts rdf-format))
+
+(defn- execute-query-in-draftset [backend draftset-ref request]
+  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
+        rewriting-executor (create-rewriter backend graph-mapping)]
+    (process-sparql-query rewriting-executor request :graph-restrictions (vals graph-mapping))))
+
+(defn- get-accepted-rdf-format [request]
+  (if-let [accept (get-in request [:headers "Accept"])]
+    (try
+      (mimetype->rdf-format accept)
+      (catch Exception ex
+        nil))))
+
+(defn- wrap-quads-writer [quads-writer-class]
+  (fn [os]
+    (let [quads-writer (util/construct-dynamic* quads-writer-class os)]
+      (reify TupleQueryResultHandler
+        (handleSolution [this bindings]
+          (let [subj (.getValue bindings "s")
+                pred (.getValue bindings "p")
+                obj (.getValue bindings "o")
+                graph (.getValue bindings "g")
+                stmt (ContextStatementImpl. subj pred obj graph)]
+            (.handleStatement quads-writer stmt)))
+
+        (handleBoolean [this b])
+        (handleLinks [this links])
+        (startQueryResult [this binding-names]
+          (.startRDF quads-writer))
+        (endQueryResult [this]
+          (.endRDF quads-writer))))))
+
+(defn- get-draftset-data [backend draftset-ref accept-content-type]
+  (let [q "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }"
+        graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
+        draft->live-graph-mapping (into {} (map (fn [[l d]] [(URIImpl. d) (URIImpl. l)]) graph-mapping))
+        rewriting-executor (create-rewriter backend graph-mapping)
+        pquery (prepare-query rewriting-executor q (vals graph-mapping))]
+    (if-let [quads-writer-class (negotiate-graph-query-content-writer accept-content-type)]
+      (let [writer (wrap-quads-writer quads-writer-class)
+            writer (comp #(make-select-result-rewriter draft->live-graph-mapping %) writer)
+            exec-fn (create-query-executor rewriting-executor writer pquery)
+            body (stream-sparql-response exec-fn drafter.operations/default-timeouts)]
+        {:status 200
+         :headers {"Content-Type" accept-content-type}
+         :body body})
+      (not-acceptable-response "Failed to negotiate output content format"))))
 
 (defn draftset-api-routes [mount-point backend]
   (routes
@@ -34,6 +87,20 @@
     (DELETE "/draftset/:id" [id]
             (delete-draftset! backend (dsmgmt/->DraftsetId id))
             (response ""))
+
+    (GET "/draftset/:id/data" [id graph union-with-live :as request]
+         (let [ds-id (dsmgmt/->DraftsetId id)]
+           (if (dsmgmt/draftset-exists? backend ds-id)
+             (if-let [rdf-format (get-accepted-rdf-format request)]
+               (if (is-quads-content-type? rdf-format)
+                 (get-draftset-data backend ds-id (get-in request [:headers "Accept"]))
+                 (if (some? graph)
+                   (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                         query-request (assoc-in request [:params :query] q)]
+                     (execute-query-in-draftset backend ds-id query-request))
+                   (not-acceptable-response "graph query parameter required for RDF triple format")))
+               (not-acceptable-response "Accept header required with MIME type of RDF format to return"))
+             (not-found ""))))
 
     (POST "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type

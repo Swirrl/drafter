@@ -75,7 +75,7 @@
    :headers {"Content-Type" "text/plain; charset=utf-8"}
    :body (str "Unsupported media-type: " media-type)})
 
-(defn- stream-sparql-response [exec-fn query-timeouts]
+(defn stream-sparql-response [exec-fn query-timeouts]
   (let [{:keys [publish] :as query-operation} (create-operation)
         streamer (result-streamer exec-fn publish)
         [write-fn input-stream] (connect-piped-output-stream streamer)]
