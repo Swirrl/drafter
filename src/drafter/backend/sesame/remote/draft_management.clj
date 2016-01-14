@@ -54,10 +54,16 @@
 
 (defn- delete-insert-move
   "Move source graph to destination.  Semantically the same as MOVE but done
-  with DELETE/INSERT's.
-
-  Massively quicker  on stardog than a MOVE."
+  with DELETE/INSERT's."
   [source destination]
+  ;; TODO: replace this with the SPARQL MOVE query from above it used to be
+  ;; faster on stardog to do it this way (and on sesame it didn't make much
+  ;; difference)
+  ;;
+  ;; but stardog claim to have fixed this performance regression in version 3.1.
+  ;; so MOVE's may now be faster this way.
+  ;;
+  ;; See here for details: http://tinyurl.com/jgcytss
   (str
    ;; first clear the destination, then...
    "DELETE {"
