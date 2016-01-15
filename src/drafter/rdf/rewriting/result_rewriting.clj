@@ -38,7 +38,7 @@
     (binding-seq->binding-set mapped-bindings)))
 
 ;Map[Uri, Uri] -> QueryResultHandler -> QueryResultHandler
-(defn make-select-result-rewriter
+(defn- make-select-result-rewriter
   "Creates a new SPARQLResultWriter that rewrites values in solutions
   according to the given graph mapping."
   [graph-map handler]
@@ -86,14 +86,6 @@
        (handleComment [this comment]
          ;; No op
          ))))
-
-(defn make-construct-result-rewriter
-  "Creates a result-rewriter for construct queries - not a tautology
-  honest!"
-  [writer draft->live]
-  (if (instance? QueryResultHandler writer)
-    (result-handler-wrapper writer draft->live)
-    writer))
 
 (defn- rewrite-value [draft->live value]
   (get draft->live value value))

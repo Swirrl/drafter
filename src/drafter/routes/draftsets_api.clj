@@ -7,7 +7,6 @@
             [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
             [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
             [drafter.rdf.draftset-management :as dsmgmt]
-            [drafter.rdf.rewriting.result-rewriting :refer [make-select-result-rewriter]]
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [grafter.rdf.io :refer [mimetype->rdf-format]])
