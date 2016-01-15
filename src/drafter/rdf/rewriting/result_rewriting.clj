@@ -95,13 +95,6 @@
     (result-handler-wrapper writer draft->live)
     writer))
 
-(defn choose-result-rewriter [query-ast draft->live writer]
-  (cond
-   (instance? GraphQuery query-ast) (make-construct-result-rewriter writer draft->live)
-   (instance? TupleQuery query-ast) (make-select-result-rewriter draft->live writer)
-   (instance? BooleanQuery query-ast) writer
-   :else writer))
-
 (defn- rewrite-value [draft->live value]
   (get draft->live value value))
 

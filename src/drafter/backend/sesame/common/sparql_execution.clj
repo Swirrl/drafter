@@ -5,7 +5,7 @@
             [drafter.backend.protocols :as backend]
             [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-            [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter result-handler-wrapper rewrite-query-results]]
+            [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
             [drafter.util :refer [construct-dynamic*]])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
@@ -201,18 +201,6 @@
 
 (defn execute-update [backend update-query restrictions]
   (execute-update-with execute-prepared-update-in-transaction backend update-query restrictions))
-
-(defn- make-draft-query-rewriter
-  "Build both a query rewriter and an accompanying result rewriter tied together
-  in a hash-map, for supplying to our draft SPARQL endpoints as configuration."
-
-  [live->draft]
-  {:query-rewriter (fn [query] (rewrite-sparql-string live->draft query))
-   :result-rewriter
-   (fn [prepared-query writer]
-     (let [draft->live (set/map-invert live->draft)]
-       (choose-result-rewriter prepared-query draft->live writer))
-     )})
 
 (defrecord RewritingSesameSparqlExecutor [inner live->draft]
   backend/SparqlExecutor
