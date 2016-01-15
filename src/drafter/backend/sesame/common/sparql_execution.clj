@@ -5,7 +5,7 @@
             [drafter.backend.protocols :as backend]
             [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-            [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter result-handler-wrapper]]
+            [drafter.rdf.rewriting.result-rewriting :refer [choose-result-rewriter result-handler-wrapper rewrite-query-results]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
             [drafter.util :refer [construct-dynamic*]])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
@@ -217,19 +217,15 @@
 (defrecord RewritingSesameSparqlExecutor [inner live->draft]
   backend/SparqlExecutor
   (prepare-query [_ sparql-string restrictions]
-    (let [rewritten-query (rewrite-sparql-string live->draft sparql-string)]
-      (backend/prepare-query inner rewritten-query restrictions)))
+    (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
+          prepared-query (backend/prepare-query inner rewritten-query-string restrictions)]
+      (rewrite-query-results prepared-query live->draft)))
 
   (get-query-type [_ pquery]
     (backend/get-query-type inner pquery))
 
   (negotiate-result-writer [_ prepared-query media-type]
-    (if-let [inner-writer-fn (backend/negotiate-result-writer inner prepared-query media-type)]
-      (fn [ostream]
-        (let [draft->live (set/map-invert live->draft)
-              writer (inner-writer-fn ostream)]
-          (choose-result-rewriter prepared-query draft->live writer)))))
+    (backend/negotiate-result-writer inner prepared-query media-type))
 
   (create-query-executor [_ writer-fn pquery]
     (backend/create-query-executor inner writer-fn pquery)))
-
