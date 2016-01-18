@@ -30,7 +30,8 @@
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
            [org.openrdf.query Dataset]
-           [org.openrdf.query.impl MapBindingSet]))
+           [org.openrdf.query.impl MapBindingSet]
+           [org.openrdf.model.impl ContextStatementImpl URIImpl]))
 
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
@@ -171,6 +172,32 @@
       (.setDataset pquery dataset)
       pquery))
 
+(defn- rdf-handler->spog-tuple-handler [rdf-handler]
+  (reify TupleQueryResultHandler
+    (handleSolution [this bindings]
+      (let [subj (.getValue bindings "s")
+            pred (.getValue bindings "p")
+            obj (.getValue bindings "o")
+            graph (.getValue bindings "g")
+            stmt (ContextStatementImpl. subj pred obj graph)]
+        (.handleStatement rdf-handler stmt)))
+
+    (handleBoolean [this b])
+    (handleLinks [this links])
+    (startQueryResult [this binding-names]
+      (.startRDF rdf-handler))
+    (endQueryResult [this]
+      (.endRDF rdf-handler))))
+
+(defn- spog-tuple-query->graph-query [tuple-query]
+  (reify GraphQuery
+    (evaluate [this rdf-handler]
+      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))))
+
+(defn all-quads-query [backend graph-restrictions]
+  (let [tuple-query (backend/prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }" graph-restrictions)]
+    (spog-tuple-query->graph-query tuple-query)))
+
 (defn- get-prepared-query-type [pquery]
     (condp instance? pquery
       TupleQuery :select
@@ -204,6 +231,9 @@
 
 (defrecord RewritingSesameSparqlExecutor [inner live->draft]
   backend/SparqlExecutor
+  (all-quads-query [this restrictions]
+    (all-quads-query this restrictions))
+  
   (prepare-query [_ sparql-string restrictions]
     (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
           prepared-query (backend/prepare-query inner rewritten-query-string restrictions)]

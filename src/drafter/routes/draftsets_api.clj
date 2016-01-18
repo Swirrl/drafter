@@ -48,14 +48,12 @@
           (.endRDF quads-writer))))))
 
 (defn- get-draftset-data [backend draftset-ref accept-content-type]
-  (let [q "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }"
-        graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
-        live->draft-graph-mapping (into {} (map (fn [[l d]] [(URIImpl. l) (URIImpl. d)]) graph-mapping))
+  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
+        live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
         rewriting-executor (create-rewriter backend live->draft-graph-mapping)
-        pquery (prepare-query rewriting-executor q (vals graph-mapping))]
-    (if-let [quads-writer-class (negotiate-graph-query-content-writer accept-content-type)]
-      (let [writer (wrap-quads-writer quads-writer-class)
-            exec-fn (create-query-executor rewriting-executor writer pquery)
+        pquery (all-quads-query rewriting-executor (vals graph-mapping))]
+    (if-let [writer (negotiate-result-writer rewriting-executor pquery accept-content-type)]
+      (let [exec-fn (create-query-executor rewriting-executor writer pquery)
             body (stream-sparql-response exec-fn drafter.operations/default-timeouts)]
         {:status 200
          :headers {"Content-Type" accept-content-type}

@@ -10,6 +10,12 @@
   [f m]
   (into {} (for [[k v] m] [k (f v)])))
 
+;;(a -> b) -> Map[a a] -> Map[b b]
+(defn map-all
+  "Maps both keys and values with the given transform function."
+  [f m]
+  (into {} (for [[k v] m] [(f k) (f v)])))
+
 (defn to-coll
   "Lifts a non-collection value into a collection containing that
   value. If the input value is already a collection it is returned

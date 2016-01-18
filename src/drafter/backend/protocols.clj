@@ -1,6 +1,7 @@
 (ns drafter.backend.protocols)
 
 (defprotocol SparqlExecutor
+  (all-quads-query [this restrictions])
   (prepare-query [this sparql-string restrictions])
   (get-query-type [this prepared-query])
   (negotiate-result-writer [this prepared-query media-type])
