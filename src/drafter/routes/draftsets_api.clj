@@ -28,25 +28,6 @@
       (catch Exception ex
         nil))))
 
-(defn- wrap-quads-writer [quads-writer-class]
-  (fn [os]
-    (let [quads-writer (util/construct-dynamic* quads-writer-class os)]
-      (reify TupleQueryResultHandler
-        (handleSolution [this bindings]
-          (let [subj (.getValue bindings "s")
-                pred (.getValue bindings "p")
-                obj (.getValue bindings "o")
-                graph (.getValue bindings "g")
-                stmt (ContextStatementImpl. subj pred obj graph)]
-            (.handleStatement quads-writer stmt)))
-
-        (handleBoolean [this b])
-        (handleLinks [this links])
-        (startQueryResult [this binding-names]
-          (.startRDF quads-writer))
-        (endQueryResult [this]
-          (.endRDF quads-writer))))))
-
 (defn- get-draftset-data [backend draftset-ref accept-content-type]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
         live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
