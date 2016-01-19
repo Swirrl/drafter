@@ -252,26 +252,19 @@
               ;;delete one quad from each, so all graphs will be non-empty after delete operation
               to-delete (map (fn [[_ graph-quads]] (first graph-quads)) (group-by context draftset-quads))
               to-delete (conj to-delete (->Quad "http://test-subject" "http://test-predicate" "http://test-obj" "http://missing-graph"))
-              bos (ByteArrayOutputStream.)
-              serialiser (rdf-serializer bos :format formats/rdf-nquads)]
-
-          ;;write quads to output stream
-          (add serialiser to-delete)
-
-          (let [input-stream (ByteArrayInputStream. (.toByteArray bos))
-                file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}
-                delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}
-                delete-response (route delete-request)]
+              input-stream (statements->input-stream to-delete formats/rdf-nquads)
+              file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}
+              delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}
+              delete-response (route delete-request)]
             
-            (assert-is-ok-response delete-response)
+          (assert-is-ok-response delete-response)
+          (assert-schema draftset-info-schema (:body delete-response))
 
-            (assert-schema draftset-info-schema (:body delete-response))
-
-            (let [ds-data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
-                  ds-data-response (route ds-data-request)
-                  expected-quads (set/difference draftset-quads to-delete)
-                  actual-quads (set (concrete-statements (:body ds-data-response) formats/rdf-nquads))]
-              (is (= (set (eval-statements expected-quads)) actual-quads)))))))
+          (let [ds-data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
+                ds-data-response (route ds-data-request)
+                expected-quads (set/difference draftset-quads to-delete)
+                actual-quads (set (eval-statements (get-draftset-quads-through-api route draftset-location)))]
+            (is (= (set (eval-statements expected-quads)) actual-quads))))))
 
     (testing "Delete triples"
       (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
