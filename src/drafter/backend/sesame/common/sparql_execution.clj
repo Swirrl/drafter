@@ -265,9 +265,9 @@
   (delete-quads [this quads graph-restriction]
     (let [rewritten-statements (map #(rewrite-statement live->draft %) quads)
           graph-restriction (get-restrictions graph-restriction)
-          rewritten-restriction (mapcat live->draft graph-restriction)
+          rewritten-restriction (remove nil? (map live->draft graph-restriction))
           draft-restriction (if (empty? graph-restriction)
                                (vals live->draft)
-                               (set/intersection (vals live->draft) rewritten-restriction))]
+                               (set/intersection (set (vals live->draft)) rewritten-restriction))]
       (when (seq draft-restriction)
         (backend/delete-quads inner rewritten-statements draft-restriction)))))

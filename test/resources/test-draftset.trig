@@ -6,10 +6,12 @@
 {
 	<http://s1> rdf:a animal:kitten .
 	<http://s1> foaf:name "Fluffy" .
+	<http://s1> <http://likes> "Murder" .
 }
 
 <http://graph2>
 {
 	<http://s2> rdf:a animal:dog .
 	<http://s2> foaf:name "Beethoven" .
+	<http://s2> <http://likes> "Walkies" .
 }

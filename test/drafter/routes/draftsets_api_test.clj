@@ -228,6 +228,18 @@
                 response (route request)]
             (is (is-client-error-response? response)))))))
 
+(defn- statements->input-stream [statements format]
+  (let [bos (ByteArrayOutputStream.)
+        serialiser (rdf-serializer bos :format format)]
+    (add serialiser statements)
+    (ByteArrayInputStream. (.toByteArray bos))))
+
+(defn- get-draftset-quads-through-api [route draftset-location]
+  (let [data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
+        data-response (route data-request)]
+    (assert-is-ok-response data-response)
+    (concrete-statements (:body data-response) formats/rdf-nquads)))
+
 (deftest delete-draftset-data-test
   (let [{:keys [mount-point route]} (create-routes)
         rdf-data-file "test/resources/test-draftset.trig"]
@@ -260,6 +272,27 @@
                   expected-quads (set/difference draftset-quads to-delete)
                   actual-quads (set (concrete-statements (:body ds-data-response) formats/rdf-nquads))]
               (is (= (set (eval-statements expected-quads)) actual-quads)))))))
+
+    (testing "Delete triples"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            draftset-quads (set (statements rdf-data-file))]
+        (append-data-to-draftset-through-api route draftset-location rdf-data-file)
+
+        (let [[graph graph-quads] (first (group-by context draftset-quads))
+              quads-to-delete (take 2 graph-quads)
+              triples-to-delete (map map->Triple quads-to-delete)
+              input-stream (statements->input-stream triples-to-delete formats/rdf-ntriples)
+              file-part {:tempfile input-stream :filename "to-delete.nt" :content-type "application/n-triples"}
+              delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part :graph graph}}
+              delete-response (route delete-request)]
+
+          (assert-is-ok-response delete-response)
+          (assert-schema draftset-info-schema (:body delete-response))
+
+          (let [quads-after-delete (set (eval-statements (get-draftset-quads-through-api route draftset-location)))
+                expected-quads (set (eval-statements (set/difference draftset-quads quads-to-delete)))]
+
+            (is (= expected-quads quads-after-delete))))))
 
     (testing "Missing draftset"
       (with-open [fs (io/input-stream rdf-data-file)]

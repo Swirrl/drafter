@@ -1,4 +1,5 @@
-(ns drafter.backend.protocols)
+(ns drafter.backend.protocols
+  (:import [org.openrdf.model.impl ContextStatementImpl URIImpl]))
 
 (defprotocol SparqlExecutor
   (all-quads-query [this restrictions])
@@ -10,8 +11,15 @@
 (defprotocol StatementDeletion
   (delete-quads [this quads graph-restrictions]))
 
+(defn- make-quad-statement [triple graph]
+  (let [s (.getSubject triple)
+        p (.getPredicate triple)
+        o (.getObject triple)]
+    (ContextStatementImpl. s p o graph)))
+
 (defn delete-triples [deletor triples graph]
-  (throw (RuntimeException. "Implement!")))
+  (let [quads (map #(make-quad-statement % graph) triples)]
+    (delete-quads deletor quads #{graph})))
 
 (defprotocol QueryRewritable
   (create-rewriter [this live->draft]))

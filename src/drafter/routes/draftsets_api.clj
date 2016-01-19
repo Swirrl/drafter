@@ -13,7 +13,8 @@
             [grafter.rdf.io :refer [mimetype->rdf-format]])
   (:import [org.openrdf.query TupleQueryResultHandler]
            [org.openrdf.rio Rio]
-           [org.openrdf.rio.helpers StatementCollector]))
+           [org.openrdf.rio.helpers StatementCollector]
+           [org.openrdf.model.impl URIImpl]))
 
 (defn- is-quads-content-type? [rdf-format]
   (.supportsContexts rdf-format))
@@ -95,15 +96,17 @@
              (not-found ""))))
 
     (DELETE "/draftset/:id/data" {{draftset-id :id
-                        request-content-type :content-type
-                        {file-part-content-type :content-type data :tempfile} :file} :params :as request}
+                                   request-content-type :content-type
+                                   graph :graph
+                                   {file-part-content-type :content-type data :tempfile} :file} :params :as request}
             (let [ds-id (dsmgmt/->DraftsetId draftset-id)]
               (if (dsmgmt/draftset-exists? backend ds-id)
                 (let [rdf-format (mimetype->rdf-format (or file-part-content-type request-content-type))
-                      quads-to-delete (read-statements data rdf-format)
+                      statements-to-delete (read-statements data rdf-format)
                       ds-executor (get-draftset-executor backend ds-id)]
-                  (delete-quads ds-executor quads-to-delete #{})
-
+                  (if (is-quads-content-type? rdf-format)
+                    (delete-quads ds-executor statements-to-delete #{})
+                    (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
                   (response (dsmgmt/get-draftset-info backend ds-id)))
                 (not-found ""))))
 
