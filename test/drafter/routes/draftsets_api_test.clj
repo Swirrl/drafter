@@ -254,7 +254,14 @@
                   ds-data-response (route ds-data-request)
                   expected-quads (set/difference draftset-quads to-delete)
                   actual-quads (set (concrete-statements (:body ds-data-response) formats/rdf-nquads))]
-              (is (= (set (eval-statements expected-quads)) actual-quads)))))))))
+              (is (= (set (eval-statements expected-quads)) actual-quads)))))))
+
+    (testing "Missing draftset"
+      (with-open [fs (io/input-stream rdf-data-file)]
+        (let [file-part {:tempfile fs :filename "to-delete.trig" :content-type "application/x-trig"}
+              delete-request {:uri "/draftset/missing/data" :request-method :delete :params {:file file-part}}
+              delete-response (route delete-request)]
+          (assert-is-not-found-response delete-response))))))
 
 (deftest publish-draftset-test
   (let [{:keys [mount-point route]} (create-routes)

@@ -97,12 +97,14 @@
     (DELETE "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type
                         {file-part-content-type :content-type data :tempfile} :file} :params :as request}
-            (let [ds-id (dsmgmt/->DraftsetId draftset-id)
-                  rdf-format (mimetype->rdf-format (or file-part-content-type request-content-type))
-                  quads-to-delete (read-statements data rdf-format)
-                  ds-executor (get-draftset-executor backend ds-id)]
-              (delete-quads ds-executor quads-to-delete #{})
-              (response "WOOOOOO")))
+            (let [ds-id (dsmgmt/->DraftsetId draftset-id)]
+              (if (dsmgmt/draftset-exists? backend ds-id)
+                (let [rdf-format (mimetype->rdf-format (or file-part-content-type request-content-type))
+                      quads-to-delete (read-statements data rdf-format)
+                      ds-executor (get-draftset-executor backend ds-id)]
+                  (delete-quads ds-executor quads-to-delete #{})
+                  (response "WOOOOOO"))
+                (not-found ""))))
 
     (POST "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type
