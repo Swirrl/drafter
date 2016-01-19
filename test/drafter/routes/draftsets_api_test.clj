@@ -83,6 +83,9 @@
 (defn- assert-is-not-acceptable-response [response]
   (assert-schema (response-code-schema 406) response))
 
+(defn- assert-is-unprocessable-response [response]
+  (assert-schema (response-code-schema 422) response))
+
 (defn- eval-statement [s]
   (util/map-values str s))
 
@@ -303,7 +306,15 @@
         (let [file-part {:tempfile fs :filename "to-delete.trig" :content-type "application/x-trig"}
               delete-request {:uri "/draftset/missing/data" :request-method :delete :params {:file file-part}}
               delete-response (route delete-request)]
-          (assert-is-not-found-response delete-response))))))
+          (assert-is-not-found-response delete-response))))
+
+    (testing "Invalid serialisation"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            input-stream (ByteArrayInputStream. (.getBytes "not nquads!" "UTF-8"))
+            file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}
+            delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}
+            delete-response (route delete-request)]
+        (assert-is-unprocessable-response delete-response)))))
 
 (deftest publish-draftset-test
   (let [{:keys [mount-point route]} (create-routes)

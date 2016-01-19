@@ -17,6 +17,9 @@
   ([] (not-acceptable-response ""))
   ([body] {:status 406 :headers {} :body body}))
 
+(defn unprocessable-entity-response [body]
+  {:status 422 :headers {} :body body})
+
 (defn default-job-result-handler
   "Default handler for creating ring responses from job results. If
   the job succeeded then a 200 response is returned, otherwise a 500
