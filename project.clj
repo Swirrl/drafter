@@ -20,17 +20,19 @@
                  [org.apache.jena/jena-arq "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api
                                                                          com.fasterxml.jackson.core/jackson-core
                                                                          org.slf4j/jcl-over-slf4j
+                                                                         org.apache.httpcomponents/httpclient
                                                                          org.slf4j/slf4j-api]]
 
                  [org.apache.jena/jena-core "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-base "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-iri "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
 
-                 [org.clojure/clojure "1.6.0"]
+                 [org.clojure/clojure "1.7.0"]
                  [me.raynes/fs "1.4.6"] ; ;filesystem utils
-                 [lib-noir "0.8.4" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
-                 [ring "1.3.2" :exclusions [org.clojure/java.classpath]]
-                 [ring-server "0.3.1"]
+                 [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
+                 [ring "1.4.0" :exclusions [org.clojure/java.classpath]]
+                 [ring/ring-core "1.4.0"]
+                 [ring-server "0.4.0"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
                  [com.novemberain/monger "3.0.2"]
@@ -47,20 +49,29 @@
                  ;; https://openrdf.atlassian.net/browse/SES-2119
                  ;;
                  ;; we can remove this exclusion.
-                 [grafter "0.6.0-alpha4" :exclusions [org.openrdf.sesame/sesame-queryresultio-sparqlxml org.clojure/tools.nrepl]]
+                 [grafter "0.6.0-alpha5" :exclusions [org.openrdf.sesame/sesame-queryresultio-sparqlxml org.clojure/tools.nrepl]]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.7.16-with-ses-memfix" :exclusions [org.openrdf.sesame/sesame-rio-api]]
 
                  [grafter/vocabularies "0.1.3"]
+                 [grafter/url "0.2.1"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.7.16"]
                  [org.openrdf.sesame/sesame-runtime "2.7.16"]
 
+                 [com.taoensso/timbre "4.0.2"]
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
                  [markdown-clj "0.9.44"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
-                 [ring-middleware-accept "2.0.2"]
-                 [environ "1.0.0"]]
+                 [ring-middleware-accept "2.0.3"]
+                 [environ "1.0.0"]
+
+                 ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
+                 ;;[criterium "0.4.3"] ;; for easy benchmarking
+                 ;;[clj-http "1.1.0"]
+                 [drafter-client "0.3.6-SNAPSHOT"]
+
+                 ]
 
   :java-source-paths ["src-java"]
   :resource-paths ["resources"]
@@ -73,7 +84,8 @@
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
             [lein-environ "1.0.0"]
             [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]
-            [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
+            [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]
+            [perforate "0.3.4"]]
 
   :ring {:handler drafter.handler/app
          :init    drafter.handler/init
@@ -88,6 +100,7 @@
 
   :profiles
   {
+
    :uberjar {:aot :all
              :main drafter.repl
              :uberjar [:swirrl-private-repos
@@ -98,6 +111,12 @@
                        :auto-reload?  false}}
 
 
+   :perforate { :dependencies [[perforate "0.3.4"] ;; include perforate and criterium in repl environments
+                               [criterium "0.4.3"] ;; for easy benchmarking
+                               [clj-http "1.1.0"]
+                               [drafter-client "0.3.6-SNAPSHOT"]
+                               [grafter "0.6.0-alpha5"]
+                               ]}
 
    :dev {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                    [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
@@ -106,8 +125,10 @@
                         [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
                         [org.clojure/data.json "0.2.5"]
                         [clojure-csv/clojure-csv "2.0.1"]
+                        [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
+                        ;;[perforate "0.3.4"]
                         [prismatic/schema "1.0.4"]
-                        [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
+                        ]
 
          :env {:dev true}
 
