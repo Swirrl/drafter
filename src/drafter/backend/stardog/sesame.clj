@@ -15,6 +15,7 @@
   proto/ISPARQLable default-sparqlable-impl
   proto/ISPARQLUpdateable default-isparql-updatable-impl
   SparqlExecutor default-sparql-query-impl
+  StatementDeletion default-statement-deletion-impl
   QueryRewritable default-query-rewritable-impl
   SparqlUpdateExecutor sparql-impl/sparql-update-executor-impl
   DraftManagement sparql-impl/draft-management-impl

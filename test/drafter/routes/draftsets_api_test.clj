@@ -3,18 +3,22 @@
                                          stream->string select-all-in-graph make-graph-live!
                                          import-data-to-draft! await-success]]
             [clojure.test :refer :all]
+            [clojure.set :as set]
             [drafter.routes.draftsets-api :refer :all]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :refer [is-graph-managed? draft-exists?]]
-            [grafter.rdf :refer [statements context]]
-            [grafter.rdf.protocols :refer [->Triple map->Triple]]
+            [grafter.rdf :refer [statements context add]]
+            [grafter.rdf.io :refer [rdf-serializer]]
+            [grafter.rdf.formats :as formats]
+            [grafter.rdf.protocols :refer [->Triple map->Triple ->Quad]]
             [grafter.rdf.repository :as repo]
             [drafter.util :as util]
             [drafter.responses :refer [is-client-error-response?]]
             [clojure.java.io :as io]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
-  (:import [java.util Date]))
+  (:import [java.util Date]
+           [java.io ByteArrayOutputStream ByteArrayInputStream]))
 
 (defn- append-to-draftset-request [mount-point draftset-location file-part]
   {:uri (str mount-point draftset-location "/data")
@@ -33,6 +37,10 @@
     (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
           request {:uri (str draftset-endpoint-uri "/data") :request-method :post :params {:file file-part}}]
       (route request))))
+
+(defn- append-data-to-draftset-through-api [route draftset-location draftset-data-file]
+  (let [append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
+    (await-success finished-jobs (:finished-job (:body append-response)))))
 
 (def ring-response-schema
   {:status s/Int
@@ -71,6 +79,15 @@
 
 (defn- assert-is-not-acceptable-response [response]
   (assert-schema (response-code-schema 406) response))
+
+(defn- eval-statement [s]
+  (util/map-values str s))
+
+(defn- eval-statements [ss]
+  (map eval-statement ss))
+
+(defn- concrete-statements [source format]
+  (eval-statements (statements source :format format)))
 
 (defn- create-draftset-through-api [mount-point route display-name]
   (let [request (create-draftset-request mount-point display-name)
@@ -208,6 +225,37 @@
                 response (route request)]
             (is (is-client-error-response? response)))))))
 
+(deftest delete-draftset-data-test
+  (let [{:keys [mount-point route]} (create-routes)
+        rdf-data-file "test/resources/test-draftset.trig"]
+    (testing "Delete quads"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")]
+        (append-data-to-draftset-through-api route draftset-location rdf-data-file)
+        (let [draftset-quads (set (statements rdf-data-file))
+
+              ;;NOTE: input data should contain at least two statements in each graph!
+              ;;delete one quad from each, so all graphs will be non-empty after delete operation
+              to-delete (map (fn [[_ graph-quads]] (first graph-quads)) (group-by context draftset-quads))
+              to-delete (conj to-delete (->Quad "http://test-subject" "http://test-predicate" "http://test-obj" "http://missing-graph"))
+              bos (ByteArrayOutputStream.)
+              serialiser (rdf-serializer bos :format formats/rdf-nquads)]
+
+          ;;write quads to output stream
+          (add serialiser to-delete)
+
+          (let [input-stream (ByteArrayInputStream. (.toByteArray bos))
+                file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}
+                delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}
+                delete-response (route delete-request)]
+            
+            (assert-is-ok-response delete-response)
+
+            (let [ds-data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
+                  ds-data-response (route ds-data-request)
+                  expected-quads (set/difference draftset-quads to-delete)
+                  actual-quads (set (concrete-statements (:body ds-data-response) formats/rdf-nquads))]
+              (is (= (set (eval-statements expected-quads)) actual-quads)))))))))
+
 (deftest publish-draftset-test
   (let [{:keys [mount-point route]} (create-routes)
         rdf-data-file "test/resources/test-draftset.trig"]
@@ -292,16 +340,6 @@
                            :params {:query "SELECT * WHERE { ?s ?p ?o }"}}
             response (route query-request)]
         (assert-is-not-found-response response)))))
-
-(defn- append-data-to-draftset-through-api [route draftset-location draftset-data-file]
-  (let [append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
-    (await-success finished-jobs (:finished-job (:body append-response)))))
-
-(defn- eval-statement [s]
-  (util/map-values str s))
-
-(defn- eval-statements [ss]
-  (map eval-statement ss))
 
 (deftest get-draftset-data-test
   (let [{:keys [mount-point route]} (create-routes)]

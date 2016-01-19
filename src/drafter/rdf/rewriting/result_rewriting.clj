@@ -90,11 +90,11 @@
 (defn- rewrite-value [draft->live value]
   (get draft->live value value))
 
-(defn- rewrite-statement [draft->live statement]
-  (let [subj (rewrite-value draft->live (.getSubject statement))
-            obj (rewrite-value draft->live (.getObject statement))
-            pred (rewrite-value draft->live (.getPredicate statement))]
-        (if-let [graph (rewrite-value draft->live (.getContext statement))]
+(defn rewrite-statement [value-mapping statement]
+  (let [subj (rewrite-value value-mapping (.getSubject statement))
+            obj (rewrite-value value-mapping (.getObject statement))
+            pred (rewrite-value value-mapping (.getPredicate statement))]
+        (if-let [graph (rewrite-value value-mapping (.getContext statement))]
           (ContextStatementImpl. subj pred obj graph)
           (StatementImpl. subj pred obj))))
 

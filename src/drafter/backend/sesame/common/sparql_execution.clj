@@ -1,13 +1,14 @@
 (ns drafter.backend.sesame.common.sparql-execution
   (:require [clojure.tools.logging :as log]
             [grafter.rdf.repository :as repo]
+            [grafter.rdf.protocols :refer [map->Quad]]
             [clojure.set :as set]
             [drafter.backend.protocols :as backend]
             [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-            [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results]]
+            [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results rewrite-statement]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
-            [drafter.util :refer [construct-dynamic*]])
+            [drafter.util :refer [construct-dynamic* map-values seq->iterable]])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
             TupleQueryResultHandler BooleanQueryResultHandler
             BindingSet QueryLanguage BooleanQuery GraphQuery Update]
@@ -31,7 +32,14 @@
            [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
            [org.openrdf.query Dataset]
            [org.openrdf.query.impl MapBindingSet]
+           [org.openrdf.model Resource]
            [org.openrdf.model.impl ContextStatementImpl URIImpl]))
+
+(defn- get-restrictions [graph-restrictions]
+  (cond
+   (coll? graph-restrictions) graph-restrictions
+   (fn? graph-restrictions) (graph-restrictions)
+   :else nil))
 
 (defn restricted-dataset
   "Returns a restricted dataset or nil when given either a 0-arg
@@ -42,14 +50,9 @@
              (fn? graph-restrictions))]
    :post [(or (instance? Dataset %)
               (nil? %))]}
-  (let [graph-restrictions (cond
-                            (coll? graph-restrictions) graph-restrictions
-                            (fn? graph-restrictions) (graph-restrictions)
-                            :else nil)]
-
-    (when graph-restrictions
-      (repo/make-restricted-dataset :default-graph graph-restrictions
-                                    :named-graphs graph-restrictions))))
+  (when-let [graph-restrictions (get-restrictions graph-restrictions)]
+    (repo/make-restricted-dataset :default-graph graph-restrictions
+                                    :named-graphs graph-restrictions)))
 
 ;class->writer-fn :: Class[T] -> (OutputStream -> T)
 (defn class->writer-fn [writer-class]
@@ -172,6 +175,13 @@
       (.setDataset pquery dataset)
       pquery))
 
+(defn delete-quads [backend quads restrictions]
+  (let [repo (->sesame-repo backend)
+        graphs (get-restrictions restrictions)
+        graph-array (into-array Resource graphs)]
+    (with-open [conn (grafter.rdf.repository/->connection repo)]
+      (.remove conn (seq->iterable quads) graph-array))))
+
 (defn- rdf-handler->spog-tuple-handler [rdf-handler]
   (reify TupleQueryResultHandler
     (handleSolution [this bindings]
@@ -229,6 +239,9 @@
 (defn execute-update [backend update-query restrictions]
   (execute-update-with execute-prepared-update-in-transaction backend update-query restrictions))
 
+(defn- rewrite-value [mapping v]
+  (get mapping v v))
+
 (defrecord RewritingSesameSparqlExecutor [inner live->draft]
   backend/SparqlExecutor
   (all-quads-query [this restrictions]
@@ -246,4 +259,15 @@
     (backend/negotiate-result-writer inner prepared-query media-type))
 
   (create-query-executor [_ writer-fn pquery]
-    (backend/create-query-executor inner writer-fn pquery)))
+    (backend/create-query-executor inner writer-fn pquery))
+
+  backend/StatementDeletion
+  (delete-quads [this quads graph-restriction]
+    (let [rewritten-statements (map #(rewrite-statement live->draft %) quads)
+          graph-restriction (get-restrictions graph-restriction)
+          rewritten-restriction (mapcat live->draft graph-restriction)
+          draft-restriction (if (empty? graph-restriction)
+                               (vals live->draft)
+                               (set/intersection (vals live->draft) rewritten-restriction))]
+      (when (seq draft-restriction)
+        (backend/delete-quads inner rewritten-statements draft-restriction)))))

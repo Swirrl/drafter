@@ -7,6 +7,12 @@
   (negotiate-result-writer [this prepared-query media-type])
   (create-query-executor [this writer pquery]))
 
+(defprotocol StatementDeletion
+  (delete-quads [this quads graph-restrictions]))
+
+(defn delete-triples [deletor triples graph]
+  (throw (RuntimeException. "Implement!")))
+
 (defprotocol QueryRewritable
   (create-rewriter [this live->draft]))
 

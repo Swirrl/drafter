@@ -9,12 +9,19 @@
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
+            [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]])
   (:import [org.openrdf.query TupleQueryResultHandler]
-           [org.openrdf.model.impl ContextStatementImpl URIImpl]))
+           [org.openrdf.rio Rio]
+           [org.openrdf.rio.helpers StatementCollector]))
 
 (defn- is-quads-content-type? [rdf-format]
   (.supportsContexts rdf-format))
+
+(defn- get-draftset-executor [backend draftset-ref]
+  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
+        live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)]
+    (create-rewriter backend live->draft-graph-mapping)))
 
 (defn- execute-query-in-draftset [backend draftset-ref request]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
@@ -40,6 +47,14 @@
          :headers {"Content-Type" accept-content-type}
          :body body})
       (not-acceptable-response "Failed to negotiate output content format"))))
+
+(defn- read-statements [in-stream format]
+  (let [parser (Rio/createParser format)
+        model (java.util.ArrayList.)
+        base-uri ""]
+    (.setRDFHandler parser (StatementCollector. model))
+    (.parse parser in-stream base-uri)
+    (seq model)))
 
 (defn draftset-api-routes [mount-point backend]
   (routes
@@ -78,6 +93,16 @@
                    (not-acceptable-response "graph query parameter required for RDF triple format")))
                (not-acceptable-response "Accept header required with MIME type of RDF format to return"))
              (not-found ""))))
+
+    (DELETE "/draftset/:id/data" {{draftset-id :id
+                        request-content-type :content-type
+                        {file-part-content-type :content-type data :tempfile} :file} :params :as request}
+            (let [ds-id (dsmgmt/->DraftsetId draftset-id)
+                  rdf-format (mimetype->rdf-format (or file-part-content-type request-content-type))
+                  quads-to-delete (read-statements data rdf-format)
+                  ds-executor (get-draftset-executor backend ds-id)]
+              (delete-quads ds-executor quads-to-delete #{})
+              (response "WOOOOOO")))
 
     (POST "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type
