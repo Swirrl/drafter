@@ -73,7 +73,8 @@
 
   :ring {:handler drafter.handler/app
          :init    drafter.handler/init
-         :destroy drafter.handler/destroy}
+         :destroy drafter.handler/destroy
+         :open-browser? false }
 
   :aliases {"reindex" ["run" "-m" "drafter.backend.sesame-native/reindex"]}
 
