@@ -19,6 +19,12 @@
 (defn- is-quads-content-type? [rdf-format]
   (.supportsContexts rdf-format))
 
+(defn- is-triples-rdf-format? [rdf-format]
+  (not (is-quads-content-type? rdf-format)))
+
+(defn- implies [p q]
+  (or (not p) q))
+
 (defn- get-draftset-executor [backend draftset-ref]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
         live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)]
@@ -104,10 +110,14 @@
                 (let [rdf-format (mimetype->rdf-format (or file-part-content-type request-content-type))
                       statements-to-delete (read-statements data rdf-format)
                       ds-executor (get-draftset-executor backend ds-id)]
-                  (if (is-quads-content-type? rdf-format)
-                    (delete-quads ds-executor statements-to-delete #{})
-                    (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
-                  (response (dsmgmt/get-draftset-info backend ds-id)))
+                  (if (implies (is-triples-rdf-format? rdf-format)
+                               (some? graph))
+                    (do
+                      (if (is-quads-content-type? rdf-format)
+                        (delete-quads ds-executor statements-to-delete nil)
+                        (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
+                      (response (dsmgmt/get-draftset-info backend ds-id)))
+                    (not-acceptable-response "graph parameter required for triples RDF format")))
                 (not-found ""))))
 
     (POST "/draftset/:id/data" {{draftset-id :id

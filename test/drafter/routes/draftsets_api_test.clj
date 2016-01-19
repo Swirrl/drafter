@@ -287,6 +287,17 @@
 
             (is (= expected-quads quads-after-delete))))))
 
+    (testing "Delete triples without graph"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            draftset-quads (statements rdf-data-file)]
+        (append-data-to-draftset-through-api route draftset-location rdf-data-file)
+
+        (with-open [input-stream (statements->input-stream (take 2 draftset-quads) formats/rdf-ntriples)]
+          (let [file-part {:tempfile input-stream :filename "to-delete.nt" :content-type "application/n-triples"}
+                delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}
+                delete-response (route delete-request)]
+            (assert-is-not-acceptable-response delete-response)))))
+
     (testing "Missing draftset"
       (with-open [fs (io/input-stream rdf-data-file)]
         (let [file-part {:tempfile fs :filename "to-delete.trig" :content-type "application/x-trig"}
