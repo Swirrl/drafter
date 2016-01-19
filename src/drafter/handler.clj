@@ -29,6 +29,7 @@
             [environ.core :refer [env]]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.verbs :refer [wrap-verbs]]
+            [ring.middleware.defaults :refer [api-defaults]]
             [selmer.parser :as parser]
             [clojure.string :as str])
 
@@ -118,6 +119,7 @@
 
                             (add-route app-routes))
 
+                        :ring-defaults (assoc-in api-defaults [:params :multipart] true)
                         ;; add custom middleware here
                         :middleware [wrap-verbs
                                      middleware/template-error-page
@@ -183,4 +185,3 @@
   (stop-writer! writer-service)
   (stop-reaper)
   (log/info "drafter has shut down."))
-

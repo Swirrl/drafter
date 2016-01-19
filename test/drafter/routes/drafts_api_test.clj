@@ -339,9 +339,9 @@
   (let [draft1 "http://graphs.org/1"
         draft2 "http://graphs.org/2"
         meta-pairs [["foo" "bar"] ["quux" "qaal"]]
-        route (draft-api-routes "" *test-backend*)
+        route (draft-api-routes "/draft" *test-backend*)
         create-meta-request (fn [graphs meta-pairs]
-                              (-> {:uri "/metadata"
+                              (-> {:uri "/draft/metadata"
                                    :request-method :post
                                    :params {:graph graphs}}
                                   (add-request-metadata-pairs meta-pairs)))]
@@ -372,7 +372,7 @@
           (is (repo/query *test-backend* (metadata-has-value-sparql draft1 k v))))))
 
     (testing "Deletes metadata"
-      (let [delete-request {:uri "/metadata"
+      (let [delete-request {:uri "/draft/metadata"
                             :request-method :delete
                             :params {:graph [draft1 draft2]
                                      :meta-key ["foo" "quux"]}}
@@ -384,13 +384,13 @@
           (is (= false (repo/query *test-backend* (metadata-exists-sparql g m)))))))
 
     (testing "Invalid if no graphs"
-      (let [request (-> {:uri "/metadata" :request-method :post}
+      (let [request (-> {:uri "/draft/metadata" :request-method :post}
                         (add-request-metadata-pairs [["foo" "bar"]]))
             {:keys [status]} (route request)]
         (is (= 400 status))))
 
     (testing "Invalid if no metadata"
-      (let [request {:uri "/metadata"
+      (let [request {:uri "/draft/metadata"
                      :request-method :post
                      :params {:graph [draft1 draft2]}}
             {:keys [status]} (route request)]
