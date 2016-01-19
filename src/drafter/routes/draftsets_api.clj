@@ -103,7 +103,8 @@
                       quads-to-delete (read-statements data rdf-format)
                       ds-executor (get-draftset-executor backend ds-id)]
                   (delete-quads ds-executor quads-to-delete #{})
-                  (response "WOOOOOO"))
+
+                  (response (dsmgmt/get-draftset-info backend ds-id)))
                 (not-found ""))))
 
     (POST "/draftset/:id/data" {{draftset-id :id

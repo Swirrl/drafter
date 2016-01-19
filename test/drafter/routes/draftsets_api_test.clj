@@ -64,6 +64,9 @@
 (def ^:private draftset-with-description-info-schema
   (assoc draftset-without-description-info-schema :description s/Str))
 
+(def ^:private draftset-info-schema
+  (assoc draftset-without-description-info-schema (s/optional-key :description) s/Str))
+
 (defn- assert-schema [schema value]
   (if-let [errors (s/check schema value)]
     (is false errors)))
@@ -249,6 +252,8 @@
                 delete-response (route delete-request)]
             
             (assert-is-ok-response delete-response)
+
+            (assert-schema draftset-info-schema (:body delete-response))
 
             (let [ds-data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
                   ds-data-response (route ds-data-request)
