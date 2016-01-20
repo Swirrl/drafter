@@ -243,6 +243,10 @@
     (assert-is-ok-response data-response)
     (concrete-statements (:body data-response) formats/rdf-nquads)))
 
+(defn- create-delete-quads-request [draftset-location input-stream format]
+  (let [file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}]
+    {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}))
+
 (deftest delete-draftset-data-test
   (let [{:keys [mount-point route]} (create-routes)
         rdf-data-file "test/resources/test-draftset.trig"]
@@ -268,6 +272,23 @@
                 expected-quads (set/difference draftset-quads to-delete)
                 actual-quads (set (eval-statements (get-draftset-quads-through-api route draftset-location)))]
             (is (= (set (eval-statements expected-quads)) actual-quads))))))
+
+    (testing "Delete all quads from graph"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            initial-statements (statements rdf-data-file)
+            grouped-statements (group-by context initial-statements)
+            [graph graph-statements] (first grouped-statements)]
+        (append-data-to-draftset-through-api route draftset-location rdf-data-file)
+
+        (with-open [input-stream (statements->input-stream graph-statements formats/rdf-nquads)]
+          (let [delete-request (create-delete-quads-request draftset-location input-stream "text/x-nquads")
+                {:keys [body] :as delete-response} (route delete-request)]
+            (assert-is-ok-response delete-response)
+            (assert-schema draftset-info-schema body)
+
+            (let [remaining-graphs (keys (:data body))
+                  expected-graphs (rest (keys grouped-statements))]
+              (is (= (set expected-graphs) (set remaining-graphs))))))))
 
     (testing "Delete triples"
       (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")

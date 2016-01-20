@@ -271,6 +271,44 @@
   (update! db (delete-live-graph-from-state-query live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
 
+(defn- delete-empty-draft-graphs-query []
+  (str "DELETE {"
+       (with-state-graph
+         "?dg ?sp ?so ."
+         "?lg <" drafter:hasDraft "> ?dg .")
+       "} WHERE {"
+       (with-state-graph
+         "?dg <" rdf:a "> <" drafter:DraftGraph "> ."
+         "?dg ?dp ?do ."
+         "OPTIONAL {"
+         "  ?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+         "  ?lg <" drafter:hasDraft "> ?dg ."
+         "}")
+       "  FILTER NOT EXISTS { GRAPH ?dg { ?s ?p ?o } }"
+       "}"))
+
+(defn delete-empty-draft-graphs! [db]
+  (update! db (delete-empty-draft-graphs-query)))
+
+(defn- delete-private-managed-graphs-without-drafts-query []
+  (str
+   "DELETE { "
+   (with-state-graph
+     "?lg ?p ?o .")
+   "} WHERE { "
+   (with-state-graph
+     "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+     "?lg <" drafter:isPublic "> false ."
+     "?lg ?p ?o .")
+   "FILTER NOT EXISTS {"
+   "  ?dg <" rdf:a "> <" drafter:DraftGraph "> ."
+   "  ?lg <" drafter:hasDraft "> ?dg ."
+   "}"
+   "}"))
+
+(defn delete-private-managed-graphs-without-drafts! [db]
+  (update! db (delete-private-managed-graphs-without-drafts-query)))
+
 (defn draft-graphs
   "Get all the draft graph URIs"
   [db]

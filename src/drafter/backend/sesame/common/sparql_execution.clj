@@ -5,6 +5,7 @@
             [clojure.set :as set]
             [drafter.backend.protocols :as backend]
             [drafter.backend.sesame.common.protocols :refer :all]
+            [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results rewrite-statement]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
@@ -180,7 +181,14 @@
         graphs (get-restrictions restrictions)
         graph-array (into-array Resource graphs)]
     (with-open [conn (grafter.rdf.repository/->connection repo)]
-      (.remove conn (seq->iterable quads) graph-array))))
+      (.remove conn (seq->iterable quads) graph-array))
+
+    ;;removal of quads may leave some draft graphs empty - these
+    ;;should be removed from the state graph. Removing the draft
+    ;;graphs may cause the corresponding managed graphs to have no
+    ;;remaining drafts - these should also be removed.
+    (mgmt/delete-empty-draft-graphs! backend)
+    (mgmt/delete-private-managed-graphs-without-drafts! backend)))
 
 (defn- rdf-handler->spog-tuple-handler [rdf-handler]
   (reify TupleQueryResultHandler
