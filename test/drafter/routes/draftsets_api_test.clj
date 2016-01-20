@@ -86,6 +86,9 @@
 (defn- assert-is-unprocessable-response [response]
   (assert-schema (response-code-schema 422) response))
 
+(defn- assert-is-unsupported-media-type-response [response]
+  (assert-schema (response-code-schema 415) response))
+
 (defn- eval-statement [s]
   (util/map-values str s))
 
@@ -244,7 +247,7 @@
     (concrete-statements (:body data-response) formats/rdf-nquads)))
 
 (defn- create-delete-quads-request [draftset-location input-stream format]
-  (let [file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}]
+  (let [file-part {:tempfile input-stream :filename "to-delete.nq" :content-type format}]
     {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}))
 
 (defn- create-delete-triples-request [draftset-location input-stream format graph]
@@ -356,7 +359,14 @@
             file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}
             delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}
             delete-response (route delete-request)]
-        (assert-is-unprocessable-response delete-response)))))
+        (assert-is-unprocessable-response delete-response)))
+
+    (testing "Unknown content type"
+      (with-open [input-stream (io/input-stream rdf-data-file)]
+        (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+              delete-request (create-delete-quads-request draftset-location input-stream "application/unknown-quads-format")
+              delete-response (route delete-request)]
+          (assert-is-unsupported-media-type-response delete-response))))))
 
 (deftest publish-draftset-test
   (let [{:keys [mount-point route]} (create-routes)

@@ -2,7 +2,8 @@
   (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes]]
             [clojure.set :as set]
             [ring.util.response :refer [redirect-after-post not-found response]]
-            [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response submit-async-job!]]
+            [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response
+                                       unsupported-media-type-response submit-async-job!]]
             [swirrl-server.responses :as response]
             [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
             [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
@@ -106,21 +107,23 @@
                                    request-content-type :content-type
                                    graph :graph
                                    {file-part-content-type :content-type data :tempfile} :file} :params :as request}
-            (let [ds-id (dsmgmt/->DraftsetId draftset-id)]
+            (let [ds-id (dsmgmt/->DraftsetId draftset-id)
+                  content-type (or file-part-content-type request-content-type)]
               (if (dsmgmt/draftset-exists? backend ds-id)
-                (let [rdf-format (mimetype->rdf-format (or file-part-content-type request-content-type))
-                      ds-executor (get-draftset-executor backend ds-id)]
-                  (if (implies (is-triples-rdf-format? rdf-format)
-                               (some? graph))
-                    (try
-                      (let [statements-to-delete (read-statements data rdf-format)]
-                        (if (is-quads-content-type? rdf-format)
-                          (delete-quads ds-executor statements-to-delete nil)
-                          (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
-                        (response (dsmgmt/get-draftset-info backend ds-id)))
-                      (catch OpenRDFException ex
-                        (unprocessable-entity-response "Cannot read statements to delete")))
-                    (not-acceptable-response "graph parameter required for triples RDF format")))
+                (if-let [rdf-format (mimetype->rdf-format content-type)]
+                  (let [ds-executor (get-draftset-executor backend ds-id)]
+                    (if (implies (is-triples-rdf-format? rdf-format)
+                                 (some? graph))
+                      (try
+                        (let [statements-to-delete (read-statements data rdf-format)]
+                          (if (is-quads-content-type? rdf-format)
+                            (delete-quads ds-executor statements-to-delete nil)
+                            (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
+                          (response (dsmgmt/get-draftset-info backend ds-id)))
+                        (catch OpenRDFException ex
+                          (unprocessable-entity-response "Cannot read statements to delete")))
+                      (not-acceptable-response "graph parameter required for triples RDF format")))
+                  (unsupported-media-type-response (str "Unsupported media type: " (or content-type ""))))
                 (not-found ""))))
 
     (POST "/draftset/:id/data" {{draftset-id :id
