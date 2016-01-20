@@ -368,6 +368,36 @@
               delete-response (route delete-request)]
           (assert-is-unsupported-media-type-response delete-response))))))
 
+(deftest delete-draftset-graph-test
+  (let [{:keys [mount-point route]} (create-routes)]
+    (testing "Deletes graph"
+      (let [rdf-data-file "test/resources/test-draftset.trig"
+            draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            draftset-quads (statements rdf-data-file)
+            grouped-quads (group-by context draftset-quads)
+            [graph _] (first grouped-quads)]
+        (append-data-to-draftset-through-api route draftset-location rdf-data-file)
+
+        (let [delete-graph-request {:uri (str draftset-location "/graph") :request-method :delete :params {:graph graph}}
+              delete-response (route delete-graph-request)]
+          (assert-is-ok-response delete-response)
+
+          (let [remaining-quads (eval-statements (get-draftset-quads-through-api route draftset-location))
+                expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
+            (is (= (set expected-quads) (set remaining-quads))))
+
+          (let [get-request {:uri draftset-location :request-method :get}
+                get-response (route get-request)
+                draftset-info (:body get-response)
+                draftset-graphs (keys (:data draftset-info))
+                expected-graphs (map first (rest grouped-quads))]
+            (is (= (set expected-graphs) (set draftset-graphs)))))))
+
+    (testing "Unknown draftset"
+      (let [delete-graph-request {:uri "/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}}
+            response (route delete-graph-request)]
+        (assert-is-not-found-response response)))))
+
 (deftest publish-draftset-test
   (let [{:keys [mount-point route]} (create-routes)
         rdf-data-file "test/resources/test-draftset.trig"]

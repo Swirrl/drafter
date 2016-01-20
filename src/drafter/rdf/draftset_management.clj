@@ -184,3 +184,9 @@
                            (combine-draftset-properties-and-graphs properties graph-mapping)))
                        all-properties)]
     all-infos))
+
+(defn delete-draftset-graph! [db draftset-ref graph-uri]
+  (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
+    (when-let [draft-graph-uri (get graph-mapping graph-uri)]
+      (let [delete-draft-query (mgmt/delete-draft-graph-and-remove-from-state-query draft-graph-uri)]
+        (update! db delete-draft-query)))))

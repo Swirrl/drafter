@@ -126,6 +126,14 @@
                   (unsupported-media-type-response (str "Unsupported media type: " (or content-type ""))))
                 (not-found ""))))
 
+    (DELETE "/draftset/:id/graph" [id graph]
+            (let [ds-id (dsmgmt/->DraftsetId id)]
+              (if (dsmgmt/draftset-exists? backend ds-id)
+                (do
+                  (dsmgmt/delete-draftset-graph! backend ds-id graph)
+                  (response {}))
+                (not-found ""))))
+
     (POST "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type
                         {file-part-content-type :content-type data :tempfile} :file} :params}
