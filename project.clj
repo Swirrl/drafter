@@ -60,14 +60,7 @@
                  [markdown-clj "0.9.44"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
                  [ring-middleware-accept "2.0.3"]
-                 [environ "1.0.0"]
-
-                 ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
-                 ;;[criterium "0.4.3"] ;; for easy benchmarking
-                 ;;[clj-http "1.1.0"]
-                 [drafter-client "0.3.6-SNAPSHOT"]
-
-                 ]
+                 [environ "1.0.0"]]
 
   :java-source-paths ["src-java"]
   :resource-paths ["resources"]
@@ -95,9 +88,17 @@
 
   :clean-targets [:target-path :compile-path]
 
+  :perforate {:environments [{:name :stardog
+                              :profiles [:bench-stardog]
+                              :namespaces [drafter.publishing-api-benchmarks]
+                              :fixtures [drafter.publishing-api-benchmarks/wrap-with-database]}
+
+                             {:name :sesame
+                              :profiles [:bench-sesame]
+                              :namespaces [drafter.publishing-api-benchmarks]}] }
+
   :profiles
   {
-
    :uberjar {:aot :all
              :main drafter.repl
              :uberjar [:swirrl-private-repos
@@ -126,6 +127,16 @@
          ;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
          ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
          }
+
+   ;; Create stardog DB with the following command first:
+   ;;
+   ;; ./stardog-admin db create -n pmd-benchmark -t D -o strict.parsing=false -o query.all.graphs=true -o reasoning.type=none -o index.differential.enable.limit=0 -o index.differential.merge.limit=20000
+   :bench-stardog {:env {:sparql-query-endpoint "http://localhost:5820/pmd-benchmark/query"
+                         :sparql-update-endpoint "http://localhost:5820/pmd-benchmark/update"
+                         :drafter-backend "drafter.backend.stardog.sesame"}}
+
+   :bench-sesame {:env {:default-repo-path "drafter-bench-db"
+                        :drafter-backend "drafter.backend.sesame.native"}}
    }
 
 
