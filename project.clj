@@ -108,13 +108,6 @@
                        :auto-reload?  false}}
 
 
-   :perforate { :dependencies [[perforate "0.3.4"] ;; include perforate and criterium in repl environments
-                               [criterium "0.4.3"] ;; for easy benchmarking
-                               [clj-http "1.1.0"]
-                               [drafter-client "0.3.6-SNAPSHOT"]
-                               [grafter "0.6.0-alpha5"]
-                               ]}
-
    :dev {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                    [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
@@ -123,8 +116,10 @@
                         [org.clojure/data.json "0.2.5"]
                         [clojure-csv/clojure-csv "2.0.1"]
                         [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
-                        ;;[perforate "0.3.4"]
-                        ]
+                        [perforate "0.3.4"] ;; include perforate in repl environments for easy benchmarking
+                        [criterium "0.4.3"] ;; Update criterium included in perforate to include new bug fixes
+                        ;;[clj-http "1.1.0"]
+                        [drafter-client "0.3.6-SNAPSHOT"]]
 
          :env {:dev true}
 
