@@ -1,7 +1,7 @@
 (ns drafter.rdf.draftset-management-test
   (:require [clojure.test :refer :all]
             [drafter.rdf.draftset-management :refer :all]
-            [drafter.rdf.draft-management :refer [draft-exists?]]
+            [drafter.rdf.draft-management :refer [draft-exists?] :as mgmt]
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft!]]
             [grafter.rdf :refer [statements context]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
@@ -45,11 +45,14 @@
     (delete-draftset-statements! *test-backend* draftset-id)
     (is (= false (ask? (str "<" draftset-uri ">") "?p" "?o")))))
 
+(defn- import-data-to-draftset! [db draftset-id quads]
+  (let [graph-quads (group-by context quads)]
+    (doall (map (fn [[live qs]] (import-data-to-draft! *test-backend* live qs draftset-id)) graph-quads))))
+
 (deftest delete-draftset!-test
   (let [draftset-id (create-draftset! *test-backend* "Test draftset")
         quads (statements "test/resources/test-draftset.trig")
-        graph-quads (group-by context quads)
-        draft-graphs (doall (map (fn [[live qs]] (import-data-to-draft! *test-backend* live qs draftset-id)) graph-quads))]
+        draft-graphs (import-data-to-draftset! *test-backend* draftset-id quads)]
     
     (doseq [dg draft-graphs]
       (is (= true (draft-exists? *test-backend* dg))))
@@ -60,6 +63,26 @@
 
     (doseq [dg draft-graphs]
       (is (= false (draft-exists? *test-backend* dg))))))
+
+(deftest delete-draftest-graph!-test
+  (testing "Draftset graph"
+    (let [draftset-id (create-draftset! *test-backend* "Test draftset")
+          quads (statements "test/resources/test-draftset.trig")]
+      
+      (import-data-to-draftset! *test-backend* draftset-id quads)
+      
+      (let [[live draft] (first (get-draftset-graph-mapping *test-backend* draftset-id))]
+        (delete-draftset-graph! *test-backend* draftset-id live)
+        (is (= false (draft-exists? *test-backend* draft))))))
+
+  (testing "Unknown graph"
+    (let [draftset-id (create-draftset! *test-backend* "Test draftset")]
+      (import-data-to-draftset! *test-backend* draftset-id (statements "test/resources/test-draftset.trig"))
+
+      (let [old-mapping (get-draftset-graph-mapping *test-backend* draftset-id)]
+        (delete-draftset-graph! *test-backend* draftset-id (mgmt/make-draft-graph-uri))
+
+        (is (= old-mapping (get-draftset-graph-mapping *test-backend* draftset-id)))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

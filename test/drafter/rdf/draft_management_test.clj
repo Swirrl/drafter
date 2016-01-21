@@ -335,5 +335,31 @@
       (is (is-graph-managed? *test-backend* live-graph-uri))
       (is (draft-exists? *test-backend* draft-graph-uri)))))
 
+(deftest delete-draft-graph!-test
+  (testing "With only draft for managed graph"
+    (let [live-graph-uri (create-managed-graph! *test-backend* "http://live")
+          draft-graph-uri (create-draft-graph! *test-backend* live-graph-uri)]
+      (append-data-batch! *test-backend* draft-graph-uri test-triples)
+      (delete-draft-graph! *test-backend* draft-graph-uri)
+
+      (testing "should delete graph data"
+        (is (= false (ask? "GRAPH <" draft-graph-uri "> { ?s ?p ?o }"))))
+
+      (testing "should delete graph from state"
+        (is (= false (ask? (with-state-graph "<" draft-graph-uri "> ?p ?o")))))
+
+      (testing "should delete managed graph"
+        (is (= false (is-graph-managed? *test-backend* live-graph-uri))))))
+
+  (testing "Draft for managed graph with other graphs"
+    (let [live-graph-uri (create-managed-graph! *test-backend* "http://live")
+          draft-graph-1 (create-draft-graph! *test-backend* live-graph-uri)
+          draft-graph-2 (create-draft-graph! *test-backend* live-graph-uri)]
+      
+      (delete-draft-graph! *test-backend* draft-graph-2)
+
+      (is (= true (draft-exists? *test-backend* draft-graph-1)))
+      (is (= true (is-graph-managed? *test-backend* live-graph-uri))))))
+
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

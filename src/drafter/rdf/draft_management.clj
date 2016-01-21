@@ -237,6 +237,34 @@
                            "}")]
     (update! db delete-sparql)))
 
+(defn- delete-dependent-private-managed-graph-query [draft-graph-uri]
+  (str
+   "DELETE {"
+   (with-state-graph
+     "?lg ?lp ?lo .")
+   "} WHERE {"
+   (with-state-graph
+     "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+     "?lg <" drafter:isPublic "> false ."
+     "?lg ?lp ?lo ."
+     "FILTER NOT EXISTS {"
+     "  ?lg <" drafter:hasDraft "> ?odg ."
+     "  FILTER (?odg != <" draft-graph-uri ">)"
+     "}")
+   "}"))
+
+(defn- delete-draft-graph-query [draft-graph-uri]
+  (util/make-compound-sparql-query
+   [(delete-draft-graph-and-remove-from-state-query draft-graph-uri)
+    (delete-dependent-private-managed-graph-query draft-graph-uri)]))
+
+(defn delete-draft-graph!
+  "Deletes a draft graph's contents and all references to it in the
+  state graph. If its associated managed graph is private and has only
+  the given draft graph then it will also be removed."
+  [db draft-graph-uri]
+  (update! db (delete-draft-graph-query draft-graph-uri)))
+
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph. Returns nil if not
   found."
