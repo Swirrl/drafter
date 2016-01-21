@@ -232,7 +232,11 @@
                 file-part {:tempfile fs :filename "test-dataset.trig"}
                 request (append-to-draftset-request mount-point draftset-location file-part)
                 response (route request)]
-            (is (is-client-error-response? response)))))))
+            (is (is-client-error-response? response)))))
+
+      (testing "Invalid draftset"
+        (let [append-response (make-append-data-to-draftset-request route "/draftset/missing" "test/resources/test-draftset.trig")]
+          (assert-is-not-found-response append-response)))))
 
 (defn- statements->input-stream [statements format]
   (let [bos (ByteArrayOutputStream.)
@@ -436,13 +440,7 @@
         draftset-location (create-draftset-through-api mount-point route "Test draftset")
         delete-response (route {:uri draftset-location :request-method :delete})]
     (assert-is-ok-response delete-response)
-
-    (with-open [fs (io/input-stream rdf-data-file)]
-      (let [file-part {:tempfile fs :filename "test-draftset.trig" :content-type "application/x-trig"}
-            append-request (append-to-draftset-request mount-point draftset-location file-part)
-            append-response (route append-request)]
-        (await-success finished-jobs (:finished-job (:body append-response)))))
-
+    
     (let [get-response (route {:uri draftset-location :request-method :get})]
       (assert-is-not-found-response get-response))))
 

@@ -137,17 +137,20 @@
     (POST "/draftset/:id/data" {{draftset-id :id
                         request-content-type :content-type
                         {file-part-content-type :content-type data :tempfile} :file} :params}
-          (if-let [content-type (or file-part-content-type request-content-type)]
-            (let [rdf-format (mimetype->rdf-format content-type)]
-              (cond (nil? rdf-format)
-                    (unknown-rdf-content-type-response content-type)
+          (let [ds-id (dsmgmt/->DraftsetId draftset-id)]
+            (if (dsmgmt/draftset-exists? backend ds-id)
+              (if-let [content-type (or file-part-content-type request-content-type)]
+                (let [rdf-format (mimetype->rdf-format content-type)]
+                  (cond (nil? rdf-format)
+                        (unknown-rdf-content-type-response content-type)
                     
-                    (is-quads-content-type? rdf-format)
-                    (let [append-job (append-data-to-draftset-job backend (dsmgmt/->DraftsetId draftset-id) data rdf-format)]
-                      (submit-async-job! append-job))
+                        (is-quads-content-type? rdf-format)
+                        (let [append-job (append-data-to-draftset-job backend (dsmgmt/->DraftsetId draftset-id) data rdf-format)]
+                          (submit-async-job! append-job))
 
-                    :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
-            (response/bad-request-response "Content type required")))
+                        :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
+                (response/bad-request-response "Content type required"))
+              (not-found ""))))
 
     (ANY "/draftset/:id/query" [id query :as request]
          (cond (not (#{:get :post} (:request-method request)))
