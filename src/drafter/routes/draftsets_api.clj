@@ -75,10 +75,8 @@
 
     ;;create a new draftset
     (POST "/draftset" [display-name description]
-          (if (some? display-name)
-            (let [draftset-id (dsmgmt/create-draftset! backend display-name description)]
-              (redirect-after-post (str mount-point "/draftset/" draftset-id)))
-            (not-acceptable-response "display-name parameter required")))
+          (let [draftset-id (dsmgmt/create-draftset! backend display-name description)]
+            (redirect-after-post (str mount-point "/draftset/" draftset-id))))
 
     (GET "/draftset/:id" [id]
          (if-let [info (dsmgmt/get-draftset-info backend (dsmgmt/->DraftsetId id))]

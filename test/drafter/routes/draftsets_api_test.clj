@@ -55,17 +55,21 @@
 (defn- response-code-schema [code]
   (assoc ring-response-schema :status (s/eq code)))
 
-(def ^:private draftset-without-description-info-schema
+(def ^:private draftset-without-title-or-description-info-schema
   {:id s/Str
    :data {s/Str {s/Any s/Any}}
-   :display-name s/Str
    :created-at Date})
+
+(def ^:private draftset-without-description-info-schema
+  (assoc draftset-without-title-or-description-info-schema :display-name s/Str))
 
 (def ^:private draftset-with-description-info-schema
   (assoc draftset-without-description-info-schema :description s/Str))
 
 (def ^:private draftset-info-schema
-  (assoc draftset-without-description-info-schema (s/optional-key :description) s/Str))
+  (merge draftset-without-title-or-description-info-schema
+         {(s/optional-key :description) s/Str
+          (s/optional-key :display-name) s/Str}))
 
 (defn- assert-schema [schema value]
   (if-let [errors (s/check schema value)]
@@ -115,7 +119,7 @@
 
     (testing "Create draftset without title"
       (let [response (route {:uri (str mount-point "/draftset") :request-method :post})]
-        (assert-is-not-acceptable-response response)))
+        (assert-is-see-other-response response)))
 
     (testing "Get non-existent draftset"
       (let [response (route {:uri (str mount-point "/draftset/missing") :request-method :get})]
@@ -138,6 +142,18 @@
 
 (deftest get-draftset-test
   (let [{:keys [mount-point route]} (create-routes)]
+    (testing "Get empty draftset without title or description"
+      (let [create-request {:uri "/draftset" :request-method :post}
+            create-response (route create-request)]
+        (assert-is-see-other-response create-response)
+
+        (let [draftset-location (get-in create-response [:headers "Location"])
+              get-request {:uri draftset-location :request-method :get}
+              {:keys [body] :as get-response} (route get-request)]
+          
+          (assert-is-ok-response get-response)
+          (assert-schema draftset-without-title-or-description-info-schema body))))
+    
     (testing "Get empty draftset without description"
       (let [display-name "Test title!"
             create-request (create-draftset-request mount-point display-name)

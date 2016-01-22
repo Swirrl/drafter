@@ -14,9 +14,19 @@
 (defn- has-string-object? [s p str-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> \"" str-o "\" }")))
 
+(defn- has-any-object? [s p]
+  (query *test-backend* (str "ASK WHERE { <" s "> <" p "> ?o }")))
+
 (deftest create-draftset!-test
   (let [title "Test draftset"
         description "Test description"]
+    (testing "Without title or description"
+      (let [draftset-id (create-draftset! *test-backend*)
+            ds-uri (->draftset-uri draftset-id)]
+        (is (draftset-exists? *test-backend* ds-uri))
+        (is (= false (has-any-object? ds-uri rdfs:label)))
+        (is (= false (has-any-object? ds-uri rdfs:comment)))))
+
     (testing "Without description"
       (let [draftset-id (create-draftset! *test-backend* title)
             ds-uri (->draftset-uri draftset-id)]

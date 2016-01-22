@@ -35,16 +35,17 @@
       (->DraftsetId (.toString relative)))))
 
 (defn- create-draftset-statements [title description draftset-uri created-date]
-  (let [base-quads [draftset-uri
-                    [rdf:a drafter:DraftSet]
-                    [rdfs:label (s title)]
-                    [drafter:createdAt created-date]]]
-    (util/conj-if (some? description) base-quads [rdfs:comment (s description)])))
+  (let [ss [draftset-uri
+            [rdf:a drafter:DraftSet]
+            [drafter:createdAt created-date]]
+        ss (util/conj-if (some? title) ss [rdfs:label (s title)])]
+    (util/conj-if (some? description) ss [rdfs:comment (s description)])))
 
 (defn create-draftset!
   "Creates a new draftset in the given database and returns its id. If
   no title is provided (i.e. it is nil) a default title will be used
   for the new draftset."
+  ([db] (create-draftset! db nil))
   ([db title] (create-draftset! db title nil))
   ([db title description] (create-draftset! db title description (UUID/randomUUID) (Date.)))
   ([db title description draftset-id created-date]
@@ -135,9 +136,9 @@
      "SELECT * WHERE { "
      (with-state-graph
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" rdfs:label "> ?title ."
        "<" draftset-uri "> <" drafter:createdAt "> ?created ."
-       "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description }")
+       "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description . }"
+       "OPTIONAL { <" draftset-uri "> <" rdfs:label "> ?title }")
      "}")))
 
 (defn- get-all-draftsets-properties-query []
@@ -145,20 +146,20 @@
    "SELECT * WHERE { "
    (with-state-graph
      "?ds <" rdf:a "> <" drafter:DraftSet "> ."
-     "?ds <" rdfs:label "> ?title ."
      "?ds <" drafter:createdAt "> ?created ."
-     "OPTIONAL { ?ds <" rdfs:comment "> ?description }")
+     "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
+     "OPTIONAL { ?ds <" rdfs:label "> ?title . }")
    "}"))
 
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
 (defn- draftset-properties-result->properties [draftset-ref {:strs [created title description]}]
-  (util/conj-if (some? description)
-                {:display-name (.stringValue title)
-                 :created-at (calendar-literal->date created)
-                 :id (str (->draftset-id draftset-ref))}
-                [:description (.stringValue description)]))
+  (let [required-fields {:id (str (->draftset-id draftset-ref))
+                         :created-at (calendar-literal->date created)}
+        optional-fields {:display-name (and title (.stringValue title))
+                         :description (and description (.stringValue description))}]
+    (merge required-fields (remove (comp nil? second) optional-fields))))
 
 (defn- get-draftset-properties [repo draftset-ref]
   (let [properties-query (get-draftset-properties-query draftset-ref)
