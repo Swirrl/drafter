@@ -43,13 +43,13 @@
                  ;; https://openrdf.atlassian.net/browse/SES-2119
                  ;;
                  ;; we can remove this exclusion.
-                 [grafter "0.6.0-alpha4" :exclusions [org.openrdf.sesame/sesame-queryresultio-sparqlxml org.clojure/tools.nrepl]]
-                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.7.16-with-ses-memfix" :exclusions [org.openrdf.sesame/sesame-rio-api]]
+                 [grafter "0.6.0"]
+                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.8"]
 
                  [grafter/vocabularies "0.1.3"]
 
-                 [org.openrdf.sesame/sesame-queryrender "2.7.16"]
-                 [org.openrdf.sesame/sesame-runtime "2.7.16"]
+                 [org.openrdf.sesame/sesame-queryrender "2.8.8"]
+                 [org.openrdf.sesame/sesame-runtime "2.8.8"]
 
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
