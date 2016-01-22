@@ -170,4 +170,12 @@
           (let [id (dsmgmt/->DraftsetId id)]
             (if (dsmgmt/draftset-exists? backend id)
               (submit-async-job! (publish-draftset-job backend id))
-              (not-found "")))))))
+              (not-found ""))))
+
+    (PUT "/draftset/:id/meta" [id :as request]
+         (let [ds-id (dsmgmt/->DraftsetId id)]
+           (if (dsmgmt/draftset-exists? backend ds-id)
+             (do
+               (dsmgmt/set-draftset-metadata! backend ds-id (:params request))
+               (response (dsmgmt/get-draftset-info backend ds-id)))
+             (not-found "")))))))

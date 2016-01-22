@@ -5,7 +5,8 @@
             [grafter.rdf.repository :refer [query]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
-            [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph] :as mgmt])
+            [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph] :as mgmt]
+            [clojure.string :as string])
   (:import [java.net URI]
            [java.util Date UUID]))
 
@@ -189,3 +190,29 @@
   (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
     (when-let [draft-graph-uri (get graph-mapping graph-uri)]
       (mgmt/delete-draft-graph! db draft-graph-uri))))
+
+(def ^:private draftset-param->predicate
+  {:display-name rdfs:label
+   :description rdfs:comment})
+
+(defn- set-draftset-metadata-query [draftset-uri po-pairs]
+  (str
+   "DELETE {"
+   (with-state-graph
+     "<" draftset-uri "> ?p ?o .")
+   "} INSERT {"
+   (with-state-graph
+     (string/join " " (map (fn [[p o]] (str "<" draftset-uri "> <" p "> \"" o "\" .")) po-pairs)))
+   "} WHERE {"
+   (with-state-graph
+     "VALUES ?p { " (string/join " " (map #(str "<" (first %) ">") po-pairs)) " }"
+     "<" draftset-uri "> ?p ?o .")
+   "}"))
+
+(defn set-draftset-metadata!
+  "Takes a map containing new values for various metadata keys and
+  updates them on the given draftset."
+  [backend draftset-ref meta-map]
+  (when-let [update-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
+    (let [q (set-draftset-metadata-query (->draftset-uri draftset-ref) update-pairs)]
+      (update! backend q))))

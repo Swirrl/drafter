@@ -43,3 +43,9 @@
 
     ;;grouped batches where input length > take-batch-size
     [:a :b :a :b :a :b] identity 2 4 [[:a :a] [:b :b] [:a] [:b]]))
+
+(deftest intersection-with-test
+  (are [m1 m2 f expected] (= expected (intersection-with m1 m2 f))
+       {:a 1 :b 2 :c 3} {:a 4 :b 5 :c 6} + {:a 5 :b 7 :c 9}
+       {:a 1 :b 2} {:b 1 :c 5} vector {:b [2 1]}
+       {:a 1 :b 2} {:c 3 :d 4} = {}))

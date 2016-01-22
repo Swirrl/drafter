@@ -114,3 +114,16 @@
   [s]
   (reify java.lang.Iterable
     (iterator [this] (seq->iterator s))))
+
+;Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
+(defn intersection-with
+  "Intersects two maps by their keys and combines corresponding values
+  with the given combination function. Returns a new map of combined
+  values mapped to their corresponding keys in the input maps."
+  [m1 m2 f]
+  (let [kvs (map (fn [[k v]]
+                   (if (contains? m2 k)
+                     [k (f v (get m2 k))]))
+                 m1)
+        kvs (remove nil? kvs)]
+    (into {} kvs)))

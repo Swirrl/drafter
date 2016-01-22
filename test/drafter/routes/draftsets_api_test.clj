@@ -528,5 +528,25 @@
       (let [response (route {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}})]
         (assert-is-not-found-response response)))))
 
+(deftest set-draftset-metadata-test
+  (let [{:keys [mount-point route]} (create-routes)]
+    (testing "Set metadata"
+      (let [draftset-location (create-draftset-through-api mount-point route "temp")
+            new-title "Updated title"
+            new-description "Updated description"
+            meta-request {:uri (str draftset-location "/meta") :request-method :put :params {:display-name new-title :description new-description}}
+            {:keys [body] :as  meta-response} (route meta-request)]
+        
+        (assert-is-ok-response meta-response)
+        (assert-schema draftset-info-schema body)
+
+        (is (= new-title (:display-name body)))
+        (is (= new-description (:description body)))))
+    
+    (testing "Missing draftest"
+      (let [meta-request {:uri "/draftset/missing/meta" :request-method :put :params {:display-name "Title!" :description "Description"}}
+            meta-response (route meta-request)]
+        (assert-is-not-found-response meta-response)))))
+
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
