@@ -20,8 +20,7 @@
                  [org.apache.jena/jena-arq "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api
                                                                          com.fasterxml.jackson.core/jackson-core
                                                                          org.slf4j/jcl-over-slf4j
-                                                                         org.apache.httpcomponents/httpclient
-                                                                         org.slf4j/slf4j-api]]
+                                                                         org.apache.httpcomponents/httpclient]]
 
                  [org.apache.jena/jena-core "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-base "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
