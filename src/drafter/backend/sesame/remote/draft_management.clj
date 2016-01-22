@@ -45,44 +45,12 @@
   (let [update-query (append-metadata-to-graphs-query graph-uris meta-pairs)]
     (update! backend update-query)))
 
-(defn- move-like-tbl-wants-super-slow-on-stardog-though
+(defn- move-graph
   "Move's how TBL intended.  Issues a SPARQL MOVE query.
   Note this is super slow on stardog 3.1."
   [source destination]
   ;; Move's how TBL intended...
   (str "MOVE SILENT <" source "> TO <" destination ">"))
-
-(defn- delete-insert-move
-  "Move source graph to destination.  Semantically the same as MOVE but done
-  with DELETE/INSERT's."
-  [source destination]
-  ;; TODO: replace this with the SPARQL MOVE query from above it used to be
-  ;; faster on stardog to do it this way (and on sesame it didn't make much
-  ;; difference)
-  ;;
-  ;; but stardog claim to have fixed this performance regression in version 3.1.
-  ;; so MOVE's may now be faster this way.
-  ;;
-  ;; See here for details: http://tinyurl.com/jgcytss
-  (str
-   ;; first clear the destination, then...
-   "DELETE {"
-   "  GRAPH <" destination "> {?s ?p ?o}"
-   "} WHERE {"
-   "  GRAPH <" destination "> {?s ?p ?o} "
-   "};"
-   ;; copy the source to the destination, and...
-   "INSERT {"
-   "  GRAPH <" destination "> {?s ?p ?o}"
-   "} WHERE { "
-   "  GRAPH <" source "> {?s ?p ?o}"
-   "};"
-   ;; remove the source (draft) graph
-   "DELETE {"
-   "  GRAPH <" source "> {?s ?p ?o}"
-   "} WHERE {"
-   " GRAPH <" source "> {?s ?p ?o}"
-   "}"))
 
 (defn graph-non-empty-query [graph-uri]
   (str
@@ -116,7 +84,7 @@
 ;;Repository -> String -> { queries: [String], live-graph-uri: String }
 (defn- migrate-live-queries [db draft-graph-uri]
   (if-let [live-graph-uri (mgmt/lookup-live-graph db draft-graph-uri)]
-    (let [move-query (delete-insert-move draft-graph-uri live-graph-uri)
+    (let [move-query (move-graph draft-graph-uri live-graph-uri)
           delete-state-query (mgmt/delete-draft-state-query draft-graph-uri)
           live-public-query (mgmt/set-isPublic-query live-graph-uri true)
           queries [move-query delete-state-query live-public-query]
