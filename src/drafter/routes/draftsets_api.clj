@@ -96,6 +96,20 @@
       (inner-handler (assoc-in request [:params :rdf-format] rdf-format))
       (not-acceptable-response "Accept header required with MIME type of RDF format to return"))))
 
+(defn- read-rdf-file-handler
+  "NOTE: This middleware must come after rdf-file-part-handler since
+  that ensure the incoming request is well-formed and has a known
+  content type."
+  [inner-handler]
+  (fn [{{rdf-format :rdf-format
+         {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
+    (try
+      (let [rdf-statements (read-statements data rdf-format)
+            modified-request (assoc-in request [:params :rdf-statements] rdf-statements)]
+        (inner-handler modified-request))
+      (catch OpenRDFException ex
+        (unprocessable-entity-response "Cannot read statements to delete")))))
+
 (defn draftset-api-routes [mount-point backend]
   (routes
    (context
@@ -135,22 +149,20 @@
                 (existing-draftset-handler
                  backend
                  (rdf-file-part-handler
-                  (fn [{{draftset-id :draftset-id
-                         graph :graph
-                         rdf-format :rdf-format
-                         {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
-                    (let [ds-executor (get-draftset-executor backend draftset-id)]
-                      (if (implies (is-triples-rdf-format? rdf-format)
-                                   (some? graph))
-                        (try
-                          (let [statements-to-delete (read-statements data rdf-format)]
-                            (if (is-quads-content-type? rdf-format)
-                              (delete-quads ds-executor statements-to-delete nil)
-                              (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
-                            (response (dsmgmt/get-draftset-info backend draftset-id)))
-                          (catch OpenRDFException ex
-                            (unprocessable-entity-response "Cannot read statements to delete")))
-                        (not-acceptable-response "graph parameter required for triples RDF format")))))))
+                  (read-rdf-file-handler
+                   (fn [{{draftset-id :draftset-id
+                          graph :graph
+                          rdf-format :rdf-format
+                          statements-to-delete :rdf-statements} :params :as request}]
+                     (let [ds-executor (get-draftset-executor backend draftset-id)]
+                       (if (implies (is-triples-rdf-format? rdf-format)
+                                    (some? graph))
+                         (do
+                           (if (is-quads-content-type? rdf-format)
+                             (delete-quads ds-executor statements-to-delete nil)
+                             (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
+                           (response (dsmgmt/get-draftset-info backend draftset-id)))
+                         (not-acceptable-response "graph parameter required for triples RDF format"))))))))
 
     (make-route :delete "/draftset/:id/graph"
                 (existing-draftset-handler backend 
