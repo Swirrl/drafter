@@ -3,7 +3,8 @@
             [swirrl-server.responses :as response]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
             [swirrl-server.async.jobs :refer [submitted-job-response]]
-            [drafter.write-scheduler :refer [await-sync-job! queue-job!]])
+            [drafter.write-scheduler :refer [await-sync-job! queue-job!]]
+            [clojure.string :refer [upper-case]])
   (:import [clojure.lang ExceptionInfo]))
 
 (def ^:private temporarily-locked-for-writes-response
@@ -22,6 +23,11 @@
 
 (defn unsupported-media-type-response [body]
   {:status 415 :headers {} :body body})
+
+(defn method-not-allowed-response [method]
+  {:status 405
+   :headers {}
+   :body (str "Method " (upper-case (name method)) " not supported by this resource")})
 
 (defn default-job-result-handler
   "Default handler for creating ring responses from job results. If

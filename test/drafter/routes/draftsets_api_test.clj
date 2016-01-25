@@ -93,6 +93,9 @@
 (defn- assert-is-unsupported-media-type-response [response]
   (assert-schema (response-code-schema 415) response))
 
+(defn- assert-is-method-not-allowed-response [response]
+  (assert-schema (response-code-schema 405) response))
+
 (defn- eval-statement [s]
   (util/map-values str s))
 
@@ -495,7 +498,7 @@
                            :headers {"Accept" "text/plain"}
                            :params {:query "SELECT * WHERE { ?s ?p ?o }"}}
             response (route query-request)]
-        (assert-is-not-found-response response)))))
+        (assert-is-method-not-allowed-response response)))))
 
 (deftest get-draftset-data-test
   (let [{:keys [mount-point route]} (create-routes)]

@@ -1,9 +1,9 @@
 (ns drafter.routes.draftsets-api
-  (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes]]
+  (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes make-route]]
             [clojure.set :as set]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response
-                                       unsupported-media-type-response submit-async-job!]]
+                                       unsupported-media-type-response method-not-allowed-response submit-async-job!]]
             [swirrl-server.responses :as response]
             [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
             [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
@@ -65,6 +65,20 @@
     (.parse parser in-stream base-uri)
     (seq model)))
 
+(defn- allowed-methods-handler [is-allowed-fn inner-handler]
+  (fn [{:keys [request-method] :as request}]
+    (if (is-allowed-fn request-method)
+      (inner-handler request)
+      (method-not-allowed-response request-method))))
+
+(defn- existing-draftset-handler [backend inner-handler]
+  (fn [{{:keys [id]} :params :as request}]
+    (let [draftset-id (dsmgmt/->DraftsetId id)]
+      (if (dsmgmt/draftset-exists? backend draftset-id)
+        (let [updated-request (assoc-in request [:params :draftset-id] draftset-id)]
+          (inner-handler updated-request))
+        (not-found "")))))
+
 (defn draftset-api-routes [mount-point backend]
   (routes
    (context
@@ -87,93 +101,84 @@
             (delete-draftset! backend (dsmgmt/->DraftsetId id))
             (response ""))
 
-    (GET "/draftset/:id/data" [id graph union-with-live :as request]
-         (let [ds-id (dsmgmt/->DraftsetId id)]
-           (if (dsmgmt/draftset-exists? backend ds-id)
-             (if-let [rdf-format (get-accepted-rdf-format request)]
-               (if (is-quads-content-type? rdf-format)
-                 (get-draftset-data backend ds-id (get-in request [:headers "Accept"]))
-                 (if (some? graph)
-                   (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                         query-request (assoc-in request [:params :query] q)]
-                     (execute-query-in-draftset backend ds-id query-request))
-                   (not-acceptable-response "graph query parameter required for RDF triple format")))
-               (not-acceptable-response "Accept header required with MIME type of RDF format to return"))
-             (not-found ""))))
+    (make-route :get "/draftset/:id/data"
+                (existing-draftset-handler
+                 backend
+                 (fn [{{:keys [draftset-id graph union-with-live]} :params :as request}]
+                   (if-let [rdf-format (get-accepted-rdf-format request)]
+                     (if (is-quads-content-type? rdf-format)
+                       (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]))
+                       (if (some? graph)
+                         (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                               query-request (assoc-in request [:params :query] q)]
+                           (execute-query-in-draftset backend draftset-id query-request))
+                         (not-acceptable-response "graph query parameter required for RDF triple format")))
+                     (not-acceptable-response "Accept header required with MIME type of RDF format to return")))))
 
-    (DELETE "/draftset/:id/data" {{draftset-id :id
-                                   request-content-type :content-type
-                                   graph :graph
-                                   {file-part-content-type :content-type data :tempfile} :file} :params :as request}
-            (let [ds-id (dsmgmt/->DraftsetId draftset-id)
-                  content-type (or file-part-content-type request-content-type)]
-              (if (dsmgmt/draftset-exists? backend ds-id)
-                (if-let [rdf-format (mimetype->rdf-format content-type)]
-                  (let [ds-executor (get-draftset-executor backend ds-id)]
-                    (if (implies (is-triples-rdf-format? rdf-format)
-                                 (some? graph))
-                      (try
-                        (let [statements-to-delete (read-statements data rdf-format)]
-                          (if (is-quads-content-type? rdf-format)
-                            (delete-quads ds-executor statements-to-delete nil)
-                            (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
-                          (response (dsmgmt/get-draftset-info backend ds-id)))
-                        (catch OpenRDFException ex
-                          (unprocessable-entity-response "Cannot read statements to delete")))
-                      (not-acceptable-response "graph parameter required for triples RDF format")))
-                  (unsupported-media-type-response (str "Unsupported media type: " (or content-type ""))))
-                (not-found ""))))
-
-    (DELETE "/draftset/:id/graph" [id graph]
-            (let [ds-id (dsmgmt/->DraftsetId id)]
-              (if (dsmgmt/draftset-exists? backend ds-id)
-                (do
-                  (dsmgmt/delete-draftset-graph! backend ds-id graph)
-                  (response {}))
-                (not-found ""))))
-
-    (POST "/draftset/:id/data" {{draftset-id :id
+    (make-route :delete "/draftset/:id/data"
+                (existing-draftset-handler
+                 backend
+                 (fn [{{draftset-id :draftset-id
                         request-content-type :content-type
-                        {file-part-content-type :content-type data :tempfile} :file} :params}
-          (let [ds-id (dsmgmt/->DraftsetId draftset-id)]
-            (if (dsmgmt/draftset-exists? backend ds-id)
-              (if-let [content-type (or file-part-content-type request-content-type)]
-                (let [rdf-format (mimetype->rdf-format content-type)]
-                  (cond (nil? rdf-format)
-                        (unknown-rdf-content-type-response content-type)
+                        graph :graph
+                        {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
+                   (let [content-type (or file-part-content-type request-content-type)]
+                     (if-let [rdf-format (mimetype->rdf-format content-type)]
+                       (let [ds-executor (get-draftset-executor backend draftset-id)]
+                         (if (implies (is-triples-rdf-format? rdf-format)
+                                      (some? graph))
+                           (try
+                             (let [statements-to-delete (read-statements data rdf-format)]
+                               (if (is-quads-content-type? rdf-format)
+                                 (delete-quads ds-executor statements-to-delete nil)
+                                 (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
+                               (response (dsmgmt/get-draftset-info backend draftset-id)))
+                             (catch OpenRDFException ex
+                               (unprocessable-entity-response "Cannot read statements to delete")))
+                           (not-acceptable-response "graph parameter required for triples RDF format")))
+                       (unsupported-media-type-response (str "Unsupported media type: " (or content-type ""))))))))
+
+    (make-route :delete "/draftset/:id/graph"
+                (existing-draftset-handler backend 
+                                           (fn [{{:keys [draftset-id graph]} :params}]
+                                             (dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                                             (response {}))))
+
+    (make-route :post "/draftset/:id/data"
+                (existing-draftset-handler
+                 backend
+                 (fn [{{draftset-id :draftset-id
+                        request-content-type :content-type
+                        {file-part-content-type :content-type data :tempfile} :file} :params}]
+                   (if-let [content-type (or file-part-content-type request-content-type)]
+                     (let [rdf-format (mimetype->rdf-format content-type)]
+                       (cond (nil? rdf-format)
+                             (unknown-rdf-content-type-response content-type)
                     
-                        (is-quads-content-type? rdf-format)
-                        (let [append-job (append-data-to-draftset-job backend (dsmgmt/->DraftsetId draftset-id) data rdf-format)]
-                          (submit-async-job! append-job))
+                             (is-quads-content-type? rdf-format)
+                             (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
+                               (submit-async-job! append-job))
 
-                        :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
-                (response/bad-request-response "Content type required"))
-              (not-found ""))))
+                             :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
+                     (response/bad-request-response "Content type required")))))
 
-    (ANY "/draftset/:id/query" [id query :as request]
-         (cond (not (#{:get :post} (:request-method request)))
-               (not-found "")
+    (make-route nil "/draftset/:id/query"
+                (allowed-methods-handler
+                 #{:get :post}
+                 (existing-draftset-handler
+                  backend
+                  (fn [{{:keys [draftset-id query]} :params :as request}]
+                    (if (nil? query)
+                      (not-acceptable-response "query parameter required")
+                      (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
+                            rewriting-executor (create-rewriter backend graph-mapping)]
+                        (process-sparql-query rewriting-executor request :graph-restrictions (vals graph-mapping))))))))
 
-               (nil? query) (not-acceptable-response "query parameter required")
+    (make-route :post "/draftset/:id/publish"
+                (existing-draftset-handler backend (fn [{{:keys [draftset-id]} :params}]
+                                                     (submit-async-job! (publish-draftset-job backend draftset-id)))))
 
-               :else
-               (let [id (dsmgmt/->DraftsetId id)]
-               (if (dsmgmt/draftset-exists? backend id)
-                 (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend id)
-                       rewriting-executor (create-rewriter backend graph-mapping)]
-                   (process-sparql-query rewriting-executor request :graph-restrictions (vals graph-mapping)))
-                 (not-found "")))))
-
-    (POST "/draftset/:id/publish" [id]
-          (let [id (dsmgmt/->DraftsetId id)]
-            (if (dsmgmt/draftset-exists? backend id)
-              (submit-async-job! (publish-draftset-job backend id))
-              (not-found ""))))
-
-    (PUT "/draftset/:id/meta" [id :as request]
-         (let [ds-id (dsmgmt/->DraftsetId id)]
-           (if (dsmgmt/draftset-exists? backend ds-id)
-             (do
-               (dsmgmt/set-draftset-metadata! backend ds-id (:params request))
-               (response (dsmgmt/get-draftset-info backend ds-id)))
-             (not-found "")))))))
+    (make-route :put "/draftset/:id/meta"
+                (existing-draftset-handler backend (fn [{{:keys [draftset-id] :as params} :params}]
+                                                     (dsmgmt/set-draftset-metadata! backend draftset-id params)
+                                                     (response (dsmgmt/get-draftset-info backend draftset-id))))))))
