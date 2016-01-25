@@ -79,6 +79,17 @@
           (inner-handler updated-request))
         (not-found "")))))
 
+(defn- rdf-file-part-handler [inner-handler]
+  (fn [{{request-content-type :content-type
+         {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
+    (if-let [content-type (or file-part-content-type request-content-type)]
+      (if-let [rdf-format (mimetype->rdf-format content-type)]
+        (let [modified-request (update-in request [:params] #(merge % {:rdf-format rdf-format
+                                                                       :rdf-content-type content-type}))]
+          (inner-handler modified-request))
+        (unsupported-media-type-response (str "Unsupported media type: " (or content-type ""))))
+      (response/bad-request-response "Content type required"))))
+
 (defn draftset-api-routes [mount-point backend]
   (routes
    (context
@@ -118,25 +129,23 @@
     (make-route :delete "/draftset/:id/data"
                 (existing-draftset-handler
                  backend
-                 (fn [{{draftset-id :draftset-id
-                        request-content-type :content-type
-                        graph :graph
-                        {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
-                   (let [content-type (or file-part-content-type request-content-type)]
-                     (if-let [rdf-format (mimetype->rdf-format content-type)]
-                       (let [ds-executor (get-draftset-executor backend draftset-id)]
-                         (if (implies (is-triples-rdf-format? rdf-format)
-                                      (some? graph))
-                           (try
-                             (let [statements-to-delete (read-statements data rdf-format)]
-                               (if (is-quads-content-type? rdf-format)
-                                 (delete-quads ds-executor statements-to-delete nil)
-                                 (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
-                               (response (dsmgmt/get-draftset-info backend draftset-id)))
-                             (catch OpenRDFException ex
-                               (unprocessable-entity-response "Cannot read statements to delete")))
-                           (not-acceptable-response "graph parameter required for triples RDF format")))
-                       (unsupported-media-type-response (str "Unsupported media type: " (or content-type ""))))))))
+                 (rdf-file-part-handler
+                  (fn [{{draftset-id :draftset-id
+                         graph :graph
+                         rdf-format :rdf-format
+                         {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
+                    (let [ds-executor (get-draftset-executor backend draftset-id)]
+                      (if (implies (is-triples-rdf-format? rdf-format)
+                                   (some? graph))
+                        (try
+                          (let [statements-to-delete (read-statements data rdf-format)]
+                            (if (is-quads-content-type? rdf-format)
+                              (delete-quads ds-executor statements-to-delete nil)
+                              (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
+                            (response (dsmgmt/get-draftset-info backend draftset-id)))
+                          (catch OpenRDFException ex
+                            (unprocessable-entity-response "Cannot read statements to delete")))
+                        (not-acceptable-response "graph parameter required for triples RDF format")))))))
 
     (make-route :delete "/draftset/:id/graph"
                 (existing-draftset-handler backend 
@@ -147,20 +156,16 @@
     (make-route :post "/draftset/:id/data"
                 (existing-draftset-handler
                  backend
-                 (fn [{{draftset-id :draftset-id
-                        request-content-type :content-type
-                        {file-part-content-type :content-type data :tempfile} :file} :params}]
-                   (if-let [content-type (or file-part-content-type request-content-type)]
-                     (let [rdf-format (mimetype->rdf-format content-type)]
-                       (cond (nil? rdf-format)
-                             (unknown-rdf-content-type-response content-type)
-                    
-                             (is-quads-content-type? rdf-format)
-                             (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
-                               (submit-async-job! append-job))
-
-                             :else (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads"))))
-                     (response/bad-request-response "Content type required")))))
+                 (rdf-file-part-handler
+                  (fn [{{draftset-id :draftset-id
+                         request-content-type :content-type
+                         rdf-format :rdf-format
+                         content-type :rdf-content-type
+                         {data :tempfile} :file} :params}]
+                    (if (is-quads-content-type? rdf-format)
+                      (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
+                        (submit-async-job! append-job))
+                      (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads")))))))
 
     (make-route nil "/draftset/:id/query"
                 (allowed-methods-handler
