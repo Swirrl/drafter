@@ -90,6 +90,12 @@
         (unsupported-media-type-response (str "Unsupported media type: " (or content-type ""))))
       (response/bad-request-response "Content type required"))))
 
+(defn- rdf-response-format-handler [inner-handler]
+  (fn [request]
+    (if-let [rdf-format (get-accepted-rdf-format request)]
+      (inner-handler (assoc-in request [:params :rdf-format] rdf-format))
+      (not-acceptable-response "Accept header required with MIME type of RDF format to return"))))
+
 (defn draftset-api-routes [mount-point backend]
   (routes
    (context
@@ -115,16 +121,15 @@
     (make-route :get "/draftset/:id/data"
                 (existing-draftset-handler
                  backend
-                 (fn [{{:keys [draftset-id graph union-with-live]} :params :as request}]
-                   (if-let [rdf-format (get-accepted-rdf-format request)]
-                     (if (is-quads-content-type? rdf-format)
-                       (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]))
-                       (if (some? graph)
-                         (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                               query-request (assoc-in request [:params :query] q)]
-                           (execute-query-in-draftset backend draftset-id query-request))
-                         (not-acceptable-response "graph query parameter required for RDF triple format")))
-                     (not-acceptable-response "Accept header required with MIME type of RDF format to return")))))
+                 (rdf-response-format-handler
+                  (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
+                    (if (is-quads-content-type? rdf-format)
+                        (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]))
+                        (if (some? graph)
+                          (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                                query-request (assoc-in request [:params :query] q)]
+                            (execute-query-in-draftset backend draftset-id query-request))
+                          (not-acceptable-response "graph query parameter required for RDF triple format")))))))
 
     (make-route :delete "/draftset/:id/data"
                 (existing-draftset-handler
