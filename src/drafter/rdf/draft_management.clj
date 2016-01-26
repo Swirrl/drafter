@@ -4,6 +4,7 @@
             [grafter.rdf :refer [add s]]
             [drafter.util :refer [map-values]]
             [clojure.walk :refer [keywordize-keys]]
+            [clojure.set :as set]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :refer [update!]]
@@ -423,4 +424,11 @@
 (defn migrate-live! [backend graph]
   (migrate-graphs-to-live! backend [graph]))
 
+(defn calculate-graph-restriction [public-live-graphs live-graph-drafts supplied-draft-graphs]
+  (set/union
+   (set/difference public-live-graphs live-graph-drafts)
+   supplied-draft-graphs))
 
+(defn graph-mapping->graph-restriction [db graph-mapping union-with-live?]
+  (let [live-graphs (if union-with-live? (live-graphs db) #{})]
+    (calculate-graph-restriction live-graphs (keys graph-mapping) (vals graph-mapping))))

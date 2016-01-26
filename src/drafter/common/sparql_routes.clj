@@ -1,12 +1,7 @@
 (ns drafter.common.sparql-routes
   (:require [clojure.set :as set]
-            [drafter.util :refer [to-coll]]
+            [drafter.util :refer [to-coll map-all]]
             [drafter.rdf.draft-management :as mgmt :refer [live-graphs]]))
-
-(defn- calculate-graph-restriction [public-live-graphs live-graph-drafts supplied-draft-graphs]
-  (set/union
-   (set/difference public-live-graphs live-graph-drafts)
-   supplied-draft-graphs))
 
 (defn supplied-drafts
   "Parses out the set of \"graph\"s supplied on the request.
@@ -21,15 +16,5 @@
   (let [graphs (get params :graph)
         union-with-live? (get params :union-with-live false)
         supplied-draftset (to-coll graphs)
-        ;; get the graphs with drafts from graph-map
-        graphs-with-drafts (into #{}
-                                 (map str
-                                      (keys (mgmt/graph-map repo supplied-draftset))))
-
-        public-live-graphs (if union-with-live?
-                             (live-graphs repo)
-                             #{})]
-
-    (calculate-graph-restriction public-live-graphs
-                                 graphs-with-drafts
-                                 supplied-draftset)))
+        graph-map (map-all str (mgmt/graph-map repo supplied-draftset))]
+    (mgmt/graph-mapping->graph-restriction repo graph-map union-with-live?)))

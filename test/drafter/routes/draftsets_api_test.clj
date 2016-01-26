@@ -10,7 +10,7 @@
             [grafter.rdf :refer [statements context add]]
             [grafter.rdf.io :refer [rdf-serializer]]
             [grafter.rdf.formats :as formats]
-            [grafter.rdf.protocols :refer [->Triple map->Triple ->Quad]]
+            [grafter.rdf.protocols :refer [->Triple map->Triple ->Quad map->Quad]]
             [grafter.rdf.repository :as repo]
             [drafter.util :as util]
             [drafter.responses :refer [is-client-error-response?]]
@@ -18,7 +18,16 @@
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.util Date]
-           [java.io ByteArrayOutputStream ByteArrayInputStream]))
+           [java.io ByteArrayOutputStream ByteArrayInputStream BufferedReader]
+           [org.openrdf.query TupleQueryResultHandler]
+           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONParser]
+           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParser]))
+
+(defn- statements->input-stream [statements format]
+  (let [bos (ByteArrayOutputStream.)
+        serialiser (rdf-serializer bos :format format)]
+    (add serialiser statements)
+    (ByteArrayInputStream. (.toByteArray bos))))
 
 (defn- append-to-draftset-request [mount-point draftset-location file-part]
   {:uri (str mount-point draftset-location "/data")
@@ -41,6 +50,16 @@
 (defn- append-data-to-draftset-through-api [route draftset-location draftset-data-file]
   (let [append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
     (await-success finished-jobs (:finished-job (:body append-response)))))
+
+(defn- statements->append-request [draftset-location statements format]
+  (let [input-stream (statements->input-stream statements format)
+        file-part {:tempfile input-stream :filename (str "data." (.getDefaultFileExtension format)) :content-type (.getDefaultMIMEType format)}]
+    {:uri (str draftset-location "/data") :request-method :post :params {:file file-part}}))
+
+(defn- append-quads-to-draftset-through-api [route draftset-location quads]
+  (let [request (statements->append-request draftset-location quads formats/rdf-nquads)
+        response (route request)]
+    (await-success finished-jobs (get-in response [:body :finished-job]))))
 
 (def ring-response-schema
   {:status s/Int
@@ -110,6 +129,29 @@
         {:keys [headers] :as response} (route request)]
     (assert-is-see-other-response response)
     (get headers "Location")))
+
+(defn- get-draftset-quads-through-api [route draftset-location]
+  (let [data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
+        data-response (route data-request)]
+    (assert-is-ok-response data-response)
+    (concrete-statements (:body data-response) formats/rdf-nquads)))
+
+(defn- publish-draftset-through-api [route draftset-location]
+  (let [publish-request {:uri (str draftset-location "/publish") :request-method :post}
+        publish-response (route publish-request)]
+    (await-success finished-jobs (:finished-job (:body publish-response)))))
+
+(defn- publish-quads-through-api [mount-point route quads]
+  (let [draftset-location (create-draftset-through-api mount-point route "tmp")]
+    (append-quads-to-draftset-through-api route draftset-location quads)
+    (publish-draftset-through-api route draftset-location)))
+
+(defn- create-delete-quads-request [draftset-location input-stream format]
+  (let [file-part {:tempfile input-stream :filename "to-delete.nq" :content-type format}]
+    {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}))
+
+(defn- create-delete-triples-request [draftset-location input-stream format graph]
+  (assoc-in (create-delete-quads-request draftset-location input-stream format) [:params :graph] graph))
 
 (defn- create-routes []
   {:mount-point "" :route (draftset-api-routes "" *test-backend*)})
@@ -256,25 +298,6 @@
       (testing "Invalid draftset"
         (let [append-response (make-append-data-to-draftset-request route "/draftset/missing" "test/resources/test-draftset.trig")]
           (assert-is-not-found-response append-response)))))
-
-(defn- statements->input-stream [statements format]
-  (let [bos (ByteArrayOutputStream.)
-        serialiser (rdf-serializer bos :format format)]
-    (add serialiser statements)
-    (ByteArrayInputStream. (.toByteArray bos))))
-
-(defn- get-draftset-quads-through-api [route draftset-location]
-  (let [data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
-        data-response (route data-request)]
-    (assert-is-ok-response data-response)
-    (concrete-statements (:body data-response) formats/rdf-nquads)))
-
-(defn- create-delete-quads-request [draftset-location input-stream format]
-  (let [file-part {:tempfile input-stream :filename "to-delete.nq" :content-type format}]
-    {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}))
-
-(defn- create-delete-triples-request [draftset-location input-stream format graph]
-  (assoc-in (create-delete-quads-request draftset-location input-stream format) [:params :graph] graph))
 
 (deftest delete-draftset-data-test
   (let [{:keys [mount-point route]} (create-routes)
@@ -463,6 +486,17 @@
     (let [get-response (route {:uri draftset-location :request-method :get})]
       (assert-is-not-found-response get-response))))
 
+(defn- result-set-handler [result-state]
+  (reify TupleQueryResultHandler
+    (handleBoolean [this b])
+    (handleLinks [this links])
+    (startQueryResult [this binding-names])
+    (endQueryResult [this])
+    (handleSolution [this binding-set]
+      (let [binding-pairs (map (fn [b] [(keyword (.getName b)) (.stringValue (.getValue b))]) binding-set)
+            binding-map (into {} binding-pairs)]
+        (swap! result-state conj binding-map)))))
+
 (deftest query-draftset-test
   (let [{:keys [mount-point route]} (create-routes)]
     (testing "Draftset with data"
@@ -481,6 +515,36 @@
           (assert-is-ok-response query-response)
 
           (is (= expected-triples response-triples)))))
+
+    (testing "Union with live"
+      (let [test-quads (statements "test/resources/test-draftset.trig")
+            grouped-test-quads (group-by context test-quads)
+            [live-graph live-quads] (first grouped-test-quads)
+            [ds-live-graph draftset-quads] (second grouped-test-quads)
+            draftset-location (create-draftset-through-api mount-point route "Test draftset")]
+
+        (publish-quads-through-api mount-point route live-quads)
+        (append-quads-to-draftset-through-api route draftset-location draftset-quads)
+
+        (let [query "SELECT * WHERE { GRAPH ?c { ?s ?p ?o } }"
+              query-request {:uri (str draftset-location "/query")
+                             :headers {"Accept" "application/sparql-results+json"}
+                             :request-method :post
+                             :params {:query query :union-with-live true}}
+              {:keys [body] :as query-response} (route query-request)
+              result-state (atom #{})
+              result-handler (result-set-handler result-state)
+              parser (doto (SPARQLResultsCSVParser.) (.setTupleQueryResultHandler result-handler))]
+
+          (comment loop [r (BufferedReader. (clojure.java.io/reader body))]
+            (when-let [line (.readLine r)]
+              (println line)
+              (recur r)))
+
+          (.parse parser body)
+
+          (let [expected-quads (set (eval-statements test-quads))]
+            (is (= expected-quads @result-state))))))
     
     (testing "Missing draftset"
       (let [response (route {:uri "/draftset/missing/query" :params {:query "SELECT * WHERE { ?s ?p ?o }"} :request-method :post})]

@@ -213,37 +213,6 @@
           (is (not-any? triple-from-state-graph? csv-result)
               "Data should not contain triples from the state graph"))))))
 
-;; This test attempts to capture the rationale behind the calculation of graph
-;; restrictions.
-;;
-;; These tests attempt to recreate the various permutations of what will happen
-;; when union-with-live=true/false and when there are drafts specified or not.
-(deftest calculate-graph-restriction-test
-  (let [calculate-graph-restriction @#'drafter.common.sparql-routes/calculate-graph-restriction]
-    (testing "union-with-live=true"
-      (testing "with no drafts specified"
-        (is (= #{:l1 :l2}
-               (calculate-graph-restriction #{:l1 :l2} #{} #{}))
-            "Restriction should be the set of public live graphs"))
-
-      (testing "with drafts specified"
-        (is (= #{:l1 :d2 :d3 :d4}
-               (calculate-graph-restriction #{:l1 :l2} #{:l3 :l4 :l2} #{:d2 :d3 :d4}))
-            "Restriction should be the set of live graphs plus drafts from the
-            draftset.  Live graphs for the specified drafts should not be
-            included as we want to use their draft graphs.")))
-
-    (testing "union-with-live=false"
-      (testing "with no drafts specified"
-        (is (= #{}
-               (calculate-graph-restriction #{} #{} #{}))
-            "Restriction should be the set of public live graphs"))
-      (testing "with drafts specified"
-        (is (= #{:d1 :d2}
-               (calculate-graph-restriction #{} #{:l1 :l2} #{:d1 :d2}))
-            "Restriction should be the set of drafts (as live graph queries will be rewritten to their draft graphs)")))))
-
-
 (deftest drafts-sparql-routes-distinct-test
   (let [[draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-backend*)
         endpoint (draft-sparql-routes "/sparql/draft" *test-backend*)]

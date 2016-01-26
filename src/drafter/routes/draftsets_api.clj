@@ -8,6 +8,7 @@
             [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
             [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
             [drafter.rdf.draftset-management :as dsmgmt]
+            [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [grafter.rdf :refer [statements]]
@@ -189,12 +190,14 @@
                  #{:get :post}
                  (existing-draftset-handler
                   backend
-                  (fn [{{:keys [draftset-id query]} :params :as request}]
+                  (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
                     (if (nil? query)
                       (not-acceptable-response "query parameter required")
                       (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
-                            rewriting-executor (create-rewriter backend graph-mapping)]
-                        (process-sparql-query rewriting-executor request :graph-restrictions (vals graph-mapping))))))))
+                            uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
+                            rewriting-executor (create-rewriter backend uri-graph-mapping)
+                            graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
+                        (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
 
     (make-route :post "/draftset/:id/publish"
                 (existing-draftset-handler backend (fn [{{:keys [draftset-id]} :params}]
