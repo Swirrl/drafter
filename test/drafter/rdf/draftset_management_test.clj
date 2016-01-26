@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [drafter.rdf.draftset-management :refer :all]
             [drafter.rdf.draft-management :refer [draft-exists?] :as mgmt]
-            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft!]]
+            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples]]
             [grafter.rdf :refer [statements context]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
             [grafter.rdf.repository :refer [query]]
@@ -75,24 +75,39 @@
       (is (= false (draft-exists? *test-backend* dg))))))
 
 (deftest delete-draftest-graph!-test
-  (testing "Draftset graph"
+  (testing "Delete non-existent live graph"
     (let [draftset-id (create-draftset! *test-backend* "Test draftset")
-          quads (statements "test/resources/test-draftset.trig")]
-      
-      (import-data-to-draftset! *test-backend* draftset-id quads)
-      
-      (let [[live draft] (first (get-draftset-graph-mapping *test-backend* draftset-id))]
-        (delete-draftset-graph! *test-backend* draftset-id live)
-        (is (= false (draft-exists? *test-backend* draft))))))
+          graph-to-delete "http://missing"]
+      (delete-draftset-graph! *test-backend* draftset-id graph-to-delete)
 
-  (testing "Unknown graph"
-    (let [draftset-id (create-draftset! *test-backend* "Test draftset")]
-      (import-data-to-draftset! *test-backend* draftset-id (statements "test/resources/test-draftset.trig"))
+      (is (= false (mgmt/is-graph-managed? *test-backend* graph-to-delete)))
+      (is (empty? (get-draftset-graph-mapping *test-backend* draftset-id)))))
 
-      (let [old-mapping (get-draftset-graph-mapping *test-backend* draftset-id)]
-        (delete-draftset-graph! *test-backend* draftset-id (mgmt/make-draft-graph-uri))
+  (testing "Delete live graph not already in draftset"
+    (let [live-graph "http://live"
+          draftset-id (create-draftset! *test-backend* "Test draftset")]
+      (make-graph-live! *test-backend* live-graph)
+      (delete-draftset-graph! *test-backend* draftset-id live-graph)
 
-        (is (= old-mapping (get-draftset-graph-mapping *test-backend* draftset-id)))))))
+      (is (mgmt/is-graph-managed? *test-backend* live-graph))
+
+      (let [graph-mapping (get-draftset-graph-mapping *test-backend* draftset-id)]
+        (is (contains? graph-mapping live-graph))
+
+        (is (mgmt/draft-exists? *test-backend* (get graph-mapping live-graph))))))
+
+  (testing "Graph already in draftset"
+    (let [live-graph "http://live"
+          draftset-id (create-draftset! *test-backend* "Test draftset")]
+      (make-graph-live! *test-backend* live-graph)
+
+      (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples "http://subject") draftset-id)]
+        (is (mgmt/draft-exists? *test-backend* draft-graph))
+
+        (delete-draftset-graph! *test-backend* draftset-id live-graph)
+
+        (is (mgmt/draft-exists? *test-backend* draft-graph))
+        (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph))))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

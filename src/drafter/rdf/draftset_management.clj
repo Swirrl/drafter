@@ -188,9 +188,13 @@
     all-infos))
 
 (defn delete-draftset-graph! [db draftset-ref graph-uri]
-  (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
-    (when-let [draft-graph-uri (get graph-mapping graph-uri)]
-      (mgmt/delete-draft-graph! db draft-graph-uri))))
+  (when (mgmt/is-graph-managed? db graph-uri)
+    (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
+      (if-let [draft-graph-uri (get graph-mapping graph-uri)]
+        (do
+          (mgmt/delete-graph-contents! db draft-graph-uri)
+          draft-graph-uri)
+        (mgmt/create-draft-graph! db graph-uri {} (str (->draftset-uri draftset-ref)))))))
 
 (def ^:private draftset-param->predicate
   {:display-name rdfs:label
