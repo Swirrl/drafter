@@ -33,10 +33,11 @@
         live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)]
     (create-rewriter backend live->draft-graph-mapping)))
 
-(defn- execute-query-in-draftset [backend draftset-ref request]
+(defn- execute-query-in-draftset [backend draftset-ref request union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
+        graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping union-with-live?)
         rewriting-executor (create-rewriter backend graph-mapping)]
-    (process-sparql-query rewriting-executor request :graph-restrictions (vals graph-mapping))))
+    (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))
 
 (defn- get-accepted-rdf-format [request]
   (if-let [accept (get-in request [:headers "Accept"])]
@@ -45,11 +46,12 @@
       (catch Exception ex
         nil))))
 
-(defn- get-draftset-data [backend draftset-ref accept-content-type]
+(defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
+        graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping union-with-live?)
         live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
         rewriting-executor (create-rewriter backend live->draft-graph-mapping)
-        pquery (all-quads-query rewriting-executor (vals graph-mapping))]
+        pquery (all-quads-query rewriting-executor graph-restriction)]
     (if-let [writer (negotiate-result-writer rewriting-executor pquery accept-content-type)]
       (let [exec-fn (create-query-executor rewriting-executor writer pquery)
             body (stream-sparql-response exec-fn drafter.operations/default-timeouts)]
@@ -139,11 +141,11 @@
                  (rdf-response-format-handler
                   (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
                     (if (is-quads-content-type? rdf-format)
-                        (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]))
+                        (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]) (or union-with-live false))
                         (if (some? graph)
                           (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                                 query-request (assoc-in request [:params :query] q)]
-                            (execute-query-in-draftset backend draftset-id query-request))
+                            (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))
                           (not-acceptable-response "graph query parameter required for RDF triple format")))))))
 
     (make-route :delete "/draftset/:id/data"
