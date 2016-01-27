@@ -45,12 +45,19 @@
                  ;;
                  ;; we can remove this exclusion.
                  [grafter "0.6.0"]
-                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.8"]
+                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
 
-                 [org.openrdf.sesame/sesame-queryrender "2.8.8"]
-                 [org.openrdf.sesame/sesame-runtime "2.8.8"]
+                 [org.openrdf.sesame/sesame-queryrender "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-runtime "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]
+
+                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
+                 ;; see here for the source code that built this release:
+                 ;;
+                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
+
+                 [swirrl/sesame-http-client "2.8.9"]
 
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
@@ -113,7 +120,14 @@
    }
 
 
-  :jvm-opts ["-Djava.awt.headless=true"]
+  :jvm-opts ["-Djava.awt.headless=true"
+
+             ;; Use this property to control number
+             ;; of connections in the SPARQLRepository connection pool:
+             ;;
+             ;;"-Dhttp.maxConnections=1"
+
+             "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
 
   ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
