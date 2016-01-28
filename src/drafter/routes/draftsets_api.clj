@@ -181,11 +181,15 @@
                          request-content-type :content-type
                          rdf-format :rdf-format
                          content-type :rdf-content-type
+                         graph :graph
                          {data :tempfile} :file} :params}]
                     (if (is-quads-content-type? rdf-format)
                       (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
                         (submit-async-job! append-job))
-                      (response/bad-request-response (str "Content type " content-type " does not map to an RDF format for quads")))))))
+                      (if (some? graph)
+                        (let [append-job (append-triples-to-draftset-job backend draftset-id data rdf-format graph)]
+                          (submit-async-job! append-job))
+                        (response/bad-request-response "Graph required for triples content type")))))))
 
     (make-route nil "/draftset/:id/query"
                 (allowed-methods-handler

@@ -45,6 +45,7 @@
   {:new-draft-job api/new-draft-job
    :append-data-to-graph-job api/append-data-to-graph-job
    :append-data-to-draftset-job api/append-data-to-draftset-job
+   :append-triples-to-draftset-job api/append-triples-to-draftset-job
    :publish-draftset-job dsapi/publish-draftset-job
    :delete-draftset! dsmgmt/delete-draftset!
    :copy-from-live-graph-job api/copy-from-live-graph-job

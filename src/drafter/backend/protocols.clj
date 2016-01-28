@@ -1,5 +1,5 @@
 (ns drafter.backend.protocols
-  (:import [org.openrdf.model.impl ContextStatementImpl URIImpl]))
+  (:require [drafter.util :as util]))
 
 (defprotocol SparqlExecutor
   (all-quads-query [this restrictions])
@@ -11,14 +11,8 @@
 (defprotocol StatementDeletion
   (delete-quads [this quads graph-restrictions]))
 
-(defn- make-quad-statement [triple graph]
-  (let [s (.getSubject triple)
-        p (.getPredicate triple)
-        o (.getObject triple)]
-    (ContextStatementImpl. s p o graph)))
-
 (defn delete-triples [deletor triples graph]
-  (let [quads (map #(make-quad-statement % graph) triples)]
+  (let [quads (map #(util/make-quad-statement % graph) triples)]
     (delete-quads deletor quads #{graph})))
 
 (defprotocol QueryRewritable
@@ -66,6 +60,8 @@
     "Return a job that appends RDF data in the specified format to the specified graph.")
   (append-data-to-draftset-job [this draftset-ref tempfile rdf-format]
     "Return a job that appends RDF data to the given draftset")
+  (append-triples-to-draftset-job [this draftset-ref data rdf-format graph]
+    "Returns a job that appends triples to the given draftset")
   (publish-draftset-job [this draftset-ref]
     "Return a job that publishes the graphs in a draftset to live and
     then deletes the draftset.")

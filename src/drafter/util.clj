@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             [markdown.core :as md]
             [noir.io :as io])
-  (:import [org.openrdf.model.impl URIImpl]))
+  (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]))
 
 ;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
 (defn map-values
@@ -127,3 +127,9 @@
                  m1)
         kvs (remove nil? kvs)]
     (into {} kvs)))
+
+(defn make-quad-statement [triple graph]
+  (let [s (.getSubject triple)
+        p (.getPredicate triple)
+        o (.getObject triple)]
+    (ContextStatementImpl. s p o graph)))

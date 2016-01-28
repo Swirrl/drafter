@@ -2,6 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [grafter.rdf.repository :as repo]
             [grafter.rdf :refer [add statements context]]
+            [grafter.rdf.protocols :refer [map->Quad]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.common.api-routes :refer [meta-params]]
@@ -107,11 +108,18 @@
         ;;NOTE: do this immediately since we haven't done any work on this iteration
         (append-draftset-quads backend draftset-ref live->draft quad-batches {:op :append} job)))))
 
-(defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
-  (let [quads (file->statements tempfile rdf-format)
-        graph-map (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
+(defn- append-quads-to-draftset-job [backend draftset-ref quads]
+  (let [graph-map (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
         quad-batches (util/batch-partition-by quads context jobs/batched-write-size)]
     (create-job :batch-write (partial append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append}))))
+
+(defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
+  (append-quads-to-draftset-job backend draftset-ref (file->statements tempfile rdf-format)))
+
+(defn append-triples-to-draftset-job [backend draftset-ref tempfile rdf-format graph]
+  (let [triples (file->statements tempfile rdf-format)
+        quads (map (comp map->Quad #(assoc % :c graph)) triples)]
+    (append-quads-to-draftset-job backend draftset-ref quads)))
 
 (defn append-data-to-graph-job
   "Return a job function that adds the triples from the specified file

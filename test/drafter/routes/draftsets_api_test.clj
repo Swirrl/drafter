@@ -61,6 +61,12 @@
         response (route request)]
     (await-success finished-jobs (get-in response [:body :finished-job]))))
 
+(defn- append-triples-to-draftset-through-api [route draftset-location triples graph]
+  (let [request (statements->append-request draftset-location triples formats/rdf-ntriples)
+        request (assoc-in request [:params :graph] graph)
+        response (route request)]
+    (await-success finished-jobs (get-in response [:body :finished-job]))))
+
 (def ring-response-schema
   {:status s/Int
    :headers {s/Str s/Str}
@@ -329,6 +335,16 @@
                 request (append-to-draftset-request mount-point draftset-location file-part)
                 response (route request)]
             (is (is-client-error-response? response)))))
+
+      (testing "Triples for graph which exists in live"
+        (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+              draftset-location (create-draftset-through-api mount-point route "Test draftset")]
+          (publish-quads-through-api mount-point route [(first graph-quads)])
+          (append-triples-to-draftset-through-api route draftset-location (rest graph-quads) graph)
+
+          (let [draftset-graph-triples (get-draftset-graph-triples-through-api route draftset-location graph false)
+                expected-triples (eval-statements (map map->Triple graph-quads))]
+            (is (= (set expected-triples) (set draftset-graph-triples))))))
 
       (testing "Quad data without content type"
         (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
