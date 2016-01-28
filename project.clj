@@ -28,7 +28,7 @@
 
                  [org.clojure/clojure "1.8.0"]
 
-                 [me.raynes/fs "1.4.6"] ; ;filesystem utils
+                 [me.raynes/fs "1.4.6"] ;; filesystem utils
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [ring "1.4.0" :exclusions [org.clojure/java.classpath]]
                  [ring/ring-core "1.4.0"]
@@ -36,7 +36,7 @@
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
 
-                 [swirrl/lib-swirrl-server "0.2.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
+                 [swirrl/lib-swirrl-server "0.3.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
                  ;; TODO:
                  ;;
                  ;; When this sesame bug about streaming sparql XML
@@ -69,12 +69,7 @@
                  [ring-middleware-accept "2.0.3"]
                  [environ "1.0.0"]
 
-                 ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
-                 ;;[criterium "0.4.3"] ;; for easy benchmarking
-                 ;;[clj-http "1.1.0"]
-                 [drafter-client "0.3.6-SNAPSHOT"]
-
-                 ]
+                 [prismatic/schema "1.0.4"]]
 
   :java-source-paths ["src-java"]
   :resource-paths ["resources"]
@@ -130,10 +125,14 @@
                         [org.clojure/data.json "0.2.5"]
                         [clojure-csv/clojure-csv "2.0.1"]
                         [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
-                        ;;[perforate "0.3.4"]
+                        ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
+                        ;;[criterium "0.4.3"] ;; for easy benchmarking
+                        ;;[clj-http "1.1.0"]
+                        ;;[drafter-client "0.3.6-SNAPSHOT"]
+
                         ]
 
-         :env {:dev true}
+         ;;:env {:dev true}
 
          ;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
          ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
@@ -148,7 +147,8 @@
              ;;
              ;;"-Dhttp.maxConnections=1"
 
-             "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
+             ;;"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
+             ]
 
   ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]

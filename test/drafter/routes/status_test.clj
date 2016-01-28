@@ -2,7 +2,9 @@
   (:require [clojure.test :refer :all]
             [ring.mock.request :refer :all]
             [drafter.common.json-encoders :as enc]
-            [drafter.routes.status :refer :all])
+            [drafter.routes.status :refer :all]
+            [swirrl-server.async.status-routes :refer [JobNotFinished]]
+            [schema.core :as s])
   (:import [java.util UUID]
            [java.util.concurrent.locks ReentrantLock]))
 
@@ -36,5 +38,5 @@
         (let [response (status-route (request :get "/finished-jobs/00000000-0000-0000-0000-000000000000"))]
           (is (= restart-id
                  (get-in response [:body :restart-id])))
-          (is (= :not-found
-                 (get-in response [:body :type]))))))))
+          (is (s/validate JobNotFinished
+                          (:body response))))))))

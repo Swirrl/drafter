@@ -30,7 +30,7 @@
                        params :params}
             (response/when-params [live-graph]
                                   (if (= live-graph drafter-state-graph)
-                                    (response/error-response 403 {:message "This graph is reserved, the create request was forbidden."})
+                                    (response/error-response 403 :reserved-graph "This graph is reserved, the create request was forbidden.")
                                     (submit-sync-job! (new-draft-job operations live-graph params)
                                                       (fn [result]
                                                         (if (failed-job-result? result)
@@ -41,14 +41,14 @@
             (let [metadata (api-routes/meta-params params)
                   graphs (to-coll graph)]
               (if (or (empty? graph) (empty? metadata))
-                {:status 400 :headers {} :body "At least one graph and metadata pair required"}
+                (response/bad-request-response "At least one graph and metadata pair required")
                 (submit-sync-job! (update-metadata-job operations graphs metadata)))))
 
       (DELETE "/metadata" [graph meta-key]
               (let [meta-keys (to-coll meta-key)
                     graphs (to-coll graph)]
                 (if (or (empty? graphs) (empty? meta-keys))
-                  {:status 400 :headers {} :body "At least one graph and metadata key required"}
+                  (response/bad-request-response 422 "At least one graph and metadata key required")
                   (submit-sync-job! (delete-metadata-job operations graphs meta-keys)))))
 
       ;; deletes draft graph data contents; does not delete the draft graph

@@ -15,6 +15,7 @@
             [drafter.rdf.draft-management :refer :all]
             [drafter.rdf.draft-management.jobs :refer [batched-write-size]]
             [swirrl-server.async.jobs :refer [restart-id]]
+            [swirrl-server.async.status-routes :refer [JobNotFinished]]
             [drafter.util :refer [set-var-root! map-values]]
             [clojure.tools.logging :as log])
   (:import [java.util UUID]
@@ -96,13 +97,13 @@
 
 (defn is-client-error-response [response]
   (let [{:keys [status body headers]} response]
-    (is (= 400 status))
+    (is (= 422 status))
     (is (= :error (body :type)))
     (is (instance? String (body :message)))))
 
 (deftest drafts-api-create-draft-test
   (testing "POST /draft/create"
-    (testing "without a live-graph param returns a 400 error"
+    (testing "without a live-graph param returns a 422 error"
       (let [response ((draft-api-routes "/draft" *test-backend*)
                       {:uri "/draft/create"
                        :request-method :post
@@ -165,8 +166,6 @@
              (Thread/sleep 5)
              (recur state-atom guid))))))))
 
-(def ok-response {:status 200 :headers {"Content-Type" "application/json"} :body {:type :ok}})
-
 (defmacro await-success
   "Waits for the job with the given path to be present in the given
   job state atom and then asserts the job succeeded. Returns the job
@@ -215,7 +214,7 @@
                              (update-in [:params :file] dissoc :content-type))
             route (draft-api-routes "/draft" *test-backend*)
             {:keys [status] :as response} (route test-request)]
-        (is (= 400 status) "Bad request")))
+        (is (= 422 status) "Bad request")))
 
     (testing "with an unknown content type"
       (let [test-request (-> {:uri "/draft" :request-method :post}
@@ -224,7 +223,7 @@
             route (draft-api-routes "/draft" *test-backend*)
             {:keys [status] :as response} (route test-request)]
 
-        (is (= 400 status) "Bad request")))))
+        (is (= 422 status) "Bad request")))))
 
 (deftest graph-management-delete-graph-test
   (testing "DELETE /graph (batched)"
@@ -387,14 +386,14 @@
       (let [request (-> {:uri "/draft/metadata" :request-method :post}
                         (add-request-metadata-pairs [["foo" "bar"]]))
             {:keys [status]} (route request)]
-        (is (= 400 status))))
+        (is (= 422 status))))
 
     (testing "Invalid if no metadata"
       (let [request {:uri "/draft/metadata"
                      :request-method :post
                      :params {:graph [draft1 draft2]}}
             {:keys [status]} (route request)]
-        (is (= 400 status))))))
+        (is (= 422 status))))))
 
 (defn ->triple [{:keys [s p o] :as quad}]
   (->Triple s p o))
