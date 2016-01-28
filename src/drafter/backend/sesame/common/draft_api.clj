@@ -64,12 +64,54 @@
         (backend/append-data-batch! backend draft-graph-uri quad-batch)
         graph-map))))
 
+(defn- append-draftset-quads [backend draftset-ref live->draft quad-batches {op :op :as state} job]
+  (case op
+    :append
+    (if-let [batch (first quad-batches)]
+      (let [{:keys [graph-uri triples]} (quad-batch->graph-triples batch)]
+        (if-let [draft-graph-uri (get live->draft graph-uri)]
+          (do
+            (backend/append-data-batch! backend draft-graph-uri triples)
+            (let [next-job (create-child-job
+                            job
+                            (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) {:op :append}))]
+              (scheduler/queue-job! next-job)))
+          ;;NOTE: do this immediately instead of scheduling a
+          ;;continuation since we haven't done any real work yet
+          (append-draftset-quads backend draftset-ref live->draft quad-batches {:op :copy-graph :graph graph-uri} job)))
+      (jobs/job-succeeded! job))
+
+    :copy-graph
+    (let [live-graph-uri (:graph state)
+          ds-uri (str (dsmgmt/->draftset-uri draftset-ref))
+          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri)
+          clone-batches (jobs/get-graph-clone-batches backend live-graph-uri)
+          copy-batches-state {:op :copy-graph-batches
+                           :graph live-graph-uri
+                           :draft-graph draft-graph-uri
+                           :batches clone-batches}]
+      ;;NOTE: do this immediately since we still haven't done any real work yet...
+      (append-draftset-quads backend draftset-ref graph-map quad-batches copy-batches-state job))
+
+    :copy-graph-batches
+    (let [{:keys [graph batches draft-graph]} state]
+      (if-let [[offset limit] (first batches)]
+        (do
+          (jobs/copy-graph-batch! backend graph draft-graph offset limit)
+          (let [next-state (update-in state [:batches] rest)
+                next-job (create-child-job
+                          job
+                          (partial append-draftset-quads backend draftset-ref live->draft quad-batches next-state))]
+            (scheduler/queue-job! next-job)))
+        ;;graph copy completed so continue appending quads
+        ;;NOTE: do this immediately since we haven't done any work on this iteration
+        (append-draftset-quads backend draftset-ref live->draft quad-batches {:op :append} job)))))
+
 (defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
   (let [quads (file->statements tempfile rdf-format)
         graph-map (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
-        quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-        batch-joblets (map #(append-data-to-draftset-graph-joblet backend draftset-ref %) quad-batches)]
-    (jobs/joblet-seq->job batch-joblets :batch-write graph-map)))
+        quad-batches (util/batch-partition-by quads context jobs/batched-write-size)]
+    (create-job :batch-write (partial append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append}))))
 
 (defn append-data-to-graph-job
   "Return a job function that adds the triples from the specified file

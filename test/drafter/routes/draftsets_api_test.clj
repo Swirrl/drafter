@@ -297,6 +297,22 @@
                       (is (draft-exists? *test-backend* draft-graph))
                       (is (set expected-statements) (set draft-statements)))))))))
 
+    (testing "Appending quads to graph which exist in live"
+      (let [quads (statements "test/resources/test-draftset.trig")
+            grouped-quads (group-by context quads)
+            live-quads (map (comp first second) grouped-quads)
+            quads-to-add (rest (second (first grouped-quads)))
+            draftset-location (create-draftset-through-api mount-point route "Test draftset")]
+        (publish-quads-through-api mount-point route live-quads)
+        (append-quads-to-draftset-through-api route draftset-location quads-to-add)
+
+        ;;draftset itself should contain the live quads from the graph
+        ;;added to along with the quads explicitly added. It should
+        ;;not contain any quads from the other live graph.
+        (let [draftset-quads (get-draftset-quads-through-api route draftset-location false)
+              expected-quads (eval-statements (second (first grouped-quads)))]
+          (is (= (set expected-quads) (set draftset-quads))))))
+
       (testing "Quad data with valid content type for request"
         (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
           (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
