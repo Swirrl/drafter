@@ -186,6 +186,27 @@
 (defn- create-delete-triples-request [draftset-location input-stream format graph]
   (assoc-in (create-delete-quads-request draftset-location input-stream format) [:params :graph] graph))
 
+(defn- await-delete-statements-response [response]
+  (let [job-result (await-success finished-jobs (get-in response [:body :finished-job]))]
+    (:draftset job-result)))
+
+(defn- create-delete-statements-request [draftset-location statements format]
+  (let [input-stream (statements->input-stream statements format)
+        file-name (str "to-delete." (.getDefaultFileExtension format))
+        file-part {:tempfile input-stream :filename file-name  :content-type (.getDefaultMIMEType format)}]
+    {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}))
+
+(defn- delete-quads-through-api [route draftset-location quads]
+  (let [delete-request (create-delete-statements-request draftset-location quads formats/rdf-nquads)
+        delete-response (route delete-request)]
+    (await-delete-statements-response delete-response)))
+
+(defn- delete-draftset-triples-through-api [route draftset-location triples graph]
+  (let [delete-request (create-delete-statements-request draftset-location triples formats/rdf-ntriples)
+        delete-request (assoc-in delete-request [:params :graph] graph)
+        delete-response (route delete-request)]
+    (await-delete-statements-response delete-response)))
+
 (defn- create-routes []
   {:mount-point "" :route (draftset-api-routes "" *test-backend*)})
 
@@ -357,27 +378,6 @@
       (testing "Invalid draftset"
         (let [append-response (make-append-data-to-draftset-request route "/draftset/missing" "test/resources/test-draftset.trig")]
           (assert-is-not-found-response append-response)))))
-
-(defn- await-delete-statements-response [response]
-  (let [job-result (await-success finished-jobs (get-in response [:body :finished-job]))]
-    (:draftset job-result)))
-
-(defn- create-delete-statements-request [draftset-location statements format]
-  (let [input-stream (statements->input-stream statements format)
-        file-name (str "to-delete." (.getDefaultFileExtension format))
-        file-part {:tempfile input-stream :filename file-name  :content-type (.getDefaultMIMEType format)}]
-    {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}))
-
-(defn- delete-quads-through-api [route draftset-location quads]
-  (let [delete-request (create-delete-statements-request draftset-location quads formats/rdf-nquads)
-        delete-response (route delete-request)]
-    (await-delete-statements-response delete-response)))
-
-(defn- delete-draftset-triples-through-api [route draftset-location triples graph]
-  (let [delete-request (create-delete-statements-request draftset-location triples formats/rdf-ntriples)
-        delete-request (assoc-in delete-request [:params :graph] graph)
-        delete-response (route delete-request)]
-    (await-delete-statements-response delete-response)))
 
 (deftest delete-draftset-data-test
   (let [{:keys [mount-point route]} (create-routes)
@@ -584,33 +584,97 @@
             response (route delete-graph-request)]
         (assert-is-not-found-response response)))))
 
+;;TODO: Get quads through query of live endpoint? This depends on
+;;'union with live' working correctly
+(defn- get-live-quads-through-api [mount-point route]
+  (let [tmp-ds (create-draftset-through-api mount-point route "tmp")]
+    (get-draftset-quads-through-api route tmp-ds true)))
+
+(defn- assert-live-quads [mount-point route expected-quads]
+  (let [live-quads (get-live-quads-through-api mount-point route)]
+    (is (= (set (eval-statements expected-quads)) (set live-quads)))))
+
 (deftest publish-draftset-test
   (let [{:keys [mount-point route]} (create-routes)
-        rdf-data-file "test/resources/test-draftset.trig"]
-    (testing "Publish existing draftset"
-      (with-open [fs (io/input-stream rdf-data-file)]
-        (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
-              file-part {:tempfile fs :filename "test-draftset.trig" :content-type "application/x-trig"}
-              append-request (append-to-draftset-request mount-point draftset-location file-part)
-              append-response (route append-request)]
-          (await-success finished-jobs (:finished-job (:body append-response)))
+        rdf-data-file "test/resources/test-draftset.trig"
+        quads (statements rdf-data-file)
+        grouped-quads (doall (group-by context quads))]
 
-          (let [publish-request {:uri (str draftset-location "/publish") :request-method :post}
-                publish-response (route publish-request)]
-            (await-success finished-jobs (:finished-job (:body publish-response)))
+    (testing "With new graphs not in live"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")]
+        (append-quads-to-draftset-through-api route draftset-location quads)
+        (publish-draftset-through-api route draftset-location)
 
-            (let [live-statements (repo/query *test-backend* "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")
-                  expected-statements (statements rdf-data-file)
-                  graph-statements (group-by context expected-statements)]
-              (doseq [[live-graph contents] graph-statements]
-                (let [q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" live-graph)
-                      result-triples (set (map #(util/map-values str %) (repo/query *test-backend* q)))
-                      graph-triples (set (map (comp #(util/map-values str %) map->Triple) contents))]
-                  (is (= graph-triples result-triples))))
+        (let [live-quads (get-live-quads-through-api mount-point route)]
+          (is (= (set (eval-statements quads)) (set live-quads))))))
 
-              ;;draftset should no longer exist
-              (let [get-response (route {:uri draftset-location :request-method :get})]
-                (assert-is-not-found-response get-response)))))))
+    (testing "With statements added to graphs in live"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            initial-live-quads (map (comp first second) grouped-quads)
+            appended-quads (mapcat (comp rest second) grouped-quads)]
+    
+        (publish-quads-through-api mount-point route initial-live-quads)
+        (append-quads-to-draftset-through-api route draftset-location appended-quads)
+        (publish-draftset-through-api route draftset-location)
+
+        (let [after-publish-quads (get-live-quads-through-api mount-point route)]
+          (is (= (set (eval-statements quads)) (set after-publish-quads))))))
+
+    (testing "With statements deleted from drafts in live"
+      (publish-quads-through-api mount-point route quads)
+
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            to-delete (map (comp first second) grouped-quads)]
+        (delete-quads-through-api route draftset-location to-delete)
+        (publish-draftset-through-api route draftset-location)
+
+        (let [after-publish-quads (get-live-quads-through-api mount-point route)
+              expected-quads (eval-statements (mapcat (comp rest second) grouped-quads))]
+          (is (= (set expected-quads) (set after-publish-quads))))))
+
+    (testing "Deleting graph from live"
+      (publish-quads-through-api mount-point route quads)
+
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            graph-to-delete (ffirst grouped-quads)
+            expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
+        (delete-draftset-graph-through-api route draftset-location graph-to-delete)
+        (publish-draftset-through-api route draftset-location)
+        (assert-live-quads mount-point route expected-quads)))
+
+    (testing "Delete and append from live"
+      ;;TODO: refactor tests so this is not required
+      (grafter.rdf.protocols/update! *test-backend* "DROP ALL")
+      
+      (let [[live-graph initial-quads] (first grouped-quads)
+            draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            to-add (take 2 (second (second grouped-quads)))
+            to-delete (take 1 initial-quads)
+            expected-quads (eval-statements (set/difference (set/union (set initial-quads) (set to-add)) (set to-delete)))]
+
+        (publish-quads-through-api mount-point route initial-quads)
+        (append-quads-to-draftset-through-api route draftset-location to-add)
+        (delete-quads-through-api route draftset-location to-delete)
+        (publish-draftset-through-api route draftset-location)
+
+        (assert-live-quads mount-point route expected-quads)))
+
+    (testing "Deletion from graph not yet in live"
+      ;;TODO: refactor tests so this is not required
+      (grafter.rdf.protocols/update! *test-backend* "DROP ALL")
+      
+      (let [[graph graph-quads] (first grouped-quads)
+            draftset-location (create-draftset-through-api mount-point route "Test draftset")]
+
+        ;;delete quads in draftset before they exist in live
+        (delete-quads-through-api route draftset-location graph-quads)
+
+        ;;add to live then publish draftset
+        (publish-quads-through-api mount-point route graph-quads)
+        (publish-draftset-through-api route draftset-location)
+
+        ;;graph should still exist in live
+        (assert-live-quads mount-point route graph-quads)))
 
     (testing "Publish non-existent draftset"
       (let [response (route {:uri (str mount-point "/draftset/missing/publish") :request-method :post})]

@@ -127,8 +127,9 @@
   updates. Explicit UPDATE statements do not take part in transactions
   on the remote sesame SPARQL client."
   (log/info "Starting make-live for graphs " graphs)
-  (let [repo (->sesame-repo backend)
-        graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo %)) graphs)
-        update-str (util/make-compound-sparql-query graph-migrate-queries)]
-    (update! repo update-str))
+  (when-not (empty? graphs)
+    (let [repo (->sesame-repo backend)
+          graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo %)) graphs)
+          update-str (util/make-compound-sparql-query graph-migrate-queries)]
+      (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
