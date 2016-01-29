@@ -160,11 +160,11 @@
                      (let [ds-executor (get-draftset-executor backend draftset-id)]
                        (if (implies (is-triples-rdf-format? rdf-format)
                                     (some? graph))
-                         (do
-                           (if (is-quads-content-type? rdf-format)
-                             (delete-quads ds-executor statements-to-delete nil)
-                             (delete-triples ds-executor statements-to-delete (URIImpl. graph)))
-                           (response (dsmgmt/get-draftset-info backend draftset-id)))
+
+                         (let [delete-job (if (is-quads-content-type? rdf-format)
+                                            (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
+                                            (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
+                           (submit-async-job! delete-job))
                          (not-acceptable-response "graph parameter required for triples RDF format"))))))))
 
     (make-route :delete "/draftset/:id/graph"

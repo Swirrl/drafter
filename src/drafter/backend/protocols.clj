@@ -9,11 +9,11 @@
   (create-query-executor [this writer pquery]))
 
 (defprotocol StatementDeletion
-  (delete-quads [this quads graph-restrictions]))
+  (delete-quads-from-draftset-job [this quads draftset-ref]))
 
-(defn delete-triples [deletor triples graph]
+(defn delete-triples-from-draftset-job [deletor triples draftset-ref graph]
   (let [quads (map #(util/make-quad-statement % graph) triples)]
-    (delete-quads deletor quads #{graph})))
+    (delete-quads-from-draftset-job deletor quads draftset-ref)))
 
 (defprotocol QueryRewritable
   (create-rewriter [this live->draft]))

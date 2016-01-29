@@ -174,3 +174,8 @@
   `(let [job-result# (await-completion ~state-atom ~job-path)]
      (is (= :ok (:type job-result#)) (str "job failed: " (:exception job-result#)))
      job-result#))
+
+(defn key-set
+  "Gets a set containing the keys in the given map."
+  [m]
+  (set (keys m)))

@@ -5,11 +5,15 @@
             [clojure.set :as set]
             [drafter.backend.protocols :as backend]
             [drafter.backend.sesame.common.protocols :refer :all]
+            [drafter.write-scheduler :as scheduler]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.draftset-management :as dsmgmt]
+            [drafter.rdf.draft-management.jobs :as jobs]
+            [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results rewrite-statement]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
-            [drafter.util :refer [construct-dynamic* map-values seq->iterable]])
+            [drafter.util :refer [construct-dynamic* map-values seq->iterable] :as util])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
             TupleQueryResultHandler BooleanQueryResultHandler
             BindingSet QueryLanguage BooleanQuery GraphQuery Update]
@@ -176,19 +180,65 @@
       (.setDataset pquery dataset)
       pquery))
 
-(defn delete-quads [backend quads restrictions]
-  (let [repo (->sesame-repo backend)
-        graphs (get-restrictions restrictions)
-        graph-array (into-array Resource graphs)]
-    (with-open [conn (grafter.rdf.repository/->connection repo)]
-      (.remove conn (seq->iterable quads) graph-array))
+(defn- delete-quads-from-draftset [backend quad-batches draftset-ref live->draft state job]
+  (case (:op state)
+    :delete
+    (if-let [batch (first quad-batches)]
+      (let [live-graph (.getContext (first batch))]
+        (if (mgmt/is-graph-managed? backend (.stringValue live-graph))
+          (if-let [draft-graph (get live->draft live-graph)]
+            (let [graph-array (into-array Resource (vals live->draft))]
+              (with-open [conn (grafter.rdf.repository/->connection (->sesame-repo backend))]
+                (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)]
+                  (.remove conn (seq->iterable rewritten-statements) graph-array)))
+              (let [next-job (create-child-job
+                              job
+                              (partial delete-quads-from-draftset backend (rest quad-batches) draftset-ref live->draft state))]
+                (scheduler/queue-job! next-job)))
+            ;;NOTE: Do this immediately as we haven't done any real work yet
+            (do
+              (recur backend quad-batches draftset-ref live->draft {:op :copy-graph :live-graph live-graph} job)))
+          ;;live graph does not exist so do not create a draft graph
+          ;;NOTE: This is the same behaviour as deleting a live graph
+          ;;which does not exist in live
+          (recur backend (rest quad-batches) draftset-ref live->draft state job)))
+      (let [draftset-info (dsmgmt/get-draftset-info backend draftset-ref)]
+        (jobs/job-succeeded! job {:draftset draftset-info})))
 
-    ;;removal of quads may leave some draft graphs empty - these
-    ;;should be removed from the state graph. Removing the draft
-    ;;graphs may cause the corresponding managed graphs to have no
-    ;;remaining drafts - these should also be removed.
-    (mgmt/delete-empty-draft-graphs! backend)
-    (mgmt/delete-private-managed-graphs-without-drafts! backend)))
+    :copy-graph
+    (let [{:keys [live-graph]} state
+          live-graph-str (.stringValue live-graph)
+          draft-graph-uri-str (mgmt/create-draft-graph! backend live-graph-str {} (str (dsmgmt/->draftset-uri draftset-ref)))
+          draft-graph-uri (util/string->sesame-uri draft-graph-uri-str)
+          copy-batches (jobs/get-graph-clone-batches backend live-graph-str)
+          copy-state {:op :copy-graph-batches
+                      :graph live-graph
+                      :draft-graph draft-graph-uri
+                      :batches copy-batches}]
+      ;;NOTE: Do this immediately as no work has been done yet
+      (recur backend quad-batches draftset-ref (assoc live->draft live-graph draft-graph-uri) copy-state job))
+
+    :copy-graph-batches
+    (let [{:keys [graph batches draft-graph]} state]
+      (if-let [[offset limit] (first batches)]
+        (do
+          (jobs/copy-graph-batch! backend graph (.stringValue draft-graph) offset limit)
+          (let [next-state (update-in state [:batches] rest)
+                next-job (create-child-job
+                          job
+                          (partial delete-quads-from-draftset backend quad-batches draftset-ref live->draft next-state))]
+            (scheduler/queue-job! next-job)))
+        ;;graph copy completed so continue deleting quads
+        ;;NOTE: do this immediately since we haven't done any work on this iteration
+        (recur backend quad-batches draftset-ref live->draft {:op :delete} job)))))
+
+(defn delete-quads-from-draftset-job [backend quads draftset-ref]
+  (let [quad-batches (util/batch-partition-by quads #(.getContext %) jobs/batched-write-size)
+        graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
+        live->draft (util/map-all util/string->sesame-uri graph-mapping)]
+    (create-job
+     :batch-write
+     (partial delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete}))))
 
 (defn- rdf-handler->spog-tuple-handler [rdf-handler]
   (reify TupleQueryResultHandler
@@ -270,12 +320,5 @@
     (backend/create-query-executor inner writer-fn pquery))
 
   backend/StatementDeletion
-  (delete-quads [this quads graph-restriction]
-    (let [rewritten-statements (map #(rewrite-statement live->draft %) quads)
-          graph-restriction (get-restrictions graph-restriction)
-          rewritten-restriction (remove nil? (map live->draft graph-restriction))
-          draft-restriction (if (empty? graph-restriction)
-                               (vals live->draft)
-                               (set/intersection (set (vals live->draft)) rewritten-restriction))]
-      (when (seq draft-restriction)
-        (backend/delete-quads inner rewritten-statements draft-restriction)))))
+  (delete-quads-from-draftset-job [this quads draftset-ref]
+    (backend/delete-quads-from-draftset-job inner quads draftset-ref)))

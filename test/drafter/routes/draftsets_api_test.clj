@@ -1,7 +1,7 @@
 (ns drafter.routes.draftsets-api-test
   (:require [drafter.test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-db-setup
                                          stream->string select-all-in-graph make-graph-live!
-                                         import-data-to-draft! await-success]]
+                                         import-data-to-draft! await-success key-set]]
             [clojure.test :refer :all]
             [clojure.set :as set]
             [drafter.routes.draftsets-api :refer :all]
@@ -358,31 +358,68 @@
         (let [append-response (make-append-data-to-draftset-request route "/draftset/missing" "test/resources/test-draftset.trig")]
           (assert-is-not-found-response append-response)))))
 
+(defn- await-delete-statements-response [response]
+  (let [job-result (await-success finished-jobs (get-in response [:body :finished-job]))]
+    (:draftset job-result)))
+
+(defn- create-delete-statements-request [draftset-location statements format]
+  (let [input-stream (statements->input-stream statements format)
+        file-name (str "to-delete." (.getDefaultFileExtension format))
+        file-part {:tempfile input-stream :filename file-name  :content-type (.getDefaultMIMEType format)}]
+    {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}))
+
+(defn- delete-quads-through-api [route draftset-location quads]
+  (let [delete-request (create-delete-statements-request draftset-location quads formats/rdf-nquads)
+        delete-response (route delete-request)]
+    (await-delete-statements-response delete-response)))
+
+(defn- delete-draftset-triples-through-api [route draftset-location triples graph]
+  (let [delete-request (create-delete-statements-request draftset-location triples formats/rdf-ntriples)
+        delete-request (assoc-in delete-request [:params :graph] graph)
+        delete-response (route delete-request)]
+    (await-delete-statements-response delete-response)))
+
 (deftest delete-draftset-data-test
   (let [{:keys [mount-point route]} (create-routes)
         rdf-data-file "test/resources/test-draftset.trig"]
-    (testing "Delete quads"
-      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")]
-        (append-data-to-draftset-through-api route draftset-location rdf-data-file)
-        (let [draftset-quads (set (statements rdf-data-file))
 
+    (testing "Delete quads from graphs in live"
+      (let [quads (statements "test/resources/test-draftset.trig")
+            grouped-quads (group-by context quads)
+            to-delete (map (comp first second) grouped-quads)
+            draftset-location (create-draftset-through-api mount-point route "Test draftset")]
+        (publish-quads-through-api mount-point route quads)
+
+        (let [{graph-info :data :as draftset-info} (delete-quads-through-api route draftset-location to-delete)
+              ds-graphs (keys graph-info)
+              expected-graphs (map first grouped-quads)
+              draftset-quads (get-draftset-quads-through-api route draftset-location false)
+              expected-quads (eval-statements (mapcat (comp rest second) grouped-quads))]
+          (is (= (set expected-graphs) (set ds-graphs)))
+          (is (= (set expected-quads) (set draftset-quads))))))
+
+    (testing "Delete quads from graph not in live"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            to-delete [(->Quad "http://s1" "http://p1" "http://o1" "http://missing-graph1")
+                       (->Quad "http://s2" "http://p2" "http://o2" "http://missing-graph2")]
+            draftset-info (delete-quads-through-api route draftset-location to-delete)]
+        (is (empty? (keys (:data draftset-info))))))
+    
+    (testing "Delete quads only in draftset"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            draftset-quads (statements rdf-data-file)
+            grouped-quads (group-by context draftset-quads)]
+
+        (append-quads-to-draftset-through-api route draftset-location draftset-quads)
+        
+        (let [
               ;;NOTE: input data should contain at least two statements in each graph!
               ;;delete one quad from each, so all graphs will be non-empty after delete operation
-              to-delete (map (fn [[_ graph-quads]] (first graph-quads)) (group-by context draftset-quads))
-              to-delete (conj to-delete (->Quad "http://test-subject" "http://test-predicate" "http://test-obj" "http://missing-graph"))
-              input-stream (statements->input-stream to-delete formats/rdf-nquads)
-              file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}
-              delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}
-              delete-response (route delete-request)]
-            
-          (assert-is-ok-response delete-response)
-          (assert-schema draftset-info-schema (:body delete-response))
-
-          (let [ds-data-request {:uri (str draftset-location "/data") :request-method :get :headers {"Accept" "text/x-nquads"}}
-                ds-data-response (route ds-data-request)
-                expected-quads (set/difference draftset-quads to-delete)
-                actual-quads (set (eval-statements (get-draftset-quads-through-api route draftset-location)))]
-            (is (= (set (eval-statements expected-quads)) actual-quads))))))
+              to-delete (map (comp first second) grouped-quads)
+              draftset-info (delete-quads-through-api route draftset-location to-delete)
+              expected-quads (eval-statements (mapcat (comp rest second) grouped-quads))
+              actual-quads (get-draftset-quads-through-api route draftset-location false)]
+          (is (= (set expected-quads) (set actual-quads))))))
 
     (testing "Delete all quads from graph"
       (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
@@ -391,54 +428,66 @@
             [graph graph-statements] (first grouped-statements)]
         (append-data-to-draftset-through-api route draftset-location rdf-data-file)
 
-        (with-open [input-stream (statements->input-stream graph-statements formats/rdf-nquads)]
-          (let [delete-request (create-delete-quads-request draftset-location input-stream "text/x-nquads")
-                {:keys [body] :as delete-response} (route delete-request)]
-            (assert-is-ok-response delete-response)
-            (assert-schema draftset-info-schema body)
+        (let [draftset-info (delete-quads-through-api route draftset-location graph-statements)
+              expected-graphs (set (map :c initial-statements))
+              draftset-graphs (key-set (:data draftset-info))]
+          ;;graph should still be in draftset even if it is empty since it should be deleted on publish
+          (is (= expected-graphs draftset-graphs)))))
 
-            (let [remaining-graphs (keys (:data body))
-                  expected-graphs (rest (keys grouped-statements))]
-              (is (= (set expected-graphs) (set remaining-graphs))))))))
+    (testing "Delete triples from graph in live"
+      (let [quads (statements "test/resources/test-draftset.trig")
+            grouped-quads (group-by context quads)
+            [live-graph graph-quads] (first grouped-quads)
+            draftset-location (create-draftset-through-api mount-point route "Test draftset")]
 
-    (testing "Delete triples"
+        (publish-quads-through-api mount-point route quads)
+        (let [draftset-info (delete-quads-through-api route draftset-location [(first graph-quads)])
+              draftset-quads (get-draftset-quads-through-api route draftset-location false)
+              expected-quads (eval-statements (rest graph-quads))]
+          (is (= #{live-graph} (key-set (:data draftset-info))))
+          (is (= (set expected-quads) (set draftset-quads))))))
+
+    (testing "Delete triples from graph not in live"
       (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
-            draftset-quads (set (statements rdf-data-file))]
+            to-delete [(->Triple "http://s1" "http://p1" "http://o1")
+                       (->Triple "http://s2" "http://p2" "http://o2")]
+            draftset-info (delete-draftset-triples-through-api route draftset-location to-delete "http://missing")
+            draftset-quads (get-draftset-quads-through-api route draftset-location false)]
+
+        ;;graph should not exist in draftset since it was not in live
+        (is (empty? (:data draftset-info)))
+        (is (empty? draftset-quads))))
+    
+    (testing "Delete triples only in draftset"
+      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+            draftset-quads (set (statements rdf-data-file))
+            [graph graph-quads] (first (group-by context draftset-quads))
+            quads-to-delete (take 2 graph-quads)
+            triples-to-delete (map map->Triple quads-to-delete)]
+        
         (append-data-to-draftset-through-api route draftset-location rdf-data-file)
 
-        (let [[graph graph-quads] (first (group-by context draftset-quads))
-              quads-to-delete (take 2 graph-quads)
-              triples-to-delete (map map->Triple quads-to-delete)
-              input-stream (statements->input-stream triples-to-delete formats/rdf-ntriples)
-              file-part {:tempfile input-stream :filename "to-delete.nt" :content-type "application/n-triples"}
-              delete-request {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part :graph graph}}
-              delete-response (route delete-request)]
-
-          (assert-is-ok-response delete-response)
-          (assert-schema draftset-info-schema (:body delete-response))
-
-          (let [quads-after-delete (set (eval-statements (get-draftset-quads-through-api route draftset-location)))
-                expected-quads (set (eval-statements (set/difference draftset-quads quads-to-delete)))]
-
-            (is (= expected-quads quads-after-delete))))))
+        (let [draftset-info (delete-draftset-triples-through-api route draftset-location triples-to-delete graph)
+              quads-after-delete (set (get-draftset-quads-through-api route draftset-location))
+              expected-quads (set (eval-statements (set/difference draftset-quads quads-to-delete)))]
+          (is (= expected-quads quads-after-delete)))))
 
     (testing "Delete all triples from graph"
-      (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
+      (let [quads (statements rdf-data-file)
+            grouped-quads (group-by context quads)
+            [graph graph-quads] (first grouped-quads)
+            triples-to-delete (map map->Triple graph-quads)
+            draftset-location (create-draftset-through-api mount-point route "Test draftset")
             draftset-quads (set (statements rdf-data-file))]
-        (append-data-to-draftset-through-api route draftset-location rdf-data-file)
+        
+        (publish-quads-through-api mount-point route quads)
 
-        (let [grouped-quads (group-by context draftset-quads)
-              [graph graph-quads] (first grouped-quads)
-              input-stream (statements->input-stream graph-quads formats/rdf-ntriples)
-              delete-request (create-delete-triples-request draftset-location input-stream "application/n-triples" graph)
-              {:keys [body] :as delete-response} (route delete-request)]
+        (let [draftset-info (delete-draftset-triples-through-api route draftset-location triples-to-delete graph)
+              draftset-quads (get-draftset-quads-through-api route draftset-location false)
+              draftset-graphs (key-set (:data draftset-info))]
 
-          (assert-is-ok-response delete-response)
-          (assert-schema draftset-info-schema body)
-
-          (let [draftset-graphs (keys (:data body))
-                expected-graphs (keys (rest grouped-quads))]
-            (is (= (set expected-graphs) (set draftset-graphs)))))))
+          (is (= #{graph} draftset-graphs))
+          (is (empty? draftset-quads)))))
 
     (testing "Delete triples without graph"
       (let [draftset-location (create-draftset-through-api mount-point route "Test draftset")
