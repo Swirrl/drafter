@@ -1,6 +1,9 @@
-(ns drafter.util-tests
+(ns drafter.util-test
   (:require [drafter.util :refer :all]
-            [clojure.test :refer :all]))
+            [clojure.test :refer :all]
+            [schema.test :refer [validate-schemas]]))
+
+(use-fixtures :each validate-schemas)
 
 (deftest get-causes-test
   (testing "Returns all causes"
