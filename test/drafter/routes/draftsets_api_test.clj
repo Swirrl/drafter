@@ -208,7 +208,7 @@
     (await-delete-statements-response delete-response)))
 
 (defn- create-routes []
-  {:mount-point "" :route (draftset-api-routes "" *test-backend*)})
+  {:mount-point "" :route (draftset-api-routes *test-backend*)})
 
 (deftest create-draftset-test
   (let [{:keys [mount-point route]} (create-routes)]

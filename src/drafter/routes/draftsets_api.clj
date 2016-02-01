@@ -113,103 +113,102 @@
       (catch OpenRDFException ex
         (unprocessable-entity-response "Cannot read statements to delete")))))
 
-(defn draftset-api-routes [mount-point backend]
+(defn draftset-api-routes [backend]
   (routes
-   (context
-    mount-point []
 
-    (GET "/draftsets" []
-         (response (dsmgmt/get-all-draftsets-info backend)))
+   (GET "/draftsets" []
+        (response (dsmgmt/get-all-draftsets-info backend)))
 
     ;;create a new draftset
-    (POST "/draftset" [display-name description]
-          (let [draftset-id (dsmgmt/create-draftset! backend display-name description)]
-            (redirect-after-post (str mount-point "/draftset/" draftset-id))))
 
-    (GET "/draftset/:id" [id]
-         (if-let [info (dsmgmt/get-draftset-info backend (dsmgmt/->DraftsetId id))]
-           (response info)
-           (not-found "")))
+   (POST "/draftset" [display-name description]
+         (let [draftset-id (dsmgmt/create-draftset! backend display-name description)]
+           (redirect-after-post (str "/draftset/" draftset-id))))
 
-    (DELETE "/draftset/:id" [id]
-            (delete-draftset! backend (dsmgmt/->DraftsetId id))
-            (response ""))
+   (GET "/draftset/:id" [id]
+        (if-let [info (dsmgmt/get-draftset-info backend (dsmgmt/->DraftsetId id))]
+          (response info)
+          (not-found "")))
 
-    (make-route :get "/draftset/:id/data"
-                (existing-draftset-handler
-                 backend
-                 (rdf-response-format-handler
-                  (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
-                    (if (is-quads-content-type? rdf-format)
-                        (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]) (or union-with-live false))
-                        (if (some? graph)
-                          (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                                query-request (assoc-in request [:params :query] q)]
-                            (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))
-                          (not-acceptable-response "graph query parameter required for RDF triple format")))))))
+   (DELETE "/draftset/:id" [id]
+           (delete-draftset! backend (dsmgmt/->DraftsetId id))
+           (response ""))
 
-    (make-route :delete "/draftset/:id/data"
-                (existing-draftset-handler
-                 backend
-                 (rdf-file-part-handler
-                  (read-rdf-file-handler
-                   (fn [{{draftset-id :draftset-id
-                          graph :graph
-                          rdf-format :rdf-format
-                          statements-to-delete :rdf-statements} :params :as request}]
-                     (let [ds-executor (get-draftset-executor backend draftset-id)]
-                       (if (implies (is-triples-rdf-format? rdf-format)
-                                    (some? graph))
+   (make-route :get "/draftset/:id/data"
+               (existing-draftset-handler
+                backend
+                (rdf-response-format-handler
+                 (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
+                   (if (is-quads-content-type? rdf-format)
+                     (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]) (or union-with-live false))
+                     (if (some? graph)
+                       (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                             query-request (assoc-in request [:params :query] q)]
+                         (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))
+                       (not-acceptable-response "graph query parameter required for RDF triple format")))))))
 
-                         (let [delete-job (if (is-quads-content-type? rdf-format)
-                                            (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
-                                            (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
-                           (submit-async-job! delete-job))
-                         (not-acceptable-response "graph parameter required for triples RDF format"))))))))
-
-    (make-route :delete "/draftset/:id/graph"
-                (existing-draftset-handler backend 
-                                           (fn [{{:keys [draftset-id graph]} :params}]
-                                             (dsmgmt/delete-draftset-graph! backend draftset-id graph)
-                                             (response {}))))
-
-    (make-route :post "/draftset/:id/data"
-                (existing-draftset-handler
-                 backend
-                 (rdf-file-part-handler
+   (make-route :delete "/draftset/:id/data"
+               (existing-draftset-handler
+                backend
+                (rdf-file-part-handler
+                 (read-rdf-file-handler
                   (fn [{{draftset-id :draftset-id
-                         request-content-type :content-type
-                         rdf-format :rdf-format
-                         content-type :rdf-content-type
                          graph :graph
-                         {data :tempfile} :file} :params}]
-                    (if (is-quads-content-type? rdf-format)
-                      (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
-                        (submit-async-job! append-job))
-                      (if (some? graph)
-                        (let [append-job (append-triples-to-draftset-job backend draftset-id data rdf-format graph)]
-                          (submit-async-job! append-job))
-                        (response/bad-request-response "Graph required for triples content type")))))))
+                         rdf-format :rdf-format
+                         statements-to-delete :rdf-statements} :params :as request}]
+                    (let [ds-executor (get-draftset-executor backend draftset-id)]
+                      (if (implies (is-triples-rdf-format? rdf-format)
+                                   (some? graph))
 
-    (make-route nil "/draftset/:id/query"
-                (allowed-methods-handler
-                 #{:get :post}
-                 (existing-draftset-handler
-                  backend
-                  (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
-                    (if (nil? query)
-                      (not-acceptable-response "query parameter required")
-                      (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
-                            uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
-                            rewriting-executor (create-rewriter backend uri-graph-mapping)
-                            graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
-                        (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
+                        (let [delete-job (if (is-quads-content-type? rdf-format)
+                                           (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
+                                           (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
+                          (submit-async-job! delete-job))
+                        (not-acceptable-response "graph parameter required for triples RDF format"))))))))
 
-    (make-route :post "/draftset/:id/publish"
-                (existing-draftset-handler backend (fn [{{:keys [draftset-id]} :params}]
-                                                     (submit-async-job! (publish-draftset-job backend draftset-id)))))
+   (make-route :delete "/draftset/:id/graph"
+               (existing-draftset-handler backend 
+                                          (fn [{{:keys [draftset-id graph]} :params}]
+                                            (dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                                            (response {}))))
 
-    (make-route :put "/draftset/:id/meta"
-                (existing-draftset-handler backend (fn [{{:keys [draftset-id] :as params} :params}]
-                                                     (dsmgmt/set-draftset-metadata! backend draftset-id params)
-                                                     (response (dsmgmt/get-draftset-info backend draftset-id))))))))
+   (make-route :post "/draftset/:id/data"
+               (existing-draftset-handler
+                backend
+                (rdf-file-part-handler
+                 (fn [{{draftset-id :draftset-id
+                        request-content-type :content-type
+                        rdf-format :rdf-format
+                        content-type :rdf-content-type
+                        graph :graph
+                        {data :tempfile} :file} :params}]
+                   (if (is-quads-content-type? rdf-format)
+                     (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
+                       (submit-async-job! append-job))
+                     (if (some? graph)
+                       (let [append-job (append-triples-to-draftset-job backend draftset-id data rdf-format graph)]
+                         (submit-async-job! append-job))
+                       (response/bad-request-response "Graph required for triples content type")))))))
+
+   (make-route nil "/draftset/:id/query"
+               (allowed-methods-handler
+                #{:get :post}
+                (existing-draftset-handler
+                 backend
+                 (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
+                   (if (nil? query)
+                     (not-acceptable-response "query parameter required")
+                     (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
+                           uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
+                           rewriting-executor (create-rewriter backend uri-graph-mapping)
+                           graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
+                       (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
+
+   (make-route :post "/draftset/:id/publish"
+               (existing-draftset-handler backend (fn [{{:keys [draftset-id]} :params}]
+                                                    (submit-async-job! (publish-draftset-job backend draftset-id)))))
+
+   (make-route :put "/draftset/:id/meta"
+               (existing-draftset-handler backend (fn [{{:keys [draftset-id] :as params} :params}]
+                                                    (dsmgmt/set-draftset-metadata! backend draftset-id params)
+                                                    (response (dsmgmt/get-draftset-info backend draftset-id)))))))
