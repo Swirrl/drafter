@@ -23,6 +23,11 @@
            [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONParser]
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParser]))
 
+(def ^:private ^:dynamic *route*)
+
+(defn- route [request]
+  (*route* request))
+
 (defn- statements->input-stream [statements format]
   (let [bos (ByteArrayOutputStream.)
         serialiser (rdf-serializer bos :format format)]
@@ -207,12 +212,8 @@
         delete-response (route delete-request)]
     (await-delete-statements-response delete-response)))
 
-(defn- create-routes []
-  {:route (draftset-api-routes *test-backend*)})
-
 (deftest create-draftset-test
-  (let [{:keys [route]} (create-routes)]
-    (testing "Create draftset with title"
+  (testing "Create draftset with title"
       (let [response (route (create-draftset-request "Test Title!"))]
         (assert-is-see-other-response response)))
 
@@ -222,166 +223,163 @@
 
     (testing "Get non-existent draftset"
       (let [response (route {:uri  "/draftset/missing" :request-method :get})]
-        (assert-is-not-found-response response)))))
+        (assert-is-not-found-response response))))
 
 (deftest get-all-draftsets-test
-  (let [{:keys [route]} (create-routes)]
-    (let [draftset-count 10
-          titles (map #(str "Title" %) (range 1 (inc draftset-count)))
-          create-requests (map create-draftset-request titles)
-          create-responses (doall (map route create-requests))]
-        (doseq [r create-responses]
-          (assert-is-see-other-response r))
+  (let [draftset-count 10
+        titles (map #(str "Title" %) (range 1 (inc draftset-count)))
+        create-requests (map create-draftset-request titles)
+        create-responses (doall (map route create-requests))]
+    (doseq [r create-responses]
+      (assert-is-see-other-response r))
 
-        (let [get-all-request {:uri "/draftsets" :request-method :get}
-              {:keys [body] :as response} (route get-all-request)]
-          (assert-is-ok-response response)
-          (is (= draftset-count (count body)))
-          (assert-schema [draftset-without-description-info-schema] body)))))
+    (let [get-all-request {:uri "/draftsets" :request-method :get}
+          {:keys [body] :as response} (route get-all-request)]
+      (assert-is-ok-response response)
+      
+      (is (= draftset-count (count body)))
+      (assert-schema [draftset-without-description-info-schema] body))))
 
 (deftest get-draftset-test
-  (let [{:keys [route]} (create-routes)]
-    (testing "Get empty draftset without title or description"
-      (let [create-request {:uri "/draftset" :request-method :post}
-            create-response (route create-request)]
-        (assert-is-see-other-response create-response)
+  (testing "Get empty draftset without title or description"
+    (let [create-request {:uri "/draftset" :request-method :post}
+          create-response (route create-request)]
+      (assert-is-see-other-response create-response)
 
-        (let [draftset-location (get-in create-response [:headers "Location"])
-              get-request {:uri draftset-location :request-method :get}
-              {:keys [body] :as get-response} (route get-request)]
-          
-          (assert-is-ok-response get-response)
-          (assert-schema draftset-without-title-or-description-info-schema body))))
+      (let [draftset-location (get-in create-response [:headers "Location"])
+            get-request {:uri draftset-location :request-method :get}
+            {:keys [body] :as get-response} (route get-request)]
+        
+        (assert-is-ok-response get-response)
+        (assert-schema draftset-without-title-or-description-info-schema body))))
     
-    (testing "Get empty draftset without description"
-      (let [display-name "Test title!"
-            create-request (create-draftset-request display-name)
-            create-response (route create-request)]
-        (assert-is-see-other-response create-response)
+  (testing "Get empty draftset without description"
+    (let [display-name "Test title!"
+          create-request (create-draftset-request display-name)
+          create-response (route create-request)]
+      (assert-is-see-other-response create-response)
 
-        (let [draftset-location (get-in create-response [:headers "Location"])
-              get-request {:uri draftset-location :request-method :get}
+      (let [draftset-location (get-in create-response [:headers "Location"])
+            get-request {:uri draftset-location :request-method :get}
+            {:keys [body] :as response} (route get-request)]
+        (assert-is-ok-response response)
+        (assert-schema draftset-without-description-info-schema body)
+        (is (= display-name (:display-name body))))))
+
+  (testing "Get empty draftset with description"
+    (let [display-name "Test title!"
+          description "Draftset used in a test"
+          create-request (create-draftset-request display-name description)
+          create-response (route create-request)]
+      (assert-is-see-other-response create-response)
+
+      (let [draftset-location (get-in create-response [:headers "Location"])
+            get-request {:uri draftset-location :request-method :get}
+            {:keys [body] :as response} (route get-request)]
+        (assert-is-ok-response response)
+        (assert-schema draftset-with-description-info-schema body)
+        (is (= display-name (:display-name body)))
+        (is (= description (:description body))))))
+
+  (testing "Get draftset containing data"
+    (let [display-name "Test title!"
+          create-request (create-draftset-request display-name)
+          {create-status :status {draftset-location "Location"} :headers :as create-response} (route create-request)
+          quads (statements "test/resources/test-draftset.trig")
+          live-graphs (set (keys (group-by context quads)))]
+      (assert-is-see-other-response create-response)
+      (let [append-response (make-append-data-to-draftset-request route draftset-location "test/resources/test-draftset.trig")]
+        (await-success finished-jobs (get-in append-response [:body :finished-job]))
+        (let [get-request {:uri draftset-location :request-method :get}
               {:keys [body] :as response} (route get-request)]
           (assert-is-ok-response response)
           (assert-schema draftset-without-description-info-schema body)
-          (is (= display-name (:display-name body))))))
-
-    (testing "Get empty draftset with description"
-      (let [display-name "Test title!"
-            description "Draftset used in a test"
-            create-request (create-draftset-request display-name description)
-            create-response (route create-request)]
-        (assert-is-see-other-response create-response)
-
-        (let [draftset-location (get-in create-response [:headers "Location"])
-              get-request {:uri draftset-location :request-method :get}
-              {:keys [body] :as response} (route get-request)]
-          (assert-is-ok-response response)
-          (assert-schema draftset-with-description-info-schema body)
+          
           (is (= display-name (:display-name body)))
-          (is (= description (:description body))))))
-
-    (testing "Get draftset containing data"
-      (let [display-name "Test title!"
-            create-request (create-draftset-request display-name)
-            {create-status :status {draftset-location "Location"} :headers :as create-response} (route create-request)
-            quads (statements "test/resources/test-draftset.trig")
-            live-graphs (set (keys (group-by context quads)))]
-        (assert-is-see-other-response create-response)
-        (let [append-response (make-append-data-to-draftset-request route draftset-location "test/resources/test-draftset.trig")]
-          (await-success finished-jobs (get-in append-response [:body :finished-job]))
-          (let [get-request {:uri draftset-location :request-method :get}
-                {:keys [body] :as response} (route get-request)]
-            (assert-is-ok-response response)
-            (assert-schema draftset-without-description-info-schema body)
-            
-            (is (= display-name (:display-name body)))
-            (is (= live-graphs (set (keys (:data body)))))))))))
+          (is (= live-graphs (set (keys (:data body))))))))))
 
 (deftest append-data-to-draftset-test
-  (let [{:keys [route]} (create-routes)]
-    (testing "Quad data with valid content type for file part"
-        (let [data-file-path "test/resources/test-draftset.trig"
-              quads (statements data-file-path)
-              create-request (create-draftset-request "Test draftset")
-              create-response (route create-request)
-              draftset-location (create-draftset-through-api route "Test draftset")
-              draftset-id (.substring draftset-location (inc (.lastIndexOf draftset-location "/")))]
-          (with-open [fs (io/input-stream data-file-path)]
-              (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
-                    request (append-to-draftset-request draftset-location file-part)
-                    {:keys [status body] :as response} (route request)]
-                (await-success finished-jobs (:finished-job body))
+  (testing "Quad data with valid content type for file part"
+    (let [data-file-path "test/resources/test-draftset.trig"
+          quads (statements data-file-path)
+          create-request (create-draftset-request "Test draftset")
+          create-response (route create-request)
+          draftset-location (create-draftset-through-api route "Test draftset")
+          draftset-id (.substring draftset-location (inc (.lastIndexOf draftset-location "/")))]
+      (with-open [fs (io/input-stream data-file-path)]
+        (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
+              request (append-to-draftset-request draftset-location file-part)
+              {:keys [status body] :as response} (route request)]
+          (await-success finished-jobs (:finished-job body))
 
-                (let [draftset-graph-map (dsmgmt/get-draftset-graph-mapping *test-backend* (dsmgmt/->DraftsetId draftset-id))
-                      graph-statements (group-by context quads)]
-                  (doseq [[live-graph graph-quads] graph-statements]
-                    (let [draft-graph (get draftset-graph-map live-graph)
-                          q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)
-                          draft-statements (repo/query *test-backend* q)
-                          expected-statements (map map->Triple graph-quads)]
-                      (is (is-graph-managed? *test-backend* live-graph))
-                      (is (draft-exists? *test-backend* draft-graph))
-                      (is (set expected-statements) (set draft-statements)))))))))
+          (let [draftset-graph-map (dsmgmt/get-draftset-graph-mapping *test-backend* (dsmgmt/->DraftsetId draftset-id))
+                graph-statements (group-by context quads)]
+            (doseq [[live-graph graph-quads] graph-statements]
+              (let [draft-graph (get draftset-graph-map live-graph)
+                    q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)
+                    draft-statements (repo/query *test-backend* q)
+                    expected-statements (map map->Triple graph-quads)]
+                (is (is-graph-managed? *test-backend* live-graph))
+                (is (draft-exists? *test-backend* draft-graph))
+                (is (set expected-statements) (set draft-statements)))))))))
 
-    (testing "Appending quads to graph which exist in live"
-      (let [quads (statements "test/resources/test-draftset.trig")
-            grouped-quads (group-by context quads)
-            live-quads (map (comp first second) grouped-quads)
-            quads-to-add (rest (second (first grouped-quads)))
-            draftset-location (create-draftset-through-api route "Test draftset")]
-        (publish-quads-through-api route live-quads)
-        (append-quads-to-draftset-through-api route draftset-location quads-to-add)
+  (testing "Appending quads to graph which exist in live"
+    (let [quads (statements "test/resources/test-draftset.trig")
+          grouped-quads (group-by context quads)
+          live-quads (map (comp first second) grouped-quads)
+          quads-to-add (rest (second (first grouped-quads)))
+          draftset-location (create-draftset-through-api route "Test draftset")]
+      (publish-quads-through-api route live-quads)
+      (append-quads-to-draftset-through-api route draftset-location quads-to-add)
 
-        ;;draftset itself should contain the live quads from the graph
-        ;;added to along with the quads explicitly added. It should
-        ;;not contain any quads from the other live graph.
-        (let [draftset-quads (get-draftset-quads-through-api route draftset-location false)
-              expected-quads (eval-statements (second (first grouped-quads)))]
-          (is (= (set expected-quads) (set draftset-quads))))))
+      ;;draftset itself should contain the live quads from the graph
+      ;;added to along with the quads explicitly added. It should
+      ;;not contain any quads from the other live graph.
+      (let [draftset-quads (get-draftset-quads-through-api route draftset-location false)
+            expected-quads (eval-statements (second (first grouped-quads)))]
+        (is (= (set expected-quads) (set draftset-quads))))))
 
-      (testing "Quad data with valid content type for request"
-        (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-          (let [draftset-location (create-draftset-through-api route "Test draftset")
-                file-part {:tempfile fs :filename "test-draftset.trig"}
-                request (-> (append-to-draftset-request draftset-location file-part)
-                            (assoc-in [:params :content-type] "application/x-trig"))
-                response (route request)]
-            (await-success finished-jobs (:finished-job (:body response))))))
+  (testing "Quad data with valid content type for request"
+    (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
+      (let [draftset-location (create-draftset-through-api route "Test draftset")
+            file-part {:tempfile fs :filename "test-draftset.trig"}
+            request (-> (append-to-draftset-request draftset-location file-part)
+                        (assoc-in [:params :content-type] "application/x-trig"))
+            response (route request)]
+        (await-success finished-jobs (:finished-job (:body response))))))
 
-      (testing "Triple data"
-        (with-open [fs (io/input-stream "test/test-triple.nt")]
-          (let [draftset-location (create-draftset-through-api route "Test draftset")
-                file-part {:tempfile fs :filename "test-triple.nt" :content-type "application/n-triples"}
-                request (append-to-draftset-request draftset-location file-part)
-                response (route request)]
-            (is (is-client-error-response? response)))))
+  (testing "Triple data"
+    (with-open [fs (io/input-stream "test/test-triple.nt")]
+      (let [draftset-location (create-draftset-through-api route "Test draftset")
+            file-part {:tempfile fs :filename "test-triple.nt" :content-type "application/n-triples"}
+            request (append-to-draftset-request draftset-location file-part)
+            response (route request)]
+        (is (is-client-error-response? response)))))
 
-      (testing "Triples for graph which exists in live"
-        (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-              draftset-location (create-draftset-through-api route "Test draftset")]
-          (publish-quads-through-api route [(first graph-quads)])
-          (append-triples-to-draftset-through-api route draftset-location (rest graph-quads) graph)
+  (testing "Triples for graph which exists in live"
+    (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (create-draftset-through-api route "Test draftset")]
+      (publish-quads-through-api route [(first graph-quads)])
+      (append-triples-to-draftset-through-api route draftset-location (rest graph-quads) graph)
 
-          (let [draftset-graph-triples (get-draftset-graph-triples-through-api route draftset-location graph false)
-                expected-triples (eval-statements (map map->Triple graph-quads))]
-            (is (= (set expected-triples) (set draftset-graph-triples))))))
+      (let [draftset-graph-triples (get-draftset-graph-triples-through-api route draftset-location graph false)
+            expected-triples (eval-statements (map map->Triple graph-quads))]
+        (is (= (set expected-triples) (set draftset-graph-triples))))))
 
-      (testing "Quad data without content type"
-        (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-          (let [draftset-location (create-draftset-through-api route "Test draftset!")
-                file-part {:tempfile fs :filename "test-dataset.trig"}
-                request (append-to-draftset-request draftset-location file-part)
-                response (route request)]
-            (is (is-client-error-response? response)))))
+  (testing "Quad data without content type"
+    (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
+      (let [draftset-location (create-draftset-through-api route "Test draftset!")
+            file-part {:tempfile fs :filename "test-dataset.trig"}
+            request (append-to-draftset-request draftset-location file-part)
+            response (route request)]
+        (is (is-client-error-response? response)))))
 
-      (testing "Invalid draftset"
-        (let [append-response (make-append-data-to-draftset-request route "/draftset/missing" "test/resources/test-draftset.trig")]
-          (assert-is-not-found-response append-response)))))
+  (testing "Invalid draftset"
+    (let [append-response (make-append-data-to-draftset-request route "/draftset/missing" "test/resources/test-draftset.trig")]
+      (assert-is-not-found-response append-response))))
 
 (deftest delete-draftset-data-test
-  (let [{:keys [route]} (create-routes)
-        rdf-data-file "test/resources/test-draftset.trig"]
+  (let [rdf-data-file "test/resources/test-draftset.trig"]
 
     (testing "Delete quads from graphs in live"
       (let [quads (statements "test/resources/test-draftset.trig")
@@ -523,66 +521,65 @@
           (assert-is-unsupported-media-type-response delete-response))))))
 
 (deftest delete-draftset-graph-test
-  (let [{:keys [route]} (create-routes)]
-    (testing "Delete non-existent live graph"
-      (let [draftset-location (create-draftset-through-api route "Test draftset")
-            graph-to-delete "http://live-graph"
-            delete-graph-request {:uri (str draftset-location "/graph") :request-method :delete :params {:graph graph-to-delete}}
-            delete-graph-response (route delete-graph-request)]
-        (assert-is-ok-response delete-graph-response)
+  (testing "Delete non-existent live graph"
+    (let [draftset-location (create-draftset-through-api route "Test draftset")
+          graph-to-delete "http://live-graph"
+          delete-graph-request {:uri (str draftset-location "/graph") :request-method :delete :params {:graph graph-to-delete}}
+          delete-graph-response (route delete-graph-request)]
+      (assert-is-ok-response delete-graph-response)
 
-        (let [draftset-info (get-draftset-info-through-api route draftset-location)]
-          ;;graph to delete should NOT exist in the draftset since it did not exist in live
-          ;;at the time of the delete
-          (is (= #{} (set (keys (:data draftset-info))))))))
+      (let [draftset-info (get-draftset-info-through-api route draftset-location)]
+        ;;graph to delete should NOT exist in the draftset since it did not exist in live
+        ;;at the time of the delete
+        (is (= #{} (set (keys (:data draftset-info))))))))
 
-    (testing "Delete live graph not in draftset"
-      (let [quads (statements "test/resources/test-draftset.trig")
-            graph-quads (group-by context quads)
-            live-graphs (keys graph-quads)
-            graph-to-delete (first live-graphs)
-            draftset-location (create-draftset-through-api route "Test draftset")]
-        (publish-quads-through-api route quads)
-        (delete-draftset-graph-through-api route draftset-location graph-to-delete)
+  (testing "Delete live graph not in draftset"
+    (let [quads (statements "test/resources/test-draftset.trig")
+          graph-quads (group-by context quads)
+          live-graphs (keys graph-quads)
+          graph-to-delete (first live-graphs)
+          draftset-location (create-draftset-through-api route "Test draftset")]
+      (publish-quads-through-api route quads)
+      (delete-draftset-graph-through-api route draftset-location graph-to-delete)
 
-        (let [{draftset-graphs :data} (get-draftset-info-through-api route draftset-location)]
-          (is (= #{graph-to-delete} (set (keys draftset-graphs)))))))
+      (let [{draftset-graphs :data} (get-draftset-info-through-api route draftset-location)]
+        (is (= #{graph-to-delete} (set (keys draftset-graphs)))))))
 
-    (testing "Delete graph with changes in draftset"
-      (let [draftset-location (create-draftset-through-api route "Test draftset")
-            [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-            published-quad (first graph-quads)
-            added-quads (rest graph-quads)]
-        (publish-quads-through-api route [published-quad])
-        (append-quads-to-draftset-through-api route draftset-location added-quads)
-        (delete-draftset-graph-through-api route draftset-location graph)
+  (testing "Delete graph with changes in draftset"
+    (let [draftset-location (create-draftset-through-api route "Test draftset")
+          [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          published-quad (first graph-quads)
+          added-quads (rest graph-quads)]
+      (publish-quads-through-api route [published-quad])
+      (append-quads-to-draftset-through-api route draftset-location added-quads)
+      (delete-draftset-graph-through-api route draftset-location graph)
 
-        (let [{draftset-graphs :data} (get-draftset-info-through-api route draftset-location)]
-          (is (= #{graph} (set (keys draftset-graphs)))))))
+      (let [{draftset-graphs :data} (get-draftset-info-through-api route draftset-location)]
+        (is (= #{graph} (set (keys draftset-graphs)))))))
     
-    (testing "Deletes graph only in draftset"
-      (let [rdf-data-file "test/resources/test-draftset.trig"
-            draftset-location (create-draftset-through-api route "Test draftset")
-            draftset-quads (statements rdf-data-file)
-            grouped-quads (group-by context draftset-quads)
-            [graph _] (first grouped-quads)]
-        (append-data-to-draftset-through-api route draftset-location rdf-data-file)
+  (testing "Deletes graph only in draftset"
+    (let [rdf-data-file "test/resources/test-draftset.trig"
+          draftset-location (create-draftset-through-api route "Test draftset")
+          draftset-quads (statements rdf-data-file)
+          grouped-quads (group-by context draftset-quads)
+          [graph _] (first grouped-quads)]
+      (append-data-to-draftset-through-api route draftset-location rdf-data-file)
 
-        (delete-draftset-graph-through-api route draftset-location graph)
-        
-        (let [remaining-quads (eval-statements (get-draftset-quads-through-api route draftset-location))
-                expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
-            (is (= (set expected-quads) (set remaining-quads))))
+      (delete-draftset-graph-through-api route draftset-location graph)
+      
+      (let [remaining-quads (eval-statements (get-draftset-quads-through-api route draftset-location))
+            expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
+        (is (= (set expected-quads) (set remaining-quads))))
 
-        (let [draftset-info (get-draftset-info-through-api route draftset-location)
-              draftset-graphs (keys (:data draftset-info))
-              expected-graphs (keys grouped-quads)]
-            (is (= (set expected-graphs) (set draftset-graphs))))))
+      (let [draftset-info (get-draftset-info-through-api route draftset-location)
+            draftset-graphs (keys (:data draftset-info))
+            expected-graphs (keys grouped-quads)]
+        (is (= (set expected-graphs) (set draftset-graphs))))))
 
-    (testing "Unknown draftset"
-      (let [delete-graph-request {:uri "/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}}
-            response (route delete-graph-request)]
-        (assert-is-not-found-response response)))))
+  (testing "Unknown draftset"
+    (let [delete-graph-request {:uri "/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}}
+          response (route delete-graph-request)]
+      (assert-is-not-found-response response))))
 
 ;;TODO: Get quads through query of live endpoint? This depends on
 ;;'union with live' working correctly
@@ -595,8 +592,7 @@
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
 (deftest publish-draftset-test
-  (let [{:keys [route]} (create-routes)
-        rdf-data-file "test/resources/test-draftset.trig"
+  (let [rdf-data-file "test/resources/test-draftset.trig"
         quads (statements rdf-data-file)
         grouped-quads (doall (group-by context quads))]
 
@@ -681,8 +677,7 @@
         (assert-is-not-found-response response)))))
 
 (deftest delete-draftset-test
-  (let [{:keys [route]} (create-routes)
-        rdf-data-file "test/resources/test-draftset.trig"
+  (let [rdf-data-file "test/resources/test-draftset.trig"
         draftset-location (create-draftset-through-api route "Test draftset")
         delete-response (route {:uri draftset-location :request-method :delete})]
     (assert-is-ok-response delete-response)
@@ -702,169 +697,172 @@
         (swap! result-state conj binding-map)))))
 
 (deftest query-draftset-test
-  (let [{:keys [route]} (create-routes)]
-    (testing "Draftset with data"
-      (let [draftset-location (create-draftset-through-api route "Test draftset")
-            draftset-data-file "test/resources/test-draftset.trig"
-            append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
-        (await-success finished-jobs (:finished-job (:body append-response)) )
-        (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
-              query-request {:uri (str draftset-location "/query")
-                             :headers {"Accept" "application/n-triples"}
-                             :request-method :post
-                             :params {:query query}}
-              query-response (route query-request)
-              response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format grafter.rdf.formats/rdf-ntriples)) )
-              expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
-          (assert-is-ok-response query-response)
-
-          (is (= expected-triples response-triples)))))
-
-    (testing "Union with live"
-      (let [test-quads (statements "test/resources/test-draftset.trig")
-            grouped-test-quads (group-by context test-quads)
-            [live-graph live-quads] (first grouped-test-quads)
-            [ds-live-graph draftset-quads] (second grouped-test-quads)
-            draftset-location (create-draftset-through-api route "Test draftset")]
-
-        (publish-quads-through-api route live-quads)
-        (append-quads-to-draftset-through-api route draftset-location draftset-quads)
-
-        (let [query "SELECT * WHERE { GRAPH ?c { ?s ?p ?o } }"
-              query-request {:uri (str draftset-location "/query")
-                             :headers {"Accept" "application/sparql-results+json"}
-                             :request-method :post
-                             :params {:query query :union-with-live true}}
-              {:keys [body] :as query-response} (route query-request)
-              result-state (atom #{})
-              result-handler (result-set-handler result-state)
-              parser (doto (SPARQLResultsCSVParser.) (.setTupleQueryResultHandler result-handler))]
-
-          (.parse parser body)
-
-          (let [expected-quads (set (eval-statements test-quads))]
-            (is (= expected-quads @result-state))))))
-    
-    (testing "Missing draftset"
-      (let [response (route {:uri "/draftset/missing/query" :params {:query "SELECT * WHERE { ?s ?p ?o }"} :request-method :post})]
-        (assert-is-not-found-response response)))
-
-    (testing "Missing query parameter"
-      (let [draftset-location (create-draftset-through-api route "Test draftset")
-            response (route {:uri (str draftset-location "/query") :request-method :post})]
-        (assert-is-not-acceptable-response response)))
-
-    (testing "Invalid HTTP method"
-      (let [draftset-location (create-draftset-through-api route "Test draftset")
+  (testing "Draftset with data"
+    (let [draftset-location (create-draftset-through-api route "Test draftset")
+          draftset-data-file "test/resources/test-draftset.trig"
+          append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
+      (await-success finished-jobs (:finished-job (:body append-response)) )
+      (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
             query-request {:uri (str draftset-location "/query")
-                           :request-method :put
-                           :headers {"Accept" "text/plain"}
-                           :params {:query "SELECT * WHERE { ?s ?p ?o }"}}
-            response (route query-request)]
-        (assert-is-method-not-allowed-response response)))))
+                           :headers {"Accept" "application/n-triples"}
+                           :request-method :post
+                           :params {:query query}}
+            query-response (route query-request)
+            response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format grafter.rdf.formats/rdf-ntriples)) )
+            expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
+        (assert-is-ok-response query-response)
+
+        (is (= expected-triples response-triples)))))
+
+  (testing "Union with live"
+    (let [test-quads (statements "test/resources/test-draftset.trig")
+          grouped-test-quads (group-by context test-quads)
+          [live-graph live-quads] (first grouped-test-quads)
+          [ds-live-graph draftset-quads] (second grouped-test-quads)
+          draftset-location (create-draftset-through-api route "Test draftset")]
+
+      (publish-quads-through-api route live-quads)
+      (append-quads-to-draftset-through-api route draftset-location draftset-quads)
+
+      (let [query "SELECT * WHERE { GRAPH ?c { ?s ?p ?o } }"
+            query-request {:uri (str draftset-location "/query")
+                           :headers {"Accept" "application/sparql-results+json"}
+                           :request-method :post
+                           :params {:query query :union-with-live true}}
+            {:keys [body] :as query-response} (route query-request)
+            result-state (atom #{})
+            result-handler (result-set-handler result-state)
+            parser (doto (SPARQLResultsCSVParser.) (.setTupleQueryResultHandler result-handler))]
+
+        (.parse parser body)
+
+        (let [expected-quads (set (eval-statements test-quads))]
+          (is (= expected-quads @result-state))))))
+    
+  (testing "Missing draftset"
+    (let [response (route {:uri "/draftset/missing/query" :params {:query "SELECT * WHERE { ?s ?p ?o }"} :request-method :post})]
+      (assert-is-not-found-response response)))
+
+  (testing "Missing query parameter"
+    (let [draftset-location (create-draftset-through-api route "Test draftset")
+          response (route {:uri (str draftset-location "/query") :request-method :post})]
+      (assert-is-not-acceptable-response response)))
+
+  (testing "Invalid HTTP method"
+    (let [draftset-location (create-draftset-through-api route "Test draftset")
+          query-request {:uri (str draftset-location "/query")
+                         :request-method :put
+                         :headers {"Accept" "text/plain"}
+                         :params {:query "SELECT * WHERE { ?s ?p ?o }"}}
+          response (route query-request)]
+      (assert-is-method-not-allowed-response response))))
 
 (deftest get-draftset-data-test
-  (let [{:keys [route]} (create-routes)]
-    (testing "Get graph triples from draftset"
-      (let [draftset-location (create-draftset-through-api route "Test draftset")
-            draftset-data-file "test/resources/test-draftset.trig"
-            input-quads (statements draftset-data-file)
-            append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
-        (await-success finished-jobs (:finished-job (:body append-response)))
+  (testing "Get graph triples from draftset"
+    (let [draftset-location (create-draftset-through-api route "Test draftset")
+          draftset-data-file "test/resources/test-draftset.trig"
+          input-quads (statements draftset-data-file)
+          append-response (make-append-data-to-draftset-request route draftset-location draftset-data-file)]
+      (await-success finished-jobs (:finished-job (:body append-response)))
 
-        (doseq [[graph quads] (group-by context input-quads)]
-          (let [graph-triples (set (eval-statements (map map->Triple quads)))
-                response-triples (set (get-draftset-graph-triples-through-api route draftset-location graph false))]
-            (is (= graph-triples response-triples))))))
+      (doseq [[graph quads] (group-by context input-quads)]
+        (let [graph-triples (set (eval-statements (map map->Triple quads)))
+              response-triples (set (get-draftset-graph-triples-through-api route draftset-location graph false))]
+          (is (= graph-triples response-triples))))))
 
-    (testing "Get all draftset quads"
-      (let [draftset-location (create-draftset-through-api route "Test draftset")
-            draftset-data-file "test/resources/test-draftset.trig"]
-        (append-data-to-draftset-through-api route draftset-location draftset-data-file)
+  (testing "Get all draftset quads"
+    (let [draftset-location (create-draftset-through-api route "Test draftset")
+          draftset-data-file "test/resources/test-draftset.trig"]
+      (append-data-to-draftset-through-api route draftset-location draftset-data-file)
 
-        (let [response-quads (set (get-draftset-quads-through-api route draftset-location))
-                input-quads (set (eval-statements (statements draftset-data-file)))]
-            (is (= input-quads response-quads)))))
+      (let [response-quads (set (get-draftset-quads-through-api route draftset-location))
+            input-quads (set (eval-statements (statements draftset-data-file)))]
+        (is (= input-quads response-quads)))))
 
-    (testing "Deleted draftset quads unioned with live"
-      (let [quads (statements "test/resources/test-draftset.trig")
-            grouped-quads (group-by context quads)
-            graph-to-delete (first (keys grouped-quads))
-            draftset-location (create-draftset-through-api route "Test draftset")]
-        (publish-quads-through-api route quads)
-        (delete-draftset-graph-through-api route draftset-location graph-to-delete)
+  (testing "Deleted draftset quads unioned with live"
+    (let [quads (statements "test/resources/test-draftset.trig")
+          grouped-quads (group-by context quads)
+          graph-to-delete (first (keys grouped-quads))
+          draftset-location (create-draftset-through-api route "Test draftset")]
+      (publish-quads-through-api route quads)
+      (delete-draftset-graph-through-api route draftset-location graph-to-delete)
 
-        (let [response-quads (set (get-draftset-quads-through-api route draftset-location true))
-                expected-quads (set (eval-statements (mapcat second (rest grouped-quads))))]
-            (is (= expected-quads response-quads)))))
+      (let [response-quads (set (get-draftset-quads-through-api route draftset-location true))
+            expected-quads (set (eval-statements (mapcat second (rest grouped-quads))))]
+        (is (= expected-quads response-quads)))))
 
-    (testing "Added draftset quads unioned with live"
-      (let [quads (statements "test/resources/test-draftset.trig")
-            grouped-quads (group-by context quads)
-            [live-graph live-quads] (first grouped-quads)
-            [draftset-graph draftset-quads] (second grouped-quads)
-            draftset-location (create-draftset-through-api route "Test draftset")]
-        (publish-quads-through-api route live-quads)
-        (append-quads-to-draftset-through-api route draftset-location draftset-quads)
+  (testing "Added draftset quads unioned with live"
+    (let [quads (statements "test/resources/test-draftset.trig")
+          grouped-quads (group-by context quads)
+          [live-graph live-quads] (first grouped-quads)
+          [draftset-graph draftset-quads] (second grouped-quads)
+          draftset-location (create-draftset-through-api route "Test draftset")]
+      (publish-quads-through-api route live-quads)
+      (append-quads-to-draftset-through-api route draftset-location draftset-quads)
 
-        (let [response-quads (set (get-draftset-quads-through-api route draftset-location true))
-              expected-quads (set (eval-statements (concat live-quads draftset-quads)))]
-          (is (= expected-quads response-quads)))))
+      (let [response-quads (set (get-draftset-quads-through-api route draftset-location true))
+            expected-quads (set (eval-statements (concat live-quads draftset-quads)))]
+        (is (= expected-quads response-quads)))))
 
-    (testing "Triples for deleted graph unioned with live"
-      (let [quads (statements "test/resources/test-draftset.trig")
-            grouped-quads (group-by context quads)
-            graph-to-delete (ffirst grouped-quads)
-            draftset-location (create-draftset-through-api route "Test draftset")]
-        (publish-quads-through-api route quads)
-        (delete-draftset-graph-through-api route draftset-location graph-to-delete)
+  (testing "Triples for deleted graph unioned with live"
+    (let [quads (statements "test/resources/test-draftset.trig")
+          grouped-quads (group-by context quads)
+          graph-to-delete (ffirst grouped-quads)
+          draftset-location (create-draftset-through-api route "Test draftset")]
+      (publish-quads-through-api route quads)
+      (delete-draftset-graph-through-api route draftset-location graph-to-delete)
 
-        (let [draftset-triples (get-draftset-graph-triples-through-api route draftset-location graph-to-delete true)]
-          (is (empty? draftset-triples)))))
+      (let [draftset-triples (get-draftset-graph-triples-through-api route draftset-location graph-to-delete true)]
+        (is (empty? draftset-triples)))))
 
-    (testing "Triples for published graph not in draftset when unioned with live"
-      (let [quads (statements "test/resources/test-draftset.trig")
-            [graph graph-quads] (first (group-by context quads))
-            draftset-location (create-draftset-through-api route "Test draftset")]
-        (publish-quads-through-api route graph-quads)
+  (testing "Triples for published graph not in draftset when unioned with live"
+    (let [quads (statements "test/resources/test-draftset.trig")
+          [graph graph-quads] (first (group-by context quads))
+          draftset-location (create-draftset-through-api route "Test draftset")]
+      (publish-quads-through-api route graph-quads)
 
-        (let [draftset-graph-triples (get-draftset-graph-triples-through-api route draftset-location graph true)
-              expected-triples (eval-statements (map map->Triple graph-quads))]
-          (is (= (set expected-triples) (set draftset-graph-triples))))))
+      (let [draftset-graph-triples (get-draftset-graph-triples-through-api route draftset-location graph true)
+            expected-triples (eval-statements (map map->Triple graph-quads))]
+        (is (= (set expected-triples) (set draftset-graph-triples))))))
     
-    (testing "Triples request without graph"
-      (let [draftset-location (create-draftset-through-api route "Test draftset")
-            append-response (make-append-data-to-draftset-request route draftset-location "test/resources/test-draftset.trig")]
-        (await-success finished-jobs (:finished-job (:body append-response)))
-        (let [data-request {:uri (str draftset-location "/data")
-                            :request-method :get
-                            :headers {"Accept" "application/n-triples"}}
-              data-response (route data-request)]
-          (assert-is-not-acceptable-response data-response))))
+  (testing "Triples request without graph"
+    (let [draftset-location (create-draftset-through-api route "Test draftset")
+          append-response (make-append-data-to-draftset-request route draftset-location "test/resources/test-draftset.trig")]
+      (await-success finished-jobs (:finished-job (:body append-response)))
+      (let [data-request {:uri (str draftset-location "/data")
+                          :request-method :get
+                          :headers {"Accept" "application/n-triples"}}
+            data-response (route data-request)]
+        (assert-is-not-acceptable-response data-response))))
 
-    (testing "Missing draftset"
-      (let [response (route {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}})]
-        (assert-is-not-found-response response)))))
+  (testing "Missing draftset"
+    (let [response (route {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}})]
+      (assert-is-not-found-response response))))
 
 (deftest set-draftset-metadata-test
-  (let [{:keys [route]} (create-routes)]
-    (testing "Set metadata"
-      (let [draftset-location (create-draftset-through-api route "temp")
-            new-title "Updated title"
-            new-description "Updated description"
-            meta-request {:uri (str draftset-location "/meta") :request-method :put :params {:display-name new-title :description new-description}}
-            {:keys [body] :as  meta-response} (route meta-request)]
-        
-        (assert-is-ok-response meta-response)
-        (assert-schema draftset-info-schema body)
+  (testing "Set metadata"
+    (let [draftset-location (create-draftset-through-api route "temp")
+          new-title "Updated title"
+          new-description "Updated description"
+          meta-request {:uri (str draftset-location "/meta") :request-method :put :params {:display-name new-title :description new-description}}
+          {:keys [body] :as  meta-response} (route meta-request)]
+      
+      (assert-is-ok-response meta-response)
+      (assert-schema draftset-info-schema body)
 
-        (is (= new-title (:display-name body)))
-        (is (= new-description (:description body)))))
+      (is (= new-title (:display-name body)))
+      (is (= new-description (:description body)))))
     
-    (testing "Missing draftest"
-      (let [meta-request {:uri "/draftset/missing/meta" :request-method :put :params {:display-name "Title!" :description "Description"}}
-            meta-response (route meta-request)]
-        (assert-is-not-found-response meta-response)))))
+  (testing "Missing draftest"
+    (let [meta-request {:uri "/draftset/missing/meta" :request-method :put :params {:display-name "Title!" :description "Description"}}
+          meta-response (route meta-request)]
+      (assert-is-not-found-response meta-response))))
+
+(defn- setup-route [test-function]
+  (binding [*route* (draftset-api-routes *test-backend*)]
+    (test-function)))
 
 (use-fixtures :once wrap-db-setup)
-(use-fixtures :each wrap-clean-test-db)
+(use-fixtures :each setup-route)
+(use-fixtures :each (fn [tf]
+                      (wrap-clean-test-db #(setup-route tf))))
