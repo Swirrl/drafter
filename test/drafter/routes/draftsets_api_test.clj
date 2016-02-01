@@ -223,17 +223,17 @@
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
 (deftest create-draftset-test
-  (testing "Create draftset with title"
+  (testing "Create draftset without title or description"
+      (let [response (route {:uri "/draftset" :request-method :post})]
+        (assert-is-see-other-response response)))
+  
+  (testing "Create draftset with title and without description"
       (let [response (route (create-draftset-request "Test Title!"))]
         (assert-is-see-other-response response)))
 
-    (testing "Create draftset without title"
-      (let [response (route {:uri "/draftset" :request-method :post})]
-        (assert-is-see-other-response response)))
-
-    (testing "Get non-existent draftset"
-      (let [response (route {:uri  "/draftset/missing" :request-method :get})]
-        (assert-is-not-found-response response))))
+  (testing "Create draftset with title and description"
+    (let [response (route (create-draftset-request "Test title" "Test description"))]
+      (assert-is-see-other-response response))))
 
 (deftest get-all-draftsets-test
   (let [draftset-count 10
@@ -292,7 +292,11 @@
         (assert-schema draftset-without-description-info-schema body)
         
         (is (= display-name (:display-name body)))
-        (is (= live-graphs (set (keys (:data body)))))))))
+        (is (= live-graphs (set (keys (:data body))))))))
+
+  (testing "Get non-existent draftset"
+    (let [response (route {:uri  "/draftset/missing" :request-method :get})]
+      (assert-is-not-found-response response))))
 
 (deftest append-data-to-draftset-test
   (testing "Quad data with valid content type for file part"
