@@ -5,8 +5,6 @@
             [clojure.test :refer :all]
             [clojure.set :as set]
             [drafter.routes.draftsets-api :refer :all]
-            [drafter.rdf.draftset-management :as dsmgmt]
-            [drafter.rdf.draft-management :refer [is-graph-managed? draft-exists?]]
             [grafter.rdf :refer [statements context add]]
             [grafter.rdf.io :refer [rdf-serializer]]
             [grafter.rdf.formats :as formats]
@@ -300,26 +298,15 @@
   (testing "Quad data with valid content type for file part"
     (let [data-file-path "test/resources/test-draftset.trig"
           quads (statements data-file-path)
-          create-request (create-draftset-request "Test draftset")
-          create-response (route create-request)
-          draftset-location (create-draftset-through-api)
-          draftset-id (.substring draftset-location (inc (.lastIndexOf draftset-location "/")))]
-      (with-open [fs (io/input-stream data-file-path)]
-        (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
-              request (append-to-draftset-request draftset-location file-part)
-              {:keys [status body] :as response} (route request)]
-          (await-success finished-jobs (:finished-job body))
-
-          (let [draftset-graph-map (dsmgmt/get-draftset-graph-mapping *test-backend* (dsmgmt/->DraftsetId draftset-id))
-                graph-statements (group-by context quads)]
-            (doseq [[live-graph graph-quads] graph-statements]
-              (let [draft-graph (get draftset-graph-map live-graph)
-                    q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)
-                    draft-statements (repo/query *test-backend* q)
-                    expected-statements (map map->Triple graph-quads)]
-                (is (is-graph-managed? *test-backend* live-graph))
-                (is (draft-exists? *test-backend* draft-graph))
-                (is (set expected-statements) (set draft-statements)))))))))
+          draftset-location (create-draftset-through-api)]
+      (append-quads-to-draftset-through-api draftset-location quads)
+      (let [draftset-graphs (key-set (:data (get-draftset-info-through-api draftset-location)))
+            graph-statements (group-by context quads)]
+        (doseq [[live-graph graph-quads] graph-statements]
+          (let [graph-triples (get-draftset-graph-triples-through-api draftset-location live-graph false)
+                expected-statements (map map->Triple graph-quads)]
+            (is (contains? draftset-graphs live-graph))
+            (is (set expected-statements) (set graph-triples)))))))
 
   (testing "Appending quads to graph which exist in live"
     (let [quads (statements "test/resources/test-draftset.trig")
@@ -521,10 +508,8 @@
 (deftest delete-draftset-graph-test
   (testing "Delete non-existent live graph"
     (let [draftset-location (create-draftset-through-api)
-          graph-to-delete "http://live-graph"
-          delete-graph-request {:uri (str draftset-location "/graph") :request-method :delete :params {:graph graph-to-delete}}
-          delete-graph-response (route delete-graph-request)]
-      (assert-is-ok-response delete-graph-response)
+          graph-to-delete "http://live-graph"]
+      (delete-draftset-graph-through-api draftset-location graph-to-delete)
 
       (let [draftset-info (get-draftset-info-through-api draftset-location)]
         ;;graph to delete should NOT exist in the draftset since it did not exist in live
@@ -749,9 +734,8 @@
   (testing "Get graph triples from draftset"
     (let [draftset-location (create-draftset-through-api)
           draftset-data-file "test/resources/test-draftset.trig"
-          input-quads (statements draftset-data-file)
-          append-response (make-append-data-to-draftset-request draftset-location draftset-data-file)]
-      (await-success finished-jobs (:finished-job (:body append-response)))
+          input-quads (statements draftset-data-file)]
+      (append-quads-to-draftset-through-api draftset-location input-quads)
 
       (doseq [[graph quads] (group-by context input-quads)]
         (let [graph-triples (set (eval-statements (map map->Triple quads)))
@@ -814,9 +798,8 @@
         (is (= (set expected-triples) (set draftset-graph-triples))))))
     
   (testing "Triples request without graph"
-    (let [draftset-location (create-draftset-through-api)
-          append-response (make-append-data-to-draftset-request draftset-location "test/resources/test-draftset.trig")]
-      (await-success finished-jobs (:finished-job (:body append-response)))
+    (let [draftset-location (create-draftset-through-api)]
+      (append-quads-to-draftset-through-api draftset-location (statements "test/resources/test-draftset.trig"))
       (let [data-request {:uri (str draftset-location "/data")
                           :request-method :get
                           :headers {"Accept" "application/n-triples"}}
