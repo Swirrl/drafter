@@ -9,7 +9,9 @@
    [grafter.rdf :refer [statements]]
    [grafter.rdf.repository :refer [repo prepare-update] :as repo]
    [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-   [clojure.test :refer :all])
+   [clojure.test :refer :all]
+   [schema.test :refer [validate-schemas]])
+
   (:import
            [org.openrdf.model.impl URIImpl]
            [org.openrdf.query QueryLanguage]
@@ -17,6 +19,8 @@
            [org.openrdf.query.algebra.evaluation.function Function]
            [org.openrdf.query.algebra Var StatementPattern Extension ExtensionElem FunctionCall]
            [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
+
+(use-fixtures :each validate-schemas)
 
 (def uri-query
   "SELECT * WHERE {

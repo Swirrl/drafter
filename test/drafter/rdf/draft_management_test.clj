@@ -10,8 +10,12 @@
    [grafter.rdf.protocols :refer [update!]]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
-   [clojure.test :refer :all])
+   [clojure.test :refer :all]
+   [schema.test :refer [validate-schemas]])
+
   (:import [org.openrdf.model.impl URIImpl]))
+
+(use-fixtures :each validate-schemas)
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"

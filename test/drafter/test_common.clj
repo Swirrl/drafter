@@ -14,9 +14,13 @@
                                                   migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
-            [swirrl-server.async.jobs :refer [create-job]])
+            [swirrl-server.async.jobs :refer [create-job]]
+            [schema.test :refer [validate-schemas]])
+
   (:import [java.util Scanner]
            [java.util.concurrent CountDownLatch TimeUnit]))
+
+(use-fixtures :each validate-schemas)
 
 (def ^:dynamic *test-backend*)
 

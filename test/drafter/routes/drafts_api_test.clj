@@ -17,9 +17,13 @@
             [swirrl-server.async.jobs :refer [restart-id]]
             [swirrl-server.async.status-routes :refer [JobNotFinished]]
             [drafter.util :refer [set-var-root! map-values]]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [schema.test :refer [validate-schemas]])
+
   (:import [java.util UUID]
            [org.openrdf.model.impl URIImpl]))
+
+(use-fixtures :each validate-schemas)
 
 (def test-graph-uri "http://example.org/my-graph")
 

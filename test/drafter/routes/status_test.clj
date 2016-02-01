@@ -3,10 +3,14 @@
             [ring.mock.request :refer :all]
             [drafter.common.json-encoders :as enc]
             [drafter.routes.status :refer :all]
-            [swirrl-server.async.status-routes :refer [JobNotFinished]]
-            [schema.core :as s])
+            [swirrl-server.async.status-routes :refer [JobNotFinishedResponse]]
+            [schema.core :as s]
+            [schema.test :refer [validate-schemas]])
+
   (:import [java.util UUID]
            [java.util.concurrent.locks ReentrantLock]))
+
+(use-fixtures :each validate-schemas)
 
 (enc/register-custom-encoders!)
 

@@ -12,7 +12,11 @@
             [drafter.util :refer [to-coll]]
             [drafter.backend.protocols :refer [append-data-batch!]]
             [drafter.routes.sparql :refer :all]
-            [drafter.rdf.draft-management :refer :all]))
+            [drafter.rdf.draft-management :refer :all]
+            [swirrl-server.errors :refer [encode-error]]
+            [schema.test :refer [validate-schemas]]))
+
+(use-fixtures :each validate-schemas)
 
 (defn add-test-data!
   "Set the state of the database so that we have three managed graphs,
