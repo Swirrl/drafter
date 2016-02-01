@@ -1,8 +1,8 @@
-(ns drafter.responses-tests
+(ns drafter.responses-test
   (:require [clojure.test :refer :all]
-          [drafter.responses :refer :all]
-          [drafter.test-common :refer [wrap-db-setup wrap-clean-test-db during-exclusive-write]]
-          [drafter.write-scheduler-test :refer [const-job]]))
+            [drafter.responses :refer :all]
+            [drafter.test-common :refer [wrap-db-setup wrap-clean-test-db during-exclusive-write]]
+            [drafter.write-scheduler-test :refer [const-job]]))
 
 (deftest submit-async-job-test
   (testing "Submits async job"
