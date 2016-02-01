@@ -39,7 +39,6 @@ draftset they effectively create a 'virtual copy' of the site's
 data in which they can safely make, review and query changes
 before publishing them to the live site.
 
-
 * Proposal: Merging with Live
 
 We propose an extension to Publish My Data's [[http://api.grafter.org/scratch/swagger/][Drafter API]] that supports
@@ -80,7 +79,7 @@ Here we see how =Draft A= contains edits to only one graph, whilst
 ** Implementation
 
 Firstly we propose to extend Draftset metadata to include a
-=derived-from= revision-identifier that represents the version of the
+=forked-from= revision-identifier that represents the version of the
 live graph the graph in the draftset was branched from.
 
 This data is stored in a Graph object under the draftset's =data=
@@ -91,7 +90,7 @@ property, e.g.
     "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
     "data": {
         "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
-            "derived-from": "ff6410cf1eadd4c41a7a5d29a35b4cd413e33212"
+            "forked-from": "ff6410cf1eadd4c41a7a5d29a35b4cd413e33212"
         }
     },
     "display-name": "New Temporary Housing Figures",
@@ -108,7 +107,7 @@ stored with the live-graph's metadata.  These identifiers have a number
 of potential uses, the primary reason being change detection.  With
 =revision-identifiers= changes to live graphs between publications can
 be detected by comparing at publication time the draft graph's
-=derived-from= =revision-identifer= with the =revision-identifier= of
+=forked-from= =revision-identifer= with the =revision-identifier= of
 the live graph.  If the identifiers differ then a publication to the
 live graph has occurred, and there is a risk that publishing the graph
 might lose changes.  In this situation the Drafter service will
@@ -156,25 +155,40 @@ We hope to persue methods of efficiently computing content hashes for
 triple-sets, that will lead to a reduced number of false positive
 conflict errors.
 
-* Proposal: Potential conflicts Alerts
+* Proposal: Conflict notifications
 
 As Drafter tracks the state of all Draftsets in the system it knows
 when several draftsets contain changes to the same live graph.
 
-This information could be exposed via Drafters API so that
-applications including PMD can make use of it.  This could be done via
-a =changed-in-draftsets= key in the Draftset object:
+This proposal describes how this information can be exposed as JSON
+objects on the Drafter API on routes such as =GET /draftsets=.
+
+This information /may/ then be used by PMD to provide users with
+information about potential future conflicts, for example if two users
+have made changes to the same graph PMD /may/ display a warning such
+as "Dale also has made changes to this graph in Draftset <ID>".
+
+3rd party applications may then make calls to this API to know when
+multiple draft changes have occurred in parallel draftsets, and handle
+this accordingly.  For example it would be possible for a client to
+fail fast if a resource it wants to modify has changes in another
+draftset.
+
+We propose that this information is represented under a
+=changed-in-draftsets= key in the Draftset object.   This is shown
+below in the response to a call to =GET /draftsets=:
 
 #+BEGIN_SRC json
+[
 {
     "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
     "data": {
         "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
-            "derived-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8",
+            "forked-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8",
             "changed-in-draftsets": [
                 {
                     "id": "bd6069c8-3da6-421b-845e-5ee289aba788",
-                    "current-owner": "editor@opendatacommunities.org"
+                    "current-owner": "dale@opendatacommunities.org"
                 }
             ]
         }
@@ -183,15 +197,46 @@ a =changed-in-draftsets= key in the Draftset object:
     "description": "Quarterly updates for Q4 2015",
     "updated-at": "2016-01-04T13:35:21.000Z",
     "created-at": "2016-01-01T13:35:21.000Z",
-    "current-owner": "admin@opendatacommunities.org",
-    "submitted-by": "editor@opendatacommunities.org"
+    "current-owner": "paul@opendatacommunities.org"
+},
+{
+    "id": "bd6069c8-3da6-421b-845e-5ee289aba788",
+    "data": {
+        "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
+            "forked-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8",
+            "changed-in-draftsets": [
+                {
+                    "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
+                    "current-owner": "paul@opendatacommunities.org"
+                }
+            ]
+        }
+    },
+    "display-name": "Experimental changes",
+    "description": "Experimental changes please ignore",
+    "updated-at": "2016-03-01T11:32:21.000Z",
+    "created-at": "2016-01-02T11:31:21.000Z",
+    "current-owner": "dale@opendatacommunities.org"
 }
+]
 #+END_SRC
 
-The draftset above shows that the draftset
-=de305d54-75b4-431b-adb2-eb6b9e546014= contains changes to the
-=temporary-housing-types= graph, which is also modified in another
-draftset with the id =bd6069c8-3da6-421b-845e-5ee289aba788=.
+Here we see there are two draftsets open in the system, both
+containing changes to a single graph, =temporary-housing-types= both
+of which were =forked-from= the same initial state represented by
+revision =3a5ac9a7-004f-4ad4-b5af-773ae98e92b8=.
+
+This information shows that these users may create conflicts and
+consequently may need to coordinate changes; though the user comments
+on =bd6069c8-3da6-421b-845e-5ee289aba788= might imply to a user that
+those changes are experimental and are not intended to ever be merged
+into live.
+
+NOTE: Also that each draftset object includes an array of other
+draftsets that have changes to it.  Whilst a little redundant when
+calling =GET /draftsets= this information is useful when querying
+routes for individual draftsets, e.g. =GET
+/draftset/bd6069c8-3da6-421b-845e-5ee289aba788=.
 
 In a similar vein, if changes to the live graph have occured since the
 draft snapshot was taken, drafter could provide a boolean property
@@ -204,14 +249,19 @@ has changed, e.g.
     "data": {
         "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
             "has-unmerged-changes": true,
-            "derived-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8"
+            "forked-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8",
+            "changed-in-draftsets": [
+                {
+                    "id": "bd6069c8-3da6-421b-845e-5ee289aba788",
+                    "current-owner": "dale@opendatacommunities.org"
+                }
+            ]
         }
     },
     "display-name": "New Temporary Housing Figures",
     "description": "Quarterly updates for Q4 2015",
     "updated-at": "2016-01-04T13:35:21.000Z",
     "created-at": "2016-01-01T13:35:21.000Z",
-    "current-owner": "admin@opendatacommunities.org",
-    "submitted-by": "editor@opendatacommunities.org"
+    "current-owner": "paul@opendatacommunities.org"
 }
 #+END_SRC
