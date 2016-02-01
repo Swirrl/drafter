@@ -40,12 +40,10 @@
    :params {:file file-part}})
 
 (defn- create-draftset-request
-  ([] (create-draftset-request "Test draftset"))
-  ([display-name] (create-draftset-request display-name nil))
+  ([] {:uri "/draftset" :request-method :post :params {}})
+  ([display-name] {:uri "/draftset" :request-method :post :params {:display-name display-name}})
   ([display-name description]
-   (let [base-params {:display-name display-name}
-         params (if (some? description) (assoc base-params :description description) base-params)]
-     {:uri "/draftset" :request-method :post :params params})))
+   {:uri "/draftset" :request-method :post :params {:display-name display-name :description description}}))
 
 (defn- make-append-data-to-draftset-request [draftset-endpoint-uri data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
@@ -137,9 +135,10 @@
   (eval-statements (statements source :format format)))
 
 (defn- create-draftset-through-api
-  ([] (create-draftset-through-api "Test draftset"))
-  ([display-name]
-   (let [request (create-draftset-request display-name)
+  ([] (create-draftset-through-api nil))
+  ([display-name] (create-draftset-through-api display-name nil))
+  ([display-name description]
+   (let [request (create-draftset-request display-name description)
          {:keys [headers] :as response} (route request)]
      (assert-is-see-other-response response)
      (get headers "Location"))))
@@ -255,39 +254,27 @@
 
 (deftest get-draftset-test
   (testing "Get empty draftset without title or description"
-    (let [create-request {:uri "/draftset" :request-method :post}
-          create-response (route create-request)]
-      (assert-is-see-other-response create-response)
-
-      (let [draftset-location (get-in create-response [:headers "Location"])
+    (let [draftset-location (create-draftset-through-api)
             get-request {:uri draftset-location :request-method :get}
             {:keys [body] :as get-response} (route get-request)]
-        
         (assert-is-ok-response get-response)
-        (assert-schema draftset-without-title-or-description-info-schema body))))
+        (assert-schema draftset-without-title-or-description-info-schema body)))
     
   (testing "Get empty draftset without description"
     (let [display-name "Test title!"
-          create-request (create-draftset-request display-name)
-          create-response (route create-request)]
-      (assert-is-see-other-response create-response)
-
-      (let [draftset-location (get-in create-response [:headers "Location"])
-            get-request {:uri draftset-location :request-method :get}
-            {:keys [body] :as response} (route get-request)]
-        (assert-is-ok-response response)
-        (assert-schema draftset-without-description-info-schema body)
-        (is (= display-name (:display-name body))))))
+          draftset-location (create-draftset-through-api display-name)
+          get-request {:uri draftset-location :request-method :get}
+          {:keys [body] :as response} (route get-request)]
+      (assert-is-ok-response response)
+      (assert-schema draftset-without-description-info-schema body)
+      (is (= display-name (:display-name body)))))
 
   (testing "Get empty draftset with description"
     (let [display-name "Test title!"
           description "Draftset used in a test"
-          create-request (create-draftset-request display-name description)
-          create-response (route create-request)]
-      (assert-is-see-other-response create-response)
-
-      (let [draftset-location (get-in create-response [:headers "Location"])
-            get-request {:uri draftset-location :request-method :get}
+          draftset-location (create-draftset-through-api display-name description)]
+      
+      (let [get-request {:uri draftset-location :request-method :get}
             {:keys [body] :as response} (route get-request)]
         (assert-is-ok-response response)
         (assert-schema draftset-with-description-info-schema body)
@@ -296,20 +283,18 @@
 
   (testing "Get draftset containing data"
     (let [display-name "Test title!"
-          create-request (create-draftset-request display-name)
-          {create-status :status {draftset-location "Location"} :headers :as create-response} (route create-request)
+          draftset-location (create-draftset-through-api display-name)
           quads (statements "test/resources/test-draftset.trig")
           live-graphs (set (keys (group-by context quads)))]
-      (assert-is-see-other-response create-response)
-      (let [append-response (make-append-data-to-draftset-request draftset-location "test/resources/test-draftset.trig")]
-        (await-success finished-jobs (get-in append-response [:body :finished-job]))
-        (let [get-request {:uri draftset-location :request-method :get}
-              {:keys [body] :as response} (route get-request)]
-          (assert-is-ok-response response)
-          (assert-schema draftset-without-description-info-schema body)
-          
-          (is (= display-name (:display-name body)))
-          (is (= live-graphs (set (keys (:data body))))))))))
+      (append-quads-to-draftset-through-api draftset-location quads)
+        
+      (let [get-request {:uri draftset-location :request-method :get}
+            {:keys [body] :as response} (route get-request)]
+        (assert-is-ok-response response)
+        (assert-schema draftset-without-description-info-schema body)
+        
+        (is (= display-name (:display-name body)))
+        (is (= live-graphs (set (keys (:data body)))))))))
 
 (deftest append-data-to-draftset-test
   (testing "Quad data with valid content type for file part"
@@ -844,7 +829,7 @@
 
 (deftest set-draftset-metadata-test
   (testing "Set metadata"
-    (let [draftset-location (create-draftset-through-api)
+    (let [draftset-location (create-draftset-through-api "Test draftset" "Test description")
           new-title "Updated title"
           new-description "Updated description"
           meta-request {:uri (str draftset-location "/meta") :request-method :put :params {:display-name new-title :description new-description}}
