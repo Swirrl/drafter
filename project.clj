@@ -37,14 +37,7 @@
                  [selmer "0.6.9"]
 
                  [swirrl/lib-swirrl-server "0.3.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
-                 ;; TODO:
-                 ;;
-                 ;; When this sesame bug about streaming sparql XML
-                 ;; results is fixed:
-                 ;;
-                 ;; https://openrdf.atlassian.net/browse/SES-2119
-                 ;;
-                 ;; we can remove this exclusion.
+
                  [grafter "0.6.0"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 

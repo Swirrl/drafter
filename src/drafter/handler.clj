@@ -30,6 +30,7 @@
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.verbs :refer [wrap-verbs]]
             [ring.middleware.defaults :refer [api-defaults]]
+            [swirrl-server.errors :refer [wrap-encode-errors]]
             [selmer.parser :as parser]
             [clojure.string :as str])
 
@@ -40,6 +41,8 @@
            [java.util UUID])
 
   (:require [clj-logging-config.log4j :refer [set-loggers!]]))
+
+(require 'drafter.errors)
 
 ;; Set these values later when we start the server
 (def backend)
@@ -122,7 +125,7 @@
                         :ring-defaults (assoc-in api-defaults [:params :multipart] true)
                         ;; add custom middleware here
                         :middleware [wrap-verbs
-                                     middleware/template-error-page
+                                     wrap-encode-errors
                                      middleware/log-request]
                         ;; add access rules here
                         :access-rules []
