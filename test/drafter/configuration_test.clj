@@ -45,7 +45,7 @@
 (deftest try-parse-timeout-test
   (testing "non-numeric timeouts invalid"
     (is (instance? Exception (try-parse-timeout "abc"))))
-  
+
   (testing "negative timeouts invalid"
     (is (instance? Exception (try-parse-timeout "-22"))))
 

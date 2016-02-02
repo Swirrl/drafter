@@ -10,6 +10,10 @@
             [drafter.responses :refer [submit-sync-job! submit-async-job!]]
             [swirrl-server.responses :as response]))
 
+;; Needs to be loaded for the coercions it provides - though we don't need any
+;; imports from it.  Put here to prevent clj-refactor etc... removing it.
+(require 'drafter.errors)
+
 (defn override-file-format
   "Takes a file object (hash) and if a non-nil file-format is supplied
   overrides its content-type."

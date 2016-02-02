@@ -15,7 +15,7 @@
             [drafter.rdf.draft-management :refer :all]
             [drafter.rdf.draft-management.jobs :refer [batched-write-size]]
             [swirrl-server.async.jobs :refer [restart-id]]
-            [swirrl-server.async.status-routes :refer [JobNotFinished]]
+            [swirrl-server.async.status-routes :refer [JobNotFinishedResponse]]
             [drafter.util :refer [set-var-root! map-values]]
             [clojure.tools.logging :as log]
             [schema.test :refer [validate-schemas]])
@@ -164,7 +164,7 @@
             guid (parse-guid path)]
        (if-let [value (@state-atom guid)]
          @value
-         (if (> (System/currentTimeMillis) (+ start (or timeout default-timeout) ))
+         (if (> (System/currentTimeMillis) (+ start (or timeout default-timeout)))
            (throw (RuntimeException. "Timed out awaiting test value"))
            (do
              (Thread/sleep 5)
@@ -210,7 +210,7 @@
                 error-result (await-completion finished-jobs guid)]
 
             (is (= :error (:type error-result)))
-            (is (instance? org.openrdf.rio.RDFParseException (:exception error-result)))))))
+            (is (= :rdf-parse-error (:error error-result)))))))
 
     (testing "with a missing content type"
       (let [test-request (-> {:uri "/draft" :request-method :post}

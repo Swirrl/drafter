@@ -1,7 +1,8 @@
 (ns drafter.responses-test
   (:require [clojure.test :refer :all]
             [drafter.responses :refer :all]
-            [drafter.test-common :refer [wrap-db-setup wrap-clean-test-db during-exclusive-write]]
+            [swirrl-server.errors :refer [encode-error]]
+            [drafter.test-common :refer [throws-exception? wrap-db-setup wrap-clean-test-db during-exclusive-write]]
             [drafter.write-scheduler-test :refer [const-job]]))
 
 (deftest submit-async-job-test
@@ -12,9 +13,11 @@
 
   (testing "Returns unavailable response if exclusive write in progress"
     (during-exclusive-write
-     (let [job (const-job :batched-write {:result :ok})
-           {:keys [status]} (submit-async-job! job)]
-       (is (= 503 status))))))
+     (let [job (const-job :batched-write {:result :ok})]
+       (throws-exception?
+        (submit-async-job! job)
+        (catch clojure.lang.ExceptionInfo ex
+          (= 503 (:status (encode-error ex)))))))))
 
 (deftest submit-sync-job-test
   (testing "Invokes response handler with job result"
@@ -25,10 +28,12 @@
           (= job-result body))))
 
   (testing "Returns unavailable response if exclusive write in progress"
-    (during-exclusive-write
-     (let [job (const-job :sync-write {:result :ok})
-           {:keys [status]} (submit-sync-job! job)]
-       (is (= 503 status))))))
+    (let [job (const-job :sync-write {:result :ok})]
+      (during-exclusive-write
+       (throws-exception?
+        (submit-sync-job! job)
+        (catch clojure.lang.ExceptionInfo ex
+          (= 503 (:status (encode-error ex)))))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

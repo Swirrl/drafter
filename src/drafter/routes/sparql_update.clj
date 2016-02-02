@@ -4,7 +4,8 @@
             [drafter.rdf.draft-management.jobs :as jobs]
             [swirrl-server.async.jobs :refer [complete-job!]]
             [swirrl-server.responses :as response]
-            [drafter.responses :refer [default-job-result-handler submit-sync-job!]]
+            [swirrl-server.errors :refer [ex-swirrl]]
+            [drafter.responses :refer [submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :refer [execute-update]]
             [drafter.operations :as ops]
@@ -33,7 +34,7 @@
      :graphs (get params "graph")}))
 
 (defmethod parse-update-request :default [request]
-  (throw (Exception. (str "Invalid Content-Type " (:content-type request)))))
+  (throw (ex-swirrl :invalid-content-type (str "Invalid Content-Type: " (:content-type request)))))
 
 (defn create-update-job [executor request restrictions timeouts]
   (jobs/make-job :sync-write [job]
@@ -71,7 +72,11 @@
   (let [job (create-update-job executor request restrictions timeouts)]
     (submit-sync-job! job (fn [result]
                             (if (jobs/failed-job-result? result)
-                              (response/api-response 500 result)
+                              ;; NOTE: We could repackage the resulting error
+                              ;; into a ex-info exception and throw it to
+                              ;; restore the status code and other details from
+                              ;; the response that have been lost, if we want more precise
+                              (response/error-response 500 result)
                               sparql-update-applied-response)))))
 
 (defn update-endpoint

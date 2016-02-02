@@ -128,3 +128,14 @@
 
 (defmacro during-exclusive-write [& forms]
   `(during-exclusive-write-f (fn [] ~@forms)))
+
+(defmacro throws-exception?
+  "Test that the form raises an exception, will cause a test failure if it doesn't.
+
+  Unlike clojure.test/thrown?  It allows you to catch the form and do
+  further tests on the exception."
+  [form & catch-forms]
+  `(try
+     ~form
+     (is false (str "Expected " (pr-str (quote ~form)) " to raise exception"))
+     ~@catch-forms))

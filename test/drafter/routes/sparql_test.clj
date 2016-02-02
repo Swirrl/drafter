@@ -1,5 +1,5 @@
 (ns drafter.routes.sparql-test
-  (:require [drafter.test-common :refer [test-triples import-data-to-draft!
+  (:require [drafter.test-common :refer [throws-exception? test-triples import-data-to-draft!
                                          stream->string select-all-in-graph make-graph-live!
                                          *test-backend* wrap-clean-test-db wrap-db-setup]]
             [clojure.test :refer :all]
@@ -65,7 +65,6 @@
   "Parse a response into a CSV"
   (-> body stream->string csv/parse-csv))
 
-;; TODO uncomment these as soon as I get the draft one working again
 (deftest live-sparql-routes-test
   (let [[draft-graph-1 draft-graph-2] (add-test-data! *test-backend*)
         endpoint (live-sparql-routes "/sparql/live" *test-backend* nil)
@@ -431,15 +430,14 @@
         endpoint (draft-sparql-routes "/sparql/draft" *test-backend*)]
 
     (testing "When the context is set to two drafts which represent the same live graph an error should be raised."
-      (let [{:keys [status headers body] :as result} (endpoint
-                                                      (draft-query
-                                                       "SELECT * WHERE { ?s ?p ?o . } LIMIT 1"
-                                                       [draft-one draft-two]))]
+      (throws-exception?
+       (endpoint
+        (draft-query
+         "SELECT * WHERE { ?s ?p ?o . } LIMIT 1"
+         [draft-one draft-two]))
 
-        (is (= 412 status))
-        ;; TODO write unit test
-
-        ))))
+       (catch clojure.lang.ExceptionInfo ex
+         (is (= 412 (:status (encode-error ex)))))))))
 
 
 (use-fixtures :once wrap-db-setup)

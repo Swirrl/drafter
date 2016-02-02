@@ -3,11 +3,13 @@
             [swirrl-server.responses :as response]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
             [swirrl-server.async.jobs :refer [submitted-job-response]]
+            [swirrl-server.responses :as r]
+            [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [await-sync-job! queue-job!]])
   (:import [clojure.lang ExceptionInfo]))
 
-(def ^:private temporarily-locked-for-writes-response
-  {:status 503 :body {:type :error :message "Write operations are temporarily unavailable.  Please try again later."}})
+(defmethod encode-error :writes-temporarily-disabled [ex]
+  (r/error-response 503 ex))
 
 (defn default-job-result-handler
   "Default handler for creating ring responses from job results. If
@@ -32,8 +34,7 @@
    (log/info "Submitting sync job: " job)
    (try
      (let [job-result (await-sync-job! job)]
-       (resp-fn job-result))
-     (catch ExceptionInfo ex temporarily-locked-for-writes-response))))
+       (resp-fn job-result)))))
 
 (defmacro handle-sync-job!
   "Convenience macro for submitting synchronous jobs and converting
@@ -54,7 +55,5 @@
   result of the submit operation."
   [job]
   (log/info "Submitting async job: " job)
-  (try
-    (queue-job! job)
-    (submitted-job-response job)
-    (catch ExceptionInfo ex temporarily-locked-for-writes-response)))
+  (queue-job! job)
+  (submitted-job-response job))

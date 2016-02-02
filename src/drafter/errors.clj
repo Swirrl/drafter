@@ -31,3 +31,7 @@ overly-specific in your interpretation of the error."
   (r/error-response 503
                     :connection-pool-full
                     (.getMessage ex)))
+
+(defmethod encode-error :reading-aborted [ex]
+  (r/error-response 422
+                    :rdf-parse-error (.getMessage ex)))
