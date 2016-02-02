@@ -803,21 +803,34 @@
   (let [response (route {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}})]
     (assert-is-not-found-response response)))
 
+(defn- create-update-draftset-metadata-request [draftset-location title description]
+  {:uri (str draftset-location "/meta") :request-method :put :params {:display-name title :description description}})
+
+(defn- update-draftset-metadata-through-api [draftset-location title description]
+  (let [request (create-update-draftset-metadata-request draftset-location title description)
+        {:keys [body] :as response} (route request)]
+    (assert-is-ok-response response)
+    (assert-schema draftset-info-schema body)
+    body))
+
 (deftest set-draftset-with-existing-title-and-description-metadata
   (let [draftset-location (create-draftset-through-api "Test draftset" "Test description")
         new-title "Updated title"
         new-description "Updated description"
-        meta-request {:uri (str draftset-location "/meta") :request-method :put :params {:display-name new-title :description new-description}}
-        {:keys [body] :as  meta-response} (route meta-request)]
-    
-    (assert-is-ok-response meta-response)
-    (assert-schema draftset-info-schema body)
+        {:keys [display-name description]} (update-draftset-metadata-through-api draftset-location new-title new-description)]
+    (is (= new-title display-name))
+    (is (= new-description description))))
 
-    (is (= new-title (:display-name body)))
-    (is (= new-description (:description body)))))
+(deftest set-metadata-for-draftset-with-no-title-or-description
+  (let [draftset-location (create-draftset-through-api)
+        new-title "New title"
+        new-description "New description"
+        {:keys [display-name description]} (update-draftset-metadata-through-api draftset-location new-title new-description)]
+    (is (= new-title display-name))
+    (is (= new-description description))))
 
 (deftest set-missing-draftset-metadata
-  (let [meta-request {:uri "/draftset/missing/meta" :request-method :put :params {:display-name "Title!" :description "Description"}}
+  (let [meta-request (create-update-draftset-metadata-request "/draftset/missing" "Title!" "Description")
         meta-response (route meta-request)]
     (assert-is-not-found-response meta-response)))
 

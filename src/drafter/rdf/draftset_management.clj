@@ -211,7 +211,7 @@
    "} WHERE {"
    (with-state-graph
      "VALUES ?p { " (string/join " " (map #(str "<" (first %) ">") po-pairs)) " }"
-     "<" draftset-uri "> ?p ?o .")
+     "OPTIONAL { <" draftset-uri "> ?p ?o . }")
    "}"))
 
 (defn set-draftset-metadata!
