@@ -108,7 +108,7 @@ info:
     Authorization: Basic YWRtaW5Ab3BlbmRhdGFjb21tdW5pdGllcy5vcmc6eW91cnBtZGFwaWtleQ==
     ````
 
-  version: 0.0.1 Draft
+  version: 0.0.2 Draft
 host: api.opendatacommunities.org
 schemes:
   - https
@@ -205,6 +205,21 @@ paths:
         '200':
           description: The Draftset was deleted successfully
   /draftset/{id}/graph:
+    put:
+      summary: Copy a graph from live into this Draftset
+      description: |
+        Copies the contents of the specified live graph into this
+        Draftset.
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/livegraph'
+      tags:
+        - Updating Data
+      responses:
+        '200':
+          description: The graph was deleted successfully
+          schema:
+            $ref: '#/definitions/AsyncJob'
     delete:
       summary: Delete the contents of a graph in this Draftset
       description: Removes the graph and its contents from the Draftset.
@@ -217,9 +232,7 @@ paths:
         '200':
           description: The graph was deleted successfully
           schema:
-            - $ref: '#/definitions/Draftset'
-            - $ref: '#/parameters/messagenonote'
-
+            $ref: '#/definitions/AsyncJob'
   /draftset/{id}/data:
     put:
       summary: Append the supplied RDF data to this Draftset
@@ -258,7 +271,7 @@ paths:
             see what graphs exist in the draftset after the append
             operation.
           schema:
-            $ref: '#/definitions/Draftset'
+            $ref: '#/definitions/AsyncJob'
     delete:
       summary: Remove the supplied RDF data from this Draftset
       description: |
@@ -294,7 +307,7 @@ paths:
             see what graphs exist in the draftset after the delete
             operation.
           schema:
-            $ref: '#/definitions/Draftset'
+            $ref: '#/definitions/AsyncJob'
     get:
       parameters:
         - $ref: "#/parameters/id"
@@ -558,6 +571,14 @@ parameters:
     in: query
     required: true
     type: string
+  livegraph:
+    name: graph
+    description: |
+      The URI of the live graph that the operation should be
+      performed on.
+    in: query
+    required: true
+    type: string
   query:
     name: query
     description: URI Encoded SPARQL Query
@@ -582,6 +603,7 @@ definitions:
   Graphs:
     type: object
     description: A map of graph names to Graph objects
+    properties: {}
     additionalProperties:
       $ref: '#/definitions/Graph'
   Draftset:
@@ -677,10 +699,10 @@ definitions:
     example:
       type: ok
       restart-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
-
   Type:
     type: string
     description: The type of response either 'ok' for a successful response or 'error' for an error.
+    properties: {}
     enum:
       - ok
       - error
