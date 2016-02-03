@@ -33,6 +33,7 @@
                  [ring-server "0.3.1"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
+                 [com.novemberain/monger "3.0.2"]
 
                  [swirrl/lib-swirrl-server "0.2.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
                  ;; TODO:
