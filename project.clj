@@ -35,6 +35,9 @@
                  [selmer "0.6.9"]
                  [com.novemberain/monger "3.0.2"]
 
+                 [buddy/buddy-core "0.9.0"]
+                 [buddy/buddy-auth "0.9.0"]
+
                  [swirrl/lib-swirrl-server "0.2.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
                  ;; TODO:
                  ;;
