@@ -2,7 +2,13 @@
   (:require [clj-logging-config.log4j :as l4j]
             [clojure.tools.logging :as log]
             [environ.core :refer [env]]
-            [selmer.parser :as parser]))
+            [selmer.parser :as parser]
+            [drafter.user :as user]
+            [drafter.user.repository :as user-repo]
+            [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
+            [buddy.auth.middleware :refer [wrap-authentication]]
+            [cemerick.friend :as friend]
+            [cemerick.friend.workflows :as friend-workflows]))
 
 (defn log-request [handler]
   (fn [req]
@@ -28,3 +34,12 @@
                :body (parser/render error-template data)}
               (throw ex))))))
     handler))
+
+(defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
+  (if-let [user (user-repo/find-user-by-email-address user-repo username)]
+    (if (user/authenticated? user password)
+      user)))
+
+(defn basic-authentication [user-repo realm inner-handler]
+  (let [backend (http-basic-backend {:realm realm :authfn #(authenticate-user user-repo %1 %2)})]
+    (wrap-authentication inner-handler backend)))
