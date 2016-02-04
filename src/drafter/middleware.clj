@@ -3,10 +3,11 @@
             [clojure.tools.logging :as log]
             [environ.core :refer [env]]
             [selmer.parser :as parser]
+            [drafter.responses :as response]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
-            [buddy.auth.middleware :refer [wrap-authentication]]
+            [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [cemerick.friend :as friend]
             [cemerick.friend.workflows :as friend-workflows]))
 
@@ -41,5 +42,9 @@
       user)))
 
 (defn basic-authentication [user-repo realm inner-handler]
-  (let [backend (http-basic-backend {:realm realm :authfn #(authenticate-user user-repo %1 %2)})]
-    (wrap-authentication inner-handler backend)))
+  (let [conf {:realm realm
+              :authfn #(authenticate-user user-repo %1 %2)
+              :unauthorized-handler (fn [req err]
+                                      (response/unauthorised-basic-response realm))}
+        backend (http-basic-backend conf)]
+    (wrap-authorization (wrap-authentication inner-handler backend) backend)))

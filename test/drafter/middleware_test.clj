@@ -39,3 +39,19 @@
         request (create-authorised-request "missing@example.com" "sdkfiwe")
         response (handler request)]
     (is (= false (auth/authenticated? response)))))
+
+(deftest request-without-credentials-should-not-authenticate
+  (let [repo (memory-repo/create-repository*)
+        handler (basic-authentication repo "test" identity)
+        response (handler {:uri "/test" :request-method :get})]
+    (is (= false (auth/authenticated? response)))))
+
+(defn- assert-is-unauthorised-basic-response [{:keys [status headers] :as response}]
+  (is (= 401 status))
+  (is (contains? headers "WWW-Authenticate")))
+
+(deftest handler-should-return-not-authenticated-response-if-inner-handler-throws-unauthorised
+  (let [inner-handler (fn [req] (auth/throw-unauthorized {:message "Auth required"}))
+        handler (basic-authentication (memory-repo/create-repository*) "test" inner-handler)
+        response (handler {:uri "/test" :request-method :get})]
+    (assert-is-unauthorised-basic-response response)))
