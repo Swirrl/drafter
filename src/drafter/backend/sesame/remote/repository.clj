@@ -32,3 +32,45 @@
   (let [query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
         update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)]
     (create-sparql-repository query-endpoint update-endpoint)))
+
+
+
+(comment
+
+  ;; The code below is playing about trying to construct a custom Httpclient
+  ;; configured how we want for sesame.  Unfortunately it doesn't work
+  ;; yet... but maybe one day after
+  ;; https://openrdf.atlassian.net/browse/SES-2368 is resolved.
+
+  (import '[org.apache.http.impl.client HttpClients]
+          '[org.openrdf.http.client SesameClient SesameSession SesameClientImpl]
+          '[org.apache.http.client.config RequestConfig]
+          '[java.util.concurrent Executors]
+          )
+
+  (defn build-http-client [repo]
+    (let [request-config (.. (RequestConfig/custom)
+                             (setConnectionRequestTimeout 1)
+                             build)
+          ;;sesame-client (.getSesameClient repo) ;; TODO consider making a new one
+
+          executor (Executors/newCachedThreadPool)
+
+          http-client (.. (HttpClients/custom)
+                          useSystemProperties
+                          (setUserAgent "Drafter")
+                          (setMaxConnPerRoute 1)
+                          (setDefaultRequestConfig request-config)
+                          build)
+
+          sesame-client (.getSesameClient repo)]
+
+      (.setHttpClient sesame-client http-client)
+      (.setSesameClient repo sesame-client)
+
+      (prn request-config)
+      (prn sesame-client)
+      (prn http-client))
+    repo)
+
+  )

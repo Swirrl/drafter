@@ -1,6 +1,9 @@
 (ns drafter.configuration-test
   (:require [drafter.configuration :refer :all]
-            [clojure.test :refer :all]))
+            [clojure.test :refer :all]
+            [schema.test :refer [validate-schemas]]))
+
+(use-fixtures :each validate-schemas)
 
 (def selector-all (create-selector nil nil nil))
 
@@ -42,7 +45,7 @@
 (deftest try-parse-timeout-test
   (testing "non-numeric timeouts invalid"
     (is (instance? Exception (try-parse-timeout "abc"))))
-  
+
   (testing "negative timeouts invalid"
     (is (instance? Exception (try-parse-timeout "-22"))))
 

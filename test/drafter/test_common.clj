@@ -14,9 +14,13 @@
                                                   migrate-live!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
-            [swirrl-server.async.jobs :refer [create-job]])
+            [swirrl-server.async.jobs :refer [create-job]]
+            [schema.test :refer [validate-schemas]])
+
   (:import [java.util Scanner]
            [java.util.concurrent CountDownLatch TimeUnit]))
+
+(use-fixtures :each validate-schemas)
 
 (def ^:dynamic *test-backend*)
 
@@ -124,3 +128,14 @@
 
 (defmacro during-exclusive-write [& forms]
   `(during-exclusive-write-f (fn [] ~@forms)))
+
+(defmacro throws-exception?
+  "Test that the form raises an exception, will cause a test failure if it doesn't.
+
+  Unlike clojure.test/thrown?  It allows you to catch the form and do
+  further tests on the exception."
+  [form & catch-forms]
+  `(try
+     ~form
+     (is false (str "Expected " (pr-str (quote ~form)) " to raise exception"))
+     ~@catch-forms))
