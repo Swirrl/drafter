@@ -52,7 +52,7 @@
                  ;;
                  ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
 
-                 [swirrl/sesame-http-client "2.8.9"]
+                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
                  [com.taoensso/timbre "4.0.2"]
                  [clj-logging-config "1.9.12"]
