@@ -4,7 +4,8 @@
             [buddy.core.codecs :refer [str->base64]]
             [buddy.auth :as auth]
             [drafter.user :as user]
-            [drafter.user.memory-repository :as memory-repo]))
+            [drafter.user.memory-repository :as memory-repo])
+  (:import [clojure.lang ExceptionInfo]))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -12,6 +13,10 @@
 
 (defn- create-authorised-request [username password]
   {:uri "/test" :request-method :get :headers (add-auth-header {} username password)})
+
+(defn- assert-is-unauthorised-basic-response [{:keys [status headers] :as response}]
+  (is (= 401 status))
+  (is (contains? headers "WWW-Authenticate")))
 
 (deftest authenticate-user-test
   (let [username "test@example.com"
@@ -46,12 +51,21 @@
         response (handler {:uri "/test" :request-method :get})]
     (is (= false (auth/authenticated? response)))))
 
-(defn- assert-is-unauthorised-basic-response [{:keys [status headers] :as response}]
-  (is (= 401 status))
-  (is (contains? headers "WWW-Authenticate")))
-
 (deftest handler-should-return-not-authenticated-response-if-inner-handler-throws-unauthorised
   (let [inner-handler (fn [req] (auth/throw-unauthorized {:message "Auth required"}))
         handler (basic-authentication (memory-repo/create-repository*) "test" inner-handler)
         response (handler {:uri "/test" :request-method :get})]
     (assert-is-unauthorised-basic-response response)))
+
+(deftest require-authenticated-should-call-inner-handler-if-authenticated
+  (let [handler (require-authenticated identity)]
+    (is (thrown? ExceptionInfo (handler {:uri "/foo" :request-method :get})))))
+
+(deftest required-authenticated-should-throw-if-unauthenticated
+  (let [user (user/create-user "test@example.com" :publisher "sdlkf")
+        request {:uri "/foo" :request-method :post :identity user}
+        inner-was-called (atom false)
+        inner-handler (fn [r] (reset! inner-was-called true) r)
+        handler (require-authenticated inner-handler)]
+    (handler request)
+    (is (= true @inner-was-called))))

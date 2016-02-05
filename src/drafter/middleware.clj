@@ -6,6 +6,7 @@
             [drafter.responses :as response]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
+            [buddy.auth :as auth]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [cemerick.friend :as friend]
@@ -48,3 +49,9 @@
                                       (response/unauthorised-basic-response realm))}
         backend (http-basic-backend conf)]
     (wrap-authorization (wrap-authentication inner-handler backend) backend)))
+
+(defn require-authenticated [inner-handler]
+  (fn [request]
+    (if (auth/authenticated? request)
+      (inner-handler request)
+      (auth/throw-unauthorized {:message "Authentication required"}))))
