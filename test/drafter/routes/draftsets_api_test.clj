@@ -93,7 +93,9 @@
 (def ^:private draftset-without-title-or-description-info-schema
   {:id s/Str
    :data {s/Str {s/Any s/Any}}
-   :created-at Date})
+   :created-at Date
+   :created-by s/Str
+   :current-owner s/Str})
 
 (def ^:private draftset-without-description-info-schema
   (assoc draftset-without-title-or-description-info-schema :display-name s/Str))

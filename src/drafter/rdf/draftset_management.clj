@@ -139,6 +139,8 @@
      (with-state-graph
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
        "<" draftset-uri "> <" drafter:createdAt "> ?created ."
+       "<" draftset-uri "> <" drafter:hasOwner "> ?owner ."
+       "<" draftset-uri "> <" drafter:createdBy "> ?creator ."
        "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description . }"
        "OPTIONAL { <" draftset-uri "> <" rdfs:label "> ?title }")
      "}")))
@@ -149,6 +151,8 @@
    (with-state-graph
      "?ds <" rdf:a "> <" drafter:DraftSet "> ."
      "?ds <" drafter:createdAt "> ?created ."
+     "?ds <" drafter:hasOwner "> ?owner ."
+     "?ds <" drafter:createdBy "> ?creator ."
      "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
      "OPTIONAL { ?ds <" rdfs:label "> ?title . }")
    "}"))
@@ -156,9 +160,11 @@
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
-(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description]}]
+(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner]}]
   (let [required-fields {:id (str (->draftset-id draftset-ref))
-                         :created-at (calendar-literal->date created)}
+                         :created-at (calendar-literal->date created)
+                         :created-by (.stringValue creator)
+                         :current-owner (.stringValue owner)}
         optional-fields {:display-name (and title (.stringValue title))
                          :description (and description (.stringValue description))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
