@@ -5,6 +5,7 @@
             [clojure.test :refer :all]
             [clojure.set :as set]
             [drafter.routes.draftsets-api :refer :all]
+            [drafter.user :as user]
             [grafter.rdf :refer [statements context add]]
             [grafter.rdf.io :refer [rdf-serializer]]
             [grafter.rdf.formats :as formats]
@@ -26,6 +27,9 @@
 (defn- route [request]
   (*route* request))
 
+(def ^:private test-editor (user/create-user "editor@example.com" :editor "test-api-key"))
+(def ^:private test-manager (user/create-user "manager@example.com" :manager "test-api-key"))
+
 (defn- statements->input-stream [statements format]
   (let [bos (ByteArrayOutputStream.)
         serialiser (rdf-serializer bos :format format)]
@@ -37,11 +41,15 @@
    :request-method :post
    :params {:file file-part}})
 
+(defn- with-identity [user request]
+  (assoc request :identity user))
+
 (defn- create-draftset-request
-  ([] {:uri "/draftset" :request-method :post :params {}})
-  ([display-name] {:uri "/draftset" :request-method :post :params {:display-name display-name}})
-  ([display-name description]
-   {:uri "/draftset" :request-method :post :params {:display-name display-name :description description}}))
+  ([] (create-draftset-request test-editor))
+  ([user] (create-draftset-request user nil))
+  ([user display-name] (create-draftset-request user display-name nil))
+  ([user display-name description]
+   (with-identity user {:uri "/draftset" :request-method :post :params {:display-name display-name :description description}})))
 
 (defn- make-append-data-to-draftset-request [draftset-endpoint-uri data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
@@ -133,10 +141,11 @@
   (eval-statements (statements source :format format)))
 
 (defn- create-draftset-through-api
-  ([] (create-draftset-through-api nil))
-  ([display-name] (create-draftset-through-api display-name nil))
-  ([display-name description]
-   (let [request (create-draftset-request display-name description)
+  ([] (create-draftset-through-api test-editor))
+  ([user] (create-draftset-through-api user nil))
+  ([user display-name] (create-draftset-through-api user display-name nil))
+  ([user display-name description]
+   (let [request (create-draftset-request user display-name description)
          {:keys [headers] :as response} (route request)]
      (assert-is-see-other-response response)
      (get headers "Location"))))
@@ -215,7 +224,7 @@
 ;;TODO: Get quads through query of live endpoint? This depends on
 ;;'union with live' working correctly
 (defn- get-live-quads-through-api []
-  (let [tmp-ds (create-draftset-through-api "tmp")]
+  (let [tmp-ds (create-draftset-through-api)]
     (get-draftset-quads-through-api tmp-ds true)))
 
 (defn- assert-live-quads [expected-quads]
@@ -223,21 +232,21 @@
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
 (deftest create-draftset-without-title-or-description
-  (let [response (route {:uri "/draftset" :request-method :post})]
+  (let [response (route (with-identity test-editor {:uri "/draftset" :request-method :post}))]
     (assert-is-see-other-response response)))
 
 (deftest create-draftset-with-title-and-without-description
-  (let [response (route (create-draftset-request "Test Title!"))]
+  (let [response (route (create-draftset-request test-editor "Test Title!"))]
     (assert-is-see-other-response response)))
 
 (deftest create-draftset-with-title-and-description
-  (let [response (route (create-draftset-request "Test title" "Test description"))]
+  (let [response (route (create-draftset-request test-editor "Test title" "Test description"))]
     (assert-is-see-other-response response)))
 
 (deftest get-all-draftsets-test
   (let [draftset-count 10
         titles (map #(str "Title" %) (range 1 (inc draftset-count)))
-        create-requests (map create-draftset-request titles)
+        create-requests (map #(create-draftset-request test-editor %) titles)
         create-responses (doall (map route create-requests))]
     (doseq [r create-responses]
       (assert-is-see-other-response r))
@@ -258,7 +267,7 @@
 
 (deftest get-empty-draftset-without-description
   (let [display-name "Test title!"
-        draftset-location (create-draftset-through-api display-name)
+        draftset-location (create-draftset-through-api test-editor display-name)
         get-request {:uri draftset-location :request-method :get}
         {:keys [body] :as response} (route get-request)]
     (assert-is-ok-response response)
@@ -268,7 +277,7 @@
 (deftest get-empty-draftset-with-description
   (let [display-name "Test title!"
         description "Draftset used in a test"
-        draftset-location (create-draftset-through-api display-name description)]
+        draftset-location (create-draftset-through-api test-editor display-name description)]
     
     (let [get-request {:uri draftset-location :request-method :get}
           {:keys [body] :as response} (route get-request)]
@@ -279,7 +288,7 @@
 
 (deftest get-draftset-containing-data
   (let [display-name "Test title!"
-        draftset-location (create-draftset-through-api display-name)
+        draftset-location (create-draftset-through-api test-editor display-name)
         quads (statements "test/resources/test-draftset.trig")
         live-graphs (set (keys (group-by context quads)))]
     (append-quads-to-draftset-through-api draftset-location quads)
@@ -814,7 +823,7 @@
     body))
 
 (deftest set-draftset-with-existing-title-and-description-metadata
-  (let [draftset-location (create-draftset-through-api "Test draftset" "Test description")
+  (let [draftset-location (create-draftset-through-api test-editor "Test draftset" "Test description")
         new-title "Updated title"
         new-description "Updated description"
         {:keys [display-name description]} (update-draftset-metadata-through-api draftset-location new-title new-description)]

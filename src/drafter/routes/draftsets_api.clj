@@ -121,8 +121,8 @@
 
     ;;create a new draftset
 
-   (POST "/draftset" [display-name description]
-         (let [draftset-id (dsmgmt/create-draftset! backend display-name description)]
+   (POST "/draftset" {{:keys [display-name description]} :params user :identity :as request}
+         (let [draftset-id (dsmgmt/create-draftset! backend user display-name description)]
            (redirect-after-post (str "/draftset/" draftset-id))))
 
    (GET "/draftset/:id" [id]

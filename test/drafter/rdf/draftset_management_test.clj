@@ -5,6 +5,8 @@
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples]]
             [grafter.rdf :refer [statements context]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
+            [drafter.user :as user]
+            [drafter.util :as util]
             [grafter.rdf.repository :refer [query]]
             [grafter.vocabularies.rdf :refer :all]))
 
@@ -17,41 +19,50 @@
 (defn- has-any-object? [s p]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> ?o }")))
 
+(defn- assert-user-is-creator-and-owner [{:keys [email] :as user} draftset-id]
+  (is (has-string-object? (->draftset-uri draftset-id) drafter:createdBy email))
+  (is (has-string-object? (->draftset-uri draftset-id) drafter:hasOwner email)))
+
+(def ^:private test-editor (user/create-user "test@example.com" :editor "test-api-key"))
+
 (deftest create-draftset!-test
   (let [title "Test draftset"
         description "Test description"]
     (testing "Without title or description"
-      (let [draftset-id (create-draftset! *test-backend*)
+      (let [draftset-id (create-draftset! *test-backend* test-editor)
             ds-uri (->draftset-uri draftset-id)]
         (is (draftset-exists? *test-backend* ds-uri))
         (is (= false (has-any-object? ds-uri rdfs:label)))
-        (is (= false (has-any-object? ds-uri rdfs:comment)))))
+        (is (= false (has-any-object? ds-uri rdfs:comment)))
+        (assert-user-is-creator-and-owner test-editor draftset-id)))
 
     (testing "Without description"
-      (let [draftset-id (create-draftset! *test-backend* title)
+      (let [draftset-id (create-draftset! *test-backend* test-editor title)
             ds-uri (->draftset-uri draftset-id)]
         (is (has-uri-object? ds-uri rdf:a drafter:DraftSet))
         (is (has-string-object? ds-uri rdfs:label title))
-        (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))
+        (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))
+        (assert-user-is-creator-and-owner test-editor draftset-id)))
 
     (testing "With description"
-      (let [draftset-id (create-draftset! *test-backend* title description)
+      (let [draftset-id (create-draftset! *test-backend* test-editor title description)
             ds-uri (->draftset-uri draftset-id)]
         (is (has-uri-object? ds-uri rdf:a drafter:DraftSet))
         (is (has-string-object? ds-uri rdfs:label title))
         (is (has-string-object? ds-uri rdfs:comment description))
-        (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))))))
+        (is (ask? "<" ds-uri "> <" drafter:createdAt "> ?o"))
+        (assert-user-is-creator-and-owner test-editor draftset-id)))))
 
 (deftest draftset-exists-test
   (testing "Existing draftset"
-    (let [draftset-id (create-draftset! *test-backend* "Test draftset")]
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
       (is (draftset-exists? *test-backend* draftset-id))))
 
   (testing "Non-existent draftset"
     (is (= false (draftset-exists? *test-backend* (->DraftsetId "missing"))))))
 
 (deftest delete-draftset-statements!-test
-  (let [draftset-id (create-draftset! *test-backend* "Test draftset")]
+  (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
     (delete-draftset-statements! *test-backend* draftset-id)
     (is (= false (ask? (str "<" draftset-uri ">") "?p" "?o")))))
 
@@ -60,7 +71,7 @@
     (doall (map (fn [[live qs]] (import-data-to-draft! *test-backend* live qs draftset-id)) graph-quads))))
 
 (deftest delete-draftset!-test
-  (let [draftset-id (create-draftset! *test-backend* "Test draftset")
+  (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
         quads (statements "test/resources/test-draftset.trig")
         draft-graphs (import-data-to-draftset! *test-backend* draftset-id quads)]
     
@@ -76,7 +87,7 @@
 
 (deftest delete-draftest-graph!-test
   (testing "Delete non-existent live graph"
-    (let [draftset-id (create-draftset! *test-backend* "Test draftset")
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           graph-to-delete "http://missing"]
       (delete-draftset-graph! *test-backend* draftset-id graph-to-delete)
 
@@ -85,7 +96,7 @@
 
   (testing "Delete live graph not already in draftset"
     (let [live-graph "http://live"
-          draftset-id (create-draftset! *test-backend* "Test draftset")]
+          draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
       (make-graph-live! *test-backend* live-graph)
       (delete-draftset-graph! *test-backend* draftset-id live-graph)
 
@@ -98,7 +109,7 @@
 
   (testing "Graph already in draftset"
     (let [live-graph "http://live"
-          draftset-id (create-draftset! *test-backend* "Test draftset")]
+          draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
       (make-graph-live! *test-backend* live-graph)
 
       (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples "http://subject") draftset-id)]

@@ -34,10 +34,12 @@
           relative (.relativize base-uri (URI. uri))]
       (->DraftsetId (.toString relative)))))
 
-(defn- create-draftset-statements [title description draftset-uri created-date]
+(defn- create-draftset-statements [username title description draftset-uri created-date]
   (let [ss [draftset-uri
             [rdf:a drafter:DraftSet]
-            [drafter:createdAt created-date]]
+            [drafter:createdAt created-date]
+            [drafter:createdBy (s username)]
+            [drafter:hasOwner (s username)]]
         ss (util/conj-if (some? title) ss [rdfs:label (s title)])]
     (util/conj-if (some? description) ss [rdfs:comment (s description)])))
 
@@ -45,11 +47,11 @@
   "Creates a new draftset in the given database and returns its id. If
   no title is provided (i.e. it is nil) a default title will be used
   for the new draftset."
-  ([db] (create-draftset! db nil))
-  ([db title] (create-draftset! db title nil))
-  ([db title description] (create-draftset! db title description (UUID/randomUUID) (Date.)))
-  ([db title description draftset-id created-date]
-   (let [template (create-draftset-statements title description (draftset-uri draftset-id) created-date)
+  ([db creator] (create-draftset! db creator nil))
+  ([db creator title] (create-draftset! db creator title nil))
+  ([db creator title description] (create-draftset! db creator title description (UUID/randomUUID) (Date.)))
+  ([db creator title description draftset-id created-date]
+   (let [template (create-draftset-statements (:email creator) title description (draftset-uri draftset-id) created-date)
          quads (to-quads template)]
      (add db quads)
      (->DraftsetId (str draftset-id)))))
