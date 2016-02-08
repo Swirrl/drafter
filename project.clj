@@ -6,9 +6,13 @@
 
   :repositories [["snapshots" {:url "s3p://swirrl-jars/snapshots/"
                                :sign-releases false
+                               :username :env
+                               :passphrase :env
                                :releases false}]
                  ["releases" {:url "s3p://swirrl-jars/releases/"
                               :sign-releases true
+                              :username :env
+                              :passphrase :env
                               :snapshots false}]]
 
   :dependencies [
@@ -95,8 +99,7 @@
 
    :uberjar {:aot :all
              :main drafter.repl
-             :uberjar [:swirrl-private-repos
-                        { :project-config-stuff "goes here"}]}
+             }
 
    :production {:ring {:open-browser? false
                        :stacktraces?  false
