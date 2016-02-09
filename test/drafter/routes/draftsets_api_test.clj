@@ -177,15 +177,18 @@
     (assert-is-ok-response data-response)
     (concrete-statements body formats/rdf-ntriples)))
 
-(defn- publish-draftset-through-api [draftset-location]
-  (let [publish-request {:uri (str draftset-location "/publish") :request-method :post}
+(defn- create-publish-request [draftset-location user]
+  (with-identity user {:uri (str draftset-location "/publish") :request-method :post}))
+
+(defn- publish-draftset-through-api [draftset-location user]
+  (let [publish-request (create-publish-request draftset-location user)
         publish-response (route publish-request)]
     (await-success finished-jobs (:finished-job (:body publish-response)))))
 
 (defn- publish-quads-through-api [route quads]
-  (let [draftset-location (create-draftset-through-api)]
+  (let [draftset-location (create-draftset-through-api test-publisher)]
     (append-quads-to-draftset-through-api draftset-location quads)
-    (publish-draftset-through-api draftset-location)))
+    (publish-draftset-through-api draftset-location test-publisher)))
 
 (defn- create-delete-quads-request [draftset-location input-stream format]
   (let [file-part {:tempfile input-stream :filename "to-delete.nq" :content-type format}]
@@ -578,9 +581,9 @@
 
 (deftest publish-draftset-with-graphs-not-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
-        draftset-location (create-draftset-through-api)]
+        draftset-location (create-draftset-through-api test-publisher)]
     (append-quads-to-draftset-through-api draftset-location quads)
-    (publish-draftset-through-api draftset-location)
+    (publish-draftset-through-api draftset-location test-publisher)
 
     (let [live-quads (get-live-quads-through-api)]
       (is (= (set (eval-statements quads)) (set live-quads))))))
@@ -588,13 +591,13 @@
 (deftest publish-draftset-with-statements-added-to-graphs-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
-        draftset-location (create-draftset-through-api)
+        draftset-location (create-draftset-through-api test-publisher)
         initial-live-quads (map (comp first second) grouped-quads)
         appended-quads (mapcat (comp rest second) grouped-quads)]
     
     (publish-quads-through-api route initial-live-quads)
     (append-quads-to-draftset-through-api draftset-location appended-quads)
-    (publish-draftset-through-api draftset-location)
+    (publish-draftset-through-api draftset-location test-publisher)
 
     (let [after-publish-quads (get-live-quads-through-api)]
       (is (= (set (eval-statements quads)) (set after-publish-quads))))))
@@ -602,11 +605,11 @@
 (deftest publish-draftset-with-statements-deleted-from-graphs-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
-        draftset-location (create-draftset-through-api)
+        draftset-location (create-draftset-through-api test-publisher)
         to-delete (map (comp first second) grouped-quads)]
     (publish-quads-through-api route quads)
     (delete-quads-through-api draftset-location to-delete)
-    (publish-draftset-through-api draftset-location)
+    (publish-draftset-through-api draftset-location test-publisher)
 
     (let [after-publish-quads (get-live-quads-through-api)
           expected-quads (eval-statements (mapcat (comp rest second) grouped-quads))]
@@ -615,19 +618,19 @@
 (deftest publish-draftset-with-graph-deleted-from-live
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
-        draftset-location (create-draftset-through-api)
+        draftset-location (create-draftset-through-api test-publisher)
         graph-to-delete (ffirst grouped-quads)
         expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
     (publish-quads-through-api route quads)
     (delete-draftset-graph-through-api draftset-location graph-to-delete)
-    (publish-draftset-through-api draftset-location)
+    (publish-draftset-through-api draftset-location test-publisher)
     (assert-live-quads expected-quads)))
 
 (deftest publish-draftset-with-deletes-and-appends-from-live
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
         [live-graph initial-quads] (first grouped-quads)
-        draftset-location (create-draftset-through-api)
+        draftset-location (create-draftset-through-api test-publisher)
         to-add (take 2 (second (second grouped-quads)))
         to-delete (take 1 initial-quads)
         expected-quads (eval-statements (set/difference (set/union (set initial-quads) (set to-add)) (set to-delete)))]
@@ -635,7 +638,7 @@
     (publish-quads-through-api route initial-quads)
     (append-quads-to-draftset-through-api draftset-location to-add)
     (delete-quads-through-api draftset-location to-delete)
-    (publish-draftset-through-api draftset-location)
+    (publish-draftset-through-api draftset-location test-publisher)
 
     (assert-live-quads expected-quads)))
 
@@ -643,14 +646,14 @@
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
         [graph graph-quads] (first grouped-quads)
-        draftset-location (create-draftset-through-api)]
+        draftset-location (create-draftset-through-api test-publisher)]
 
     ;;delete quads in draftset before they exist in live
     (delete-quads-through-api draftset-location graph-quads)
 
     ;;add to live then publish draftset
     (publish-quads-through-api route graph-quads)
-    (publish-draftset-through-api draftset-location)
+    (publish-draftset-through-api draftset-location test-publisher)
 
     ;;graph should still exist in live
     (assert-live-quads graph-quads)))
@@ -658,6 +661,20 @@
 (deftest publish-non-existent-draftset
   (let [response (route {:uri "/draftset/missing/publish" :request-method :post})]
     (assert-is-not-found-response response)))
+
+(deftest publish-by-non-publisher-test
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (append-quads-to-draftset-through-api draftset-location (statements "test/resources/test-draftset.trig"))
+    (let [publish-response (route (create-publish-request draftset-location test-editor))]
+      (assert-is-forbidden-response publish-response))))
+
+(deftest publish-by-non-owner-test
+  (let [draftset-location (create-draftset-through-api test-publisher)
+        quads (statements "test/resources/test-draftset.trig")]
+    (append-quads-to-draftset-through-api draftset-location quads)
+    (let [publish-request (create-publish-request draftset-location test-manager)
+          publish-response (route publish-request)]
+      (assert-is-forbidden-response publish-response))))
 
 (defn- create-delete-draftset-request [draftset-location user]
   {:uri draftset-location :request-method :delete :identity user})

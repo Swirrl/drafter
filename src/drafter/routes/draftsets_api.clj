@@ -11,6 +11,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
+            [drafter.user :as user]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]])
   (:import [org.openrdf.query TupleQueryResultHandler]
@@ -218,8 +219,14 @@
                        (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
 
    (make-route :post "/draftset/:id/publish"
-               (existing-draftset-handler backend (fn [{{:keys [draftset-id]} :params}]
-                                                    (submit-async-job! (publish-draftset-job backend draftset-id)))))
+               (existing-draftset-handler
+                backend
+                (restrict-to-draftset-owner
+                 backend
+                 (fn [{{:keys [draftset-id]} :params user :identity}]
+                   (if (user/has-role? user :publisher)
+                     (submit-async-job! (publish-draftset-job backend draftset-id))
+                     (forbidden-response "You require the publisher role to perform this action"))))))
 
    (make-route :put "/draftset/:id/meta"
                (existing-draftset-handler backend (fn [{{:keys [draftset-id] :as params} :params}]
