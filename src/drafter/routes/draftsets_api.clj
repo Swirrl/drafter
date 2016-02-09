@@ -125,8 +125,8 @@
 (defn draftset-api-routes [backend]
   (routes
 
-   (GET "/draftsets" []
-        (response (dsmgmt/get-all-draftsets-info backend)))
+   (GET "/draftsets" {user :identity :as request}
+        (response (dsmgmt/get-all-draftsets-info backend user)))
 
     ;;create a new draftset
 

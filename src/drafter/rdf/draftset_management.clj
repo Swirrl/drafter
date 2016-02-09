@@ -145,17 +145,19 @@
        "OPTIONAL { <" draftset-uri "> <" rdfs:label "> ?title }")
      "}")))
 
-(defn- get-all-draftsets-properties-query []
-  (str
-   "SELECT * WHERE { "
-   (with-state-graph
-     "?ds <" rdf:a "> <" drafter:DraftSet "> ."
-     "?ds <" drafter:createdAt "> ?created ."
-     "?ds <" drafter:hasOwner "> ?owner ."
-     "?ds <" drafter:createdBy "> ?creator ."
-     "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
-     "OPTIONAL { ?ds <" rdfs:label "> ?title . }")
-   "}"))
+(defn- get-all-draftsets-properties-query [user]
+  (let [username (:email user)]
+    (str
+     "SELECT * WHERE { "
+     (with-state-graph
+       "?ds <" rdf:a "> <" drafter:DraftSet "> ."
+       "?ds <" drafter:createdAt "> ?created ."
+       "?ds <" drafter:hasOwner "> \"" username "\" ."
+       "?ds <" drafter:createdBy "> ?creator ." 
+       "BIND (\"" username "\" as ?owner)"
+       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
+       "OPTIONAL { ?ds <" rdfs:label "> ?title . }")
+     "}")))
 
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
@@ -184,8 +186,8 @@
     (let [ds-graph-mapping (get-draftset-graph-mapping repo draftset-ref)]
       (combine-draftset-properties-and-graphs ds-properties ds-graph-mapping))))
 
-(defn get-all-draftsets-info [repo]
-  (let [all-properties (query repo (get-all-draftsets-properties-query))
+(defn get-all-draftsets-info [repo user]
+  (let [all-properties (query repo (get-all-draftsets-properties-query user))
         all-graph-mappings (get-all-draftset-graph-mappings repo)
         all-infos (map (fn [{ds-uri "ds" :as result}]
                          (let [ds-uri (.stringValue ds-uri)

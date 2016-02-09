@@ -262,12 +262,19 @@
     (doseq [r create-responses]
       (assert-is-see-other-response r))
 
-    (let [get-all-request {:uri "/draftsets" :request-method :get}
+    ;;create another draftset owned by a different user - this should
+    ;;not be returned in the results
+    (create-draftset-through-api test-publisher "Other draftset")
+
+    (let [get-all-request (with-identity test-editor {:uri "/draftsets" :request-method :get})
           {:keys [body] :as response} (route get-all-request)]
       (assert-is-ok-response response)
       
       (is (= draftset-count (count body)))
-      (assert-schema [draftset-without-description-info-schema] body))))
+      (assert-schema [draftset-without-description-info-schema] body)
+
+      (let [returned-names (map :display-name body)]
+        (is (= (set returned-names) (set titles)))))))
 
 (deftest get-empty-draftset-without-title-or-description
   (let [draftset-location (create-draftset-through-api test-editor)
