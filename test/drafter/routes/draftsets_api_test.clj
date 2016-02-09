@@ -28,6 +28,7 @@
   (*route* request))
 
 (def ^:private test-editor (user/create-user "editor@example.com" :editor "test-api-key"))
+(def ^:private test-publisher (user/create-user "publisher@example.com" :publisher "test-api-key"))
 (def ^:private test-manager (user/create-user "manager@example.com" :manager "test-api-key"))
 
 (defn- statements->input-stream [statements format]
@@ -132,6 +133,9 @@
 
 (defn- assert-is-method-not-allowed-response [response]
   (assert-schema (response-code-schema 405) response))
+
+(defn assert-is-forbidden-response [response]
+  (assert-schema (response-code-schema 403) response))
 
 (defn- eval-statement [s]
   (util/map-values str s))
@@ -655,14 +659,26 @@
   (let [response (route {:uri "/draftset/missing/publish" :request-method :post})]
     (assert-is-not-found-response response)))
 
+(defn- create-delete-draftset-request [draftset-location user]
+  {:uri draftset-location :request-method :delete :identity user})
+
 (deftest delete-draftset-test
   (let [rdf-data-file "test/resources/test-draftset.trig"
-        draftset-location (create-draftset-through-api)
-        delete-response (route {:uri draftset-location :request-method :delete})]
+        draftset-location (create-draftset-through-api test-editor)
+        delete-response (route (create-delete-draftset-request draftset-location test-editor))]
     (assert-is-ok-response delete-response)
     
     (let [get-response (route {:uri draftset-location :request-method :get})]
       (assert-is-not-found-response get-response))))
+
+(deftest delete-non-existent-draftset-test
+  (let [delete-response (route (create-delete-draftset-request "/draftset/missing" test-publisher))]
+    (assert-is-not-found-response delete-response)))
+
+(deftest delete-draftset-by-non-owner-test
+  (let [draftset-location (create-draftset-through-api test-editor)
+        delete-response (route (create-delete-draftset-request draftset-location test-manager))]
+    (assert-is-forbidden-response delete-response)))
 
 (defn- result-set-handler [result-state]
   (reify TupleQueryResultHandler

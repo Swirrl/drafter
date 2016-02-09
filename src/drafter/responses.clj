@@ -33,6 +33,9 @@
   (let [params (str "Basic realm=\"" realm "\"")]
     {:status 401 :body "" :headers {"WWW-Authenticate" params}}))
 
+(defn forbidden-response [body]
+  {:status 403 :body body :headers {}})
+
 (defn default-job-result-handler
   "Default handler for creating ring responses from job results. If
   the job succeeded then a 200 response is returned, otherwise a 500

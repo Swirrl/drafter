@@ -3,7 +3,7 @@
             [clojure.set :as set]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response
-                                       unsupported-media-type-response method-not-allowed-response submit-async-job!]]
+                                       unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!]]
             [swirrl-server.responses :as response]
             [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
             [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
@@ -82,6 +82,14 @@
           (inner-handler updated-request))
         (not-found "")))))
 
+(defn- restrict-to-draftset-owner [backend inner-handler]
+  (fn [{{email :email} :identity {:keys [draftset-id]} :params :as request}]
+    (let [{:keys [current-owner]} (dsmgmt/get-draftset-info backend draftset-id)]
+      ;;TODO: use secure comparison method?
+      (if (= email current-owner)
+        (inner-handler request)
+        (forbidden-response "Operation only permitted by draftset owner")))))
+
 (defn- rdf-file-part-handler [inner-handler]
   (fn [{{request-content-type :content-type
          {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
@@ -130,9 +138,14 @@
           (response info)
           (not-found "")))
 
-   (DELETE "/draftset/:id" [id]
-           (delete-draftset! backend (dsmgmt/->DraftsetId id))
-           (response ""))
+   (make-route :delete "/draftset/:id"
+               (existing-draftset-handler
+                backend
+                (restrict-to-draftset-owner
+                 backend
+                 (fn [{{id :id} :params :as request}]
+                   (delete-draftset! backend (dsmgmt/->DraftsetId id))
+                   (response "")))))
 
    (make-route :get "/draftset/:id/data"
                (existing-draftset-handler
