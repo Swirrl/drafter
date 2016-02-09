@@ -194,9 +194,11 @@
   (let [file-part {:tempfile input-stream :filename "to-delete.nq" :content-type format}]
     {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}}))
 
-(defn- get-draftset-info-through-api [draftset-location]
-  (let [request {:uri draftset-location :request-method :get}
-        {:keys [body] :as response} (route request)]
+(defn- get-draftset-info-request [draftset-location user]
+  (with-identity user {:uri draftset-location :request-method :get}))
+
+(defn- get-draftset-info-through-api [draftset-location user]
+  (let [{:keys [body] :as response} (route (get-draftset-info-request draftset-location user))]
     (assert-is-ok-response response)
     (assert-schema draftset-info-schema body)
     body))
@@ -268,32 +270,26 @@
       (assert-schema [draftset-without-description-info-schema] body))))
 
 (deftest get-empty-draftset-without-title-or-description
-  (let [draftset-location (create-draftset-through-api)
-        get-request {:uri draftset-location :request-method :get}
-        {:keys [body] :as get-response} (route get-request)]
-    (assert-is-ok-response get-response)
-    (assert-schema draftset-without-title-or-description-info-schema body)))
+  (let [draftset-location (create-draftset-through-api test-editor)
+        ds-info (get-draftset-info-through-api draftset-location test-editor)]
+    (assert-schema draftset-without-title-or-description-info-schema ds-info)))
 
 (deftest get-empty-draftset-without-description
   (let [display-name "Test title!"
         draftset-location (create-draftset-through-api test-editor display-name)
-        get-request {:uri draftset-location :request-method :get}
-        {:keys [body] :as response} (route get-request)]
-    (assert-is-ok-response response)
-    (assert-schema draftset-without-description-info-schema body)
-    (is (= display-name (:display-name body)))))
+        ds-info (get-draftset-info-through-api draftset-location test-editor)]
+    (assert-schema draftset-without-description-info-schema ds-info)
+    (is (= display-name (:display-name ds-info)))))
 
 (deftest get-empty-draftset-with-description
   (let [display-name "Test title!"
         description "Draftset used in a test"
         draftset-location (create-draftset-through-api test-editor display-name description)]
     
-    (let [get-request {:uri draftset-location :request-method :get}
-          {:keys [body] :as response} (route get-request)]
-      (assert-is-ok-response response)
-      (assert-schema draftset-with-description-info-schema body)
-      (is (= display-name (:display-name body)))
-      (is (= description (:description body))))))
+    (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
+      (assert-schema draftset-with-description-info-schema ds-info)
+      (is (= display-name (:display-name ds-info)))
+      (is (= description (:description ds-info))))))
 
 (deftest get-draftset-containing-data
   (let [display-name "Test title!"
@@ -302,24 +298,28 @@
         live-graphs (set (keys (group-by context quads)))]
     (append-quads-to-draftset-through-api draftset-location quads)
     
-    (let [get-request {:uri draftset-location :request-method :get}
-          {:keys [body] :as response} (route get-request)]
-      (assert-is-ok-response response)
-      (assert-schema draftset-without-description-info-schema body)
+    (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
+      (assert-schema draftset-without-description-info-schema ds-info)
       
-      (is (= display-name (:display-name body)))
-      (is (= live-graphs (set (keys (:data body))))))))
+      (is (= display-name (:display-name ds-info)))
+      (is (= live-graphs (key-set (:data ds-info)))))))
 
 (deftest get-draftset-request-for-non-existent-draftset
-  (let [response (route {:uri  "/draftset/missing" :request-method :get})]
+  (let [response (route (get-draftset-info-request "/draftset/missing" test-publisher))]
     (assert-is-not-found-response response)))
+
+(deftest get-draftset-for-other-user-test
+  (let [draftset-location (create-draftset-through-api test-editor)
+        get-request (get-draftset-info-request draftset-location test-publisher)
+        get-response (route get-request)]
+    (assert-is-forbidden-response get-response)))
 
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
         quads (statements data-file-path)
-        draftset-location (create-draftset-through-api)]
+        draftset-location (create-draftset-through-api test-editor)]
     (append-quads-to-draftset-through-api draftset-location quads)
-    (let [draftset-graphs (key-set (:data (get-draftset-info-through-api draftset-location)))
+    (let [draftset-graphs (key-set (:data (get-draftset-info-through-api draftset-location test-editor)))
           graph-statements (group-by context quads)]
       (doseq [[live-graph graph-quads] graph-statements]
         (let [graph-triples (get-draftset-graph-triples-through-api draftset-location live-graph false)
@@ -522,11 +522,11 @@
       (assert-is-unsupported-media-type-response delete-response))))
 
 (deftest delete-non-existent-live-graph-in-draftset
-  (let [draftset-location (create-draftset-through-api)
+  (let [draftset-location (create-draftset-through-api test-editor)
         graph-to-delete "http://live-graph"]
     (delete-draftset-graph-through-api draftset-location graph-to-delete)
 
-    (let [draftset-info (get-draftset-info-through-api draftset-location)]
+    (let [draftset-info (get-draftset-info-through-api draftset-location test-editor)]
       ;;graph to delete should NOT exist in the draftset since it did not exist in live
       ;;at the time of the delete
       (is (= #{} (set (keys (:data draftset-info))))))))
@@ -536,15 +536,15 @@
         graph-quads (group-by context quads)
         live-graphs (keys graph-quads)
         graph-to-delete (first live-graphs)
-        draftset-location (create-draftset-through-api)]
+        draftset-location (create-draftset-through-api test-editor)]
     (publish-quads-through-api route quads)
     (delete-draftset-graph-through-api draftset-location graph-to-delete)
 
-    (let [{draftset-graphs :data} (get-draftset-info-through-api draftset-location)]
+    (let [{draftset-graphs :data} (get-draftset-info-through-api draftset-location test-editor)]
       (is (= #{graph-to-delete} (set (keys draftset-graphs)))))))
 
 (deftest delete-graph-with-changes-in-draftset
-  (let [draftset-location (create-draftset-through-api)
+  (let [draftset-location (create-draftset-through-api test-editor)
         [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         published-quad (first graph-quads)
         added-quads (rest graph-quads)]
@@ -552,12 +552,12 @@
     (append-quads-to-draftset-through-api draftset-location added-quads)
     (delete-draftset-graph-through-api draftset-location graph)
 
-    (let [{draftset-graphs :data} (get-draftset-info-through-api draftset-location)]
+    (let [{draftset-graphs :data} (get-draftset-info-through-api draftset-location test-editor)]
       (is (= #{graph} (set (keys draftset-graphs)))))))
 
 (deftest delete-graph-only-in-draftset
   (let [rdf-data-file "test/resources/test-draftset.trig"
-        draftset-location (create-draftset-through-api)
+        draftset-location (create-draftset-through-api test-editor)
         draftset-quads (statements rdf-data-file)
         grouped-quads (group-by context draftset-quads)
         [graph _] (first grouped-quads)]
@@ -569,7 +569,7 @@
           expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
       (is (= (set expected-quads) (set remaining-quads))))
 
-    (let [draftset-info (get-draftset-info-through-api draftset-location)
+    (let [draftset-info (get-draftset-info-through-api draftset-location test-editor)
           draftset-graphs (keys (:data draftset-info))
           expected-graphs (keys grouped-quads)]
       (is (= (set expected-graphs) (set draftset-graphs))))))

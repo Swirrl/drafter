@@ -134,10 +134,15 @@
          (let [draftset-id (dsmgmt/create-draftset! backend user display-name description)]
            (redirect-after-post (str "/draftset/" draftset-id))))
 
-   (GET "/draftset/:id" [id]
-        (if-let [info (dsmgmt/get-draftset-info backend (dsmgmt/->DraftsetId id))]
-          (response info)
-          (not-found "")))
+   (make-route :get "/draftset/:id"
+               (existing-draftset-handler
+                backend
+                (restrict-to-draftset-owner
+                 backend
+                 (fn [{{id :id} :params :as request}]
+                   (if-let [info (dsmgmt/get-draftset-info backend (dsmgmt/->DraftsetId id))]
+                     (response info)
+                     (not-found ""))))))
 
    (make-route :delete "/draftset/:id"
                (existing-draftset-handler
