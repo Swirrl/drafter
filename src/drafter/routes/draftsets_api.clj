@@ -169,21 +169,23 @@
    (make-route :delete "/draftset/:id/data"
                (existing-draftset-handler
                 backend
-                (rdf-file-part-handler
-                 (read-rdf-file-handler
-                  (fn [{{draftset-id :draftset-id
-                         graph :graph
-                         rdf-format :rdf-format
-                         statements-to-delete :rdf-statements} :params :as request}]
-                    (let [ds-executor (get-draftset-executor backend draftset-id)]
-                      (if (implies (is-triples-rdf-format? rdf-format)
-                                   (some? graph))
+                (restrict-to-draftset-owner
+                 backend
+                 (rdf-file-part-handler
+                  (read-rdf-file-handler
+                   (fn [{{draftset-id :draftset-id
+                          graph :graph
+                          rdf-format :rdf-format
+                          statements-to-delete :rdf-statements} :params :as request}]
+                     (let [ds-executor (get-draftset-executor backend draftset-id)]
+                       (if (implies (is-triples-rdf-format? rdf-format)
+                                    (some? graph))
 
-                        (let [delete-job (if (is-quads-content-type? rdf-format)
-                                           (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
-                                           (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
-                          (submit-async-job! delete-job))
-                        (not-acceptable-response "graph parameter required for triples RDF format"))))))))
+                         (let [delete-job (if (is-quads-content-type? rdf-format)
+                                            (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
+                                            (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
+                           (submit-async-job! delete-job))
+                         (not-acceptable-response "graph parameter required for triples RDF format")))))))))
 
    (make-route :delete "/draftset/:id/graph"
                (existing-draftset-handler
