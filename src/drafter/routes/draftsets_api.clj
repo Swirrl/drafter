@@ -186,10 +186,13 @@
                         (not-acceptable-response "graph parameter required for triples RDF format"))))))))
 
    (make-route :delete "/draftset/:id/graph"
-               (existing-draftset-handler backend 
-                                          (fn [{{:keys [draftset-id graph]} :params}]
-                                            (dsmgmt/delete-draftset-graph! backend draftset-id graph)
-                                            (response {}))))
+               (existing-draftset-handler
+                backend
+                (restrict-to-draftset-owner
+                 backend
+                 (fn [{{:keys [draftset-id graph]} :params}]
+                   (dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                   (response {})))))
 
    (make-route :post "/draftset/:id/data"
                (existing-draftset-handler
