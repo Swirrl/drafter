@@ -37,13 +37,14 @@
     (add serialiser statements)
     (ByteArrayInputStream. (.toByteArray bos))))
 
-(defn- append-to-draftset-request [draftset-location file-part]
-  {:uri (str draftset-location "/data")
-   :request-method :post
-   :params {:file file-part}})
-
 (defn- with-identity [user request]
   (assoc request :identity user))
+
+(defn- append-to-draftset-request [user draftset-location file-part]
+  (with-identity user
+    {:uri (str draftset-location "/data")
+     :request-method :post
+     :params {:file file-part}}))
 
 (defn- create-draftset-request
   ([] (create-draftset-request test-editor))
@@ -52,29 +53,32 @@
   ([user display-name description]
    (with-identity user {:uri "/draftset" :request-method :post :params {:display-name display-name :description description}})))
 
-(defn- make-append-data-to-draftset-request [draftset-endpoint-uri data-file-path]
+(defn- make-append-data-to-draftset-request [user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
     (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
-          request {:uri (str draftset-endpoint-uri "/data") :request-method :post :params {:file file-part}}]
+          request (append-to-draftset-request user draftset-location file-part)]
       (route request))))
 
-(defn- append-data-to-draftset-through-api [draftset-location draftset-data-file]
-  (let [append-response (make-append-data-to-draftset-request draftset-location draftset-data-file)]
+(defn- append-data-to-draftset-through-api [user draftset-location draftset-data-file]
+  (let [append-response (make-append-data-to-draftset-request user draftset-location draftset-data-file)]
     (await-success finished-jobs (:finished-job (:body append-response)))))
 
-(defn- statements->append-request [draftset-location statements format]
+(defn- statements->append-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)
         file-part {:tempfile input-stream :filename (str "data." (.getDefaultFileExtension format)) :content-type (.getDefaultMIMEType format)}]
-    {:uri (str draftset-location "/data") :request-method :post :params {:file file-part}}))
+    (append-to-draftset-request user draftset-location file-part)))
 
-(defn- append-quads-to-draftset-through-api [draftset-location quads]
-  (let [request (statements->append-request draftset-location quads formats/rdf-nquads)
+(defn- append-quads-to-draftset-through-api [user draftset-location quads]
+  (let [request (statements->append-request user draftset-location quads formats/rdf-nquads)
         response (route request)]
     (await-success finished-jobs (get-in response [:body :finished-job]))))
 
-(defn- append-triples-to-draftset-through-api [draftset-location triples graph]
-  (let [request (statements->append-request draftset-location triples formats/rdf-ntriples)
-        request (assoc-in request [:params :graph] graph)
+(defn- statements->append-triples-request [user draftset-location triples graph]
+  (-> (statements->append-request user draftset-location triples formats/rdf-ntriples)
+      (assoc-in [:params :graph] graph)))
+
+(defn- append-triples-to-draftset-through-api [user draftset-location triples graph]
+  (let [request (statements->append-triples-request user draftset-location triples graph)
         response (route request)]
     (await-success finished-jobs (get-in response [:body :finished-job]))))
 
@@ -187,7 +191,7 @@
 
 (defn- publish-quads-through-api [route quads]
   (let [draftset-location (create-draftset-through-api test-publisher)]
-    (append-quads-to-draftset-through-api draftset-location quads)
+    (append-quads-to-draftset-through-api test-publisher draftset-location quads)
     (publish-draftset-through-api draftset-location test-publisher)))
 
 (defn- create-delete-quads-request [user draftset-location input-stream format]
@@ -303,7 +307,7 @@
         draftset-location (create-draftset-through-api test-editor display-name)
         quads (statements "test/resources/test-draftset.trig")
         live-graphs (set (keys (group-by context quads)))]
-    (append-quads-to-draftset-through-api draftset-location quads)
+    (append-quads-to-draftset-through-api test-editor draftset-location quads)
     
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
       (assert-schema draftset-without-description-info-schema ds-info)
@@ -325,7 +329,7 @@
   (let [data-file-path "test/resources/test-draftset.trig"
         quads (statements data-file-path)
         draftset-location (create-draftset-through-api test-editor)]
-    (append-quads-to-draftset-through-api draftset-location quads)
+    (append-quads-to-draftset-through-api test-editor draftset-location quads)
     (let [draftset-graphs (key-set (:data (get-draftset-info-through-api draftset-location test-editor)))
           graph-statements (group-by context quads)]
       (doseq [[live-graph graph-quads] graph-statements]
@@ -339,9 +343,9 @@
         grouped-quads (group-by context quads)
         live-quads (map (comp first second) grouped-quads)
         quads-to-add (rest (second (first grouped-quads)))
-        draftset-location (create-draftset-through-api)]
+        draftset-location (create-draftset-through-api test-editor)]
     (publish-quads-through-api route live-quads)
-    (append-quads-to-draftset-through-api draftset-location quads-to-add)
+    (append-quads-to-draftset-through-api test-editor draftset-location quads-to-add)
 
     ;;draftset itself should contain the live quads from the graph
     ;;added to along with the quads explicitly added. It should
@@ -352,26 +356,26 @@
 
 (deftest append-quad-data-to-draftset-with-content-type-set-for-request
   (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [draftset-location (create-draftset-through-api)
+    (let [draftset-location (create-draftset-through-api test-editor)
           file-part {:tempfile fs :filename "test-draftset.trig"}
-          request (-> (append-to-draftset-request draftset-location file-part)
+          request (-> (append-to-draftset-request test-editor draftset-location file-part)
                       (assoc-in [:params :content-type] "application/x-trig"))
           response (route request)]
       (await-success finished-jobs (:finished-job (:body response))))))
 
 (deftest append-triple-data-to-draftset-test
   (with-open [fs (io/input-stream "test/test-triple.nt")]
-    (let [draftset-location (create-draftset-through-api)
+    (let [draftset-location (create-draftset-through-api test-editor)
           file-part {:tempfile fs :filename "test-triple.nt" :content-type "application/n-triples"}
-          request (append-to-draftset-request draftset-location file-part)
+          request (append-to-draftset-request test-editor draftset-location file-part)
           response (route request)]
       (is (is-client-error-response? response)))))
 
 (deftest append-triples-to-graph-which-exists-in-live
   (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api)]
+        draftset-location (create-draftset-through-api test-editor)]
     (publish-quads-through-api route [(first graph-quads)])
-    (append-triples-to-draftset-through-api draftset-location (rest graph-quads) graph)
+    (append-triples-to-draftset-through-api test-editor draftset-location (rest graph-quads) graph)
 
     (let [draftset-graph-triples (get-draftset-graph-triples-through-api draftset-location graph false)
           expected-triples (eval-statements (map map->Triple graph-quads))]
@@ -379,15 +383,29 @@
 
 (deftest append-quad-data-without-content-type-to-draftset
   (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [draftset-location (create-draftset-through-api)
+    (let [draftset-location (create-draftset-through-api test-editor)
           file-part {:tempfile fs :filename "test-dataset.trig"}
-          request (append-to-draftset-request draftset-location file-part)
+          request (append-to-draftset-request test-editor draftset-location file-part)
           response (route request)]
       (is (is-client-error-response? response)))))
 
 (deftest append-data-to-non-existent-draftset
-  (let [append-response (make-append-data-to-draftset-request "/draftset/missing" "test/resources/test-draftset.trig")]
+  (let [append-response (make-append-data-to-draftset-request test-publisher "/draftset/missing" "test/resources/test-draftset.trig")]
     (assert-is-not-found-response append-response)))
+
+(deftest append-quads-by-non-owner
+  (let [draftset-location (create-draftset-through-api test-editor)
+        quads (statements "test/resources/test-draftset.trig")
+        append-request (statements->append-request test-publisher draftset-location quads formats/rdf-nquads)
+        append-response (route append-request)]
+    (assert-is-forbidden-response append-response)))
+
+(deftest append-graph-triples-by-non-owner
+  (let [draftset-location (create-draftset-through-api test-editor)
+        [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+        append-request (statements->append-triples-request test-publisher draftset-location graph-quads graph)
+        append-response (route append-request)]
+    (assert-is-forbidden-response append-response)))
 
 (deftest delete-quads-from-live-graphs-in-draftset
   (let [quads (statements "test/resources/test-draftset.trig")
@@ -416,7 +434,7 @@
         draftset-quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context draftset-quads)]
 
-    (append-quads-to-draftset-through-api draftset-location draftset-quads)
+    (append-quads-to-draftset-through-api test-editor draftset-location draftset-quads)
     
     (let [
           ;;NOTE: input data should contain at least two statements in each graph!
@@ -432,7 +450,7 @@
         initial-statements (statements "test/resources/test-draftset.trig")
         grouped-statements (group-by context initial-statements)
         [graph graph-statements] (first grouped-statements)]
-    (append-data-to-draftset-through-api draftset-location "test/resources/test-draftset.trig")
+    (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
 
     (let [draftset-info (delete-quads-through-api test-editor draftset-location graph-statements)
           expected-graphs (set (map :c initial-statements))
@@ -471,7 +489,7 @@
         quads-to-delete (take 2 graph-quads)
         triples-to-delete (map map->Triple quads-to-delete)]
     
-    (append-data-to-draftset-through-api draftset-location "test/resources/test-draftset.trig")
+    (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
 
     (let [draftset-info (delete-draftset-triples-through-api test-editor draftset-location triples-to-delete graph)
           quads-after-delete (set (get-draftset-quads-through-api draftset-location))
@@ -498,7 +516,7 @@
 (deftest delete-draftset-triples-request-without-graph-parameter
   (let [draftset-location (create-draftset-through-api test-editor)
         draftset-quads (statements "test/resources/test-draftset.trig")]
-    (append-data-to-draftset-through-api draftset-location "test/resources/test-draftset.trig")
+    (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
 
     (with-open [input-stream (statements->input-stream (take 2 draftset-quads) formats/rdf-ntriples)]
       (let [file-part {:tempfile input-stream :filename "to-delete.nt" :content-type "application/n-triples"}
@@ -556,7 +574,7 @@
         published-quad (first graph-quads)
         added-quads (rest graph-quads)]
     (publish-quads-through-api route [published-quad])
-    (append-quads-to-draftset-through-api draftset-location added-quads)
+    (append-quads-to-draftset-through-api test-editor draftset-location added-quads)
     (delete-draftset-graph-through-api test-editor draftset-location graph)
 
     (let [{draftset-graphs :data} (get-draftset-info-through-api draftset-location test-editor)]
@@ -568,7 +586,7 @@
         draftset-quads (statements rdf-data-file)
         grouped-quads (group-by context draftset-quads)
         [graph _] (first grouped-quads)]
-    (append-data-to-draftset-through-api draftset-location rdf-data-file)
+    (append-data-to-draftset-through-api test-editor draftset-location rdf-data-file)
 
     (delete-draftset-graph-through-api test-editor draftset-location graph)
     
@@ -589,7 +607,7 @@
 (deftest delete-graph-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
         [graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
-    (append-quads-to-draftset-through-api draftset-location quads)
+    (append-quads-to-draftset-through-api test-editor draftset-location quads)
 
     (let [delete-request (delete-draftset-graph-request test-publisher draftset-location graph)
           delete-response (route delete-request)]
@@ -598,7 +616,7 @@
 (deftest publish-draftset-with-graphs-not-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
         draftset-location (create-draftset-through-api test-publisher)]
-    (append-quads-to-draftset-through-api draftset-location quads)
+    (append-quads-to-draftset-through-api test-publisher draftset-location quads)
     (publish-draftset-through-api draftset-location test-publisher)
 
     (let [live-quads (get-live-quads-through-api)]
@@ -612,7 +630,7 @@
         appended-quads (mapcat (comp rest second) grouped-quads)]
     
     (publish-quads-through-api route initial-live-quads)
-    (append-quads-to-draftset-through-api draftset-location appended-quads)
+    (append-quads-to-draftset-through-api test-publisher draftset-location appended-quads)
     (publish-draftset-through-api draftset-location test-publisher)
 
     (let [after-publish-quads (get-live-quads-through-api)]
@@ -652,7 +670,7 @@
         expected-quads (eval-statements (set/difference (set/union (set initial-quads) (set to-add)) (set to-delete)))]
 
     (publish-quads-through-api route initial-quads)
-    (append-quads-to-draftset-through-api draftset-location to-add)
+    (append-quads-to-draftset-through-api test-publisher draftset-location to-add)
     (delete-quads-through-api test-publisher draftset-location to-delete)
     (publish-draftset-through-api draftset-location test-publisher)
 
@@ -680,14 +698,14 @@
 
 (deftest publish-by-non-publisher-test
   (let [draftset-location (create-draftset-through-api test-editor)]
-    (append-quads-to-draftset-through-api draftset-location (statements "test/resources/test-draftset.trig"))
+    (append-quads-to-draftset-through-api test-editor draftset-location (statements "test/resources/test-draftset.trig"))
     (let [publish-response (route (create-publish-request draftset-location test-editor))]
       (assert-is-forbidden-response publish-response))))
 
 (deftest publish-by-non-owner-test
   (let [draftset-location (create-draftset-through-api test-publisher)
         quads (statements "test/resources/test-draftset.trig")]
-    (append-quads-to-draftset-through-api draftset-location quads)
+    (append-quads-to-draftset-through-api test-publisher draftset-location quads)
     (let [publish-request (create-publish-request draftset-location test-manager)
           publish-response (route publish-request)]
       (assert-is-forbidden-response publish-response))))
@@ -725,9 +743,9 @@
         (swap! result-state conj binding-map)))))
 
 (deftest query-draftset-with-data
-  (let [draftset-location (create-draftset-through-api)
+  (let [draftset-location (create-draftset-through-api test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
-        append-response (make-append-data-to-draftset-request draftset-location draftset-data-file)]
+        append-response (make-append-data-to-draftset-request test-editor draftset-location draftset-data-file)]
     (await-success finished-jobs (:finished-job (:body append-response)) )
     (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
           query-request {:uri (str draftset-location "/query")
@@ -746,10 +764,10 @@
         grouped-test-quads (group-by context test-quads)
         [live-graph live-quads] (first grouped-test-quads)
         [ds-live-graph draftset-quads] (second grouped-test-quads)
-        draftset-location (create-draftset-through-api)]
+        draftset-location (create-draftset-through-api test-editor)]
 
     (publish-quads-through-api route live-quads)
-    (append-quads-to-draftset-through-api draftset-location draftset-quads)
+    (append-quads-to-draftset-through-api test-editor draftset-location draftset-quads)
 
     (let [query "SELECT * WHERE { GRAPH ?c { ?s ?p ?o } }"
           query-request {:uri (str draftset-location "/query")
@@ -785,10 +803,10 @@
     (assert-is-method-not-allowed-response response)))
 
 (deftest get-draftset-graph-triples-data
-  (let [draftset-location (create-draftset-through-api)
+  (let [draftset-location (create-draftset-through-api test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
         input-quads (statements draftset-data-file)]
-    (append-quads-to-draftset-through-api draftset-location input-quads)
+    (append-quads-to-draftset-through-api test-editor draftset-location input-quads)
 
     (doseq [[graph quads] (group-by context input-quads)]
       (let [graph-triples (set (eval-statements (map map->Triple quads)))
@@ -796,9 +814,9 @@
         (is (= graph-triples response-triples))))))
 
 (deftest get-draftset-quads-data
-  (let [draftset-location (create-draftset-through-api)
+  (let [draftset-location (create-draftset-through-api test-editor)
         draftset-data-file "test/resources/test-draftset.trig"]
-    (append-data-to-draftset-through-api draftset-location draftset-data-file)
+    (append-data-to-draftset-through-api test-editor draftset-location draftset-data-file)
 
     (let [response-quads (set (get-draftset-quads-through-api draftset-location))
           input-quads (set (eval-statements (statements draftset-data-file)))]
@@ -821,9 +839,9 @@
         grouped-quads (group-by context quads)
         [live-graph live-quads] (first grouped-quads)
         [draftset-graph draftset-quads] (second grouped-quads)
-        draftset-location (create-draftset-through-api)]
+        draftset-location (create-draftset-through-api test-editor)]
     (publish-quads-through-api route live-quads)
-    (append-quads-to-draftset-through-api draftset-location draftset-quads)
+    (append-quads-to-draftset-through-api test-editor draftset-location draftset-quads)
 
     (let [response-quads (set (get-draftset-quads-through-api draftset-location true))
           expected-quads (set (eval-statements (concat live-quads draftset-quads)))]
@@ -851,8 +869,8 @@
       (is (= (set expected-triples) (set draftset-graph-triples))))))
 
 (deftest get-draftset-graph-triples-request-without-graph
-  (let [draftset-location (create-draftset-through-api)]
-    (append-quads-to-draftset-through-api draftset-location (statements "test/resources/test-draftset.trig"))
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (append-quads-to-draftset-through-api test-editor draftset-location (statements "test/resources/test-draftset.trig"))
     (let [data-request {:uri (str draftset-location "/data")
                         :request-method :get
                         :headers {"Accept" "application/n-triples"}}
