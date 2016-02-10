@@ -854,11 +854,12 @@
   (let [response (route {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}})]
     (assert-is-not-found-response response)))
 
-(defn- create-update-draftset-metadata-request [draftset-location title description]
-  {:uri (str draftset-location "/meta") :request-method :put :params {:display-name title :description description}})
+(defn- create-update-draftset-metadata-request [user draftset-location title description]
+  (with-identity user
+    {:uri (str draftset-location "/meta") :request-method :put :params {:display-name title :description description}}))
 
-(defn- update-draftset-metadata-through-api [draftset-location title description]
-  (let [request (create-update-draftset-metadata-request draftset-location title description)
+(defn- update-draftset-metadata-through-api [user draftset-location title description]
+  (let [request (create-update-draftset-metadata-request user draftset-location title description)
         {:keys [body] :as response} (route request)]
     (assert-is-ok-response response)
     (assert-schema draftset-info-schema body)
@@ -868,7 +869,7 @@
   (let [draftset-location (create-draftset-through-api test-editor "Test draftset" "Test description")
         new-title "Updated title"
         new-description "Updated description"
-        {:keys [display-name description]} (update-draftset-metadata-through-api draftset-location new-title new-description)]
+        {:keys [display-name description]} (update-draftset-metadata-through-api test-editor draftset-location new-title new-description)]
     (is (= new-title display-name))
     (is (= new-description description))))
 
@@ -876,14 +877,20 @@
   (let [draftset-location (create-draftset-through-api)
         new-title "New title"
         new-description "New description"
-        {:keys [display-name description]} (update-draftset-metadata-through-api draftset-location new-title new-description)]
+        {:keys [display-name description]} (update-draftset-metadata-through-api test-editor draftset-location new-title new-description)]
     (is (= new-title display-name))
     (is (= new-description description))))
 
 (deftest set-missing-draftset-metadata
-  (let [meta-request (create-update-draftset-metadata-request "/draftset/missing" "Title!" "Description")
+  (let [meta-request (create-update-draftset-metadata-request test-manager "/draftset/missing" "Title!" "Description")
         meta-response (route meta-request)]
     (assert-is-not-found-response meta-response)))
+
+(deftest set-metadata-by-non-owner
+  (let [draftset-location (create-draftset-through-api test-editor "Test draftset" "Test description")
+        update-request (create-update-draftset-metadata-request test-publisher draftset-location "New title" "New description")
+        update-response (route update-request)]
+    (assert-is-forbidden-response update-response)))
 
 (defn- setup-route [test-function]
   (binding [*route* (draftset-api-routes *test-backend*)]

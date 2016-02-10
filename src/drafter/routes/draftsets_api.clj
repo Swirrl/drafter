@@ -234,6 +234,10 @@
                      (forbidden-response "You require the publisher role to perform this action"))))))
 
    (make-route :put "/draftset/:id/meta"
-               (existing-draftset-handler backend (fn [{{:keys [draftset-id] :as params} :params}]
-                                                    (dsmgmt/set-draftset-metadata! backend draftset-id params)
-                                                    (response (dsmgmt/get-draftset-info backend draftset-id)))))))
+               (existing-draftset-handler
+                backend
+                (restrict-to-draftset-owner
+                 backend
+                 (fn [{{:keys [draftset-id] :as params} :params}]
+                   (dsmgmt/set-draftset-metadata! backend draftset-id params)
+                   (response (dsmgmt/get-draftset-info backend draftset-id))))))))
