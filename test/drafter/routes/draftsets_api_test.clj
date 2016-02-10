@@ -742,16 +742,20 @@
             binding-map (into {} binding-pairs)]
         (swap! result-state conj binding-map)))))
 
+(defn- create-query-request [user draftset-location query accept-content-type & {:keys [union-with-live?]}]
+  (with-identity user
+    {:uri (str draftset-location "/query")
+     :headers {"Accept" accept-content-type}
+     :request-method :post
+     :params {:query query :union-with-live union-with-live?}}))
+
 (deftest query-draftset-with-data
   (let [draftset-location (create-draftset-through-api test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
         append-response (make-append-data-to-draftset-request test-editor draftset-location draftset-data-file)]
     (await-success finished-jobs (:finished-job (:body append-response)) )
     (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
-          query-request {:uri (str draftset-location "/query")
-                         :headers {"Accept" "application/n-triples"}
-                         :request-method :post
-                         :params {:query query}}
+          query-request (create-query-request test-editor draftset-location query "application/n-triples")
           query-response (route query-request)
           response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format grafter.rdf.formats/rdf-ntriples)) )
           expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
@@ -770,10 +774,7 @@
     (append-quads-to-draftset-through-api test-editor draftset-location draftset-quads)
 
     (let [query "SELECT * WHERE { GRAPH ?c { ?s ?p ?o } }"
-          query-request {:uri (str draftset-location "/query")
-                         :headers {"Accept" "application/sparql-results+json"}
-                         :request-method :post
-                         :params {:query query :union-with-live true}}
+          query-request (create-query-request test-editor draftset-location query "application/sparql-results+json" :union-with-live? true)
           {:keys [body] :as query-response} (route query-request)
           result-state (atom #{})
           result-handler (result-set-handler result-state)
@@ -785,22 +786,27 @@
         (is (= expected-quads @result-state))))))
 
 (deftest query-non-existent-draftset
-  (let [response (route {:uri "/draftset/missing/query" :params {:query "SELECT * WHERE { ?s ?p ?o }"} :request-method :post})]
+  (let [request (create-query-request test-editor "/draftset/missing" "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
+        response (route request)]
     (assert-is-not-found-response response)))
 
 (deftest query-draftest-request-with-missing-query-parameter
-  (let [draftset-location (create-draftset-through-api)
-        response (route {:uri (str draftset-location "/query") :request-method :post})]
+  (let [draftset-location (create-draftset-through-api test-editor)
+        response (route (with-identity test-editor {:uri (str draftset-location "/query") :request-method :post}))]
     (assert-is-not-acceptable-response response)))
 
 (deftest query-draftset-request-with-invalid-http-method
-  (let [draftset-location (create-draftset-through-api)
-        query-request {:uri (str draftset-location "/query")
-                       :request-method :put
-                       :headers {"Accept" "text/plain"}
-                       :params {:query "SELECT * WHERE { ?s ?p ?o }"}}
+  (let [draftset-location (create-draftset-through-api test-editor)
+        query-request (create-query-request test-editor draftset-location "SELECT * WHERE { ?s ?p ?o }" "text/plain")
+        query-request (assoc query-request :request-method :put)
         response (route query-request)]
     (assert-is-method-not-allowed-response response)))
+
+(deftest query-draftset-by-non-owner
+  (let [draftset-location (create-draftset-through-api test-editor)
+        query-request (create-query-request test-publisher draftset-location "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
+        query-response (route query-request)]
+    (assert-is-forbidden-response query-response)))
 
 (deftest get-draftset-graph-triples-data
   (let [draftset-location (create-draftset-through-api test-editor)

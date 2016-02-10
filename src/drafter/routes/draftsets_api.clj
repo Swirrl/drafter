@@ -221,14 +221,16 @@
                 #{:get :post}
                 (existing-draftset-handler
                  backend
-                 (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
-                   (if (nil? query)
-                     (not-acceptable-response "query parameter required")
-                     (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
-                           uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
-                           rewriting-executor (create-rewriter backend uri-graph-mapping)
-                           graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
-                       (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
+                 (restrict-to-draftset-owner
+                  backend
+                  (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
+                    (if (nil? query)
+                      (not-acceptable-response "query parameter required")
+                      (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
+                            uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
+                            rewriting-executor (create-rewriter backend uri-graph-mapping)
+                            graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
+                        (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction))))))))
 
    (make-route :post "/draftset/:id/publish"
                (existing-draftset-handler
