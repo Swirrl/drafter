@@ -138,6 +138,9 @@
 (defn assert-is-forbidden-response [response]
   (assert-schema (response-code-schema 403) response))
 
+(defn assert-is-bad-request-response [response]
+  (assert-schema (response-code-schema 400) response))
+
 (defn- eval-statement [s]
   (util/map-values str s))
 
@@ -921,6 +924,34 @@
         update-request (create-update-draftset-metadata-request test-publisher draftset-location "New title" "New description")
         update-response (route update-request)]
     (assert-is-forbidden-response update-response)))
+
+(defn- create-offer-request [user draftset-location role]
+  (with-identity user {:uri (str draftset-location "/offer") :request-method :post :params {:role (name role)}}))
+
+(deftest offer-draftset-test
+  (let [draftset-location (create-draftset-through-api test-editor)
+        offer-request (create-offer-request test-editor draftset-location :publisher)
+        offer-response (route offer-request)]
+    (assert-is-ok-response offer-response)
+
+    ;;user should not longer have access after yielding ownership
+    (let [get-request (get-draftset-info-request draftset-location test-editor)
+          get-response (route get-request)]
+      (assert-is-forbidden-response get-response))))
+
+(deftest offer-non-existent-draftset-test
+  (let [offer-response (route (create-offer-request test-editor "/draftset/missing" :publisher))]
+    (assert-is-not-found-response offer-response)))
+
+(deftest offer-by-non-owner
+  (let [draftset-location (create-draftset-through-api test-editor)
+        offer-response (route (create-offer-request test-publisher draftset-location :manager))]
+    (assert-is-forbidden-response offer-response)))
+
+(deftest offer-with-invalid-role
+  (let [draftset-location (create-draftset-through-api test-editor)
+        offer-response (route (create-offer-request test-editor draftset-location :invalid))]
+    (assert-is-bad-request-response offer-response)))
 
 (defn- setup-route [test-function]
   (binding [*route* (draftset-api-routes *test-backend*)]

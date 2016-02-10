@@ -249,4 +249,17 @@
                  backend
                  (fn [{{:keys [draftset-id] :as params} :params}]
                    (dsmgmt/set-draftset-metadata! backend draftset-id params)
-                   (response (dsmgmt/get-draftset-info backend draftset-id))))))))
+                   (response (dsmgmt/get-draftset-info backend draftset-id))))))
+
+   (make-route :post "/draftset/:id/offer"
+               (existing-draftset-handler
+                backend
+                (restrict-to-draftset-owner
+                 backend
+                 (fn [{{:keys [draftset-id role]} :params user :identity}]
+                   (let [role-kw (keyword role)]
+                     (if (contains? user/roles role-kw)
+                       (do
+                         (dsmgmt/offer-draftset! backend draftset-id user role-kw)
+                         (response ""))
+                       (swirrl-server.responses/bad-request-response (str "Invalid role: " role))))))))))
