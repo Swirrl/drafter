@@ -2,7 +2,8 @@
   (:require [clojure.test :refer :all]
             [drafter.rdf.draftset-management :refer :all]
             [drafter.rdf.draft-management :refer [draft-exists?] :as mgmt]
-            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples]]
+            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples
+                                         test-editor test-publisher]]
             [grafter.rdf :refer [statements context]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
             [drafter.user :as user]
@@ -22,8 +23,6 @@
 (defn- assert-user-is-creator-and-owner [{:keys [email] :as user} draftset-id]
   (is (has-string-object? (->draftset-uri draftset-id) drafter:createdBy email))
   (is (has-string-object? (->draftset-uri draftset-id) drafter:hasOwner email)))
-
-(def ^:private test-editor (user/create-user "test@example.com" :editor "test-api-key"))
 
 (deftest create-draftset!-test
   (let [title "Test draftset"
@@ -119,6 +118,23 @@
 
         (is (mgmt/draft-exists? *test-backend* draft-graph))
         (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph))))))))
+
+(deftest offer-draftset-test!
+  (testing "Existing owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+          draftset-uri (->draftset-uri draftset-id)]
+      (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+
+      (has-string-object? draftset-uri drafter:claimableBy "publisher")
+      (is (= false (has-any-object? draftset-uri drafter:hasOwner)))))
+
+  (testing "Other owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+          draftset-uri (->draftset-uri draftset-id)]
+      (offer-draftset! *test-backend* draftset-id test-publisher :manager)
+
+      (has-string-object? draftset-uri drafter:hasOwner (:email test-editor))
+      (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

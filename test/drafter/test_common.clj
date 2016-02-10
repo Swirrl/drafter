@@ -4,6 +4,7 @@
             [grafter.rdf.protocols :refer [add update!]]
             [grafter.rdf.templater :refer [triplify]]
             [environ.core :refer [env]]
+            [drafter.user :as user]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.configuration :refer [get-backend]]
             ;; [drafter.backend.sesame.native]
@@ -179,3 +180,7 @@
   "Gets a set containing the keys in the given map."
   [m]
   (set (keys m)))
+
+(def test-editor (user/create-user "editor@example.com" :editor "flksewit"))
+(def test-publisher (user/create-user "publisher@example.com" :publisher "lbxkfglsdf"))
+(def test-manager (user/create-user "manager@example.com" :manager "esoriudfsj"))

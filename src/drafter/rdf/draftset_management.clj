@@ -231,3 +231,27 @@
   (when-let [update-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
     (let [q (set-draftset-metadata-query (->draftset-uri draftset-ref) update-pairs)]
       (update! backend q))))
+
+(defn- offer-draftset-update-query [draftset-ref owner role]
+  (let [draftset-uri (->draftset-uri draftset-ref)
+        username (:email owner)]
+    (str
+     "DELETE {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" .")
+     "} INSERT {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:claimableBy "> \"" (name role) "\" .")
+     "} WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" .")
+     "}")))
+
+(defn offer-draftset!
+  "Removes the current owner of a draftset and makes it available to
+  be claimed by another user in a particular role. If the given user
+  is not the current owner of the draftset, no changes are made."
+  [backend draftset-ref owner role]
+  (let [q (offer-draftset-update-query draftset-ref owner role)]
+    (update! backend q)))

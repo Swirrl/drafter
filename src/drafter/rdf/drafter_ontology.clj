@@ -29,3 +29,5 @@
 (def drafter:createdBy dcterms:creator)
 
 (def drafter:modifiedAt dcterms:modified)
+
+(def drafter:claimableBy (drafter "claimableBy"))
