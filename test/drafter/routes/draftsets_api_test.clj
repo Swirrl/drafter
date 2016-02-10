@@ -1,7 +1,8 @@
 (ns drafter.routes.draftsets-api-test
   (:require [drafter.test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-db-setup
                                          stream->string select-all-in-graph make-graph-live!
-                                         import-data-to-draft! await-success key-set]]
+                                         import-data-to-draft! await-success key-set test-editor test-publisher
+                                         test-manager]]
             [clojure.test :refer :all]
             [clojure.set :as set]
             [drafter.routes.draftsets-api :refer :all]
@@ -26,10 +27,6 @@
 
 (defn- route [request]
   (*route* request))
-
-(def ^:private test-editor (user/create-user "editor@example.com" :editor "test-api-key"))
-(def ^:private test-publisher (user/create-user "publisher@example.com" :publisher "test-api-key"))
-(def ^:private test-manager (user/create-user "manager@example.com" :manager "test-api-key"))
 
 (defn- statements->input-stream [statements format]
   (let [bos (ByteArrayOutputStream.)
