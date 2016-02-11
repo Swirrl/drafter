@@ -52,7 +52,7 @@
   ([db creator title] (create-draftset! db creator title nil))
   ([db creator title description] (create-draftset! db creator title description (UUID/randomUUID) (Date.)))
   ([db creator title description draftset-id created-date]
-   (let [template (create-draftset-statements (:email creator) title description (draftset-uri draftset-id) created-date)
+   (let [template (create-draftset-statements (user/username creator) title description (draftset-uri draftset-id) created-date)
          quads (to-quads template)]
      (add db quads)
      (->DraftsetId (str draftset-id)))))
@@ -149,7 +149,7 @@
     (and owner-lit (.stringValue owner-lit))))
 
 (defn is-draftset-owner? [backend user draftset-ref]
-  (let [username (:email user)
+  (let [username (user/username user)
         owner (get-draftset-owner backend draftset-ref)]
     (= owner username)))
 
@@ -167,7 +167,7 @@
      "}")))
 
 (defn- get-all-draftsets-properties-query [user]
-  (let [username (:email user)]
+  (let [username (user/username user)]
     (str
      "SELECT * WHERE { "
      (with-state-graph
@@ -255,7 +255,7 @@
 
 (defn- offer-draftset-update-query [draftset-ref owner role]
   (let [draftset-uri (->draftset-uri draftset-ref)
-        username (:email owner)]
+        username (user/username owner)]
     (str
      "DELETE {"
      (with-state-graph
@@ -279,7 +279,7 @@
 
 (defn- claim-draftset-update-query [draftset-ref claimant]
   (let [draftset-uri (->draftset-uri draftset-ref)
-        username (:email claimant)]
+        username (user/username claimant)]
     (str
      "DELETE {"
      (with-state-graph

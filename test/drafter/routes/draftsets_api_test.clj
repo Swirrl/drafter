@@ -969,7 +969,7 @@
       (assert-is-ok-response claim-response)
 
       (let [{:keys [current-owner]} (get-draftset-info-through-api draftset-location test-publisher)]
-        (is (= (:email test-publisher) current-owner))))))
+        (is (= (user/username test-publisher) current-owner))))))
 
 (deftest claim-draftset-owned-by-other-user
   (let [draftset-location (create-draftset-through-api test-editor)

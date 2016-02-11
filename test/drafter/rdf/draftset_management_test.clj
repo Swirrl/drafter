@@ -64,7 +64,7 @@
   (testing "With owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
           owner (get-draftset-owner *test-backend* draftset-id)]
-      (is (= (:email test-editor) owner))))
+      (is (= (user/username test-editor) owner))))
 
   (testing "With no owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
@@ -159,7 +159,7 @@
           draftset-uri (->draftset-uri draftset-id)]
       (offer-draftset! *test-backend* draftset-id test-publisher :manager)
 
-      (has-string-object? draftset-uri drafter:hasOwner (:email test-editor))
+      (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor))
       (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
 
 (deftest claim-draftset-test!

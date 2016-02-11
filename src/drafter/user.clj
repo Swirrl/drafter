@@ -4,6 +4,7 @@
 
 (def roles #{:editor :publisher :manager})
 (defrecord User [email role api-key-digest])
+(def username :email)
 
 (defn create-user [email role api-key-digest]
   {:pre [(contains? roles role)]}
