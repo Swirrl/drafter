@@ -85,11 +85,9 @@
 
 (defn- restrict-to-draftset-owner [backend inner-handler]
   (fn [{user :identity {:keys [draftset-id]} :params :as request}]
-    (let [{:keys [current-owner]} (dsmgmt/get-draftset-info backend draftset-id)]
-      ;;TODO: use secure comparison method?
-      (if (dsmgmt/is-draftset-owner? backend user draftset-id)
-        (inner-handler request)
-        (forbidden-response "Operation only permitted by draftset owner")))))
+    (if (dsmgmt/is-draftset-owner? backend draftset-id user)
+      (inner-handler request)
+      (forbidden-response "Operation only permitted by draftset owner"))))
 
 (defn- rdf-file-part-handler [inner-handler]
   (fn [{{request-content-type :content-type

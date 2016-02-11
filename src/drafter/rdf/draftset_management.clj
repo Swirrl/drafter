@@ -148,7 +148,7 @@
         owner-lit (get result "owner")]
     (and owner-lit (.stringValue owner-lit))))
 
-(defn is-draftset-owner? [backend user draftset-ref]
+(defn is-draftset-owner? [backend draftset-ref user]
   (let [username (user/username user)
         owner (get-draftset-owner backend draftset-ref)]
     (= owner username)))
@@ -310,7 +310,7 @@
       (keyword (.stringValue role)))))
 
 (defn- user-can-claim-draftset? [backend draftset-ref user]
-  (or (is-draftset-owner? backend user draftset-ref)
+  (or (is-draftset-owner? backend draftset-ref user)
       (let [claim-role (get-draftset-claimable-role backend draftset-ref)]
         (and (some? claim-role)
              (user/has-role? user claim-role)))))

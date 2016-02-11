@@ -75,16 +75,16 @@
 (deftest is-draftset-owner?-test
   (testing "Is owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (is (= true (is-draftset-owner? *test-backend* test-editor draftset-id)))))
+      (is (= true (is-draftset-owner? *test-backend* draftset-id test-editor)))))
   
   (testing "Has no owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
       (offer-draftset! *test-backend* draftset-id test-editor :publisher)
-      (is (= false (is-draftset-owner? *test-backend* test-editor draftset-id)))))
+      (is (= false (is-draftset-owner? *test-backend* draftset-id test-editor)))))
   
   (testing "Has different owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (is (= false (is-draftset-owner? *test-backend* test-publisher draftset-id))))))
+      (is (= false (is-draftset-owner? *test-backend* draftset-id test-publisher))))))
 
 (deftest delete-draftset-statements!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
@@ -171,14 +171,14 @@
       (let [err (claim-draftset! *test-backend* draftset-id test-publisher)
             ds-info (get-draftset-info *test-backend* draftset-id)]
         (is (nil? err))
-        (is (is-draftset-owner? *test-backend* test-publisher draftset-id))
+        (is (is-draftset-owner? *test-backend* draftset-id test-publisher))
         (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
 
   (testing "Claimed by current owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
           err (claim-draftset! *test-backend* draftset-id test-editor)]
       (is (nil? err))
-      (is (is-draftset-owner? *test-backend* test-editor draftset-id))))
+      (is (is-draftset-owner? *test-backend* draftset-id test-editor))))
 
   (testing "User not in claim role"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
@@ -191,7 +191,7 @@
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
       (let [err (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (some? err))
-        (is (is-draftset-owner? *test-backend* test-editor draftset-id))))))
+        (is (is-draftset-owner? *test-backend* draftset-id test-editor))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
