@@ -957,14 +957,18 @@
         offer-response (route (create-offer-request test-editor draftset-location :invalid))]
     (assert-is-bad-request-response offer-response)))
 
-(defn- create-claim-request [user draftset-location]
+(defn- create-claim-request [draftset-location user]
   (with-identity user {:uri (str draftset-location "/claim") :request-method :post}))
+
+(defn- claim-draftset-through-api [draftset-location user]
+  (let [response (route (create-claim-request draftset-location user))]
+    (assert-is-ok-response response)))
 
 (deftest claim-draftset
   (let [draftset-location (create-draftset-through-api test-editor)]
     (offer-draftset-through-api test-editor draftset-location :publisher)
 
-    (let [claim-request (create-claim-request test-publisher draftset-location)
+    (let [claim-request (create-claim-request draftset-location test-publisher)
           claim-response (route claim-request)]
       (assert-is-ok-response claim-response)
 
@@ -973,7 +977,7 @@
 
 (deftest claim-draftset-owned-by-other-user
   (let [draftset-location (create-draftset-through-api test-editor)
-        claim-request (create-claim-request test-publisher draftset-location)
+        claim-request (create-claim-request draftset-location test-publisher)
         claim-response (route claim-request)]
     (assert-is-forbidden-response claim-response)))
 
@@ -981,12 +985,36 @@
   (let [other-editor (user/create-user "edtheduck@example.com" :editor "quack")
         draftset-location (create-draftset-through-api test-editor)]
     (offer-draftset-through-api test-editor draftset-location :publisher)
-    (let [claim-response (route (create-claim-request other-editor draftset-location))]
+    (let [claim-response (route (create-claim-request draftset-location other-editor))]
       (assert-is-forbidden-response claim-response))))
 
 (deftest claim-non-existent-draftset
-  (let [claim-response (route (create-claim-request test-publisher "/draftset/missing"))]
+  (let [claim-response (route (create-claim-request "/draftset/missing" test-publisher))]
     (assert-is-not-found-response claim-response)))
+
+(defn- create-return-request [draftset-location user]
+  (with-identity user {:uri (str draftset-location "/return") :request-method :post}))
+
+(deftest return-draftset-to-owner
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (offer-draftset-through-api test-editor draftset-location :publisher)
+    (claim-draftset-through-api draftset-location test-publisher)
+
+    (let [return-request (create-return-request draftset-location test-publisher)
+          return-response (route return-request)]
+      (assert-is-ok-response return-response)
+
+      (let [{:keys [current-owner] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+        (is (= (user/username test-editor) current-owner))))))
+
+(deftest return-non-existent-draftset
+  (let [response (route (create-return-request "/draftset/missing" test-publisher))]
+    (assert-is-not-found-response response)))
+
+(deftest return-unowned-draftset
+  (let [draftset-location (create-draftset-through-api test-editor)
+        response (route (create-return-request draftset-location test-publisher))]
+    (assert-is-forbidden-response response)))
 
 (defn- setup-route [test-function]
   (binding [*route* (draftset-api-routes *test-backend*)]

@@ -269,4 +269,13 @@
                   (if-let [error (dsmgmt/claim-draftset! backend draftset-id user)]
                     (forbidden-response error)
                     (let [ds-info (dsmgmt/get-draftset-info backend draftset-id)]
-                      (response ""))))))))
+                      (response ""))))))
+
+   (make-route :post "/draftset/:id/return"
+               (existing-draftset-handler
+                backend
+                (restrict-to-draftset-owner
+                 backend
+                 (fn [{{:keys [draftset-id]} :params :as request}]
+                   (dsmgmt/return-draftset! backend draftset-id)
+                   (response "")))))))

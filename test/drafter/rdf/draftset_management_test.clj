@@ -193,5 +193,13 @@
         (is (some? err))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor))))))
 
+(deftest return-draftset!-test
+  (let [draftset-id (create-draftset! *test-backend* test-editor)]
+    (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+    (claim-draftset! *test-backend* draftset-id test-publisher)
+    (return-draftset! *test-backend* draftset-id)
+
+    (is (is-draftset-owner? *test-backend* draftset-id test-editor))))
+
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
