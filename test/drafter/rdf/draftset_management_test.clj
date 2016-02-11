@@ -60,6 +60,32 @@
   (testing "Non-existent draftset"
     (is (= false (draftset-exists? *test-backend* (->DraftsetId "missing"))))))
 
+(deftest get-draftest-owner
+  (testing "With owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)
+          owner (get-draftset-owner *test-backend* draftset-id)]
+      (is (= (:email test-editor) owner))))
+
+  (testing "With no owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)]
+      (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+      (let [owner (get-draftset-owner *test-backend* draftset-id)]
+        (is (nil? owner))))))
+
+(deftest is-draftset-owner?-test
+  (testing "Is owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)]
+      (is (= true (is-draftset-owner? *test-backend* test-editor draftset-id)))))
+  
+  (testing "Has no owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)]
+      (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+      (is (= false (is-draftset-owner? *test-backend* test-editor draftset-id)))))
+  
+  (testing "Has different owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)]
+      (is (= false (is-draftset-owner? *test-backend* test-publisher draftset-id))))))
+
 (deftest delete-draftset-statements!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
     (delete-draftset-statements! *test-backend* draftset-id)
@@ -135,6 +161,37 @@
 
       (has-string-object? draftset-uri drafter:hasOwner (:email test-editor))
       (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
+
+(deftest claim-draftset-test!
+  (testing "No owner when user in role"
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+          draftset-uri (->draftset-uri draftset-id)]
+      (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+
+      (let [err (claim-draftset! *test-backend* draftset-id test-publisher)
+            ds-info (get-draftset-info *test-backend* draftset-id)]
+        (is (nil? err))
+        (is (is-draftset-owner? *test-backend* test-publisher draftset-id))
+        (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
+
+  (testing "Claimed by current owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)
+          err (claim-draftset! *test-backend* draftset-id test-editor)]
+      (is (nil? err))
+      (is (is-draftset-owner? *test-backend* test-editor draftset-id))))
+
+  (testing "User not in claim role"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)]
+      (offer-draftset! *test-backend* draftset-id test-editor :manager)
+      (let [err (claim-draftset! *test-backend* draftset-id test-publisher)]
+        (is (some? err))
+        (is (nil? (get-draftset-owner *test-backend* draftset-id))))))
+
+  (testing "Draftset owned by other user"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)]
+      (let [err (claim-draftset! *test-backend* draftset-id test-publisher)]
+        (is (some? err))
+        (is (is-draftset-owner? *test-backend* test-editor draftset-id))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

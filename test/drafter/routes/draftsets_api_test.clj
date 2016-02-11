@@ -928,6 +928,10 @@
 (defn- create-offer-request [user draftset-location role]
   (with-identity user {:uri (str draftset-location "/offer") :request-method :post :params {:role (name role)}}))
 
+(defn- offer-draftset-through-api [user draftset-location role]
+  (let [response (route (create-offer-request user draftset-location role))]
+    (assert-is-ok-response response)))
+
 (deftest offer-draftset-test
   (let [draftset-location (create-draftset-through-api test-editor)
         offer-request (create-offer-request test-editor draftset-location :publisher)
@@ -952,6 +956,37 @@
   (let [draftset-location (create-draftset-through-api test-editor)
         offer-response (route (create-offer-request test-editor draftset-location :invalid))]
     (assert-is-bad-request-response offer-response)))
+
+(defn- create-claim-request [user draftset-location]
+  (with-identity user {:uri (str draftset-location "/claim") :request-method :post}))
+
+(deftest claim-draftset
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (offer-draftset-through-api test-editor draftset-location :publisher)
+
+    (let [claim-request (create-claim-request test-publisher draftset-location)
+          claim-response (route claim-request)]
+      (assert-is-ok-response claim-response)
+
+      (let [{:keys [current-owner]} (get-draftset-info-through-api draftset-location test-publisher)]
+        (is (= (:email test-publisher) current-owner))))))
+
+(deftest claim-draftset-owned-by-other-user
+  (let [draftset-location (create-draftset-through-api test-editor)
+        claim-request (create-claim-request test-publisher draftset-location)
+        claim-response (route claim-request)]
+    (assert-is-forbidden-response claim-response)))
+
+(deftest claim-draftset-by-user-not-in-role
+  (let [other-editor (user/create-user "edtheduck@example.com" :editor "quack")
+        draftset-location (create-draftset-through-api test-editor)]
+    (offer-draftset-through-api test-editor draftset-location :publisher)
+    (let [claim-response (route (create-claim-request other-editor draftset-location))]
+      (assert-is-forbidden-response claim-response))))
+
+(deftest claim-non-existent-draftset
+  (let [claim-response (route (create-claim-request test-publisher "/draftset/missing"))]
+    (assert-is-not-found-response claim-response)))
 
 (defn- setup-route [test-function]
   (binding [*route* (draftset-api-routes *test-backend*)]

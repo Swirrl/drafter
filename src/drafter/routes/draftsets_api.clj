@@ -84,10 +84,10 @@
         (not-found "")))))
 
 (defn- restrict-to-draftset-owner [backend inner-handler]
-  (fn [{{email :email} :identity {:keys [draftset-id]} :params :as request}]
+  (fn [{user :identity {:keys [draftset-id]} :params :as request}]
     (let [{:keys [current-owner]} (dsmgmt/get-draftset-info backend draftset-id)]
       ;;TODO: use secure comparison method?
-      (if (= email current-owner)
+      (if (dsmgmt/is-draftset-owner? backend user draftset-id)
         (inner-handler request)
         (forbidden-response "Operation only permitted by draftset owner")))))
 
@@ -262,4 +262,13 @@
                        (do
                          (dsmgmt/offer-draftset! backend draftset-id user role-kw)
                          (response ""))
-                       (swirrl-server.responses/bad-request-response (str "Invalid role: " role))))))))))
+                       (swirrl-server.responses/bad-request-response (str "Invalid role: " role))))))))
+
+   (make-route :post "/draftset/:id/claim"
+               (existing-draftset-handler
+                backend
+                (fn [{{:keys [draftset-id]} :params user :identity}]
+                  (if-let [error (dsmgmt/claim-draftset! backend draftset-id user)]
+                    (forbidden-response error)
+                    (let [ds-info (dsmgmt/get-draftset-info backend draftset-id)]
+                      (response ""))))))))

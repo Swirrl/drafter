@@ -5,6 +5,7 @@
             [grafter.rdf.repository :refer [query]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
+            [drafter.user :as user]
             [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph] :as mgmt]
             [clojure.string :as string])
   (:import [java.net URI]
@@ -132,6 +133,26 @@
                     [(.stringValue ds-uri) (graph-mapping-result-seq->map mappings)])
                   draftset-grouped-results))))
 
+(defn- get-draftset-owner-query [draftset-ref]
+  (let [draftset-uri (str (->draftset-uri draftset-ref))]
+    (str
+     "SELECT ?owner WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:hasOwner "> ?owner .")
+     "}")))
+
+(defn get-draftset-owner [backend draftset-ref]
+  (let [q (get-draftset-owner-query draftset-ref)
+        result (first (query backend q))
+        owner-lit (get result "owner")]
+    (and owner-lit (.stringValue owner-lit))))
+
+(defn is-draftset-owner? [backend user draftset-ref]
+  (let [username (:email user)
+        owner (get-draftset-owner backend draftset-ref)]
+    (= owner username)))
+
 (defn- get-draftset-properties-query [draftset-ref]
   (let [draftset-uri (str (->draftset-uri draftset-ref))]
     (str
@@ -255,3 +276,47 @@
   [backend draftset-ref owner role]
   (let [q (offer-draftset-update-query draftset-ref owner role)]
     (update! backend q)))
+
+(defn- claim-draftset-update-query [draftset-ref claimant]
+  (let [draftset-uri (->draftset-uri draftset-ref)
+        username (:email claimant)]
+    (str
+     "DELETE {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:claimableBy "> ?c ."
+       )
+     "} INSERT {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" ." )
+     "} WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:claimableBy "> ?c .")
+     "}")))
+
+(defn- draftset-claimable-role-query [draftset-ref]
+  (let [draftset-uri (->draftset-uri draftset-ref)]
+    (str
+     "SELECT ?role WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:claimableBy "> ?role .")
+     "}")))
+
+(defn- get-draftset-claimable-role [backend draftset-ref]
+  (let [q (draftset-claimable-role-query draftset-ref)
+        result (first (query backend q))]
+    (if-let [role (get result "role")]
+      (keyword (.stringValue role)))))
+
+(defn- user-can-claim-draftset? [backend draftset-ref user]
+  (or (is-draftset-owner? backend user draftset-ref)
+      (let [claim-role (get-draftset-claimable-role backend draftset-ref)]
+        (and (some? claim-role)
+             (user/has-role? user claim-role)))))
+
+(defn claim-draftset! [backend draftset-ref claimant]
+  (if (user-can-claim-draftset? backend draftset-ref claimant)
+    (let [q (claim-draftset-update-query draftset-ref claimant)]
+      (update! backend q))
+    "User cannot claim draftset"))
