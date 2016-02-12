@@ -1,17 +1,21 @@
 (ns drafter.user
   (:require [buddy.core.codecs :refer [str->bytes]]
-            [buddy.core.bytes :as bytes]))
+            [buddy.core.bytes :as bytes]
+            [drafter.util :as util]))
 
-(def roles #{:editor :publisher :manager})
+(def roles [:editor :publisher :manager])
 (defrecord User [email role api-key-digest])
 (def username :email)
 
 (defn create-user [email role api-key-digest]
-  {:pre [(contains? roles role)]}
+  {:pre [(util/seq-contains? roles role)]}
   (->User email role api-key-digest))
 
+(defn is-known-role? [r]
+  (util/seq-contains? roles r))
+
 (defn has-role? [{:keys [role] :as user} requested]
-  {:pre [(contains? roles requested)]}
+  {:pre [(util/seq-contains? roles requested)]}
   (case role
     :manager true
     :publisher (not= requested :manager)

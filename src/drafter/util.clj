@@ -133,3 +133,8 @@
         p (.getPredicate triple)
         o (.getObject triple)]
     (ContextStatementImpl. s p o graph)))
+
+(defn seq-contains?
+  "Returns whether a sequence contains a given value according to =."
+  [col value]
+  (boolean (some #(= value %) col)))

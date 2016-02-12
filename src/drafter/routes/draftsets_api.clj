@@ -256,7 +256,7 @@
                  backend
                  (fn [{{:keys [draftset-id role]} :params user :identity}]
                    (let [role-kw (keyword role)]
-                     (if (contains? user/roles role-kw)
+                     (if (user/is-known-role? role-kw)
                        (do
                          (dsmgmt/offer-draftset! backend draftset-id user role-kw)
                          (response ""))
