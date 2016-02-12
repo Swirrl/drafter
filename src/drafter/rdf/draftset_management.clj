@@ -163,7 +163,8 @@
        "<" draftset-uri "> <" drafter:createdBy "> ?creator ."
        "OPTIONAL { <" draftset-uri "> <" drafter:hasOwner "> ?owner . }"
        "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description . }"
-       "OPTIONAL { <" draftset-uri "> <" rdfs:label "> ?title }")
+       "OPTIONAL { <" draftset-uri "> <" rdfs:label "> ?title }"
+       "OPTIONAL { <" draftset-uri "> <" drafter:claimableBy "> ?role . }")
      "}")))
 
 (defn- get-all-draftsets-properties-query [user]
@@ -183,13 +184,14 @@
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
-(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner]}]
+(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner role]}]
   (let [required-fields {:id (str (->draftset-id draftset-ref))
                          :created-at (calendar-literal->date created)
                          :created-by (.stringValue creator)}
         optional-fields {:display-name (and title (.stringValue title))
                          :description (and description (.stringValue description))
-                         :current-owner (and owner (.stringValue owner))}]
+                         :current-owner (and owner (.stringValue owner))
+                         :claim-role (and role (keyword (.stringValue role)))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
 (defn- get-draftset-properties [repo draftset-ref]
@@ -324,11 +326,26 @@
   (let [q (try-claim-draftset-query draftset-ref claimant)]
     (update! backend q)))
 
-(defn claim-draftset! [backend draftset-ref claimant]
+(defn claim-draftset!
+  "Attempts to claim a draftset for a user. If the draftset is
+  available for claim by the claiming user they will be updated to be
+  the new owner. Returns a result describing the outcome of the
+  operation:
+    - :ok The draftset was claimed by the user
+    - :owned Claim failed as the draftset is not on offer
+    - :role Claim failed because the user is not in the claim role
+    - :not-found Claim failed because the draftset does not exist
+    - :unknown Claim failed for an unknown reason"
+  [backend draftset-ref claimant]
   (try-claim-draftset! backend draftset-ref claimant)
-  (let [{:keys [current-owner] :as ds-info} (get-draftset-info backend draftset-ref)]
-    (if (not= (user/username claimant) current-owner)
-      "User cannot claim draftset")))
+  (let [{:keys [current-owner claim-role] :as ds-info} (get-draftset-info backend draftset-ref)]
+    (if (= (user/username claimant) current-owner)
+      :ok
+      (cond
+       (nil? ds-info) :not-found
+       (nil? claim-role) :owned
+       (not (user/has-role? claimant claim-role)) :role
+       :else :unknown))))
 
 (defn- return-draftset-query [draftset-ref]
   (let [draftset-uri (->draftset-uri draftset-ref)]

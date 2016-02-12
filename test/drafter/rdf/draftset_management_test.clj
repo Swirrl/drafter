@@ -168,30 +168,34 @@
           draftset-uri (->draftset-uri draftset-id)]
       (offer-draftset! *test-backend* draftset-id test-editor :publisher)
 
-      (let [err (claim-draftset! *test-backend* draftset-id test-publisher)
+      (let [result (claim-draftset! *test-backend* draftset-id test-publisher)
             ds-info (get-draftset-info *test-backend* draftset-id)]
-        (is (nil? err))
+        (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-publisher))
         (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
 
   (testing "Claimed by current owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
-          err (claim-draftset! *test-backend* draftset-id test-editor)]
-      (is (nil? err))
+          result (claim-draftset! *test-backend* draftset-id test-editor)]
+      (is (= :ok result))
       (is (is-draftset-owner? *test-backend* draftset-id test-editor))))
 
   (testing "User not in claim role"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
       (offer-draftset! *test-backend* draftset-id test-editor :manager)
-      (let [err (claim-draftset! *test-backend* draftset-id test-publisher)]
-        (is (some? err))
+      (let [result (claim-draftset! *test-backend* draftset-id test-publisher)]
+        (is (= :role result))
         (is (nil? (get-draftset-owner *test-backend* draftset-id))))))
 
   (testing "Draftset owned by other user"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (let [err (claim-draftset! *test-backend* draftset-id test-publisher)]
-        (is (some? err))
-        (is (is-draftset-owner? *test-backend* draftset-id test-editor))))))
+      (let [result (claim-draftset! *test-backend* draftset-id test-publisher)]
+        (is (= :owned result))
+        (is (is-draftset-owner? *test-backend* draftset-id test-editor)))))
+
+  (testing "Draftset does not exist"
+    (let [result (claim-draftset! *test-backend* (->DraftsetURI "http://missing-draftset") test-publisher)]
+      (is (= :not-found result)))))
 
 (deftest return-draftset!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor)]
