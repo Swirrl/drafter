@@ -294,32 +294,41 @@
        "<" draftset-uri "> <" drafter:claimableBy "> ?c .")
      "}")))
 
-(defn- draftset-claimable-role-query [draftset-ref]
-  (let [draftset-uri (->draftset-uri draftset-ref)]
+(defn- try-claim-draftset-query [draftset-ref claimant]
+  (let [draftset-uri (->draftset-uri draftset-ref)
+        username (user/username claimant)
+        role (user/role claimant)
+        scored-roles (zipmap user/roles (iterate inc 1))
+        user-score (scored-roles role)
+        scores-values (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
     (str
-     "SELECT ?role WHERE {"
+     "DELETE {"
      (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
        "<" draftset-uri "> <" drafter:claimableBy "> ?role .")
+     "} INSERT {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" .")
+     "} WHERE {"
+     (with-state-graph
+       "VALUES (?role ?rv) { " (clojure.string/join " " scores-values) " }"
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:claimableBy "> ?role ."
+       "FILTER (" user-score " >= ?rv)")
      "}")))
 
-(defn- get-draftset-claimable-role [backend draftset-ref]
-  (let [q (draftset-claimable-role-query draftset-ref)
-        result (first (query backend q))]
-    (if-let [role (get result "role")]
-      (keyword (.stringValue role)))))
-
-(defn- user-can-claim-draftset? [backend draftset-ref user]
-  (or (is-draftset-owner? backend draftset-ref user)
-      (let [claim-role (get-draftset-claimable-role backend draftset-ref)]
-        (and (some? claim-role)
-             (user/has-role? user claim-role)))))
+(defn- try-claim-draftset!
+  "Sets the claiming user to the owner of the given draftset if:
+     - the draftset is on offer
+     - the claiming user is in the offering role"
+  [backend draftset-ref claimant]
+  (let [q (try-claim-draftset-query draftset-ref claimant)]
+    (update! backend q)))
 
 (defn claim-draftset! [backend draftset-ref claimant]
-  (if (user-can-claim-draftset? backend draftset-ref claimant)
-    (let [q (claim-draftset-update-query draftset-ref claimant)]
-      (update! backend q))
-    "User cannot claim draftset"))
+  (try-claim-draftset! backend draftset-ref claimant)
+  (let [{:keys [current-owner] :as ds-info} (get-draftset-info backend draftset-ref)]
+    (if (not= (user/username claimant) current-owner)
+      "User cannot claim draftset")))
 
 (defn- return-draftset-query [draftset-ref]
   (let [draftset-uri (->draftset-uri draftset-ref)]
