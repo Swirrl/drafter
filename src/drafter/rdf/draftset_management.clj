@@ -326,11 +326,21 @@
   (let [q (try-claim-draftset-query draftset-ref claimant)]
     (update! backend q)))
 
+(defn- infer-claim-outcome [{:keys [current-owner claim-role] :as ds-info} claimant]
+  (if (= (user/username claimant) current-owner)
+    :ok
+    (cond
+     (nil? ds-info) :not-found
+     (nil? claim-role) :owned
+     (not (user/has-role? claimant claim-role)) :role
+     :else :unknown)))
+
 (defn claim-draftset!
   "Attempts to claim a draftset for a user. If the draftset is
   available for claim by the claiming user they will be updated to be
-  the new owner. Returns a result describing the outcome of the
-  operation:
+  the new owner. Returns a pair containing the outcome of the
+  operation and the current info for the draftset.
+  The possible outcomes are:
     - :ok The draftset was claimed by the user
     - :owned Claim failed as the draftset is not on offer
     - :role Claim failed because the user is not in the claim role
@@ -338,14 +348,9 @@
     - :unknown Claim failed for an unknown reason"
   [backend draftset-ref claimant]
   (try-claim-draftset! backend draftset-ref claimant)
-  (let [{:keys [current-owner claim-role] :as ds-info} (get-draftset-info backend draftset-ref)]
-    (if (= (user/username claimant) current-owner)
-      :ok
-      (cond
-       (nil? ds-info) :not-found
-       (nil? claim-role) :owned
-       (not (user/has-role? claimant claim-role)) :role
-       :else :unknown))))
+  (let [ds-info (get-draftset-info backend draftset-ref)
+        outcome (infer-claim-outcome ds-info claimant)]
+    [outcome ds-info]))
 
 (defn- return-draftset-query [draftset-ref]
   (let [draftset-uri (->draftset-uri draftset-ref)]

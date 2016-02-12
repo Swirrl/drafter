@@ -168,7 +168,7 @@
           draftset-uri (->draftset-uri draftset-id)]
       (offer-draftset! *test-backend* draftset-id test-editor :publisher)
 
-      (let [result (claim-draftset! *test-backend* draftset-id test-publisher)
+      (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)
             ds-info (get-draftset-info *test-backend* draftset-id)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-publisher))
@@ -176,25 +176,25 @@
 
   (testing "Claimed by current owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
-          result (claim-draftset! *test-backend* draftset-id test-editor)]
+          [result _] (claim-draftset! *test-backend* draftset-id test-editor)]
       (is (= :ok result))
       (is (is-draftset-owner? *test-backend* draftset-id test-editor))))
 
   (testing "User not in claim role"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
       (offer-draftset! *test-backend* draftset-id test-editor :manager)
-      (let [result (claim-draftset! *test-backend* draftset-id test-publisher)]
+      (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :role result))
         (is (nil? (get-draftset-owner *test-backend* draftset-id))))))
 
   (testing "Draftset owned by other user"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (let [result (claim-draftset! *test-backend* draftset-id test-publisher)]
+      (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :owned result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "Draftset does not exist"
-    (let [result (claim-draftset! *test-backend* (->DraftsetURI "http://missing-draftset") test-publisher)]
+    (let [[result _] (claim-draftset! *test-backend* (->DraftsetURI "http://missing-draftset") test-publisher)]
       (is (= :not-found result)))))
 
 (deftest return-draftset!-test

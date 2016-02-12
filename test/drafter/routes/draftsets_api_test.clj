@@ -969,8 +969,9 @@
     (offer-draftset-through-api test-editor draftset-location :publisher)
 
     (let [claim-request (create-claim-request draftset-location test-publisher)
-          claim-response (route claim-request)]
+          {:keys [body] :as claim-response} (route claim-request)]
       (assert-is-ok-response claim-response)
+      (assert-schema draftset-info-schema body)
 
       (let [{:keys [current-owner]} (get-draftset-info-through-api draftset-location test-publisher)]
         (is (= (user/username test-publisher) current-owner))))))

@@ -266,11 +266,12 @@
                (existing-draftset-handler
                 backend
                 (fn [{{:keys [draftset-id]} :params user :identity}]
-                  (case (dsmgmt/claim-draftset! backend draftset-id user)
-                    :ok (response "")
-                    :role (forbidden-response "User not in role for draftset offer")
-                    :owned (forbidden-response "Draftset not on offer")
-                    (forbidden-response "Failed to claim draftset")))))
+                  (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
+                    (case result
+                      :ok (response ds-info)
+                      :role (forbidden-response "User not in role for draftset offer")
+                      :owned (forbidden-response "Draftset not on offer")
+                      (forbidden-response "Failed to claim draftset"))))))
 
    (make-route :post "/draftset/:id/return"
                (existing-draftset-handler
