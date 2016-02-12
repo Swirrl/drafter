@@ -160,8 +160,8 @@
      (with-state-graph
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
        "<" draftset-uri "> <" drafter:createdAt "> ?created ."
-       "<" draftset-uri "> <" drafter:hasOwner "> ?owner ."
        "<" draftset-uri "> <" drafter:createdBy "> ?creator ."
+       "OPTIONAL { <" draftset-uri "> <" drafter:hasOwner "> ?owner . }"
        "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description . }"
        "OPTIONAL { <" draftset-uri "> <" rdfs:label "> ?title }")
      "}")))
@@ -186,10 +186,10 @@
 (defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner]}]
   (let [required-fields {:id (str (->draftset-id draftset-ref))
                          :created-at (calendar-literal->date created)
-                         :created-by (.stringValue creator)
-                         :current-owner (.stringValue owner)}
+                         :created-by (.stringValue creator)}
         optional-fields {:display-name (and title (.stringValue title))
-                         :description (and description (.stringValue description))}]
+                         :description (and description (.stringValue description))
+                         :current-owner (and owner (.stringValue owner))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
 (defn- get-draftset-properties [repo draftset-ref]
