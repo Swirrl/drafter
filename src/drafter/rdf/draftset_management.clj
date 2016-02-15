@@ -80,6 +80,13 @@
   (let [delete-query (delete-draftset-statements-query draftset-ref)]
     (grafter.rdf.protocols/update! db delete-query)))
 
+(defn- role->score-map []
+  (zipmap user/roles (iterate inc 1)))
+
+(defn- role-scores->sparql-values [scored-roles]
+  (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
+    (clojure.string/join " " score-pairs)))
+
 (defn- get-draftset-graph-mapping-query [draftset-ref]
   (let [ds-uri (str (->draftset-uri draftset-ref))]
     (str
@@ -91,15 +98,26 @@
        "?lg <" drafter:hasDraft "> ?dg .")
      "}")))
 
-(defn- get-all-draftset-graph-mappings-query []
-  (str
-   "SELECT * WHERE { "
-   (with-state-graph
-     "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
-     "?dg <" drafter:inDraftSet "> ?ds ."
-     "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-     "?lg <" drafter:hasDraft "> ?dg .")
-   "}"))
+(defn- get-all-draftset-graph-mappings-query [user]
+  (let [username (user/username user)
+        role (user/role user)
+        scored-roles (role->score-map)
+        user-role-score (role scored-roles)]
+    (str
+     "SELECT * WHERE { "
+     (with-state-graph
+       "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
+       "?dg <" drafter:inDraftSet "> ?ds ."
+       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+       "?lg <" drafter:hasDraft "> ?dg ."
+       "{"
+       "  ?ds <" drafter:hasOwner "> \"" username "\" ."
+       "} UNION {"
+       "  VALUES (?role ?rv) { " (role-scores->sparql-values scored-roles) " }"
+       "  ?ds <" drafter:claimableBy "> ?role ."
+       "  FILTER ( " user-role-score " >= ?rv )"
+       "}")
+     "}")))
 
 ;;seq {"lg" URI "dg" URI} -> {String String}
 (defn- graph-mapping-result-seq->map [mapping-results]
@@ -132,8 +150,8 @@
                   draftset-grouped-results))))
 
 ;;Repository -> Map {DraftSetURI -> {String String}}
-(defn- get-all-draftset-graph-mappings [repo]
-  (let [results (query repo (get-all-draftset-graph-mappings-query))]
+(defn- get-all-draftset-graph-mappings [repo user]
+  (let [results (query repo (get-all-draftset-graph-mappings-query user))]
     (graph-mapping-results->map results)))
 
 (defn- get-draftset-owner-query [draftset-ref]
@@ -171,25 +189,28 @@
      "}")))
 
 (defn- get-all-draftsets-properties-query [user]
-  (let [username (user/username user)]
+  (let [username (user/username user)
+        role (user/role user)
+        scored-roles (role->score-map)
+        user-role-score (role scored-roles)]
     (str
      "SELECT * WHERE { "
      (with-state-graph
        "?ds <" rdf:a "> <" drafter:DraftSet "> ."
        "?ds <" drafter:createdAt "> ?created ."
-       "?ds <" drafter:hasOwner "> \"" username "\" ."
-       "?ds <" drafter:createdBy "> ?creator ." 
-       "BIND (\"" username "\" as ?owner)"
+       "?ds <" drafter:createdBy "> ?creator ."
        "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
-       "OPTIONAL { ?ds <" rdfs:label "> ?title . }")
+       "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
+       "{"
+       "  ?ds <" drafter:hasOwner "> \"" username "\" ."
+       "  BIND (\"" username "\" as ?owner)"
+       "} UNION {"
+       "  VALUES (?role ?rv) { " (role-scores->sparql-values scored-roles) " }"
+       "  ?ds <" drafter:claimableBy "> ?role ."
+       "  FILTER (" user-role-score " >= ?rv)"
+       "}"
+       )
      "}")))
-
-(defn- role->score-map []
-  (zipmap user/roles (iterate inc 1)))
-
-(defn- role-scores->sparql-values [scored-roles]
-  (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
-    (clojure.string/join " " score-pairs)))
 
 (defn- get-all-draftsets-offered-to-query [user]
   (let [role (user/role user)
@@ -268,7 +289,7 @@
 
 (defn get-all-draftsets-info [repo user]
   (let [all-properties (query repo (get-all-draftsets-properties-query user))
-        all-graph-mappings (get-all-draftset-graph-mappings repo)]
+        all-graph-mappings (get-all-draftset-graph-mappings repo user)]
     (combine-all-properties-and-graph-mappings all-properties all-graph-mappings)))
 
 (defn get-draftsets-offered-to [backend user]

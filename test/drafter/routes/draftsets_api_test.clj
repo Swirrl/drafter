@@ -266,27 +266,26 @@
   (let [response (route (create-draftset-request test-editor "Test title" "Test description"))]
     (assert-is-see-other-response response)))
 
+(defn- get-all-draftsets-through-api [user]
+  (let [request (with-identity user {:uri "/draftsets" :request-method :get})
+        {:keys [body] :as response} (route request)]
+    (assert-is-ok-response response)
+    body))
+
 (deftest get-all-draftsets-test
-  (let [draftset-count 10
-        titles (map #(str "Title" %) (range 1 (inc draftset-count)))
-        create-requests (map #(create-draftset-request test-editor %) titles)
-        create-responses (doall (map route create-requests))]
-    (doseq [r create-responses]
-      (assert-is-see-other-response r))
+  (let [owned-ds (create-draftset-through-api test-publisher "owned")
+        editing-ds (create-draftset-through-api test-editor "editing")
+        claimable-publisher-ds (create-draftset-through-api test-editor "publishing")
+        claimable-manager-ds (create-draftset-through-api test-editor "admining")]
 
-    ;;create another draftset owned by a different user - this should
-    ;;not be returned in the results
-    (create-draftset-through-api test-publisher "Other draftset")
+    ;;offer two draftsets, one to publishers, the other to managers
+    (offer-draftset-through-api test-editor claimable-publisher-ds :publisher)
+    (offer-draftset-through-api test-editor claimable-manager-ds :manager)
 
-    (let [get-all-request (with-identity test-editor {:uri "/draftsets" :request-method :get})
-          {:keys [body] :as response} (route get-all-request)]
-      (assert-is-ok-response response)
-      
-      (is (= draftset-count (count body)))
-      (assert-schema [draftset-without-description-info-schema] body)
-
-      (let [returned-names (map :display-name body)]
-        (is (= (set returned-names) (set titles)))))))
+    (let [ds-infos (get-all-draftsets-through-api test-publisher)
+          available-names (set (map :display-name ds-infos))]
+      (assert-schema [draftset-info-schema] ds-infos)
+      (is (= #{"owned" "publishing"} available-names)))))
 
 (deftest get-empty-draftset-without-title-or-description
   (let [draftset-location (create-draftset-through-api test-editor)
