@@ -97,7 +97,8 @@
    :data {s/Str {s/Any s/Any}}
    :created-at Date
    :created-by s/Str
-   :current-owner s/Str})
+   (s/optional-key :current-owner) s/Str
+   (s/optional-key :claim-role) s/Keyword})
 
 (def ^:private draftset-without-description-info-schema
   (assoc draftset-without-title-or-description-info-schema :display-name s/Str))
@@ -246,6 +247,13 @@
   (let [live-quads (get-live-quads-through-api)]
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
+(defn- create-offer-request [user draftset-location role]
+  (with-identity user {:uri (str draftset-location "/offer") :request-method :post :params {:role (name role)}}))
+
+(defn- offer-draftset-through-api [user draftset-location role]
+  (let [response (route (create-offer-request user draftset-location role))]
+    (assert-is-ok-response response)))
+
 (deftest create-draftset-without-title-or-description
   (let [response (route (with-identity test-editor {:uri "/draftset" :request-method :post}))]
     (assert-is-see-other-response response)))
@@ -324,6 +332,26 @@
         get-request (get-draftset-info-request draftset-location test-publisher)
         get-response (route get-request)]
     (assert-is-forbidden-response get-response)))
+
+(deftest get-offered-draftsets-test
+  (let [ds-names (map #(str "Draftset " %) (range 1 5))
+        [ds1 ds2 ds3 ds4] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
+    (offer-draftset-through-api test-editor ds1 :editor)
+    (offer-draftset-through-api test-editor ds2 :publisher)
+    (offer-draftset-through-api test-editor ds3 :manager)
+
+    (let [get-offered-request (with-identity test-publisher {:uri "/draftsets/offered" :request-method :get})
+          {:keys [body] :as response} (route get-offered-request)]
+
+      (assert-schema [draftset-info-schema] body)
+      (is (= 2 (count body)))
+
+      ;;Draftsets 1 and 2 should be on offer to publisher
+      ;;Draftset 3 is in too high a role
+      ;;Draftset 4 is not on offer
+      (let [offered-names (map :display-name body)
+            expected-offered-names (map #(nth ds-names %) [0 1])]
+        (is (= (set expected-offered-names) (set offered-names)))))))
 
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
@@ -924,13 +952,6 @@
         update-request (create-update-draftset-metadata-request test-publisher draftset-location "New title" "New description")
         update-response (route update-request)]
     (assert-is-forbidden-response update-response)))
-
-(defn- create-offer-request [user draftset-location role]
-  (with-identity user {:uri (str draftset-location "/offer") :request-method :post :params {:role (name role)}}))
-
-(defn- offer-draftset-through-api [user draftset-location role]
-  (let [response (route (create-offer-request user draftset-location role))]
-    (assert-is-ok-response response)))
 
 (deftest offer-draftset-test
   (let [draftset-location (create-draftset-through-api test-editor)

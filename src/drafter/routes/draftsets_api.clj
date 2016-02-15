@@ -126,6 +126,9 @@
    (GET "/draftsets" {user :identity :as request}
         (response (dsmgmt/get-all-draftsets-info backend user)))
 
+   (GET "/draftsets/offered" {user :identity :as request}
+        (response (dsmgmt/get-draftsets-offered-to backend user)))
+
     ;;create a new draftset
 
    (POST "/draftset" {{:keys [display-name description]} :params user :identity :as request}

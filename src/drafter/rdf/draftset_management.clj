@@ -125,13 +125,16 @@
         delete-query (delete-draftset-query draftset-ref draft-graphs)]
     (update! db delete-query)))
 
-;;Repository -> Map {DraftSetURI -> {String String}}
-(defn- get-all-draftset-graph-mappings [repo]
-  (let [results (query repo (get-all-draftset-graph-mappings-query))
-        draftset-grouped-results (group-by #(get % "ds") results)]
+(defn- graph-mapping-results->map [results]
+  (let [draftset-grouped-results (group-by #(get % "ds") results)]
     (into {} (map (fn [[ds-uri mappings]]
                     [(.stringValue ds-uri) (graph-mapping-result-seq->map mappings)])
                   draftset-grouped-results))))
+
+;;Repository -> Map {DraftSetURI -> {String String}}
+(defn- get-all-draftset-graph-mappings [repo]
+  (let [results (query repo (get-all-draftset-graph-mappings-query))]
+    (graph-mapping-results->map results)))
 
 (defn- get-draftset-owner-query [draftset-ref]
   (let [draftset-uri (str (->draftset-uri draftset-ref))]
@@ -181,6 +184,52 @@
        "OPTIONAL { ?ds <" rdfs:label "> ?title . }")
      "}")))
 
+(defn- role->score-map []
+  (zipmap user/roles (iterate inc 1)))
+
+(defn- role-scores->sparql-values [scored-roles]
+  (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
+    (clojure.string/join " " score-pairs)))
+
+(defn- get-all-draftsets-offered-to-query [user]
+  (let [role (user/role user)
+        scored-roles (role->score-map)
+        user-role-score (role scored-roles)]
+    (str
+     "SELECT * WHERE {"
+     (with-state-graph
+       "VALUES (?role ?rv) { " (role-scores->sparql-values scored-roles) " }"
+       "?ds <" rdf:a "> <" drafter:DraftSet "> ."
+       "?ds <" drafter:createdAt "> ?created ."
+       "?ds <" drafter:createdBy "> ?creator ."
+       "?ds <" drafter:claimableBy "> ?role ."
+       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
+       "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
+       "FILTER (" user-role-score " >= ?rv )")
+     "}")))
+
+(defn- get-draftsets-offered-to-graph-mapping-query [user]
+  (let [role (user/role user)
+        scored-roles (role->score-map)
+        user-role-score (role scored-roles)]
+    (str
+     "SELECT * WHERE { "
+     (with-state-graph
+       "VALUES (?role ?rv) { " (role-scores->sparql-values scored-roles) " }"
+       "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
+       "?ds <" drafter:claimableBy "> ?role ."
+       "?dg <" drafter:inDraftSet "> ?ds ."
+       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+       "?lg <" drafter:hasDraft "> ?dg ."
+       "FILTER (" user-role-score " >= ?rv )")
+     "}")))
+
+
+(defn- get-draftsets-offered-to-graph-mapping [backend user]
+  (let [q (get-draftsets-offered-to-graph-mapping-query user)
+        results (query backend q)]
+    (graph-mapping-results->map results)))
+
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
@@ -209,16 +258,24 @@
     (let [ds-graph-mapping (get-draftset-graph-mapping repo draftset-ref)]
       (combine-draftset-properties-and-graphs ds-properties ds-graph-mapping))))
 
+(defn- combine-all-properties-and-graph-mappings [draftset-properties dataset-graph-mappings]
+  (map (fn [{ds-uri "ds" :as result}]
+         (let [ds-uri (.stringValue ds-uri)
+               properties (draftset-properties-result->properties (->DraftsetURI ds-uri) result)
+               graph-mapping (get dataset-graph-mappings ds-uri)]
+           (combine-draftset-properties-and-graphs properties graph-mapping)))
+       draftset-properties))
+
 (defn get-all-draftsets-info [repo user]
   (let [all-properties (query repo (get-all-draftsets-properties-query user))
-        all-graph-mappings (get-all-draftset-graph-mappings repo)
-        all-infos (map (fn [{ds-uri "ds" :as result}]
-                         (let [ds-uri (.stringValue ds-uri)
-                               properties (draftset-properties-result->properties (->DraftsetURI ds-uri) result)
-                               graph-mapping (get all-graph-mappings ds-uri)]
-                           (combine-draftset-properties-and-graphs properties graph-mapping)))
-                       all-properties)]
-    all-infos))
+        all-graph-mappings (get-all-draftset-graph-mappings repo)]
+    (combine-all-properties-and-graph-mappings all-properties all-graph-mappings)))
+
+(defn get-draftsets-offered-to [backend user]
+  (let [q (get-all-draftsets-offered-to-query user)
+        offered-properties (query backend q)
+        all-graph-mappings (get-draftsets-offered-to-graph-mapping backend user)]
+    (combine-all-properties-and-graph-mappings offered-properties all-graph-mappings)))
 
 (defn delete-draftset-graph! [db draftset-ref graph-uri]
   (when (mgmt/is-graph-managed? db graph-uri)
@@ -300,9 +357,9 @@
   (let [draftset-uri (->draftset-uri draftset-ref)
         username (user/username claimant)
         role (user/role claimant)
-        scored-roles (zipmap user/roles (iterate inc 1))
+        scored-roles (role->score-map)
         user-score (scored-roles role)
-        scores-values (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
+        scores-values (role-scores->sparql-values scored-roles)]
     (str
      "DELETE {"
      (with-state-graph
@@ -312,7 +369,7 @@
        "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" .")
      "} WHERE {"
      (with-state-graph
-       "VALUES (?role ?rv) { " (clojure.string/join " " scores-values) " }"
+       "VALUES (?role ?rv) { " scores-values " }"
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
        "<" draftset-uri "> <" drafter:claimableBy "> ?role ."
        "FILTER (" user-score " >= ?rv)")
