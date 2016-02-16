@@ -39,16 +39,14 @@
            (has-role? user claim-role))))
 
 (defn permitted-draftset-operations [{:keys [current-owner claim-role] :as draftset} user]
-  (let [role (role user)
-        username (username user)]
-    (cond
-     (is-owner? user draftset)
-     (util/conj-if
-        (has-role? user :publisher)
-        #{:delete :edit :offer}
-        :publish)
+  (cond
+   (is-owner? user draftset)
+   (util/conj-if
+    (has-role? user :publisher)
+    #{:delete :edit :offer}
+    :publish)
 
-     (can-claim? user draftset)
-     #{:claim}
+   (can-claim? user draftset)
+   #{:claim}
 
-     :else #{})))
+   :else #{}))
