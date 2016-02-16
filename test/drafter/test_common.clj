@@ -13,7 +13,7 @@
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!
                                                   migrate-live!]]
-            [drafter.rdf.draftset-management :refer [->draftset-uri]]
+            [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
             [swirrl-server.async.jobs :refer [create-job]])

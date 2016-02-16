@@ -12,6 +12,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.user :as user]
+            [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]])
   (:import [org.openrdf.query TupleQueryResultHandler]
@@ -77,7 +78,7 @@
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
-    (let [draftset-id (dsmgmt/->DraftsetId id)]
+    (let [draftset-id (ds/->DraftsetId id)]
       (if (dsmgmt/draftset-exists? backend draftset-id)
         (let [updated-request (assoc-in request [:params :draftset-id] draftset-id)]
           (inner-handler updated-request))
@@ -140,8 +141,8 @@
                 backend
                 (restrict-to-draftset-owner
                  backend
-                 (fn [{{id :id} :params :as request}]
-                   (if-let [info (dsmgmt/get-draftset-info backend (dsmgmt/->DraftsetId id))]
+                 (fn [{{:keys [draftset-id]} :params :as request}]
+                   (if-let [info (dsmgmt/get-draftset-info backend draftset-id)]
                      (response info)
                      (not-found ""))))))
 
@@ -150,8 +151,8 @@
                 backend
                 (restrict-to-draftset-owner
                  backend
-                 (fn [{{id :id} :params :as request}]
-                   (delete-draftset! backend (dsmgmt/->DraftsetId id))
+                 (fn [{{:keys [draftset-id]} :params :as request}]
+                   (delete-draftset! backend draftset-id)
                    (response "")))))
 
    (make-route :get "/draftset/:id/data"

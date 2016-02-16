@@ -7,6 +7,7 @@
             [grafter.rdf :refer [statements context]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
             [drafter.user :as user]
+            [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
             [drafter.util :as util]
             [grafter.rdf.repository :refer [query]]
             [grafter.vocabularies.rdf :refer :all]))

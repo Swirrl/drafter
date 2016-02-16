@@ -5,35 +5,11 @@
             [grafter.rdf.repository :refer [query]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
+            [drafter.draftset :refer :all]
             [drafter.user :as user]
             [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph] :as mgmt]
             [clojure.string :as string])
-  (:import [java.net URI]
-           [java.util Date UUID]))
-
-(defprotocol DraftsetRef
-  (->draftset-uri [this])
-  (->draftset-id [this]))
-
-(defrecord DraftsetURI [uri]
-  Object
-  (toString [this] uri))
-
-(defrecord DraftsetId [id]
-  DraftsetRef
-  (->draftset-uri [this] (->DraftsetURI (drafter.rdf.drafter-ontology/draftset-uri id)))
-  (->draftset-id [this] this)
-
-  Object
-  (toString [this] id))
-
-(extend-type DraftsetURI
-  DraftsetRef
-  (->draftset-uri [this] this)
-  (->draftset-id [{:keys [uri]}]
-    (let [base-uri (URI. (drafter.rdf.drafter-ontology/draftset-uri ""))
-          relative (.relativize base-uri (URI. uri))]
-      (->DraftsetId (.toString relative)))))
+  (:import [java.util Date UUID]))
 
 (defn- create-draftset-statements [username title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -449,3 +425,8 @@
 (defn return-draftset! [backend draftset-ref]
   (let [q (return-draftset-query draftset-ref)]
     (update! backend q)))
+
+(defn find-permitted-draftset-operations [backend draftset-ref user]
+  (if-let [ds-info (get-draftset-info backend draftset-ref)]
+    (user/permitted-draftset-operations ds-info user)
+    #{}))

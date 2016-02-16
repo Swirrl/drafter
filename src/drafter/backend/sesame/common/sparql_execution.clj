@@ -7,6 +7,7 @@
             [drafter.backend.sesame.common.protocols :refer :all]
             [drafter.write-scheduler :as scheduler]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.draftset :as ds]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management.jobs :as jobs]
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
@@ -208,7 +209,7 @@
     :copy-graph
     (let [{:keys [live-graph]} state
           live-graph-str (.stringValue live-graph)
-          draft-graph-uri-str (mgmt/create-draft-graph! backend live-graph-str {} (str (dsmgmt/->draftset-uri draftset-ref)))
+          draft-graph-uri-str (mgmt/create-draft-graph! backend live-graph-str {} (str (ds/->draftset-uri draftset-ref)))
           draft-graph-uri (util/string->sesame-uri draft-graph-uri-str)
           copy-batches (jobs/get-graph-clone-batches backend live-graph-str)
           copy-state {:op :copy-graph-batches

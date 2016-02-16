@@ -16,7 +16,7 @@
   (util/seq-contains? roles r))
 
 (defn has-role? [{:keys [role] :as user} requested]
-  {:pre [(util/seq-contains? roles requested)]}
+  {:pre [(is-known-role? requested)]}
   (case role
     :manager true
     :publisher (not= requested :manager)
@@ -29,3 +29,26 @@
 
 (defn authenticated? [{:keys [api-key-digest] :as user} key]
   (constant-time-string-equals? api-key-digest key))
+
+(defn is-owner? [user {:keys [current-owner] :as draftset}]
+  (= (username user) current-owner))
+
+(defn can-claim? [user {:keys [claim-role] :as draftset}]
+  (or (is-owner? user draftset)
+      (and (some? claim-role)
+           (has-role? user claim-role))))
+
+(defn permitted-draftset-operations [{:keys [current-owner claim-role] :as draftset} user]
+  (let [role (role user)
+        username (username user)]
+    (cond
+     (is-owner? user draftset)
+     (util/conj-if
+        (has-role? user :publisher)
+        #{:delete :edit :offer}
+        :publish)
+
+     (can-claim? user draftset)
+     #{:claim}
+
+     :else #{})))

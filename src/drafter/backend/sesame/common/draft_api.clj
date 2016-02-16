@@ -7,6 +7,7 @@
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.write-scheduler :as scheduler]
+            [drafter.draftset :as ds]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.protocols :as backend]
@@ -58,7 +59,7 @@
               :buffer-size jobs/batched-write-size))
 
 (defn- append-data-to-draftset-graph-joblet [backend draftset-ref quad-batch]
-  (let [draftset-uri (str (dsmgmt/->draftset-uri draftset-ref))]
+  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
     (fn [graph-map]
       (let [{:keys [graph-uri triples]} (quad-batch->graph-triples quad-batch)
             {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend graph-uri graph-map draftset-uri)]
@@ -84,7 +85,7 @@
 
     :copy-graph
     (let [live-graph-uri (:graph state)
-          ds-uri (str (dsmgmt/->draftset-uri draftset-ref))
+          ds-uri (str (ds/->draftset-uri draftset-ref))
           {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri)
           clone-batches (jobs/get-graph-clone-batches backend live-graph-uri)
           copy-batches-state {:op :copy-graph-batches
