@@ -155,6 +155,13 @@
                    (delete-draftset! backend draftset-id)
                    (response "")))))
 
+   (make-route :options "/draftset/:id"
+               (existing-draftset-handler
+                backend
+                (fn [{{:keys [draftset-id]} :params user :identity}]
+                  (let [permitted (dsmgmt/find-permitted-draftset-operations backend draftset-id user)]
+                    (response permitted)))))
+
    (make-route :get "/draftset/:id/data"
                (existing-draftset-handler
                 backend

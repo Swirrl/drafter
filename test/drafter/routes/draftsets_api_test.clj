@@ -1037,6 +1037,17 @@
         response (route (create-return-request draftset-location test-publisher))]
     (assert-is-forbidden-response response)))
 
+(deftest get-options-test
+  (let [draftset-location (create-draftset-through-api test-editor)
+        options-request (with-identity test-editor {:uri draftset-location :request-method :options})
+        {:keys [body] :as options-response} (route options-request)]
+    (assert-is-ok-response options-response)
+    (is (= #{:edit :delete :offer} (set body)))))
+
+(deftest get-options-for-non-existent-draftset
+  (let [response (route (with-identity test-manager {:uri "/draftset/missing" :request-method :options}))]
+    (assert-is-not-found-response response)))
+
 (defn- setup-route [test-function]
   (binding [*route* (draftset-api-routes *test-backend*)]
     (test-function)))
