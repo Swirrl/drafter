@@ -32,7 +32,8 @@
             [ring.middleware.verbs :refer [wrap-verbs]]
             [ring.middleware.defaults :refer [api-defaults]]
             [selmer.parser :as parser]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [drafter.user.mongo :as mongousers])
 
   ;; Note that though the classes and requires below aren't used in this namespace
   ;; they are needed by the log-config file which is loaded from here.
@@ -44,6 +45,7 @@
 
 ;; Set these values later when we start the server
 (def backend)
+(def user-repo)
 (def app)
 
 (def ^{:doc "A future to control the single write thread that performs database writes."}
@@ -112,8 +114,8 @@
                         ;; add your application routes here
                         (-> []
                             (add-route (pages-routes backend))
-                            (add-route (draftset-api-routes backend))
                             (add-route (draft-api-routes "/draft" backend))
+                            (add-route (draftset-api-routes backend user-repo "Drafter"))
                             (add-route (graph-management-routes "/graph" backend))
                             (add-routes (get-sparql-routes backend))
                             (add-route (context "/status" []
@@ -142,11 +144,15 @@
   []
   (set-var-root! #'backend (get-backend env)))
 
+(defn- init-user-repo! []
+  (set-var-root! #'user-repo (mongousers/create-repository {})))
+
 (defn initialise-services! []
   (enc/register-custom-encoders!)
 
   (initialise-write-service!)
   (init-backend!)
+  (init-user-repo!)
   (initialise-app! backend)
   (set-var-root! #'stop-reaper (ops/start-reaper 2000)))
 
@@ -184,6 +190,7 @@
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
   (stop backend)
+  (.close user-repo)
   (stop-writer! writer-service)
   (stop-reaper)
   (log/info "drafter has shut down."))

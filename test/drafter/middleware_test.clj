@@ -1,6 +1,7 @@
 (ns drafter.middleware-test
   (:require [drafter.middleware :refer :all]
             [clojure.test :refer :all]
+            [drafter.test-common :refer [api-key->digest]]
             [buddy.core.codecs :refer [str->base64]]
             [buddy.auth :as auth]
             [drafter.user :as user]
@@ -21,7 +22,8 @@
 (deftest authenticate-user-test
   (let [username "test@example.com"
         api-key "dslkfjsejw"
-        user (user/create-user username :publisher api-key)
+        api-key-digest (api-key->digest api-key)
+        user (user/create-user username :publisher api-key-digest)
         repo (memory-repo/create-repository* user)
         handler (basic-authentication repo "test" identity)
         request (create-authorised-request username api-key)
@@ -31,7 +33,7 @@
 
 (deftest invalid-api-key-should-not-authenticate-test
   (let [username "test@example.com"
-        user (user/create-user username :editor "apikey")
+        user (user/create-user username :editor (api-key->digest "apikey"))
         repo (memory-repo/create-repository* user)
         handler (basic-authentication repo "test" identity)
         request (create-authorised-request username "invalidkey")
@@ -41,7 +43,7 @@
 (deftest non-existent-user-should-not-authenticate-test
   (let [repo (memory-repo/create-repository*)
         handler (basic-authentication repo "test" identity)
-        request (create-authorised-request "missing@example.com" "sdkfiwe")
+        request (create-authorised-request "missing@example.com" (api-key->digest "sdkfiwe"))
         response (handler request)]
     (is (= false (auth/authenticated? response)))))
 

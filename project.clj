@@ -40,6 +40,7 @@
                  
                  [buddy/buddy-core "0.9.0"]
                  [buddy/buddy-auth "0.9.0"]
+                 [org.mindrot/jbcrypt "0.3m"]
                  [com.cemerick/friend "0.2.1" :exclusions [org.clojure/core.cache]]
 
                  [swirrl/lib-swirrl-server "0.2.0-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]

@@ -2,32 +2,30 @@
   (:require [drafter.user :refer :all]
             [clojure.test :refer :all]
             [drafter.draftset :as ds]
-            [drafter.test-common :refer [test-editor test-publisher test-manager]])
+            [drafter.test-common :refer [test-editor test-publisher test-manager api-key->digest]])
   (:import [java.util UUID]))
 
 (deftest has-role?-test
-  (let [editor (create-user "editor@example.com" :editor "dslfkd")
-        publisher (create-user "publisher@example.com" :publisher "xfsdfkzdjflksd")
-        manager (create-user "manager@example.com" :manager "weirrsjtrj")]
-    (are [user role has?] (= has? (has-role? user role))
-         editor :editor true
-         editor :publisher false
-         editor :manager false
+  (are [user role has?] (= has? (has-role? user role))
+       test-editor :editor true
+       test-editor :publisher false
+       test-editor :manager false
 
-         publisher :editor true
-         publisher :publisher true
-         publisher :manager false
+       test-publisher :editor true
+       test-publisher :publisher true
+       test-publisher :manager false
 
-         manager :editor true
-         manager :publisher true
-         manager :manager true)))
+       test-manager :editor true
+       test-manager :publisher true
+       test-manager :manager true))
 
 (deftest authenticated?-test
   (let [api-key (str (UUID/randomUUID))
-        user (create-user "test@example.com" :publisher api-key)]
+        api-key-digest (api-key->digest api-key)
+        user (create-user "test@example.com" :publisher api-key-digest)]
     (are [user key should-authenticate?] (= should-authenticate? (authenticated? user key))
          user api-key true
-         user "different key" false)))
+         user (api-key->digest "different key") false)))
 
 (deftest is-owner?-test
   (are [user draftset expected] (= expected (is-owner? user draftset))

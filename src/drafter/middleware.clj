@@ -55,3 +55,9 @@
     (if (auth/authenticated? request)
       (inner-handler request)
       (auth/throw-unauthorized {:message "Authentication required"}))))
+
+(defn require-basic-authentication
+  "Wraps a handler in one which requires the request is authenticated
+  through HTTP Basic authentication."
+  [user-repo realm inner-handler]
+  (basic-authentication user-repo realm (require-authenticated inner-handler)))

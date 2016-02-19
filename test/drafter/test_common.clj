@@ -18,7 +18,8 @@
                                              global-writes-lock]]
             [swirrl-server.async.jobs :refer [create-job]])
   (:import [java.util Scanner UUID]
-           [java.util.concurrent CountDownLatch TimeUnit]))
+           [java.util.concurrent CountDownLatch TimeUnit]
+           [org.mindrot.jbcrypt BCrypt]))
 
 (def ^:dynamic *test-backend*)
 
@@ -181,6 +182,9 @@
   [m]
   (set (keys m)))
 
-(def test-editor (user/create-user "editor@example.com" :editor "flksewit"))
-(def test-publisher (user/create-user "publisher@example.com" :publisher "lbxkfglsdf"))
-(def test-manager (user/create-user "manager@example.com" :manager "esoriudfsj"))
+(defn api-key->digest [api-key]
+  (BCrypt/hashpw api-key (BCrypt/gensalt)))
+
+(def test-editor (user/create-user "editor@example.com" :editor (api-key->digest "apikey")))
+(def test-publisher (user/create-user "publisher@example.com" :publisher (api-key->digest "apikey")))
+(def test-manager (user/create-user "manager@example.com" :manager (api-key->digest "apikey")))

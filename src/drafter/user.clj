@@ -1,12 +1,14 @@
 (ns drafter.user
-  (:require [buddy.core.codecs :refer [str->bytes]]
+  (:require [buddy.core.codecs :refer [str->bytes base64->bytes]]
             [buddy.core.bytes :as bytes]
-            [drafter.util :as util]))
+            [drafter.util :as util])
+  (:import [org.mindrot.jbcrypt BCrypt]))
 
 (def roles [:editor :publisher :manager])
 (defrecord User [email role api-key-digest])
 (def username :email)
 (def role :role)
+(def api-key :api-key-digest)
 
 (defn create-user [email role api-key-digest]
   {:pre [(util/seq-contains? roles role)]}
@@ -27,8 +29,8 @@
         b2 (str->bytes s2)]
     (bytes/equals? b1 b2)))
 
-(defn authenticated? [{:keys [api-key-digest] :as user} key]
-  (constant-time-string-equals? api-key-digest key))
+(defn authenticated? [{:keys [api-key-digest] :as user} submitted-key]
+  (BCrypt/checkpw submitted-key api-key-digest))
 
 (defn is-owner? [user {:keys [current-owner] :as draftset}]
   (= (username user) current-owner))
