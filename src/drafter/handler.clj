@@ -145,7 +145,8 @@
   (set-var-root! #'backend (get-backend env)))
 
 (defn- init-user-repo! []
-  (set-var-root! #'user-repo (mongousers/create-repository {})))
+  (let [repo (drafter.user.repository/get-configured-repository env)]
+    (set-var-root! #'user-repo repo)))
 
 (defn initialise-services! []
   (enc/register-custom-encoders!)

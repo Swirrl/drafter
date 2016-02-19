@@ -17,3 +17,6 @@
   "Adds a user to this repository."
   [{:keys [users] :as repo} user]
   (swap! users (fn [m u] (assoc m (username u) u)) user))
+
+(defn get-repository [env-map]
+  (create-repository*))

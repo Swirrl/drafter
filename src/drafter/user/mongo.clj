@@ -31,7 +31,7 @@
   (close [this]
     (mg/disconnect conn)))
 
-(defn create-repository [env-map]
+(defn get-repository [env-map]
   (let [conn (mg/connect)
         db (mg/get-db conn "pmd-host_development")]
     (->MongoUserRepository conn db "publish_my_data_users")))
