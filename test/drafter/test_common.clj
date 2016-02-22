@@ -182,9 +182,3 @@
   [m]
   (set (keys m)))
 
-(defn api-key->digest [api-key]
-  (user/get-digest api-key))
-
-(def test-editor (user/create-user "editor@example.com" :editor (api-key->digest "apikey")))
-(def test-publisher (user/create-user "publisher@example.com" :publisher (api-key->digest "apikey")))
-(def test-manager (user/create-user "manager@example.com" :manager (api-key->digest "apikey")))

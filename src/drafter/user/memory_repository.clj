@@ -1,5 +1,5 @@
 (ns drafter.user.memory-repository
-  (:require [drafter.user :refer [username create-user get-digest]]
+  (:require [drafter.user :refer [username create-user get-digest test-editor test-publisher test-manager]]
             [drafter.user.repository :refer :all]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
@@ -33,10 +33,7 @@
       repo)))
 
 (defn- default-user-repo []
-  (create-repository*
-   (create-user "editor@example.com" :editor (get-digest "password"))
-   (create-user "publisher@example.com" :publisher (get-digest "password"))
-   (create-user "manager@example.com" :manager (get-digest "password"))))
+  (create-repository* test-editor test-publisher test-manager))
 
 (defn get-repository [env-map]
   (log/info "Creating memory repository")

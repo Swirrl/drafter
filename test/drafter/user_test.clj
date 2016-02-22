@@ -1,8 +1,7 @@
 (ns drafter.user-test
   (:require [drafter.user :refer :all]
             [clojure.test :refer :all]
-            [drafter.draftset :as ds]
-            [drafter.test-common :refer [test-editor test-publisher test-manager api-key->digest]])
+            [drafter.draftset :as ds])
   (:import [java.util UUID]))
 
 (deftest has-role?-test
@@ -21,11 +20,11 @@
 
 (deftest authenticated?-test
   (let [api-key (str (UUID/randomUUID))
-        api-key-digest (api-key->digest api-key)
+        api-key-digest (get-digest api-key)
         user (create-user "test@example.com" :publisher api-key-digest)]
     (are [user key should-authenticate?] (= should-authenticate? (authenticated? user key))
          user api-key true
-         user (api-key->digest "different key") false)))
+         user (get-digest "different key") false)))
 
 (deftest is-owner?-test
   (are [user draftset expected] (= expected (is-owner? user draftset))

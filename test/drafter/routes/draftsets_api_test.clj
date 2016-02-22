@@ -1,12 +1,11 @@
 (ns drafter.routes.draftsets-api-test
   (:require [drafter.test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-db-setup
                                          stream->string select-all-in-graph make-graph-live!
-                                         import-data-to-draft! await-success key-set test-editor test-publisher
-                                         test-manager api-key->digest]]
+                                         import-data-to-draft! await-success key-set]]
             [clojure.test :refer :all]
             [clojure.set :as set]
             [drafter.routes.draftsets-api :refer :all]
-            [drafter.user :as user]
+            [drafter.user :as user :refer [test-editor test-publisher test-manager]]
             [drafter.user.memory-repository :as memrepo]
             [grafter.rdf :refer [statements context add]]
             [grafter.rdf.io :refer [rdf-serializer]]
@@ -37,7 +36,7 @@
     (ByteArrayInputStream. (.toByteArray bos))))
 
 (defn- with-identity [user request]
-  (let [unencoded-auth (str (user/username user) ":apikey")
+  (let [unencoded-auth (str (user/username user) ":" user/test-password)
         encoded-auth (buddy.core.codecs/str->base64 unencoded-auth)]
     (-> request
         (assoc :identity user)
@@ -1013,7 +1012,7 @@
     (assert-is-forbidden-response claim-response)))
 
 (deftest claim-draftset-by-user-not-in-role
-  (let [other-editor (user/create-user "edtheduck@example.com" :editor (api-key->digest "apikey"))
+  (let [other-editor (user/create-user "edtheduck@example.com" :editor (user/get-digest user/test-password))
         draftset-location (create-draftset-through-api test-editor)]
     (memrepo/add-user *user-repo* other-editor)
     (offer-draftset-through-api test-editor draftset-location :publisher)

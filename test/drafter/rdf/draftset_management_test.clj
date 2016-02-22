@@ -2,11 +2,10 @@
   (:require [clojure.test :refer :all]
             [drafter.rdf.draftset-management :refer :all]
             [drafter.rdf.draft-management :refer [draft-exists?] :as mgmt]
-            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples
-                                         test-editor test-publisher]]
+            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples]]
             [grafter.rdf :refer [statements context]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
-            [drafter.user :as user]
+            [drafter.user :as user :refer [test-editor test-publisher]]
             [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
             [drafter.util :as util]
             [grafter.rdf.repository :refer [query]]

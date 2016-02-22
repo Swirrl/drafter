@@ -1,9 +1,8 @@
 (ns drafter.user.memory-repository-test
   (:require [clojure.test :refer :all]
             [drafter.user.memory-repository :refer :all]
-            [drafter.user :refer [create-user username]]
-            [drafter.user.repository :refer [find-user-by-username]]
-            [drafter.test-common :refer [test-editor]]))
+            [drafter.user :refer [create-user username test-editor]]
+            [drafter.user.repository :refer [find-user-by-username]]))
 
 (deftest find-existing-user-test
   (let [repo (create-repository* test-editor)
