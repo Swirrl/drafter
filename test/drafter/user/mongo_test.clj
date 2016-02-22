@@ -20,13 +20,13 @@
                      :api_key_digest api-key-digest}]
     (mc/insert *user-db* *user-collection* user-record)
 
-    (let [user (find-user-by-email-address *user-repo* email)]
+    (let [user (find-user-by-username *user-repo* email)]
       (is (= email (:email user)))
       (is (= :publisher (:role user)))
       (is (= api-key-digest (:api-key-digest user))))))
 
 (deftest find-non-existent-user-test
-  (is (nil? (find-user-by-email-address *user-repo* "missing@example.com"))))
+  (is (nil? (find-user-by-username *user-repo* "missing@example.com"))))
 
 (deftest find-malformed-user-record-test
   ;;user record is invalid - role number is out of range and
@@ -37,7 +37,7 @@
                      :role_number 18}]
     (mc/insert *user-db* *user-collection* user-record)
 
-    (is (thrown? RuntimeException (find-user-by-email-address *user-repo* email)))))
+    (is (thrown? RuntimeException (find-user-by-username *user-repo* email)))))
 
 (defn- with-clean-mongo-db [test-function]
   (let [conn (mg/connect)

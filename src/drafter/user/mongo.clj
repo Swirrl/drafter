@@ -23,8 +23,8 @@
 
 (defrecord MongoUserRepository [conn db user-collection]
   UserRepository
-  (find-user-by-email-address [this email]
-    (if-let [mongo-user (mc/find-one-as-map db user-collection {:email email})]
+  (find-user-by-username [this username]
+    (if-let [mongo-user (mc/find-one-as-map db user-collection {:email username})]
       (mongo-user->user mongo-user)))
 
   Closeable

@@ -4,7 +4,7 @@
 
 (defrecord MemoryUserRepository [users]
   UserRepository
-  (find-user-by-email-address [this email] (get @users email)))
+  (find-user-by-username [this username] (get @users username)))
 
 (defn create-repository [users]
   (let [user-map (reduce (fn [m user] (assoc m (username user) user)) {} users)]

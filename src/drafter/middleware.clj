@@ -38,7 +38,7 @@
     handler))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
-  (if-let [user (user-repo/find-user-by-email-address user-repo username)]
+  (if-let [user (user-repo/find-user-by-username user-repo username)]
     (if (user/authenticated? user password)
       user)))
 

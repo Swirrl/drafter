@@ -2,9 +2,9 @@
   (:require [clojure.tools.logging :as log]))
 
 (defprotocol UserRepository
-  (find-user-by-email-address [this email]
-    "Attempts to find a user with the given email address (user name)
-    in the underlying store. Returns nil if no such user was found."))
+  (find-user-by-username [this username]
+    "Attempts to find a user with the given user name in the
+    underlying store. Returns nil if no such user was found."))
 
 (defn- get-repository-ns-name [env-map]
   (let [repo-ns (:drafter-user-repo-ns env-map)
