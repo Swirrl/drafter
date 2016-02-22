@@ -29,6 +29,9 @@
         b2 (str->bytes s2)]
     (bytes/equals? b1 b2)))
 
+(defn get-digest [s]
+  (BCrypt/hashpw s (BCrypt/gensalt)))
+
 (defn authenticated? [{:keys [api-key-digest] :as user} submitted-key]
   (BCrypt/checkpw submitted-key api-key-digest))
 

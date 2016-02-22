@@ -183,7 +183,7 @@
   (set (keys m)))
 
 (defn api-key->digest [api-key]
-  (BCrypt/hashpw api-key (BCrypt/gensalt)))
+  (user/get-digest api-key))
 
 (def test-editor (user/create-user "editor@example.com" :editor (api-key->digest "apikey")))
 (def test-publisher (user/create-user "publisher@example.com" :publisher (api-key->digest "apikey")))

@@ -1,6 +1,10 @@
 (ns drafter.user.memory-repository
-  (:require [drafter.user :refer [username]]
-            [drafter.user.repository :refer :all]))
+  (:require [drafter.user :refer [username create-user get-digest]]
+            [drafter.user.repository :refer :all]
+            [clojure.java.io :as io]
+            [clojure.edn :as edn]
+            [clojure.tools.logging :as log])
+  (:import [java.io PushbackReader FileNotFoundException]))
 
 (defrecord MemoryUserRepository [users]
   UserRepository
@@ -18,5 +22,26 @@
   [{:keys [users] :as repo} user]
   (swap! users (fn [m u] (assoc m (username u) u)) user))
 
+(defn- user-decl->user [{:keys [username password role]}]
+  (create-user username role (get-digest password)))
+
+(defn create-repository-from-file [source]
+  (with-open [reader (PushbackReader. (io/reader source))]
+    (let [repo (create-repository*)]
+      (doseq [decl (edn/read reader)]
+        (add-user repo (user-decl->user decl)))
+      repo)))
+
+(defn- default-user-repo []
+  (create-repository*
+   (create-user "editor@example.com" :editor (get-digest "password"))
+   (create-user "publisher@example.com" :publisher (get-digest "password"))
+   (create-user "manager@example.com" :manager (get-digest "password"))))
+
 (defn get-repository [env-map]
-  (create-repository*))
+  (log/info "Creating memory repository")
+  (try
+    (create-repository-from-file "test-users.edn")
+    (catch FileNotFoundException e
+      (log/warn "test-users.edn does not exist - using default users")
+      (default-user-repo))))

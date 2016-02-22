@@ -1,0 +1,3 @@
+[{:username "editor" :password "password" :role :editor}
+ {:username "publisher" :password "password" :role :publisher}
+ {:username "manager" :password "password" :role :manager}]
