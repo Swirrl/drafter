@@ -430,3 +430,36 @@
   (if-let [ds-info (get-draftset-info backend draftset-ref)]
     (user/permitted-draftset-operations ds-info user)
     #{}))
+
+(defn- find-draftset-draft-graph-query [draftset-ref live-graph]
+  (let [draftset-uri (str (->draftset-uri draftset-ref))]
+    (str
+     "SELECT ?dg WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "?dg <" rdf:a "> <" drafter:DraftGraph "> ."
+       "?dg <" drafter:inDraftSet "> <" draftset-uri "> ."
+       "<" live-graph "> <" rdf:a "> <" drafter:ManagedGraph "> ."
+       "<" live-graph "> <" drafter:hasDraft "> ?dg .")
+     "}")))
+
+(defn- find-draftset-draft-graph
+  "Finds the draft graph for a live graph inside a draftset if one
+  exists. Returns nil if the draftset does not exist, or does not
+  contain a draft for the graph."
+  [backend draftset-ref live-graph]
+  (let [q (find-draftset-draft-graph-query draftset-ref live-graph)]
+    (when-let [[result] (query backend q)]
+      (.stringValue (get result "dg")))))
+
+(defn revert-graph-changes!
+  "Reverts the changes made to a live graph inside the given
+  draftset. Returns a result indicating the result of the operation:
+    - :reverted If the changes were reverted
+    - :not-found If the draftset does not exist or no changes exist within it."
+  [backend draftset-ref graph]
+  (if-let [draft-graph-uri (find-draftset-draft-graph backend draftset-ref graph)]
+    (let [ds-uri (->draftset-uri draftset-ref)]
+      (mgmt/delete-draft-graph! backend draft-graph-uri)
+      :reverted)
+    :not-found))

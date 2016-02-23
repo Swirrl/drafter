@@ -205,5 +205,48 @@
 
     (is (is-draftset-owner? *test-backend* draftset-id test-editor))))
 
+(deftest revert-changes-from-graph-only-in-draftset
+  (let [live-graph "http://live"
+        draftset-id (create-draftset! *test-backend* test-editor)]
+    (mgmt/create-managed-graph! *test-backend* live-graph)
+    (let [draft-graph (mgmt/create-draft-graph! *test-backend* live-graph {} (str (->draftset-uri draftset-id)))
+          result (revert-graph-changes! *test-backend* draftset-id live-graph)]
+      (is (= :reverted result))
+      (is (= false (mgmt/draft-exists? *test-backend* draft-graph)))
+      (is (= false (mgmt/is-graph-managed? *test-backend* live-graph))))))
+
+(deftest revert-changes-from-graph-which-exists-in-live
+  (let [live-graph-uri (make-graph-live! *test-backend* "http://live")
+        draftset-id (create-draftset! *test-backend* test-editor)
+        draftset-uri (str (->draftset-uri draftset-id))
+        draft-graph-uri (delete-draftset-graph! *test-backend* draftset-id live-graph-uri)]
+    (let [result (revert-graph-changes! *test-backend* draftset-id live-graph-uri)]
+      (is (= :reverted result))
+      (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
+      (is (= false (mgmt/draft-exists? *test-backend* draft-graph-uri))))))
+
+(deftest revert-change-from-graph-which-exists-independently-in-other-draftset
+  (let [live-graph-uri (mgmt/create-managed-graph! *test-backend* "http://live")
+        ds1-id (create-draftset! *test-backend* test-editor)
+        ds2-id (create-draftset! *test-backend* test-publisher)
+        draft-graph1-uri (mgmt/create-draft-graph! *test-backend* live-graph-uri {} (str (->draftset-uri ds1-id)))
+        draft-graph2-uri (mgmt/create-draft-graph! *test-backend* live-graph-uri {} (str (->draftset-uri ds2-id)))]
+
+    (let [result (revert-graph-changes! *test-backend* ds2-id live-graph-uri)]
+      (is (= :reverted result))
+      (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
+      (is (= false (draft-exists? *test-backend* draft-graph2-uri)))
+      (is (draft-exists? *test-backend* draft-graph1-uri)))))
+
+(deftest revert-non-existent-change-in-draftset
+  (let [draftset-id (create-draftset! *test-backend* test-editor)
+        result (revert-graph-changes! *test-backend* draftset-id "http://missing")]
+    (is (= :not-found result))))
+
+(deftest revert-changes-in-non-existent-draftset
+  (let [live-graph (make-graph-live! *test-backend* "http://live")
+        result (revert-graph-changes! *test-backend* (->DraftsetId "missing") live-graph)]
+    (is (= :not-found result))))
+
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
