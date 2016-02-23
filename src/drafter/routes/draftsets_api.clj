@@ -218,6 +218,20 @@
                       (dsmgmt/delete-draftset-graph! backend draftset-id graph)
                       (response {}))))))
 
+     (make-route :delete "/draftset/:id/changes"
+                 (authorised
+                  (existing-draftset-handler
+                   backend
+                   (restrict-to-draftset-owner
+                    backend
+                    (fn [{{:keys [draftset-id graph]} :params}]
+                      (if (some? graph)
+                        (let [result (dsmgmt/revert-graph-changes! backend draftset-id graph)]
+                          (if (= :reverted result)
+                            (response (dsmgmt/get-draftset-info backend draftset-id))
+                            (not-found "")))
+                        (response/bad-request-response "graph parameter required")))))))
+
      (make-route :post "/draftset/:id/data"
                  (authorised
                   (existing-draftset-handler

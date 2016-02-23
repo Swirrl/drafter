@@ -144,6 +144,9 @@
 (defn assert-is-forbidden-response [response]
   (assert-schema (response-code-schema 403) response))
 
+(defn assert-is-unauthorised-response [response]
+  (assert-schema (response-code-schema 401) response))
+
 (defn assert-is-bad-request-response [response]
   (assert-schema (response-code-schema 400) response))
 
@@ -1057,6 +1060,70 @@
 (deftest get-options-for-non-existent-draftset
   (let [response (route (with-identity test-manager {:uri "/draftset/missing" :request-method :options}))]
     (assert-is-not-found-response response)))
+
+(defn- revert-draftset-graph-changes-request [draftset-location user graph]
+  (with-identity user {:uri (str draftset-location "/changes") :request-method :delete :params {:graph graph}}))
+
+(defn- revert-draftset-graph-changes-through-api [draftset-location user graph]
+  (let [{:keys [body] :as response} (route (revert-draftset-graph-changes-request draftset-location user graph))]
+    (assert-is-ok-response response)
+    (assert-schema draftset-info-schema body)
+    body))
+
+(deftest revert-graph-change-in-draftset
+  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+        draftset-location (create-draftset-through-api test-editor)]
+    (publish-quads-through-api route quads)
+    (delete-draftset-graph-through-api test-editor draftset-location live-graph)
+
+    (let [{:keys [data]} (get-draftset-info-through-api draftset-location test-editor)]
+      (is (= #{live-graph} (key-set data))))
+
+    (let [{:keys [data] :as ds-info} (revert-draftset-graph-changes-through-api draftset-location test-editor live-graph)]
+      (is (= #{} (key-set data))))
+
+    (let [ds-quads (get-draftset-quads-through-api draftset-location test-editor true)]
+      (is (= (set (eval-statements quads)) (set ds-quads))))))
+
+(deftest revert-graph-change-in-unowned-draftset
+  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+        draftset-location (create-draftset-through-api test-editor)]
+    (publish-quads-through-api route quads)
+    (delete-draftset-graph-through-api test-editor draftset-location live-graph)
+
+    (let [revert-request (revert-draftset-graph-changes-request draftset-location test-publisher live-graph)
+          response (route revert-request)]
+      (assert-is-forbidden-response response))))
+
+(deftest revert-graph-change-in-draftset-unauthorised
+  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+        draftset-location (create-draftset-through-api test-editor)]
+    (publish-quads-through-api route quads)
+    (delete-draftset-graph-through-api test-editor draftset-location live-graph)
+
+    (let [revert-request {:uri (str draftset-location "/changes") :request-method :delete :params {:graph live-graph}}
+          response (route revert-request)]
+      (assert-is-unauthorised-response response))))
+
+(deftest revert-non-existent-graph-change-in-draftest
+  (let [draftset-location (create-draftset-through-api test-editor)
+        revert-request (revert-draftset-graph-changes-request draftset-location test-editor "http://missing")
+        response (route revert-request)]
+    (assert-is-not-found-response response)))
+
+(deftest revert-change-in-non-existent-draftset
+  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
+    (publish-quads-through-api route quads)
+    (let [revert-request (revert-draftset-graph-changes-request "/draftset/missing" test-manager live-graph)
+          response (route revert-request)]
+      (assert-is-not-found-response response))))
+
+(deftest revert-graph-change-request-without-graph-parameter
+  (let [draftset-location (create-draftset-through-api test-editor)
+        revert-request (revert-draftset-graph-changes-request draftset-location test-editor "tmp")
+        revert-request (update-in revert-request [:params] dissoc :graph)
+        response (route revert-request)]
+    (assert-is-bad-request-response response)))
 
 (defn- setup-route [test-function]
   (let [repo (memrepo/create-repository* test-editor test-publisher test-manager)]
