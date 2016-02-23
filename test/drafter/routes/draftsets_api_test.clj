@@ -200,7 +200,7 @@
         publish-response (route publish-request)]
     (await-success finished-jobs (:finished-job (:body publish-response)))))
 
-(defn- publish-quads-through-api [route quads]
+(defn- publish-quads-through-api [quads]
   (let [draftset-location (create-draftset-through-api test-publisher)]
     (append-quads-to-draftset-through-api test-publisher draftset-location quads)
     (publish-draftset-through-api draftset-location test-publisher)))
@@ -381,7 +381,7 @@
         live-quads (map (comp first second) grouped-quads)
         quads-to-add (rest (second (first grouped-quads)))
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route live-quads)
+    (publish-quads-through-api live-quads)
     (append-quads-to-draftset-through-api test-editor draftset-location quads-to-add)
 
     ;;draftset itself should contain the live quads from the graph
@@ -411,7 +411,7 @@
 (deftest append-triples-to-graph-which-exists-in-live
   (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route [(first graph-quads)])
+    (publish-quads-through-api [(first graph-quads)])
     (append-triples-to-draftset-through-api test-editor draftset-location (rest graph-quads) graph)
 
     (let [draftset-graph-triples (get-draftset-graph-triples-through-api draftset-location test-editor graph false)
@@ -449,7 +449,7 @@
         grouped-quads (group-by context quads)
         to-delete (map (comp first second) grouped-quads)
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
 
     (let [{graph-info :data :as draftset-info} (delete-quads-through-api test-editor draftset-location to-delete)
           ds-graphs (keys graph-info)
@@ -501,7 +501,7 @@
         [live-graph graph-quads] (first grouped-quads)
         draftset-location (create-draftset-through-api test-editor)]
 
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (let [draftset-info (delete-quads-through-api test-editor draftset-location [(first graph-quads)])
           draftset-quads (get-draftset-quads-through-api draftset-location test-editor false)
           expected-quads (eval-statements (rest graph-quads))]
@@ -541,7 +541,7 @@
         draftset-location (create-draftset-through-api test-editor)
         draftset-quads (set (statements "test/resources/test-draftset.trig"))]
     
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
 
     (let [draftset-info (delete-draftset-triples-through-api test-editor draftset-location triples-to-delete graph)
           draftset-quads (get-draftset-quads-through-api draftset-location test-editor false)
@@ -599,7 +599,7 @@
         live-graphs (keys graph-quads)
         graph-to-delete (first live-graphs)
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location graph-to-delete)
 
     (let [{draftset-graphs :data} (get-draftset-info-through-api draftset-location test-editor)]
@@ -610,7 +610,7 @@
         [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         published-quad (first graph-quads)
         added-quads (rest graph-quads)]
-    (publish-quads-through-api route [published-quad])
+    (publish-quads-through-api [published-quad])
     (append-quads-to-draftset-through-api test-editor draftset-location added-quads)
     (delete-draftset-graph-through-api test-editor draftset-location graph)
 
@@ -666,7 +666,7 @@
         initial-live-quads (map (comp first second) grouped-quads)
         appended-quads (mapcat (comp rest second) grouped-quads)]
     
-    (publish-quads-through-api route initial-live-quads)
+    (publish-quads-through-api initial-live-quads)
     (append-quads-to-draftset-through-api test-publisher draftset-location appended-quads)
     (publish-draftset-through-api draftset-location test-publisher)
 
@@ -678,7 +678,7 @@
         grouped-quads (group-by context quads)
         draftset-location (create-draftset-through-api test-publisher)
         to-delete (map (comp first second) grouped-quads)]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (delete-quads-through-api test-publisher draftset-location to-delete)
     (publish-draftset-through-api draftset-location test-publisher)
 
@@ -692,7 +692,7 @@
         draftset-location (create-draftset-through-api test-publisher)
         graph-to-delete (ffirst grouped-quads)
         expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-publisher draftset-location graph-to-delete)
     (publish-draftset-through-api draftset-location test-publisher)
     (assert-live-quads expected-quads)))
@@ -706,7 +706,7 @@
         to-delete (take 1 initial-quads)
         expected-quads (eval-statements (set/difference (set/union (set initial-quads) (set to-add)) (set to-delete)))]
 
-    (publish-quads-through-api route initial-quads)
+    (publish-quads-through-api initial-quads)
     (append-quads-to-draftset-through-api test-publisher draftset-location to-add)
     (delete-quads-through-api test-publisher draftset-location to-delete)
     (publish-draftset-through-api draftset-location test-publisher)
@@ -723,7 +723,7 @@
     (delete-quads-through-api test-publisher draftset-location graph-quads)
 
     ;;add to live then publish draftset
-    (publish-quads-through-api route graph-quads)
+    (publish-quads-through-api graph-quads)
     (publish-draftset-through-api draftset-location test-publisher)
 
     ;;graph should still exist in live
@@ -808,7 +808,7 @@
         [ds-live-graph draftset-quads] (second grouped-test-quads)
         draftset-location (create-draftset-through-api test-editor)]
 
-    (publish-quads-through-api route live-quads)
+    (publish-quads-through-api live-quads)
     (append-quads-to-draftset-through-api test-editor draftset-location draftset-quads)
 
     (let [query "SELECT * WHERE { GRAPH ?c { ?s ?p ?o } }"
@@ -871,7 +871,7 @@
         grouped-quads (group-by context quads)
         graph-to-delete (first (keys grouped-quads))
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location graph-to-delete)
 
     (let [response-quads (set (get-draftset-quads-through-api draftset-location test-editor true))
@@ -884,7 +884,7 @@
         [live-graph live-quads] (first grouped-quads)
         [draftset-graph draftset-quads] (second grouped-quads)
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route live-quads)
+    (publish-quads-through-api live-quads)
     (append-quads-to-draftset-through-api test-editor draftset-location draftset-quads)
 
     (let [response-quads (set (get-draftset-quads-through-api draftset-location test-editor true))
@@ -896,7 +896,7 @@
         grouped-quads (group-by context quads)
         graph-to-delete (ffirst grouped-quads)
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location graph-to-delete)
 
     (let [draftset-triples (get-draftset-graph-triples-through-api draftset-location test-editor graph-to-delete true)]
@@ -906,7 +906,7 @@
   (let [quads (statements "test/resources/test-draftset.trig")
         [graph graph-quads] (first (group-by context quads))
         draftset-location (create-draftset-through-api)]
-    (publish-quads-through-api route graph-quads)
+    (publish-quads-through-api graph-quads)
 
     (let [draftset-graph-triples (get-draftset-graph-triples-through-api draftset-location test-editor graph true)
           expected-triples (eval-statements (map map->Triple graph-quads))]
@@ -1073,7 +1073,7 @@
 (deftest revert-graph-change-in-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location live-graph)
 
     (let [{:keys [data]} (get-draftset-info-through-api draftset-location test-editor)]
@@ -1088,7 +1088,7 @@
 (deftest revert-graph-change-in-unowned-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location live-graph)
 
     (let [revert-request (revert-draftset-graph-changes-request draftset-location test-publisher live-graph)
@@ -1098,7 +1098,7 @@
 (deftest revert-graph-change-in-draftset-unauthorised
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location live-graph)
 
     (let [revert-request {:uri (str draftset-location "/changes") :request-method :delete :params {:graph live-graph}}
@@ -1113,7 +1113,7 @@
 
 (deftest revert-change-in-non-existent-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
-    (publish-quads-through-api route quads)
+    (publish-quads-through-api quads)
     (let [revert-request (revert-draftset-graph-changes-request "/draftset/missing" test-manager live-graph)
           response (route revert-request)]
       (assert-is-not-found-response response))))
