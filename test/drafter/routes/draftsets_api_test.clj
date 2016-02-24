@@ -169,15 +169,18 @@
      (assert-is-see-other-response response)
      (get headers "Location"))))
 
+(defn- get-draftset-quads-request [draftset-location user format union-with-live?]
+  (with-identity user
+    {:uri (str draftset-location "/data")
+     :request-method :get
+     :headers {"Accept" (.getDefaultMIMEType format)}
+     :params {:union-with-live union-with-live?}}))
+
 (defn- get-draftset-quads-through-api
   ([draftset-location user]
    (get-draftset-quads-through-api draftset-location user false))
   ([draftset-location user union-with-live?]
-   (let [data-request {:uri (str draftset-location "/data")
-                       :request-method :get
-                       :headers {"Accept" "text/x-nquads"}
-                       :params {:union-with-live union-with-live?}}
-         data-request (with-identity user data-request)
+   (let [data-request (get-draftset-quads-request draftset-location user formats/rdf-nquads union-with-live?)
          data-response (route data-request)]
      (assert-is-ok-response data-response)
      (concrete-statements (:body data-response) formats/rdf-nquads))))
@@ -925,6 +928,12 @@
 (deftest get-draftset-data-for-missing-draftset
   (let [response (route (with-identity test-manager {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}}))]
     (assert-is-not-found-response response)))
+
+(deftest get-draftset-data-for-unowned-draftset
+  (let [draftset-location (create-draftset-through-api test-editor)
+        get-data-request (get-draftset-quads-request draftset-location test-publisher formats/rdf-nquads false)
+        response (route get-data-request)]
+    (assert-is-forbidden-response response)))
 
 (defn- create-update-draftset-metadata-request [user draftset-location title description]
   (with-identity user
