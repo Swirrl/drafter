@@ -253,6 +253,17 @@
                              (submit-async-job! append-job))
                            (response/bad-request-response "Graph required for triples content type")))))))))
 
+     (make-route :put "/draftset/:id/graph"
+                 (authorised
+                  (existing-draftset-handler
+                   backend
+                   (restrict-to-draftset-owner
+                    backend
+                    (fn [{{:keys [draftset-id graph]} :params}]
+                      (if (mgmt/is-graph-managed? backend graph)                        
+                        (submit-async-job! (dsmgmt/copy-live-graph-into-draftset-job backend draftset-id graph))
+                        (not-found (str "Graph " graph " does not exist"))))))))
+
      (make-route nil "/draftset/:id/query"
                  (allowed-methods-handler
                   #{:get :post}

@@ -2,13 +2,16 @@
   (:require [clojure.test :refer :all]
             [drafter.rdf.draftset-management :refer :all]
             [drafter.rdf.draft-management :refer [draft-exists?] :as mgmt]
-            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples]]
+            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples
+                                         select-all-in-graph]]
+            [drafter.write-scheduler :as scheduler]
             [grafter.rdf :refer [statements context]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
             [drafter.user :as user :refer [test-editor test-publisher]]
             [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
             [drafter.util :as util]
             [grafter.rdf.repository :refer [query]]
+            [grafter.rdf.protocols :refer [->Triple]]
             [grafter.vocabularies.rdf :refer :all]))
 
 (defn- has-uri-object? [s p uri-o]
@@ -247,6 +250,37 @@
   (let [live-graph (make-graph-live! *test-backend* "http://live")
         result (revert-graph-changes! *test-backend* (->DraftsetId "missing") live-graph)]
     (is (= :not-found result))))
+
+(defn- get-graph-triples [graph-uri]
+  (let [results (query *test-backend* (select-all-in-graph graph-uri))]
+    (map (fn [{:strs [s p o]}] (->Triple (str s) (str p) (str o))) results)))
+
+(deftest copy-live-graph-into-draftset-test
+  (let [draftset-id (create-draftset! *test-backend* test-editor)
+        live-triples (test-triples "http://test-subject")
+        live-graph-uri (make-graph-live! *test-backend* "http://live" live-triples)
+        {:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
+    (scheduler/queue-job! copy-job)
+
+    @value-p
+
+    (let [draft-graph (find-draftset-draft-graph *test-backend* draftset-id live-graph-uri)
+          draft-triples (get-graph-triples draft-graph)]
+      (is (= (set live-triples) (set draft-triples))))))
+
+(deftest copy-live-graph-into-existing-draft-graph-in-draftset-test
+  (let [draftset-id (create-draftset! *test-backend* test-editor)
+        live-triples (test-triples "http://test-subject")
+        live-graph-uri (make-graph-live! *test-backend* "http://live" live-triples)
+        initial-draft-triples (test-triples "http://temp-subject")
+        draft-graph-uri (import-data-to-draft! *test-backend* live-graph-uri initial-draft-triples draftset-id)
+        {:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
+
+    (scheduler/queue-job! copy-job)
+    @value-p
+
+    (let [draft-triples (get-graph-triples draft-graph-uri)]
+      (is (= (set live-triples) (set draft-triples))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

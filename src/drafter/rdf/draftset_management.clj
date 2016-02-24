@@ -8,6 +8,8 @@
             [drafter.draftset :refer :all]
             [drafter.user :as user]
             [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph] :as mgmt]
+            [drafter.backend.protocols :refer [copy-from-live-graph-job]]
+            [drafter.rdf.draft-management.jobs :as jobs]
             [clojure.string :as string])
   (:import [java.util Date UUID]))
 
@@ -443,7 +445,7 @@
        "<" live-graph "> <" drafter:hasDraft "> ?dg .")
      "}")))
 
-(defn- find-draftset-draft-graph
+(defn find-draftset-draft-graph
   "Finds the draft graph for a live graph inside a draftset if one
   exists. Returns nil if the draftset does not exist, or does not
   contain a draft for the graph."
@@ -463,3 +465,16 @@
       (mgmt/delete-draft-graph! backend draft-graph-uri)
       :reverted)
     :not-found))
+
+(defn- create-or-empty-draft-graph-for [backend draftset-ref live-graph]
+  (if-let [draft-graph-uri (find-draftset-draft-graph backend draftset-ref live-graph)]
+    (do
+      (mgmt/delete-graph-contents! backend draft-graph-uri)
+      draft-graph-uri)
+    (mgmt/create-draft-graph! backend live-graph {} (str (->draftset-uri draftset-ref)))))
+
+(defn copy-live-graph-into-draftset-job [backend draftset-ref live-graph]
+  (jobs/make-job :batch-write [job]
+                 (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph)
+                       batches (jobs/get-graph-clone-batches backend live-graph)]
+                   (jobs/copy-from-live-graph backend live-graph draft-graph-uri batches job))))

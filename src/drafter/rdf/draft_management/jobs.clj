@@ -204,7 +204,7 @@
   (create-job :sync-write (partial delete-graph-metadata repo graphs meta-keys)))
 
 
-(defn- copy-from-live-graph [repo live-graph-uri dest-graph-uri batches job]
+(defn copy-from-live-graph [repo live-graph-uri dest-graph-uri batches job]
   (with-job-exception-handling job
     (if-let [[offset limit] (first batches)]
       (let [next-fn (fn [job]
