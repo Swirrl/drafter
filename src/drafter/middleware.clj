@@ -69,3 +69,14 @@
     (if-let [missing-keys (seq (set/difference required-keys (set (keys params))))]
       (response/unprocessable-entity-response (str "Missing required parameters: " (string/join "," (map name missing-keys))))
       (inner-handler request))))
+
+(defn allowed-methods-handler
+  "Wraps a handler with one which checks whether the method of the
+  incoming request is allowed with a given predicate. If the request
+  method does not pass the predicate a 405 Not Allowed response is
+  returned."
+  [is-allowed-fn inner-handler]
+  (fn [{:keys [request-method] :as request}]
+    (if (is-allowed-fn request-method)
+      (inner-handler request)
+      (response/method-not-allowed-response request-method))))

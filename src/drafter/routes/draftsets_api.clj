@@ -12,15 +12,14 @@
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.user :as user]
-            [drafter.middleware :refer [require-basic-authentication require-params]]
+            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]])
   (:import [org.openrdf.query TupleQueryResultHandler]
            [org.openrdf OpenRDFException]
            [org.openrdf.rio Rio]
-           [org.openrdf.rio.helpers StatementCollector]
-           [org.openrdf.model.impl URIImpl]))
+           [org.openrdf.rio.helpers StatementCollector]))
 
 (defn- is-quads-content-type? [rdf-format]
   (.supportsContexts rdf-format))
@@ -70,12 +69,6 @@
     (.setRDFHandler parser (StatementCollector. model))
     (.parse parser in-stream base-uri)
     (seq model)))
-
-(defn- allowed-methods-handler [is-allowed-fn inner-handler]
-  (fn [{:keys [request-method] :as request}]
-    (if (is-allowed-fn request-method)
-      (inner-handler request)
-      (method-not-allowed-response request-method))))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]

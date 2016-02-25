@@ -64,29 +64,47 @@
   (let [handler (require-authenticated identity)]
     (is (thrown? ExceptionInfo (handler {:uri "/foo" :request-method :get})))))
 
+(defn- notifying-handler [a]
+  (fn [r]
+    (reset! a true)
+    (response "")))
+
 (deftest required-authenticated-should-throw-if-unauthenticated
   (let [user (user/create-user "test@example.com" :publisher "sdlkf")
         request {:uri "/foo" :request-method :post :identity user}
-        inner-was-called (atom false)
-        inner-handler (fn [r] (reset! inner-was-called true) r)
-        handler (require-authenticated inner-handler)]
+        invoked-inner (atom false)
+        handler (require-authenticated (notifying-handler invoked-inner))]
     (handler request)
-    (is (= true @inner-was-called))))
+    (is (= true @invoked-inner))))
 
 (deftest require-params-test
   (testing "Request with params"
     (let [invoked-inner (atom false)
-          inner-handler (fn [r] (reset! invoked-inner true) (response ""))
-          wrapped-handler (require-params #{:p1 :p2} inner-handler)
+          wrapped-handler (require-params #{:p1 :p2} (notifying-handler invoked-inner))
           request {:uri "/test" :request-method :get :params {:p1 "p1" :p2 "p2" :other "other"}}
           response (wrapped-handler request)]
       (is @invoked-inner)))
 
   (testing "Request with missing params"
     (let [invoked-inner (atom false)
-          inner-handler (fn [r] (reset! invoked-inner true) (response ""))
-          wrapped-handler (require-params #{:p1 :p2} inner-handler)
+          wrapped-handler (require-params #{:p1 :p2} (notifying-handler invoked-inner))
           request {:uri "/test" :request-method :get :params {:p2 "p2" :p3 "p3"}}
           response (wrapped-handler request)]
       (is (= false @invoked-inner))
       (tc/assert-is-unprocessable-response response))))
+
+(deftest allowed-methods-handler-test
+  (testing "Allowed method"
+    (let [invoked-inner (atom false)
+          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
+          request {:uri "/test" :request-method :get}
+          response (wrapped-handler request)]
+      (is @invoked-inner)))
+
+  (testing "Disallowed method"
+    (let [invoked-inner (atom false)
+          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
+          request {:uri "/test" :request-method :delete}
+          response (wrapped-handler request)]
+      (is (= false @invoked-inner))
+      (tc/assert-is-method-not-allowed-response response))))
