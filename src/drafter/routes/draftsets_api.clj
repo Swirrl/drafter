@@ -15,17 +15,10 @@
             [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
+            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format? parse-stream-statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]])
   (:import [org.openrdf.query TupleQueryResultHandler]
-           [org.openrdf OpenRDFException]
-           [org.openrdf.rio Rio]
-           [org.openrdf.rio.helpers StatementCollector]))
-
-(defn- is-quads-content-type? [rdf-format]
-  (.supportsContexts rdf-format))
-
-(defn- is-triples-rdf-format? [rdf-format]
-  (not (is-quads-content-type? rdf-format)))
+           [org.openrdf OpenRDFException]))
 
 (defn- implies [p q]
   (or (not p) q))
@@ -61,14 +54,6 @@
          :headers {"Content-Type" accept-content-type}
          :body body})
       (not-acceptable-response "Failed to negotiate output content format"))))
-
-(defn- read-statements [in-stream format]
-  (let [parser (Rio/createParser format)
-        model (java.util.ArrayList.)
-        base-uri ""]
-    (.setRDFHandler parser (StatementCollector. model))
-    (.parse parser in-stream base-uri)
-    (seq model)))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
@@ -109,7 +94,7 @@
   (fn [{{rdf-format :rdf-format
          {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
     (try
-      (let [rdf-statements (read-statements data rdf-format)
+      (let [rdf-statements (parse-stream-statements data rdf-format)
             modified-request (assoc-in request [:params :rdf-statements] rdf-statements)]
         (inner-handler modified-request))
       (catch OpenRDFException ex
@@ -117,7 +102,7 @@
 
 (defn- require-graph-for-triples-rdf-format [inner-handler]
   (fn [{{:keys [graph rdf-format]} :params :as request}]
-    (if (implies (is-triples-rdf-format? rdf-format) (some? graph))
+    (if (implies (is-triples-format? rdf-format) (some? graph))
       (inner-handler request)
       (unprocessable-entity-response "Graph parameter required for triples RDF format"))))
 
@@ -187,7 +172,7 @@
                   (rdf-response-format-handler
                    (require-graph-for-triples-rdf-format
                     (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
-                      (if (is-quads-content-type? rdf-format)
+                      (if (is-quads-format? rdf-format)
                         (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]) (or union-with-live false))
                         (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                               query-request (assoc-in request [:params :query] q)]
@@ -203,7 +188,7 @@
                             rdf-format :rdf-format
                             statements-to-delete :rdf-statements} :params :as request}]
                        (let [ds-executor (get-draftset-executor backend draftset-id)
-                             delete-job (if (is-quads-content-type? rdf-format)
+                             delete-job (if (is-quads-format? rdf-format)
                                             (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
                                             (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
                          (submit-async-job! delete-job))))))))
@@ -234,7 +219,7 @@
                            content-type :rdf-content-type
                            graph :graph
                            {data :tempfile} :file} :params}]
-                      (if (is-quads-content-type? rdf-format)
+                      (if (is-quads-format? rdf-format)
                         (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
                           (submit-async-job! append-job))
                         (let [append-job (append-triples-to-draftset-job backend draftset-id data rdf-format graph)]
