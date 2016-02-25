@@ -1089,7 +1089,7 @@
         revert-request (revert-draftset-graph-changes-request draftset-location test-editor "tmp")
         revert-request (update-in revert-request [:params] dissoc :graph)
         response (route revert-request)]
-    (assert-is-bad-request-response response)))
+    (assert-is-unprocessable-response response)))
 
 (defn- copy-live-graph-into-draftset-request [draftset-location user live-graph]
   (with-identity user
