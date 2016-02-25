@@ -43,6 +43,14 @@
                 "}")
               )))
 
+(defn is-graph-live? [db graph-uri]
+  (query db
+         (str "ASK WHERE {"
+              (with-state-graph
+                "<" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ."
+                "<" graph-uri "> <" drafter:isPublic "> true ."
+                "}"))))
+
 (defn draft-exists?
   "Checks state graph to see if a draft graph exists"
   [db graph-uri]

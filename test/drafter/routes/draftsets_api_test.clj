@@ -588,13 +588,11 @@
 
 (deftest delete-non-existent-live-graph-in-draftset
   (let [draftset-location (create-draftset-through-api test-editor)
-        graph-to-delete "http://live-graph"]
-    (delete-draftset-graph-through-api test-editor draftset-location graph-to-delete)
+        graph-to-delete "http://live-graph"
+        delete-request (delete-draftset-graph-request test-editor draftset-location "http://live-graph")
+        delete-response (route delete-request)]
 
-    (let [draftset-info (get-draftset-info-through-api draftset-location test-editor)]
-      ;;graph to delete should NOT exist in the draftset since it did not exist in live
-      ;;at the time of the delete
-      (is (= #{} (set (keys (:data draftset-info))))))))
+    (assert-is-unprocessable-response delete-response)))
 
 (deftest delete-live-graph-not-in-draftset
   (let [quads (statements "test/resources/test-draftset.trig")
@@ -1180,7 +1178,7 @@
   (let [draftset-location (create-draftset-through-api test-editor)
         copy-request (copy-live-graph-into-draftset-request draftset-location test-editor "http://missing")
         copy-response (route copy-request)]
-    (assert-is-not-found-response copy-response)))
+    (assert-is-unprocessable-response copy-response)))
 
 (deftest copy-live-graph-into-non-existent-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]

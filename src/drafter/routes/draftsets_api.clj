@@ -124,6 +124,16 @@
 
 (defn draftset-api-routes [backend user-repo realm]
   (letfn [(authorised [h] (require-basic-authentication user-repo realm h))
+          (required-live-graph-param [inner-handler]
+            (fn [{{:keys [graph]} :params :as request}]
+              (if (mgmt/is-graph-live? backend graph)
+                (inner-handler request)
+                (unprocessable-entity-response (str "Graph not found in live")))))
+          (required-managed-graph-param [inner-handler]
+            (fn [{{:keys [graph]} :params :as request}]
+              (if (mgmt/is-graph-managed? backend graph)
+                (inner-handler request)
+                (unprocessable-entity-response (str "Graph not found")))))
           (as-draftset-owner [h]
             (authorised
              (existing-draftset-handler
@@ -201,9 +211,10 @@
 
      (make-route :delete "/draftset/:id/graph"
                  (as-draftset-owner
-                  (fn [{{:keys [draftset-id graph]} :params}]
-                      (dsmgmt/delete-draftset-graph! backend draftset-id graph)
-                      (response {}))))
+                  (required-managed-graph-param
+                   (fn [{{:keys [draftset-id graph]} :params}]
+                     (dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                     (response "")))))
 
      (make-route :delete "/draftset/:id/changes"
                  (as-draftset-owner
@@ -234,10 +245,9 @@
 
      (make-route :put "/draftset/:id/graph"
                  (as-draftset-owner
-                  (fn [{{:keys [draftset-id graph]} :params}]
-                    (if (mgmt/is-graph-managed? backend graph)                        
-                      (submit-async-job! (dsmgmt/copy-live-graph-into-draftset-job backend draftset-id graph))
-                      (not-found (str "Graph " graph " does not exist"))))))
+                  (required-live-graph-param
+                   (fn [{{:keys [draftset-id graph]} :params}]            
+                    (submit-async-job! (dsmgmt/copy-live-graph-into-draftset-job backend draftset-id graph))))))
 
      (make-route nil "/draftset/:id/query"
                  (allowed-methods-handler

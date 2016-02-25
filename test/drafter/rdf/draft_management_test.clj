@@ -69,6 +69,18 @@
       (create-managed-graph! *test-backend* test-graph-uri)
       (is (is-graph-managed? *test-backend* test-graph-uri)))))
 
+(deftest is-graph-live?-test
+  (testing "Non-existent graph"
+    (is (= false (is-graph-live? *test-backend* "http://missing"))))
+
+  (testing "Non-live graph"
+    (let [graph-uri (create-managed-graph! *test-backend* "http://live")]
+      (is (= false (is-graph-live? *test-backend* graph-uri)))))
+
+  (testing "Live graph"
+    (let [graph-uri (make-graph-live! *test-backend* "http://live")]
+      (is (is-graph-live? *test-backend* graph-uri)))))
+
 (deftest create-draft-graph!-test
   (testing "create-draft-graph!"
 
