@@ -54,3 +54,10 @@
   (are [col value expected] (= expected (seq-contains? col value))
        [:a :b :c] :a true
        [:a :b :c] :d false))
+
+(deftest implies-test
+  (are [p q expected] (= expected (implies p q))
+       true true true
+       true false false
+       false true true
+       false false true))

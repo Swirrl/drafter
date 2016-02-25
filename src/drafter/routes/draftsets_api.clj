@@ -20,9 +20,6 @@
   (:import [org.openrdf.query TupleQueryResultHandler]
            [org.openrdf OpenRDFException]))
 
-(defn- implies [p q]
-  (or (not p) q))
-
 (defn- get-draftset-executor [backend draftset-ref]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
         live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)]
@@ -102,7 +99,7 @@
 
 (defn- require-graph-for-triples-rdf-format [inner-handler]
   (fn [{{:keys [graph rdf-format]} :params :as request}]
-    (if (implies (is-triples-format? rdf-format) (some? graph))
+    (if (util/implies (is-triples-format? rdf-format) (some? graph))
       (inner-handler request)
       (unprocessable-entity-response "Graph parameter required for triples RDF format"))))
 
