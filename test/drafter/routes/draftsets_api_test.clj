@@ -1,7 +1,5 @@
 (ns drafter.routes.draftsets-api-test
-  (:require [drafter.test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-db-setup
-                                         stream->string select-all-in-graph make-graph-live!
-                                         import-data-to-draft! await-success key-set]]
+  (:require [drafter.test-common :refer :all]
             [clojure.test :refer :all]
             [clojure.set :as set]
             [drafter.routes.draftsets-api :refer :all]
@@ -84,18 +82,13 @@
         response (route request)]
     (await-success finished-jobs (get-in response [:body :finished-job]))))
 
-(def ring-response-schema
-  {:status s/Int
-   :headers {s/Str s/Str}
-   :body s/Any})
-
 (def see-other-response-schema
   (merge ring-response-schema
          {:status (s/eq 303)
           :headers {(s/required-key "Location") s/Str}}))
 
-(defn- response-code-schema [code]
-  (assoc ring-response-schema :status (s/eq code)))
+(defn assert-is-see-other-response [response]
+  (assert-schema see-other-response-schema response))
 
 (def ^:private draftset-without-title-or-description-info-schema
   {:id s/Str
@@ -115,40 +108,6 @@
   (merge draftset-without-title-or-description-info-schema
          {(s/optional-key :description) s/Str
           (s/optional-key :display-name) s/Str}))
-
-(defn- assert-schema [schema value]
-  (if-let [errors (s/check schema value)]
-    (is false errors)))
-
-(defn- assert-is-see-other-response [response]
-  (assert-schema see-other-response-schema response))
-
-(defn- assert-is-ok-response [response]
-  (assert-schema (response-code-schema 200) response))
-
-(defn- assert-is-not-found-response [response]
-  (assert-schema (response-code-schema 404) response))
-
-(defn- assert-is-not-acceptable-response [response]
-  (assert-schema (response-code-schema 406) response))
-
-(defn- assert-is-unprocessable-response [response]
-  (assert-schema (response-code-schema 422) response))
-
-(defn- assert-is-unsupported-media-type-response [response]
-  (assert-schema (response-code-schema 415) response))
-
-(defn- assert-is-method-not-allowed-response [response]
-  (assert-schema (response-code-schema 405) response))
-
-(defn assert-is-forbidden-response [response]
-  (assert-schema (response-code-schema 403) response))
-
-(defn assert-is-unauthorised-response [response]
-  (assert-schema (response-code-schema 401) response))
-
-(defn assert-is-bad-request-response [response]
-  (assert-schema (response-code-schema 400) response))
 
 (defn- eval-statement [s]
   (util/map-values str s))
@@ -562,7 +521,7 @@
       (let [file-part {:tempfile input-stream :filename "to-delete.nt" :content-type "application/n-triples"}
             delete-request (with-identity test-editor {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}})
             delete-response (route delete-request)]
-        (assert-is-not-acceptable-response delete-response)))))
+        (assert-is-unprocessable-response delete-response)))))
 
 (deftest delete-draftset-data-for-non-existent-draftset
   (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
@@ -829,10 +788,10 @@
         response (route request)]
     (assert-is-not-found-response response)))
 
-(deftest query-draftest-request-with-missing-query-parameter
+(deftest query-draftset-request-with-missing-query-parameter
   (let [draftset-location (create-draftset-through-api test-editor)
         response (route (with-identity test-editor {:uri (str draftset-location "/query") :request-method :post}))]
-    (assert-is-not-acceptable-response response)))
+    (assert-is-unprocessable-response response)))
 
 (deftest query-draftset-request-with-invalid-http-method
   (let [draftset-location (create-draftset-through-api test-editor)
@@ -921,7 +880,7 @@
                         :headers {"Accept" "application/n-triples"}}
           data-request (with-identity test-editor data-request)
           data-response (route data-request)]
-      (assert-is-not-acceptable-response data-response))))
+      (assert-is-unprocessable-response data-response))))
 
 (deftest get-draftset-data-for-missing-draftset
   (let [response (route (with-identity test-manager {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}}))]

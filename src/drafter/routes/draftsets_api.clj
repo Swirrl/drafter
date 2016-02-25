@@ -12,7 +12,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.user :as user]
-            [drafter.middleware :refer [require-basic-authentication]]
+            [drafter.middleware :refer [require-basic-authentication require-params]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]])
@@ -122,18 +122,22 @@
       (catch OpenRDFException ex
         (unprocessable-entity-response "Cannot read statements to delete")))))
 
+(defn- required-managed-graph-param-handler [backend inner-handler]
+  (fn [{{:keys [graph]} :params :as request}]
+    (if (mgmt/is-graph-managed? backend graph)
+      (inner-handler request)
+      (unprocessable-entity-response (str "Graph not found")))))
+
+(defn- required-live-graph-param-handler [backend inner-handler]
+  (fn [{{:keys [graph]} :params :as request}]
+    (if (mgmt/is-graph-live? backend graph)
+      (inner-handler request)
+      (unprocessable-entity-response (str "Graph not found in live")))))
+
 (defn draftset-api-routes [backend user-repo realm]
   (letfn [(authorised [h] (require-basic-authentication user-repo realm h))
-          (required-live-graph-param [inner-handler]
-            (fn [{{:keys [graph]} :params :as request}]
-              (if (mgmt/is-graph-live? backend graph)
-                (inner-handler request)
-                (unprocessable-entity-response (str "Graph not found in live")))))
-          (required-managed-graph-param [inner-handler]
-            (fn [{{:keys [graph]} :params :as request}]
-              (if (mgmt/is-graph-managed? backend graph)
-                (inner-handler request)
-                (unprocessable-entity-response (str "Graph not found")))))
+          (required-live-graph-param [h] (required-live-graph-param-handler backend h))
+          (required-managed-graph-param [h] (required-managed-graph-param-handler backend h))
           (as-draftset-owner [h]
             (authorised
              (existing-draftset-handler
@@ -189,7 +193,7 @@
                          (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                                query-request (assoc-in request [:params :query] q)]
                            (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))
-                         (not-acceptable-response "graph query parameter required for RDF triple format")))))))
+                         (unprocessable-entity-response "graph query parameter required for RDF triple format")))))))
 
      (make-route :delete "/draftset/:id/data"
                  (as-draftset-owner
@@ -207,7 +211,7 @@
                                              (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
                                              (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
                             (submit-async-job! delete-job))
-                          (not-acceptable-response "graph parameter required for triples RDF format"))))))))
+                          (unprocessable-entity-response "graph parameter required for triples RDF format"))))))))
 
      (make-route :delete "/draftset/:id/graph"
                  (as-draftset-owner
@@ -253,14 +257,14 @@
                  (allowed-methods-handler
                   #{:get :post}
                   (as-draftset-owner
-                   (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
-                     (if (nil? query)
-                       (not-acceptable-response "query parameter required")
-                       (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
-                             uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
-                             rewriting-executor (create-rewriter backend uri-graph-mapping)
-                             graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
-                         (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
+                   (require-params
+                    #{:query}
+                    (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
+                      (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
+                            uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
+                            rewriting-executor (create-rewriter backend uri-graph-mapping)
+                            graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
+                        (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
 
      (make-route :post "/draftset/:id/publish"
                  (as-draftset-owner

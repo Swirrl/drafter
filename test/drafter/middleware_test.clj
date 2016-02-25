@@ -1,10 +1,12 @@
 (ns drafter.middleware-test
   (:require [drafter.middleware :refer :all]
             [clojure.test :refer :all]
+            [ring.util.response :refer [response]]
             [buddy.core.codecs :refer [str->base64]]
             [buddy.auth :as auth]
             [drafter.user :as user]
-            [drafter.user.memory-repository :as memory-repo])
+            [drafter.user.memory-repository :as memory-repo]
+            [drafter.test-common :as tc])
   (:import [clojure.lang ExceptionInfo]))
 
 (defn- add-auth-header [m username password]
@@ -70,3 +72,21 @@
         handler (require-authenticated inner-handler)]
     (handler request)
     (is (= true @inner-was-called))))
+
+(deftest require-params-test
+  (testing "Request with params"
+    (let [invoked-inner (atom false)
+          inner-handler (fn [r] (reset! invoked-inner true) (response ""))
+          wrapped-handler (require-params #{:p1 :p2} inner-handler)
+          request {:uri "/test" :request-method :get :params {:p1 "p1" :p2 "p2" :other "other"}}
+          response (wrapped-handler request)]
+      (is @invoked-inner)))
+
+  (testing "Request with missing params"
+    (let [invoked-inner (atom false)
+          inner-handler (fn [r] (reset! invoked-inner true) (response ""))
+          wrapped-handler (require-params #{:p1 :p2} inner-handler)
+          request {:uri "/test" :request-method :get :params {:p2 "p2" :p3 "p3"}}
+          response (wrapped-handler request)]
+      (is (= false @invoked-inner))
+      (tc/assert-is-unprocessable-response response))))

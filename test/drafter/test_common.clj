@@ -16,7 +16,8 @@
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
-            [swirrl-server.async.jobs :refer [create-job]])
+            [swirrl-server.async.jobs :refer [create-job]]
+            [schema.core :as s])
   (:import [java.util Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
            [org.mindrot.jbcrypt BCrypt]))
@@ -182,3 +183,41 @@
   [m]
   (set (keys m)))
 
+(defn assert-schema [schema value]
+  (if-let [errors (s/check schema value)]
+    (is false errors)))
+
+(def ring-response-schema
+  {:status s/Int
+   :headers {s/Str s/Str}
+   :body s/Any})
+
+(defn response-code-schema [code]
+  (assoc ring-response-schema :status (s/eq code)))
+
+(defn assert-is-ok-response [response]
+  (assert-schema (response-code-schema 200) response))
+
+(defn assert-is-not-found-response [response]
+  (assert-schema (response-code-schema 404) response))
+
+(defn assert-is-not-acceptable-response [response]
+  (assert-schema (response-code-schema 406) response))
+
+(defn assert-is-unprocessable-response [response]
+  (assert-schema (response-code-schema 422) response))
+
+(defn assert-is-unsupported-media-type-response [response]
+  (assert-schema (response-code-schema 415) response))
+
+(defn assert-is-method-not-allowed-response [response]
+  (assert-schema (response-code-schema 405) response))
+
+(defn assert-is-forbidden-response [response]
+  (assert-schema (response-code-schema 403) response))
+
+(defn assert-is-unauthorised-response [response]
+  (assert-schema (response-code-schema 401) response))
+
+(defn assert-is-bad-request-response [response]
+  (assert-schema (response-code-schema 400) response))

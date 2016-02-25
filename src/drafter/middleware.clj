@@ -1,6 +1,8 @@
 (ns drafter.middleware
   (:require [clj-logging-config.log4j :as l4j]
             [clojure.tools.logging :as log]
+            [clojure.string :as string]
+            [clojure.set :as set]
             [environ.core :refer [env]]
             [selmer.parser :as parser]
             [drafter.responses :as response]
@@ -61,3 +63,9 @@
   through HTTP Basic authentication."
   [user-repo realm inner-handler]
   (basic-authentication user-repo realm (require-authenticated inner-handler)))
+
+(defn require-params [required-keys inner-handler]
+  (fn [{:keys [params] :as request}]
+    (if-let [missing-keys (seq (set/difference required-keys (set (keys params))))]
+      (response/unprocessable-entity-response (str "Missing required parameters: " (string/join "," (map name missing-keys))))
+      (inner-handler request))))
