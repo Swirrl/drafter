@@ -1,4 +1,4 @@
-(ns drafter.operations-tests
+(ns drafter.operations-test
   (:require [drafter.operations :refer :all]
             [clojure.test :refer :all])
   (:import [java.util.concurrent Future FutureTask Executors Executor TimeUnit]
@@ -93,7 +93,7 @@
         completed1 (atom (completed-future))
         categorised {:timed-out {timed-out1 {} timed-out2 {}} :in-progress {in-progress1 {}} :completed {completed1 {}}}
         remaining (process-categorised categorised)]
-    
+
     (testing "should cancel timed-out operations"
       (is (= true (.isCancelled @timed-out1)))
       (is (= true (.isCancelled @timed-out2))))
@@ -106,7 +106,7 @@
         key :op
         operations (atom {:op {}})
         publish-fn (create-operation-publish-fn :op (fixed-clock now) operations)]
-    
+
     (publish-fn)
 
     (let [timestamp (get-in @operations [:op :timestamp])]
@@ -119,7 +119,7 @@
         ran-op (atom false)
         expected-state (assoc timeouts :started-at now)
         {:keys [operations-atom operation-ref] :as operation} (create-operation operations (fixed-clock now))]
-    
+
     (execute-operation operation #(reset! ran-op true) timeouts (current-thread-executor))
 
     (is (= true @ran-op))

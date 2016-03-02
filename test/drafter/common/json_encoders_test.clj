@@ -1,4 +1,4 @@
-(ns drafter.common.json-encoders-tests
+(ns drafter.common.json-encoders-test
   (:require [drafter.common.json-encoders :refer :all]
             [clojure.test :refer :all]
             [cheshire.core :refer [generate-string parse-string]]))

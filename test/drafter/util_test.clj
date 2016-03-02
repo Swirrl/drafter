@@ -1,4 +1,4 @@
-(ns drafter.util-tests
+(ns drafter.util-test
   (:require [drafter.util :refer :all]
             [clojure.test :refer :all]
             [clojure.math.combinatorics :refer [permutations]]))
