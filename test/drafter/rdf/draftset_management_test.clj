@@ -79,12 +79,12 @@
   (testing "Is owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
       (is (= true (is-draftset-owner? *test-backend* draftset-id test-editor)))))
-  
+
   (testing "Has no owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
       (offer-draftset! *test-backend* draftset-id test-editor :publisher)
       (is (= false (is-draftset-owner? *test-backend* draftset-id test-editor)))))
-  
+
   (testing "Has different owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
       (is (= false (is-draftset-owner? *test-backend* draftset-id test-publisher))))))
@@ -92,7 +92,7 @@
 (deftest delete-draftset-statements!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
     (delete-draftset-statements! *test-backend* draftset-id)
-    (is (= false (ask? (str "<" draftset-uri ">") "?p" "?o")))))
+    (is (= false (ask? (str "<" (draftset-uri draftset-id) ">") "?p" "?o")))))
 
 (defn- import-data-to-draftset! [db draftset-id quads]
   (let [graph-quads (group-by context quads)]
@@ -102,7 +102,7 @@
   (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
         quads (statements "test/resources/test-draftset.trig")
         draft-graphs (import-data-to-draftset! *test-backend* draftset-id quads)]
-    
+
     (doseq [dg draft-graphs]
       (is (= true (draft-exists? *test-backend* dg))))
 
