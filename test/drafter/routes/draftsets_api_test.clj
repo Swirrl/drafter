@@ -51,7 +51,7 @@
   ([user] (create-draftset-request user nil))
   ([user display-name] (create-draftset-request user display-name nil))
   ([user display-name description]
-   (with-identity user {:uri "/draftset" :request-method :post :params {:display-name display-name :description description}})))
+   (with-identity user {:uri "/draftsets" :request-method :post :params {:display-name display-name :description description}})))
 
 (defn- make-append-data-to-draftset-request [user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
@@ -227,7 +227,7 @@
     (assert-is-ok-response response)))
 
 (deftest create-draftset-without-title-or-description
-  (let [response (route (with-identity test-editor {:uri "/draftset" :request-method :post}))]
+  (let [response (route (with-identity test-editor {:uri "/draftsets" :request-method :post}))]
     (assert-is-see-other-response response)))
 
 (deftest create-draftset-with-title-and-without-description
@@ -275,7 +275,7 @@
   (let [display-name "Test title!"
         description "Draftset used in a test"
         draftset-location (create-draftset-through-api test-editor display-name description)]
-    
+
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
       (assert-schema draftset-with-description-info-schema ds-info)
       (is (= display-name (:display-name ds-info)))
@@ -287,10 +287,10 @@
         quads (statements "test/resources/test-draftset.trig")
         live-graphs (set (keys (group-by context quads)))]
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
-    
+
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
       (assert-schema draftset-without-description-info-schema ds-info)
-      
+
       (is (= display-name (:display-name ds-info)))
       (is (= live-graphs (key-set (:data ds-info)))))))
 
@@ -434,7 +434,7 @@
         grouped-quads (group-by context draftset-quads)]
 
     (append-quads-to-draftset-through-api test-editor draftset-location draftset-quads)
-    
+
     (let [
           ;;NOTE: input data should contain at least two statements in each graph!
           ;;delete one quad from each, so all graphs will be non-empty after delete operation
@@ -487,7 +487,7 @@
         [graph graph-quads] (first (group-by context draftset-quads))
         quads-to-delete (take 2 graph-quads)
         triples-to-delete (map map->Triple quads-to-delete)]
-    
+
     (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
 
     (let [draftset-info (delete-draftset-triples-through-api test-editor draftset-location triples-to-delete graph)
@@ -502,7 +502,7 @@
         triples-to-delete (map map->Triple graph-quads)
         draftset-location (create-draftset-through-api test-editor)
         draftset-quads (set (statements "test/resources/test-draftset.trig"))]
-    
+
     (publish-quads-through-api quads)
 
     (let [draftset-info (delete-draftset-triples-through-api test-editor draftset-location triples-to-delete graph)
@@ -586,7 +586,7 @@
     (append-data-to-draftset-through-api test-editor draftset-location rdf-data-file)
 
     (delete-draftset-graph-through-api test-editor draftset-location graph)
-    
+
     (let [remaining-quads (eval-statements (get-draftset-quads-through-api draftset-location test-editor))
           expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
       (is (= (set expected-quads) (set remaining-quads))))
@@ -625,7 +625,7 @@
         draftset-location (create-draftset-through-api test-publisher)
         initial-live-quads (map (comp first second) grouped-quads)
         appended-quads (mapcat (comp rest second) grouped-quads)]
-    
+
     (publish-quads-through-api initial-live-quads)
     (append-quads-to-draftset-through-api test-publisher draftset-location appended-quads)
     (publish-draftset-through-api draftset-location test-publisher)
@@ -716,7 +716,7 @@
         draftset-location (create-draftset-through-api test-editor)
         delete-response (route (create-delete-draftset-request draftset-location test-editor))]
     (assert-is-ok-response delete-response)
-    
+
     (let [get-response (route (with-identity test-editor {:uri draftset-location :request-method :get}))]
       (assert-is-not-found-response get-response))))
 

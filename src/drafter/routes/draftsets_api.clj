@@ -127,7 +127,7 @@
     (routes
 
      (make-route :get "/draftsets"
-                 (authorised 
+                 (authorised
                   (fn [{user :identity :as request}]
                     (response (dsmgmt/get-all-draftsets-info backend user)))))
 
@@ -137,7 +137,7 @@
                     (response (dsmgmt/get-draftsets-offered-to backend user)))))
 
      ;;create a new draftset
-     (make-route :post "/draftset"
+     (make-route :post "/draftsets"
                  (authorised
                   (fn [{{:keys [display-name description]} :params user :identity :as request}]
                     (let [draftset-id (dsmgmt/create-draftset! backend user display-name description)]
@@ -171,6 +171,8 @@
                     (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
                       (if (is-quads-format? rdf-format)
                         (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]) (or union-with-live false))
+
+                        ;; TODO fix this as it's vulnerable to SPARQL injection
                         (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                               query-request (assoc-in request [:params :query] q)]
                           (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))))))))
@@ -225,7 +227,7 @@
      (make-route :put "/draftset/:id/graph"
                  (as-draftset-owner
                   (required-live-graph-param
-                   (fn [{{:keys [draftset-id graph]} :params}]            
+                   (fn [{{:keys [draftset-id graph]} :params}]
                     (submit-async-job! (dsmgmt/copy-live-graph-into-draftset-job backend draftset-id graph))))))
 
      (make-route nil "/draftset/:id/query"
