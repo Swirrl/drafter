@@ -20,7 +20,8 @@
             [schema.core :as s])
   (:import [java.util Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
-           [org.mindrot.jbcrypt BCrypt]))
+           [org.mindrot.jbcrypt BCrypt]
+           [java.io ByteArrayInputStream]))
 
 (def ^:dynamic *test-backend*)
 
@@ -221,3 +222,6 @@
 
 (defn assert-is-bad-request-response [response]
   (assert-schema (response-code-schema 400) response))
+
+(defn string->input-stream [s]
+  (ByteArrayInputStream. (.getBytes s)))

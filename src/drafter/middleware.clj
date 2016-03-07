@@ -9,6 +9,7 @@
             [drafter.responses :as response]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
+            [drafter.rdf.sesame :refer [parse-stream-statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [buddy.auth :as auth]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
@@ -16,7 +17,8 @@
             [cemerick.friend :as friend]
             [cemerick.friend.workflows :as friend-workflows]
             [ring.util.request :as request]
-            [pantomime.media :refer [media-type-named]]))
+            [pantomime.media :refer [media-type-named]])
+  (:import [org.openrdf OpenRDFException]))
 
 (defn log-request [handler]
   (fn [req]
@@ -98,7 +100,7 @@
           (inner-handler request)))
       (response/unprocessable-entity-response "Content type required"))))
 
-(defn rdf-content-type-handler
+(defn require-rdf-content-type
   "Wraps a ring handler in one which requires the incoming request has
   a content type which maps to a known serialisation format for
   RDF. If the content type does not exist or is invalid, a 422
@@ -117,3 +119,21 @@
                                                                   :rdf-content-type content-type})]
            (inner-handler modified-request))
          (response/unsupported-media-type-response  (str "Unsupported media type: " content-type)))))))
+
+(defn read-body-rdf-statements
+  "Returns a handler which attempts to parse RDF statements from the
+  body of an incoming request and associates the resulting sequence
+  with the rdf-statements key in the request params map. If the
+  parsing process or the inner handler throw a Sesame parse exception,
+  a 422 Unprocessable Entity response is returned. NOTE: This
+  middleware expects an rdf-format key to exist in the params map of
+  the incoming request, so should follow a middleware which populates
+  it such as require-rdf-content-type."
+  [inner-handler]
+  (fn [{{:keys [rdf-format]} :params body :body :as request}]
+    (try
+      (let [rdf-statements (parse-stream-statements body rdf-format)
+            modified-request (assoc-in request [:params :rdf-statements] rdf-statements)]
+        (inner-handler modified-request))
+      (catch OpenRDFException ex
+        (response/unprocessable-entity-response "Error parsing RDF")))))

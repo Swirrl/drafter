@@ -2,6 +2,7 @@
   (:require [drafter.middleware :refer :all]
             [grafter.rdf.formats :as formats]
             [clojure.test :refer :all]
+            [clojure.java.io :as io]
             [ring.util.response :refer [response]]
             [buddy.core.codecs :refer [str->base64]]
             [buddy.auth :as auth]
@@ -134,10 +135,10 @@
   (testing "With malformed content type"
     (assert-unprocessable-with-malformed-content-type (require-content-type ok-handler))))
 
-(deftest rdf-content-type-handler-test
+(deftest required-rdf-content-type-test
   (testing "With valid RDF content type"
-    (let [inner-handler (fn [req] (:params req))
-          wrapped-handler (rdf-content-type-handler inner-handler)
+    (let [handler (fn [req] (:params req))
+          wrapped-handler (require-rdf-content-type handler)
           content-type (.getDefaultMIMEType formats/rdf-nquads)
           request {:uri "/test" :headers {"content-type" content-type}}
           {:keys [rdf-format rdf-content-type]} (wrapped-handler request)]
@@ -145,13 +146,29 @@
       (is (= formats/rdf-nquads rdf-format))))
 
   (testing "With unknown RDF content type"
-    (let [handler (rdf-content-type-handler ok-handler)
+    (let [handler (require-rdf-content-type ok-handler)
           request {:uri "/test" :headers {"content-type" "text/notrdf"}}
           response (handler request)]
       (tc/assert-is-unsupported-media-type-response response)))
 
   (testing "With no content type"
-    (assert-unprocessable-with-no-content-type (rdf-content-type-handler ok-handler)))
+    (assert-unprocessable-with-no-content-type (require-rdf-content-type ok-handler)))
 
   (testing "With malformed content type"
-    (assert-unprocessable-with-malformed-content-type (rdf-content-type-handler ok-handler))))
+    (assert-unprocessable-with-malformed-content-type (require-rdf-content-type ok-handler))))
+
+(deftest read-body-rdf-statements-test
+  (testing "Valid body"
+    (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
+      (let [inner-handler (fn [{{:keys [rdf-statements]} :params}] (doall rdf-statements) (response "OK"))
+            handler (read-body-rdf-statements inner-handler)
+            request {:uri "/test" :body fs :params {:rdf-format formats/rdf-trig}}
+            response (handler request)]
+        (tc/assert-is-ok-response response))))
+
+  (testing "Invalid body"
+    (let [inner-handler (fn [{{:keys [rdf-statements]} :params}] (doall rdf-statements) (response "OK"))
+          handler (read-body-rdf-statements inner-handler)
+          request {:uri "/test" :body (tc/string->input-stream "NOT NQUADS") :params {:rdf-format formats/rdf-nquads}}
+          response (handler request)]
+      (tc/assert-is-unprocessable-response response))))
