@@ -1,6 +1,7 @@
 (ns drafter.routes.draftsets-api
   (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes make-route]]
             [clojure.set :as set]
+            [taoensso.timbre :as log]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response
                                        unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!]]
@@ -16,7 +17,8 @@
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format? parse-stream-statements]]
-            [grafter.rdf.io :refer [mimetype->rdf-format]])
+            [grafter.rdf.io :refer [mimetype->rdf-format]]
+            [clojure.java.io :as io])
   (:import [org.openrdf.query TupleQueryResultHandler]
            [org.openrdf OpenRDFException]))
 
@@ -91,7 +93,7 @@
   (fn [{{rdf-format :rdf-format
          {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
     (try
-      (let [rdf-statements (parse-stream-statements data rdf-format)
+      (let [rdf-statements (parse-stream-statements (io/input-stream data) rdf-format)
             modified-request (assoc-in request [:params :rdf-statements] rdf-statements)]
         (inner-handler modified-request))
       (catch OpenRDFException ex
