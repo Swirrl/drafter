@@ -118,29 +118,29 @@
       (unprocessable-entity-response (str "Graph not found in live")))))
 
 (defn draftset-api-routes [backend user-repo realm]
-  (letfn [(authorised [h] (require-basic-authentication user-repo realm h))
+  (letfn [(authenticated [h] (require-basic-authentication user-repo realm h))
           (required-live-graph-param [h] (required-live-graph-param-handler backend h))
           (required-managed-graph-param [h] (required-managed-graph-param-handler backend h))
           (as-draftset-owner [h]
-            (authorised
+            (authenticated
              (existing-draftset-handler
               backend
               (restrict-to-draftset-owner backend h))))]
     (routes
 
      (make-route :get "/draftsets"
-                 (authorised
+                 (authenticated
                   (fn [{user :identity :as request}]
                     (response (dsmgmt/get-all-draftsets-info backend user)))))
 
      (make-route :get "/draftsets/submitted"
-                 (authorised
+                 (authenticated
                   (fn [{user :identity :as request}]
                     (response (dsmgmt/get-draftsets-submitted-to backend user)))))
 
      ;;create a new draftset
      (make-route :post "/draftsets"
-                 (authorised
+                 (authenticated
                   (fn [{{:keys [display-name description]} :params user :identity :as request}]
                     (let [draftset-id (dsmgmt/create-draftset! backend user display-name description)]
                       (redirect-after-post (str "/draftset/" draftset-id))))))
@@ -159,7 +159,7 @@
                       (response ""))))
 
      (make-route :options "/draftset/:id"
-                 (authorised
+                 (authenticated
                   (existing-draftset-handler
                    backend
                    (fn [{{:keys [draftset-id]} :params user :identity}]
@@ -268,7 +268,7 @@
                         (swirrl-server.responses/bad-request-response (str "Invalid role: " role)))))))
 
      (make-route :put "/draftset/:id/claim"
-                 (authorised
+                 (authenticated
                   (existing-draftset-handler
                    backend
                    (fn [{{:keys [draftset-id]} :params user :identity}]
