@@ -217,9 +217,7 @@ paths:
         '200':
           description: The graph was deleted successfully
           schema:
-            - $ref: '#/definitions/Draftset'
-            - $ref: '#/parameters/messagenonote'
-
+            $ref: '#/definitions/Draftset'
   /draftset/{id}/data:
     put:
       summary: Append the supplied RDF data to this Draftset
