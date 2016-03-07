@@ -184,8 +184,8 @@
   (set (keys m)))
 
 (defn assert-schema [schema value]
-  (if-let [errors (s/check schema value)]
-    (is false errors)))
+  (let [errors (s/check schema value)]
+    (is (not errors) errors)))
 
 (def ring-response-schema
   {:status s/Int
