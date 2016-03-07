@@ -5,14 +5,18 @@
             [clojure.set :as set]
             [environ.core :refer [env]]
             [selmer.parser :as parser]
+            [drafter.util :as util]
             [drafter.responses :as response]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
+            [grafter.rdf.io :refer [mimetype->rdf-format]]
             [buddy.auth :as auth]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [cemerick.friend :as friend]
-            [cemerick.friend.workflows :as friend-workflows]))
+            [cemerick.friend.workflows :as friend-workflows]
+            [ring.util.request :as request]
+            [pantomime.media :refer [media-type-named]]))
 
 (defn log-request [handler]
   (fn [req]
@@ -80,3 +84,36 @@
     (if (is-allowed-fn request-method)
       (inner-handler request)
       (response/method-not-allowed-response request-method))))
+
+(defn require-content-type
+  "Wraps a ring handler in one which requires the incoming request has
+  a valid content type. If no content type is present, or if it is
+  malformed, a 422 Unprocessable Entity response is returned."
+  [inner-handler]
+  (fn [request]
+    (if-let [content-type (request/content-type request)]
+      (let [media-type (media-type-named content-type)]
+        (if (nil? media-type)
+          (response/unprocessable-entity-response (str "Invalid content type: " content-type))
+          (inner-handler request)))
+      (response/unprocessable-entity-response "Content type required"))))
+
+(defn rdf-content-type-handler
+  "Wraps a ring handler in one which requires the incoming request has
+  a content type which maps to a known serialisation format for
+  RDF. If the content type does not exist or is invalid, a 422
+  Unprocessable Entity response is returned. If the content type does
+  not map to a known RDF format, a 415 Unsupported Media Type response
+  is returned. Otherwise the inner handler will be invoked with a
+  request containing two extra keys in the request parameters:
+    - rdf-format A sesame RDFFormat instance for the format
+    - rdf-content-type The content type for the request"
+  [inner-handler]
+  (require-content-type
+   (fn [request]
+     (let [content-type (request/content-type request)]
+       (if-let [rdf-format (mimetype->rdf-format content-type)]
+         (let [modified-request (util/merge-in request [:params] {:rdf-format rdf-format
+                                                                  :rdf-content-type content-type})]
+           (inner-handler modified-request))
+         (response/unsupported-media-type-response  (str "Unsupported media type: " content-type)))))))

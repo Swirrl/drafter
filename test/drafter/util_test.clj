@@ -61,3 +61,8 @@
        true false false
        false true true
        false false true))
+
+(deftest merge-in-test
+  (are [target path ms expected] (= expected (apply merge-in target path ms))
+       {} [:a :b] {:c 1} {:a {:b {:c 1}}}
+       {:a {:b {:c 1}}} [:a :b] [{:d 2} {:e 3}] {:a {:b {:c 1 :d 2 :e 3}}}))

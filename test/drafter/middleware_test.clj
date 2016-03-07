@@ -1,5 +1,6 @@
 (ns drafter.middleware-test
   (:require [drafter.middleware :refer :all]
+            [grafter.rdf.formats :as formats]
             [clojure.test :refer :all]
             [ring.util.response :refer [response]]
             [buddy.core.codecs :refer [str->base64]]
@@ -108,3 +109,49 @@
           response (wrapped-handler request)]
       (is (= false @invoked-inner))
       (tc/assert-is-method-not-allowed-response response))))
+
+(defn- ok-handler [request]
+  (response "OK"))
+
+(defn- assert-unprocessable-with-no-content-type [handler]
+  (let [response (handler {:uri "/test"})]
+    (tc/assert-is-unprocessable-response response)))
+
+(defn- assert-unprocessable-with-malformed-content-type [handler]
+  (let [response (handler {:uri "/test" :headers {"content-type" "malformed"}})]
+    (tc/assert-is-unprocessable-response response)))
+
+(deftest require-content-type-test
+  (testing "With valid content type"
+    (let [handler (require-content-type ok-handler)
+          request {:uri "/test" :headers {"content-type" "text/plain"}}
+          response (handler request)]
+      (tc/assert-is-ok-response response)))
+
+  (testing "With no content type"
+    (assert-unprocessable-with-no-content-type (require-content-type ok-handler)))
+
+  (testing "With malformed content type"
+    (assert-unprocessable-with-malformed-content-type (require-content-type ok-handler))))
+
+(deftest rdf-content-type-handler-test
+  (testing "With valid RDF content type"
+    (let [inner-handler (fn [req] (:params req))
+          wrapped-handler (rdf-content-type-handler inner-handler)
+          content-type (.getDefaultMIMEType formats/rdf-nquads)
+          request {:uri "/test" :headers {"content-type" content-type}}
+          {:keys [rdf-format rdf-content-type]} (wrapped-handler request)]
+      (is (= content-type rdf-content-type))
+      (is (= formats/rdf-nquads rdf-format))))
+
+  (testing "With unknown RDF content type"
+    (let [handler (rdf-content-type-handler ok-handler)
+          request {:uri "/test" :headers {"content-type" "text/notrdf"}}
+          response (handler request)]
+      (tc/assert-is-unsupported-media-type-response response)))
+
+  (testing "With no content type"
+    (assert-unprocessable-with-no-content-type (rdf-content-type-handler ok-handler)))
+
+  (testing "With malformed content type"
+    (assert-unprocessable-with-malformed-content-type (rdf-content-type-handler ok-handler))))

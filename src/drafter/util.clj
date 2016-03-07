@@ -141,3 +141,9 @@
 
 (defn implies [p q]
   (or (not p) q))
+
+(defn merge-in
+  "Merges each of the maps with the map at the path defined by ks
+  inside the nested target structure."
+  [target ks & ms]
+  (update-in target ks #(apply merge % ms)))
