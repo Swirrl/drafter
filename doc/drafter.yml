@@ -53,12 +53,12 @@ info:
       - `/submit` to mark this draftset as being ready for review.
         After this operation the draftset will be made visible to
         users with the publisher role.  These publishers can then
-        choose to `/publish` or `/reject` the draftset.
+        choose to `/publish` or `/return` the draftset.
 
       - `/publish` which can be used by clients with the `publisher`
         role to publish a reviewed draftset to the live site.
 
-      - `/reject` which can be used to return a draftset to the user
+      - `/return` which can be used to return a draftset to the user
         who submitted it for review.
 
       - `/claim` which can be used by users in the `publisher` role to
@@ -341,11 +341,11 @@ paths:
           description: The Draftset was successfully submitted for review.
           schema:
             $ref: '#/definitions/Draftset'
-  /draftset/{id}/reject:
-    put:
-      summary: Reject a Draftset from review
+  /draftset/{id}/return:
+    post:
+      summary: Return a Draftset from review
       description: |
-        Rejects this draftset, returning it to the submitter for
+        Returns this draftset, returning it to the submitter for
         further ammendments and changes.  Sets the `current-owner` to
         the draftsets `submitted-by`.
       parameters:
@@ -633,7 +633,7 @@ definitions:
         type: string
         description: |
           A note that can be used by users to communicate the status
-          of a submission, why a draftset was rejected etc.
+          of a submission, why a draftset was returned etc.
     example:
       id: de305d54-75b4-431b-adb2-eb6b9e546014
       data:

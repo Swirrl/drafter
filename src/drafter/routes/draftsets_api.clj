@@ -257,7 +257,7 @@
                     (dsmgmt/set-draftset-metadata! backend draftset-id params)
                     (response (dsmgmt/get-draftset-info backend draftset-id)))))
 
-     (make-route :post "/draftset/:id/offer"
+     (make-route :post "/draftset/:id/submit"
                  (as-draftset-owner
                   (fn [{{:keys [draftset-id role]} :params user :identity}]
                     (let [role-kw (keyword role)]
@@ -267,7 +267,7 @@
                           (response ""))
                         (swirrl-server.responses/bad-request-response (str "Invalid role: " role)))))))
 
-     (make-route :post "/draftset/:id/claim"
+     (make-route :put "/draftset/:id/claim"
                  (authorised
                   (existing-draftset-handler
                    backend
