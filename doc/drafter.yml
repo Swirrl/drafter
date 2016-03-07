@@ -325,12 +325,13 @@ paths:
           schema:
             type: file
   /draftset/{id}/submit:
-    put:
+    post:
       summary: Submit a Draftset for review
       description: |
         Submits this draftset for review and potential publication.
       parameters:
         - $ref: '#/parameters/id'
+        - $ref: '#/parameters/role'
         - $ref: '#/parameters/message'
         - $ref: '#/parameters/note'
       tags:
@@ -500,6 +501,17 @@ parameters:
     in: query
     required: false
     type: string
+  role:
+    name: role
+    description: The role to submit the draftset to
+    in: query
+    required: true
+    type: string
+    enum:
+      - editor
+      - publisher
+      - manager
+
   message:
     name: message
     description: |
@@ -571,6 +583,7 @@ parameters:
     required: false
     type: boolean
     default: false
+
 definitions:
   Graph:
     type: object
@@ -579,11 +592,13 @@ definitions:
       uri:
         type: string
         description: The graphs uri
+
   Graphs:
     type: object
     description: A map of graph names to Graph objects
     additionalProperties:
       $ref: '#/definitions/Graph'
+
   Draftset:
     type: object
     required: [id, graphs, updated-at, created-at]
