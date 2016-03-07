@@ -208,7 +208,7 @@
                          (response (dsmgmt/get-draftset-info backend draftset-id))
                          (not-found "")))))))
 
-     (make-route :post "/draftset/:id/data"
+     (make-route :put "/draftset/:id/data"
                  (as-draftset-owner
                   (rdf-file-part-handler
                    (require-graph-for-triples-rdf-format
@@ -217,7 +217,7 @@
                            rdf-format :rdf-format
                            content-type :rdf-content-type
                            graph :graph
-                           {data :tempfile} :file} :params}]
+                           {data :tempfile} :file} :params :as request}]
                       (if (is-quads-format? rdf-format)
                         (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
                           (submit-async-job! append-job))

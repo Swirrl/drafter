@@ -43,7 +43,7 @@
 (defn- append-to-draftset-request [user draftset-location file-part]
   (with-identity user
     {:uri (str draftset-location "/data")
-     :request-method :post
+     :request-method :put
      :params {:file file-part}}))
 
 (defn- create-draftset-request
