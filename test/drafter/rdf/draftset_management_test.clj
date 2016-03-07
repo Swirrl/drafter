@@ -71,7 +71,7 @@
 
   (testing "With no owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
       (let [owner (get-draftset-owner *test-backend* draftset-id)]
         (is (nil? owner))))))
 
@@ -82,7 +82,7 @@
 
   (testing "Has no owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
       (is (= false (is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "Has different owner"
@@ -148,11 +148,11 @@
         (is (mgmt/draft-exists? *test-backend* draft-graph))
         (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph))))))))
 
-(deftest offer-draftset-test!
+(deftest submit-draftset-test!
   (testing "Existing owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
 
       (has-string-object? draftset-uri drafter:claimableBy "publisher")
       (is (= false (has-any-object? draftset-uri drafter:hasOwner)))))
@@ -160,7 +160,7 @@
   (testing "Other owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (offer-draftset! *test-backend* draftset-id test-publisher :manager)
+      (submit-draftset! *test-backend* draftset-id test-publisher :manager)
 
       (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor))
       (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
@@ -169,7 +169,7 @@
   (testing "No owner when user in role"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
 
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)
             ds-info (get-draftset-info *test-backend* draftset-id)]
@@ -185,7 +185,7 @@
 
   (testing "User not in claim role"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (offer-draftset! *test-backend* draftset-id test-editor :manager)
+      (submit-draftset! *test-backend* draftset-id test-editor :manager)
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :role result))
         (is (nil? (get-draftset-owner *test-backend* draftset-id))))))
@@ -202,7 +202,7 @@
 
 (deftest return-draftset!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor)]
-    (offer-draftset! *test-backend* draftset-id test-editor :publisher)
+    (submit-draftset! *test-backend* draftset-id test-editor :publisher)
     (claim-draftset! *test-backend* draftset-id test-publisher)
     (return-draftset! *test-backend* draftset-id)
 

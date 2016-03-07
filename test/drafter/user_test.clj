@@ -40,24 +40,24 @@
        test-publisher (ds/create-draftset (username test-editor)) false
 
        ;;in claimable role
-       test-manager (-> (ds/create-draftset "tmp") (ds/offer-to :publisher)) true
+       test-manager (-> (ds/create-draftset "tmp") (ds/submit-to :publisher)) true
 
        ;;not in claimable role
-       test-editor (-> (ds/create-draftset "tmp") (ds/offer-to :publisher)) false))
+       test-editor (-> (ds/create-draftset "tmp") (ds/submit-to :publisher)) false))
 
 (deftest permitted-draftset-operations-test
   (are [user draftset expected-operations] (= expected-operations (permitted-draftset-operations draftset user))
        ;;non-publishing owner
-       test-editor (ds/create-draftset (username test-editor)) #{:delete :edit :offer}
+    test-editor (ds/create-draftset (username test-editor)) #{:delete :edit :submit}
 
        ;;publishing owner
-       test-publisher (ds/create-draftset (username test-publisher)) #{:delete :edit :offer :publish}
+    test-publisher (ds/create-draftset (username test-publisher)) #{:delete :edit :submit :publish}
 
-       ;;non-owner
-       test-publisher (ds/create-draftset (username test-editor)) #{}
+    ;;non-owner
+    test-publisher (ds/create-draftset (username test-editor)) #{}
 
-       ;;user in claim role
-       test-publisher (-> (ds/create-draftset "tmp@example.com") (ds/offer-to :publisher)) #{:claim}
+    ;;user in claim role
+    test-publisher (-> (ds/create-draftset "tmp@example.com") (ds/submit-to :publisher)) #{:claim}
 
-       ;;user not in claim role
-       test-editor (-> (ds/create-draftset "tmp@example.com") (ds/offer-to :manager)) #{}))
+    ;;user not in claim role
+    test-editor (-> (ds/create-draftset "tmp@example.com") (ds/submit-to :manager)) #{}))

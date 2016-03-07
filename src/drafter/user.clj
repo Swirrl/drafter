@@ -48,7 +48,7 @@
    (is-owner? user draftset)
    (util/conj-if
     (has-role? user :publisher)
-    #{:delete :edit :offer}
+    #{:delete :edit :submit}
     :publish)
 
    (can-claim? user draftset)

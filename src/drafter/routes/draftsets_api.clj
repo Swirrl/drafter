@@ -133,10 +133,10 @@
                   (fn [{user :identity :as request}]
                     (response (dsmgmt/get-all-draftsets-info backend user)))))
 
-     (make-route :get "/draftsets/offered"
+     (make-route :get "/draftsets/submitted"
                  (authorised
                   (fn [{user :identity :as request}]
-                    (response (dsmgmt/get-draftsets-offered-to backend user)))))
+                    (response (dsmgmt/get-draftsets-submitted-to backend user)))))
 
      ;;create a new draftset
      (make-route :post "/draftsets"
@@ -263,7 +263,7 @@
                     (let [role-kw (keyword role)]
                       (if (user/is-known-role? role-kw)
                         (do
-                          (dsmgmt/offer-draftset! backend draftset-id user role-kw)
+                          (dsmgmt/submit-draftset! backend draftset-id user role-kw)
                           (response ""))
                         (swirrl-server.responses/bad-request-response (str "Invalid role: " role)))))))
 
@@ -275,8 +275,8 @@
                      (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
                        (case result
                          :ok (response ds-info)
-                         :role (forbidden-response "User not in role for draftset offer")
-                         :owned (forbidden-response "Draftset not on offer")
+                         :role (forbidden-response "User not in role for draftset claim")
+                         :owned (forbidden-response "Draftset has not been submitted")
                          (forbidden-response "Failed to claim draftset")))))))
 
      (make-route :post "/draftset/:id/return"

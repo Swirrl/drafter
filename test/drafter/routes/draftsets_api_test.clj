@@ -219,11 +219,11 @@
   (let [live-quads (get-live-quads-through-api)]
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
-(defn- create-offer-request [user draftset-location role]
-  (with-identity user {:uri (str draftset-location "/offer") :request-method :post :params {:role (name role)}}))
+(defn- create-submit-request [user draftset-location role]
+  (with-identity user {:uri (str draftset-location "/submit") :request-method :post :params {:role (name role)}}))
 
-(defn- offer-draftset-through-api [user draftset-location role]
-  (let [response (route (create-offer-request user draftset-location role))]
+(defn- submit-draftset-through-api [user draftset-location role]
+  (let [response (route (create-submit-request user draftset-location role))]
     (assert-is-ok-response response)))
 
 (deftest create-draftset-without-title-or-description
@@ -250,9 +250,9 @@
         claimable-publisher-ds (create-draftset-through-api test-editor "publishing")
         claimable-manager-ds (create-draftset-through-api test-editor "admining")]
 
-    ;;offer two draftsets, one to publishers, the other to managers
-    (offer-draftset-through-api test-editor claimable-publisher-ds :publisher)
-    (offer-draftset-through-api test-editor claimable-manager-ds :manager)
+    ;;submit two draftsets, one to publishers, the other to managers
+    (submit-draftset-through-api test-editor claimable-publisher-ds :publisher)
+    (submit-draftset-through-api test-editor claimable-manager-ds :manager)
 
     (let [ds-infos (get-all-draftsets-through-api test-publisher)
           available-names (set (map :display-name ds-infos))]
@@ -304,25 +304,25 @@
         get-response (route get-request)]
     (assert-is-forbidden-response get-response)))
 
-(deftest get-offered-draftsets-test
+(deftest get-submitted-draftsets-test
   (let [ds-names (map #(str "Draftset " %) (range 1 5))
         [ds1 ds2 ds3 ds4] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
-    (offer-draftset-through-api test-editor ds1 :editor)
-    (offer-draftset-through-api test-editor ds2 :publisher)
-    (offer-draftset-through-api test-editor ds3 :manager)
+    (submit-draftset-through-api test-editor ds1 :editor)
+    (submit-draftset-through-api test-editor ds2 :publisher)
+    (submit-draftset-through-api test-editor ds3 :manager)
 
-    (let [get-offered-request (with-identity test-publisher {:uri "/draftsets/offered" :request-method :get})
-          {:keys [body] :as response} (route get-offered-request)]
+    (let [get-submitted-request (with-identity test-publisher {:uri "/draftsets/submitted" :request-method :get})
+          {:keys [body] :as response} (route get-submitted-request)]
 
       (assert-schema [draftset-info-schema] body)
       (is (= 2 (count body)))
 
-      ;;Draftsets 1 and 2 should be on offer to publisher
+      ;;Draftsets 1 and 2 should be on submit to publisher
       ;;Draftset 3 is in too high a role
-      ;;Draftset 4 is not on offer
-      (let [offered-names (map :display-name body)
-            expected-offered-names (map #(nth ds-names %) [0 1])]
-        (is (= (set expected-offered-names) (set offered-names)))))))
+      ;;Draftset 4 is not on available
+      (let [submitted-names (map :display-name body)
+            expected-submitted-names (map #(nth ds-names %) [0 1])]
+        (is (= (set expected-submitted-names) (set submitted-names)))))))
 
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
@@ -930,33 +930,33 @@
         update-response (route update-request)]
     (assert-is-forbidden-response update-response)))
 
-(deftest offer-draftset-test
+(deftest submit-draftset-test
   (let [draftset-location (create-draftset-through-api test-editor)
-        offer-request (create-offer-request test-editor draftset-location :publisher)
-        offer-response (route offer-request)]
-    (assert-is-ok-response offer-response)
+        submit-request (create-submit-request test-editor draftset-location :publisher)
+        submit-response (route submit-request)]
+    (assert-is-ok-response submit-response)
 
     ;;user should not longer have access after yielding ownership
     (let [get-request (get-draftset-info-request draftset-location test-editor)
           get-response (route get-request)]
       (assert-is-forbidden-response get-response))))
 
-(deftest offer-non-existent-draftset-test
-  (let [offer-response (route (create-offer-request test-editor "/draftset/missing" :publisher))]
-    (assert-is-not-found-response offer-response)))
+(deftest submit-non-existent-draftset-test
+  (let [submit-response (route (create-submit-request test-editor "/draftset/missing" :publisher))]
+    (assert-is-not-found-response submit-response)))
 
-(deftest offer-by-non-owner
+(deftest submit-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
-        offer-response (route (create-offer-request test-publisher draftset-location :manager))]
-    (assert-is-forbidden-response offer-response)))
+        submit-response (route (create-submit-request test-publisher draftset-location :manager))]
+    (assert-is-forbidden-response submit-response)))
 
-(deftest offer-with-invalid-role
+(deftest submit-with-invalid-role
   (let [draftset-location (create-draftset-through-api test-editor)
-        offer-response (route (create-offer-request test-editor draftset-location :invalid))]
-    (assert-is-bad-request-response offer-response)))
+        submit-response (route (create-submit-request test-editor draftset-location :invalid))]
+    (assert-is-bad-request-response submit-response)))
 
 (defn- create-claim-request [draftset-location user]
-  (with-identity user {:uri (str draftset-location "/claim") :request-method :post}))
+  (with-identity user {:uri (str draftset-location "/claim") :request-method :put}))
 
 (defn- claim-draftset-through-api [draftset-location user]
   (let [response (route (create-claim-request draftset-location user))]
@@ -964,7 +964,7 @@
 
 (deftest claim-draftset
   (let [draftset-location (create-draftset-through-api test-editor)]
-    (offer-draftset-through-api test-editor draftset-location :publisher)
+    (submit-draftset-through-api test-editor draftset-location :publisher)
 
     (let [claim-request (create-claim-request draftset-location test-publisher)
           {:keys [body] :as claim-response} (route claim-request)]
@@ -984,7 +984,7 @@
   (let [other-editor (user/create-user "edtheduck@example.com" :editor (user/get-digest user/test-password))
         draftset-location (create-draftset-through-api test-editor)]
     (memrepo/add-user *user-repo* other-editor)
-    (offer-draftset-through-api test-editor draftset-location :publisher)
+    (submit-draftset-through-api test-editor draftset-location :publisher)
     (let [claim-response (route (create-claim-request draftset-location other-editor))]
       (assert-is-forbidden-response claim-response))))
 
@@ -997,7 +997,7 @@
 
 (deftest return-draftset-to-owner
   (let [draftset-location (create-draftset-through-api test-editor)]
-    (offer-draftset-through-api test-editor draftset-location :publisher)
+    (submit-draftset-through-api test-editor draftset-location :publisher)
     (claim-draftset-through-api draftset-location test-publisher)
 
     (let [return-request (create-return-request draftset-location test-publisher)
@@ -1021,7 +1021,7 @@
         options-request (with-identity test-editor {:uri draftset-location :request-method :options})
         {:keys [body] :as options-response} (route options-request)]
     (assert-is-ok-response options-response)
-    (is (= #{:edit :delete :offer} (set body)))))
+    (is (= #{:edit :delete :submit} (set body)))))
 
 (deftest get-options-for-non-existent-draftset
   (let [response (route (with-identity test-manager {:uri "/draftset/missing" :request-method :options}))]

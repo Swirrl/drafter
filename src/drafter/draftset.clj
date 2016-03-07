@@ -38,11 +38,11 @@
   (merge schema-common
          {:current-owner s/Str}))
 
-(def offered-draftset-schema
+(def submitted-draftset-schema
   (merge schema-common
          {:claim-role s/Keyword}))
 
-(def draftset-schema (s/either owned-draftset-schema offered-draftset-schema))
+(def draftset-schema (s/either owned-draftset-schema submitted-draftset-schema))
 
 (defn create-draftset
   ([creator] {:id (->DraftsetId (str (UUID/randomUUID)))
@@ -53,7 +53,7 @@
   ([creator display-name description]
    (assoc (create-draftset creator display-name) :description description)))
 
-(defn offer-to [draftset role]
+(defn submit-to [draftset role]
   (-> draftset
       (dissoc :current-owner)
       (assoc :claim-role role)))
@@ -63,4 +63,4 @@
       (dissoc :claim-role)
       (assoc :current-owner claimant)))
 
-(def operations #{:delete :edit :offer :publish :claim})
+(def operations #{:delete :edit :submit :publish :claim})
