@@ -58,10 +58,7 @@
   (let [delete-query (delete-draftset-statements-query draftset-ref)]
     (grafter.rdf.protocols/update! db delete-query)))
 
-(defn- role->score-map []
-  (zipmap user/roles (iterate inc 1)))
-
-(defn- role-scores->sparql-values [scored-roles]
+(defn- role-scores-values-clause [scored-roles]
   (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
     (clojure.string/join " " score-pairs)))
 
@@ -79,8 +76,7 @@
 (defn- get-all-draftset-graph-mappings-query [user]
   (let [username (user/username user)
         role (user/role user)
-        scored-roles (role->score-map)
-        user-role-score (role scored-roles)]
+        user-role-score (role user/role->permission-level)]
     (str
      "SELECT * WHERE { "
      (with-state-graph
@@ -91,7 +87,7 @@
        "{"
        "  ?ds <" drafter:hasOwner "> \"" username "\" ."
        "} UNION {"
-       "  VALUES (?role ?rv) { " (role-scores->sparql-values scored-roles) " }"
+       "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
        "  ?ds <" drafter:claimableBy "> ?role ."
        "  FILTER ( " user-role-score " >= ?rv )"
        "}")
@@ -169,8 +165,7 @@
 (defn- get-all-draftsets-properties-query [user]
   (let [username (user/username user)
         role (user/role user)
-        scored-roles (role->score-map)
-        user-role-score (role scored-roles)]
+        user-role-score (role user/role->permission-level)]
     (str
      "SELECT * WHERE { "
      (with-state-graph
@@ -183,7 +178,7 @@
        "  ?ds <" drafter:hasOwner "> \"" username "\" ."
        "  BIND (\"" username "\" as ?owner)"
        "} UNION {"
-       "  VALUES (?role ?rv) { " (role-scores->sparql-values scored-roles) " }"
+       "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
        "  ?ds <" drafter:claimableBy "> ?role ."
        "  FILTER (" user-role-score " >= ?rv)"
        "}"
@@ -192,12 +187,11 @@
 
 (defn- get-all-draftsets-submitted-to-query [user]
   (let [role (user/role user)
-        scored-roles (role->score-map)
-        user-role-score (role scored-roles)]
+        user-role-score (role user/role->permission-level)]
     (str
      "SELECT * WHERE {"
      (with-state-graph
-       "VALUES (?role ?rv) { " (role-scores->sparql-values scored-roles) " }"
+       "VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
        "?ds <" rdf:a "> <" drafter:DraftSet "> ."
        "?ds <" drafter:createdAt "> ?created ."
        "?ds <" drafter:createdBy "> ?creator ."
@@ -209,12 +203,11 @@
 
 (defn- get-draftsets-submitted-to-graph-mapping-query [user]
   (let [role (user/role user)
-        scored-roles (role->score-map)
-        user-role-score (role scored-roles)]
+        user-role-score (role user/role->permission-level)]
     (str
      "SELECT * WHERE { "
      (with-state-graph
-       "VALUES (?role ?rv) { " (role-scores->sparql-values scored-roles) " }"
+       "VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
        "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
        "?ds <" drafter:claimableBy "> ?role ."
        "?dg <" drafter:inDraftSet "> ?ds ."
@@ -358,9 +351,8 @@
   (let [draftset-uri (->draftset-uri draftset-ref)
         username (user/username claimant)
         role (user/role claimant)
-        scored-roles (role->score-map)
-        user-score (scored-roles role)
-        scores-values (role-scores->sparql-values scored-roles)]
+        user-score (user/role->permission-level role)
+        scores-values (role-scores-values-clause user/role->permission-level)]
     (str
      "DELETE {"
      (with-state-graph
@@ -405,6 +397,7 @@
     - :not-found Claim failed because the draftset does not exist
     - :unknown Claim failed for an unknown reason"
   [backend draftset-ref claimant]
+
   (try-claim-draftset! backend draftset-ref claimant)
   (let [ds-info (get-draftset-info backend draftset-ref)
         outcome (infer-claim-outcome ds-info claimant)]
