@@ -168,8 +168,10 @@
     (publish-draftset-through-api draftset-location test-publisher)))
 
 (defn- create-delete-quads-request [user draftset-location input-stream format]
-  (let [file-part {:tempfile input-stream :filename "to-delete.nq" :content-type format}]
-    (with-identity user {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}})))
+  (with-identity user {:uri (str draftset-location "/data")
+                       :request-method :delete
+                       :body input-stream
+                       :headers {"content-type" format}}))
 
 (defn- get-draftset-info-request [draftset-location user]
   (with-identity user {:uri draftset-location :request-method :get}))
@@ -193,10 +195,11 @@
     (:draftset job-result)))
 
 (defn- create-delete-statements-request [user draftset-location statements format]
-  (let [input-stream (statements->input-stream statements format)
-        file-name (str "to-delete." (.getDefaultFileExtension format))
-        file-part {:tempfile input-stream :filename file-name  :content-type (.getDefaultMIMEType format)}]
-    (with-identity user {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}})))
+  (let [input-stream (statements->input-stream statements format)]
+    (with-identity user {:uri (str draftset-location "/data")
+                         :request-method :delete
+                         :body input-stream
+                         :headers {"content-type" (.getDefaultMIMEType format)}})))
 
 (defn- delete-quads-through-api [user draftset-location quads]
   (let [delete-request (create-delete-statements-request user draftset-location quads formats/rdf-nquads)

@@ -182,8 +182,8 @@
 
      (make-route :delete "/draftset/:id/data"
                  (as-draftset-owner
-                  (rdf-file-part-handler
-                   (read-rdf-file-handler
+                  (require-rdf-content-type
+                   (read-body-rdf-statements
                     (require-graph-for-triples-rdf-format
                      (fn [{{draftset-id :draftset-id
                             graph :graph
