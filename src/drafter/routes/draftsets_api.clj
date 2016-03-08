@@ -5,6 +5,7 @@
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response
                                        unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!]]
+            [drafter.requests :as request]
             [swirrl-server.responses :as response]
             [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
             [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
@@ -35,7 +36,7 @@
     (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))
 
 (defn- get-accepted-rdf-format [request]
-  (if-let [accept (get-in request [:headers "Accept"])]
+  (if-let [accept (request/accept request)]
     (try
       (mimetype->rdf-format accept)
       (catch Exception ex
@@ -148,7 +149,7 @@
                    (require-graph-for-triples-rdf-format
                     (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
                       (if (is-quads-format? rdf-format)
-                        (get-draftset-data backend draftset-id (get-in request [:headers "Accept"]) (or union-with-live false))
+                        (get-draftset-data backend draftset-id (request/accept request) (or union-with-live false))
 
                         ;; TODO fix this as it's vulnerable to SPARQL injection
                         (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)

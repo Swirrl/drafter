@@ -132,7 +132,7 @@
   (with-identity user
     {:uri (str draftset-location "/data")
      :request-method :get
-     :headers {"Accept" (.getDefaultMIMEType format)}
+     :headers {"accept" (.getDefaultMIMEType format)}
      :params {:union-with-live union-with-live?}}))
 
 (defn- get-draftset-quads-through-api
@@ -147,7 +147,7 @@
 (defn- get-draftset-graph-triples-through-api [draftset-location user graph union-with-live?]
   (let [data-request {:uri (str draftset-location "/data")
                       :request-method :get
-                      :headers {"Accept" "application/n-triples"}
+                      :headers {"accept" "application/n-triples"}
                       :params {:union-with-live union-with-live? :graph graph}}
         data-request (with-identity user data-request)
         {:keys [body] :as data-response} (route data-request)]
@@ -870,13 +870,13 @@
     (append-quads-to-draftset-through-api test-editor draftset-location (statements "test/resources/test-draftset.trig"))
     (let [data-request {:uri (str draftset-location "/data")
                         :request-method :get
-                        :headers {"Accept" "application/n-triples"}}
+                        :headers {"accept" "application/n-triples"}}
           data-request (with-identity test-editor data-request)
           data-response (route data-request)]
       (assert-is-unprocessable-response data-response))))
 
 (deftest get-draftset-data-for-missing-draftset
-  (let [response (route (with-identity test-manager {:uri "/draftset/missing/data" :request-method :get :headers {"Accept" "application/n-quads"}}))]
+  (let [response (route (with-identity test-manager {:uri "/draftset/missing/data" :request-method :get :headers {"accept" "application/n-quads"}}))]
     (assert-is-not-found-response response)))
 
 (deftest get-draftset-data-for-unowned-draftset
