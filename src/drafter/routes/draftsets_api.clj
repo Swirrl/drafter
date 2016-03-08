@@ -69,36 +69,11 @@
       (inner-handler request)
       (forbidden-response "Operation only permitted by draftset owner"))))
 
-(defn- rdf-file-part-handler [inner-handler]
-  (fn [{{request-content-type :content-type
-         {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
-    (if-let [content-type (or file-part-content-type request-content-type)]
-      (if-let [rdf-format (mimetype->rdf-format content-type)]
-        (let [modified-request (update-in request [:params] #(merge % {:rdf-format rdf-format
-                                                                       :rdf-content-type content-type}))]
-          (inner-handler modified-request))
-        (unsupported-media-type-response (str "Unsupported media type: " (or content-type ""))))
-      (response/bad-request-response "Content type required"))))
-
 (defn- rdf-response-format-handler [inner-handler]
   (fn [request]
     (if-let [rdf-format (get-accepted-rdf-format request)]
       (inner-handler (assoc-in request [:params :rdf-format] rdf-format))
       (not-acceptable-response "Accept header required with MIME type of RDF format to return"))))
-
-(defn- read-rdf-file-handler
-  "NOTE: This middleware must come after rdf-file-part-handler since
-  that ensure the incoming request is well-formed and has a known
-  content type."
-  [inner-handler]
-  (fn [{{rdf-format :rdf-format
-         {file-part-content-type :content-type data :tempfile} :file} :params :as request}]
-    (try
-      (let [rdf-statements (parse-stream-statements (io/input-stream data) rdf-format)
-            modified-request (assoc-in request [:params :rdf-statements] rdf-statements)]
-        (inner-handler modified-request))
-      (catch OpenRDFException ex
-        (unprocessable-entity-response "Cannot read statements to delete")))))
 
 (defn- require-graph-for-triples-rdf-format [inner-handler]
   (fn [{{:keys [graph rdf-format]} :params :as request}]
