@@ -4,6 +4,11 @@
             [drafter.draftset :as ds])
   (:import [java.util UUID]))
 
+(def test-password "password")
+(def test-editor (create-user "editor@example.com" :editor (get-digest test-password)))
+(def test-publisher (create-user "publisher@example.com" :publisher (get-digest test-password)))
+(def test-manager (create-user "manager@example.com" :manager (get-digest test-password)))
+
 (deftest has-role?-test
   (are [user role has?] (= has? (has-role? user role))
        test-editor :editor true

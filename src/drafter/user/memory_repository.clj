@@ -1,5 +1,5 @@
 (ns drafter.user.memory-repository
-  (:require [drafter.user :refer [username create-user get-digest test-editor test-publisher test-manager]]
+  (:require [drafter.user :refer [username create-user get-digest]]
             [drafter.user.repository :refer :all]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
@@ -32,13 +32,12 @@
         (add-user repo (user-decl->user decl)))
       repo)))
 
-(defn- default-user-repo []
-  (create-repository* test-editor test-publisher test-manager))
-
 (defn get-repository [env-map]
   (log/info "Creating memory repository")
   (try
     (create-repository-from-file "test-users.edn")
     (catch FileNotFoundException e
-      (log/warn "test-users.edn does not exist - using default users")
-      (default-user-repo))))
+      (let [msg "To use the memory repository you must have a test-users.edn file configured.  Aborting."]
+        (println msg)
+        (log/fatal msg))
+      (throw e))))
