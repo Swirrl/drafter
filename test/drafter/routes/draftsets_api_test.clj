@@ -41,11 +41,12 @@
         (assoc :identity user)
         (assoc-in [:headers "Authorization"] (str "Basic " encoded-auth)))))
 
-(defn- append-to-draftset-request [user draftset-location file-part]
+(defn- append-to-draftset-request [user draftset-location data-stream content-type]
   (with-identity user
     {:uri (str draftset-location "/data")
      :request-method :put
-     :params {:file file-part}}))
+     :body data-stream
+     :headers {"content-type" content-type}}))
 
 (defn- create-draftset-request
   ([] (create-draftset-request test-editor))
@@ -56,8 +57,7 @@
 
 (defn- make-append-data-to-draftset-request [user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
-    (let [file-part {:tempfile fs :filename "test-dataset.trig" :content-type "application/x-trig"}
-          request (append-to-draftset-request user draftset-location file-part)]
+    (let [request (append-to-draftset-request user draftset-location fs "application/x-trig")]
       (route request))))
 
 (defn- append-data-to-draftset-through-api [user draftset-location draftset-data-file]
@@ -65,9 +65,8 @@
     (await-success finished-jobs (:finished-job (:body append-response)))))
 
 (defn- statements->append-request [user draftset-location statements format]
-  (let [input-stream (statements->input-stream statements format)
-        file-part {:tempfile input-stream :filename (str "data." (.getDefaultFileExtension format)) :content-type (.getDefaultMIMEType format)}]
-    (append-to-draftset-request user draftset-location file-part)))
+  (let [input-stream (statements->input-stream statements format)]
+    (append-to-draftset-request user draftset-location input-stream (.getDefaultMIMEType format))))
 
 (defn- append-quads-to-draftset-through-api [user draftset-location quads]
   (let [request (statements->append-request user draftset-location quads formats/rdf-nquads)
@@ -354,20 +353,10 @@
           expected-quads (eval-statements (second (first grouped-quads)))]
       (is (= (set expected-quads) (set draftset-quads))))))
 
-(deftest append-quad-data-to-draftset-with-content-type-set-for-request
-  (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [draftset-location (create-draftset-through-api test-editor)
-          file-part {:tempfile fs :filename "test-draftset.trig"}
-          request (-> (append-to-draftset-request test-editor draftset-location file-part)
-                      (assoc-in [:params :content-type] "application/x-trig"))
-          response (route request)]
-      (await-success finished-jobs (:finished-job (:body response))))))
-
 (deftest append-triple-data-to-draftset-test
   (with-open [fs (io/input-stream "test/test-triple.nt")]
     (let [draftset-location (create-draftset-through-api test-editor)
-          file-part {:tempfile fs :filename "test-triple.nt" :content-type "application/n-triples"}
-          request (append-to-draftset-request test-editor draftset-location file-part)
+          request (append-to-draftset-request test-editor draftset-location fs "application/n-triples")
           response (route request)]
       (is (is-client-error-response? response)))))
 
@@ -384,8 +373,8 @@
 (deftest append-quad-data-without-content-type-to-draftset
   (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
     (let [draftset-location (create-draftset-through-api test-editor)
-          file-part {:tempfile fs :filename "test-dataset.trig"}
-          request (append-to-draftset-request test-editor draftset-location file-part)
+          request (append-to-draftset-request test-editor draftset-location fs "tmp-content-type")
+          request (update-in request [:headers] dissoc "content-type")
           response (route request)]
       (is (is-client-error-response? response)))))
 

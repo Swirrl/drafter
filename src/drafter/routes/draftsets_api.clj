@@ -13,7 +13,8 @@
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.user :as user]
-            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler]]
+            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type
+                                        read-body-rdf-statements]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format? parse-stream-statements]]
@@ -212,18 +213,17 @@
 
      (make-route :put "/draftset/:id/data"
                  (as-draftset-owner
-                  (rdf-file-part-handler
+                  (require-rdf-content-type
                    (require-graph-for-triples-rdf-format
                     (fn [{{draftset-id :draftset-id
                            request-content-type :content-type
                            rdf-format :rdf-format
                            content-type :rdf-content-type
-                           graph :graph
-                           {data :tempfile} :file} :params :as request}]
+                           graph :graph} :params body :body :as request}]
                       (if (is-quads-format? rdf-format)
-                        (let [append-job (append-data-to-draftset-job backend draftset-id data rdf-format)]
+                        (let [append-job (append-data-to-draftset-job backend draftset-id body rdf-format)]
                           (submit-async-job! append-job))
-                        (let [append-job (append-triples-to-draftset-job backend draftset-id data rdf-format graph)]
+                        (let [append-job (append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
                           (submit-async-job! append-job))))))))
 
      (make-route :put "/draftset/:id/graph"
