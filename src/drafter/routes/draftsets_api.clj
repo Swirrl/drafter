@@ -22,7 +22,8 @@
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [clojure.java.io :as io])
   (:import [org.openrdf.query TupleQueryResultHandler]
-           [org.openrdf OpenRDFException]))
+           [org.openrdf OpenRDFException]
+           [org.openrdf.queryrender RenderUtils]))
 
 (defn- get-draftset-executor [backend draftset-ref]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
@@ -152,8 +153,9 @@
                         (get-draftset-data backend draftset-id (request/accept request) (or union-with-live false))
 
                         ;; TODO fix this as it's vulnerable to SPARQL injection
-                        (let [q (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                              query-request (assoc-in request [:params :query] q)]
+                        (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                              escaped-query (RenderUtils/escape unsafe-query)
+                              query-request (assoc-in request [:params :query] escaped-query)]
                           (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))))))))
 
      (make-route :delete "/draftset/:id/data"
