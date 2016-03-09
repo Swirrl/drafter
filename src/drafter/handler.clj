@@ -31,6 +31,7 @@
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.verbs :refer [wrap-verbs]]
             [ring.middleware.defaults :refer [api-defaults]]
+            [ring.middleware.resource :refer [wrap-resource]]
             [selmer.parser :as parser]
             [clojure.string :as str]
             [drafter.user.mongo :as mongousers])
@@ -125,7 +126,8 @@
 
                         :ring-defaults (assoc-in api-defaults [:params :multipart] true)
                         ;; add custom middleware here
-                        :middleware [wrap-verbs
+                        :middleware [#(wrap-resource % "swagger-ui")
+                                     wrap-verbs
                                      middleware/template-error-page
                                      middleware/log-request]
                         ;; add access rules here

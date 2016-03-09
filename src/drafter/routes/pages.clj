@@ -36,7 +36,7 @@
 
 (defn pages-routes [db]
   (routes
-   (GET "/" [] (ring.util.response/redirect "/live"))
+   (GET "/" [] (clojure.java.io/resource "swagger-ui/index.html"))
    (GET "/live" [] (query-page {:endpoint "/sparql/live"
                                 :update-endpoint "/sparql/live/update"
                                 :dump-path "/live/data"
