@@ -111,10 +111,10 @@
                   (fn [{user :identity :as request}]
                     (response (dsmgmt/get-all-draftsets-info backend user)))))
 
-     (make-route :get "/draftsets/submitted"
+     (make-route :get "/draftsets/claimable"
                  (authenticated
                   (fn [{user :identity :as request}]
-                    (response (dsmgmt/get-draftsets-submitted-to backend user)))))
+                    (response (dsmgmt/get-draftsets-claimable-by backend user)))))
 
      ;;create a new draftset
      (make-route :post "/draftsets"

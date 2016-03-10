@@ -307,15 +307,15 @@
         get-response (route get-request)]
     (assert-is-forbidden-response get-response)))
 
-(deftest get-submitted-draftsets-test
+(deftest get-claimable-draftsets-test
   (let [ds-names (map #(str "Draftset " %) (range 1 5))
         [ds1 ds2 ds3 ds4] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
     (submit-draftset-through-api test-editor ds1 :editor)
     (submit-draftset-through-api test-editor ds2 :publisher)
     (submit-draftset-through-api test-editor ds3 :manager)
 
-    (let [get-submitted-request (with-identity test-publisher {:uri "/draftsets/submitted" :request-method :get})
-          {:keys [body] :as response} (route get-submitted-request)]
+    (let [get-claimable-request (with-identity test-publisher {:uri "/draftsets/claimable" :request-method :get})
+          {:keys [body] :as response} (route get-claimable-request)]
 
       (assert-schema [draftset-info-schema] body)
       (is (= 2 (count body)))
@@ -323,9 +323,9 @@
       ;;Draftsets 1 and 2 should be on submit to publisher
       ;;Draftset 3 is in too high a role
       ;;Draftset 4 is not on available
-      (let [submitted-names (map :display-name body)
-            expected-submitted-names (map #(nth ds-names %) [0 1])]
-        (is (= (set expected-submitted-names) (set submitted-names)))))))
+      (let [claimable-names (map :display-name body)
+            expected-claimable-names (map #(nth ds-names %) [0 1])]
+        (is (= (set expected-claimable-names) (set claimable-names)))))))
 
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"

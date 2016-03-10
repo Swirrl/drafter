@@ -185,7 +185,7 @@
        )
      "}")))
 
-(defn- get-all-draftsets-submitted-to-query [user]
+(defn- get-all-draftsets-claimable-by-query [user]
   (let [role (user/role user)
         user-role-score (role user/role->permission-level)]
     (str
@@ -201,7 +201,7 @@
        "FILTER (" user-role-score " >= ?rv )")
      "}")))
 
-(defn- get-draftsets-submitted-to-graph-mapping-query [user]
+(defn- get-draftsets-claimable-by-graph-mapping-query [user]
   (let [role (user/role user)
         user-role-score (role user/role->permission-level)]
     (str
@@ -217,8 +217,8 @@
      "}")))
 
 
-(defn- get-draftsets-submitted-to-graph-mapping [backend user]
-  (let [q (get-draftsets-submitted-to-graph-mapping-query user)
+(defn- get-draftsets-claimable-by-graph-mapping [backend user]
+  (let [q (get-draftsets-claimable-by-graph-mapping-query user)
         results (query backend q)]
     (graph-mapping-results->map results)))
 
@@ -263,10 +263,10 @@
         all-graph-mappings (get-all-draftset-graph-mappings repo user)]
     (combine-all-properties-and-graph-mappings all-properties all-graph-mappings)))
 
-(defn get-draftsets-submitted-to [backend user]
-  (let [q (get-all-draftsets-submitted-to-query user)
+(defn get-draftsets-claimable-by [backend user]
+  (let [q (get-all-draftsets-claimable-by-query user)
         submitted-properties (query backend q)
-        all-graph-mappings (get-draftsets-submitted-to-graph-mapping backend user)]
+        all-graph-mappings (get-draftsets-claimable-by-graph-mapping backend user)]
     (combine-all-properties-and-graph-mappings submitted-properties all-graph-mappings)))
 
 (defn delete-draftset-graph! [db draftset-ref graph-uri]
