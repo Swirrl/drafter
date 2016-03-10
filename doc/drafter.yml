@@ -108,10 +108,6 @@ info:
     Authorization: Basic YWRtaW5Ab3BlbmRhdGFjb21tdW5pdGllcy5vcmc6eW91cnBtZGFwaWtleQ==
     ````
 
-  version: 0.0.1 Draft
-host: api.opendatacommunities.org
-schemes:
-  - https
     ## Roles
 
     Users in Drafter and PMD are assigned to a role which authorises
