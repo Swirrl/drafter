@@ -11,7 +11,8 @@
 
   Jobs can be added to the write queue using the queue-job! function."
   (:require [clojure.tools.logging :as log]
-            [swirrl-server.async.jobs :refer [finished-jobs complete-job! restart-id ->Job]])
+            [swirrl-server.async.jobs :refer [finished-jobs complete-job! restart-id ->Job]]
+            [swirrl-server.errors :refer [ex-swirrl encode-error]])
   (:import (java.util UUID)
            (java.util.concurrent PriorityBlockingQueue)
            (java.util.concurrent.locks ReentrantLock)
@@ -64,7 +65,7 @@
         (finally
           (.unlock global-writes-lock)))
 
-      (throw (ex-info "Failed to queue job" {:type :job-enqueue-failed})))))
+      (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later.")))))
 
 ;;await-sync-job! :: Job -> ApiResponse
 (defn await-sync-job!
@@ -101,8 +102,11 @@
 
         (catch Exception ex
           (log/warn ex "A task raised an error delivering error to promise")
-          (complete-job! job {:type :error
-                              :exception ex})))
+          ;; TODO improve error returned
+          (complete-job! job (:body (encode-error ex))
+                         ;; {:type :error
+                         ;;  :exception ex}
+                         )))
 
       (log/info "Writer waiting for tasks")
       (recur (.take writes-queue))))

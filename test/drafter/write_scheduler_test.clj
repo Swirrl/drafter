@@ -2,9 +2,13 @@
   (:require [drafter.write-scheduler :refer :all]
             [clojure.test :refer :all]
             [drafter.test-common :refer [wait-for-lock-ms during-exclusive-write wrap-clean-test-db wrap-db-setup]]
-            [swirrl-server.async.jobs :refer [create-job complete-job! ->Job]])
+            [swirrl-server.async.jobs :refer [create-job complete-job! ->Job]]
+            [schema.test :refer [validate-schemas]])
+
   (:import [java.util UUID]
            [clojure.lang ExceptionInfo]))
+
+(use-fixtures :each validate-schemas)
 
 (defn t
   "Just a dummy function"

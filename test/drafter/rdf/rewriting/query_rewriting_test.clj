@@ -2,11 +2,15 @@
   (:require [drafter.rdf.rewriting.query-rewriting :refer :all]
             [drafter.rdf.rewriting.arq :refer :all]
             [clojure.test :refer :all]
-            [clojure.string :refer [trim]])
+            [clojure.string :refer [trim]]
+            [schema.test :refer [validate-schemas]])
+
   (:import [org.apache.jena.query Query]
            [org.apache.jena.sparql.sse Item ItemList]
            [org.apache.jena.sparql.algebra Op]
            [org.apache.jena.graph NodeFactory]))
+
+(use-fixtures :each validate-schemas)
 
 (defn rewrite [rewriter q]
   (-> q

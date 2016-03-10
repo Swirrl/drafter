@@ -10,7 +10,10 @@
             [drafter.rdf.draft-management :refer [migrate-live!]]
             [drafter.test-common :refer [wrap-clean-test-db wrap-db-setup
                                          *test-backend* test-triples import-data-to-draft!
-                                         stream->string select-all-in-graph]]))
+                                         stream->string select-all-in-graph]]
+            [schema.test :refer [validate-schemas]]))
+
+(use-fixtures :each validate-schemas)
 
 (def dumps-request {:request-method :get
                     :uri "/data/live"

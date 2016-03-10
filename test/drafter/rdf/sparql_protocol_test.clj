@@ -10,11 +10,15 @@
    [clojure.java.io :as io]
    [clojure.data.json :as json]
    [clojure-csv.core :as csv]
-   [clojure.test :refer :all])
+   [clojure.test :refer :all]
+   [schema.test :refer [validate-schemas]])
+
 
   (:import [java.io ByteArrayOutputStream]
            [java.util Scanner]
            [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]))
+
+(use-fixtures :each validate-schemas)
 
 (defn add-triple-to-db [db]
   (pr/add db "http://foo.com/my-graph" (test-triples "http://test.com/data/one")))

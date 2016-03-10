@@ -1,9 +1,13 @@
 (ns drafter.operations-test
   (:require [drafter.operations :refer :all]
-            [clojure.test :refer :all])
+            [clojure.test :refer :all]
+            [schema.test :refer [validate-schemas]])
+
   (:import [java.util.concurrent Future FutureTask Executors Executor TimeUnit]
            [java.nio.charset Charset]
            [java.util.concurrent.atomic AtomicBoolean]))
+
+(use-fixtures :each validate-schemas)
 
 (defn fixed-clock [at] {:now-fn (constantly at)})
 

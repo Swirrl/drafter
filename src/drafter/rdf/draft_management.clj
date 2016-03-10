@@ -10,7 +10,8 @@
             [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.repository :refer [query]]
             [drafter.backend.protocols :refer [migrate-graphs-to-live!]]
-            [grafter.rdf.templater :refer [add-properties graph]])
+            [grafter.rdf.templater :refer [add-properties graph]]
+            [swirrl-server.errors :refer [ex-swirrl]])
   (:import (java.util Date UUID)
            (java.net URI)
            (org.openrdf.model.impl URIImpl)))
@@ -365,9 +366,9 @@
   [res]
   (if (>= 1 (count res))
     (URIImpl. (first res))
-    (throw (ex-info
-            "Multiple drafts were found, when only one is expected.  The context is likely too broad."
-            {:error :multiple-drafts-error}))))
+    (throw (ex-swirrl
+            :multiple-drafts-error
+            "Multiple drafts were found, when only one is expected.  The context is likely too broad."))))
 
 (defn- has-duplicates? [col]
   (not= col
@@ -392,8 +393,8 @@
                                    "}")))]
       (let [live-graphs (map #(get % "live") results)]
         (when (has-duplicates? live-graphs)
-          (throw (ex-info "Multiple draft graphs were supplied referencing the same live graph."
-                          {:error :multiple-drafts-error})))
+          (throw (ex-swirrl :multiple-drafts-error
+                            "Multiple draft graphs were supplied referencing the same live graph.")))
 
         (zipmap live-graphs
                 (map #(get % "draft") results))))))

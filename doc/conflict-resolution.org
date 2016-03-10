@@ -82,13 +82,13 @@ Firstly we propose to extend Draftset metadata to include a
 =forked-from= revision-identifier that represents the version of the
 live graph the graph in the draftset was branched from.
 
-This data is stored in a Graph object under the draftset's =data=
+This data is stored in a Graph object under the draftset's =changes=
 property, e.g.
 
 #+BEGIN_SRC json
 {
     "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
-    "data": {
+    "changes": {
         "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
             "forked-from": "ff6410cf1eadd4c41a7a5d29a35b4cd413e33212"
         }
@@ -182,7 +182,7 @@ below in the response to a call to =GET /draftsets=:
 [
 {
     "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
-    "data": {
+    "changes": {
         "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
             "forked-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8",
             "changed-in-draftsets": [
@@ -201,7 +201,7 @@ below in the response to a call to =GET /draftsets=:
 },
 {
     "id": "bd6069c8-3da6-421b-845e-5ee289aba788",
-    "data": {
+    "changes": {
         "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
             "forked-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8",
             "changed-in-draftsets": [
@@ -246,7 +246,7 @@ has changed, e.g.
 #+BEGIN_SRC json
 {
     "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
-    "data": {
+    "changes": {
         "http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types": {
             "has-unmerged-changes": true,
             "forked-from": "3a5ac9a7-004f-4ad4-b5af-773ae98e92b8",

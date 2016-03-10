@@ -161,3 +161,11 @@ is 3 minutes:
 DRAFTER_TIMEOUT_OPERATION=50
 DRAFTER_TIMEOUT_ENDPOINT_RAW_OPERATION=180
 #+END_SRC
+** System Properties
+
+The following JVM system properties can be set to configure various
+aspects of drafter.  This is not necessarily an exhaustive list:
+
+| Property            | Default Value | Description                                                                                                                                                                |
+|---------------------+---------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| http.maxConnections | 20?           | The maximum number of HTTP connections allowed inside Apache HTTP Client instances.  Use this to configure the connection pool size inside our Sesame SPARQLRepository, if using drafter against a remote store. |

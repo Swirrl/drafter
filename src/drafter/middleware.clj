@@ -14,8 +14,6 @@
             [buddy.auth :as auth]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
-            [cemerick.friend :as friend]
-            [cemerick.friend.workflows :as friend-workflows]
             [ring.util.request :as request]
             [pantomime.media :refer [media-type-named]])
   (:import [org.openrdf OpenRDFException]))
@@ -30,20 +28,6 @@
             total-time (- (System/currentTimeMillis) start-time)]
         (log/info "RESPONSE " (:status resp) "took" (str total-time "ms"))
         resp))))
-
-(defn template-error-page [handler]
-  (if (env :dev)
-    (fn [request]
-      (try
-        (handler request)
-        (catch clojure.lang.ExceptionInfo ex
-          (log/warn ex)
-          (let [{:keys [type error-template] :as data} (ex-data ex)]
-            (if (= :selmer-validation-error type)
-              {:status 500
-               :body (parser/render error-template data)}
-              (throw ex))))))
-    handler))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (if-let [user (user-repo/find-user-by-username user-repo username)]

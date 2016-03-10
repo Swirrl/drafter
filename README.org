@@ -446,7 +446,6 @@ Server: Jetty(7.6.13.v20130916)
 false
 #+end_example
 
-*** TODO Add restart id to finished-jobs route
 ** Data Model
 
 This is an alternative model to that written up by Ric.  It is

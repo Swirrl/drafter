@@ -37,6 +37,9 @@
                    {:port          port
                     :init          service/init
                     :auto-reload?  true
+                    :stacktraces?  (:dev env) ;; remove fancy error page in all
+                                              ;; but the dev env (Jetty will
+                                              ;; still display HTML though)
                     :open-browser? (:dev env)
                     :destroy       service/destroy
                     :join?         false}))
