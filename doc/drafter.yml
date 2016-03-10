@@ -189,6 +189,29 @@ paths:
             type: array
             items:
               $ref: '#/definitions/Draftset'
+
+  /draftsets/claimable:
+    get:
+      summary: List all the draftsets that are claimable by you
+      description: |
+        Lists all of the draftset's that you can claim.  Claimable
+        draftsets are either submitted draftsets that have been
+        submitted to a pool of draftsets for users of a given role, or
+        unclaimed draftsets which you submitted (i.e. you can
+        withdrawl a submitted draftset.)
+      security:
+        - basic-auth: []
+      tags:
+        - Draftsets
+      responses:
+        '200':
+          description: An array of Draftsets you can claim
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Draftset'
+
+
   /draftset/{id}:
     get:
       summary: Get information about a Draftset
@@ -355,6 +378,10 @@ paths:
       summary: Submit a Draftset for review
       description: |
         Submits this draftset for review and potential publication.
+        Draftsets are submitted into a pool for users of a given role.
+
+        Users with a role greater than or equal to the role the
+        draftset was submitted to can then lay claim to it.
       parameters:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/role'
@@ -393,6 +420,11 @@ paths:
         performing this operation.  This is necessary to prevent
         other's from making changes to the data contained within the
         Draftset.
+
+        Each role in the system has a pool of 0 or more claimable
+        draftsets associated with it.  Claimable draftsets are
+        draftsets in a pool where the rank of the pools role is less
+        than or equal to the user's role's rank.
       parameters:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/messagenonote'
