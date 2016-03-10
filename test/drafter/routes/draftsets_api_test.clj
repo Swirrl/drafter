@@ -53,7 +53,7 @@
   ([user] (create-draftset-request user nil))
   ([user display-name] (create-draftset-request user display-name nil))
   ([user display-name description]
-   (with-identity user {:uri "/draftsets" :request-method :post :params {:display-name display-name :description description}})))
+   (with-identity user {:uri "/v1/draftsets" :request-method :post :params {:display-name display-name :description description}})))
 
 (defn- make-append-data-to-draftset-request [user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
@@ -230,7 +230,7 @@
     (assert-is-ok-response response)))
 
 (deftest create-draftset-without-title-or-description
-  (let [response (route (with-identity test-editor {:uri "/draftsets" :request-method :post}))]
+  (let [response (route (with-identity test-editor {:uri "/v1/draftsets" :request-method :post}))]
     (assert-is-see-other-response response)))
 
 (deftest create-draftset-with-title-and-without-description
@@ -242,7 +242,7 @@
     (assert-is-see-other-response response)))
 
 (defn- get-all-draftsets-through-api [user]
-  (let [request (with-identity user {:uri "/draftsets" :request-method :get})
+  (let [request (with-identity user {:uri "/v1/draftsets" :request-method :get})
         {:keys [body] :as response} (route request)]
     (assert-is-ok-response response)
     body))
@@ -298,7 +298,7 @@
       (is (= live-graphs (key-set (:data ds-info)))))))
 
 (deftest get-draftset-request-for-non-existent-draftset
-  (let [response (route (get-draftset-info-request "/draftset/missing" test-publisher))]
+  (let [response (route (get-draftset-info-request "/v1/draftset/missing" test-publisher))]
     (assert-is-not-found-response response)))
 
 (deftest get-draftset-for-other-user-test
@@ -314,7 +314,7 @@
     (submit-draftset-through-api test-editor ds2 :publisher)
     (submit-draftset-through-api test-editor ds3 :manager)
 
-    (let [get-claimable-request (with-identity test-publisher {:uri "/draftsets/claimable" :request-method :get})
+    (let [get-claimable-request (with-identity test-publisher {:uri "/v1/draftsets/claimable" :request-method :get})
           {:keys [body] :as response} (route get-claimable-request)]
 
       (assert-schema [draftset-info-schema] body)
@@ -382,7 +382,7 @@
       (is (is-client-error-response? response)))))
 
 (deftest append-data-to-non-existent-draftset
-  (let [append-response (make-append-data-to-draftset-request test-publisher "/draftset/missing" "test/resources/test-draftset.trig")]
+  (let [append-response (make-append-data-to-draftset-request test-publisher "/v1/draftset/missing" "test/resources/test-draftset.trig")]
     (assert-is-not-found-response append-response)))
 
 (deftest append-quads-by-non-owner
@@ -519,7 +519,7 @@
 (deftest delete-draftset-data-for-non-existent-draftset
   (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
     (let [file-part {:tempfile fs :filename "to-delete.trig" :content-type "application/x-trig"}
-          delete-request (with-identity test-manager {:uri "/draftset/missing/data" :request-method :delete :params {:file file-part}})
+          delete-request (with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :params {:file file-part}})
           delete-response (route delete-request)]
       (assert-is-not-found-response delete-response))))
 
@@ -590,7 +590,7 @@
       (is (= (set expected-graphs) (set draftset-graphs))))))
 
 (deftest delete-graph-request-for-non-existent-draftset
-  (let [request (with-identity test-manager {:uri "/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
+  (let [request (with-identity test-manager {:uri "/v1/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
         response (route request)]
     (assert-is-not-found-response response)))
 
@@ -683,7 +683,7 @@
     (assert-live-quads graph-quads)))
 
 (deftest publish-non-existent-draftset
-  (let [response (route (with-identity test-publisher {:uri "/draftset/missing/publish" :request-method :post}))]
+  (let [response (route (with-identity test-publisher {:uri "/v1/draftset/missing/publish" :request-method :post}))]
     (assert-is-not-found-response response)))
 
 (deftest publish-by-non-publisher-test
@@ -714,7 +714,7 @@
       (assert-is-not-found-response get-response))))
 
 (deftest delete-non-existent-draftset-test
-  (let [delete-response (route (create-delete-draftset-request "/draftset/missing" test-publisher))]
+  (let [delete-response (route (create-delete-draftset-request "/v1/draftset/missing" test-publisher))]
     (assert-is-not-found-response delete-response)))
 
 (deftest delete-draftset-by-non-owner-test
@@ -777,7 +777,7 @@
         (is (= expected-quads @result-state))))))
 
 (deftest query-non-existent-draftset
-  (let [request (create-query-request test-editor "/draftset/missing" "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
+  (let [request (create-query-request test-editor "/v1/draftset/missing" "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
         response (route request)]
     (assert-is-not-found-response response)))
 
@@ -876,7 +876,7 @@
       (assert-is-unprocessable-response data-response))))
 
 (deftest get-draftset-data-for-missing-draftset
-  (let [response (route (with-identity test-manager {:uri "/draftset/missing/data" :request-method :get :headers {"accept" "application/n-quads"}}))]
+  (let [response (route (with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :get :headers {"accept" "application/n-quads"}}))]
     (assert-is-not-found-response response)))
 
 (deftest get-draftset-data-for-unowned-draftset
@@ -913,7 +913,7 @@
     (is (= new-description description))))
 
 (deftest set-missing-draftset-metadata
-  (let [meta-request (create-update-draftset-metadata-request test-manager "/draftset/missing" "Title!" "Description")
+  (let [meta-request (create-update-draftset-metadata-request test-manager "/v1/draftset/missing" "Title!" "Description")
         meta-response (route meta-request)]
     (assert-is-not-found-response meta-response)))
 
@@ -935,7 +935,7 @@
       (assert-is-forbidden-response get-response))))
 
 (deftest submit-non-existent-draftset-test
-  (let [submit-response (route (create-submit-request test-editor "/draftset/missing" :publisher))]
+  (let [submit-response (route (create-submit-request test-editor "/v1/draftset/missing" :publisher))]
     (assert-is-not-found-response submit-response)))
 
 (deftest submit-by-non-owner
@@ -982,7 +982,7 @@
       (assert-is-forbidden-response claim-response))))
 
 (deftest claim-non-existent-draftset
-  (let [claim-response (route (create-claim-request "/draftset/missing" test-publisher))]
+  (let [claim-response (route (create-claim-request "/v1/draftset/missing" test-publisher))]
     (assert-is-not-found-response claim-response)))
 
 (defn- create-return-request [draftset-location user]
@@ -1001,7 +1001,7 @@
         (is (= (user/username test-editor) current-owner))))))
 
 (deftest return-non-existent-draftset
-  (let [response (route (create-return-request "/draftset/missing" test-publisher))]
+  (let [response (route (create-return-request "/v1/draftset/missing" test-publisher))]
     (assert-is-not-found-response response)))
 
 (deftest return-unowned-draftset
@@ -1017,7 +1017,7 @@
     (is (= #{:edit :delete :submit} (set body)))))
 
 (deftest get-options-for-non-existent-draftset
-  (let [response (route (with-identity test-manager {:uri "/draftset/missing" :request-method :options}))]
+  (let [response (route (with-identity test-manager {:uri "/v1/draftset/missing" :request-method :options}))]
     (assert-is-not-found-response response)))
 
 (defn- revert-draftset-graph-changes-request [draftset-location user graph]
@@ -1073,7 +1073,7 @@
 (deftest revert-change-in-non-existent-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
     (publish-quads-through-api quads)
-    (let [revert-request (revert-draftset-graph-changes-request "/draftset/missing" test-manager live-graph)
+    (let [revert-request (revert-draftset-graph-changes-request "/v1/draftset/missing" test-manager live-graph)
           response (route revert-request)]
       (assert-is-not-found-response response))))
 
@@ -1135,7 +1135,7 @@
 (deftest copy-live-graph-into-non-existent-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
     (publish-quads-through-api quads)
-    (let [copy-request (copy-live-graph-into-draftset-request "/draftset/missing" test-publisher live-graph)
+    (let [copy-request (copy-live-graph-into-draftset-request "/v1/draftset/missing" test-publisher live-graph)
           copy-response (route copy-request)]
       (assert-is-not-found-response copy-response))))
 

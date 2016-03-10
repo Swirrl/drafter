@@ -104,161 +104,164 @@
              (existing-draftset-handler
               backend
               (restrict-to-draftset-owner backend h))))]
-    (routes
+    (let [version "/v1"]
+      (context
+       version []
+       (routes
 
-     (make-route :get "/draftsets"
-                 (authenticated
-                  (fn [{user :identity :as request}]
-                    (response (dsmgmt/get-all-draftsets-info backend user)))))
+        (make-route :get "/draftsets"
+                    (authenticated
+                     (fn [{user :identity :as request}]
+                       (response (dsmgmt/get-all-draftsets-info backend user)))))
 
-     (make-route :get "/draftsets/claimable"
-                 (authenticated
-                  (fn [{user :identity :as request}]
-                    (response (dsmgmt/get-draftsets-claimable-by backend user)))))
+        (make-route :get "/draftsets/claimable"
+                    (authenticated
+                     (fn [{user :identity :as request}]
+                       (response (dsmgmt/get-draftsets-claimable-by backend user)))))
 
-     ;;create a new draftset
-     (make-route :post "/draftsets"
-                 (authenticated
-                  (fn [{{:keys [display-name description]} :params user :identity :as request}]
-                    (let [draftset-id (dsmgmt/create-draftset! backend user display-name description)]
-                      (redirect-after-post (str "/draftset/" draftset-id))))))
+        ;;create a new draftset
+        (make-route :post "/draftsets"
+                    (authenticated
+                     (fn [{{:keys [display-name description]} :params user :identity :as request}]
+                       (let [draftset-id (dsmgmt/create-draftset! backend user display-name description)]
+                         (redirect-after-post (str version "/draftset/" draftset-id))))))
 
-     (make-route :get "/draftset/:id"
-                 (as-draftset-owner
-                  (fn [{{:keys [draftset-id]} :params :as request}]
-                      (if-let [info (dsmgmt/get-draftset-info backend draftset-id)]
-                        (response info)
-                        (not-found "")))))
+        (make-route :get "/draftset/:id"
+                    (as-draftset-owner
+                     (fn [{{:keys [draftset-id]} :params :as request}]
+                       (if-let [info (dsmgmt/get-draftset-info backend draftset-id)]
+                         (response info)
+                         (not-found "")))))
 
-     (make-route :delete "/draftset/:id"
-                 (as-draftset-owner
-                  (fn [{{:keys [draftset-id]} :params :as request}]
-                      (delete-draftset! backend draftset-id)
-                      (response ""))))
+        (make-route :delete "/draftset/:id"
+                    (as-draftset-owner
+                     (fn [{{:keys [draftset-id]} :params :as request}]
+                       (delete-draftset! backend draftset-id)
+                       (response ""))))
 
-     (make-route :options "/draftset/:id"
-                 (authenticated
-                  (existing-draftset-handler
-                   backend
-                   (fn [{{:keys [draftset-id]} :params user :identity}]
-                     (let [permitted (dsmgmt/find-permitted-draftset-operations backend draftset-id user)]
-                       (response permitted))))))
+        (make-route :options "/draftset/:id"
+                    (authenticated
+                     (existing-draftset-handler
+                      backend
+                      (fn [{{:keys [draftset-id]} :params user :identity}]
+                        (let [permitted (dsmgmt/find-permitted-draftset-operations backend draftset-id user)]
+                          (response permitted))))))
 
-     (make-route :get "/draftset/:id/data"
-                 (as-draftset-owner
-                  (rdf-response-format-handler
-                   (require-graph-for-triples-rdf-format
-                    (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
-                      (if (is-quads-format? rdf-format)
-                        (get-draftset-data backend draftset-id (request/accept request) (or union-with-live false))
+        (make-route :get "/draftset/:id/data"
+                    (as-draftset-owner
+                     (rdf-response-format-handler
+                      (require-graph-for-triples-rdf-format
+                       (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
+                         (if (is-quads-format? rdf-format)
+                           (get-draftset-data backend draftset-id (request/accept request) (or union-with-live false))
 
-                        ;; TODO fix this as it's vulnerable to SPARQL injection
-                        (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                              escaped-query (RenderUtils/escape unsafe-query)
-                              query-request (assoc-in request [:params :query] escaped-query)]
-                          (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))))))))
+                           ;; TODO fix this as it's vulnerable to SPARQL injection
+                           (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                                 escaped-query (RenderUtils/escape unsafe-query)
+                                 query-request (assoc-in request [:params :query] escaped-query)]
+                             (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))))))))
 
-     (make-route :delete "/draftset/:id/data"
-                 (as-draftset-owner
-                  (require-rdf-content-type
-                   (read-body-rdf-statements
-                    (require-graph-for-triples-rdf-format
-                     (fn [{{draftset-id :draftset-id
-                            graph :graph
-                            rdf-format :rdf-format
-                            statements-to-delete :rdf-statements} :params :as request}]
-                       (let [ds-executor (get-draftset-executor backend draftset-id)
-                             delete-job (if (is-quads-format? rdf-format)
-                                            (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
-                                            (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
-                         (submit-async-job! delete-job))))))))
+        (make-route :delete "/draftset/:id/data"
+                    (as-draftset-owner
+                     (require-rdf-content-type
+                      (read-body-rdf-statements
+                       (require-graph-for-triples-rdf-format
+                        (fn [{{draftset-id :draftset-id
+                              graph :graph
+                              rdf-format :rdf-format
+                              statements-to-delete :rdf-statements} :params :as request}]
+                          (let [ds-executor (get-draftset-executor backend draftset-id)
+                                delete-job (if (is-quads-format? rdf-format)
+                                             (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
+                                             (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
+                            (submit-async-job! delete-job))))))))
 
-     (make-route :delete "/draftset/:id/graph"
-                 (as-draftset-owner
-                  (required-managed-graph-param
-                   (fn [{{:keys [draftset-id graph]} :params}]
-                     (dsmgmt/delete-draftset-graph! backend draftset-id graph)
-                     (response "")))))
+        (make-route :delete "/draftset/:id/graph"
+                    (as-draftset-owner
+                     (required-managed-graph-param
+                      (fn [{{:keys [draftset-id graph]} :params}]
+                        (dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                        (response "")))))
 
-     (make-route :delete "/draftset/:id/changes"
-                 (as-draftset-owner
-                  (require-params #{:graph}
-                   (fn [{{:keys [draftset-id graph]} :params}]
-                     (let [result (dsmgmt/revert-graph-changes! backend draftset-id graph)]
-                       (if (= :reverted result)
-                         (response (dsmgmt/get-draftset-info backend draftset-id))
-                         (not-found "")))))))
+        (make-route :delete "/draftset/:id/changes"
+                    (as-draftset-owner
+                     (require-params #{:graph}
+                                     (fn [{{:keys [draftset-id graph]} :params}]
+                                       (let [result (dsmgmt/revert-graph-changes! backend draftset-id graph)]
+                                         (if (= :reverted result)
+                                           (response (dsmgmt/get-draftset-info backend draftset-id))
+                                           (not-found "")))))))
 
-     (make-route :put "/draftset/:id/data"
-                 (as-draftset-owner
-                  (require-rdf-content-type
-                   (require-graph-for-triples-rdf-format
-                    (fn [{{draftset-id :draftset-id
-                           request-content-type :content-type
-                           rdf-format :rdf-format
-                           content-type :rdf-content-type
-                           graph :graph} :params body :body :as request}]
-                      (if (is-quads-format? rdf-format)
-                        (let [append-job (append-data-to-draftset-job backend draftset-id body rdf-format)]
-                          (submit-async-job! append-job))
-                        (let [append-job (append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
-                          (submit-async-job! append-job))))))))
+        (make-route :put "/draftset/:id/data"
+                    (as-draftset-owner
+                     (require-rdf-content-type
+                      (require-graph-for-triples-rdf-format
+                       (fn [{{draftset-id :draftset-id
+                             request-content-type :content-type
+                             rdf-format :rdf-format
+                             content-type :rdf-content-type
+                             graph :graph} :params body :body :as request}]
+                         (if (is-quads-format? rdf-format)
+                           (let [append-job (append-data-to-draftset-job backend draftset-id body rdf-format)]
+                             (submit-async-job! append-job))
+                           (let [append-job (append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
+                             (submit-async-job! append-job))))))))
 
-     (make-route :put "/draftset/:id/graph"
-                 (as-draftset-owner
-                  (required-live-graph-param
-                   (fn [{{:keys [draftset-id graph]} :params}]
-                    (submit-async-job! (dsmgmt/copy-live-graph-into-draftset-job backend draftset-id graph))))))
+        (make-route :put "/draftset/:id/graph"
+                    (as-draftset-owner
+                     (required-live-graph-param
+                      (fn [{{:keys [draftset-id graph]} :params}]
+                        (submit-async-job! (dsmgmt/copy-live-graph-into-draftset-job backend draftset-id graph))))))
 
-     (make-route nil "/draftset/:id/query"
-                 (allowed-methods-handler
-                  #{:get :post}
-                  (as-draftset-owner
-                   (require-params #{:query}
-                    (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
-                      (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
-                            uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
-                            rewriting-executor (create-rewriter backend uri-graph-mapping)
-                            graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
-                        (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
+        (make-route nil "/draftset/:id/query"
+                    (allowed-methods-handler
+                     #{:get :post}
+                     (as-draftset-owner
+                      (require-params #{:query}
+                                      (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
+                                        (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
+                                              uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
+                                              rewriting-executor (create-rewriter backend uri-graph-mapping)
+                                              graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
+                                          (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
 
-     (make-route :post "/draftset/:id/publish"
-                 (as-draftset-owner
-                  (fn [{{:keys [draftset-id]} :params user :identity}]
-                    (if (user/has-role? user :publisher)
-                      (submit-async-job! (publish-draftset-job backend draftset-id))
-                      (forbidden-response "You require the publisher role to perform this action")))))
+        (make-route :post "/draftset/:id/publish"
+                    (as-draftset-owner
+                     (fn [{{:keys [draftset-id]} :params user :identity}]
+                       (if (user/has-role? user :publisher)
+                         (submit-async-job! (publish-draftset-job backend draftset-id))
+                         (forbidden-response "You require the publisher role to perform this action")))))
 
-     (make-route :put "/draftset/:id/meta"
-                 (as-draftset-owner
-                  (fn [{{:keys [draftset-id] :as params} :params}]
-                    (dsmgmt/set-draftset-metadata! backend draftset-id params)
-                    (response (dsmgmt/get-draftset-info backend draftset-id)))))
+        (make-route :put "/draftset/:id/meta"
+                    (as-draftset-owner
+                     (fn [{{:keys [draftset-id] :as params} :params}]
+                       (dsmgmt/set-draftset-metadata! backend draftset-id params)
+                       (response (dsmgmt/get-draftset-info backend draftset-id)))))
 
-     (make-route :post "/draftset/:id/submit"
-                 (as-draftset-owner
-                  (fn [{{:keys [draftset-id role]} :params user :identity}]
-                    (let [role-kw (keyword role)]
-                      (if (user/is-known-role? role-kw)
-                        (do
-                          (dsmgmt/submit-draftset! backend draftset-id user role-kw)
-                          (response ""))
-                        (unprocessable-entity-response (str "Invalid role: " role)))))))
+        (make-route :post "/draftset/:id/submit"
+                    (as-draftset-owner
+                     (fn [{{:keys [draftset-id role]} :params user :identity}]
+                       (let [role-kw (keyword role)]
+                         (if (user/is-known-role? role-kw)
+                           (do
+                             (dsmgmt/submit-draftset! backend draftset-id user role-kw)
+                             (response ""))
+                           (unprocessable-entity-response (str "Invalid role: " role)))))))
 
-     (make-route :put "/draftset/:id/claim"
-                 (authenticated
-                  (existing-draftset-handler
-                   backend
-                   (fn [{{:keys [draftset-id]} :params user :identity}]
-                     (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
-                       (case result
-                         :ok (response ds-info)
-                         :role (forbidden-response "User not in role for draftset claim")
-                         :owned (forbidden-response "Draftset has not been submitted")
-                         (forbidden-response "Failed to claim draftset")))))))
+        (make-route :put "/draftset/:id/claim"
+                    (authenticated
+                     (existing-draftset-handler
+                      backend
+                      (fn [{{:keys [draftset-id]} :params user :identity}]
+                        (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
+                          (case result
+                            :ok (response ds-info)
+                            :role (forbidden-response "User not in role for draftset claim")
+                            :owned (forbidden-response "Draftset has not been submitted")
+                            (forbidden-response "Failed to claim draftset")))))))
 
-     (make-route :post "/draftset/:id/return"
-                 (as-draftset-owner
-                  (fn [{{:keys [draftset-id]} :params :as request}]
-                    (dsmgmt/return-draftset! backend draftset-id)
-                    (response "")))))))
+        (make-route :post "/draftset/:id/return"
+                    (as-draftset-owner
+                     (fn [{{:keys [draftset-id]} :params :as request}]
+                       (dsmgmt/return-draftset! backend draftset-id)
+                       (response "")))))))))
