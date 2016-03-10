@@ -28,7 +28,7 @@ info:
     data in which they can safely make, review and query changes
     before publishing them to the live site.
 
-    When a user creates a Draftset they are given a private endpoint
+    When a user creates a draftset they are given a private endpoint
     which they can use to insert, remove or query RDF data through
     standard operations.
 
@@ -63,7 +63,7 @@ info:
 
       - `/claim` which can be used by users in the `publisher` role to
         claim exclusive ownership in order to edit the data within a
-        Draftset.
+        draftset.
 
     In addition to these routes there are routes available to list all
     Draftset's in the system and access metadata about an individual
@@ -165,7 +165,7 @@ paths:
       tags:
         - Draftsets
       description: |
-        Creates a new Draftset in the database.
+        Creates a new draftset in the database.
 
         Optionally accepts query string parameters for a name and a description.
       security:
@@ -175,11 +175,11 @@ paths:
         - $ref: '#/parameters/draftset-description'
       responses:
         '303':
-          description: Upon the creation of a new Draftset the caller is redirected to its representation.
+          description: Upon the creation of a new draftset the caller is redirected to its representation.
     get:
       summary: List available Draftsets
       description: |
-       Lists all available Draftsets
+       Lists all available draftsets
       tags:
         - Metadata
       responses:
