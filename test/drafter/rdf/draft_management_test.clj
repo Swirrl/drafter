@@ -10,10 +10,13 @@
    [grafter.rdf.protocols :refer [update!]]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
+   [schema.test :refer [validate-schemas]]
    [drafter.util :as util]
    [clojure.test :refer :all])
-  (:import [java.util UUID]
-           [org.openrdf.model.impl URIImpl]))
+  (:import [org.openrdf.model.impl URIImpl]
+           [java.util UUID]))
+
+(use-fixtures :each validate-schemas)
 
 (defn clone-data-from-live-to-draft-query [draft-graph-uri]
   (str

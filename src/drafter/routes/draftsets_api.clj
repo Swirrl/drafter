@@ -243,7 +243,7 @@
                         (do
                           (dsmgmt/submit-draftset! backend draftset-id user role-kw)
                           (response ""))
-                        (swirrl-server.responses/bad-request-response (str "Invalid role: " role)))))))
+                        (unprocessable-entity-response (str "Invalid role: " role)))))))
 
      (make-route :put "/draftset/:id/claim"
                  (authenticated

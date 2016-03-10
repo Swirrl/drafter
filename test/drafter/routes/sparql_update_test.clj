@@ -1,5 +1,6 @@
 (ns drafter.routes.sparql-update-test
   (:require [drafter.routes.sparql-update :refer :all]
+            [drafter.test-common :refer [throws-exception?]]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!]]
             [swirrl-server.async.jobs :as jobs]
             [clojure.test :refer :all]
@@ -7,7 +8,8 @@
             [ring.util.codec :as codec]
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db stream->string
                                          select-all-in-graph during-exclusive-write]]
-            [grafter.rdf.repository :refer [query]])
+            [grafter.rdf.repository :refer [query]]
+            [swirrl-server.errors :refer [encode-error]])
   (:import [java.util UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
            [java.nio.charset StandardCharsets]
@@ -67,9 +69,14 @@
     (let [endpoint (update-endpoint "/update" *test-backend*)]
 
       ;; update should fail while exclusive write is in progress
+
       (during-exclusive-write
-       (let [{:keys [status]} (endpoint (application-sparql-update-request))]
-          (is (= 503 status))))
+       (testing "An exception that encode-error's as a 503 is thrown"
+         (throws-exception?
+          (endpoint (application-sparql-update-request))
+          (catch clojure.lang.ExceptionInfo ex
+            (is (= 503 (:status (encode-error ex)))
+                "The exception that is thrown encodes a 503 response")))))
 
       ;; should be able to submit updates again
       (let [{:keys [status]} (endpoint (application-sparql-update-request))]

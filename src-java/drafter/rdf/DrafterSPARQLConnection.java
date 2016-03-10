@@ -4,11 +4,12 @@ import org.openrdf.query.*;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.sparql.SPARQLConnection;
 import org.openrdf.repository.sparql.SPARQLRepository;
+import org.openrdf.http.client.SparqlSession;
 
 public class DrafterSPARQLConnection extends SPARQLConnection {
 
-    public DrafterSPARQLConnection(SPARQLRepository repository) {
-        super(repository);
+    public DrafterSPARQLConnection(SPARQLRepository repository, SparqlSession sparqlSession) {
+        super(repository, sparqlSession);
     }
 
     @Override public BooleanQuery prepareBooleanQuery(QueryLanguage ql, String query, String base) throws RepositoryException, MalformedQueryException {

@@ -6,24 +6,23 @@
             [drafter.backend.protocols :refer :all]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
             [clojure.tools.logging :as log]
+            [swirrl-server.responses :as r]
+            [swirrl-server.errors :refer [encode-error]]
             [drafter.common.sparql-routes :refer [supplied-drafts]]))
 
 (defn- draft-query-endpoint [executor request timeouts]
   (try
     (let [{:keys [params]} request
           graph-uris (supplied-drafts executor request)
-          live->draft (log/spy(mgmt/graph-map executor graph-uris))
+          live->draft (log/spy (mgmt/graph-map executor graph-uris))
           rewriting-executor (create-rewriter executor live->draft)]
 
       (process-sparql-query rewriting-executor request
                             :graph-restrictions graph-uris
-                            :query-timeouts timeouts))
+                            :query-timeouts timeouts))))
 
-    (catch clojure.lang.ExceptionInfo ex
-      (let [unpack #(= %1 (-> %2 ex-data :error))
-            status (condp unpack ex
-                     :multiple-drafts-error 412)]
-        {:status status :body (.getMessage ex)}))))
+(defmethod encode-error :multiple-drafts-error [ex]
+  (r/error-response 412 :multiple-drafts-error (.getMessage ex)))
 
 (defn draft-sparql-routes
   ([mount-point executor] (draft-sparql-routes mount-point executor nil))

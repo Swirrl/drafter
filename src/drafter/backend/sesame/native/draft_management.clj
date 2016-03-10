@@ -3,6 +3,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [grafter.rdf.repository :as repo]
             [grafter.rdf :refer [add]]
+            [swirrl-server.errors :refer [ex-swirrl]]
             [drafter.backend.sesame.common.protocols :refer [->repo-connection]]))
 
 (defn- migrate-graph-to-live!
@@ -52,11 +53,10 @@
 
         (if (and is-only-draft? (empty? contents))
           (mgmt/delete-live-graph-from-state! db live-graph-uri)))
-      
+
       (log/info (str "Migrated graph: " draft-graph-uri " to live graph: " live-graph-uri)))
 
-    (throw (ex-info (str "Could not find the live graph associated with graph " draft-graph-uri)
-                    {:error :graph-not-found}))))
+    (throw (ex-swirrl :graph-not-found (str "Could not find the live graph associated with graph " draft-graph-uri)))))
 
 (defn migrate-graphs-to-live! [backend graphs]
   (log/info "Starting make-live for graphs " graphs)

@@ -5,6 +5,7 @@
             [drafter.util :as util]
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job complete-job! create-child-job]]
+            [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
@@ -23,16 +24,12 @@
 (defmacro with-job-exception-handling [job & forms]
   `(try
      ~@forms
-     (catch clojure.lang.ExceptionInfo exi#
-       (log/warn exi# "Error whilst executing job")
-       (complete-job! ~job {:type :error
-                            :error-type (str (class exi#))
-                            :exception (.getCause exi#)}))
-     (catch Exception ex#
-       (log/warn ex# "Error whilst executing job")
-       (complete-job! ~job {:type :error
-                            :error-type (str (class ex#))
-                            :exception ex#}))))
+     (catch Throwable ext#
+       (log/warn ext# "Error whilst executing job")
+       ;; Call in to encode-errors to coerce the exception into the appropriate
+       ;; JSON object but discard the ring-response as job status routes return
+       ;; error information as a 200 OK even if the job errored.
+       (complete-job! ~job (:body (encode-error ext#))))))
 
 (defn failed-job-result?
   "Indicates whether the given result object is a failed job result."

@@ -1,15 +1,27 @@
-(let [log-pattern "%d{ISO8601} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"]
-                (set-loggers!
-                 ["org.openrdf" "drafter"]
-                 {:name "drafter"
-                  :level :trace
-                  :out (DailyRollingFileAppender.
-                        (EnhancedPatternLayout. log-pattern)
-                        "logs/drafter.log" "'.'YYYY-MM")}
+(let [log-pattern "%d{ISO8601} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"
+      max-backups 7
 
-                 "drafter.rdf.sparql-protocol"
-                 {:name "sparql"
-                  :level :info
-                  :out (DailyRollingFileAppender.
+      sparql-log (doto (org.apache.log4j.RollingFileAppender.
                         (EnhancedPatternLayout. log-pattern)
-                        "logs/sparql.log" "'.'YYYY-MM")}))
+                        "logs/sparql.log")
+                   (.setMaxBackupIndex max-backups))
+      drafter-log (doto (org.apache.log4j.RollingFileAppender.
+                         (EnhancedPatternLayout. log-pattern)
+                         "logs/drafter.log")
+                    (.setMaxBackupIndex max-backups))]
+
+  (set-loggers!
+   ["org.openrdf" "drafter" "drafter.backend.sesame.common.draft-api" "org.apache.http"]
+   {:name "drafter"
+    :level :trace
+    :out drafter-log}
+
+   ["grafter.rdf.sesame"]
+   {:name "grafter"
+    :level :trace
+    :out drafter-log }
+
+   ["drafter.rdf.sparql-protocol" "drafter.routes.sparql-update"]
+   {:name "sparql"
+    :level :trace
+    :out sparql-log }))

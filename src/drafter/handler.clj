@@ -31,6 +31,7 @@
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.verbs :refer [wrap-verbs]]
             [ring.middleware.defaults :refer [api-defaults]]
+            [swirrl-server.errors :refer [wrap-encode-errors]]
             [ring.middleware.resource :refer [wrap-resource]]
             [selmer.parser :as parser]
             [clojure.string :as str]
@@ -38,11 +39,13 @@
 
   ;; Note that though the classes and requires below aren't used in this namespace
   ;; they are needed by the log-config file which is loaded from here.
-  (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
+  (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender RollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
            [org.apache.log4j.helpers DateLayout]
            [java.util UUID])
 
   (:require [clj-logging-config.log4j :refer [set-loggers!]]))
+
+(require 'drafter.errors)
 
 ;; Set these values later when we start the server
 (def backend)
@@ -128,7 +131,7 @@
                         ;; add custom middleware here
                         :middleware [#(wrap-resource % "swagger-ui")
                                      wrap-verbs
-                                     middleware/template-error-page
+                                     wrap-encode-errors
                                      middleware/log-request]
                         ;; add access rules here
                         :access-rules []

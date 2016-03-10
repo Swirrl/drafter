@@ -18,7 +18,7 @@
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.util Date]
            [java.io ByteArrayOutputStream ByteArrayInputStream BufferedReader]
-           [org.openrdf.query TupleQueryResultHandler]
+           [org.openrdf.query QueryResultHandler]
            [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONParser]
            [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParser]))
 
@@ -723,7 +723,7 @@
     (assert-is-forbidden-response delete-response)))
 
 (defn- result-set-handler [result-state]
-  (reify TupleQueryResultHandler
+  (reify QueryResultHandler
     (handleBoolean [this b])
     (handleLinks [this links])
     (startQueryResult [this binding-names])
@@ -736,7 +736,7 @@
 (defn- create-query-request [user draftset-location query accept-content-type & {:keys [union-with-live?]}]
   (with-identity user
     {:uri (str draftset-location "/query")
-     :headers {"Accept" accept-content-type}
+     :headers {"accept" accept-content-type}
      :request-method :post
      :params {:query query :union-with-live union-with-live?}}))
 
@@ -769,7 +769,7 @@
           {:keys [body] :as query-response} (route query-request)
           result-state (atom #{})
           result-handler (result-set-handler result-state)
-          parser (doto (SPARQLResultsCSVParser.) (.setTupleQueryResultHandler result-handler))]
+          parser (doto (SPARQLResultsJSONParser.) (.setQueryResultHandler result-handler))]
 
       (.parse parser body)
 
@@ -946,7 +946,7 @@
 (deftest submit-with-invalid-role
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-response (route (create-submit-request test-editor draftset-location :invalid))]
-    (assert-is-bad-request-response submit-response)))
+    (assert-is-unprocessable-response submit-response)))
 
 (defn- create-claim-request [draftset-location user]
   (with-identity user {:uri (str draftset-location "/claim") :request-method :put}))
