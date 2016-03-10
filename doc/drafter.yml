@@ -112,6 +112,34 @@ info:
 host: api.opendatacommunities.org
 schemes:
   - https
+    ## Roles
+
+    Users in Drafter and PMD are assigned to a role which authorises
+    them to perform various actions associated with the role and all
+    of the roles ranked beneath it.  The roles are currently:
+
+    | rank | role            | Description                                                                          |
+    |------|-----------------|--------------------------------------------------------------------------------------|
+    |    1 | editor          | Can acess the admin panel and create and edit draftsets.                             |
+    |    2 | publisher       | Can do everything an editor can, but also publish to the live site.                  |
+    |    3 | manager         | Can do everything a publisher can, but also manage user accounts (not via this API)  |
+
+
+    **Note:** roles their ranks and permissions may be adjusted in the
+    future.
+
+    Roles are also what users use to exchange Draftsets.  Users submit
+    a Draftset to a role, which puts it in that roles pool of
+    claimable Draftsets.  Draftsets are then only claimable out of the
+    roles pool by users with a role of an equal or higher rank.  In
+    addition to this the user who submitted the draftset to the role
+    can also withdraw it from submission by claiming it back -
+    regarldess of their roles rank.
+
+    Draftsets *must* be claimed before they can be reviewed, published
+    or edited.
+
+  version: 0.0.4 Draft
 securityDefinitions:
   basic-auth:
     type: basic
