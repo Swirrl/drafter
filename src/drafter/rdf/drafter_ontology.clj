@@ -31,3 +31,5 @@
 (def drafter:modifiedAt dcterms:modified)
 
 (def drafter:claimableBy (drafter "claimableBy"))
+
+(def drafter:submittedBy (drafter "submittedBy"))

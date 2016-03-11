@@ -278,7 +278,7 @@
           draft-graph-uri)
         (mgmt/create-draft-graph! db graph-uri {} (str (->draftset-uri draftset-ref)))))))
 
-(def ^:private draftset-param->predicate
+(def ^:prviate draftset-param->predicate
   {:display-name rdfs:label
    :description rdfs:comment})
 
@@ -310,14 +310,21 @@
     (str
      "DELETE {"
      (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" .")
+       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" ."
+       "<" draftset-uri "> <" drafter:submittedBy "> ?submitter .")
      "} INSERT {"
      (with-state-graph
-       "<" draftset-uri "> <" drafter:claimableBy "> \"" (name role) "\" .")
+       "<" draftset-uri "> <" drafter:claimableBy "> \"" (name role) "\" ."
+       "<" draftset-uri "> <" drafter:submittedBy "> \"" username "\" ."
+       )
      "} WHERE {"
      (with-state-graph
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" .")
+       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" ."
+       "OPTIONAL { "
+         "<" draftset-uri "> <" drafter:submittedBy "> ?submitter ."
+       "}"
+       )
      "}")))
 
 (defn submit-draftset!
