@@ -18,7 +18,7 @@
                                         read-body-rdf-statements]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
-            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format? parse-stream-statements]]
+            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [clojure.java.io :as io])
   (:import [org.openrdf.query TupleQueryResultHandler]
@@ -166,11 +166,11 @@
                      (fn [{{draftset-id :draftset-id
                             graph :graph
                             rdf-format :rdf-format
-                            statements-to-delete :rdf-statements} :params :as request}]
+                            rdf-statements :rdf-statements} :params :as request}]
                        (let [ds-executor (get-draftset-executor backend draftset-id)
                              delete-job (if (is-quads-format? rdf-format)
-                                            (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
-                                            (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
+                                          (delete-quads-from-draftset-job ds-executor rdf-statements draftset-id)
+                                          (delete-triples-from-draftset-job ds-executor rdf-statements draftset-id graph))]
                          (submit-async-job! delete-job))))))))
 
      (make-route :delete "/draftset/:id/graph"

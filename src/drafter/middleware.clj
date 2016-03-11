@@ -9,14 +9,14 @@
             [drafter.responses :as response]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
-            [drafter.rdf.sesame :refer [parse-stream-statements]]
+            [drafter.rdf.sesame :refer [read-statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [buddy.auth :as auth]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [ring.util.request :as request]
             [pantomime.media :refer [media-type-named]])
-  (:import [org.openrdf OpenRDFException]))
+  (:import [clojure.lang ExceptionInfo]))
 
 (defn log-request [handler]
   (fn [req]
@@ -116,8 +116,12 @@
   [inner-handler]
   (fn [{{:keys [rdf-format]} :params body :body :as request}]
     (try
-      (let [rdf-statements (parse-stream-statements body rdf-format)
+      (let [rdf-statements (read-statements body rdf-format)
             modified-request (assoc-in request [:params :rdf-statements] rdf-statements)]
         (inner-handler modified-request))
-      (catch OpenRDFException ex
-        (response/unprocessable-entity-response "Error parsing RDF")))))
+      (catch ExceptionInfo exi
+        (if-let [error-type (:error (ex-data exi))]
+          (if (= :reading-aborted error-type)
+            (response/unprocessable-entity-response "Error parsing RDF")
+            (throw exi))
+          (throw exi))))))
