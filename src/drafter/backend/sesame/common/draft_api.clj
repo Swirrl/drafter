@@ -89,9 +89,9 @@
           {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri)
           clone-batches (jobs/get-graph-clone-batches backend live-graph-uri)
           copy-batches-state {:op :copy-graph-batches
-                           :graph live-graph-uri
-                           :draft-graph draft-graph-uri
-                           :batches clone-batches}]
+                              :graph live-graph-uri
+                              :draft-graph draft-graph-uri
+                              :batches clone-batches}]
       ;;NOTE: do this immediately since we still haven't done any real work yet...
       (append-draftset-quads backend draftset-ref graph-map quad-batches copy-batches-state job))
 
