@@ -127,6 +127,7 @@
                                [drafter:hasDraft draft-graph-uri]]
            draft-graph-triples  [draft-graph-uri
                                  [rdf:a drafter:DraftGraph]
+                                 [drafter:createdAt time]
                                  [drafter:modifiedAt time]]
            draft-graph-triples (util/conj-if (some? draftset-uri) draft-graph-triples [drafter:inDraftSet draftset-uri])
            triples [live-graph-triples (add-properties draft-graph-triples
