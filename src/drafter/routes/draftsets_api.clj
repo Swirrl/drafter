@@ -232,7 +232,7 @@
                          (submit-async-job! (publish-draftset-job backend draftset-id))
                          (forbidden-response "You require the publisher role to perform this action")))))
 
-        (make-route :put "/draftset/:id/meta"
+        (make-route :put "/draftset/:id"
                     (as-draftset-owner
                      (fn [{{:keys [draftset-id] :as params} :params}]
                        (dsmgmt/set-draftset-metadata! backend draftset-id params)

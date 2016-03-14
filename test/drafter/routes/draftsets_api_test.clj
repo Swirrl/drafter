@@ -887,7 +887,7 @@
 
 (defn- create-update-draftset-metadata-request [user draftset-location title description]
   (with-identity user
-    {:uri (str draftset-location "/meta") :request-method :put :params {:display-name title :description description}}))
+    {:uri draftset-location :request-method :put :params {:display-name title :description description}}))
 
 (defn- update-draftset-metadata-through-api [user draftset-location title description]
   (let [request (create-update-draftset-metadata-request user draftset-location title description)
