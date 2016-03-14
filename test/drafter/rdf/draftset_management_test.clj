@@ -283,5 +283,20 @@
     (let [draft-triples (get-graph-triples draft-graph-uri)]
       (is (= (set live-triples) (set draft-triples))))))
 
+(deftest set-timestamp-test
+  (let [draftset (create-draftset! *test-backend* test-editor)
+        triples (test-triples "http://test-subject")
+        draft-graph-uri (import-data-to-draft! *test-backend* "http://foo/graph" triples draftset)]
+
+    (set-timestamp-on-draft-graph! *test-backend* draft-graph-uri drafter:createdAt)
+    (set-timestamp-on-draft-graph! *test-backend* draft-graph-uri drafter:modifiedAt)
+
+    (is (query *test-backend*
+               (str
+                "ASK {"
+                "<" draft-graph-uri "> <" drafter:createdAt "> ?created . "
+                "<" draft-graph-uri "> <" drafter:modifiedAt "> ?modified . "
+                "}")))))
+
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
