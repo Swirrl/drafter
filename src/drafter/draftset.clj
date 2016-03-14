@@ -27,30 +27,35 @@
           relative (.relativize base-uri (URI. uri))]
       (->DraftsetId (.toString relative)))))
 
-(def ^:private schema-common
+(def ^:private SchemaCommon
   {:id (s/protocol DraftsetRef)
    :created-by s/Str
    :created-date Date
    (s/optional-key :display-name) s/Str
    (s/optional-key :description) s/Str})
 
-(def owned-draftset-schema
-  (merge schema-common
+(def OwnedDraftset
+  (merge SchemaCommon
          {:current-owner s/Str}))
 
-(def submitted-draftset-schema
-  (merge schema-common
+(def SubmittedDraftset
+  (merge SchemaCommon
          {:claim-role s/Keyword}))
 
-(def draftset-schema (s/either owned-draftset-schema submitted-draftset-schema))
+(def Draftset (s/either OwnedDraftset SubmittedDraftset))
 
-(defn create-draftset
-  ([creator] {:id (->DraftsetId (str (UUID/randomUUID)))
-              :created-by creator
-              :created-date (Date.)
-              :current-owner creator})
-  ([creator display-name] (assoc (create-draftset creator) :display-name display-name))
-  ([creator display-name description]
+(s/defn create-draftset :- Draftset
+  ([creator :- s/Str]
+   {:id (->DraftsetId (str (UUID/randomUUID)))
+    :created-by creator
+    :created-date (Date.)
+    :current-owner creator})
+  ([creator :- s/Str
+    display-name :- s/Str]
+   (assoc (create-draftset creator) :display-name display-name))
+  ([creator :- s/Str
+    display-name :- s/Str
+    description :- s/Str]
    (assoc (create-draftset creator display-name) :description description)))
 
 (defn submit-to [draftset role]

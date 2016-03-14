@@ -90,22 +90,22 @@
 (defn assert-is-see-other-response [response]
   (assert-schema see-other-response-schema response))
 
-(def ^:private draftset-without-title-or-description-info-schema
+(def ^:private DraftsetWithoutTitleOrDescription
   {:id s/Str
-   :data {s/Str {s/Any s/Any}}
+   :changes {s/Str {s/Any s/Any}}
    :created-at Date
    :created-by s/Str
    (s/optional-key :current-owner) s/Str
    (s/optional-key :claim-role) s/Keyword})
 
-(def ^:private draftset-without-description-info-schema
-  (assoc draftset-without-title-or-description-info-schema :display-name s/Str))
+(def ^:private DraftsetWithoutDescription
+  (assoc DraftsetWithoutTitleOrDescription :display-name s/Str))
 
 (def ^:private draftset-with-description-info-schema
-  (assoc draftset-without-description-info-schema :description s/Str))
+  (assoc DraftsetWithoutDescription :description s/Str))
 
-(def ^:private draftset-info-schema
-  (merge draftset-without-title-or-description-info-schema
+(def ^:private Draftset
+  (merge DraftsetWithoutTitleOrDescription
          {(s/optional-key :description) s/Str
           (s/optional-key :display-name) s/Str}))
 
@@ -179,7 +179,7 @@
 (defn- get-draftset-info-through-api [draftset-location user]
   (let [{:keys [body] :as response} (route (get-draftset-info-request draftset-location user))]
     (assert-is-ok-response response)
-    (assert-schema draftset-info-schema body)
+    (assert-schema Draftset body)
     body))
 
 (defn- delete-draftset-graph-request [user draftset-location graph-to-delete]
@@ -259,19 +259,19 @@
 
     (let [ds-infos (get-all-draftsets-through-api test-publisher)
           available-names (set (map :display-name ds-infos))]
-      (assert-schema [draftset-info-schema] ds-infos)
+      (assert-schema [Draftset] ds-infos)
       (is (= #{"owned" "publishing"} available-names)))))
 
 (deftest get-empty-draftset-without-title-or-description
   (let [draftset-location (create-draftset-through-api test-editor)
         ds-info (get-draftset-info-through-api draftset-location test-editor)]
-    (assert-schema draftset-without-title-or-description-info-schema ds-info)))
+    (assert-schema DraftsetWithoutTitleOrDescription ds-info)))
 
 (deftest get-empty-draftset-without-description
   (let [display-name "Test title!"
         draftset-location (create-draftset-through-api test-editor display-name)
         ds-info (get-draftset-info-through-api draftset-location test-editor)]
-    (assert-schema draftset-without-description-info-schema ds-info)
+    (assert-schema DraftsetWithoutDescription ds-info)
     (is (= display-name (:display-name ds-info)))))
 
 (deftest get-empty-draftset-with-description
@@ -292,10 +292,10 @@
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
 
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
-      (assert-schema draftset-without-description-info-schema ds-info)
+      (assert-schema DraftsetWithoutDescription ds-info)
 
       (is (= display-name (:display-name ds-info)))
-      (is (= live-graphs (key-set (:data ds-info)))))))
+      (is (= live-graphs (key-set (:changes ds-info)))))))
 
 (deftest get-draftset-request-for-non-existent-draftset
   (let [response (route (get-draftset-info-request "/v1/draftset/missing" test-publisher))]
@@ -317,7 +317,7 @@
     (let [get-claimable-request (with-identity test-publisher {:uri "/v1/draftsets/claimable" :request-method :get})
           {:keys [body] :as response} (route get-claimable-request)]
 
-      (assert-schema [draftset-info-schema] body)
+      (assert-schema [Draftset] body)
       (is (= 2 (count body)))
 
       ;;Draftsets 1 and 2 should be on submit to publisher
@@ -893,7 +893,7 @@
   (let [request (create-update-draftset-metadata-request user draftset-location title description)
         {:keys [body] :as response} (route request)]
     (assert-is-ok-response response)
-    (assert-schema draftset-info-schema body)
+    (assert-schema Draftset body)
     body))
 
 (deftest set-draftset-with-existing-title-and-description-metadata
@@ -962,7 +962,7 @@
     (let [claim-request (create-claim-request draftset-location test-publisher)
           {:keys [body] :as claim-response} (route claim-request)]
       (assert-is-ok-response claim-response)
-      (assert-schema draftset-info-schema body)
+      (assert-schema Draftset body)
 
       (let [{:keys [current-owner]} (get-draftset-info-through-api draftset-location test-publisher)]
         (is (= (user/username test-publisher) current-owner))))))
@@ -1026,7 +1026,7 @@
 (defn- revert-draftset-graph-changes-through-api [draftset-location user graph]
   (let [{:keys [body] :as response} (route (revert-draftset-graph-changes-request draftset-location user graph))]
     (assert-is-ok-response response)
-    (assert-schema draftset-info-schema body)
+    (assert-schema Draftset body)
     body))
 
 (deftest revert-graph-change-in-draftset

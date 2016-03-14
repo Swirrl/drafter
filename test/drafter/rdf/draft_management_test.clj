@@ -370,7 +370,7 @@
     (let [live-graph-uri (create-managed-graph! *test-backend* "http://live")
           draft-graph-1 (create-draft-graph! *test-backend* live-graph-uri)
           draft-graph-2 (create-draft-graph! *test-backend* live-graph-uri)]
-      
+
       (delete-draft-graph! *test-backend* draft-graph-2)
 
       (is (= true (draft-exists? *test-backend* draft-graph-1)))
