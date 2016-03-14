@@ -5,11 +5,12 @@
             [grafter.rdf.repository :refer [query]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
-            [drafter.draftset :refer :all]
+            [drafter.draftset :as ds]
             [drafter.user :as user]
             [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph] :as mgmt]
             [drafter.backend.protocols :refer [copy-from-live-graph-job]]
             [drafter.rdf.draft-management.jobs :as jobs]
+            [schema.core :as s]
             [clojure.string :as string])
   (:import [java.util Date UUID]))
 
@@ -33,12 +34,12 @@
    (let [template (create-draftset-statements (user/username creator) title description (draftset-uri draftset-id) created-date)
          quads (to-quads template)]
      (add db quads)
-     (->DraftsetId (str draftset-id)))))
+     (ds/->DraftsetId (str draftset-id)))))
 
 (defn- draftset-exists-query [draftset-ref]
   (str "ASK WHERE {"
        (with-state-graph
-         "<" (->draftset-uri draftset-ref) "> <" rdf:a "> <" drafter:DraftSet ">")
+         "<" (ds/->draftset-uri draftset-ref) "> <" rdf:a "> <" drafter:DraftSet ">")
        "}"))
 
 (defn draftset-exists? [db draftset-ref]
@@ -51,7 +52,7 @@
        "}"))
 
 (defn- delete-draftset-statements-query [draftset-ref]
-  (let [ds-uri (str (->draftset-uri draftset-ref))]
+  (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
     (delete-statements-for-subject-query drafter-state-graph ds-uri)))
 
 (defn delete-draftset-statements! [db draftset-ref]
@@ -63,7 +64,7 @@
     (clojure.string/join " " score-pairs)))
 
 (defn- get-draftset-graph-mapping-query [draftset-ref]
-  (let [ds-uri (str (->draftset-uri draftset-ref))]
+  (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
     (str
      "SELECT ?lg ?dg WHERE { "
      (with-state-graph
@@ -129,7 +130,7 @@
     (graph-mapping-results->map results)))
 
 (defn- get-draftset-owner-query [draftset-ref]
-  (let [draftset-uri (str (->draftset-uri draftset-ref))]
+  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
     (str
      "SELECT ?owner WHERE {"
      (with-state-graph
@@ -149,7 +150,7 @@
     (= owner username)))
 
 (defn- get-draftset-properties-query [draftset-ref]
-  (let [draftset-uri (str (->draftset-uri draftset-ref))]
+  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
     (str
      "SELECT * WHERE { "
      (with-state-graph
@@ -226,7 +227,7 @@
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
 (defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner role]}]
-  (let [required-fields {:id (str (->draftset-id draftset-ref))
+  (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :created-at (calendar-literal->date created)
                          :created-by (.stringValue creator)}
         optional-fields {:display-name (and title (.stringValue title))
@@ -243,7 +244,7 @@
 
 (defn- combine-draftset-properties-and-graphs [properties graph-mapping]
   (let [live-graph-info (util/map-values (constantly {}) graph-mapping)]
-      (assoc properties :data live-graph-info)))
+    (assoc properties :changes live-graph-info)))
 
 (defn get-draftset-info [repo draftset-ref]
   (if-let [ds-properties (get-draftset-properties repo draftset-ref)]
@@ -253,7 +254,7 @@
 (defn- combine-all-properties-and-graph-mappings [draftset-properties dataset-graph-mappings]
   (map (fn [{ds-uri "ds" :as result}]
          (let [ds-uri (.stringValue ds-uri)
-               properties (draftset-properties-result->properties (->DraftsetURI ds-uri) result)
+               properties (draftset-properties-result->properties (ds/->DraftsetURI ds-uri) result)
                graph-mapping (get dataset-graph-mappings ds-uri)]
            (combine-draftset-properties-and-graphs properties graph-mapping)))
        draftset-properties))
@@ -276,7 +277,7 @@
         (do
           (mgmt/delete-graph-contents! db draft-graph-uri)
           draft-graph-uri)
-        (mgmt/create-draft-graph! db graph-uri {} (str (->draftset-uri draftset-ref)))))))
+        (mgmt/create-draft-graph! db graph-uri {} (str (ds/->draftset-uri draftset-ref)))))))
 
 (def ^:prviate draftset-param->predicate
   {:display-name rdfs:label
@@ -301,11 +302,11 @@
   updates them on the given draftset."
   [backend draftset-ref meta-map]
   (when-let [update-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
-    (let [q (set-draftset-metadata-query (->draftset-uri draftset-ref) update-pairs)]
+    (let [q (set-draftset-metadata-query (ds/->draftset-uri draftset-ref) update-pairs)]
       (update! backend q))))
 
 (defn- submit-draftset-update-query [draftset-ref owner role]
-  (let [draftset-uri (->draftset-uri draftset-ref)
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)
         username (user/username owner)]
     (str
      "DELETE {"
@@ -338,7 +339,7 @@
     (update! backend q)))
 
 (defn- claim-draftset-update-query [draftset-ref claimant]
-  (let [draftset-uri (->draftset-uri draftset-ref)
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)
         username (user/username claimant)]
     (str
      "DELETE {"
@@ -355,7 +356,7 @@
      "}")))
 
 (defn- try-claim-draftset-query [draftset-ref claimant]
-  (let [draftset-uri (->draftset-uri draftset-ref)
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)
         username (user/username claimant)
         role (user/role claimant)
         user-score (user/role->permission-level role)
@@ -411,7 +412,7 @@
     [outcome ds-info]))
 
 (defn- return-draftset-query [draftset-ref]
-  (let [draftset-uri (->draftset-uri draftset-ref)]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
     (str
      "DELETE {"
      (with-state-graph
@@ -436,7 +437,7 @@
     #{}))
 
 (defn- find-draftset-draft-graph-query [draftset-ref live-graph]
-  (let [draftset-uri (str (->draftset-uri draftset-ref))]
+  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
     (str
      "SELECT ?dg WHERE {"
      (with-state-graph
@@ -463,7 +464,7 @@
     - :not-found If the draftset does not exist or no changes exist within it."
   [backend draftset-ref graph]
   (if-let [draft-graph-uri (find-draftset-draft-graph backend draftset-ref graph)]
-    (let [ds-uri (->draftset-uri draftset-ref)]
+    (let [ds-uri (ds/->draftset-uri draftset-ref)]
       (mgmt/delete-draft-graph! backend draft-graph-uri)
       :reverted)
     :not-found))
@@ -473,7 +474,7 @@
     (do
       (mgmt/delete-graph-contents! backend draft-graph-uri)
       draft-graph-uri)
-    (mgmt/create-draft-graph! backend live-graph {} (str (->draftset-uri draftset-ref)))))
+    (mgmt/create-draft-graph! backend live-graph {} (str (ds/->draftset-uri draftset-ref)))))
 
 (defn copy-live-graph-into-draftset-job [backend draftset-ref live-graph]
   (jobs/make-job :batch-write [job]

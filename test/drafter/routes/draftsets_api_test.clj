@@ -332,7 +332,7 @@
         quads (statements data-file-path)
         draftset-location (create-draftset-through-api test-editor)]
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
-    (let [draftset-graphs (key-set (:data (get-draftset-info-through-api draftset-location test-editor)))
+    (let [draftset-graphs (key-set (:changes (get-draftset-info-through-api draftset-location test-editor)))
           graph-statements (group-by context quads)]
       (doseq [[live-graph graph-quads] graph-statements]
         (let [graph-triples (get-draftset-graph-triples-through-api draftset-location test-editor live-graph false)
@@ -406,7 +406,7 @@
         draftset-location (create-draftset-through-api test-editor)]
     (publish-quads-through-api quads)
 
-    (let [{graph-info :data :as draftset-info} (delete-quads-through-api test-editor draftset-location to-delete)
+    (let [{graph-info :changes :as draftset-info} (delete-quads-through-api test-editor draftset-location to-delete)
           ds-graphs (keys graph-info)
           expected-graphs (map first grouped-quads)
           draftset-quads (get-draftset-quads-through-api draftset-location test-editor false)
@@ -419,7 +419,7 @@
         to-delete [(->Quad "http://s1" "http://p1" "http://o1" "http://missing-graph1")
                    (->Quad "http://s2" "http://p2" "http://o2" "http://missing-graph2")]
         draftset-info (delete-quads-through-api test-editor draftset-location to-delete)]
-    (is (empty? (keys (:data draftset-info))))))
+    (is (empty? (keys (:changes draftset-info))))))
 
 (deftest delete-quads-only-in-draftset
   (let [draftset-location (create-draftset-through-api test-editor)
@@ -446,7 +446,7 @@
 
     (let [draftset-info (delete-quads-through-api test-editor draftset-location graph-statements)
           expected-graphs (set (map :c initial-statements))
-          draftset-graphs (key-set (:data draftset-info))]
+          draftset-graphs (key-set (:changes draftset-info))]
       ;;graph should still be in draftset even if it is empty since it should be deleted on publish
       (is (= expected-graphs draftset-graphs)))))
 
@@ -460,7 +460,7 @@
     (let [draftset-info (delete-quads-through-api test-editor draftset-location [(first graph-quads)])
           draftset-quads (get-draftset-quads-through-api draftset-location test-editor false)
           expected-quads (eval-statements (rest graph-quads))]
-      (is (= #{live-graph} (key-set (:data draftset-info))))
+      (is (= #{live-graph} (key-set (:changes draftset-info))))
       (is (= (set expected-quads) (set draftset-quads))))))
 
 (deftest delete-triples-from-graph-not-in-live
@@ -471,7 +471,7 @@
         draftset-quads (get-draftset-quads-through-api draftset-location test-editor false)]
 
     ;;graph should not exist in draftset since it was not in live
-    (is (empty? (:data draftset-info)))
+    (is (empty? (:changes draftset-info)))
     (is (empty? draftset-quads))))
 
 (deftest delete-graph-triples-only-in-draftset
@@ -500,7 +500,7 @@
 
     (let [draftset-info (delete-draftset-triples-through-api test-editor draftset-location triples-to-delete graph)
           draftset-quads (get-draftset-quads-through-api draftset-location test-editor false)
-          draftset-graphs (key-set (:data draftset-info))]
+          draftset-graphs (key-set (:changes draftset-info))]
 
       (is (= #{graph} draftset-graphs))
       (is (empty? draftset-quads)))))
@@ -555,7 +555,7 @@
     (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location graph-to-delete)
 
-    (let [{draftset-graphs :data} (get-draftset-info-through-api draftset-location test-editor)]
+    (let [{draftset-graphs :changes} (get-draftset-info-through-api draftset-location test-editor)]
       (is (= #{graph-to-delete} (set (keys draftset-graphs)))))))
 
 (deftest delete-graph-with-changes-in-draftset
@@ -567,7 +567,7 @@
     (append-quads-to-draftset-through-api test-editor draftset-location added-quads)
     (delete-draftset-graph-through-api test-editor draftset-location graph)
 
-    (let [{draftset-graphs :data} (get-draftset-info-through-api draftset-location test-editor)]
+    (let [{draftset-graphs :changes} (get-draftset-info-through-api draftset-location test-editor)]
       (is (= #{graph} (set (keys draftset-graphs)))))))
 
 (deftest delete-graph-only-in-draftset
@@ -585,7 +585,7 @@
       (is (= (set expected-quads) (set remaining-quads))))
 
     (let [draftset-info (get-draftset-info-through-api draftset-location test-editor)
-          draftset-graphs (keys (:data draftset-info))
+          draftset-graphs (keys (:changes draftset-info))
           expected-graphs (keys grouped-quads)]
       (is (= (set expected-graphs) (set draftset-graphs))))))
 
@@ -1035,11 +1035,11 @@
     (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location live-graph)
 
-    (let [{:keys [data]} (get-draftset-info-through-api draftset-location test-editor)]
-      (is (= #{live-graph} (key-set data))))
+    (let [{:keys [changes]} (get-draftset-info-through-api draftset-location test-editor)]
+      (is (= #{live-graph} (key-set changes))))
 
-    (let [{:keys [data] :as ds-info} (revert-draftset-graph-changes-through-api draftset-location test-editor live-graph)]
-      (is (= #{} (key-set data))))
+    (let [{:keys [changes] :as ds-info} (revert-draftset-graph-changes-through-api draftset-location test-editor live-graph)]
+      (is (= #{} (key-set changes))))
 
     (let [ds-quads (get-draftset-quads-through-api draftset-location test-editor true)]
       (is (= (set (eval-statements quads)) (set ds-quads))))))
