@@ -58,21 +58,14 @@
               :format rdf-format
               :buffer-size jobs/batched-write-size))
 
-(defn- append-data-to-draftset-graph-joblet [backend draftset-ref quad-batch]
-  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
-    (fn [graph-map]
-      (let [{:keys [graph-uri triples]} (quad-batch->graph-triples quad-batch)
-            {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend graph-uri graph-map draftset-uri)]
-        (backend/append-data-batch! backend draft-graph-uri quad-batch)
-        graph-map))))
-
-(defn- append-draftset-quads [backend draftset-ref live->draft quad-batches {op :op :as state} job]
+(defn- append-draftset-quads [backend draftset-ref live->draft quad-batches {:keys [op job-started-at] :as state} job]
   (case op
     :append
     (if-let [batch (first quad-batches)]
       (let [{:keys [graph-uri triples]} (quad-batch->graph-triples batch)]
         (if-let [draft-graph-uri (get live->draft graph-uri)]
           (do
+            (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
             (backend/append-data-batch! backend draft-graph-uri triples)
             (let [next-job (create-child-job
                             job
@@ -80,18 +73,18 @@
               (scheduler/queue-job! next-job)))
           ;;NOTE: do this immediately instead of scheduling a
           ;;continuation since we haven't done any real work yet
-          (append-draftset-quads backend draftset-ref live->draft quad-batches {:op :copy-graph :graph graph-uri} job)))
+          (append-draftset-quads backend draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
       (jobs/job-succeeded! job))
 
     :copy-graph
     (let [live-graph-uri (:graph state)
           ds-uri (str (ds/->draftset-uri draftset-ref))
-          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri)
+          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri job-started-at)
           clone-batches (jobs/get-graph-clone-batches backend live-graph-uri)
-          copy-batches-state {:op :copy-graph-batches
-                              :graph live-graph-uri
-                              :draft-graph draft-graph-uri
-                              :batches clone-batches}]
+          copy-batches-state (merge state {:op :copy-graph-batches
+                                           :graph live-graph-uri
+                                           :draft-graph draft-graph-uri
+                                           :batches clone-batches})]
       ;;NOTE: do this immediately since we still haven't done any real work yet...
       (append-draftset-quads backend draftset-ref graph-map quad-batches copy-batches-state job))
 
@@ -107,12 +100,15 @@
             (scheduler/queue-job! next-job)))
         ;;graph copy completed so continue appending quads
         ;;NOTE: do this immediately since we haven't done any work on this iteration
-        (append-draftset-quads backend draftset-ref live->draft quad-batches {:op :append} job)))))
+        (append-draftset-quads backend draftset-ref live->draft quad-batches (merge state {:op :append}) job)))))
 
 (defn- append-quads-to-draftset-job [backend draftset-ref quads]
   (let [graph-map (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
-        quad-batches (util/batch-partition-by quads context jobs/batched-write-size)]
-    (create-job :batch-write (partial append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append}))))
+        quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
+        now (java.util.Date.)
+        append-data (partial append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append
+                                                                                                :job-started-at now })]
+    (create-job :batch-write append-data)))
 
 (defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
   (append-quads-to-draftset-job backend draftset-ref (file->statements tempfile rdf-format)))

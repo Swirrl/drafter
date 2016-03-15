@@ -3,6 +3,7 @@
             [clojure.test :refer :all]
             [clojure.set :as set]
             [drafter.routes.draftsets-api :refer :all]
+            [drafter.rdf.drafter-ontology :refer [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-publisher test-manager test-password]]
             [drafter.user.memory-repository :as memrepo]
@@ -362,6 +363,43 @@
           request (append-to-draftset-request test-editor draftset-location fs "application/n-triples")
           response (route request)]
       (is (is-client-error-response? response)))))
+
+(deftest append-data-to-draftset-updates-modified-timestamp-test
+  (let [quads (statements "test/resources/test-draftset.trig")
+        draftset-location (create-draftset-through-api test-editor)
+        get-draft-graph-modified-at (fn []
+                                      ;; There is only one draftgraph in this
+                                      ;; test - so we can get away with a bit of
+                                      ;; a sloppy query.
+                                      (-> *test-backend*
+                                          (repo/query
+                                           (str "SELECT ?modified {"
+                                                "   ?draftgraph a <" drafter:DraftGraph "> ;"
+                                                "                 <" drafter:modifiedAt ">   ?modified ."
+                                                "}"))
+                                          first
+                                          (get "modified")
+                                          .calendarValue
+                                          .toGregorianCalendar
+                                          .getTime))]
+
+    (testing "Publishing some triples sets the modified time"
+      (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
+
+      (let [before (get-draft-graph-modified-at)]
+        (is (instance? Date before))
+
+        (testing "Publishing more triples afterwards updates the modified time"
+          (Thread/sleep 500)
+
+          (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
+
+          (let [after (get-draft-graph-modified-at)]
+            (is (instance? Date after))
+
+            (is (< (.getTime before)
+                   (.getTime after))
+                "Modified time is updated")))))))
 
 (deftest append-triples-to-graph-which-exists-in-live
   (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
@@ -1140,9 +1178,9 @@
       (assert-is-not-found-response copy-response))))
 
 (defn- setup-route [test-function]
-  (let [repo (memrepo/create-repository* test-editor test-publisher test-manager)]
-    (binding [*user-repo* repo
-              *route* (draftset-api-routes *test-backend* repo "Test")]
+  (let [users (memrepo/create-repository* test-editor test-publisher test-manager)]
+    (binding [*user-repo* users
+              *route* (draftset-api-routes *test-backend* users "Test")]
       (test-function))))
 
 (use-fixtures :once wrap-db-setup)
