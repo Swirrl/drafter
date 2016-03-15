@@ -25,9 +25,8 @@
            [org.openrdf.queryrender RenderUtils]))
 
 (defn- get-draftset-executor [backend draftset-ref]
-  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
-        live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)]
-    (create-rewriter backend live->draft-graph-mapping)))
+  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
+    (create-rewriter backend graph-mapping)))
 
 (defn- execute-query-in-draftset [backend draftset-ref request union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)

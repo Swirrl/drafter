@@ -235,22 +235,9 @@
         ;;NOTE: do this immediately since we haven't done any work on this iteration
         (recur backend quad-batches draftset-ref live->draft {:op :delete} job)))))
 
-(defn delete-quads-from-draftset-job [backend serialised rdf-format draftset-ref]
-  (jobs/make-job
-   :batch-write [job]
-   (let [quads (read-statements serialised rdf-format)
-         quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-         live->draft (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]                
-     (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete} job))))
-
-(defn delete-triples-from-draftset-job [backend serialised rdf-format draftset-ref graph]
-  (jobs/make-job
-   :batch-write [job]
-   (let [triples (read-statements serialised rdf-format)
-         quads (map #(util/make-quad-statement % graph) triples)
-         quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-         live->draft (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
-     (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete} job))))
+(defn- batch-and-delete-quads-from-draftset [backend quads draftset-ref live->draft job]
+  (let [quad-batches (util/batch-partition-by quads context jobs/batched-write-size)]
+    (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete} job)))
 
 (defn- rdf-handler->spog-tuple-handler [rdf-handler]
   (reify TupleQueryResultHandler
@@ -333,6 +320,14 @@
 
   backend/StatementDeletion
   (delete-quads-from-draftset-job [this serialised rdf-format draftset-ref]
-    (backend/delete-quads-from-draftset-job inner serialised rdf-format draftset-ref))
+    (jobs/make-job
+     :batch-write [job]
+     (let [quads (read-statements serialised rdf-format)]
+       (batch-and-delete-quads-from-draftset inner quads draftset-ref live->draft job))))
+
   (delete-triples-from-draftset-job [this serialised rdf-format draftset-ref graph]
-    (backend/delete-triples-from-draftset-job inner serialised rdf-format draftset-ref graph)))
+    (jobs/make-job
+     :batch-write [job]
+     (let [triples (read-statements serialised rdf-format)
+           quads (map #(util/make-quad-statement % graph) triples)]
+       (batch-and-delete-quads-from-draftset inner quads draftset-ref live->draft job)))))
