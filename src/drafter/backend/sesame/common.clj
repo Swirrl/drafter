@@ -21,7 +21,8 @@
    :create-query-executor sparql/create-query-executor})
 
 (def default-statement-deletion-impl
-  {:delete-quads-from-draftset-job sparql/delete-quads-from-draftset-job})
+  {:delete-quads-from-draftset-job sparql/delete-quads-from-draftset-job
+   :delete-triples-from-draftset-job sparql/delete-triples-from-draftset-job})
 
 (def default-query-rewritable-impl
   {:create-rewriter sparql/->RewritingSesameSparqlExecutor})

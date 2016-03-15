@@ -14,8 +14,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.user :as user]
-            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type
-                                        read-body-rdf-statements]]
+            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
@@ -161,17 +160,15 @@
      (make-route :delete "/draftset/:id/data"
                  (as-draftset-owner
                   (require-rdf-content-type
-                   (read-body-rdf-statements
-                    (require-graph-for-triples-rdf-format
-                     (fn [{{draftset-id :draftset-id
-                            graph :graph
-                            rdf-format :rdf-format
-                            rdf-statements :rdf-statements} :params :as request}]
-                       (let [ds-executor (get-draftset-executor backend draftset-id)
-                             delete-job (if (is-quads-format? rdf-format)
-                                          (delete-quads-from-draftset-job ds-executor rdf-statements draftset-id)
-                                          (delete-triples-from-draftset-job ds-executor rdf-statements draftset-id graph))]
-                         (submit-async-job! delete-job))))))))
+                   (require-graph-for-triples-rdf-format
+                    (fn [{{draftset-id :draftset-id
+                           graph :graph
+                           rdf-format :rdf-format} :params body :body :as request}]
+                      (let [ds-executor (get-draftset-executor backend draftset-id)
+                            delete-job (if (is-quads-format? rdf-format)
+                                         (delete-quads-from-draftset-job ds-executor body rdf-format draftset-id)
+                                         (delete-triples-from-draftset-job ds-executor body rdf-format draftset-id graph))]
+                        (submit-async-job! delete-job)))))))
 
      (make-route :delete "/draftset/:id/graph"
                  (as-draftset-owner
