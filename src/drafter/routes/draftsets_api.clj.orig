@@ -159,18 +159,35 @@
                                  query-request (assoc-in request [:params :query] escaped-query)]
                              (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))))))))
 
+<<<<<<< HEAD
         (make-route :delete "/draftset/:id/data"
                     (as-draftset-owner
                      (require-rdf-content-type
-                      (require-graph-for-triples-rdf-format
-                       (fn [{{draftset-id :draftset-id
+                      (read-body-rdf-statements
+                       (require-graph-for-triples-rdf-format
+                        (fn [{{draftset-id :draftset-id
                               graph :graph
-                              rdf-format :rdf-format} :params body :body :as request}]
-                         (let [ds-executor (get-draftset-executor backend draftset-id)
-                               delete-job (if (is-quads-format? rdf-format)
-                                            (delete-quads-from-draftset-job ds-executor body rdf-format draftset-id)
-                                            (delete-triples-from-draftset-job ds-executor body rdf-format draftset-id graph))]
-                           (submit-async-job! delete-job)))))))
+                              rdf-format :rdf-format
+                              statements-to-delete :rdf-statements} :params :as request}]
+                          (let [ds-executor (get-draftset-executor backend draftset-id)
+                                delete-job (if (is-quads-format? rdf-format)
+                                             (delete-quads-from-draftset-job ds-executor statements-to-delete draftset-id)
+                                             (delete-triples-from-draftset-job ds-executor statements-to-delete draftset-id (util/string->sesame-uri graph)))]
+                            (submit-async-job! delete-job))))))))
+=======
+     (make-route :delete "/draftset/:id/data"
+                 (as-draftset-owner
+                  (require-rdf-content-type
+                   (require-graph-for-triples-rdf-format
+                    (fn [{{draftset-id :draftset-id
+                           graph :graph
+                           rdf-format :rdf-format} :params body :body :as request}]
+                      (let [ds-executor (get-draftset-executor backend draftset-id)
+                            delete-job (if (is-quads-format? rdf-format)
+                                         (delete-quads-from-draftset-job ds-executor body rdf-format draftset-id)
+                                         (delete-triples-from-draftset-job ds-executor body rdf-format draftset-id graph))]
+                        (submit-async-job! delete-job)))))))
+>>>>>>> stream_statements
 
         (make-route :delete "/draftset/:id/graph"
                     (as-draftset-owner

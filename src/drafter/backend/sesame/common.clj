@@ -20,9 +20,6 @@
    :negotiate-result-writer sparql/negotiate-result-writer
    :create-query-executor sparql/create-query-executor})
 
-(def default-statement-deletion-impl
-  {:delete-quads-from-draftset-job sparql/delete-quads-from-draftset-job})
-
 (def default-query-rewritable-impl
   {:create-rewriter sparql/->RewritingSesameSparqlExecutor})
 

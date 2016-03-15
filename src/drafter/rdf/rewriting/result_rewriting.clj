@@ -4,6 +4,8 @@
   (:require
    [grafter.rdf.repository :as repo]
    [grafter.rdf :refer [prefixer]]
+   [grafter.rdf.protocols :refer [map->Quad]]
+   [drafter.util :as util]
    [drafter.rdf.draft-management :as mgmt]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
@@ -87,10 +89,13 @@
          ;; No op
          ))))
 
+(defn rewrite-statement [value-mapping statement]
+  (map->Quad (util/map-values #(get value-mapping % %) statement)))
+
 (defn- rewrite-value [draft->live value]
   (get draft->live value value))
 
-(defn rewrite-statement [value-mapping statement]
+(defn rewrite-sesame-statement [value-mapping statement]
   (let [subj (rewrite-value value-mapping (.getSubject statement))
             obj (rewrite-value value-mapping (.getObject statement))
             pred (rewrite-value value-mapping (.getPredicate statement))]
@@ -101,7 +106,7 @@
 (defn- rewriting-rdf-handler [inner-handler draft->live]
   (reify RDFHandler
     (handleStatement [this statement]
-      (.handleStatement inner-handler (rewrite-statement draft->live statement)))
+      (.handleStatement inner-handler (rewrite-sesame-statement draft->live statement)))
     (handleNamespace [this prefix uri]
       ;;TODO: are namespaces re-written? Need to re-write results if
       ;;so...
