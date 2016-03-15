@@ -1,6 +1,8 @@
 (ns drafter.rdf.draft-management-test
   (:require
-   [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live! ask?]]
+   [drafter.rdf.draftset-management :refer [create-draftset!]]
+   [drafter.user-test :refer [test-editor]]
+   [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live! import-data-to-draft! ask?] :as test]
    [grafter.rdf :refer [s add add-statement]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.vocabularies.rdf :refer :all]
@@ -14,7 +16,7 @@
    [drafter.util :as util]
    [clojure.test :refer :all])
   (:import [org.openrdf.model.impl URIImpl]
-           [java.util UUID]))
+           [java.util Date UUID]))
 
 (use-fixtures :each validate-schemas)
 
@@ -404,6 +406,22 @@
       (is (= #{:d1 :d2}
              (calculate-graph-restriction #{} #{:l1 :l2} #{:d1 :d2}))
           "Restriction should be the set of drafts (as live graph queries will be rewritten to their draft graphs)"))))
+
+(deftest set-timestamp-test
+  (let [draftset (create-draftset! *test-backend* test-editor)
+        triples (test/test-triples "http://test-subject")
+        draft-graph-uri (import-data-to-draft! *test-backend* "http://foo/graph" triples draftset)]
+
+    (set-modifed-at-on-draft-graph! *test-backend* draft-graph-uri (Date.))
+
+    (is (query *test-backend*
+               (str
+                "ASK {"
+                "<" draft-graph-uri "> <" drafter:modifiedAt "> ?modified . "
+                "}")))))
+
+
+
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

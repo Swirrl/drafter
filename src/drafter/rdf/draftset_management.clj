@@ -481,36 +481,3 @@
                  (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph)
                        batches (jobs/get-graph-clone-batches backend live-graph)]
                    (jobs/copy-from-live-graph backend live-graph draft-graph-uri batches job))))
-
-(defn- set-timestamp [subject class-uri time-predicate datetime]
-  (let [instant (javax.xml.bind.DatatypeConverter/printDateTime datetime)]
-    (str "DELETE {"
-         (with-state-graph
-           "  <" subject "> <" time-predicate "> ?lastvalue ."
-           "}")
-         "INSERT { "
-         (with-state-graph
-           "  <" subject "> <" time-predicate "> \"" instant "\"^^<http://www.w3.org/2001/XMLSchema#dateTime> .")
-         "}"
-         "WHERE {"
-         (with-state-graph
-           "  <" subject "> a <" class-uri "> ."
-           "OPTIONAL {"
-           "    <" subject "> <" time-predicate "> ?lastvalue ."
-           "}"
-           )
-         "}")))
-
-(s/defn set-timestamp-on-instance-of-class!
-  "Sets the specified object on the specified subject/predicate.  It
-  assumes the property has a cardinality of 1 or 0, so will delete all
-  other values of \":subject :predicate ?object\" if present."
-  [class-uri repo subject predicate]
-
-  (update! repo (set-timestamp subject class-uri predicate (java.util.GregorianCalendar.))))
-
-(def set-timestamp-on-draft-graph! (partial set-timestamp-on-instance-of-class!
-                                            drafter:DraftGraph))
-
-(def set-timestamp-on-live-graph! (partial set-timestamp-on-instance-of-class!
-                                           drafter:ManagedGraph))

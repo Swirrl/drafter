@@ -11,7 +11,8 @@
             [grafter.rdf.repository :refer [query]]
             [drafter.backend.protocols :refer [migrate-graphs-to-live!]]
             [grafter.rdf.templater :refer [add-properties graph]]
-            [swirrl-server.errors :refer [ex-swirrl]])
+            [swirrl-server.errors :refer [ex-swirrl]]
+            [schema.core :as s])
   (:import (java.util Date UUID)
            (java.net URI)
            (org.openrdf.model.impl URIImpl)))
@@ -152,19 +153,59 @@
   ([db live-graph-uri opts]
    (create-draft-graph! db live-graph-uri opts nil))
   ([db live-graph-uri opts draftset-uri]
-     (let [now (Date.)
-           draft-graph-uri (make-draft-graph-uri)]
-       ;; adds the triples returned by crate-draft-graph to the state graph
-       (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now opts draftset-uri)
-                    (apply to-quads)))
+   (create-draft-graph! db live-graph-uri opts draftset-uri (java.util.Date.)))
+  ([db live-graph-uri opts draftset-uri now]
+   (let [draft-graph-uri (make-draft-graph-uri)]
+     ;; adds the triples returned by crate-draft-graph to the state graph
+     (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now opts draftset-uri)
+                  (apply to-quads)))
 
-       draft-graph-uri)))
+     draft-graph-uri)))
 
-(defn ensure-draft-exists-for [repo live-graph graph-map draftset-uri]
+(defn- set-timestamp [subject class-uri time-predicate datetime]
+  (let [date-as-calendar (doto (java.util.Calendar/getInstance)
+                           (.setTime datetime))
+        instant (javax.xml.bind.DatatypeConverter/printDateTime date-as-calendar)]
+    (str "DELETE {"
+         (with-state-graph
+           "  <" subject "> <" time-predicate "> ?lastvalue ."
+           "}")
+         "INSERT { "
+         (with-state-graph
+           "  <" subject "> <" time-predicate "> \"" instant "\"^^<http://www.w3.org/2001/XMLSchema#dateTime> .")
+         "}"
+         "WHERE {"
+         (with-state-graph
+           "  <" subject "> a <" class-uri "> ."
+           "OPTIONAL {"
+           "    <" subject "> <" time-predicate "> ?lastvalue ."
+           "}"
+           )
+         "}")))
+
+(s/defn set-timestamp-on-instance-of-class!
+  "Sets the specified object on the specified subject/predicate.  It
+  assumes the property has a cardinality of 1 or 0, so will delete all
+  other values of \":subject :predicate ?object\" if present."
+  [class-uri
+   predicate
+   repo
+   subject
+   date-time :- Date]
+
+  (update! repo (set-timestamp subject class-uri predicate date-time)))
+
+(def ^{:doc "Set modified at time on a draft graph.  It is assumed the
+  cardinality of modifiedAt is at most 1, and that it will be updated in
+  place."}  set-modifed-at-on-draft-graph!
+  (partial set-timestamp-on-instance-of-class! drafter:DraftGraph drafter:modifiedAt))
+
+(defn ensure-draft-exists-for
+  [repo live-graph graph-map draftset-uri modified-at]
   (if-let [draft-graph (get graph-map live-graph)]
     {:draft-graph-uri draft-graph :graph-map graph-map}
     (let [live-graph-uri (create-managed-graph! repo live-graph)
-          draft-graph-uri (create-draft-graph! repo live-graph-uri {} draftset-uri)]
+          draft-graph-uri (create-draft-graph! repo live-graph-uri {} draftset-uri modified-at)]
       {:draft-graph-uri draft-graph-uri :graph-map (assoc graph-map live-graph-uri draft-graph-uri)})))
 
 (defn- escape-sparql-value [val]
