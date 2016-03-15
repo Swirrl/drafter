@@ -4,7 +4,8 @@
             [taoensso.timbre :as log]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response
-                                       unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!]]
+                                       unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!
+                                       conflict-detected-response]]
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
             [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
@@ -249,12 +250,14 @@
                      (existing-draftset-handler
                       backend
                       (fn [{{:keys [draftset-id]} :params user :identity}]
-                        (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
-                          (case result
-                            :ok (response ds-info)
-                            :role (forbidden-response "User not in role for draftset claim")
-                            :owned (forbidden-response "Draftset has not been submitted")
-                            (forbidden-response "Failed to claim draftset")))))))
+                        (if-let [claim-role (dsmgmt/get-draftset-claim-role backend draftset-id)]
+                          (if (user/has-role? user claim-role)
+                            (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
+                              (if (= :ok result)
+                                (response ds-info)
+                                (conflict-detected-response "Failed to claim draftset")))
+                            (forbidden-response "User not in role for draftset claim"))
+                          (forbidden-response "Draftset has not been submitted"))))))
 
         (make-route :post "/draftset/:id/return"
                     (as-draftset-owner
