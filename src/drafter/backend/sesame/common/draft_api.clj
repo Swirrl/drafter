@@ -69,7 +69,7 @@
             (backend/append-data-batch! backend draft-graph-uri triples)
             (let [next-job (create-child-job
                             job
-                            (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) {:op :append}))]
+                            (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) (merge state {:op :append})))]
               (scheduler/queue-job! next-job)))
           ;;NOTE: do this immediately instead of scheduling a
           ;;continuation since we haven't done any real work yet
@@ -79,7 +79,7 @@
     :copy-graph
     (let [live-graph-uri (:graph state)
           ds-uri (str (ds/->draftset-uri draftset-ref))
-          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri job-started-at)
+          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri)
           clone-batches (jobs/get-graph-clone-batches backend live-graph-uri)
           copy-batches-state (merge state {:op :copy-graph-batches
                                            :graph live-graph-uri

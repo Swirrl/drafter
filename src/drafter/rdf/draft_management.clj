@@ -201,11 +201,11 @@
   (partial set-timestamp-on-instance-of-class! drafter:DraftGraph drafter:modifiedAt))
 
 (defn ensure-draft-exists-for
-  [repo live-graph graph-map draftset-uri modified-at]
+  [repo live-graph graph-map draftset-uri]
   (if-let [draft-graph (get graph-map live-graph)]
     {:draft-graph-uri draft-graph :graph-map graph-map}
     (let [live-graph-uri (create-managed-graph! repo live-graph)
-          draft-graph-uri (create-draft-graph! repo live-graph-uri {} draftset-uri modified-at)]
+          draft-graph-uri (create-draft-graph! repo live-graph-uri {} draftset-uri)]
       {:draft-graph-uri draft-graph-uri :graph-map (assoc graph-map live-graph-uri draft-graph-uri)})))
 
 (defn- escape-sparql-value [val]
