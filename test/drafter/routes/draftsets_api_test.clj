@@ -6,6 +6,7 @@
             [drafter.rdf.drafter-ontology :refer [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-publisher test-manager test-password]]
+            [drafter.user.repository :as user-repo]
             [drafter.user.memory-repository :as memrepo]
             [grafter.rdf :refer [statements context add]]
             [grafter.rdf.io :refer [rdf-serializer]]
@@ -1181,6 +1182,20 @@
     (let [copy-request (copy-live-graph-into-draftset-request "/v1/draftset/missing" test-publisher live-graph)
           copy-response (route copy-request)]
       (assert-is-not-found-response copy-response))))
+
+(defn- get-users-request [user]
+  (with-identity user {:uri "/v1/users" :request-method :get}))
+
+(deftest get-users
+  (let [users (user-repo/get-all-users *user-repo*)
+        expected-summaries (map user/get-summary users)
+        {:keys [body] :as response} (route (get-users-request test-editor))]
+    (assert-is-ok-response response)
+    (is (= (set expected-summaries) (set body)))))
+
+(deftest get-users-unauthenticated
+  (let [response (route {:uri "/v1/users" :request-method :get})]
+    (assert-is-unauthorised-response response)))
 
 (defn- setup-route [test-function]
   (let [users (memrepo/create-repository* test-editor test-publisher test-manager)]

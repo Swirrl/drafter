@@ -15,6 +15,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.user :as user]
+            [drafter.user.repository :as user-repo]
             [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type temp-file-body]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
@@ -107,6 +108,13 @@
       (context
        version []
        (routes
+
+        (make-route :get "/users"
+                    (authenticated
+                     (fn [r]
+                       (let [users (user-repo/get-all-users user-repo)
+                             summaries (map user/get-summary users)]
+                         (response summaries)))))
 
         (make-route :get "/draftsets"
                     (authenticated

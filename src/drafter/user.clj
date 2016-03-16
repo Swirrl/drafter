@@ -21,6 +21,11 @@ permissions."
   {:pre [(util/seq-contains? roles role)]}
   (->User email role api-key-digest))
 
+(defn get-summary
+  "Returns a map containing summary information about a user."
+  [{:keys [email role] :as user}]
+  {:username email :role role})
+
 (defn is-known-role? [r]
   (util/seq-contains? roles r))
 
