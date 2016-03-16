@@ -150,6 +150,8 @@ tags:
     description: Draftset metadata
   - name: Querying Draftsets
     description: Accessing Data in Draftsets
+  - name: Users
+    description: Querying users
 produces:
   - application/json
 consumes:
@@ -559,6 +561,22 @@ paths:
           description: The query results returned according to the SPARQL specification.
           schema:
             type: file
+  /users:
+    get:
+      summary: Gets all users
+      description: |
+        Returns a JSON document containing an array of summary
+        documents, one for each known user.
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Users found.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/User'
+            
   /status/finished-jobs/{jobid}:
     get:
       summary: Poll to see if asynchronous job has finished
@@ -721,6 +739,20 @@ definitions:
     properties: {}
     additionalProperties:
       $ref: '#/definitions/Graph'
+
+  User:
+    type: object
+    required: [username, role]
+    properties:
+      username:
+        type: string
+        description: Username of the user
+      role:
+        type: string
+        description: role of the user
+    example:
+      username: user@example.com
+      role: publisher
 
   Draftset:
     type: object
