@@ -8,6 +8,7 @@
             [drafter.common.api-routes :refer [meta-params]]
             [drafter.write-scheduler :as scheduler]
             [drafter.draftset :as ds]
+            [drafter.rdf.sesame :refer [read-statements]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.protocols :as backend]
@@ -52,11 +53,6 @@
   (jobs/action-joblet
    (backend/append-graph-metadata! repo draft-graph metadata)
     (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))))
-
-(defn- file->statements [tempfile rdf-format]
-  (statements tempfile
-              :format rdf-format
-              :buffer-size jobs/batched-write-size))
 
 (defn- append-draftset-quads [backend draftset-ref live->draft quad-batches {:keys [op job-started-at] :as state} job]
   (case op
@@ -111,10 +107,10 @@
     (create-job :batch-write append-data)))
 
 (defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
-  (append-quads-to-draftset-job backend draftset-ref (file->statements tempfile rdf-format)))
+  (append-quads-to-draftset-job backend draftset-ref (read-statements tempfile rdf-format)))
 
 (defn append-triples-to-draftset-job [backend draftset-ref tempfile rdf-format graph]
-  (let [triples (file->statements tempfile rdf-format)
+  (let [triples (read-statements tempfile rdf-format)
         quads (map (comp map->Quad #(assoc % :c graph)) triples)]
     (append-quads-to-draftset-job backend draftset-ref quads)))
 
@@ -136,7 +132,7 @@
 
   [backend draft-graph tempfile rdf-format metadata]
 
-  (let [new-triples (file->statements tempfile rdf-format)
+  (let [new-triples (read-statements tempfile rdf-format)
 
         ;; NOTE that this is technically not transactionally safe as
         ;; sesame currently only supports the READ_COMMITTED isolation

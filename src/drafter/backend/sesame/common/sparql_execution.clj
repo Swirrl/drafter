@@ -2,6 +2,8 @@
   (:require [clojure.tools.logging :as log]
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :refer [map->Quad]]
+            [grafter.rdf :refer [context]]
+            [grafter.rdf.io :refer [IStatement->sesame-statement]]
             [clojure.set :as set]
             [drafter.backend.protocols :as backend]
             [drafter.backend.sesame.common.protocols :refer :all]
@@ -10,6 +12,7 @@
             [drafter.draftset :as ds]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.rdf.sesame :refer [read-statements]]
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results rewrite-statement]]
@@ -185,20 +188,21 @@
   (case (:op state)
     :delete
     (if-let [batch (first quad-batches)]
-      (let [live-graph (.getContext (first batch))]
-        (if (mgmt/is-graph-managed? backend (.stringValue live-graph))
+      (let [live-graph (context (first batch))]
+        (if (mgmt/is-graph-managed? backend live-graph)
           (if-let [draft-graph (get live->draft live-graph)]
-            (let [graph-array (into-array Resource (vals live->draft))]
-              (with-open [conn (grafter.rdf.repository/->connection (->sesame-repo backend))]
-                (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)]
-                  (.remove conn (seq->iterable rewritten-statements) graph-array)))
+            (do
+              (with-open [conn (repo/->connection (->sesame-repo backend))]
+                (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
+                      sesame-statements (map IStatement->sesame-statement rewritten-statements)
+                      graph-array (into-array Resource (map util/string->sesame-uri (vals live->draft)))]
+                  (.remove conn sesame-statements graph-array)))
               (let [next-job (create-child-job
                               job
                               (partial delete-quads-from-draftset backend (rest quad-batches) draftset-ref live->draft state))]
                 (scheduler/queue-job! next-job)))
             ;;NOTE: Do this immediately as we haven't done any real work yet
-            (do
-              (recur backend quad-batches draftset-ref live->draft {:op :copy-graph :live-graph live-graph} job)))
+            (recur backend quad-batches draftset-ref live->draft {:op :copy-graph :live-graph live-graph} job))
           ;;live graph does not exist so do not create a draft graph
           ;;NOTE: This is the same behaviour as deleting a live graph
           ;;which does not exist in live
@@ -208,22 +212,20 @@
 
     :copy-graph
     (let [{:keys [live-graph]} state
-          live-graph-str (.stringValue live-graph)
-          draft-graph-uri-str (mgmt/create-draft-graph! backend live-graph-str {} (str (ds/->draftset-uri draftset-ref)))
-          draft-graph-uri (util/string->sesame-uri draft-graph-uri-str)
-          copy-batches (jobs/get-graph-clone-batches backend live-graph-str)
+          draft-graph (mgmt/create-draft-graph! backend live-graph {} (str (ds/->draftset-uri draftset-ref)))
+          copy-batches (jobs/get-graph-clone-batches backend live-graph)
           copy-state {:op :copy-graph-batches
                       :graph live-graph
-                      :draft-graph draft-graph-uri
+                      :draft-graph draft-graph
                       :batches copy-batches}]
       ;;NOTE: Do this immediately as no work has been done yet
-      (recur backend quad-batches draftset-ref (assoc live->draft live-graph draft-graph-uri) copy-state job))
+      (recur backend quad-batches draftset-ref (assoc live->draft live-graph draft-graph) copy-state job))
 
     :copy-graph-batches
     (let [{:keys [graph batches draft-graph]} state]
       (if-let [[offset limit] (first batches)]
         (do
-          (jobs/copy-graph-batch! backend graph (.stringValue draft-graph) offset limit)
+          (jobs/copy-graph-batch! backend graph draft-graph offset limit)
           (let [next-state (update-in state [:batches] rest)
                 next-job (create-child-job
                           job
@@ -233,13 +235,9 @@
         ;;NOTE: do this immediately since we haven't done any work on this iteration
         (recur backend quad-batches draftset-ref live->draft {:op :delete} job)))))
 
-(defn delete-quads-from-draftset-job [backend quads draftset-ref]
-  (let [quad-batches (util/batch-partition-by quads #(.getContext %) jobs/batched-write-size)
-        graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
-        live->draft (util/map-all util/string->sesame-uri graph-mapping)]
-    (create-job
-     :batch-write
-     (partial delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete}))))
+(defn- batch-and-delete-quads-from-draftset [backend quads draftset-ref live->draft job]
+  (let [quad-batches (util/batch-partition-by quads context jobs/batched-write-size)]
+    (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete} job)))
 
 (defn- rdf-handler->spog-tuple-handler [rdf-handler]
   (reify TupleQueryResultHandler
@@ -321,5 +319,15 @@
     (backend/create-query-executor inner writer-fn pquery))
 
   backend/StatementDeletion
-  (delete-quads-from-draftset-job [this quads draftset-ref]
-    (backend/delete-quads-from-draftset-job inner quads draftset-ref)))
+  (delete-quads-from-draftset-job [this serialised rdf-format draftset-ref]
+    (jobs/make-job
+     :batch-write [job]
+     (let [quads (read-statements serialised rdf-format)]
+       (batch-and-delete-quads-from-draftset inner quads draftset-ref live->draft job))))
+
+  (delete-triples-from-draftset-job [this serialised rdf-format draftset-ref graph]
+    (jobs/make-job
+     :batch-write [job]
+     (let [triples (read-statements serialised rdf-format)
+           quads (map #(util/make-quad-statement % graph) triples)]
+       (batch-and-delete-quads-from-draftset inner quads draftset-ref live->draft job)))))

@@ -9,7 +9,8 @@
             [drafter.user :as user]
             [drafter.user.memory-repository :as memory-repo]
             [drafter.test-common :as tc])
-  (:import [clojure.lang ExceptionInfo]))
+  (:import [clojure.lang ExceptionInfo]
+           [java.io File]))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -172,3 +173,20 @@
           request {:uri "/test" :body (tc/string->input-stream "NOT NQUADS") :params {:rdf-format formats/rdf-nquads}}
           response (handler request)]
       (tc/assert-is-unprocessable-response response))))
+
+(deftest temp-file-body-test
+  (testing "Creates file"
+    (let [inner-handler (fn [{:keys [body]}] (instance? File body))
+          handler (temp-file-body inner-handler)
+          body-stream (tc/string->input-stream "body contents")
+          result (handler {:uri "/test" :request-method :get :body body-stream})]
+      (is result)))
+
+  (testing "Copies body contents"
+    (let [inner-handler (fn [{:keys [body]}]
+                          (first (line-seq (io/reader body))))
+          handler (temp-file-body inner-handler)
+          body-text "The quick brown fox jumped"
+          body-stream (tc/string->input-stream body-text)
+          result (handler {:uri "/test" :request-method :post :body body-stream})]
+      (is (= body-text result )))))

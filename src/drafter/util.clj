@@ -1,7 +1,8 @@
 (ns drafter.util
   (:require [clojure.string :as str]
             [markdown.core :as md]
-            [noir.io :as io])
+            [noir.io :as io]
+            [grafter.rdf.protocols :refer [map->Quad]])
   (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]))
 
 ;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
@@ -129,10 +130,7 @@
     (into {} kvs)))
 
 (defn make-quad-statement [triple graph]
-  (let [s (.getSubject triple)
-        p (.getPredicate triple)
-        o (.getObject triple)]
-    (ContextStatementImpl. s p o graph)))
+  (assoc triple :c graph))
 
 (defn seq-contains?
   "Returns whether a sequence contains a given value according to =."

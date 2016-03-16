@@ -12,6 +12,7 @@
             [grafter.rdf.formats :as formats]
             [grafter.rdf.protocols :refer [->Triple map->Triple ->Quad map->Quad]]
             [grafter.rdf.repository :as repo]
+            [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.util :as util]
             [drafter.responses :refer [is-client-error-response?]]
             [clojure.java.io :as io]
@@ -197,10 +198,7 @@
 
 (defn- create-delete-statements-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)]
-    (with-identity user {:uri (str draftset-location "/data")
-                         :request-method :delete
-                         :body input-stream
-                         :headers {"content-type" (.getDefaultMIMEType format)}})))
+    (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType format))))
 
 (defn- delete-quads-through-api [user draftset-location quads]
   (let [delete-request (create-delete-statements-request user draftset-location quads formats/rdf-nquads)
@@ -488,6 +486,14 @@
       ;;graph should still be in draftset even if it is empty since it should be deleted on publish
       (is (= expected-graphs draftset-graphs)))))
 
+(deftest delete-quads-with-malformed-body
+  (let [draftset-location (create-draftset-through-api test-editor)
+        body (string->input-stream "NOT NQUADS")
+        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType formats/rdf-nquads))
+        delete-response (route delete-request)
+        job-result (await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
+    (is (jobs/failed-job-result? job-result))))
+
 (deftest delete-triples-from-graph-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
@@ -549,25 +555,24 @@
     (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
 
     (with-open [input-stream (statements->input-stream (take 2 draftset-quads) formats/rdf-ntriples)]
-      (let [file-part {:tempfile input-stream :filename "to-delete.nt" :content-type "application/n-triples"}
-            delete-request (with-identity test-editor {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}})
+      (let [delete-request (create-delete-quads-request test-editor draftset-location input-stream (.getDefaultMIMEType formats/rdf-ntriples))
             delete-response (route delete-request)]
         (assert-is-unprocessable-response delete-response)))))
 
+(deftest delete-triples-with-malformed-body
+  (let [draftset-location (create-draftset-through-api test-editor)
+        body (string->input-stream "NOT TURTLE")
+        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType formats/rdf-turtle))
+        delete-request (assoc-in delete-request [:params :graph] "http://test-graph")
+        delete-response (route delete-request)
+        job-result (await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
+    (is (jobs/failed-job-result? job-result))))
+
 (deftest delete-draftset-data-for-non-existent-draftset
   (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [file-part {:tempfile fs :filename "to-delete.trig" :content-type "application/x-trig"}
-          delete-request (with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :params {:file file-part}})
+    (let [delete-request (with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :body fs})
           delete-response (route delete-request)]
       (assert-is-not-found-response delete-response))))
-
-(deftest delete-draftset-data-request-with-invalid-rdf-serialisation
-  (let [draftset-location (create-draftset-through-api test-editor)
-        input-stream (ByteArrayInputStream. (.getBytes "not nquads!" "UTF-8"))
-        file-part {:tempfile input-stream :filename "to-delete.nq" :content-type "text/x-nquads"}
-        delete-request (with-identity test-editor {:uri (str draftset-location "/data") :request-method :delete :params {:file file-part}})
-        delete-response (route delete-request)]
-    (assert-is-unprocessable-response delete-response)))
 
 (deftest delete-draftset-data-request-with-unknown-content-type
   (with-open [input-stream (io/input-stream "test/resources/test-draftset.trig")]

@@ -166,6 +166,19 @@
       (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor))
       (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
 
+(deftest get-draftset-claim-role-test
+  (testing "Claimable draftset"
+    (doseq [submitted-role user/roles]
+      (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
+        (submit-draftset! *test-backend* draftset-id test-editor submitted-role)
+        (let [claim-role (get-draftset-claim-role *test-backend* draftset-id)]
+          (is (= submitted-role claim-role))))))
+
+  (testing "Unclaimable draftset"
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+          claim-role (get-draftset-claim-role *test-backend* draftset-id)]
+      (is (nil? claim-role)))))
+
 (deftest claim-draftset-test!
   (testing "No owner when user in role"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")

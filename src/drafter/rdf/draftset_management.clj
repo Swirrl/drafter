@@ -338,6 +338,21 @@
   (let [q (submit-draftset-update-query draftset-ref owner role)]
     (update! backend q)))
 
+(defn- get-draftset-claim-role-query [draftset-ref]
+  (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
+    (str
+     "SELECT ?role WHERE {"
+     (with-state-graph
+       "<" ds-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" ds-uri "> <" drafter:claimableBy "> ?role .")
+     "}")))
+
+(defn get-draftset-claim-role [backend draftset-ref]
+  {:post [(or (nil? %) (user/is-known-role? %))]}
+  (let [q (get-draftset-claim-role-query draftset-ref)]
+    (if-let [claim-role (get (first (query backend q)) "role")]
+      (keyword (.stringValue claim-role)))))
+
 (defn- claim-draftset-update-query [draftset-ref claimant]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
         username (user/username claimant)]
