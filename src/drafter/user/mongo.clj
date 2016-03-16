@@ -3,8 +3,10 @@
             [monger.collection :as mc]
             [schema.core :as s]
             [drafter.user :as user]
-            [drafter.user.repository :refer :all])
-  (:import [java.io Closeable]))
+            [drafter.user.repository :refer :all]
+            [clojure.set :as set])
+  (:import [java.io Closeable]
+           [org.bson.types ObjectId]))
 
 (def ^:private role-mappings
   {10 :editor
@@ -27,6 +29,10 @@
     (if-let [mongo-user (mc/find-one-as-map db user-collection {:email username})]
       (mongo-user->user mongo-user)))
 
+  (get-all-users [this]
+    (->> (mc/find-maps db user-collection)
+         (map mongo-user->user)))
+
   Closeable
   (close [this]
     (mg/disconnect conn)))
@@ -35,3 +41,23 @@
   (let [conn (mg/connect)
         db (mg/get-db conn "pmd-host_development")]
     (->MongoUserRepository conn db "publish_my_data_users")))
+
+(defn- user->mongo-user [user]
+  (let [[email role digest] ((juxt user/username user/role user/api-key) user)
+        role-number (get (set/map-invert role-mappings) role)]
+    {:_id (ObjectId.)
+     :email email
+     :role_number role-number
+     :api_key_digest digest}))
+
+(defn insert-document
+  "Inserts a map into the user collection referenced by a mongo user
+  repository."
+  [{:keys [db user-collection] :as repo} document]
+  (mc/insert db user-collection document))
+
+(defn insert-user
+  "Inserts a user into a mongo db user repository."
+  [repo user]
+  (let [mongo-user (user->mongo-user user)]
+    (insert-document repo mongo-user)))

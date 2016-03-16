@@ -8,7 +8,8 @@
 
 (defrecord MemoryUserRepository [users]
   UserRepository
-  (find-user-by-username [this username] (get @users username)))
+  (find-user-by-username [this username] (get @users username))
+  (get-all-users [this] (vals @users)))
 
 (defn create-repository [users]
   (let [user-map (reduce (fn [m user] (assoc m (username user) user)) {} users)]

@@ -4,7 +4,10 @@
 (defprotocol UserRepository
   (find-user-by-username [this username]
     "Attempts to find a user with the given user name in the
-    underlying store. Returns nil if no such user was found."))
+    underlying store. Returns nil if no such user was found.")
+
+  (get-all-users [this]
+    "Returns all users in this repository"))
 
 (defn- get-repository-ns-name [env-map]
   (let [repo-ns (:drafter-user-repo-ns env-map)
