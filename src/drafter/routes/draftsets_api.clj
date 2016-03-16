@@ -15,7 +15,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.user :as user]
-            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type]]
+            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type temp-file-body]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
@@ -164,14 +164,15 @@
                     (as-draftset-owner
                      (require-rdf-content-type
                       (require-graph-for-triples-rdf-format
-                       (fn [{{draftset-id :draftset-id
-                              graph :graph
-                              rdf-format :rdf-format} :params body :body :as request}]
-                         (let [ds-executor (get-draftset-executor backend draftset-id)
-                               delete-job (if (is-quads-format? rdf-format)
-                                            (delete-quads-from-draftset-job ds-executor body rdf-format draftset-id)
-                                            (delete-triples-from-draftset-job ds-executor body rdf-format draftset-id graph))]
-                           (submit-async-job! delete-job)))))))
+                       (temp-file-body
+                        (fn [{{draftset-id :draftset-id
+                               graph :graph
+                               rdf-format :rdf-format} :params body :body :as request}]
+                          (let [ds-executor (get-draftset-executor backend draftset-id)
+                                delete-job (if (is-quads-format? rdf-format)
+                                             (delete-quads-from-draftset-job ds-executor body rdf-format draftset-id)
+                                             (delete-triples-from-draftset-job ds-executor body rdf-format draftset-id graph))]
+                            (submit-async-job! delete-job))))))))
 
         (make-route :delete "/draftset/:id/graph"
                     (as-draftset-owner
@@ -193,16 +194,17 @@
                     (as-draftset-owner
                      (require-rdf-content-type
                       (require-graph-for-triples-rdf-format
-                       (fn [{{draftset-id :draftset-id
-                             request-content-type :content-type
-                             rdf-format :rdf-format
-                             content-type :rdf-content-type
-                             graph :graph} :params body :body :as request}]
-                         (if (is-quads-format? rdf-format)
-                           (let [append-job (append-data-to-draftset-job backend draftset-id body rdf-format)]
-                             (submit-async-job! append-job))
-                           (let [append-job (append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
-                             (submit-async-job! append-job))))))))
+                       (temp-file-body
+                        (fn [{{draftset-id :draftset-id
+                               request-content-type :content-type
+                               rdf-format :rdf-format
+                               content-type :rdf-content-type
+                               graph :graph} :params body :body :as request}]
+                          (if (is-quads-format? rdf-format)
+                            (let [append-job (append-data-to-draftset-job backend draftset-id body rdf-format)]
+                              (submit-async-job! append-job))
+                            (let [append-job (append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
+                              (submit-async-job! append-job)))))))))
 
         (make-route :put "/draftset/:id/graph"
                     (as-draftset-owner

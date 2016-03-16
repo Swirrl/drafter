@@ -3,6 +3,7 @@
             [clojure.tools.logging :as log]
             [clojure.string :as string]
             [clojure.set :as set]
+            [clojure.java.io :as io]
             [environ.core :refer [env]]
             [selmer.parser :as parser]
             [drafter.util :as util]
@@ -16,7 +17,8 @@
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [ring.util.request :as request]
             [pantomime.media :refer [media-type-named]])
-  (:import [clojure.lang ExceptionInfo]))
+  (:import [clojure.lang ExceptionInfo]
+           [java.io File]))
 
 (defn log-request [handler]
   (fn [req]
@@ -125,3 +127,13 @@
             (response/unprocessable-entity-response "Error parsing RDF")
             (throw exi))
           (throw exi))))))
+
+(defn temp-file-body
+  "Wraps a handler with one that writes the incoming body to a temp
+  file and sets the new body as the file before invoking the inner
+  handler."
+  [inner-handler]
+  (fn [{:keys [body] :as request}]
+    (let [temp-file (File/createTempFile "drafter-body" nil)]
+      (io/copy body temp-file)
+      (inner-handler (assoc request :body temp-file)))))
