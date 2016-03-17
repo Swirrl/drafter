@@ -192,14 +192,21 @@
     (str
      "SELECT * WHERE {"
      (with-state-graph
-       "VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
        "?ds <" rdf:a "> <" drafter:DraftSet "> ."
        "?ds <" drafter:createdAt "> ?created ."
        "?ds <" drafter:createdBy "> ?creator ."
-       "?ds <" drafter:claimableBy "> ?role ."
        "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
        "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
-       "FILTER (" user-role-score " >= ?rv )")
+       "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter. }"
+       "{"
+       "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
+       "  ?ds <" drafter:claimableBy "> ?role ."
+       "  FILTER (" user-role-score " >= ?rv )"
+       "} UNION {"
+       "  ?ds <" drafter:submittedBy "> \"" (user/username user) "\" ."
+       "  ?ds <" drafter:claimableBy "> ?role ."
+       "}"
+       )
      "}")))
 
 (defn- get-draftsets-claimable-by-graph-mapping-query [user]

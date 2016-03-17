@@ -134,11 +134,15 @@
                          (redirect-after-post (str version "/draftset/" draftset-id))))))
 
         (make-route :get "/draftset/:id"
-                    (as-draftset-owner
-                     (fn [{{:keys [draftset-id]} :params :as request}]
-                       (if-let [info (dsmgmt/get-draftset-info backend draftset-id)]
-                         (response info)
-                         (not-found "")))))
+                    (authenticated
+                     (existing-draftset-handler
+                      backend
+                      (fn [{{:keys [draftset-id]} :params user :identity :as request}]
+                        (if-let [info (dsmgmt/get-draftset-info backend draftset-id)]
+                          (if (user/can-view? user info)
+                            (response info)
+                            (forbidden-response "Draftset not in accessible state"))
+                          (not-found ""))))))
 
         (make-route :delete "/draftset/:id"
                     (as-draftset-owner

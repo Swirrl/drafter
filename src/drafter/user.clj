@@ -63,6 +63,10 @@ permissions."
       (and (some? claim-role)
            (has-role? user claim-role))))
 
+(defn can-view? [user draftset]
+  (or (can-claim? user draftset)
+      (is-owner? user draftset)))
+
 (defn permitted-draftset-operations [{:keys [current-owner claim-role] :as draftset} user]
   (cond
    (is-owner? user draftset)
