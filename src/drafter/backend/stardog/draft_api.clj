@@ -1,6 +1,5 @@
 (ns drafter.backend.stardog.draft-api
-  (:require [drafter.rdf.draft-management :refer [delete-draft-state-query]]
-            [grafter.rdf.protocols :refer [update!]]
+  (:require [drafter.rdf.draft-management :refer [update! delete-draft-state-query]]
             [swirrl-server.async.jobs :refer [create-job]]
             [taoensso.timbre :as log]
             [drafter.rdf.draft-management.jobs :as jobs]))

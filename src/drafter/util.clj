@@ -60,7 +60,7 @@
 (defn make-compound-sparql-query
   "Combines a sequence of SPARQL queries into a single query."
   [queries]
-  (str/join "; " queries))
+  (str/join ";\n" queries))
 
 (defmacro conj-if
   "Returns (conj col x) if test evaluates to true, otherwise returns

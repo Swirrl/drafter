@@ -11,9 +11,7 @@
             [drafter.util :as util]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
-            [grafter.rdf.protocols :refer [update!]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
-            [grafter.rdf.repository :refer [query]]
             [environ.core :refer [env]]
             [clojure.string :as string]))
 
@@ -129,7 +127,7 @@
   into the given destination graph."
   [repo source-graph dest-graph offset limit]
   (let [query (copy-graph-batch-query source-graph dest-graph offset limit)]
-    (update! repo query)))
+    (mgmt/update! repo query)))
 
 (defn calculate-offsets [count batch-size]
   "Given a total number of items and a batch size, returns a sequence
@@ -150,7 +148,7 @@
 (defn get-graph-clone-batches
   ([repo graph-uri] (get-graph-clone-batches repo graph-uri batched-write-size))
   ([repo graph-uri batch-size]
-   (let [m (first (query repo (graph-count-query graph-uri)))
+   (let [m (first (mgmt/query repo (graph-count-query graph-uri)))
          graph-count (Integer/parseInt (.stringValue (get m "c")))]
      (calculate-offsets graph-count batch-size))))
 
@@ -191,7 +189,7 @@
   (with-job-exception-handling job
     (let [meta-uris (map meta-uri meta-keys)
           delete-query (delete-graph-metadata-query graphs meta-uris)]
-      (update! repo delete-query)
+      (mgmt/update! repo delete-query)
       (complete-job! job restapi/ok-response))))
 
 (defn create-delete-metadata-job

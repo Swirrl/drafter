@@ -1,15 +1,15 @@
 (ns drafter.rdf.draft-management-test
   (:require
    [drafter.rdf.draftset-management :refer [create-draftset!]]
+   [drafter.rdf.draft-management :refer :all]
    [drafter.user-test :refer [test-editor]]
    [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live! import-data-to-draft! ask?] :as test]
    [grafter.rdf :refer [s add add-statement]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.vocabularies.rdf :refer :all]
-   [grafter.rdf.repository :refer :all]
+   [grafter.rdf.repository :as repo]
    [drafter.backend.protocols :refer [append-data-batch!]]
    [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
-   [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
    [schema.test :refer [validate-schemas]]
    [drafter.util :as util]
@@ -298,7 +298,7 @@
                 (live-graphs *test-backend* :online false))))))
 
 (deftest build-draft-map-test
-  (let [db (repo)]
+  (let [db (repo/repo)]
     (testing "graph-map associates live graphs with their drafts"
       (create-managed-graph! db "http://frogs.com/")
       (create-managed-graph! db "http://dogs.com/")
@@ -311,12 +311,12 @@
                (graph-map db #{frogs-draft dogs-draft})))))))
 
 (deftest upsert-single-object-insert-test
-  (let [db (repo)]
+  (let [db (repo/repo)]
     (upsert-single-object! db "http://foo/" "http://bar/" "baz")
     (is (query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
 (deftest upsert-single-object-update-test
-  (let [db (repo)
+  (let [db (repo/repo)
         subject "http://example.com/subject"
         predicate "http://example.com/predicate"]
     (add db (triplify [subject [predicate (s "initial")]]))

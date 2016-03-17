@@ -1,7 +1,7 @@
 (ns drafter.rdf.draftset-management-test
   (:require [clojure.test :refer :all]
             [drafter.rdf.draftset-management :refer :all]
-            [drafter.rdf.draft-management :refer [draft-exists?] :as mgmt]
+            [drafter.rdf.draft-management :refer [draft-exists? query] :as mgmt]
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples
                                          select-all-in-graph]]
             [drafter.write-scheduler :as scheduler]
@@ -11,7 +11,7 @@
             [drafter.user-test :refer [test-editor test-publisher]]
             [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
             [drafter.util :as util]
-            [grafter.rdf.repository :refer [query]]
+            [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :refer [->Triple]]
             [grafter.vocabularies.rdf :refer :all]))
 

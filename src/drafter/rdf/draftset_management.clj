@@ -1,13 +1,11 @@
 (ns drafter.rdf.draftset-management
   (:require [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [add s]]
-            [grafter.rdf.protocols :refer [update!]]
-            [grafter.rdf.repository :refer [query]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.util :as util]
             [drafter.draftset :as ds]
             [drafter.user :as user]
-            [drafter.rdf.draft-management :refer [to-quads with-state-graph drafter-state-graph] :as mgmt]
+            [drafter.rdf.draft-management :refer [update! query to-quads with-state-graph drafter-state-graph] :as mgmt]
             [drafter.backend.protocols :refer [copy-from-live-graph-job]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [schema.core :as s]
@@ -39,7 +37,7 @@
 (defn- draftset-exists-query [draftset-ref]
   (str "ASK WHERE {"
        (with-state-graph
-         "<" (ds/->draftset-uri draftset-ref) "> <" rdf:a "> <" drafter:DraftSet ">")
+         "<" (ds/->draftset-uri draftset-ref) "> a drafter:DraftSet . ")
        "}"))
 
 (defn draftset-exists? [db draftset-ref]
@@ -68,10 +66,10 @@
     (str
      "SELECT ?lg ?dg WHERE { "
      (with-state-graph
-       "<" ds-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "?dg <" drafter:inDraftSet "> <" ds-uri "> ."
-       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-       "?lg <" drafter:hasDraft "> ?dg .")
+       "<" ds-uri "> a drafter:DraftSet ."
+       "?dg drafter:inDraftSet <" ds-uri "> ."
+       "?lg a drafter:ManagedGraph ; "
+       "    drafter:hasDraft ?dg .")
      "}")))
 
 (defn- get-all-draftset-graph-mappings-query [user]
