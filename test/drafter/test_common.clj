@@ -1,17 +1,15 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
-            [grafter.rdf.repository :refer :all]
-            [grafter.rdf.protocols :refer [add update!]]
+            [grafter.rdf.repository :as repo]
+            [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
             [environ.core :refer [env]]
             [drafter.user :as user]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.configuration :refer [get-backend]]
-            ;; [drafter.backend.sesame.native]
-            ;; [drafter.backend.sesame.remote]
             [drafter.backend.protocols :refer [stop]]
             [me.raynes.fs :as fs]
-            [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!
+            [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph! query update!
                                                   migrate-live!]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
@@ -82,7 +80,7 @@
 
 
 (defn make-store []
-  (repo))
+  (repo/repo))
 
 (defn make-backend []
   (get-backend env))
