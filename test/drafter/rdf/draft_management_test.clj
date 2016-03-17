@@ -167,7 +167,13 @@
           "Draft graph should be removed from the state graph")
 
       (is (= true (is-graph-managed? *test-backend* test-graph-uri))
-          "Live graph reference shouldn't have been deleted from state graph"))))
+          "Live graph reference shouldn't have been deleted from state graph")
+
+      (is (ask? "GRAPH <" drafter-state-graph "> {
+                   <http://example.org/my-graph> dcterms:modified ?modified ;
+                                                 dcterms:issued ?published .
+                }")
+          "Live graph should have a modified and issued time stamp"))))
 
 (deftest migrate-live!-remove-live-aswell-test
   (testing "migrate-live! DELETION: Deleted draft removes live graph from state graph"
