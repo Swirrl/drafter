@@ -3,13 +3,16 @@
             [drafter.layout :as layout]
             [drafter.rdf.draft-management :refer [drafter-state-graph
                                                   live-graphs]]
+            [drafter.rdf.drafter-ontology :refer [drafter]]
             [drafter.backend.protocols :refer [get-all-drafts get-live-graph-for-draft]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
-            [grafter.rdf.io :refer [rdf-serializer]]
+            [grafter.rdf.io :refer [rdf-serializer default-prefixes]]
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]))
+
+(def drafter-prefixes (assoc default-prefixes "drafter" (drafter "")))
 
 (defn query-page [params]
   (layout/render "query-page.html" params))
@@ -25,7 +28,7 @@
   the RAW database as a Trig String for debugging.  Don't use on large
   databases as it will be loaded into memory."
   [db ostream]
-  (add (rdf-serializer ostream :format rdf-trig) (statements db)))
+  (add (rdf-serializer ostream :format rdf-trig :prefixes drafter-prefixes) (statements db)))
 
 (defn data-page [template dumps-endpoint graphs]
   (layout/render template {:dump-path dumps-endpoint :graphs graphs}))

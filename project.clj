@@ -37,12 +37,12 @@
                  [com.novemberain/monger "3.0.2"]
 
                  [swirrl/lib-swirrl-server "0.3.0" :exclusions [clout org.clojure/java.classpath]]
-                 
+
                  [buddy/buddy-core "0.9.0"]
                  [buddy/buddy-auth "0.9.0"]
                  [org.mindrot/jbcrypt "0.3m"]
 
-                 [grafter "0.7.0"]
+                 [grafter "0.7.1-SNAPSHOT"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
