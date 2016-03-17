@@ -158,7 +158,8 @@
        "OPTIONAL { <" draftset-uri "> <" drafter:hasOwner "> ?owner . }"
        "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description . }"
        "OPTIONAL { <" draftset-uri "> <" rdfs:label "> ?title }"
-       "OPTIONAL { <" draftset-uri "> <" drafter:claimableBy "> ?role . }")
+       "OPTIONAL { <" draftset-uri "> <" drafter:claimableBy "> ?role . }"
+       "OPTIONAL { <" draftset-uri "> <" drafter:submittedBy "> ?submitter . }")
      "}")))
 
 (defn- get-all-draftsets-properties-query [user]
@@ -173,6 +174,7 @@
        "?ds <" drafter:createdBy "> ?creator ."
        "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
        "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
+       "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter . }"
        "{"
        "  ?ds <" drafter:hasOwner "> \"" username "\" ."
        "  BIND (\"" username "\" as ?owner)"
@@ -224,14 +226,15 @@
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
-(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner role]}]
+(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner role submitter]}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :created-at (calendar-literal->date created)
                          :created-by (.stringValue creator)}
         optional-fields {:display-name (and title (.stringValue title))
                          :description (and description (.stringValue description))
                          :current-owner (and owner (.stringValue owner))
-                         :claim-role (and role (keyword (.stringValue role)))}]
+                         :claim-role (and role (keyword (.stringValue role)))
+                         :submitted-by (and submitter (.stringValue submitter))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
 (defn- get-draftset-properties [repo draftset-ref]
@@ -336,21 +339,6 @@
   (let [q (submit-draftset-update-query draftset-ref owner role)]
     (update! backend q)))
 
-(defn- get-draftset-claim-role-query [draftset-ref]
-  (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "SELECT ?role WHERE {"
-     (with-state-graph
-       "<" ds-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" ds-uri "> <" drafter:claimableBy "> ?role .")
-     "}")))
-
-(defn get-draftset-claim-role [backend draftset-ref]
-  {:post [(or (nil? %) (user/is-known-role? %))]}
-  (let [q (get-draftset-claim-role-query draftset-ref)]
-    (if-let [claim-role (get (first (query backend q)) "role")]
-      (keyword (.stringValue claim-role)))))
-
 (defn- claim-draftset-update-query [draftset-ref claimant]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
         username (user/username claimant)]
@@ -382,11 +370,17 @@
      (with-state-graph
        "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" .")
      "} WHERE {"
-     (with-state-graph
-       "VALUES (?role ?rv) { " scores-values " }"
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:claimableBy "> ?role ."
-       "FILTER (" user-score " >= ?rv)")
+     "  {"
+       (with-state-graph
+         "VALUES (?role ?rv) { " scores-values " }"
+         "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+         "<" draftset-uri "> <" drafter:claimableBy "> ?role ."
+         "FILTER (" user-score " >= ?rv)")
+     "  } UNION {"
+       (with-state-graph
+         "<" draftset-uri "> <" drafter:submittedBy "> \"" username "\" ."
+         "<" draftset-uri "> <" drafter:claimableBy "> ?role .")
+     "  }"
      "}")))
 
 (defn- try-claim-draftset!

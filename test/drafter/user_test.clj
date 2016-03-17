@@ -36,33 +36,55 @@
        test-editor (ds/create-draftset (username test-editor)) true
        test-editor (ds/create-draftset (username test-publisher)) false))
 
+(defn- submitted-to-role [owner role]
+  (-> (ds/create-draftset (username owner))
+      (ds/submit-to-role (username owner) role)))
+
+(deftest is-submitted-by?-test
+  (are [user draftset expected] (= expected (is-submitted-by? user draftset))
+    test-editor (submitted-to-role test-editor :publisher) true
+    test-publisher (submitted-to-role test-editor :manager) false
+    test-editor (ds/create-draftset (username test-editor)) false))
+
 (deftest can-claim?-test
   (are [user draftset expected] (= expected (can-claim? user draftset))
        ;;owned by self
        test-editor (ds/create-draftset (username test-editor)) true
 
+       ;;unclaimed after submitted by self to role
+       test-editor (submitted-to-role test-editor :publisher) true
+
+       ;;claimed after submitted by self to role
+       test-editor (ds/claim (submitted-to-role test-editor :publisher) test-publisher) false
+
        ;;owned by other
        test-publisher (ds/create-draftset (username test-editor)) false
 
        ;;in claimable role
-       test-manager (-> (ds/create-draftset "tmp") (ds/submit-to :publisher)) true
+       test-manager (ds/submit-to-role (ds/create-draftset "tmp") "tmp" :publisher) true
 
        ;;not in claimable role
-       test-editor (-> (ds/create-draftset "tmp") (ds/submit-to :publisher)) false))
+       test-editor (ds/submit-to-role (ds/create-draftset "tmp") "tmp" :publisher) false))
 
 (deftest permitted-draftset-operations-test
   (are [user draftset expected-operations] (= expected-operations (permitted-draftset-operations draftset user))
-       ;;non-publishing owner
-    test-editor (ds/create-draftset (username test-editor)) #{:delete :edit :submit}
+    ;;non-publishing owner
+    test-editor (ds/create-draftset (username test-editor)) #{:delete :edit :submit :claim}
 
-       ;;publishing owner
-    test-publisher (ds/create-draftset (username test-publisher)) #{:delete :edit :submit :publish}
+    ;;publishing owner
+    test-publisher (ds/create-draftset (username test-publisher)) #{:delete :edit :submit :claim :publish}
+
+    ;;submitter on unclaimed
+    test-editor (submitted-to-role test-editor :publisher) #{:claim}
+
+    ;;submitted on claimed
+    test-editor (ds/claim (submitted-to-role test-editor :publisher) test-publisher) #{}
 
     ;;non-owner
     test-publisher (ds/create-draftset (username test-editor)) #{}
 
     ;;user in claim role
-    test-publisher (-> (ds/create-draftset "tmp@example.com") (ds/submit-to :publisher)) #{:claim}
+    test-publisher (ds/submit-to-role (ds/create-draftset "tmp@example.com") "tmp@example.com" :publisher) #{:claim}
 
     ;;user not in claim role
-    test-editor (-> (ds/create-draftset "tmp@example.com") (ds/submit-to :manager)) #{}))
+    test-editor (ds/submit-to-role (ds/create-draftset "tmp@example.com") "tmp@example.com" :manager) #{}))

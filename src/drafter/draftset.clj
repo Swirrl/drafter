@@ -32,7 +32,8 @@
    :created-by s/Str
    :created-date Date
    (s/optional-key :display-name) s/Str
-   (s/optional-key :description) s/Str})
+   (s/optional-key :description) s/Str
+   (s/optional-key :submitted-by) s/Str})
 
 (def OwnedDraftset
   (merge SchemaCommon
@@ -58,10 +59,11 @@
     description :- s/Str]
    (assoc (create-draftset creator display-name) :description description)))
 
-(defn submit-to [draftset role]
+(defn submit-to-role [draftset submitter role]
   (-> draftset
       (dissoc :current-owner)
-      (assoc :claim-role role)))
+      (assoc :claim-role role)
+      (assoc :submitted-by submitter)))
 
 (defn claim [draftset claimant]
   (-> draftset

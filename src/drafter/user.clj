@@ -47,11 +47,19 @@ permissions."
 (defn authenticated? [{:keys [api-key-digest] :as user} submitted-key]
   (BCrypt/checkpw submitted-key api-key-digest))
 
+(defn has-owner? [draftset]
+  (contains? draftset :current-owner))
+
 (defn is-owner? [user {:keys [current-owner] :as draftset}]
   (= (username user) current-owner))
 
+(defn is-submitted-by? [user {:keys [submitted-by] :as draftset}]
+  (= (username user) submitted-by))
+
 (defn can-claim? [user {:keys [claim-role] :as draftset}]
   (or (is-owner? user draftset)
+      (and (not (has-owner? draftset))
+           (is-submitted-by? user draftset))
       (and (some? claim-role)
            (has-role? user claim-role))))
 
@@ -60,7 +68,7 @@ permissions."
    (is-owner? user draftset)
    (util/conj-if
     (has-role? user :publisher)
-    #{:delete :edit :submit}
+    #{:delete :edit :submit :claim}
     :publish)
 
    (can-claim? user draftset)

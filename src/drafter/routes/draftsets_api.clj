@@ -260,14 +260,14 @@
                      (existing-draftset-handler
                       backend
                       (fn [{{:keys [draftset-id]} :params user :identity}]
-                        (if-let [claim-role (dsmgmt/get-draftset-claim-role backend draftset-id)]
-                          (if (user/has-role? user claim-role)
+                        (if-let [ds-info (dsmgmt/get-draftset-info backend draftset-id)]
+                          (if (user/can-claim? user ds-info)
                             (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
                               (if (= :ok result)
                                 (response ds-info)
                                 (conflict-detected-response "Failed to claim draftset")))
                             (forbidden-response "User not in role for draftset claim"))
-                          (forbidden-response "Draftset has not been submitted"))))))
+                          (not-found "Draftset not found"))))))
 
         (make-route :post "/draftset/:id/return"
                     (as-draftset-owner

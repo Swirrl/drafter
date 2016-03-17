@@ -99,7 +99,8 @@
    :created-at Date
    :created-by s/Str
    (s/optional-key :current-owner) s/Str
-   (s/optional-key :claim-role) s/Keyword})
+   (s/optional-key :claim-role) s/Keyword
+   (s/optional-key :submitted-by) s/Str})
 
 (def ^:private DraftsetWithoutDescription
   (assoc DraftsetWithoutTitleOrDescription :display-name s/Str))
@@ -1011,6 +1012,26 @@
       (let [{:keys [current-owner]} (get-draftset-info-through-api draftset-location test-publisher)]
         (is (= (user/username test-publisher) current-owner))))))
 
+(deftest claim-draftset-owned-by-self
+  (let [draftset-location (create-draftset-through-api test-editor)
+        claim-request (create-claim-request draftset-location test-editor)
+        {:keys [body] :as claim-response} (route claim-request)]
+    (assert-is-ok-response claim-response)
+    (is (= (user/username test-editor (:current-owner body))))))
+
+(deftest claim-unowned-draftset-submitted-by-self
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (submit-draftset-through-api test-editor draftset-location :publisher)
+    (claim-draftset-through-api draftset-location test-editor)))
+
+(deftest claim-owned-by-other-user-draftset-submitted-by-self
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (submit-draftset-through-api test-editor draftset-location :publisher)
+    (claim-draftset-through-api draftset-location test-publisher)
+
+    (let [response (route (create-claim-request draftset-location test-editor))]
+      (assert-is-forbidden-response response))))
+
 (deftest claim-draftset-owned-by-other-user
   (let [draftset-location (create-draftset-through-api test-editor)
         claim-request (create-claim-request draftset-location test-publisher)
@@ -1058,7 +1079,7 @@
         options-request (with-identity test-editor {:uri draftset-location :request-method :options})
         {:keys [body] :as options-response} (route options-request)]
     (assert-is-ok-response options-response)
-    (is (= #{:edit :delete :submit} (set body)))))
+    (is (= #{:edit :delete :submit :claim} (set body)))))
 
 (deftest get-options-for-non-existent-draftset
   (let [response (route (with-identity test-manager {:uri "/v1/draftset/missing" :request-method :options}))]
