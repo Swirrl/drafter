@@ -5,8 +5,9 @@
             [grafter.rdf :refer [add]]
             [grafter.rdf.protocols :as pr]
             [drafter.util :as util]
-            [drafter.rdf.draft-management :refer [drafter-state-graph] :as mgmt]
-            [drafter.backend.sesame.common.protocols :refer [->sesame-repo ->repo-connection]]))
+            [drafter.rdf.draft-management :refer [drafter-state-graph update! xsd-datetime] :as mgmt]
+            [drafter.backend.sesame.common.protocols :refer [->sesame-repo ->repo-connection]])
+  (:import [java.util Date]))
 
 (defn append-data-batch [backend graph-uri triple-batch]
   ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
@@ -81,13 +82,58 @@
    (graph-empty? repo draft-graph-uri)
    (not (mgmt/has-more-than-one-draft? repo live-graph-uri))))
 
+(defn- update-live-graph-timestamps-query [draft-graph-uri now-ts]
+  (let [issued-at (xsd-datetime now-ts)]
+    (str "# First remove the modified timestamp from the live graph
+
+WITH <http://publishmydata.com/graphs/drafter/drafts> DELETE {
+  ?live dcterms:modified ?modified .
+} WHERE {
+
+  VALUES ?draft { <" draft-graph-uri "> }
+
+  ?live a drafter:ManagedGraph ;
+     drafter:hasDraft ?draft ;
+     dcterms:modified ?modified .
+
+  ?draft a drafter:DraftGraph .
+}
+
+; # Then set the modified timestamp on the live graph to be that of the draft graph
+WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
+  ?live dcterms:modified ?modified .
+} WHERE {
+
+  VALUES ?draft { <" draft-graph-uri "> }
+
+  ?live a drafter:ManagedGraph ;
+        drafter:hasDraft ?draft .
+
+  ?draft a drafter:DraftGraph ;
+         dcterms:modified ?modified .
+}
+
+
+; # And finally set a dcterms:issued timestamp if it doesn't have one already.
+WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
+  ?live dcterms:issued " issued-at " .
+} WHERE {
+  VALUES ?draft { <" draft-graph-uri "> }
+
+  ?live a drafter:ManagedGraph ;
+        drafter:hasDraft ?draft .
+
+  FILTER NOT EXISTS { ?live dcterms:issued ?existing . }
+}")))
+
 ;;Repository -> String -> { queries: [String], live-graph-uri: String }
-(defn- migrate-live-queries [db draft-graph-uri]
+(defn- migrate-live-queries [db draft-graph-uri transaction-at]
   (if-let [live-graph-uri (mgmt/lookup-live-graph db draft-graph-uri)]
     (let [move-query (move-graph draft-graph-uri live-graph-uri)
+          update-timestamps-query (update-live-graph-timestamps-query draft-graph-uri transaction-at)
           delete-state-query (mgmt/delete-draft-state-query draft-graph-uri)
           live-public-query (mgmt/set-isPublic-query live-graph-uri true)
-          queries [move-query delete-state-query live-public-query]
+          queries [update-timestamps-query move-query delete-state-query live-public-query]
           queries (if (should-delete-live-graph-from-state-after-draft-migrate? db draft-graph-uri live-graph-uri)
                     (conj queries (mgmt/delete-live-graph-from-state-query live-graph-uri))
                     queries)]
@@ -102,8 +148,9 @@
   on the remote sesame SPARQL client."
   (log/info "Starting make-live for graphs " graphs)
   (when-not (empty? graphs)
-    (let [repo (->sesame-repo backend)
-          graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo %)) graphs)
+    (let [transaction-started-at (Date.)
+          repo (->sesame-repo backend)
+          graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at)) graphs)
           update-str (util/make-compound-sparql-query graph-migrate-queries)]
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))

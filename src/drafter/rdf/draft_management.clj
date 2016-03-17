@@ -176,17 +176,24 @@ PREFIX drafter: <http://publishmydata.com/def/drafter/>
 
      draft-graph-uri)))
 
-(defn- set-timestamp [subject class-uri time-predicate datetime]
+(defn xsd-datetime
+  "Coerce a date into the xsd-datetime string"
+  [datetime]
   (let [date-as-calendar (doto (java.util.Calendar/getInstance)
                            (.setTime datetime))
         instant (javax.xml.bind.DatatypeConverter/printDateTime date-as-calendar)]
+
+    (str "\"" instant "\"^^xsd:dateTime")))
+
+(defn- set-timestamp [subject class-uri time-predicate datetime]
+  (let [instant (xsd-datetime datetime)]
     (str "DELETE {"
          (with-state-graph
            "  <" subject "> <" time-predicate "> ?lastvalue ."
            "}")
          "INSERT { "
          (with-state-graph
-           "  <" subject "> <" time-predicate "> \"" instant "\"^^<http://www.w3.org/2001/XMLSchema#dateTime> .")
+           "  <" subject "> <" time-predicate "> " instant " .")
          "}"
          "WHERE {"
          (with-state-graph
@@ -260,12 +267,12 @@ PREFIX drafter: <http://publishmydata.com/def/drafter/>
   ;; remove the mention of this draft uri, but leave the live graph as a managed graph.
   (str "DELETE {"
        (with-state-graph
-         "?live <" drafter:hasDraft "> <" draft-graph-uri "> . "
-         "<" draft-graph-uri "> ?p ?o . ")
+         "?live <" drafter:hasDraft "> <" draft-graph-uri "> ."
+         "<" draft-graph-uri "> ?p ?o .")
        "} WHERE {"
        (with-state-graph
-         "?live <" rdf:a "> <" drafter:ManagedGraph "> ; "
-         "<" drafter:hasDraft "> <" draft-graph-uri "> . "
+         "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
+         "<" drafter:hasDraft "> <" draft-graph-uri "> ."
          "<" draft-graph-uri "> ?p ?o . ")
        "}"))
 
