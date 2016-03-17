@@ -3,7 +3,7 @@
             [clojure.string :as string]
             [grafter.rdf.repository :as repo]
             [grafter.rdf :refer [add]]
-            [grafter.rdf.protocols :refer [update!]]
+            [grafter.rdf.protocols :as pr]
             [drafter.util :as util]
             [drafter.rdf.draft-management :refer [drafter-state-graph] :as mgmt]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo ->repo-connection]]))

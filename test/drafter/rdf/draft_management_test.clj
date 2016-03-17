@@ -9,7 +9,6 @@
    [grafter.rdf.repository :refer :all]
    [drafter.backend.protocols :refer [append-data-batch!]]
    [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
-   [grafter.rdf.protocols :refer [update!]]
    [drafter.rdf.draft-management :refer :all]
    [drafter.rdf.drafter-ontology :refer :all]
    [schema.test :refer [validate-schemas]]

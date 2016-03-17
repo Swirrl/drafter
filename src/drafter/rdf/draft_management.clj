@@ -7,7 +7,7 @@
             [clojure.set :as set]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.rdf.protocols :refer [update!]]
+            [grafter.rdf.protocols :as pr]
             [grafter.rdf.repository :refer [query]]
             [drafter.backend.protocols :refer [migrate-graphs-to-live!]]
             [grafter.rdf.templater :refer [add-properties graph]]
@@ -22,6 +22,20 @@
 (def staging-base "http://publishmydata.com/graphs/drafter/draft")
 
 (def to-quads (partial graph drafter-state-graph))
+
+(def prefixes "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX qb: <http://purl.org/linked-data/cube#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+")
+
+(defn update! [repo update-string]
+  (pr/update! repo (str prefixes update-string)))
 
 (defn make-draft-graph-uri []
   (str staging-base "/" (UUID/randomUUID)))
