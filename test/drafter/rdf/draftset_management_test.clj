@@ -1,17 +1,17 @@
 (ns drafter.rdf.draftset-management-test
   (:require [clojure.test :refer :all]
             [drafter.rdf.draftset-management :refer :all]
-            [drafter.rdf.draft-management :refer [draft-exists? query] :as mgmt]
+            [drafter.rdf.draft-management :refer [draft-exists?] :as mgmt]
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples
                                          select-all-in-graph]]
             [drafter.write-scheduler :as scheduler]
             [grafter.rdf :refer [statements context]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
             [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-publisher]]
+            [drafter.user-test :refer [test-editor test-publisher test-manager]]
             [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
             [drafter.util :as util]
-            [grafter.rdf.repository :as repo]
+            [grafter.rdf.repository :refer [query]]
             [grafter.rdf.protocols :refer [->Triple]]
             [grafter.vocabularies.rdf :refer :all]))
 
@@ -72,7 +72,7 @@
 
   (testing "With no owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
       (let [owner (get-draftset-owner *test-backend* draftset-id)]
         (is (nil? owner))))))
 
@@ -83,7 +83,7 @@
 
   (testing "Has no owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
       (is (= false (is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "Has different owner"
@@ -153,7 +153,7 @@
   (testing "Existing owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
 
       (has-string-object? draftset-uri drafter:claimableBy "publisher")
       (is (= false (has-any-object? draftset-uri drafter:hasOwner)))))
@@ -161,16 +161,46 @@
   (testing "Other owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (submit-draftset! *test-backend* draftset-id test-publisher :manager)
+      (submit-draftset-to-role! *test-backend* draftset-id test-publisher :manager)
 
       (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor))
       (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
+
+(deftest submit-to-user!-test
+  (testing "When owned"
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+          draftset-uri (str (->draftset-uri draftset-id))]
+      (submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
+
+      (is (has-string-object? draftset-uri drafter:hasOwner (user/username test-publisher)))
+      (is (has-string-object? draftset-uri drafter:submittedBy (user/username test-editor)))
+
+      (is (= false (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor))))))
+
+  (testing "Submitted to self"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)
+          draftset-uri (str (->draftset-uri draftset-id))]
+      (submit-draftset-to-user! *test-backend* draftset-id test-editor test-editor)
+
+      (is (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor)))))
+
+  (testing "When not owned"
+    (let [draftset-id (create-draftset! *test-backend* test-editor)
+          draftset-uri (str (->draftset-uri draftset-id))]
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset-to-user! *test-backend* draftset-id test-manager test-publisher)
+
+      (is (has-string-object? draftset-uri drafter:hasOwner (user/username test-publisher)))
+      (is (has-string-object? draftset-uri drafter:submittedBy (user/username test-manager)))
+
+      (is (= false (has-any-object? draftset-uri drafter:claimableBy)))
+      (is (= false (has-string-object? draftset-uri drafter:submittedBy (user/username test-editor)))))))
 
 (deftest claim-draftset-test!
   (testing "No owner when user in role"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
 
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)
             ds-info (get-draftset-info *test-backend* draftset-id)]
@@ -180,7 +210,7 @@
 
   (testing "No owner when user is submitter not in role"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor))
@@ -188,7 +218,7 @@
 
   (testing "Owned by other user after submitted by user"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (submit-draftset! *test-backend* draftset-id test-editor :publisher)
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
       (claim-draftset! *test-backend* draftset-id test-publisher)
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :owned result)))))
@@ -201,7 +231,7 @@
 
   (testing "User not in claim role"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (submit-draftset! *test-backend* draftset-id test-editor :manager)
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :manager)
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :role result))
         (is (nil? (get-draftset-owner *test-backend* draftset-id))))))
@@ -218,7 +248,7 @@
 
 (deftest return-draftset!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor)]
-    (submit-draftset! *test-backend* draftset-id test-editor :publisher)
+    (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
     (claim-draftset! *test-backend* draftset-id test-publisher)
     (return-draftset! *test-backend* draftset-id)
 

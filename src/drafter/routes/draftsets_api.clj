@@ -255,7 +255,7 @@
                        (let [role-kw (keyword role)]
                          (if (user/is-known-role? role-kw)
                            (do
-                             (dsmgmt/submit-draftset! backend draftset-id user role-kw)
+                             (dsmgmt/submit-draftset-to-role! backend draftset-id user role-kw)
                              (response ""))
                            (unprocessable-entity-response (str "Invalid role: " role)))))))
 

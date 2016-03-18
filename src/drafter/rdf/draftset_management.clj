@@ -313,7 +313,7 @@
     (let [q (set-draftset-metadata-query (ds/->draftset-uri draftset-ref) update-pairs)]
       (update! backend q))))
 
-(defn- submit-draftset-update-query [draftset-ref owner role]
+(defn- submit-draftset-to-role-query [draftset-ref owner role]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
         username (user/username owner)]
     (str
@@ -336,14 +336,39 @@
        )
      "}")))
 
-(defn submit-draftset!
+(defn submit-draftset-to-role!
   "Submits a draftset to users of the specified role.
 
   Removes the current owner of a draftset and makes it available to be
   claimed by another user in a particular role. If the given user is
   not the current owner of the draftset, no changes are made."
   [backend draftset-ref owner role]
-  (let [q (submit-draftset-update-query draftset-ref owner role)]
+  (let [q (submit-draftset-to-role-query draftset-ref owner role)]
+    (update! backend q)))
+
+(defn- submit-to-user-query [draftset-ref submitter target]
+  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
+    (str
+     "DELETE {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:hasOwner "> ?owner ."
+       "<" draftset-uri "> <" drafter:claimableBy "> ?claimrole ."
+       "<" draftset-uri "> <" drafter:submittedBy "> ?oldsubmitter ."
+       )
+     "} INSERT {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:hasOwner "> \"" (user/username target) "\" ."
+       "<" draftset-uri "> <" drafter:submittedBy "> \"" (user/username submitter) "\" ."
+       )
+     "} WHERE {"
+     (with-state-graph
+       "OPTIONAL { <" draftset-uri "> <" drafter:hasOwner "> ?owner . }"
+       "OPTIONAL { <" draftset-uri "> <" drafter:claimableBy "> ?claimrole . }"
+       "OPTIONAL { <" draftset-uri "> <" drafter:submittedBy "> ?oldsubmitter . }")
+     "}")))
+
+(defn submit-draftset-to-user! [backend draftset-ref submitter target]
+  (let [q (submit-to-user-query draftset-ref submitter target)]
     (update! backend q)))
 
 (defn- claim-draftset-update-query [draftset-ref claimant]
