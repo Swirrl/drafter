@@ -249,28 +249,30 @@
                        (dsmgmt/set-draftset-metadata! backend draftset-id params)
                        (response (dsmgmt/get-draftset-info backend draftset-id)))))
 
-        (make-route :post "/draftset/:id/submit"
-                    (as-draftset-owner
-                     (fn [{{:keys [draftset-id role]} :params user :identity}]
-                       (let [role-kw (keyword role)]
-                         (if (user/is-known-role? role-kw)
-                           (do
-                             (dsmgmt/submit-draftset-to-role! backend draftset-id user role-kw)
-                             (response ""))
-                           (unprocessable-entity-response (str "Invalid role: " role)))))))
-
         (make-route :post "/draftset/:id/submit-to"
                     (as-draftset-owner
-                     (fn [{{:keys [user draftset-id]} :params owner :identity}]
-                       (cond (some? user)
-                             (if-let [target-user (user-repo/find-user-by-username user-repo user)]
-                               (do
-                                 (dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
-                                 (response ""))
-                               (unprocessable-entity-response (str "User: " user " not found")))
+                     (fn [{{:keys [user role draftset-id]} :params owner :identity}]
+                       (cond
+                         (and (some? user) (some? role))
+                         (unprocessable-entity-response "Only one of user and role parameters permitted")
+                         
+                         (some? user)
+                         (if-let [target-user (user-repo/find-user-by-username user-repo user)]
+                           (do
+                             (dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
+                             (response ""))
+                           (unprocessable-entity-response (str "User: " user " not found")))
 
-                             (nil? user)
-                             (unprocessable-entity-response (str "user parameter required"))))))
+                         (some? role)
+                         (let [role-kw (keyword role)]
+                           (if (user/is-known-role? role-kw)
+                             (do
+                               (dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
+                               (response ""))
+                             (unprocessable-entity-response (str "Invalid role: " role))))
+
+                         :else
+                         (unprocessable-entity-response (str "user or role parameter required"))))))
 
         (make-route :put "/draftset/:id/claim"
                     (authenticated

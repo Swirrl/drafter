@@ -231,7 +231,7 @@
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
 (defn- create-submit-request [user draftset-location role]
-  (with-identity user {:uri (str draftset-location "/submit") :request-method :post :params {:role (name role)}}))
+  (with-identity user {:uri (str draftset-location "/submit-to") :request-method :post :params {:role (name role)}}))
 
 (defn- submit-draftset-through-api [user draftset-location role]
   (let [response (route (create-submit-request user draftset-location role))]
@@ -996,7 +996,7 @@
         update-response (route update-request)]
     (assert-is-forbidden-response update-response)))
 
-(deftest submit-draftset-test
+(deftest submit-draftset-to-role
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-request (create-submit-request test-editor draftset-location :publisher)
         submit-response (route submit-request)]
@@ -1006,16 +1006,16 @@
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
       (is (= false (contains? ds-info :current-owner))))))
 
-(deftest submit-non-existent-draftset-test
+(deftest submit-non-existent-draftset-to-role
   (let [submit-response (route (create-submit-request test-editor "/v1/draftset/missing" :publisher))]
     (assert-is-not-found-response submit-response)))
 
-(deftest submit-by-non-owner
+(deftest submit-draftset-to-role-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-response (route (create-submit-request test-publisher draftset-location :manager))]
     (assert-is-forbidden-response submit-response)))
 
-(deftest submit-with-invalid-role
+(deftest submit-draftset-to-invalid-role
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-response (route (create-submit-request test-editor draftset-location :invalid))]
     (assert-is-unprocessable-response submit-response)))
@@ -1054,6 +1054,13 @@
         submit-request (submit-to-user-request draftset-location test-publisher test-editor)
         submit-request (update-in submit-request [:params] dissoc :user)
         response (route submit-request)]
+    (assert-is-unprocessable-response response)))
+
+(deftest submit-to-with-both-user-and-role-params
+  (let [draftset-location (create-draftset-through-api test-editor)
+        request (submit-to-user-request draftset-location test-publisher test-editor)
+        request (assoc-in request [:params :role] "editor")
+        response (route request)]
     (assert-is-unprocessable-response response)))
 
 (deftest claim-draftset
