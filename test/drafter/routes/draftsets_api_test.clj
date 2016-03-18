@@ -1020,6 +1020,42 @@
         submit-response (route (create-submit-request test-editor draftset-location :invalid))]
     (assert-is-unprocessable-response submit-response)))
 
+(defn- submit-to-username-request [draftset-location target-username user]
+  (with-identity user
+    {:uri (str draftset-location "/submit-to") :request-method :post :params {:user target-username}}))
+
+(defn- submit-to-user-request [draftset-location target-user user]
+  (submit-to-username-request draftset-location (user/username target-user) user))
+
+(deftest submit-draftset-to-user
+  (let [draftset-location (create-draftset-through-api test-editor)
+        submit-response (route (submit-to-user-request draftset-location test-publisher test-editor))]
+    (assert-is-ok-response submit-response)
+
+    (let [{:keys [current-owner] :as ds-info} (get-draftset-info-through-api draftset-location test-publisher)]
+      (is (= (user/username test-publisher) current-owner)))))
+
+(deftest submit-draftset-to-user-as-non-owner
+  (let [draftset-location (create-draftset-through-api test-editor)
+        submit-response (route (submit-to-user-request draftset-location test-manager test-publisher))]
+    (assert-is-forbidden-response submit-response)))
+
+(deftest submit-non-existent-draftset-to-user
+  (let [submit-response (route (submit-to-user-request "/v1/draftset/missing" test-publisher test-editor))]
+    (assert-is-not-found-response submit-response)))
+
+(deftest submit-draftset-to-non-existent-user
+  (let [draftset-location (create-draftset-through-api test-editor)
+        submit-response (route (submit-to-username-request draftset-location "invalid-user@example.com" test-editor))]
+    (assert-is-unprocessable-response submit-response)))
+
+(deftest submit-draftset-without-user-param
+  (let [draftset-location (create-draftset-through-api test-editor)
+        submit-request (submit-to-user-request draftset-location test-publisher test-editor)
+        submit-request (update-in submit-request [:params] dissoc :user)
+        response (route submit-request)]
+    (assert-is-unprocessable-response response)))
+
 (deftest claim-draftset
   (let [draftset-location (create-draftset-through-api test-editor)]
     (submit-draftset-through-api test-editor draftset-location :publisher)
