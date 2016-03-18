@@ -209,6 +209,15 @@
   (let [input-stream (statements->input-stream statements format)]
     (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType format))))
 
+(defn- create-delete-triples-request [user draftset-location statements graph]
+  (assoc-in (create-delete-statements-request user draftset-location statements formats/rdf-ntriples)
+            [:params :graph] graph))
+
+(defn- delete-triples-through-api [user draftset-location triples graph]
+  (-> (create-delete-triples-request user draftset-location triples graph)
+      route
+      await-delete-statements-response))
+
 (defn- delete-quads-through-api [user draftset-location quads]
   (let [delete-request (create-delete-statements-request user draftset-location quads formats/rdf-nquads)
         delete-response (route delete-request)]
@@ -339,7 +348,7 @@
       (let [expected-claimable-names (map #(nth ds-names %) [0 1 2])
             claimable-names (map :display-name editor-claimable)]
         (is (= (set expected-claimable-names) (set claimable-names)))))
-    
+
     (let [publisher-claimable (get-claimable-draftsets-through-api test-publisher)]
       ;;Draftsets 1 and 2 should be on submit to publisher
       ;;Draftset 3 is in too high a role
@@ -392,7 +401,7 @@
           response (route request)]
       (is (is-client-error-response? response)))))
 
-(deftest append-data-to-draftset-updates-modified-timestamp-test
+(deftest modifying-in-draftset-updates-modified-timestamp-test
   (let [quads (statements "test/resources/test-draftset.trig")
         draftset-location (create-draftset-through-api test-editor)
         get-draft-graph-modified-at (fn []
@@ -414,20 +423,30 @@
     (testing "Publishing some triples sets the modified time"
       (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
 
-      (let [before (get-draft-graph-modified-at)]
-        (is (instance? Date before))
+      (let [first-timestamp (get-draft-graph-modified-at)]
+        (is (instance? Date first-timestamp))
 
         (testing "Publishing more triples afterwards updates the modified time"
           (Thread/sleep 500)
 
           (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
 
-          (let [after (get-draft-graph-modified-at)]
-            (is (instance? Date after))
+          (let [second-timestamp (get-draft-graph-modified-at)]
+            (is (instance? Date second-timestamp))
 
-            (is (< (.getTime before)
-                   (.getTime after))
-                "Modified time is updated")))))))
+            (is (< (.getTime first-timestamp)
+                   (.getTime second-timestamp))
+                "Modified time is updated")
+
+
+            (Thread/sleep 500)
+
+            (delete-triples-through-api test-editor draftset-location quads "http://foo/")
+            (let [third-timestamp (get-draft-graph-modified-at)]
+
+              (is (< (.getTime second-timestamp)
+                     (.getTime third-timestamp))
+                  "Modified time is updated"))))))))
 
 (deftest append-triples-to-graph-which-exists-in-live
   (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
