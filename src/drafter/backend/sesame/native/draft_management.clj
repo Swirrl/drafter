@@ -30,10 +30,9 @@
 
         ;;if the source (draft) graph has data then copy it to the live graph and
         ;;make it public.
-        (if (not (empty? contents))
-          (do
-            (add db live-graph-uri contents)
-            (mgmt/set-isPublic! db live-graph-uri true)))
+        (when (seq contents)
+          (add db live-graph-uri contents)
+          (mgmt/set-isPublic! db live-graph-uri true))
 
         ;;delete draft data
         (mgmt/delete-graph-contents! db draft-graph-uri)

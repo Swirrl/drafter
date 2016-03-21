@@ -448,7 +448,7 @@ PREFIX drafter: <" (drafter "") ">"))
   [db draft-set]
   (if (empty? draft-set)
     {}
-    (let [drafts (apply str (map #(str "<" % "> ") draft-set))
+    (let [drafts (clojure.string/join " " (map #(str "<" % ">") draft-set))
           results (->> (query db
                               (str "SELECT ?live ?draft WHERE {"
                                    (with-state-graph

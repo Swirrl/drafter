@@ -88,7 +88,7 @@
 (defn create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? backend timeout-config]
   (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query backend timeout-config)
         update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update backend timeout-config))
-        dumps-route (if add-dumps? (create-dumps-route route-name query-fn backend timeout-config) nil)
+        dumps-route (when add-dumps? (create-dumps-route route-name query-fn backend timeout-config))
         routes [query-route update-route]]
     (vec (remove nil? [query-route update-route dumps-route]))))
 

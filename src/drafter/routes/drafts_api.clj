@@ -25,8 +25,8 @@
 
 (defn draft-api-routes [mount-point operations]
   (routes
-    (context
-      mount-point []
+   (context
+    mount-point []
 
       ;; makes a new managed/draft graph.
       ;; accepts extra meta- query string params, which are added to the state

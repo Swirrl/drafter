@@ -21,7 +21,7 @@
 
 (defn- read-body [body]
   "Extract the body of the request into a string"
-  (-> body (slurp :encoding "UTF-8")))
+  (slurp body :encoding "UTF-8"))
 
 (defmethod parse-update-request "application/sparql-update" [{:keys [body params] :as request}]
   (let [update (read-body body)]
@@ -29,7 +29,7 @@
      :graphs (get params "graph")}))
 
 (defmethod parse-update-request "application/x-www-form-urlencoded" [request]
-  (let [params (-> request :form-params)]
+  (let [params (:form-params request)]
     {:update (get params "update")
      :graphs (get params "graph")}))
 

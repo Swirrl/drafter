@@ -14,9 +14,8 @@
                        " or define "
                        var-key
                        " in the relevant profile in profiles.clj")]
-      (do
-        (log/error message)
-        (throw (RuntimeException. message))))))
+      (log/error message)
+      (throw (RuntimeException. message)))))
 
 (defn create-sparql-repository [query-endpoint update-endpoint]
   "Creates a new SPARQL repository with the given query and update

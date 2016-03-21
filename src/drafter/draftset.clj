@@ -25,7 +25,7 @@
   (->draftset-id [{:keys [uri]}]
     (let [base-uri (URI. (drafter.rdf.drafter-ontology/draftset-uri ""))
           relative (.relativize base-uri (URI. uri))]
-      (->DraftsetId (.toString relative)))))
+      (->DraftsetId (str relative)))))
 
 (def ^:private SchemaCommon
   {:id (s/protocol DraftsetRef)

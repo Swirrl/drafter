@@ -147,7 +147,7 @@ WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
   updates. Explicit UPDATE statements do not take part in transactions
   on the remote sesame SPARQL client."
   (log/info "Starting make-live for graphs " graphs)
-  (when-not (empty? graphs)
+  (when (seq graphs)
     (let [transaction-started-at (Date.)
           repo (->sesame-repo backend)
           graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at)) graphs)

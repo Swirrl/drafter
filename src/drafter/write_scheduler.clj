@@ -20,7 +20,7 @@
 
 (def priority-levels-map {:sync-write 0 :exclusive-write 1 :batch-write 2})
 
-(def all-priority-types (into #{} (keys priority-levels-map)))
+(def all-priority-types (set (keys priority-levels-map)))
 
 (def compare-jobs (comparator
                    (fn [job1 job2]

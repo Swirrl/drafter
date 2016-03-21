@@ -8,7 +8,7 @@
 
   (reduce (fn [acc [k v]]
             (let [k (name k)
-                  param-name (subs k (+ 1 (.indexOf k "-")) (.length k))
+                  param-name (subs k (inc (.indexOf k "-")) (.length k))
                   new-key (meta-uri param-name)]
               (assoc acc new-key v)))
           {}

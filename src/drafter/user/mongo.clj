@@ -30,8 +30,9 @@
       (mongo-user->user mongo-user)))
 
   (get-all-users [this]
-    (->> (mc/find-maps db user-collection)
-         (map mongo-user->user)))
+    (->>  user-collection
+          (mc/find-maps db)
+          (map mongo-user->user)))
 
   Closeable
   (close [this]
