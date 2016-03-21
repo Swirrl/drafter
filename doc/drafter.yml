@@ -50,10 +50,11 @@ info:
       - `/data` which can be used to `POST` (append), `DELETE` or
         `GET` quads from the draftset.
 
-      - `/submit` to mark this draftset as being ready for review.
-        After this operation the draftset will be made visible to
-        users with the publisher role.  These publishers can then
-        choose to `/publish` or `/return` the draftset.
+      - `/submit-to` to relinquish ownership of the drafset and either
+        assign ownership to another user, or make it available to
+        users in a given role. The user which takes ownership of the
+        draftset can then choose to `/publish` or `/return` the
+        draftset.
 
       - `/publish` which can be used by clients with the `publisher`
         role to publish a reviewed draftset to the live site.
@@ -431,27 +432,31 @@ paths:
           description: The Data in the draftset.
           schema:
             type: file
-  /draftset/{id}/submit:
+  /draftset/{id}/submit-to:
     post:
-      summary: Submit a Draftset for review
+      summary: Submit a Draftset to a user or role
       description: |
         Submits this draftset for review and potential publication.
-        Draftsets are submitted into a pool for users of a given role.
+        Draftsets are submitted directly to a user, or into a pool for
+        users of a given role.
 
         Users with a role greater than or equal to the role the
         draftset was submitted to can then lay claim to it.
       parameters:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/role'
+        - $ref: '#/parameters/submit-user'
         - $ref: '#/parameters/message'
         - $ref: '#/parameters/note'
       tags:
         - Draftsets
       responses:
         '200':
-          description: The Draftset was successfully submitted for review.
+          description: The Draftset was successfully submitted.
           schema:
             $ref: '#/definitions/Draftset'
+        '422':
+          description: The submit request could not be processed.
   /draftset/{id}/return:
     post:
       summary: Return a Draftset from review
@@ -637,12 +642,18 @@ parameters:
     name: role
     description: The role to submit the draftset to
     in: query
-    required: true
+    required: false
     type: string
     enum:
       - editor
       - publisher
       - manager
+  submit-user:
+    name: user
+    description: The username of the user to submit the draftset to.
+    in: query
+    required: false
+    type: string
 
   message:
     name: message
