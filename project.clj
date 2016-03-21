@@ -141,6 +141,9 @@
          ;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
          ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
          }
+
+   :test {
+          :jvm-opts ["-Dlog4j.configurationFile=./test/log4j.properties"]}
    }
 
 
