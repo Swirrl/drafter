@@ -246,14 +246,6 @@
     (let [[result _] (claim-draftset! *test-backend* (->DraftsetURI "http://missing-draftset") test-publisher)]
       (is (= :not-found result)))))
 
-(deftest return-draftset!-test
-  (let [draftset-id (create-draftset! *test-backend* test-editor)]
-    (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
-    (claim-draftset! *test-backend* draftset-id test-publisher)
-    (return-draftset! *test-backend* draftset-id)
-
-    (is (is-draftset-owner? *test-backend* draftset-id test-editor))))
-
 (deftest revert-changes-from-graph-only-in-draftset
   (let [live-graph "http://live"
         draftset-id (create-draftset! *test-backend* test-editor)]

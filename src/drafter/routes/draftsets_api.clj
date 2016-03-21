@@ -286,10 +286,4 @@
                                 (response ds-info)
                                 (conflict-detected-response "Failed to claim draftset")))
                             (forbidden-response "User not in role for draftset claim"))
-                          (not-found "Draftset not found"))))))
-
-        (make-route :post "/draftset/:id/return"
-                    (as-draftset-owner
-                     (fn [{{:keys [draftset-id]} :params :as request}]
-                       (dsmgmt/return-draftset! backend draftset-id)
-                       (response "")))))))))
+                          (not-found "Draftset not found")))))))))))

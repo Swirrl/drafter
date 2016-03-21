@@ -450,26 +450,6 @@
         outcome (infer-claim-outcome ds-info claimant)]
     [outcome ds-info]))
 
-(defn- return-draftset-query [draftset-ref]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> ?owner .")
-     "} INSERT {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> ?creator .")
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> ?owner ."
-       "<" draftset-uri "> <" drafter:createdBy "> ?creator")
-     "}")))
-
-(defn return-draftset! [backend draftset-ref]
-  (let [q (return-draftset-query draftset-ref)]
-    (update! backend q)))
-
 (defn find-permitted-draftset-operations [backend draftset-ref user]
   (if-let [ds-info (get-draftset-info backend draftset-ref)]
     (user/permitted-draftset-operations ds-info user)
