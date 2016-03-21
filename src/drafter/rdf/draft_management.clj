@@ -375,25 +375,6 @@ PREFIX drafter: <" (drafter "") ">"))
   (update! db (delete-live-graph-from-state-query live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
 
-(defn- delete-empty-draft-graphs-query []
-  (str
-   "WITH <http://publishmydata.com/graphs/drafter/drafts>"
-   "DELETE {"
-     "?dg ?sp ?so ."
-     "?lg drafter:hasDraft ?dg ."
-   "} WHERE {"
-   "   ?dg a drafter:DraftGraph ."
-   "   ?dg ?dp ?do ."
-   "   OPTIONAL {"
-   "      ?lg a drafter:ManagedGraph ."
-   "      ?lg drafter:hasDraft ?dg ."
-   "   }"
-   "   FILTER NOT EXISTS { GRAPH ?dg { ?s ?p ?o } }"
-   "}"))
-
-(defn delete-empty-draft-graphs! [db]
-  (update! db (delete-empty-draft-graphs-query)))
-
 (defn- delete-private-managed-graphs-without-drafts-query []
   (str
    "WITH <http://publishmydata.com/graphs/drafter/drafts>"
@@ -424,16 +405,6 @@ PREFIX drafter: <" (drafter "") ">"))
                  (map #(str (get % "draft")))
                  (into #{}))]
     res))
-
-(defn- return-one-or-zero-uris
-  "Helper function to check there's at most only one result and return it packed as a URIImpl.
-  Raise an error if there are more than one result."
-  [res]
-  (if (>= 1 (count res))
-    (URIImpl. (first res))
-    (throw (ex-swirrl
-            :multiple-drafts-error
-            "Multiple drafts were found, when only one is expected.  The context is likely too broad."))))
 
 (defn- has-duplicates? [col]
   (not= col

@@ -106,28 +106,6 @@
            (inner-handler modified-request))
          (response/unsupported-media-type-response  (str "Unsupported media type: " content-type)))))))
 
-(defn read-body-rdf-statements
-  "Returns a handler which attempts to parse RDF statements from the
-  body of an incoming request and associates the resulting sequence
-  with the rdf-statements key in the request params map. If the
-  parsing process or the inner handler throw a Sesame parse exception,
-  a 422 Unprocessable Entity response is returned. NOTE: This
-  middleware expects an rdf-format key to exist in the params map of
-  the incoming request, so should follow a middleware which populates
-  it such as require-rdf-content-type."
-  [inner-handler]
-  (fn [{{:keys [rdf-format]} :params body :body :as request}]
-    (try
-      (let [rdf-statements (read-statements body rdf-format)
-            modified-request (assoc-in request [:params :rdf-statements] rdf-statements)]
-        (inner-handler modified-request))
-      (catch ExceptionInfo exi
-        (if-let [error-type (:error (ex-data exi))]
-          (if (= :reading-aborted error-type)
-            (response/unprocessable-entity-response "Error parsing RDF")
-            (throw exi))
-          (throw exi))))))
-
 (defn temp-file-body
   "Wraps a handler with one that writes the incoming body to a temp
   file and sets the new body as the file before invoking the inner

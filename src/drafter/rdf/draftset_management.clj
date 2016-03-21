@@ -371,23 +371,6 @@
   (let [q (submit-to-user-query draftset-ref submitter target)]
     (update! backend q)))
 
-(defn- claim-draftset-update-query [draftset-ref claimant]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)
-        username (user/username claimant)]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:claimableBy "> ?c ."
-       )
-     "} INSERT {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" ." )
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:claimableBy "> ?c .")
-     "}")))
-
 (defn- try-claim-draftset-query [draftset-ref claimant]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
         username (user/username claimant)

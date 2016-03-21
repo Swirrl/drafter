@@ -17,7 +17,7 @@
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results rewrite-statement]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
-            [drafter.util :refer [construct-dynamic* map-values seq->iterable] :as util])
+            [drafter.util :refer [construct-dynamic* map-values] :as util])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
             TupleQueryResultHandler BooleanQueryResultHandler
             BindingSet QueryLanguage BooleanQuery GraphQuery Update]

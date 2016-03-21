@@ -61,7 +61,6 @@
                  [com.taoensso/timbre "4.0.2"]
                  [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
-                 [markdown-clj "0.9.44"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
                  [ring-middleware-accept "2.0.3"]
                  [environ "1.0.0"]

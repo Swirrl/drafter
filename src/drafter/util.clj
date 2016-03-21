@@ -1,7 +1,5 @@
 (ns drafter.util
   (:require [clojure.string :as str]
-            [markdown.core :as md]
-            [noir.io :as io]
             [grafter.rdf.protocols :refer [map->Quad]])
   (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]))
 
@@ -40,13 +38,6 @@
   constructor arguments."
   [klass & args]
   (construct-dynamic klass args))
-
-(defn md->html
-  "reads a markdown file from public/md and returns an HTML string"
-  [filename]
-  (->>
-    (io/slurp-resource filename)
-    (md/md-to-html-string)))
 
 (defn get-causes [ex]
   "Returns a flattened vector containing the root exception and all
@@ -110,13 +101,7 @@
           (swap! state rest)
           value)))))
 
-(defn seq->iterable
-  "Creates a java Iterable implementation for a sequence."
-  [s]
-  (reify java.lang.Iterable
-    (iterator [this] (seq->iterator s))))
-
-;Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
+;; Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
 (defn intersection-with
   "Intersects two maps by their keys and combines corresponding values
   with the given combination function. Returns a new map of combined

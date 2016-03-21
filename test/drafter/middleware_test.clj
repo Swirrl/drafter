@@ -158,22 +158,6 @@
   (testing "With malformed content type"
     (assert-unprocessable-with-malformed-content-type (require-rdf-content-type ok-handler))))
 
-(deftest read-body-rdf-statements-test
-  (testing "Valid body"
-    (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-      (let [inner-handler (fn [{{:keys [rdf-statements]} :params}] (doall rdf-statements) (response "OK"))
-            handler (read-body-rdf-statements inner-handler)
-            request {:uri "/test" :body fs :params {:rdf-format formats/rdf-trig}}
-            response (handler request)]
-        (tc/assert-is-ok-response response))))
-
-  (testing "Invalid body"
-    (let [inner-handler (fn [{{:keys [rdf-statements]} :params}] (doall rdf-statements) (response "OK"))
-          handler (read-body-rdf-statements inner-handler)
-          request {:uri "/test" :body (tc/string->input-stream "NOT NQUADS") :params {:rdf-format formats/rdf-nquads}}
-          response (handler request)]
-      (tc/assert-is-unprocessable-response response))))
-
 (deftest temp-file-body-test
   (testing "Creates file"
     (let [inner-handler (fn [{:keys [body]}] (instance? File body))
