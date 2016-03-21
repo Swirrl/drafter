@@ -11,14 +11,6 @@
 (defn is-triples-format? [rdf-format]
   (not (is-quads-format? rdf-format)))
 
-(defn parse-stream-statements [in-stream format]
-  (let [parser (Rio/createParser format)
-        model (ArrayList.)
-        base-uri ""]
-    (.setRDFHandler parser (StatementCollector. model))
-    (.parse parser in-stream base-uri)
-    (seq model)))
-
 (defn read-statements
   "Creates a lazy stream of statements from an input stream containing
   RDF data serialised in the given format."

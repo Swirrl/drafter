@@ -11,10 +11,10 @@
       (assoc :claim-role role)
       (set-submitter submitter)))
 
-(defn submit-to-user [draftset submitter target]
-  (-> draftset
-      (assoc :current-owner (user/username target))
-      (set-submitter submitter)))
+(comment  (defn submit-to-user [draftset submitter target]
+            (-> draftset
+                (assoc :current-owner (user/username target))
+                (set-submitter submitter))))
 
 (defn claim [draftset claimant]
   (-> draftset

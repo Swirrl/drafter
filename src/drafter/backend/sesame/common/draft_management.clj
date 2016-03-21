@@ -16,10 +16,6 @@
             [meta-name value] metadata]
       (mgmt/upsert-single-object! repo graph-uri meta-name value))))
 
-(defn get-all-drafts [backend]
-  (with-open [conn (->repo-connection backend)]
-    (mgmt/query-all-drafts conn)))
-
 (defn get-live-graph-for-draft [backend draft-graph-uri]
   (with-open [conn (->repo-connection backend)]
     (mgmt/get-live-graph-for-draft conn draft-graph-uri)))

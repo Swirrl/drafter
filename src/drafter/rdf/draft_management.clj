@@ -375,24 +375,6 @@ PREFIX drafter: <" (drafter "") ">"))
   (update! db (delete-live-graph-from-state-query live-graph-uri))
   (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
 
-(defn- delete-private-managed-graphs-without-drafts-query []
-  (str
-   "WITH <http://publishmydata.com/graphs/drafter/drafts>"
-   "DELETE { "
-   "   ?lg ?p ?o ."
-   "} WHERE { "
-   "  ?lg a drafter:ManagedGraph ;"
-   "      drafter:isPublic false ;"
-   "      ?p ?o ."
-   "  FILTER NOT EXISTS {"
-   "    ?dg a drafter:DraftGraph ."
-   "    ?lg drafter:hasDraft ?dg ."
-   "  }"
-   "}"))
-
-(defn delete-private-managed-graphs-without-drafts! [db]
-  (update! db (delete-private-managed-graphs-without-drafts-query)))
-
 (defn draft-graphs
   "Get all the draft graph URIs"
   [db]

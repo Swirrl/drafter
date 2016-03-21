@@ -66,19 +66,6 @@
      (let [job-result (await-sync-job! job)]
        (resp-fn job-result)))))
 
-(defmacro handle-sync-job!
-  "Convenience macro for submitting synchronous jobs and converting
-  the results into ring responses. At least three forms are required -
-  the first is for the job, the second for the job result and the
-  remaining are used to construct the ring response. The job result
-  form can be used to destructure the map used to complete the job.
-
-  (handle-sync-job (create-job)
-     {:keys [message] :as result} (create-response message))"
-
-  [job result-form & response-forms]
-  `(submit-sync-job! ~job (fn [~result-form] ~@response-forms)))
-
 ;; submit-async-job! :: Job -> RingResponse
 (defn submit-async-job!
   "Submits an async job and returns a ring response indiciating the
@@ -87,9 +74,3 @@
   (log/info "Submitting async job: " job)
   (queue-job! job)
   (submitted-job-response job))
-
-(defn is-client-error-response?
-  "Whether the given ring response map represents a client error."
-  [{:keys [status] :as response}]
-  (and (>= status 400)
-       (< status 500)))

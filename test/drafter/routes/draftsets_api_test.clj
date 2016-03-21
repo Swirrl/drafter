@@ -15,7 +15,6 @@
             [grafter.rdf.repository :as repo]
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.util :as util]
-            [drafter.responses :refer [is-client-error-response?]]
             [clojure.java.io :as io]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
@@ -27,6 +26,12 @@
 
 (def ^:private ^:dynamic *route*)
 (def ^:private ^:dynamic *user-repo*)
+
+(defn is-client-error-response?
+  "Whether the given ring response map represents a client error."
+  [{:keys [status] :as response}]
+  (and (>= status 400)
+       (< status 500)))
 
 (defn- route [request]
   (*route* request))

@@ -52,11 +52,6 @@ permissions."
   {:pre [(is-known-role? requested)]}
   (<= (role->permission-level requested) (role->permission-level role)))
 
-(defn- constant-time-string-equals? [s1 s2]
-  (let [b1 (str->bytes s1)
-        b2 (str->bytes s2)]
-    (bytes/equals? b1 b2)))
-
 (defn get-digest [s]
   (BCrypt/hashpw s (BCrypt/gensalt)))
 
