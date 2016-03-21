@@ -24,9 +24,9 @@
 (defn- has-any-object? [s p]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> ?o }")))
 
-(defn- assert-user-is-creator-and-owner [{:keys [email] :as user} draftset-id]
-  (is (has-string-object? (->draftset-uri draftset-id) drafter:createdBy email))
-  (is (has-string-object? (->draftset-uri draftset-id) drafter:hasOwner email)))
+(defn- assert-user-is-creator-and-owner [user draftset-id]
+  (is (has-uri-object? (->draftset-uri draftset-id) drafter:createdBy (user/user->uri user)))
+  (is (has-uri-object? (->draftset-uri draftset-id) drafter:hasOwner (user/user->uri user))))
 
 (deftest create-draftset!-test
   (let [title "Test draftset"
@@ -163,7 +163,7 @@
           draftset-uri (->draftset-uri draftset-id)]
       (submit-draftset-to-role! *test-backend* draftset-id test-publisher :manager)
 
-      (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor))
+      (has-uri-object? draftset-uri drafter:hasOwner (user/username test-editor))
       (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
 
 (deftest submit-to-user!-test
@@ -172,17 +172,16 @@
           draftset-uri (str (->draftset-uri draftset-id))]
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
 
-      (is (has-string-object? draftset-uri drafter:hasOwner (user/username test-publisher)))
-      (is (has-string-object? draftset-uri drafter:submittedBy (user/username test-editor)))
-
-      (is (= false (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor))))))
+      (is (is-draftset-owner? *test-backend* draftset-id test-publisher))
+      (is (is-draftset-submitter? *test-backend* draftset-id test-editor))
+      (is (= false (has-uri-object? draftset-uri drafter:hasOwner (user/user->uri test-editor))))))
 
   (testing "Submitted to self"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
           draftset-uri (str (->draftset-uri draftset-id))]
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-editor)
 
-      (is (has-string-object? draftset-uri drafter:hasOwner (user/username test-editor)))))
+      (is-draftset-owner? *test-backend* draftset-id test-editor)))
 
   (testing "When not owned"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
@@ -190,11 +189,11 @@
       (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
       (submit-draftset-to-user! *test-backend* draftset-id test-manager test-publisher)
 
-      (is (has-string-object? draftset-uri drafter:hasOwner (user/username test-publisher)))
-      (is (has-string-object? draftset-uri drafter:submittedBy (user/username test-manager)))
+      (is (is-draftset-owner? *test-backend* draftset-id test-publisher))
+      (is (is-draftset-submitter? *test-backend* draftset-id test-manager))
 
       (is (= false (has-any-object? draftset-uri drafter:claimableBy)))
-      (is (= false (has-string-object? draftset-uri drafter:submittedBy (user/username test-editor)))))))
+      (is (= false (has-uri-object? draftset-uri drafter:submittedBy (user/user->uri test-editor)))))))
 
 (deftest claim-draftset-test!
   (testing "No owner when user in role"

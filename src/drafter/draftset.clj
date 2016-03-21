@@ -1,5 +1,6 @@
 (ns drafter.draftset
-  (:require [schema.core :as s])
+  (:require [schema.core :as s]
+            [drafter.util :as util])
   (:import [java.net URI]
            [java.util Date UUID]))
 
@@ -27,17 +28,19 @@
           relative (.relativize base-uri (URI. uri))]
       (->DraftsetId (str relative)))))
 
+(def ^:private email-schema (s/pred util/validate-email-address))
+
 (def ^:private SchemaCommon
   {:id (s/protocol DraftsetRef)
-   :created-by s/Str
+   :created-by email-schema
    :created-date Date
    (s/optional-key :display-name) s/Str
    (s/optional-key :description) s/Str
-   (s/optional-key :submitted-by) s/Str})
+   (s/optional-key :submitted-by) email-schema})
 
 (def OwnedDraftset
   (merge SchemaCommon
-         {:current-owner s/Str}))
+         {:current-owner email-schema}))
 
 (def SubmittedDraftset
   (merge SchemaCommon
@@ -46,15 +49,15 @@
 (def Draftset (s/either OwnedDraftset SubmittedDraftset))
 
 (s/defn create-draftset :- Draftset
-  ([creator :- s/Str]
+  ([creator :- email-schema]
    {:id (->DraftsetId (str (UUID/randomUUID)))
     :created-by creator
     :created-date (Date.)
     :current-owner creator})
-  ([creator :- s/Str
+  ([creator :- email-schema
     display-name :- s/Str]
    (assoc (create-draftset creator) :display-name display-name))
-  ([creator :- s/Str
+  ([creator :- email-schema
     display-name :- s/Str
     description :- s/Str]
    (assoc (create-draftset creator display-name) :description description)))

@@ -66,3 +66,10 @@
   (are [target path ms expected] (= expected (apply merge-in target path ms))
        {} [:a :b] {:c 1} {:a {:b {:c 1}}}
        {:a {:b {:c 1}}} [:a :b] [{:d 2} {:e 3}] {:a {:b {:c 1 :d 2 :e 3}}}))
+
+(deftest validate-email-address-test
+  (are [input expected] (= expected (validate-email-address input))
+    "foo@bar.com" "foo@bar.com"
+    "Commander foo <foo@bar.com>" "foo@bar.com"
+    "invalid" false
+    :notastring false))

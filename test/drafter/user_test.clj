@@ -9,6 +9,10 @@
 (def test-publisher (create-user "publisher@example.com" :publisher (get-digest test-password)))
 (def test-manager (create-user "manager@example.com" :manager (get-digest test-password)))
 
+(deftest create-user-test
+  (testing "Invalid email address"
+    (is (thrown? IllegalArgumentException (create-user "invalidemail" :publisher (get-digest "password"))))))
+
 (deftest has-role?-test
   (are [user role has?] (= has? (has-role? user role))
        test-editor :editor true

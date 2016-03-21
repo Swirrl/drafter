@@ -5,6 +5,7 @@
             [drafter.util :as util]
             [drafter.draftset :as ds]
             [drafter.user :as user]
+            [drafter.util :as util]
             [drafter.rdf.draft-management :refer [update! query to-quads with-state-graph drafter-state-graph] :as mgmt]
             [drafter.backend.protocols :refer [copy-from-live-graph-job]]
             [drafter.rdf.draft-management.jobs :as jobs]
@@ -12,12 +13,12 @@
             [clojure.string :as string])
   (:import [java.util Date UUID]))
 
-(defn- create-draftset-statements [username title description draftset-uri created-date]
+(defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
             [rdf:a drafter:DraftSet]
             [drafter:createdAt created-date]
-            [drafter:createdBy (s username)]
-            [drafter:hasOwner (s username)]]
+            [drafter:createdBy user-uri]
+            [drafter:hasOwner user-uri]]
         ss (util/conj-if (some? title) ss [rdfs:label (s title)])]
     (util/conj-if (some? description) ss [rdfs:comment (s description)])))
 
@@ -29,7 +30,8 @@
   ([db creator title] (create-draftset! db creator title nil))
   ([db creator title description] (create-draftset! db creator title description (UUID/randomUUID) (Date.)))
   ([db creator title description draftset-id created-date]
-   (let [template (create-draftset-statements (user/username creator) title description (draftset-uri draftset-id) created-date)
+   (let [user-uri (user/user->uri creator)
+         template (create-draftset-statements user-uri title description (draftset-uri draftset-id) created-date)
          quads (to-quads template)]
      (add db quads)
      (ds/->DraftsetId (str draftset-id)))))
@@ -140,7 +142,7 @@
   (let [q (get-draftset-owner-query draftset-ref)
         result (first (query backend q))
         owner-lit (get result "owner")]
-    (and owner-lit (.stringValue owner-lit))))
+    (and owner-lit (user/uri->username (.stringValue owner-lit)))))
 
 (defn is-draftset-owner? [backend draftset-ref user]
   (let [username (user/username user)
@@ -163,7 +165,7 @@
      "}")))
 
 (defn- get-all-draftsets-properties-query [user]
-  (let [username (user/username user)
+  (let [user-uri (user/user->uri user)
         role (user/role user)
         user-role-score (role user/role->permission-level)]
     (str
@@ -176,8 +178,8 @@
        "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
        "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter . }"
        "{"
-       "  ?ds <" drafter:hasOwner "> \"" username "\" ."
-       "  BIND (\"" username "\" as ?owner)"
+       "  ?ds <" drafter:hasOwner "> <" user-uri "> ."
+       "  BIND (<" user-uri "> as ?owner)"
        "} UNION {"
        "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
        "  ?ds <" drafter:claimableBy "> ?role ."
@@ -188,6 +190,7 @@
 
 (defn- get-all-draftsets-claimable-by-query [user]
   (let [role (user/role user)
+        user-uri (user/user->uri user)
         user-role-score (role user/role->permission-level)]
     (str
      "SELECT * WHERE {"
@@ -203,7 +206,7 @@
        "  ?ds <" drafter:claimableBy "> ?role ."
        "  FILTER (" user-role-score " >= ?rv )"
        "} UNION {"
-       "  ?ds <" drafter:submittedBy "> \"" (user/username user) "\" ."
+       "  ?ds <" drafter:submittedBy "> <" user-uri "> ."
        "  ?ds <" drafter:claimableBy "> ?role ."
        "}"
        )
@@ -233,15 +236,18 @@
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
+(defn- value->username [val]
+  (user/uri->username (.stringValue val)))
+
 (defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner role submitter]}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :created-at (calendar-literal->date created)
-                         :created-by (.stringValue creator)}
+                         :created-by (value->username creator)}
         optional-fields {:display-name (and title (.stringValue title))
                          :description (and description (.stringValue description))
-                         :current-owner (and owner (.stringValue owner))
+                         :current-owner (and owner (value->username owner))
                          :claim-role (and role (keyword (.stringValue role)))
-                         :submitted-by (and submitter (.stringValue submitter))}]
+                         :submitted-by (and submitter (value->username submitter))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
 (defn- get-draftset-properties [repo draftset-ref]
@@ -271,6 +277,11 @@
   (let [all-properties (query repo (get-all-draftsets-properties-query user))
         all-graph-mappings (get-all-draftset-graph-mappings repo user)]
     (combine-all-properties-and-graph-mappings all-properties all-graph-mappings)))
+
+(defn is-draftset-submitter? [backend draftset-ref user]
+  (if-let [{:keys [submitted-by]} (get-draftset-info backend draftset-ref)]
+    (= submitted-by (user/username user))
+    false))
 
 (defn get-draftsets-claimable-by [backend user]
   (let [q (get-all-draftsets-claimable-by-query user)
@@ -315,21 +326,21 @@
 
 (defn- submit-draftset-to-role-query [draftset-ref owner role]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
-        username (user/username owner)]
+        user-uri (user/user->uri owner)]
     (str
      "DELETE {"
      (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" ."
+       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> ."
        "<" draftset-uri "> <" drafter:submittedBy "> ?submitter .")
      "} INSERT {"
      (with-state-graph
        "<" draftset-uri "> <" drafter:claimableBy "> \"" (name role) "\" ."
-       "<" draftset-uri "> <" drafter:submittedBy "> \"" username "\" ."
+       "<" draftset-uri "> <" drafter:submittedBy "> <" user-uri "> ."
        )
      "} WHERE {"
      (with-state-graph
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" ."
+       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> ."
        "OPTIONAL { "
          "<" draftset-uri "> <" drafter:submittedBy "> ?submitter ."
        "}"
@@ -357,8 +368,8 @@
        )
      "} INSERT {"
      (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> \"" (user/username target) "\" ."
-       "<" draftset-uri "> <" drafter:submittedBy "> \"" (user/username submitter) "\" ."
+       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri target) "> ."
+       "<" draftset-uri "> <" drafter:submittedBy "> <" (user/user->uri submitter) "> ."
        )
      "} WHERE {"
      (with-state-graph
@@ -373,7 +384,7 @@
 
 (defn- try-claim-draftset-query [draftset-ref claimant]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
-        username (user/username claimant)
+        user-uri (user/user->uri claimant)
         role (user/role claimant)
         user-score (user/role->permission-level role)
         scores-values (role-scores-values-clause user/role->permission-level)]
@@ -383,7 +394,7 @@
        "<" draftset-uri "> <" drafter:claimableBy "> ?role .")
      "} INSERT {"
      (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> \"" username "\" .")
+       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> .")
      "} WHERE {"
      "  {"
        (with-state-graph
@@ -393,7 +404,7 @@
          "FILTER (" user-score " >= ?rv)")
      "  } UNION {"
        (with-state-graph
-         "<" draftset-uri "> <" drafter:submittedBy "> \"" username "\" ."
+         "<" draftset-uri "> <" drafter:submittedBy "> <" user-uri "> ."
          "<" draftset-uri "> <" drafter:claimableBy "> ?role .")
      "  }"
      "}")))

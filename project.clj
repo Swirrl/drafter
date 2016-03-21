@@ -71,7 +71,9 @@
                  ;;[clj-http "1.1.0"]
                  [drafter-client "0.3.6-SNAPSHOT"]
 
-                 [metosin/ring-swagger-ui "2.1.4-0"]]
+                 [metosin/ring-swagger-ui "2.1.4-0"]
+
+                 [com.sun.mail/javax.mail "1.5.5"]]
 
   :java-source-paths ["src-java"]
   :resource-paths ["resources"]

@@ -1,7 +1,8 @@
 (ns drafter.util
   (:require [clojure.string :as str]
             [grafter.rdf.protocols :refer [map->Quad]])
-  (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]))
+  (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]
+           [javax.mail.internet InternetAddress AddressException]))
 
 ;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
 (defn map-values
@@ -130,3 +131,17 @@
   inside the nested target structure."
   [target ks & ms]
   (update-in target ks #(apply merge % ms)))
+
+(defn validate-email-address
+  "Validates that a value is a string containing a valid
+  representation of an email address. If the string is valid, the
+  contained email address is returned as a string. Otherwise false is
+  returned."
+  [s]
+  (and
+   (string? s)
+   (try
+     (let [ia (InternetAddress. s)]
+       (.validate ia)
+       (.getAddress ia))
+     (catch AddressException ex false))))

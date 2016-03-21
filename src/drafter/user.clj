@@ -2,7 +2,8 @@
   (:require [buddy.core.codecs :refer [str->bytes base64->bytes]]
             [buddy.core.bytes :as bytes]
             [drafter.util :as util])
-  (:import [org.mindrot.jbcrypt BCrypt]))
+  (:import [org.mindrot.jbcrypt BCrypt]
+           [java.net URI]))
 
 
 (def ^{:doc "Ordered list of roles from least permissions to greatest
@@ -17,9 +18,24 @@ permissions."
 (def role :role)
 (def api-key :api-key-digest)
 
+(defn username->uri
+  "Gets a user's URI from their username."
+  [username]
+  {:pre [(util/validate-email-address username)]}
+  (str "mailto:" username))
+
+(def user->uri (comp username->uri username))
+(defn uri->username
+  "Gets a user's username from their URI."
+  [user-uri]
+  (let [uri (URI. user-uri)]
+    (.getSchemeSpecificPart uri)))
+
 (defn create-user [email role api-key-digest]
   {:pre [(util/seq-contains? roles role)]}
-  (->User email role api-key-digest))
+  (if-let [address (util/validate-email-address email)]
+     (->User address role api-key-digest)
+     (throw (IllegalArgumentException. (str "Not a valid email address: " email)))))
 
 (defn get-summary
   "Returns a map containing summary information about a user."
