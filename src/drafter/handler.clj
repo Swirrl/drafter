@@ -10,8 +10,6 @@
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
-            [drafter.routes.drafts-api :refer [draft-api-routes
-                                               graph-management-routes]]
             [drafter.routes.draftsets-api :refer [draftset-api-routes]]
             [drafter.routes.status :refer [status-routes]]
             [drafter.routes.dumps :refer [dumps-endpoint]]
@@ -88,7 +86,8 @@
 (defn create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? backend timeout-config]
   (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query backend timeout-config)
         update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update backend timeout-config))
-        dumps-route (when add-dumps? (create-dumps-route route-name query-fn backend timeout-config))
+        dumps-route (when add-dumps?
+                      (create-dumps-route route-name query-fn backend timeout-config))
         routes [query-route update-route]]
     (vec (remove nil? [query-route update-route dumps-route]))))
 
@@ -118,9 +117,7 @@
                         ;; add your application routes here
                         (-> []
                             (add-route (pages-routes backend))
-                            (add-route (draft-api-routes "/draft" backend))
                             (add-route (draftset-api-routes backend user-repo "Drafter"))
-                            (add-route (graph-management-routes "/graph" backend))
                             (add-routes (get-sparql-routes backend))
                             (add-route (context "/status" []
                                                 (status-routes global-writes-lock finished-jobs restart-id)))
