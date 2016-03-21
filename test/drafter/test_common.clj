@@ -60,7 +60,6 @@
 
 (defn wrap-db-setup [test-fn]
   (let [backend (get-backend (assoc env :drafter-repo-path "test-drafter-db"))]
-    (println "backend: " backend)
     (binding [*test-backend* backend
               *test-writer* (start-writer!)]
 

@@ -250,7 +250,6 @@
 
             (is (= 200 status))
             (let [[header & results] (csv-> response)]
-              (println "header " header " results" results)
               (is (= "1" (ffirst results))
                   "There should be a count of 2 returned"))))
 

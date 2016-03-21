@@ -41,7 +41,7 @@ PREFIX drafter: <" (drafter "") ">"))
 
 (defn update! [repo update-string]
   (let [update-string (str prefixes update-string)]
-    (println "Running update: " update-string)
+    (log/info "Running update: " update-string)
     (pr/update! repo update-string)))
 
 (defn make-draft-graph-uri []
