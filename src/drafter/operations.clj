@@ -1,5 +1,5 @@
 (ns drafter.operations
-  (:require [taoensso.timbre :as timbre])
+  (:require [clojure.tools.logging :as log])
   (:import [java.util.concurrent FutureTask TimeUnit Executors]
            [java.io PipedInputStream PipedOutputStream]))
 
@@ -45,7 +45,7 @@
   (if-let [op-state (get operations-map operation)]
     (update-in operations-map [operation] #(update-timestamp % timestamp))
     (do
-      (timbre/warn "Received timestamp for unknown operation")
+      (log/warn "Received timestamp for unknown operation")
       operations-map)))
 
 (defn- exceeded-total-time?
@@ -124,7 +124,7 @@
   catches and logs any thrown exceptions."
   [f]
   #(try (f)
-     (catch Exception ex (timbre/error ex "Error executing task function"))))
+        (catch Exception ex (log/error ex "Error executing task function"))))
 
 (defn- repeating-task
   "Creates a starts a new thread which repeatedly executes the given
@@ -134,7 +134,7 @@
   (let [executor-service (Executors/newSingleThreadScheduledExecutor)
         task-future (.scheduleWithFixedDelay executor-service (create-repeating-task-fn f) delay-ms delay-ms TimeUnit/MILLISECONDS)]
     (fn []
-      (timbre/warn "Terminating long running operation as it has exceeded the time out.")
+      (log/warn "Terminating long running operation as it has exceeded the time out.")
       (future-cancel task-future)
       (.shutdown executor-service))))
 

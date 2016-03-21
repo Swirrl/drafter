@@ -1,7 +1,7 @@
 (ns drafter.backend.stardog.draft-api
   (:require [drafter.rdf.draft-management :refer [update! delete-draft-state-query]]
             [swirrl-server.async.jobs :refer [create-job]]
-            [taoensso.timbre :as log]
+            [clojure.tools.logging :as log]
             [drafter.rdf.draft-management.jobs :as jobs]))
 
 (defn delete-graph!
