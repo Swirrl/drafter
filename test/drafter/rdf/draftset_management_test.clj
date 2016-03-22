@@ -149,7 +149,7 @@
         (is (mgmt/draft-exists? *test-backend* draft-graph))
         (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph))))))))
 
-(deftest submit-draftset-test!
+(deftest submit-draftset-to-role-test!
   (testing "Existing owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
@@ -158,12 +158,12 @@
       (has-string-object? draftset-uri drafter:claimableBy "publisher")
       (is (= false (has-any-object? draftset-uri drafter:hasOwner)))))
 
-  (testing "Other owner"
+  (testing "Submitted by other user"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
       (submit-draftset-to-role! *test-backend* draftset-id test-publisher :manager)
 
-      (has-uri-object? draftset-uri drafter:hasOwner (user/username test-editor))
+      (is-draftset-owner? *test-backend* draftset-id test-editor)
       (is (= false (has-any-object? draftset-uri drafter:claimableBy))))))
 
 (deftest submit-to-user!-test
