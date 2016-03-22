@@ -16,7 +16,7 @@
   SparqlExecutor default-sparql-query-impl
   QueryRewritable default-query-rewritable-impl
   SparqlUpdateExecutor sparql-impl/sparql-update-executor-impl
-  DraftManagement sparql-impl/sparql-update-executor-impl
+  DraftManagement default-draft-management-impl
   ApiOperations default-api-operations-impl
   Stoppable default-stoppable-impl
   sesproto/ToRepository {:->sesame-repo :repo}

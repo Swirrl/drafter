@@ -4,7 +4,6 @@
             [drafter.backend.sesame.common :refer :all]
             [drafter.backend.sesame.common.protocols :as sesproto]
             [drafter.backend.sesame.native.repository :refer [get-repository]]
-            [drafter.backend.sesame.native.draft-management :as mgmt]
             [grafter.rdf.protocols :as proto]))
 
 (defrecord SesameNativeStoreBackend [repo])
@@ -18,7 +17,7 @@
   backproto/QueryRewritable default-query-rewritable-impl
   backproto/SparqlUpdateExecutor default-sparql-update-impl
   backproto/ApiOperations default-api-operations-impl
-  backproto/DraftManagement (assoc default-draft-management-impl :migrate-graphs-to-live! mgmt/migrate-graphs-to-live!)
+  backproto/DraftManagement default-draft-management-impl
   sesproto/ToRepository {:->sesame-repo :repo}
   backproto/Stoppable default-stoppable-impl
   sesproto/SesameBatchOperations {:delete-graph-batch! batching/delete-graph-batch!})
