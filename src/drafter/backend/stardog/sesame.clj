@@ -1,7 +1,6 @@
 (ns drafter.backend.stardog.sesame
   (:require [grafter.rdf.protocols :as proto]
             [drafter.backend.protocols :refer :all]
-            [drafter.backend.stardog.draft-api :as api]
             [drafter.backend.sesame.common.protocols :as sesproto]
             [drafter.backend.sesame.remote.repository :refer [create-repository-for-environment]]
             [drafter.backend.sesame.remote.impl :as sparql-impl]
@@ -18,8 +17,7 @@
   QueryRewritable default-query-rewritable-impl
   SparqlUpdateExecutor sparql-impl/sparql-update-executor-impl
   DraftManagement default-draft-management-impl
-  ApiOperations (assoc default-api-operations-impl
-                       :delete-graph-job api/delete-graph-job)
+  ApiOperations default-api-operations-impl
   Stoppable default-stoppable-impl
   sesproto/ToRepository {:->sesame-repo :repo})
 

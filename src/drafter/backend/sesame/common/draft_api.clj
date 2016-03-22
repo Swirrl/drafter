@@ -16,33 +16,24 @@
             [drafter.backend.common.draft-api :refer [quad-batch->graph-triples]]
             [drafter.backend.sesame.common.protocols :refer :all]))
 
-(defn- finish-delete-job! [backend graph contents-only? job]
-  (when-not contents-only?
-    (mgmt/delete-draft-graph-state! backend graph))
-  (jobs/job-succeeded! job))
+(defn delete-graph!
+  "Deletes graph contents as per batch size in order to avoid blocking
+  writes with a lock."
+  [backend graph-uri contents-only? job]
 
-(defn- delete-in-batches [backend graph contents-only? job]
-  ;; Loops until the graph is empty, then deletes state graph if not a
-  ;; contents-only? deletion.
-  ;;
-  ;; Checks that graph is a draft graph - will only delete drafts.
-  (if (and (mgmt/graph-exists? backend graph)
-           (mgmt/draft-exists? backend graph))
-      (do
-        (delete-graph-batch! backend graph jobs/batched-write-size)
+  (let [drop-statement (str "DROP SILENT GRAPH <" graph-uri ">")]
 
-        (if (mgmt/graph-exists? backend graph)
-          ;; There's more graph contents so queue another job to continue the
-          ;; deletions.
-          (let [apply-next-batch (partial delete-in-batches backend graph contents-only?)]
-            (scheduler/queue-job! (create-child-job job apply-next-batch)))
-          (finish-delete-job! backend graph contents-only? job)))
-      (finish-delete-job! backend graph contents-only? job)))
+    (if contents-only?
+      (mgmt/update! backend drop-statement)
+      (mgmt/update! backend (str drop-statement " ; "
+                            (mgmt/delete-draft-state-query graph-uri))))
+
+    (jobs/job-succeeded! job)))
 
 (defn delete-graph-job [this graph-uri contents-only?]
-  (log/info "Starting batch deletion job")
+  (log/info "Starting deletion job")
   (create-job :batch-write
-              (partial delete-in-batches this graph-uri contents-only?)))
+              (partial delete-graph! this graph-uri contents-only?)))
 
 (defn- append-data-batch-joblet [repo draft-graph batch]
   (jobs/action-joblet
