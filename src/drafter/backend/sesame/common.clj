@@ -34,8 +34,7 @@
   {:append-data-to-draftset-job api/append-data-to-draftset-job
    :append-triples-to-draftset-job api/append-triples-to-draftset-job
    :publish-draftset-job dsapi/publish-draftset-job
-   :delete-draftset! dsmgmt/delete-draftset!
-   :migrate-graphs-to-live-job api-common/migrate-graphs-to-live-job})
+   :delete-draftset! dsmgmt/delete-draftset!})
 
 ;;Grafter SPARQL protocols
 
