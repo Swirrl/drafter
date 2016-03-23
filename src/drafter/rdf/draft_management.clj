@@ -294,25 +294,6 @@ PREFIX drafter: <" (drafter "") ">"))
         delete-from-state-query (delete-draft-state-query draft-graph-uri)]
     (util/make-compound-sparql-query [drop-query delete-from-state-query])))
 
-(defn delete-graph-batched!
-  "Deletes graph contents as per batch size in order to avoid blocking
-  writes with a lock."
-  [db graph-uri batch-size]
-  (let [delete-sparql
-        (str
-         "WITH <" graph-uri ">"
-         "DELETE  {"
-         "    ?s ?p ?o"
-         "}"
-         "WHERE {"
-         "  SELECT ?s ?p ?o WHERE"
-         "  {"
-         "      ?s ?p ?o"
-         "  }"
-         "  LIMIT " batch-size
-         "}")]
-    (update! db delete-sparql)))
-
 (defn- delete-dependent-private-managed-graph-query [draft-graph-uri]
   (str
    "WITH <http://publishmydata.com/graphs/drafter/drafts>"

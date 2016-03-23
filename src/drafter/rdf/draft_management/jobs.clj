@@ -88,24 +88,6 @@
    (make-job write-priority [job]
                   (exec-joblets joblet-seq state job))))
 
-(comment (defn delete-in-batches [repo graph contents-only? job]
-           ;; Loops until the graph is empty, then deletes state graph if not a
-           ;; contents-only? deletion.
-           ;;
-           ;; Checks that graph is a draft graph - will only delete drafts.
-           (if (and (mgmt/graph-exists? repo graph)
-                    (mgmt/draft-exists? repo graph))
-             (do
-               (mgmt/delete-graph-batched! repo graph batched-write-size)
-
-               (if (mgmt/graph-exists? repo graph)
-                 ;; There's more graph contents so queue another job to continue the
-                 ;; deletions.
-                 (let [apply-next-batch (partial delete-in-batches repo graph contents-only?)]
-                   (queue-job! (create-child-job job apply-next-batch)))
-                 (finish-delete-job! repo graph contents-only? job)))
-             (finish-delete-job! repo graph contents-only? job))))
-
 (defn copy-graph-batch-query
   "Query to copy a range of data in a source graph into a destination
   graph."

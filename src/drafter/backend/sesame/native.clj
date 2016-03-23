@@ -1,6 +1,5 @@
 (ns drafter.backend.sesame.native
   (:require [drafter.backend.protocols :as backproto]
-            [drafter.backend.sesame.native.batching :as batching]
             [drafter.backend.sesame.common :refer :all]
             [drafter.backend.sesame.common.protocols :as sesproto]
             [drafter.backend.sesame.native.repository :refer [get-repository]]
@@ -19,8 +18,7 @@
   backproto/ApiOperations default-api-operations-impl
   backproto/DraftManagement default-draft-management-impl
   sesproto/ToRepository {:->sesame-repo :repo}
-  backproto/Stoppable default-stoppable-impl
-  sesproto/SesameBatchOperations {:delete-graph-batch! batching/delete-graph-batch!})
+  backproto/Stoppable default-stoppable-impl)
 
 (defn get-backend [env-map]
   (->SesameNativeStoreBackend (get-repository env-map)))
