@@ -37,8 +37,7 @@
    :delete-draftset! dsmgmt/delete-draftset!
    :migrate-graphs-to-live-job api-common/migrate-graphs-to-live-job
    :delete-metadata-job api/delete-metadata-job
-   :update-metadata-job api/create-update-metadata-job
-   :delete-graph-job api/delete-graph-job})
+   :update-metadata-job api/create-update-metadata-job})
 
 ;;Grafter SPARQL protocols
 

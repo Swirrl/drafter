@@ -40,8 +40,4 @@
   graphs.")
   (update-metadata-job [this graphs metadata]
     "Create a job to update or creates each of the the given graph metadata
-  pairs for each given graph under a job.")
-  (delete-graph-job [this graph contents-only?]
-    "Create a job to delete graph contents as per batch size in order to avoid
-   blocking writes with a lock. Finally the graph itself will be deleted unless
-   contents-only? is true"))
+  pairs for each given graph under a job."))
