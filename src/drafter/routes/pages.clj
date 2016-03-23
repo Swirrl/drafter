@@ -4,8 +4,6 @@
             [drafter.rdf.draft-management :refer [drafter-state-graph
                                                   live-graphs]]
             [drafter.rdf.drafter-ontology :refer [drafter]]
-            [drafter.backend.protocols :refer [;;get-all-drafts
-                                               get-live-graph-for-draft]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]

@@ -334,14 +334,6 @@ PREFIX drafter: <" (drafter "") ">"))
                           (get "live"))]
     (str live-uri)))
 
-(defn get-live-graph-for-draft
-  "Gets the live graph URI corresponding to a draft graph. Returns nil
-  if the draft URI does not have an associated managed graph or if the
-  live graph does not exist."
-  [db draft-graph-uri]
-  (if (draft-exists? db draft-graph-uri)
-    (lookup-live-graph db draft-graph-uri)))
-
 (defn delete-live-graph-from-state-query [live-graph-uri]
   (str
    "DELETE WHERE {"

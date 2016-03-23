@@ -8,10 +8,6 @@
             [drafter.backend.sesame.common.protocols :refer :all])
   (:import [java.util Date]))
 
-(defn get-live-graph-for-draft [backend draft-graph-uri]
-  (with-open [conn (->repo-connection backend)]
-    (mgmt/get-live-graph-for-draft conn draft-graph-uri)))
-
 (defn append-data-batch [backend graph-uri triple-batch]
   ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
   ;;so only create one if there is data in the batch
