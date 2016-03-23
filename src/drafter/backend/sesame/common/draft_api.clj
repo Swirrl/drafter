@@ -16,16 +16,6 @@
             [drafter.backend.common.draft-api :refer [quad-batch->graph-triples]]
             [drafter.backend.sesame.common.protocols :refer :all]))
 
-(defn- append-data-batch-joblet [repo draft-graph batch]
-  (jobs/action-joblet
-    (log/info "Adding a batch of triples to repo")
-    (mgmt/append-data-batch! repo draft-graph batch)))
-
-(defn- append-graph-metadata-joblet [repo draft-graph metadata]
-  (jobs/action-joblet
-   (mgmt/append-graph-metadata! repo draft-graph metadata)
-    (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))))
-
 (defn- append-draftset-quads [backend draftset-ref live->draft quad-batches {:keys [op job-started-at] :as state} job]
   (case op
     :append
