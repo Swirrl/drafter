@@ -5,7 +5,6 @@
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.common.draft-api :as api-common]
-            [drafter.backend.sesame.common.draft-management :as mgmt]
             [drafter.backend.sesame.common.draft-api :as api]
             [drafter.backend.sesame.common.draftset-api :as dsapi]
             [grafter.rdf.protocols :as proto]
@@ -29,10 +28,6 @@
 ;;stoppable
 (def default-stoppable-impl
   {:stop (fn [x] (repo/shutdown (->sesame-repo x)))})
-
-;;draft management
-(def default-draft-management-impl
-  {:append-metadata-to-graphs! mgmt/append-metadata-to-graphs!})
 
 ;;draft API
 (def default-api-operations-impl

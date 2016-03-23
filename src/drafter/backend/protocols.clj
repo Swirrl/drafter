@@ -18,19 +18,6 @@
 (defprotocol SparqlUpdateExecutor
   (execute-update [this update-query restrictions]))
 
-(defprotocol DraftManagement
-  (append-metadata-to-graphs! [this graph-uris metadata]
-    "Takes a hash-map of metadata key/value pairs and adds them as
-  metadata to the state graphs of each of the given graphs, converting
-  keys into drafter URIs as necessary. Assumes all values are
-  strings."))
-
-(defn append-graph-metadata! [backend graph-uri metadata]
-  "Takes a hash-map of metadata key/value pairs and adds them as
-  metadata to the graphs state graph, converting keys into drafter
-  URIs as necessary. Assumes all values are strings."
-  (append-metadata-to-graphs! backend [graph-uri] metadata))
-
 ;; NOTE: We should eventually replace this when we migrate to using Stuart
 ;; Sierra's Component.
 (defprotocol Stoppable

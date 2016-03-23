@@ -11,6 +11,7 @@
             [grafter.rdf.repository :as repo]
             [drafter.backend.sesame.common.protocols :refer [->repo-connection ->sesame-repo]]
             [grafter.rdf.templater :refer [add-properties graph]]
+            [clojure.string :as string]
             [swirrl-server.errors :refer [ex-swirrl]]
             [schema.core :as s])
   (:import (java.util Date UUID)
@@ -551,3 +552,43 @@ WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
     (with-open [conn (->repo-connection backend)]
       (repo/with-transaction conn
         (add conn graph-uri triple-batch)))))
+
+(defn- sparql-uri-list [uris]
+  (string/join " " (map #(str "<" % ">") uris)))
+
+(defn ->sparql-values-binding [e]
+  (if (coll? e)
+    (str "(" (string/join " " e) ")")
+    e))
+
+(defn- meta-pair->values-binding [[uri value]]
+  [(str "<" uri ">") (str \" value \")])
+
+(defn meta-pairs->values-bindings [meta-pairs]
+  (let [uri-pairs (map meta-pair->values-binding meta-pairs)]
+    (string/join " " (map ->sparql-values-binding uri-pairs))))
+
+(defn- append-metadata-to-graphs-query [graph-uris meta-pairs]
+  (str "WITH <" drafter-state-graph ">
+        DELETE { ?g ?p ?existing }
+        INSERT { ?g ?p ?o }
+        WHERE {
+          VALUES ?g { " (sparql-uri-list graph-uris) " }
+          VALUES (?p ?o) { " (meta-pairs->values-bindings meta-pairs)  " }
+          OPTIONAL { ?g ?p ?existing }
+        }"))
+
+(defn append-metadata-to-graphs!
+  "Takes a hash-map of metadata key/value pairs and adds them as
+  metadata to the state graphs of each of the given graphs, converting
+  keys into drafter URIs as necessary. Assumes all values are
+  strings."
+  [backend graph-uris meta-pairs]
+  (let [update-query (append-metadata-to-graphs-query graph-uris meta-pairs)]
+    (update! backend update-query)))
+
+(defn append-graph-metadata! [backend graph-uri metadata]
+  "Takes a hash-map of metadata key/value pairs and adds them as
+  metadata to the graphs state graph, converting keys into drafter
+  URIs as necessary. Assumes all values are strings."
+  (append-metadata-to-graphs! backend [graph-uri] metadata))

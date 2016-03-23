@@ -42,7 +42,7 @@
 
 (defn- append-graph-metadata-joblet [repo draft-graph metadata]
   (jobs/action-joblet
-   (backend/append-graph-metadata! repo draft-graph metadata)
+   (mgmt/append-graph-metadata! repo draft-graph metadata)
     (log/info (str "File import (append) to draft-graph: " draft-graph " completed"))))
 
 (defn- append-draftset-quads [backend draftset-ref live->draft quad-batches {:keys [op job-started-at] :as state} job]

@@ -140,7 +140,7 @@
   each given graph under a job."
   [backend graphs metadata job]
   (with-job-exception-handling job
-    (append-metadata-to-graphs! backend graphs metadata)
+    (mgmt/append-metadata-to-graphs! backend graphs metadata)
     (complete-job! job restapi/ok-response)))
 
 (defn create-update-metadata-job
