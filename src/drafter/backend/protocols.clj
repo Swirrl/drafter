@@ -37,7 +37,4 @@
     "Return a job to migrate the supplied set of draft graphs to live.")
   (delete-metadata-job [this graphs meta-keys]
     "Create a job to delete the given metadata keys from a collection of draft
-  graphs.")
-  (update-metadata-job [this graphs metadata]
-    "Create a job to update or creates each of the the given graph metadata
-  pairs for each given graph under a job."))
+  graphs."))

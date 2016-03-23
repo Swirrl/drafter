@@ -143,12 +143,6 @@
     (mgmt/append-metadata-to-graphs! backend graphs metadata)
     (complete-job! job restapi/ok-response)))
 
-(defn create-update-metadata-job
-  "Creates a job to associate the given graph metadata pairs with each
-  given graph."
-  [backend graphs metadata]
-  (create-job :sync-write (partial update-graph-metadata backend graphs metadata)))
-
 (defn- sparql-uri-list [uris]
   (string/join " " (map #(str "<" % ">") uris)))
 

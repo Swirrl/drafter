@@ -88,5 +88,3 @@
 
 (defn delete-metadata-job [backend graphs meta-keys]
   (jobs/create-delete-metadata-job (->sesame-repo backend) graphs meta-keys))
-
-(def create-update-metadata-job jobs/create-update-metadata-job)
