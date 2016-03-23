@@ -10,7 +10,6 @@
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
             [drafter.util :refer [to-coll]]
-            [drafter.backend.protocols :refer [append-data-batch!]]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.draft-management :refer :all]
             [swirrl-server.errors :refer [encode-error]]

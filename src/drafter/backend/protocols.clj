@@ -19,9 +19,6 @@
   (execute-update [this update-query restrictions]))
 
 (defprotocol DraftManagement
-  (append-data-batch! [this draft-graph-uri triple-batch]
-    "Appends a sequence of triples to the given draft graph.")
-
   (append-metadata-to-graphs! [this graph-uris metadata]
     "Takes a hash-map of metadata key/value pairs and adds them as
   metadata to the state graphs of each of the given graphs, converting

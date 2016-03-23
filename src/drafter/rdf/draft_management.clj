@@ -10,6 +10,7 @@
             [grafter.rdf.protocols :as pr]
             [grafter.rdf.repository :as repo]
             [drafter.backend.protocols :refer [migrate-graphs-to-live!]]
+            [drafter.backend.sesame.common.protocols :refer [->repo-connection]]
             [grafter.rdf.templater :refer [add-properties graph]]
             [swirrl-server.errors :refer [ex-swirrl]]
             [schema.core :as s])
@@ -432,3 +433,15 @@ PREFIX drafter: <" (drafter "") ">"))
 (defn graph-mapping->graph-restriction [db graph-mapping union-with-live?]
   (let [live-graphs (if union-with-live? (live-graphs db) #{})]
     (calculate-graph-restriction live-graphs (keys graph-mapping) (vals graph-mapping))))
+
+(defn append-data-batch!
+  "Appends a sequence of triples to the given draft graph."
+  [backend graph-uri triple-batch]
+  ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
+  ;;so only create one if there is data in the batch
+  (if-not (empty? triple-batch)
+    ;;WARNING: This assumes the backend is a sesame backend which is
+    ;;true for all current backends.
+    (with-open [conn (->repo-connection backend)]
+      (repo/with-transaction conn
+        (add conn graph-uri triple-batch)))))

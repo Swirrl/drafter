@@ -8,7 +8,6 @@
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.vocabularies.rdf :refer :all]
    [grafter.rdf.repository :as repo]
-   [drafter.backend.protocols :refer [append-data-batch!]]
    [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
    [drafter.rdf.drafter-ontology :refer :all]
    [schema.test :refer [validate-schemas]]

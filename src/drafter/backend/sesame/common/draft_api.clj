@@ -38,7 +38,7 @@
 (defn- append-data-batch-joblet [repo draft-graph batch]
   (jobs/action-joblet
     (log/info "Adding a batch of triples to repo")
-    (backend/append-data-batch! repo draft-graph batch)))
+    (mgmt/append-data-batch! repo draft-graph batch)))
 
 (defn- append-graph-metadata-joblet [repo draft-graph metadata]
   (jobs/action-joblet
@@ -53,7 +53,7 @@
         (if-let [draft-graph-uri (get live->draft graph-uri)]
           (do
             (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
-            (backend/append-data-batch! backend draft-graph-uri triples)
+            (mgmt/append-data-batch! backend draft-graph-uri triples)
             (let [next-job (create-child-job
                             job
                             (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) (merge state {:op :append})))]
