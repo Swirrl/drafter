@@ -30,6 +30,4 @@
     "Returns a job that appends triples to the given draftset")
   (publish-draftset-job [this draftset-ref]
     "Return a job that publishes the graphs in a draftset to live and
-    then deletes the draftset.")
-  (delete-draftset! [this draftset-ref]
-    "Deletes a draftset and all of its constituent graphs"))
+    then deletes the draftset."))

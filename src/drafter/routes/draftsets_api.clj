@@ -147,7 +147,7 @@
         (make-route :delete "/draftset/:id"
                     (as-draftset-owner
                      (fn [{{:keys [draftset-id]} :params :as request}]
-                       (delete-draftset! backend draftset-id)
+                       (dsmgmt/delete-draftset! backend draftset-id)
                        (response ""))))
 
         (make-route :options "/draftset/:id"

@@ -111,7 +111,9 @@
         delete-draftset-query (delete-draftset-statements-query draftset-ref)]
     (util/make-compound-sparql-query (conj delete-drafts-query delete-draftset-query))))
 
-(defn delete-draftset! [db draftset-ref]
+(defn delete-draftset!
+  "Deletes a draftset and all of its constituent graphs"
+  [db draftset-ref]
   (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)
         draft-graphs (graph-mapping-draft-graphs graph-mapping)
         delete-query (delete-draftset-query draftset-ref draft-graphs)]

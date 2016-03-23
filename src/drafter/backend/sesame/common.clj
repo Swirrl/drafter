@@ -33,8 +33,7 @@
 (def default-api-operations-impl
   {:append-data-to-draftset-job api/append-data-to-draftset-job
    :append-triples-to-draftset-job api/append-triples-to-draftset-job
-   :publish-draftset-job dsapi/publish-draftset-job
-   :delete-draftset! dsmgmt/delete-draftset!})
+   :publish-draftset-job dsapi/publish-draftset-job})
 
 ;;Grafter SPARQL protocols
 
