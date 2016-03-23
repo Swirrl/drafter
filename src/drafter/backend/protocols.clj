@@ -23,10 +23,7 @@
     "Takes a hash-map of metadata key/value pairs and adds them as
   metadata to the state graphs of each of the given graphs, converting
   keys into drafter URIs as necessary. Assumes all values are
-  strings.")
-
-  (migrate-graphs-to-live! [this graph-uris]
-    "Migrates the given collections of draft graphs to live"))
+  strings."))
 
 (defn append-graph-metadata! [backend graph-uri metadata]
   "Takes a hash-map of metadata key/value pairs and adds them as

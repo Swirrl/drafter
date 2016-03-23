@@ -32,8 +32,7 @@
 
 ;;draft management
 (def default-draft-management-impl
-  {:append-metadata-to-graphs! mgmt/append-metadata-to-graphs!
-   :migrate-graphs-to-live! mgmt/migrate-graphs-to-live!})
+  {:append-metadata-to-graphs! mgmt/append-metadata-to-graphs!})
 
 ;;draft API
 (def default-api-operations-impl

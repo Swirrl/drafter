@@ -1,12 +1,12 @@
 (ns drafter.backend.sesame.common.draftset-api
-  (:require [drafter.backend.protocols :as backend]
+  (:require [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.draftset-management :as dsmgmt]))
 
 (defn- publish-draftset-graphs-joblet [backend draftset-ref]
   (jobs/action-joblet
    (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
-     (backend/migrate-graphs-to-live! backend (vals graph-mapping)))))
+     (mgmt/migrate-graphs-to-live! backend (vals graph-mapping)))))
 
 (defn- delete-draftset-joblet [backend draftset-ref]
   (jobs/action-joblet

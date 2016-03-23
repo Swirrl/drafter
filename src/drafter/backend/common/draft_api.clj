@@ -1,5 +1,5 @@
 (ns drafter.backend.common.draft-api
-  (:require [drafter.backend.protocols :as backend]
+  (:require [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :as jobs]
             [grafter.rdf :refer [context]]
             [grafter.rdf.protocols :refer [map->Triple]]))
@@ -8,7 +8,7 @@
   "Default implementation of migrate-graphs-to-live-job."
   [backend graphs]
   (jobs/make-job :exclusive-write [job]
-                 (backend/migrate-graphs-to-live! backend graphs)
+                 (mgmt/migrate-graphs-to-live! backend graphs)
                  (jobs/job-succeeded! job)))
 
 (defn quad-batch->graph-triples
