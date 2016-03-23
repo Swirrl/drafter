@@ -495,3 +495,19 @@
                  (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph)
                        batches (jobs/get-graph-clone-batches backend live-graph)]
                    (jobs/copy-from-live-graph backend live-graph draft-graph-uri batches job))))
+
+(defn- publish-draftset-graphs-joblet [backend draftset-ref]
+  (jobs/action-joblet
+   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
+     (mgmt/migrate-graphs-to-live! backend (vals graph-mapping)))))
+
+(defn- delete-draftset-joblet [backend draftset-ref]
+  (jobs/action-joblet
+   (delete-draftset-statements! backend draftset-ref)))
+
+(defn publish-draftset-job
+  "Return a job that publishes the graphs in a draftset to live and
+  then deletes the draftset."
+  [backend draftset-ref]
+  (jobs/joblet-seq->job [(publish-draftset-graphs-joblet backend draftset-ref)
+                         (delete-draftset-joblet backend draftset-ref)] :batch-write))

@@ -27,7 +27,4 @@
   (append-data-to-draftset-job [this draftset-ref tempfile rdf-format]
     "Return a job that appends RDF data to the given draftset")
   (append-triples-to-draftset-job [this draftset-ref data rdf-format graph]
-    "Returns a job that appends triples to the given draftset")
-  (publish-draftset-job [this draftset-ref]
-    "Return a job that publishes the graphs in a draftset to live and
-    then deletes the draftset."))
+    "Returns a job that appends triples to the given draftset"))

@@ -240,7 +240,7 @@
                     (as-draftset-owner
                      (fn [{{:keys [draftset-id]} :params user :identity}]
                        (if (user/has-role? user :publisher)
-                         (submit-async-job! (publish-draftset-job backend draftset-id))
+                         (submit-async-job! (dsmgmt/publish-draftset-job backend draftset-id))
                          (forbidden-response "You require the publisher role to perform this action")))))
 
         (make-route :put "/draftset/:id"

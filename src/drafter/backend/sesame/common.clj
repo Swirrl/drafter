@@ -6,7 +6,6 @@
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.backend.common.draft-api :as api-common]
             [drafter.backend.sesame.common.draft-api :as api]
-            [drafter.backend.sesame.common.draftset-api :as dsapi]
             [grafter.rdf.protocols :as proto]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.sesame.common.sparql-execution :as sparql]))
@@ -32,8 +31,7 @@
 ;;draft API
 (def default-api-operations-impl
   {:append-data-to-draftset-job api/append-data-to-draftset-job
-   :append-triples-to-draftset-job api/append-triples-to-draftset-job
-   :publish-draftset-job dsapi/publish-draftset-job})
+   :append-triples-to-draftset-job api/append-triples-to-draftset-job})
 
 ;;Grafter SPARQL protocols
 
