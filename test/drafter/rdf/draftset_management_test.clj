@@ -5,14 +5,14 @@
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples
                                          select-all-in-graph]]
             [drafter.write-scheduler :as scheduler]
-            [grafter.rdf :refer [statements context]]
+            [grafter.rdf :refer [statements context triple=]]
             [drafter.rdf.drafter-ontology :refer :all :as ont]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-publisher test-manager]]
             [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
             [drafter.util :as util]
             [grafter.rdf.repository :refer [query]]
-            [grafter.rdf.protocols :refer [->Triple]]
+            [grafter.rdf.protocols :refer [->Triple ->Quad]]
             [grafter.vocabularies.rdf :refer :all]))
 
 (defn- has-uri-object? [s p uri-o]
@@ -318,6 +318,17 @@
 
     (let [draft-triples (get-graph-triples draft-graph-uri)]
       (is (= (set live-triples) (set draft-triples))))))
+
+(deftest quad-batch->graph-triples-test
+  (testing "Empty batch"
+    (is (thrown? IllegalArgumentException (quad-batch->graph-triples []))))
+
+  (testing "Non-empty batch"
+    (let [guri "http://graph"
+          quads (map #(->Quad (str "http://s" %) (str "http://p" %) (str "http://o" %) guri) (range 1 10))
+          {:keys [graph-uri triples]} (quad-batch->graph-triples quads)]
+      (is (= guri graph-uri))
+      (is (every? identity (map triple= quads triples))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

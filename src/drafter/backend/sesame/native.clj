@@ -15,7 +15,6 @@
   backproto/SparqlExecutor default-sparql-query-impl
   backproto/QueryRewritable default-query-rewritable-impl
   backproto/SparqlUpdateExecutor default-sparql-update-impl
-  backproto/ApiOperations default-api-operations-impl
   sesproto/ToRepository {:->sesame-repo :repo}
   backproto/Stoppable default-stoppable-impl)
 

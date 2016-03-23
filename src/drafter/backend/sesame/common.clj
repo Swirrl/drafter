@@ -4,8 +4,6 @@
             [clojure.tools.logging :as log]
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.draftset-management :as dsmgmt]
-            [drafter.backend.common.draft-api :as api-common]
-            [drafter.backend.sesame.common.draft-api :as api]
             [grafter.rdf.protocols :as proto]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.sesame.common.sparql-execution :as sparql]))
@@ -27,11 +25,6 @@
 ;;stoppable
 (def default-stoppable-impl
   {:stop (fn [x] (repo/shutdown (->sesame-repo x)))})
-
-;;draft API
-(def default-api-operations-impl
-  {:append-data-to-draftset-job api/append-data-to-draftset-job
-   :append-triples-to-draftset-job api/append-triples-to-draftset-job})
 
 ;;Grafter SPARQL protocols
 

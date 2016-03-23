@@ -213,9 +213,9 @@
                                content-type :rdf-content-type
                                graph :graph} :params body :body :as request}]
                           (if (is-quads-format? rdf-format)
-                            (let [append-job (append-data-to-draftset-job backend draftset-id body rdf-format)]
+                            (let [append-job (dsmgmt/append-data-to-draftset-job backend draftset-id body rdf-format)]
                               (submit-async-job! append-job))
-                            (let [append-job (append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
+                            (let [append-job (dsmgmt/append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
                               (submit-async-job! append-job)))))))))
 
         (make-route :put "/draftset/:id/graph"

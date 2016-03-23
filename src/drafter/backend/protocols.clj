@@ -22,9 +22,3 @@
 ;; Sierra's Component.
 (defprotocol Stoppable
   (stop [this]))
-
-(defprotocol ApiOperations
-  (append-data-to-draftset-job [this draftset-ref tempfile rdf-format]
-    "Return a job that appends RDF data to the given draftset")
-  (append-triples-to-draftset-job [this draftset-ref data rdf-format graph]
-    "Returns a job that appends triples to the given draftset"))
