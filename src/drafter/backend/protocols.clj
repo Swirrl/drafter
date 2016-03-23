@@ -33,9 +33,6 @@
     then deletes the draftset.")
   (delete-draftset! [this draftset-ref]
     "Deletes a draftset and all of its constituent graphs")
-  (copy-from-live-graph-job [this draft-graph-uri]
-    "Retrun a job to Copy the data from the draft graphs live graph into the
-    given draft graph.")
   (migrate-graphs-to-live-job [this graphs]
     "Return a job to migrate the supplied set of draft graphs to live.")
   (delete-metadata-job [this graphs meta-keys]

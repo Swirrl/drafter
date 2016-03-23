@@ -7,7 +7,6 @@
             [drafter.user :as user]
             [drafter.util :as util]
             [drafter.rdf.draft-management :refer [update! query to-quads with-state-graph drafter-state-graph] :as mgmt]
-            [drafter.backend.protocols :refer [copy-from-live-graph-job]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [schema.core :as s]
             [clojure.string :as string])

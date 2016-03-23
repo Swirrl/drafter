@@ -35,7 +35,6 @@
    :append-triples-to-draftset-job api/append-triples-to-draftset-job
    :publish-draftset-job dsapi/publish-draftset-job
    :delete-draftset! dsmgmt/delete-draftset!
-   :copy-from-live-graph-job api/copy-from-live-graph-job
    :migrate-graphs-to-live-job api-common/migrate-graphs-to-live-job
    :delete-metadata-job api/delete-metadata-job
    :update-metadata-job api/create-update-metadata-job
