@@ -85,6 +85,3 @@
   (let [triples (read-statements tempfile rdf-format)
         quads (map (comp map->Quad #(assoc % :c graph)) triples)]
     (append-quads-to-draftset-job backend draftset-ref quads)))
-
-(defn delete-metadata-job [backend graphs meta-keys]
-  (jobs/create-delete-metadata-job (->sesame-repo backend) graphs meta-keys))

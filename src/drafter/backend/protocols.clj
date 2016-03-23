@@ -34,7 +34,4 @@
   (delete-draftset! [this draftset-ref]
     "Deletes a draftset and all of its constituent graphs")
   (migrate-graphs-to-live-job [this graphs]
-    "Return a job to migrate the supplied set of draft graphs to live.")
-  (delete-metadata-job [this graphs meta-keys]
-    "Create a job to delete the given metadata keys from a collection of draft
-  graphs."))
+    "Return a job to migrate the supplied set of draft graphs to live."))

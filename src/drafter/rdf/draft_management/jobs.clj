@@ -134,47 +134,6 @@
          graph-count (Integer/parseInt (.stringValue (get m "c")))]
      (calculate-offsets graph-count batch-size))))
 
-;;update-graph-metadata :: Repository -> [URI] -> Seq [String, String] -> Job -> ()
-(defn- update-graph-metadata
-  "Updates or creates each of the the given graph metadata pairs for
-  each given graph under a job."
-  [backend graphs metadata job]
-  (with-job-exception-handling job
-    (mgmt/append-metadata-to-graphs! backend graphs metadata)
-    (complete-job! job restapi/ok-response)))
-
-(defn- sparql-uri-list [uris]
-  (string/join " " (map #(str "<" % ">") uris)))
-
-(defn- delete-graph-metadata-query [graph-uris meta-uris]
-  (str
-   "DELETE {"
-   (mgmt/with-state-graph "?g ?meta ?o")
-   "} WHERE {"
-   (mgmt/with-state-graph
-     (str
-      "?g ?meta ?o
-       VALUES ?g {" (sparql-uri-list graph-uris) "}
-       VALUES ?meta {" (sparql-uri-list meta-uris) "}"))
-   "}"))
-
-(defn- delete-graph-metadata
-  "Deletes all metadata values associated with the given keys across
-  all the given graph URIs."
-  [repo graphs meta-keys job]
-  (with-job-exception-handling job
-    (let [meta-uris (map meta-uri meta-keys)
-          delete-query (delete-graph-metadata-query graphs meta-uris)]
-      (mgmt/update! repo delete-query)
-      (complete-job! job restapi/ok-response))))
-
-(defn create-delete-metadata-job
-  "Create a job to delete the given metadata keys from a collection of
-  draft graphs."
-  [repo graphs meta-keys]
-  (create-job :sync-write (partial delete-graph-metadata repo graphs meta-keys)))
-
-
 (defn copy-from-live-graph [repo live-graph-uri dest-graph-uri batches job]
   (with-job-exception-handling job
     (if-let [[offset limit] (first batches)]
