@@ -24,8 +24,6 @@
   (stop [this]))
 
 (defprotocol ApiOperations
-  (append-data-to-graph-job [this graph data rdf-format metadata]
-    "Return a job that appends RDF data in the specified format to the specified graph.")
   (append-data-to-draftset-job [this draftset-ref tempfile rdf-format]
     "Return a job that appends RDF data to the given draftset")
   (append-triples-to-draftset-job [this draftset-ref data rdf-format graph]

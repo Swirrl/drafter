@@ -105,54 +105,6 @@
         quads (map (comp map->Quad #(assoc % :c graph)) triples)]
     (append-quads-to-draftset-job backend draftset-ref quads)))
 
-(defn append-data-to-graph-job
-  "Return a job function that adds the triples from the specified file
-  to the specified graph.
-
-  This operation is batched at the :batch-write level to allow
-  cooperative scheduling with :sync-writes.
-
-  It works by concatenating the existing live quads with a lazy-seq on
-  the uploaded file.  This combined lazy sequence is then split into
-  the current batch and remaining, with the current batch being
-  applied before the job is resubmitted (under the same ID) with the
-  remaining triples.
-
-  The last batch is finally responsible for signaling job completion
-  via a side-effecting call to complete-job!"
-
-  [backend draft-graph tempfile rdf-format metadata]
-
-  (let [new-triples (read-statements tempfile rdf-format)
-
-        ;; NOTE that this is technically not transactionally safe as
-        ;; sesame currently only supports the READ_COMMITTED isolation
-        ;; level.
-        ;;
-        ;; As there is no read lock or support for (repeatable reads)
-        ;; this means that the CONSTRUCT below can witness data
-        ;; changing underneath it.
-        ;;
-        ;; TODO: protect against this, either by adopting a better
-        ;; storage engine or by adding code to either refuse make-live
-        ;; operations on jobs that touch the same graphs that we're
-        ;; manipulating here, or to raise an error on the batch task.
-        ;;
-        ;; I think the newer versions of Sesame 1.8.x might also provide better
-        ;; support for different isolation levels, so we might want to consider
-        ;; upgrading.
-        ;;
-        ;; http://en.wikipedia.org/wiki/Isolation_%28database_systems%29#Read_committed
-        ;;
-        ;; This can occur if a user does a make-live on a graph
-        ;; which is being written to in a batch job.
-        batches (partition-all jobs/batched-write-size new-triples)
-        batch-joblets (map #(append-data-batch-joblet backend draft-graph %) batches)
-        metadata-joblet (append-graph-metadata-joblet backend draft-graph metadata)
-        all-joblets (concat batch-joblets [metadata-joblet])
-    ]
-    (jobs/joblet-seq->job all-joblets :batch-write)))
-
 (defn copy-from-live-graph-job [backend draft-graph-uri]
   (jobs/create-copy-from-live-graph-job (->sesame-repo backend) draft-graph-uri))
 
