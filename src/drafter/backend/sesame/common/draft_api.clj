@@ -153,14 +153,6 @@
     ]
     (jobs/joblet-seq->job all-joblets :batch-write)))
 
-(defn new-draft-job [backend live-graph params]
-  (jobs/make-job :sync-write [job]
-            (with-open [conn (repo/->connection (->sesame-repo backend))]
-              (let [draft-graph-uri (repo/with-transaction conn
-                                      (mgmt/create-managed-graph! conn live-graph)
-                                      (mgmt/create-draft-graph! conn live-graph (meta-params params)))]
-                (jobs/job-succeeded! job {:guri draft-graph-uri})))))
-
 (defn copy-from-live-graph-job [backend draft-graph-uri]
   (jobs/create-copy-from-live-graph-job (->sesame-repo backend) draft-graph-uri))
 

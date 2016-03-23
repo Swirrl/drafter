@@ -31,8 +31,7 @@
 
 ;;draft API
 (def default-api-operations-impl
-  {:new-draft-job api/new-draft-job
-   :append-data-to-graph-job api/append-data-to-graph-job
+  {:append-data-to-graph-job api/append-data-to-graph-job
    :append-data-to-draftset-job api/append-data-to-draftset-job
    :append-triples-to-draftset-job api/append-triples-to-draftset-job
    :publish-draftset-job dsapi/publish-draftset-job

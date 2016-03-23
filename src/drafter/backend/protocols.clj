@@ -24,9 +24,6 @@
   (stop [this]))
 
 (defprotocol ApiOperations
-  (new-draft-job [this live-graph-uri params]
-    "Return a job that makes a new draft associated with the given live-graph in
-    the state graph.")
   (append-data-to-graph-job [this graph data rdf-format metadata]
     "Return a job that appends RDF data in the specified format to the specified graph.")
   (append-data-to-draftset-job [this draftset-ref tempfile rdf-format]
