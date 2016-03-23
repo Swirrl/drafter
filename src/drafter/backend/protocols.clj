@@ -1,5 +1,4 @@
-(ns drafter.backend.protocols
-  (:require [drafter.util :as util]))
+(ns drafter.backend.protocols)
 
 (defprotocol SparqlExecutor
   (all-quads-query [this restrictions])
