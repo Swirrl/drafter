@@ -598,6 +598,31 @@ paths:
           schema:
             $ref: '#/definitions/FinishedJob'
 
+  /status/writes-locked:
+    get:
+      summary: Poll to see if the system is accepting writes
+      description: |
+        During a publish operation operations that create writes such
+        as creating a draftset and updating it are temporarily
+        disabled and will cause a 503.
+
+        You can poll this route to see if the application is available
+        for writes.
+
+        This route exists to give users & user interfaces information
+        as to whether the system is available for writes or not.  It
+        is not necessary (or desirable) for applications to check this
+        route before performing an operation.  Any operation that
+        creates writes may 503.
+
+        Returns a boolean true if the system is locked for writes and
+        false if it isn't.'
+      tags:
+          - Draftsets
+      responses:
+        '200':
+          schema:
+            $ref: '#/definitions/WritesLocked'
 parameters:
   id:
     name: id
@@ -810,6 +835,12 @@ definitions:
           message:
             type: string
             description: An error message relating to the specific exception
+
+  WritesLocked:
+    type: boolean
+    description: |
+      True when the system is unavailable for write operations, and false
+      when it is accepting them.
 
   AsyncJob:
     type: object
