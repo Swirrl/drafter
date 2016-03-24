@@ -8,4 +8,4 @@
   (routes
    (GET "/writes-locked" []
         (str (.isLocked writes-lock)))
-   (st/status-routes finished-jobs restart-id)))
+   (st/status-routes "/v1/" finished-jobs restart-id)))

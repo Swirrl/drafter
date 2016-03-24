@@ -825,7 +825,7 @@ definitions:
     example:
       type: ok
       restart-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
-      finished-job: /status/finished-jobs/2c4111e5-a299-4526-8327-bad5996de400
+      finished-job: /v1/status/finished-jobs/2c4111e5-a299-4526-8327-bad5996de400
 
   FinishedJob:
     type: object

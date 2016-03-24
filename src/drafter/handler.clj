@@ -119,7 +119,7 @@
                             (add-route (pages-routes backend))
                             (add-route (draftset-api-routes backend user-repo "Drafter"))
                             (add-routes (get-sparql-routes backend))
-                            (add-route (context "/status" []
+                            (add-route (context "/v1/status" []
                                                 (status-routes global-writes-lock finished-jobs restart-id)))
 
                             (add-route app-routes))

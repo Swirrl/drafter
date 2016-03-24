@@ -73,4 +73,4 @@
   [job]
   (log/info "Submitting async job: " job)
   (queue-job! job)
-  (submitted-job-response job))
+  (submitted-job-response "/v1" job))
