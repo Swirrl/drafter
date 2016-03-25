@@ -3,45 +3,9 @@
             [drafter.operations :refer :all]
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [create-query-executor prepare-query get-query-type]]
-            [compojure.core :refer [context defroutes routes routing let-request
-                                    make-route let-routes
-                                    ANY GET POST PUT DELETE HEAD]]
-            [drafter.rdf.content-negotiation :as conneg]
-            [ring.middleware.accept :refer [wrap-accept]])
+            [compojure.core :refer [routes GET POST]]
+            [drafter.rdf.content-negotiation :as conneg])
   (:import [org.apache.jena.query QueryParseException]))
-
-(defn mime-pref [mime q] [mime :as mime :qs q])
-
-(defn mime-table [& preferences]
-  (apply vector (apply concat preferences)))
-
-(def tuple-query-mime-preferences
-  (mime-table (mime-pref "application/sparql-results+json" 0.9)
-              (mime-pref "application/sparql-results+xml" 0.9)
-              (mime-pref "application/x-binary-rdf" 0.7)
-              (mime-pref "text/csv" 1.0)
-              (mime-pref "text/tab-separated-values" 0.8)
-              (mime-pref "text/plain" 1.0)
-              (mime-pref "text/html" 1.0)))
-
-(def boolean-query-mime-preferences
-  (mime-table (mime-pref "application/sparql-results+xml" 1.0)
-              (mime-pref "application/sparql-results+json" 1.0)
-              (mime-pref "application/x-binary-rdf" 0.7)
-              (mime-pref "text/plain" 0.9)
-              (mime-pref "text/html" 0.8)))
-
-(def graph-query-mime-preferences
-  (mime-table (mime-pref "application/n-triples" 1.0)
-              (mime-pref "application/n-quads" 0.9)
-              (mime-pref "text/n3" 0.9)
-              (mime-pref "application/trig" 0.8)
-              (mime-pref "application/trix" 0.8)
-              (mime-pref "text/turtle" 0.9)
-              (mime-pref "text/html" 0.7)
-              (mime-pref "application/rdf+xml" 0.9)
-              (mime-pref "text/csv" 0.8)
-              (mime-pref "text/tab-separated-values" 0.7)))
 
 ;result-streamer :: (OutputStream -> NotifierFn -> ()) -> NotifierFn -> (OutputStream -> ())
 (defn result-streamer [exec-fn result-notify-fn]
@@ -79,19 +43,6 @@
 
       (execute-operation query-operation write-fn query-timeouts)
       input-stream))
-
-(defn get-query-mime-preferences [query-type]
-  (case query-type
-    :select tuple-query-mime-preferences
-    :ask boolean-query-mime-preferences
-    :construct graph-query-mime-preferences
-    nil))
-
-(defn negotiate-sparql-query-mime-type [query-type request]
-  (let [mime-preferences (get-query-mime-preferences query-type)
-        accept-handler (wrap-accept identity {:mime mime-preferences})
-        mime (get-in (accept-handler request) [:accept :mime])]
-    mime))
 
 (defn process-sparql-query [executor request & {:keys [graph-restrictions query-timeouts]
                                                 :or {query-timeouts default-timeouts}}]
