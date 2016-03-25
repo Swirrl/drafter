@@ -8,7 +8,7 @@
                                        conflict-detected-response]]
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
-            [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
+            [drafter.rdf.sparql-protocol :refer [process-prepared-query process-sparql-query]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.content-negotiation :as conneg]
@@ -48,15 +48,8 @@
         graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping union-with-live?)
         live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
         rewriting-executor (create-rewriter backend live->draft-graph-mapping)
-        pquery (all-quads-query rewriting-executor graph-restriction)
-        query-type (get-query-type rewriting-executor pquery)]
-    (if-let [[rdf-format media-type] (conneg/negotiate query-type accept-content-type)]
-      (let [exec-fn (create-query-executor rewriting-executor rdf-format pquery)
-            body (stream-sparql-response exec-fn drafter.operations/default-timeouts)]
-        {:status 200
-         :headers {"Content-Type" media-type}
-         :body body})
-      (not-acceptable-response "Failed to negotiate output content format"))))
+        pquery (all-quads-query rewriting-executor graph-restriction)]
+    (process-prepared-query rewriting-executor pquery accept-content-type nil)))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]

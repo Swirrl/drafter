@@ -44,15 +44,9 @@
       (execute-operation query-operation write-fn query-timeouts)
       input-stream))
 
-(defn process-sparql-query [executor request & {:keys [graph-restrictions query-timeouts]
-                                                :or {query-timeouts default-timeouts}}]
-  (let [query-str (get-in request [:params :query])
-        pquery (prepare-query executor query-str graph-restrictions)
-        query-type (get-query-type executor pquery)
-        accept (get-in request [:headers "accept"])]
-
-    (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
-
+(defn process-prepared-query [executor pquery accept query-timeouts]
+  (let [query-type (get-query-type executor pquery)
+        query-timeouts (or query-timeouts default-timeouts)]
     (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
       (let [exec-fn (create-query-executor executor result-format pquery)
             body (stream-sparql-response exec-fn query-timeouts)
@@ -64,6 +58,14 @@
          :body body})
 
       (not-acceptable-response))))
+
+(defn process-sparql-query [executor request & {:keys [graph-restrictions query-timeouts]
+                                                :or {query-timeouts default-timeouts}}]
+  (let [query-str (get-in request [:params :query])
+        pquery (prepare-query executor query-str graph-restrictions)
+        accept (get-in request [:headers "accept"])]
+    (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
+    (process-prepared-query executor pquery accept query-timeouts)))
 
 (defn wrap-sparql-errors [handler]
   (fn [request]
