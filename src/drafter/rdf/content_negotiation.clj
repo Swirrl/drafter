@@ -45,7 +45,7 @@
   (reify RDFWriterFactory
     (getRDFFormat [this] rdf-format)
     (^RDFWriter getWriter [this ^OutputStream os]
-      (query-result-writer->rdf-writer (writer-fn)))
+      (query-result-writer->rdf-writer rdf-format (writer-fn os)))
     (^RDFWriter getWriter [this ^Writer w]
       (throw (RuntimeException. "Not supported - use OutputStream overload")))))
 
@@ -123,4 +123,4 @@
           handler (wrap-accept identity {:mime prefs})]
       (if-let [mime (get-in (handler request) [:accept :mime])]
         (let [[format _] (get spec mime)]
-          format)))))
+          [format mime])))))

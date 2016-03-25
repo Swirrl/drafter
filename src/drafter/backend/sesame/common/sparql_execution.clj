@@ -22,7 +22,7 @@
             TupleQueryResultHandler BooleanQueryResultHandler
             BindingSet QueryLanguage BooleanQuery GraphQuery Update]
            [org.openrdf.rio Rio RDFWriter RDFHandler]
-           [org.openrdf.query.resultio QueryResultWriter]
+           [org.openrdf.query.resultio QueryResultWriter QueryResultIO]
            [org.openrdf.rio.ntriples NTriplesWriter]
            [org.openrdf.rio.nquads NQuadsWriter]
            [org.openrdf.rio.n3 N3Writer]
@@ -285,6 +285,13 @@
 (defn negotiate-result-writer [backend prepared-query media-type]
   (negotiate-query-result-writer prepared-query media-type))
 
+(defn create-result-writer [backend pquery result-format]
+  (case (get-prepared-query-type pquery)
+    :select (fn [os] (QueryResultIO/createWriter result-format os))
+    :ask (fn [os] (QueryResultIO/createWriter result-format os))
+    :construct (fn [os] (Rio/createWriter result-format os))
+    (throw (IllegalArgumentException. (str "Invalid query type")))))
+
 (defn execute-update-with [exec-prepared-update-fn backend update-query restrictions]
   (with-open [conn (->repo-connection backend)]
       (let [dataset (restricted-dataset restrictions)
@@ -316,6 +323,9 @@
 
   (negotiate-result-writer [_ prepared-query media-type]
     (backend/negotiate-result-writer db prepared-query media-type))
+
+  (create-result-writer [_ pquery result-format]
+    (backend/create-result-writer db pquery result-format))
 
   (create-query-executor [_ writer-fn pquery]
     (backend/create-query-executor db writer-fn pquery))

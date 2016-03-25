@@ -1,10 +1,12 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.tools.logging :as log]
             [drafter.operations :refer :all]
-            [drafter.backend.protocols :refer [create-query-executor prepare-query get-query-type negotiate-result-writer]]
+            [drafter.responses :refer [not-acceptable-response]]
+            [drafter.backend.protocols :refer [create-query-executor prepare-query get-query-type create-result-writer]]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
+            [drafter.rdf.content-negotiation :as conneg]
             [ring.middleware.accept :refer [wrap-accept]])
   (:import [org.apache.jena.query QueryParseException]))
 
@@ -70,11 +72,6 @@
     "text/plain" "text/plain; charset=utf-8"
     mime-type))
 
-(defn- unsupported-media-type-response [media-type]
-  {:status 406
-   :headers {"Content-Type" "text/plain; charset=utf-8"}
-   :body (str "Unsupported media-type: " media-type)})
-
 (defn stream-sparql-response [exec-fn query-timeouts]
   (let [{:keys [publish] :as query-operation} (create-operation)
         streamer (result-streamer exec-fn publish)
@@ -101,12 +98,13 @@
   (let [query-str (get-in request [:params :query])
         pquery (prepare-query executor query-str graph-restrictions)
         query-type (get-query-type executor pquery)
-        media-type (negotiate-sparql-query-mime-type query-type request)]
+        accept (get-in request [:headers "accept"])]
 
     (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
 
-    (if-let [writer (negotiate-result-writer executor pquery media-type)]
-      (let [exec-fn (create-query-executor executor writer pquery)
+    (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
+      (let [writer (create-result-writer executor pquery result-format)
+            exec-fn (create-query-executor executor writer pquery)
             body (stream-sparql-response exec-fn query-timeouts)
             response-content-type (get-sparql-response-content-type media-type)]
         {:status 200
@@ -115,7 +113,7 @@
          ;; in another thread to stream the results to the client.
          :body body})
 
-      (unsupported-media-type-response media-type))))
+      (not-acceptable-response))))
 
 (defn wrap-sparql-errors [handler]
   (fn [request]

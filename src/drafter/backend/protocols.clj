@@ -5,6 +5,7 @@
   (prepare-query [this sparql-string restrictions])
   (get-query-type [this prepared-query])
   (negotiate-result-writer [this prepared-query media-type])
+  (create-result-writer [this prepared-query result-format])
   (create-query-executor [this writer pquery]))
 
 (defprotocol StatementDeletion
