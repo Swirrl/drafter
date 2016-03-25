@@ -9,7 +9,6 @@
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
             [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
-            [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.content-negotiation :as conneg]
