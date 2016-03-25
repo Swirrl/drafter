@@ -51,8 +51,7 @@
         pquery (all-quads-query rewriting-executor graph-restriction)
         query-type (get-query-type rewriting-executor pquery)]
     (if-let [[rdf-format media-type] (conneg/negotiate query-type accept-content-type)]
-      (let [writer (create-result-writer rewriting-executor pquery rdf-format)
-            exec-fn (create-query-executor rewriting-executor writer pquery)
+      (let [exec-fn (create-query-executor rewriting-executor rdf-format pquery)
             body (stream-sparql-response exec-fn drafter.operations/default-timeouts)]
         {:status 200
          :headers {"Content-Type" media-type}

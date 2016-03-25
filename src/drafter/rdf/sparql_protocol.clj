@@ -2,7 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [drafter.operations :refer :all]
             [drafter.responses :refer [not-acceptable-response]]
-            [drafter.backend.protocols :refer [create-query-executor prepare-query get-query-type create-result-writer]]
+            [drafter.backend.protocols :refer [create-query-executor prepare-query get-query-type]]
             [compojure.core :refer [context defroutes routes routing let-request
                                     make-route let-routes
                                     ANY GET POST PUT DELETE HEAD]]
@@ -103,8 +103,7 @@
     (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
 
     (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
-      (let [writer (create-result-writer executor pquery result-format)
-            exec-fn (create-query-executor executor writer pquery)
+      (let [exec-fn (create-query-executor executor result-format pquery)
             body (stream-sparql-response exec-fn query-timeouts)
             response-content-type (get-sparql-response-content-type media-type)]
         {:status 200

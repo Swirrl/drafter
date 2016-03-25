@@ -90,21 +90,28 @@
   (let [notifying-handler (notifying-rdf-handler result-notify-fn writer)]
     (.evaluate pquery notifying-handler)))
 
-(defn- get-exec-query [writer-fn pquery]
-  (fn [ostream notifier-fn]
-    (let [writer (writer-fn ostream)]
-      (cond
-       (instance? BooleanQuery pquery)
-       (exec-ask-query writer pquery notifier-fn)
+(defn get-query-type [backend pquery]
+  (condp instance? pquery
+      TupleQuery :select
+      BooleanQuery :ask
+      GraphQuery :construct
+      Update :update
+      nil))
 
-       (instance? TupleQuery pquery)
-       (exec-tuple-query writer pquery notifier-fn)
+(defn create-query-executor [backend result-format pquery]
+  (case (get-query-type backend pquery)
+    :select (fn [os notifier-fn]
+              (let [w (QueryResultIO/createWriter result-format os)]
+                (exec-tuple-query w pquery notifier-fn)))
 
-       :else
-       (exec-graph-query writer pquery notifier-fn)))))
+    :ask (fn [os notifier-fn]
+           (let [w (QueryResultIO/createWriter result-format os)]
+             (exec-ask-query w pquery notifier-fn)))
 
-(defn create-query-executor [backend writer-fn prepared-query]
-  (get-exec-query writer-fn prepared-query))
+    :construct (fn [os notifier-fn]
+                 (let [w (Rio/createWriter result-format os)]
+                   (exec-graph-query w pquery notifier-fn)))
+    (throw (IllegalArgumentException. (str "Invalid query type")))))
 
 (defn validate-query [query-str]
   "Validates a query by parsing it using ARQ. If the query is invalid
@@ -203,24 +210,6 @@
   (let [tuple-query (backend/prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }" graph-restrictions)]
     (spog-tuple-query->graph-query tuple-query)))
 
-(defn- get-prepared-query-type [pquery]
-    (condp instance? pquery
-      TupleQuery :select
-      BooleanQuery :ask
-      GraphQuery :construct
-      Update :update
-      nil))
-
-(defn get-query-type [backend prepared-query]
-  (get-prepared-query-type prepared-query))
-
-(defn create-result-writer [backend pquery result-format]
-  (case (get-prepared-query-type pquery)
-    :select (fn [os] (QueryResultIO/createWriter result-format os))
-    :ask (fn [os] (QueryResultIO/createWriter result-format os))
-    :construct (fn [os] (Rio/createWriter result-format os))
-    (throw (IllegalArgumentException. (str "Invalid query type")))))
-
 (defn execute-update-with [exec-prepared-update-fn backend update-query restrictions]
   (with-open [conn (->repo-connection backend)]
       (let [dataset (restricted-dataset restrictions)
@@ -246,9 +235,6 @@
 
   (get-query-type [_ pquery]
     (backend/get-query-type db pquery))
-
-  (create-result-writer [_ pquery result-format]
-    (backend/create-result-writer db pquery result-format))
 
   (create-query-executor [_ writer-fn pquery]
     (backend/create-query-executor db writer-fn pquery))
