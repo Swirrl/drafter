@@ -1,6 +1,5 @@
 (ns drafter.rdf.content-negotiation
-  (:require [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper]]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [grafter.rdf.formats :as formats]
             [ring.middleware.accept :refer [wrap-accept]])
   (:import [java.nio.charset Charset]

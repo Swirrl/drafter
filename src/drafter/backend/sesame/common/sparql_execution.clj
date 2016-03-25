@@ -15,7 +15,7 @@
             [drafter.rdf.sesame :refer [read-statements]]
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-            [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results rewrite-statement]]
+            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
             [drafter.util :refer [map-values] :as util])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
@@ -85,16 +85,10 @@
   (log/debug "pquery (default) is " pquery " writer is " writer)
   (.evaluate pquery (notifying-query-result-handler result-notify-fn writer)))
 
-(defn- get-graph-query-handler [writer]
-  (if (instance? QueryResultWriter writer)
-    (result-handler-wrapper writer)
-    writer))
-
 (defn- exec-graph-query [writer pquery result-notify-fn]
   (log/debug "pquery is " pquery " writer is " writer)
-  (let [handler (get-graph-query-handler writer)
-        notifying-handler (notifying-rdf-handler result-notify-fn handler)]
-    (.evaluate pquery handler)))
+  (let [notifying-handler (notifying-rdf-handler result-notify-fn writer)]
+    (.evaluate pquery notifying-handler)))
 
 (defn- get-exec-query [writer-fn pquery]
   (fn [ostream notifier-fn]

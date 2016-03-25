@@ -64,29 +64,6 @@
     (startQueryResult [this binding-names]
       (.startQueryResult handler binding-names))))
 
-(defn result-handler-wrapper [writer]
-  (reify
-    RDFHandler
-    (startRDF [this]
-      (.startQueryResult writer '("s" "p" "o")))
-    (endRDF [this]
-      (.endQueryResult writer))
-    (handleNamespace [this prefix uri]
-      ;; No op
-      )
-    (handleStatement [this statement]
-      (let [s (.getSubject statement)
-            p (.getPredicate statement)
-            o (.getObject statement)
-            bs (doto (MapBindingSet.)
-                 (.addBinding "s" s)
-                 (.addBinding "p" p)
-                 (.addBinding "o" o))]
-        (.handleSolution writer bs)))
-    (handleComment [this comment]
-      ;; No op
-      )))
-
 (defn rewrite-statement [value-mapping statement]
   (map->Quad (util/map-values #(get value-mapping % %) statement)))
 
