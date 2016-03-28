@@ -1,6 +1,7 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.tools.logging :as log]
             [drafter.operations :refer :all]
+            [drafter.requests :as request]
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [create-query-executor prepare-query get-query-type]]
             [compojure.core :refer [routes GET POST]]
@@ -61,11 +62,10 @@
 
 (defn process-sparql-query [executor request & {:keys [graph-restrictions query-timeouts]
                                                 :or {query-timeouts default-timeouts}}]
-  (let [query-str (get-in request [:params :query])
-        pquery (prepare-query executor query-str graph-restrictions)
-        accept (get-in request [:headers "accept"])]
+  (let [query-str (request/query request)
+        pquery (prepare-query executor query-str graph-restrictions)]
     (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
-    (process-prepared-query executor pquery accept query-timeouts)))
+    (process-prepared-query executor pquery (request/accept request) query-timeouts)))
 
 (defn wrap-sparql-errors [handler]
   (fn [request]
