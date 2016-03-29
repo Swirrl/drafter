@@ -4,8 +4,7 @@
   (all-quads-query [this restrictions])
   (prepare-query [this sparql-string restrictions])
   (get-query-type [this prepared-query])
-  (negotiate-result-writer [this prepared-query media-type])
-  (create-query-executor [this writer pquery]))
+  (create-query-executor [this result-format pquery]))
 
 (defprotocol StatementDeletion
   (delete-quads-from-draftset-job [this serialised rdf-format draftset-ref])

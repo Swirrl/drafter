@@ -13,7 +13,6 @@
   {:all-quads-query sparql/all-quads-query
    :prepare-query sparql/prepare-query
    :get-query-type sparql/get-query-type
-   :negotiate-result-writer sparql/negotiate-result-writer
    :create-query-executor sparql/create-query-executor})
 
 (def default-query-rewritable-impl

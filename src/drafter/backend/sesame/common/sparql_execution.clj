@@ -15,30 +15,14 @@
             [drafter.rdf.sesame :refer [read-statements]]
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-            [drafter.rdf.rewriting.result-rewriting :refer [result-handler-wrapper rewrite-query-results rewrite-statement]]
+            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
             [drafter.rdf.rewriting.arq :refer [->sparql-string sparql-string->arq-query]]
-            [drafter.util :refer [construct-dynamic* map-values] :as util])
+            [drafter.util :refer [map-values] :as util])
   (:import [org.openrdf.query TupleQuery TupleQueryResult
             TupleQueryResultHandler BooleanQueryResultHandler
             BindingSet QueryLanguage BooleanQuery GraphQuery Update]
            [org.openrdf.rio Rio RDFWriter RDFHandler]
-           [org.openrdf.query.resultio QueryResultWriter]
-           [org.openrdf.rio.ntriples NTriplesWriter]
-           [org.openrdf.rio.nquads NQuadsWriter]
-           [org.openrdf.rio.n3 N3Writer]
-           [org.openrdf.rio.n3 N3Writer]
-           [org.openrdf.rio.trig TriGWriter]
-           [org.openrdf.rio.trix TriXWriter]
-           [org.openrdf.rio.turtle TurtleWriter]
-           [org.openrdf.rio.rdfxml RDFXMLWriter]
-           [org.openrdf.query.parser ParsedBooleanQuery ParsedGraphQuery ParsedTupleQuery]
-           [org.openrdf.query.resultio TupleQueryResultFormat]
-           [org.openrdf.query.resultio.text BooleanTextWriter]
-           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]
-           [org.openrdf.query.resultio.sparqlxml SPARQLResultsXMLWriter SPARQLBooleanXMLWriter]
-           [org.openrdf.query.resultio.binary BinaryQueryResultWriter]
-           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
-           [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
+           [org.openrdf.query.resultio QueryResultWriter QueryResultIO]
            [org.openrdf.query Dataset]
            [org.openrdf.query.impl MapBindingSet]
            [org.openrdf.model Resource]
@@ -62,48 +46,6 @@
   (when-let [graph-restrictions (get-restrictions graph-restrictions)]
     (repo/make-restricted-dataset :default-graph graph-restrictions
                                     :named-graphs graph-restrictions)))
-
-;class->writer-fn :: Class[T] -> (OutputStream -> T)
-(defn class->writer-fn [writer-class]
-  (fn [output-stream]
-    (construct-dynamic* writer-class output-stream)))
-
-(def negotiate-graph-query-content-writer {
-                       "application/n-triples" NTriplesWriter
-                       "application/n-quads" NQuadsWriter
-                       "text/x-nquads" NQuadsWriter
-                       "text/n3" N3Writer
-                       "application/trig" TriGWriter
-                       "application/trix" TriXWriter
-                       "text/turtle" TurtleWriter
-                       "text/html" TurtleWriter
-                       "application/rdf+xml" RDFXMLWriter
-                       "text/csv" SPARQLResultsCSVWriter
-                       "text/tab-separated-values" SPARQLResultsTSVWriter
-                       })
-
-(defn- negotiate-content-writer
-  "Given a prepared query and a mime-type return the appropriate
-  Sesame SPARQLResultsWriter class, according to the SPARQL protocols
-  content negotiation rules."
-  [preped-query format]
-  (get (condp instance? preped-query
-         TupleQuery   { "application/sparql-results+json" SPARQLResultsJSONWriter
-                        "application/sparql-results+xml" SPARQLResultsXMLWriter
-                        "application/x-binary-rdf" BinaryQueryResultWriter
-                        "text/csv" SPARQLResultsCSVWriter
-                        "text/tab-separated-values" SPARQLResultsTSVWriter
-                        "text/html" SPARQLResultsCSVWriter
-                        "text/plain" SPARQLResultsCSVWriter
-                        }
-         BooleanQuery { "application/sparql-results+xml" SPARQLResultsXMLWriter
-                        "application/sparql-results+json" SPARQLResultsJSONWriter
-                        "application/x-binary-rdf" BinaryQueryResultWriter
-                        "text/plain" BooleanTextWriter
-                        "text/html" BooleanTextWriter
-                        }
-         GraphQuery   negotiate-graph-query-content-writer
-         nil) format))
 
 (defn notifying-query-result-handler [notify-fn inner-handler]
   (reify
@@ -143,32 +85,33 @@
   (log/debug "pquery (default) is " pquery " writer is " writer)
   (.evaluate pquery (notifying-query-result-handler result-notify-fn writer)))
 
-(defn- get-graph-query-handler [writer]
-  (if (instance? QueryResultWriter writer)
-    (result-handler-wrapper writer)
-    writer))
-
 (defn- exec-graph-query [writer pquery result-notify-fn]
   (log/debug "pquery is " pquery " writer is " writer)
-  (let [handler (get-graph-query-handler writer)
-        notifying-handler (notifying-rdf-handler result-notify-fn handler)]
-    (.evaluate pquery handler)))
+  (let [notifying-handler (notifying-rdf-handler result-notify-fn writer)]
+    (.evaluate pquery notifying-handler)))
 
-(defn- get-exec-query [writer-fn pquery]
-  (fn [ostream notifier-fn]
-    (let [writer (writer-fn ostream)]
-      (cond
-       (instance? BooleanQuery pquery)
-       (exec-ask-query writer pquery notifier-fn)
+(defn get-query-type [backend pquery]
+  (condp instance? pquery
+      TupleQuery :select
+      BooleanQuery :ask
+      GraphQuery :construct
+      Update :update
+      nil))
 
-       (instance? TupleQuery pquery)
-       (exec-tuple-query writer pquery notifier-fn)
+(defn create-query-executor [backend result-format pquery]
+  (case (get-query-type backend pquery)
+    :select (fn [os notifier-fn]
+              (let [w (QueryResultIO/createWriter result-format os)]
+                (exec-tuple-query w pquery notifier-fn)))
 
-       :else
-       (exec-graph-query writer pquery notifier-fn)))))
+    :ask (fn [os notifier-fn]
+           (let [w (QueryResultIO/createWriter result-format os)]
+             (exec-ask-query w pquery notifier-fn)))
 
-(defn create-query-executor [backend writer-fn prepared-query]
-  (get-exec-query writer-fn prepared-query))
+    :construct (fn [os notifier-fn]
+                 (let [w (Rio/createWriter result-format os)]
+                   (exec-graph-query w pquery notifier-fn)))
+    (throw (IllegalArgumentException. (str "Invalid query type")))))
 
 (defn validate-query [query-str]
   "Validates a query by parsing it using ARQ. If the query is invalid
@@ -267,24 +210,6 @@
   (let [tuple-query (backend/prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }" graph-restrictions)]
     (spog-tuple-query->graph-query tuple-query)))
 
-(defn- get-prepared-query-type [pquery]
-    (condp instance? pquery
-      TupleQuery :select
-      BooleanQuery :ask
-      GraphQuery :construct
-      Update :update
-      nil))
-
-(defn get-query-type [backend prepared-query]
-  (get-prepared-query-type prepared-query))
-
-(defn- negotiate-query-result-writer [pquery media-type]
-    (if-let [writer-class (negotiate-content-writer pquery media-type)]
-      (class->writer-fn writer-class)))
-
-(defn negotiate-result-writer [backend prepared-query media-type]
-  (negotiate-query-result-writer prepared-query media-type))
-
 (defn execute-update-with [exec-prepared-update-fn backend update-query restrictions]
   (with-open [conn (->repo-connection backend)]
       (let [dataset (restricted-dataset restrictions)
@@ -298,9 +223,6 @@
 (defn execute-update [backend update-query restrictions]
   (execute-update-with execute-prepared-update-in-transaction backend update-query restrictions))
 
-(defn- rewrite-value [mapping v]
-  (get mapping v v))
-
 (defrecord RewritingSesameSparqlExecutor [db live->draft]
   backend/SparqlExecutor
   (all-quads-query [this restrictions]
@@ -313,9 +235,6 @@
 
   (get-query-type [_ pquery]
     (backend/get-query-type db pquery))
-
-  (negotiate-result-writer [_ prepared-query media-type]
-    (backend/negotiate-result-writer db prepared-query media-type))
 
   (create-query-executor [_ writer-fn pquery]
     (backend/create-query-executor db writer-fn pquery))

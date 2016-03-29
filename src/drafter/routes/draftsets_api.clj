@@ -8,10 +8,10 @@
                                        conflict-detected-response]]
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
-            [drafter.rdf.sparql-protocol :refer [process-sparql-query stream-sparql-response]]
-            [drafter.backend.sesame.common.sparql-execution :refer [negotiate-graph-query-content-writer]]
+            [drafter.rdf.sparql-protocol :refer [process-prepared-query process-sparql-query]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.content-negotiation :as conneg]
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.user :as user]
@@ -49,13 +49,7 @@
         live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
         rewriting-executor (create-rewriter backend live->draft-graph-mapping)
         pquery (all-quads-query rewriting-executor graph-restriction)]
-    (if-let [writer (negotiate-result-writer rewriting-executor pquery accept-content-type)]
-      (let [exec-fn (create-query-executor rewriting-executor writer pquery)
-            body (stream-sparql-response exec-fn drafter.operations/default-timeouts)]
-        {:status 200
-         :headers {"Content-Type" accept-content-type}
-         :body body})
-      (not-acceptable-response "Failed to negotiate output content format"))))
+    (process-prepared-query rewriting-executor pquery accept-content-type nil)))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
