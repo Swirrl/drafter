@@ -1,7 +1,8 @@
 (ns drafter.backend.sesame.common.sparql-execution
   (:require [clojure.tools.logging :as log]
+            [schema.core :as s]
             [grafter.rdf.repository :as repo]
-            [grafter.rdf.protocols :refer [map->Quad]]
+            [grafter.rdf.protocols :refer [map->Quad] :as gproto]
             [grafter.rdf :refer [context]]
             [grafter.rdf.io :refer [IStatement->sesame-statement]]
             [clojure.set :as set]
@@ -21,11 +22,12 @@
   (:import [org.openrdf.query TupleQuery TupleQueryResult
             TupleQueryResultHandler BooleanQueryResultHandler
             BindingSet QueryLanguage BooleanQuery GraphQuery Update]
+           [org.openrdf.repository Repository]
            [org.openrdf.rio Rio RDFWriter RDFHandler]
            [org.openrdf.query.resultio QueryResultWriter QueryResultIO]
            [org.openrdf.query Dataset]
            [org.openrdf.query.impl MapBindingSet]
-           [org.openrdf.model Resource]
+           [org.openrdf.model Resource URI]
            [org.openrdf.model.impl ContextStatementImpl URIImpl]))
 
 (defn- get-restrictions [graph-restrictions]
@@ -119,13 +121,19 @@
   (sparql-string->arq-query query-str)
   query-str)
 
-(defn prepare-query [backend sparql-string graph-restrictions]
+(defn prepare-query [backend sparql-string]
     (let [repo (->sesame-repo backend)
-          validated-query-string (validate-query sparql-string)
-          dataset (restricted-dataset graph-restrictions)
-          pquery (repo/prepare-query repo validated-query-string)]
-      (.setDataset pquery dataset)
-      pquery))
+          validated-query-string (validate-query sparql-string)]
+      (repo/prepare-query repo validated-query-string)))
+
+(defn- apply-restriction [pquery restriction]
+  (let [dataset (restricted-dataset restriction)]
+    (.setDataset pquery dataset)
+    pquery))
+
+(defn- prepare-restricted-query [backend sparql-string graph-restriction]
+  (let [pquery (prepare-query backend sparql-string)]
+    (apply-restriction pquery graph-restriction)))
 
 (defn- delete-quads-from-draftset [backend quad-batches draftset-ref live->draft {:keys [op job-started-at] :as state} job]
   (case op
@@ -206,8 +214,8 @@
     (evaluate [this rdf-handler]
       (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))))
 
-(defn all-quads-query [backend graph-restrictions]
-  (let [tuple-query (backend/prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }" graph-restrictions)]
+(defn all-quads-query [backend]
+  (let [tuple-query (backend/prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
     (spog-tuple-query->graph-query tuple-query)))
 
 (defn execute-update-with [exec-prepared-update-fn backend update-query restrictions]
@@ -223,32 +231,104 @@
 (defn execute-update [backend update-query restrictions]
   (execute-update-with execute-prepared-update-in-transaction backend update-query restrictions))
 
-(defrecord RewritingSesameSparqlExecutor [db live->draft]
-  backend/SparqlExecutor
-  (all-quads-query [this restrictions]
-    (all-quads-query this restrictions))
+(defn- stringify-graph-mapping [live->draft]
+  (util/map-all #(.stringValue %) live->draft))
 
-  (prepare-query [_ sparql-string restrictions]
+(defn- get-rewritten-query-graph-restriction [db live->draft union-with-live?]
+  (mgmt/graph-mapping->graph-restriction db (stringify-graph-mapping live->draft) union-with-live?))
+
+(s/defrecord RewritingSesameSparqlExecutor [db :- Repository
+                                            live->draft :- {URI URI}
+                                            union-with-live? :- Boolean]
+  backend/SparqlExecutor
+  (all-quads-query [this]
+    (all-quads-query this))
+
+  (prepare-query [this sparql-string]
     (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
-          prepared-query (backend/prepare-query db rewritten-query-string restrictions)]
+          graph-restriction (get-rewritten-query-graph-restriction db live->draft union-with-live?)
+          prepared-query (prepare-restricted-query this rewritten-query-string graph-restriction)]
       (rewrite-query-results prepared-query live->draft)))
 
   (get-query-type [_ pquery]
-    (backend/get-query-type db pquery))
+    (get-query-type db pquery))
 
   (create-query-executor [_ writer-fn pquery]
-    (backend/create-query-executor db writer-fn pquery))
+    (create-query-executor db writer-fn pquery))
 
   backend/StatementDeletion
   (delete-quads-from-draftset-job [this serialised rdf-format draftset-ref]
     (jobs/make-job
      :batch-write [job]
      (let [quads (read-statements serialised rdf-format)]
-       (batch-and-delete-quads-from-draftset db quads draftset-ref live->draft job))))
+       (batch-and-delete-quads-from-draftset this quads draftset-ref (stringify-graph-mapping live->draft) job))))
 
   (delete-triples-from-draftset-job [this serialised rdf-format draftset-ref graph]
     (jobs/make-job
      :batch-write [job]
      (let [triples (read-statements serialised rdf-format)
            quads (map #(util/make-quad-statement % graph) triples)]
-       (batch-and-delete-quads-from-draftset db quads draftset-ref live->draft job)))))
+       (batch-and-delete-quads-from-draftset this quads draftset-ref (stringify-graph-mapping live->draft) job))))
+
+  gproto/ITripleReadable
+  (to-statements [_ options] (gproto/to-statements db options))
+
+  gproto/ISPARQLable
+  (query-dataset [_ sparql-string model] (gproto/query-dataset db sparql-string model))
+
+  gproto/ISPARQLUpdateable
+  (update! [this sparql-string] (gproto/update! db sparql-string))
+  
+  ToRepository
+  (->sesame-repo [_] db))
+
+(extend-type RewritingSesameSparqlExecutor
+  gproto/ITripleWriteable
+  (add
+    ([this triples] (gproto/add (->sesame-repo this) triples))
+    ([this graph triples] (gproto/add (->sesame-repo this) graph triples))
+    ([this graph format triple-stream] (gproto/add (->sesame-repo this) graph format triple-stream))
+    ([this graph base-uri format triple-stream] (gproto/add (->sesame-repo this) graph base-uri format triple-stream)))
+
+  (add-statement
+    ([this statement] (gproto/add-statement (->sesame-repo this) statement))
+    ([this graph statement] (gproto/add-statement (->sesame-repo this) graph statement))))
+
+(defrecord RestrictedExecutor [db restriction]
+  backend/SparqlExecutor
+  (all-quads-query [this]
+    (all-quads-query this))
+
+  (prepare-query [this query-string]
+    (let [pquery (prepare-query this query-string)]
+      (apply-restriction pquery restriction)))
+
+  (get-query-type [this pquery]
+    (get-query-type this pquery))
+
+  (create-query-executor [this result-format pquery]
+    (create-query-executor this result-format pquery))
+
+  gproto/ITripleReadable
+  (to-statements [_ options] (gproto/to-statements db options))
+
+  gproto/ISPARQLable
+  (query-dataset [_ sparql-string model] (gproto/query-dataset db sparql-string model))
+
+  gproto/ISPARQLUpdateable
+  (update! [this sparql-string] (gproto/update! db sparql-string))
+
+  ToRepository
+  (->sesame-repo [_] db))
+
+(extend-type RestrictedExecutor
+  gproto/ITripleWriteable
+  (add
+    ([this triples] (gproto/add (->sesame-repo this) triples))
+    ([this graph triples] (gproto/add (->sesame-repo this) graph triples))
+    ([this graph format triple-stream] (gproto/add (->sesame-repo this) graph format triple-stream))
+    ([this graph base-uri format triple-stream] (gproto/add (->sesame-repo this) graph base-uri format triple-stream)))
+
+  (add-statement
+    ([this statement] (gproto/add-statement (->sesame-repo this) statement))
+    ([this graph statement] (gproto/add-statement (->sesame-repo this) graph statement))))

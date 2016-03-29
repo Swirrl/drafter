@@ -7,18 +7,16 @@
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
             [clojure.tools.logging :as log]
             [swirrl-server.responses :as r]
-            [swirrl-server.errors :refer [encode-error]]
-            [drafter.common.sparql-routes :refer [supplied-drafts]]))
+            [drafter.util :refer [to-coll]]
+            [swirrl-server.errors :refer [encode-error]]))
 
 (defn- draft-query-endpoint [executor request timeouts]
   (try
-    (let [{:keys [params]} request
-          graph-uris (supplied-drafts executor request)
-          live->draft (log/spy (mgmt/graph-map executor graph-uris))
-          rewriting-executor (create-rewriter executor live->draft)]
+    (let [{{:keys [union-with-live graph]} :params} request
+          live->draft (log/spy (mgmt/graph-map executor (to-coll graph)))
+          rewriting-executor (create-rewriter executor live->draft (or union-with-live false))]
 
       (process-sparql-query rewriting-executor request
-                            :graph-restrictions graph-uris
                             :query-timeouts timeouts))))
 
 (defmethod encode-error :multiple-drafts-error [ex]
@@ -36,10 +34,10 @@
              (draft-query-endpoint executor request timeouts))))))
 
 (defn live-sparql-routes [mount-point executor timeouts]
-  (sparql-end-point mount-point executor (partial mgmt/live-graphs executor) timeouts))
+  (sparql-end-point mount-point (create-restricted executor (partial mgmt/live-graphs executor)) timeouts))
 
 (defn state-sparql-routes [mount-point executor timeouts]
-  (sparql-end-point mount-point executor #{mgmt/drafter-state-graph} timeouts))
+  (sparql-end-point mount-point (create-restricted executor #{mgmt/drafter-state-graph}) timeouts))
 
 (defn raw-sparql-routes [mount-point executor timeouts]
-  (sparql-end-point mount-point executor nil timeouts))
+  (sparql-end-point mount-point executor timeouts))

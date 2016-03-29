@@ -26,7 +26,7 @@
 (deftest results-streamer-test
   (testing "Streams sparql results into output stream"
     (let [baos (ByteArrayOutputStream.)
-          preped-query (backend/prepare-query *test-backend* "SELECT * WHERE { ?s ?p ?o }" nil)
+          preped-query (backend/prepare-query *test-backend* "SELECT * WHERE { ?s ?p ?o }")
           streamer! (result-streamer (fn [ostream notify] (.evaluate preped-query (SPARQLResultsJSONWriter. ostream)))
                                      (fn []))]
 

@@ -60,10 +60,10 @@
 
       (not-acceptable-response))))
 
-(defn process-sparql-query [executor request & {:keys [graph-restrictions query-timeouts]
+(defn process-sparql-query [executor request & {:keys [query-timeouts]
                                                 :or {query-timeouts default-timeouts}}]
   (let [query-str (request/query request)
-        pquery (prepare-query executor query-str graph-restrictions)]
+        pquery (prepare-query executor query-str)]
     (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
     (process-prepared-query executor pquery (request/accept request) query-timeouts)))
 
@@ -82,17 +82,14 @@
   to restrict both the union and named-graph queries too."
 
   ([mount-path executor] (sparql-end-point mount-path executor nil))
-  ([mount-path executor restrictions] (sparql-end-point mount-path executor restrictions nil))
-  ([mount-path executor restrictions timeouts]
+  ([mount-path executor timeouts]
      ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
    (wrap-sparql-errors
     (routes
      (GET mount-path request
-          (process-sparql-query executor request
-                                :graph-restrictions restrictions
+          (process-sparql-query executor request                        
                                 :query-timeouts timeouts))
 
      (POST mount-path request
-           (process-sparql-query executor request
-                                 :graph-restrictions restrictions
+           (process-sparql-query executor request                        
                                  :query-timeouts timeouts))))))

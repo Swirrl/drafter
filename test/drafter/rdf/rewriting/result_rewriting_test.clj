@@ -82,7 +82,7 @@
   "Rewrites the results in the query."
   [db query-str query-substitutions]
   (let [rewritten-query (rewrite-sparql-string query-substitutions query-str)
-        prepared-query (prepare-query db rewritten-query nil)]
+        prepared-query (prepare-query db rewritten-query)]
     (rewrite-graph-results query-substitutions prepared-query)))
 
 (defn first-result [results key]

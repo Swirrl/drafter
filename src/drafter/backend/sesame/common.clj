@@ -16,7 +16,10 @@
    :create-query-executor sparql/create-query-executor})
 
 (def default-query-rewritable-impl
-  {:create-rewriter sparql/->RewritingSesameSparqlExecutor})
+  {:create-rewriter (fn [backend live->draft union-with-live?]
+                      (sparql/->RewritingSesameSparqlExecutor (->sesame-repo backend) live->draft union-with-live?))
+   :create-restricted (fn [backend restriction]
+                        (sparql/->RestrictedExecutor (->sesame-repo backend) restriction))})
 
 (def default-sparql-update-impl
   {:execute-update sparql/execute-update})

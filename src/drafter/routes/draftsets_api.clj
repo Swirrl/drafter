@@ -26,15 +26,13 @@
            [org.openrdf OpenRDFException]
            [org.openrdf.queryrender RenderUtils]))
 
-(defn- get-draftset-executor [backend draftset-ref]
+(defn- get-draftset-executor [backend draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
-    (create-rewriter backend graph-mapping)))
+    (create-rewriter backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
 
 (defn- execute-query-in-draftset [backend draftset-ref request union-with-live?]
-  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
-        graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping union-with-live?)
-        rewriting-executor (create-rewriter backend graph-mapping)]
-    (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))
+  (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)]
+    (process-sparql-query rewriting-executor request)))
 
 (defn- get-accepted-rdf-format [request]
   (if-let [accept (request/accept request)]
@@ -44,11 +42,8 @@
         nil))))
 
 (defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
-  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)
-        graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping union-with-live?)
-        live->draft-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
-        rewriting-executor (create-rewriter backend live->draft-graph-mapping)
-        pquery (all-quads-query rewriting-executor graph-restriction)]
+  (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
+        pquery (all-quads-query rewriting-executor)]
     (process-prepared-query rewriting-executor pquery accept-content-type nil)))
 
 (defn- existing-draftset-handler [backend inner-handler]
@@ -174,7 +169,7 @@
                         (fn [{{draftset-id :draftset-id
                                graph :graph
                                rdf-format :rdf-format} :params body :body :as request}]
-                          (let [ds-executor (get-draftset-executor backend draftset-id)
+                          (let [ds-executor (get-draftset-executor backend draftset-id false)
                                 delete-job (if (is-quads-format? rdf-format)
                                              (delete-quads-from-draftset-job ds-executor body rdf-format draftset-id)
                                              (delete-triples-from-draftset-job ds-executor body rdf-format draftset-id graph))]
@@ -223,12 +218,8 @@
                      #{:get :post}
                      (as-draftset-owner
                       (require-params #{:query}
-                                      (fn [{{:keys [draftset-id query union-with-live]} :params :as request}]
-                                        (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-id)
-                                              uri-graph-mapping (util/map-all util/string->sesame-uri graph-mapping)
-                                              rewriting-executor (create-rewriter backend uri-graph-mapping)
-                                              graph-restriction (mgmt/graph-mapping->graph-restriction backend graph-mapping (or union-with-live false))]
-                                          (process-sparql-query rewriting-executor request :graph-restrictions graph-restriction)))))))
+                                      (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
+                                        (execute-query-in-draftset backend draftset-id request (or union-with-live false)))))))
 
         (make-route :post "/draftset/:id/publish"
                     (as-draftset-owner
