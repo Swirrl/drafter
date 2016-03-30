@@ -1,9 +1,13 @@
 (ns drafter.rdf.draftset-management
   (:require [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [add s context]]
+            [grafter.rdf.io :refer [IStatement->sesame-statement]]
             [grafter.rdf.protocols :refer [map->Triple map->Quad]]
+            [grafter.rdf.repository :as repo]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sesame :refer [read-statements]]
+            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
+            [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.util :as util]
             [drafter.draftset :as ds]
             [drafter.user :as user]
@@ -14,7 +18,8 @@
             [drafter.write-scheduler :as scheduler]
             [schema.core :as s]
             [clojure.string :as string])
-  (:import [java.util Date UUID]))
+  (:import [java.util Date UUID]
+           [org.openrdf.model Resource URI]))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -584,3 +589,84 @@
   (let [triples (read-statements tempfile rdf-format)
         quads (map (comp map->Quad #(assoc % :c graph)) triples)]
     (append-quads-to-draftset-job backend draftset-ref quads)))
+
+(defn- delete-quads-from-draftset [backend quad-batches draftset-ref live->draft {:keys [op job-started-at] :as state} job]
+  (case op
+    :delete
+    (if-let [batch (first quad-batches)]
+      (let [live-graph (context (first batch))]
+        (if (mgmt/is-graph-managed? backend live-graph)
+          (if-let [draft-graph-uri (get live->draft live-graph)]
+            (do
+              (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
+              (with-open [conn (repo/->connection (->sesame-repo backend))]
+                (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
+                      sesame-statements (map IStatement->sesame-statement rewritten-statements)
+                      graph-array (into-array Resource (map util/string->sesame-uri (vals live->draft)))]
+                  (.remove conn sesame-statements graph-array)))
+              (let [next-job (create-child-job
+                              job
+                              (partial delete-quads-from-draftset backend (rest quad-batches) draftset-ref live->draft state))]
+                (scheduler/queue-job! next-job)))
+            ;;NOTE: Do this immediately as we haven't done any real work yet
+            (recur backend quad-batches draftset-ref live->draft (merge state {:op :copy-graph :live-graph live-graph}) job))
+          ;;live graph does not exist so do not create a draft graph
+          ;;NOTE: This is the same behaviour as deleting a live graph
+          ;;which does not exist in live
+          (recur backend (rest quad-batches) draftset-ref live->draft state job)))
+      (let [draftset-info (get-draftset-info backend draftset-ref)]
+        (jobs/job-succeeded! job {:draftset draftset-info})))
+
+    :copy-graph
+    (let [{:keys [live-graph]} state
+          draft-graph-uri (mgmt/create-draft-graph! backend live-graph {} (str (ds/->draftset-uri draftset-ref)))
+          copy-batches (jobs/get-graph-clone-batches backend live-graph)
+          copy-state {:op :copy-graph-batches
+                      :graph live-graph
+                      :draft-graph-uri draft-graph-uri
+                      :batches copy-batches}]
+      ;;NOTE: Do this immediately as no work has been done yet
+      (recur backend quad-batches draftset-ref (assoc live->draft live-graph draft-graph-uri) (merge state copy-state) job))
+
+    :copy-graph-batches
+    (let [{:keys [graph batches draft-graph-uri]} state]
+      (if-let [[offset limit] (first batches)]
+        (do
+          (jobs/copy-graph-batch! backend graph draft-graph-uri offset limit)
+          (let [next-state (update-in state [:batches] rest)
+                next-job (create-child-job
+                          job
+                          (partial delete-quads-from-draftset backend quad-batches draftset-ref live->draft (merge state next-state)))]
+            (scheduler/queue-job! next-job)))
+        ;;graph copy completed so continue deleting quads
+        ;;NOTE: do this immediately since we haven't done any work on this iteration
+        (recur backend quad-batches draftset-ref live->draft (merge state {:op :delete}) job)))))
+
+(defn- batch-and-delete-quads-from-draftset [backend quads draftset-ref live->draft job]
+  (let [quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
+        now (java.util.Date.)]
+    (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
+
+(defn- stringified-draftset-backend-graph-mapping
+  "Gets a map of type {String String} containing the live->draft graph
+  mapping of a RewritingSesameSparqlExecutor. WARNING: This is coupled
+  to the implementation of RewritingSesameSparqlExecutor since it
+  relies on the name of the graph mapping field."
+  [ds-backend]
+  (let [graph-mapping (:live->draft ds-backend)]
+    (util/map-all #(.stringValue %) graph-mapping)))
+
+(defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format]
+  (jobs/make-job
+   :batch-write [job]
+   (let [quads (read-statements serialised rdf-format)
+         graph-mapping (stringified-draftset-backend-graph-mapping backend)]
+     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
+
+(defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format]
+  (jobs/make-job
+     :batch-write [job]
+     (let [triples (read-statements serialised rdf-format)
+           quads (map #(util/make-quad-statement % graph) triples)
+           graph-mapping (stringified-draftset-backend-graph-mapping backend)]
+       (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))

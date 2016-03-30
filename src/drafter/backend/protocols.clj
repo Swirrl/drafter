@@ -6,10 +6,6 @@
   (get-query-type [this prepared-query])
   (create-query-executor [this result-format pquery]))
 
-(defprotocol StatementDeletion
-  (delete-quads-from-draftset-job [this serialised rdf-format draftset-ref])
-  (delete-triples-from-draftset-job [this serialised rdf-format draftset-ref graph]))
-
 (defprotocol QueryRewritable
   (create-rewriter [this live->draft union-with-live?])
   (create-restricted [this graph-restriction]))

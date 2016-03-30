@@ -171,8 +171,8 @@
                                rdf-format :rdf-format} :params body :body :as request}]
                           (let [ds-executor (get-draftset-executor backend draftset-id false)
                                 delete-job (if (is-quads-format? rdf-format)
-                                             (delete-quads-from-draftset-job ds-executor body rdf-format draftset-id)
-                                             (delete-triples-from-draftset-job ds-executor body rdf-format draftset-id graph))]
+                                             (dsmgmt/delete-quads-from-draftset-job ds-executor draftset-id body rdf-format)
+                                             (dsmgmt/delete-triples-from-draftset-job ds-executor draftset-id graph body rdf-format))]
                             (submit-async-job! delete-job))))))))
 
         (make-route :delete "/draftset/:id/graph"

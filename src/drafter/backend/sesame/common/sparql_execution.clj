@@ -136,63 +136,6 @@
   (let [pquery (prepare-query backend sparql-string)]
     (apply-restriction pquery graph-restriction)))
 
-(defn- delete-quads-from-draftset [backend quad-batches draftset-ref live->draft {:keys [op job-started-at] :as state} job]
-  (case op
-    :delete
-    (if-let [batch (first quad-batches)]
-      (let [live-graph (context (first batch))]
-        (if (mgmt/is-graph-managed? backend live-graph)
-          (if-let [draft-graph-uri (get live->draft live-graph)]
-            (do
-              (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
-              (with-open [conn (repo/->connection (->sesame-repo backend))]
-                (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
-                      sesame-statements (map IStatement->sesame-statement rewritten-statements)
-                      graph-array (into-array Resource (map util/string->sesame-uri (vals live->draft)))]
-                  (.remove conn sesame-statements graph-array)))
-              (let [next-job (create-child-job
-                              job
-                              (partial delete-quads-from-draftset backend (rest quad-batches) draftset-ref live->draft state))]
-                (scheduler/queue-job! next-job)))
-            ;;NOTE: Do this immediately as we haven't done any real work yet
-            (recur backend quad-batches draftset-ref live->draft (merge state {:op :copy-graph :live-graph live-graph}) job))
-          ;;live graph does not exist so do not create a draft graph
-          ;;NOTE: This is the same behaviour as deleting a live graph
-          ;;which does not exist in live
-          (recur backend (rest quad-batches) draftset-ref live->draft state job)))
-      (let [draftset-info (dsmgmt/get-draftset-info backend draftset-ref)]
-        (jobs/job-succeeded! job {:draftset draftset-info})))
-
-    :copy-graph
-    (let [{:keys [live-graph]} state
-          draft-graph-uri (mgmt/create-draft-graph! backend live-graph {} (str (ds/->draftset-uri draftset-ref)))
-          copy-batches (jobs/get-graph-clone-batches backend live-graph)
-          copy-state {:op :copy-graph-batches
-                      :graph live-graph
-                      :draft-graph-uri draft-graph-uri
-                      :batches copy-batches}]
-      ;;NOTE: Do this immediately as no work has been done yet
-      (recur backend quad-batches draftset-ref (assoc live->draft live-graph draft-graph-uri) (merge state copy-state) job))
-
-    :copy-graph-batches
-    (let [{:keys [graph batches draft-graph-uri]} state]
-      (if-let [[offset limit] (first batches)]
-        (do
-          (jobs/copy-graph-batch! backend graph draft-graph-uri offset limit)
-          (let [next-state (update-in state [:batches] rest)
-                next-job (create-child-job
-                          job
-                          (partial delete-quads-from-draftset backend quad-batches draftset-ref live->draft (merge state next-state)))]
-            (scheduler/queue-job! next-job)))
-        ;;graph copy completed so continue deleting quads
-        ;;NOTE: do this immediately since we haven't done any work on this iteration
-        (recur backend quad-batches draftset-ref live->draft (merge state {:op :delete}) job)))))
-
-(defn- batch-and-delete-quads-from-draftset [backend quads draftset-ref live->draft job]
-  (let [quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-        now (java.util.Date.)]
-    (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
-
 (defn- rdf-handler->spog-tuple-handler [rdf-handler]
   (reify TupleQueryResultHandler
     (handleSolution [this bindings]
@@ -266,20 +209,6 @@
 
   (create-query-executor [_ writer-fn pquery]
     (create-query-executor db writer-fn pquery))
-
-  backend/StatementDeletion
-  (delete-quads-from-draftset-job [this serialised rdf-format draftset-ref]
-    (jobs/make-job
-     :batch-write [job]
-     (let [quads (read-statements serialised rdf-format)]
-       (batch-and-delete-quads-from-draftset this quads draftset-ref (stringify-graph-mapping live->draft) job))))
-
-  (delete-triples-from-draftset-job [this serialised rdf-format draftset-ref graph]
-    (jobs/make-job
-     :batch-write [job]
-     (let [triples (read-statements serialised rdf-format)
-           quads (map #(util/make-quad-statement % graph) triples)]
-       (batch-and-delete-quads-from-draftset this quads draftset-ref (stringify-graph-mapping live->draft) job))))
 
   gproto/ITripleReadable
   (to-statements [_ options] (gproto/to-statements db options))
