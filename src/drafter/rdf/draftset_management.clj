@@ -7,6 +7,7 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sesame :refer [read-statements]]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
+            [drafter.backend.protocols :refer [prepare-query]]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.util :as util]
             [drafter.draftset :as ds]
@@ -19,7 +20,9 @@
             [schema.core :as s]
             [clojure.string :as string])
   (:import [java.util Date UUID]
-           [org.openrdf.model Resource URI]))
+           [org.openrdf.model Resource URI]
+           [org.openrdf.model.impl ContextStatementImpl]
+           [org.openrdf.query TupleQueryResultHandler GraphQuery]))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -65,7 +68,7 @@
 
 (defn delete-draftset-statements! [db draftset-ref]
   (let [delete-query (delete-draftset-statements-query draftset-ref)]
-    (grafter.rdf.protocols/update! db delete-query)))
+    (update! db delete-query)))
 
 (defn- role-scores-values-clause [scored-roles]
   (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
@@ -670,3 +673,32 @@
            quads (map #(util/make-quad-statement % graph) triples)
            graph-mapping (stringified-draftset-backend-graph-mapping backend)]
        (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
+
+(defn- rdf-handler->spog-tuple-handler [rdf-handler]
+  (reify TupleQueryResultHandler
+    (handleSolution [this bindings]
+      (let [subj (.getValue bindings "s")
+            pred (.getValue bindings "p")
+            obj (.getValue bindings "o")
+            graph (.getValue bindings "g")
+            stmt (ContextStatementImpl. subj pred obj graph)]
+        (.handleStatement rdf-handler stmt)))
+
+    (handleBoolean [this b])
+    (handleLinks [this links])
+    (startQueryResult [this binding-names]
+      (.startRDF rdf-handler))
+    (endQueryResult [this]
+      (.endRDF rdf-handler))))
+
+(defn- spog-tuple-query->graph-query [tuple-query]
+  (reify GraphQuery
+    (evaluate [this rdf-handler]
+      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))))
+
+(defn all-quads-query
+  "Returns a Sesame GraphQuery for all quads in the draftset
+  represented by the given backend."
+  [backend]
+  (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
+    (spog-tuple-query->graph-query tuple-query)))

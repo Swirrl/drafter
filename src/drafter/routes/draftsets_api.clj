@@ -43,7 +43,7 @@
 
 (defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
-        pquery (all-quads-query rewriting-executor)]
+        pquery (dsmgmt/all-quads-query rewriting-executor)]
     (process-prepared-query rewriting-executor pquery accept-content-type nil)))
 
 (defn- existing-draftset-handler [backend inner-handler]

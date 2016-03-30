@@ -10,8 +10,7 @@
 
 ;;SPARQL execution
 (def default-sparql-query-impl
-  {:all-quads-query sparql/all-quads-query
-   :prepare-query sparql/prepare-query
+  {:prepare-query sparql/prepare-query
    :get-query-type sparql/get-query-type
    :create-query-executor sparql/create-query-executor})
 

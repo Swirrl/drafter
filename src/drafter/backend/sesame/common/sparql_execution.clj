@@ -136,32 +136,6 @@
   (let [pquery (prepare-query backend sparql-string)]
     (apply-restriction pquery graph-restriction)))
 
-(defn- rdf-handler->spog-tuple-handler [rdf-handler]
-  (reify TupleQueryResultHandler
-    (handleSolution [this bindings]
-      (let [subj (.getValue bindings "s")
-            pred (.getValue bindings "p")
-            obj (.getValue bindings "o")
-            graph (.getValue bindings "g")
-            stmt (ContextStatementImpl. subj pred obj graph)]
-        (.handleStatement rdf-handler stmt)))
-
-    (handleBoolean [this b])
-    (handleLinks [this links])
-    (startQueryResult [this binding-names]
-      (.startRDF rdf-handler))
-    (endQueryResult [this]
-      (.endRDF rdf-handler))))
-
-(defn- spog-tuple-query->graph-query [tuple-query]
-  (reify GraphQuery
-    (evaluate [this rdf-handler]
-      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))))
-
-(defn all-quads-query [backend]
-  (let [tuple-query (backend/prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
-    (spog-tuple-query->graph-query tuple-query)))
-
 (defmulti exec-sesame-prepared-update (fn [repo prepare-fn] (class repo)))
 (defmethod exec-sesame-prepared-update SPARQLRepository [repo prepare-fn]
   ;;default sesame implementation executes UPDATE queries in a
@@ -195,9 +169,6 @@
                                             live->draft :- {URI URI}
                                             union-with-live? :- Boolean]
   backend/SparqlExecutor
-  (all-quads-query [this]
-    (all-quads-query this))
-
   (prepare-query [this sparql-string]
     (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
           graph-restriction (get-rewritten-query-graph-restriction db live->draft union-with-live?)
@@ -236,8 +207,6 @@
 
 (defrecord RestrictedExecutor [db restriction]
   backend/SparqlExecutor
-  (all-quads-query [this]
-    (all-quads-query this))
 
   (prepare-query [this query-string]
     (let [pquery (prepare-query this query-string)]
