@@ -3,7 +3,6 @@
             [drafter.backend.protocols :refer :all]
             [drafter.backend.sesame.common.protocols :as sesproto]
             [drafter.backend.sesame.remote.repository :refer [create-repository-for-environment]]
-            [drafter.backend.sesame.remote.impl :as sparql-impl]
             [drafter.backend.sesame.common :refer :all]))
 
 (defrecord SesameRemoteSparqlBackend [repo])
@@ -15,7 +14,7 @@
   proto/ISPARQLUpdateable default-isparql-updatable-impl
   SparqlExecutor default-sparql-query-impl
   QueryRewritable default-query-rewritable-impl
-  SparqlUpdateExecutor sparql-impl/sparql-update-executor-impl
+  SparqlUpdateExecutor default-sparql-update-impl
   Stoppable default-stoppable-impl
   sesproto/ToRepository {:->sesame-repo :repo})
 

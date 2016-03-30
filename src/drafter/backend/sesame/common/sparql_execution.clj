@@ -23,6 +23,7 @@
             TupleQueryResultHandler BooleanQueryResultHandler
             BindingSet QueryLanguage BooleanQuery GraphQuery Update]
            [org.openrdf.repository Repository]
+           [org.openrdf.repository.sparql SPARQLRepository]
            [org.openrdf.rio Rio RDFWriter RDFHandler]
            [org.openrdf.query.resultio QueryResultWriter QueryResultIO]
            [org.openrdf.query Dataset]
@@ -218,18 +219,28 @@
   (let [tuple-query (backend/prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
     (spog-tuple-query->graph-query tuple-query)))
 
-(defn execute-update-with [exec-prepared-update-fn backend update-query restrictions]
-  (with-open [conn (->repo-connection backend)]
-      (let [dataset (restricted-dataset restrictions)
-            pquery (repo/prepare-update conn update-query dataset)]
-        (exec-prepared-update-fn conn pquery))))
+(defmulti exec-sesame-prepared-update (fn [repo prepare-fn] (class repo)))
+(defmethod exec-sesame-prepared-update SPARQLRepository [repo prepare-fn]
+  ;;default sesame implementation executes UPDATE queries in a
+  ;;transaction which the remote SPARQL client does not like
+  (with-open [conn (repo/->connection repo)]
+    (let [pquery (prepare-fn conn)]
+      (repo/evaluate pquery))))
 
-(defn- execute-prepared-update-in-transaction [conn prepared-query]
-  (repo/with-transaction conn
-    (repo/evaluate prepared-query)))
+(defmethod exec-sesame-prepared-update Repository [repo prepare-fn]
+  (with-open [conn (repo/->connection repo)]
+    (repo/with-transaction conn
+      (let [pquery (prepare-fn conn)]
+        (repo/evaluate pquery)))))
 
-(defn execute-update [backend update-query restrictions]
-  (execute-update-with execute-prepared-update-in-transaction backend update-query restrictions))
+(defn- execute-restricted-update [backend update-query restrictions]
+  (exec-sesame-prepared-update
+   (->sesame-repo backend)
+   (fn [conn]
+     (repo/prepare-update conn update-query (restricted-dataset restrictions)))))
+
+(defn execute-update [backend update-query]
+  (execute-restricted-update backend update-query #{}))
 
 (defn- stringify-graph-mapping [live->draft]
   (util/map-all #(.stringValue %) live->draft))
@@ -308,6 +319,10 @@
 
   (create-query-executor [this result-format pquery]
     (create-query-executor this result-format pquery))
+
+  backend/SparqlUpdateExecutor
+  (execute-update [this update-query]
+    (execute-restricted-update this update-query restriction))
 
   gproto/ITripleReadable
   (to-statements [_ options] (gproto/to-statements db options))

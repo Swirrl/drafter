@@ -7,7 +7,7 @@
             [swirrl-server.errors :refer [ex-swirrl]]
             [drafter.responses :refer [submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.backend.protocols :refer [execute-update]]
+            [drafter.backend.protocols :refer [execute-update create-restricted]]
             [drafter.operations :as ops]
             [pantomime.media :as mt])
   (:import [java.util.concurrent FutureTask CancellationException]))
@@ -36,12 +36,12 @@
 (defmethod parse-update-request :default [request]
   (throw (ex-swirrl :invalid-content-type (str "Invalid Content-Type: " (:content-type request)))))
 
-(defn create-update-job [executor request restrictions timeouts]
+(defn create-update-job [executor request timeouts]
   (jobs/make-job :sync-write [job]
                  (let [timeouts (or timeouts ops/default-timeouts)
                        parsed-query (parse-update-request request)
                        query-string (:update parsed-query)
-                       update-future (FutureTask. #(execute-update executor query-string restrictions))]
+                       update-future (FutureTask. #(execute-update executor query-string))]
                    (try
                      (log/debug "Executing update-query " parsed-query)
                      ;; The 'reaper' framework monitors instances of the
@@ -67,9 +67,9 @@
 
 (def ^:private sparql-update-applied-response {:status 200 :body "OK"})
 
-;exec-update :: SparqlUpdateExecutor -> Request -> GraphRestrictions -> Response
-(defn exec-update [executor request restrictions timeouts]
-  (let [job (create-update-job executor request restrictions timeouts)]
+;exec-update :: SparqlUpdateExecutor -> Request -> Response
+(defn exec-update [executor request timeouts]
+  (let [job (create-update-job executor request timeouts)]
     (submit-sync-job! job (fn [result]
                             (if (jobs/failed-job-result? result)
                               ;; NOTE: We could repackage the resulting error
@@ -80,25 +80,19 @@
                               sparql-update-applied-response)))))
 
 (defn update-endpoint
-  "Create a standard update-endpoint and optional restrictions on the
-  allowed graphs; restrictions can either be a collection of string
-  graph-uri's or a function that returns such a collection."
-
+  "Create an endpoint for executing SPARQL updates."
   ([mount-point executor]
-     (update-endpoint mount-point executor #{}))
+   (update-endpoint mount-point executor nil))
 
-  ([mount-point executor restrictions]
-   (update-endpoint mount-point executor restrictions nil))
-
-  ([mount-point executor restrictions timeouts]
+  ([mount-point executor timeouts]
      (POST mount-point request
-           (exec-update executor request restrictions timeouts))))
+           (exec-update executor request timeouts))))
 
 (defn live-update-endpoint-route [mount-point backend timeouts]
-  (update-endpoint mount-point backend (partial mgmt/live-graphs backend) timeouts))
+  (update-endpoint mount-point (create-restricted backend (partial mgmt/live-graphs backend)) timeouts))
 
 (defn state-update-endpoint-route [mount-point backend timeouts]
-  (update-endpoint mount-point backend #{mgmt/drafter-state-graph} timeouts))
+  (update-endpoint mount-point (create-restricted backend #{mgmt/drafter-state-graph}) timeouts))
 
 (defn raw-update-endpoint-route [mount-point backend timeouts]
-  (update-endpoint mount-point backend nil timeouts))
+  (update-endpoint mount-point backend timeouts))

@@ -15,7 +15,7 @@
   (create-restricted [this graph-restriction]))
 
 (defprotocol SparqlUpdateExecutor
-  (execute-update [this update-query restrictions]))
+  (execute-update [this update-query]))
 
 ;; NOTE: We should eventually replace this when we migrate to using Stuart
 ;; Sierra's Component.
