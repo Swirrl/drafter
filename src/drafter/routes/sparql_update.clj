@@ -7,7 +7,8 @@
             [swirrl-server.errors :refer [ex-swirrl]]
             [drafter.responses :refer [submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
-            [drafter.backend.protocols :refer [execute-update create-restricted]]
+            [drafter.backend.protocols :refer [execute-update]]
+            [drafter.rdf.endpoints :refer [live-endpoint state-endpoint]]
             [drafter.operations :as ops]
             [pantomime.media :as mt])
   (:import [java.util.concurrent FutureTask CancellationException]))
@@ -89,10 +90,10 @@
            (exec-update executor request timeouts))))
 
 (defn live-update-endpoint-route [mount-point backend timeouts]
-  (update-endpoint mount-point (create-restricted backend (partial mgmt/live-graphs backend)) timeouts))
+  (update-endpoint mount-point (live-endpoint backend) timeouts))
 
 (defn state-update-endpoint-route [mount-point backend timeouts]
-  (update-endpoint mount-point (create-restricted backend #{mgmt/drafter-state-graph}) timeouts))
+  (update-endpoint mount-point (state-endpoint backend) timeouts))
 
 (defn raw-update-endpoint-route [mount-point backend timeouts]
   (update-endpoint mount-point backend timeouts))

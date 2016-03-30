@@ -5,6 +5,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :refer :all]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
+            [drafter.rdf.endpoints :refer [live-endpoint state-endpoint]]
             [clojure.tools.logging :as log]
             [swirrl-server.responses :as r]
             [drafter.util :refer [to-coll]]
@@ -34,10 +35,10 @@
              (draft-query-endpoint executor request timeouts))))))
 
 (defn live-sparql-routes [mount-point executor timeouts]
-  (sparql-end-point mount-point (create-restricted executor (partial mgmt/live-graphs executor)) timeouts))
+  (sparql-end-point mount-point (live-endpoint executor) timeouts))
 
 (defn state-sparql-routes [mount-point executor timeouts]
-  (sparql-end-point mount-point (create-restricted executor #{mgmt/drafter-state-graph}) timeouts))
+  (sparql-end-point mount-point (state-endpoint executor) timeouts))
 
 (defn raw-sparql-routes [mount-point executor timeouts]
   (sparql-end-point mount-point executor timeouts))
