@@ -1,8 +1,7 @@
 (ns drafter.backend.protocols)
 
 (defprotocol SparqlExecutor
-  (prepare-query [this sparql-string])
-  (create-query-executor [this result-format pquery]))
+  (prepare-query [this sparql-string]))
 
 (defprotocol SparqlUpdateExecutor
   (execute-update [this update-query]))

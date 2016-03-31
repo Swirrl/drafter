@@ -10,8 +10,7 @@
 
 ;;SPARQL execution
 (def default-sparql-query-impl
-  {:prepare-query sparql/prepare-query
-   :create-query-executor sparql/create-query-executor})
+  {:prepare-query sparql/prepare-query})
 
 (def default-sparql-update-impl
   {:execute-update sparql/execute-update})
