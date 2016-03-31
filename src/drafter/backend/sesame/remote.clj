@@ -13,7 +13,6 @@
   proto/ISPARQLable default-sparqlable-impl
   proto/ISPARQLUpdateable default-isparql-updatable-impl
   SparqlExecutor default-sparql-query-impl
-  QueryRewritable default-query-rewritable-impl
   SparqlUpdateExecutor default-sparql-update-impl
   Stoppable default-stoppable-impl
   sesproto/ToRepository {:->sesame-repo :repo})

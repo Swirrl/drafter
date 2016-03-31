@@ -5,10 +5,6 @@
   (get-query-type [this prepared-query])
   (create-query-executor [this result-format pquery]))
 
-(defprotocol QueryRewritable
-  (create-rewriter [this live->draft union-with-live?])
-  (create-restricted [this graph-restriction]))
-
 (defprotocol SparqlUpdateExecutor
   (execute-update [this update-query]))
 

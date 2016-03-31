@@ -6,6 +6,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point process-sparql-query wrap-sparql-errors]]
             [drafter.rdf.endpoints :refer [live-endpoint state-endpoint]]
+            [drafter.backend.endpoints :refer [draft-graph-set]]
             [clojure.tools.logging :as log]
             [swirrl-server.responses :as r]
             [drafter.util :refer [to-coll]]
@@ -15,9 +16,9 @@
   (try
     (let [{{:keys [union-with-live graph]} :params} request
           live->draft (log/spy (mgmt/graph-map executor (to-coll graph)))
-          rewriting-executor (create-rewriter executor live->draft (or union-with-live false))]
+          draft-executor (draft-graph-set executor live->draft (or union-with-live false))]
 
-      (process-sparql-query rewriting-executor request
+      (process-sparql-query draft-executor request
                             :query-timeouts timeouts))))
 
 (defmethod encode-error :multiple-drafts-error [ex]

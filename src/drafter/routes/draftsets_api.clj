@@ -13,6 +13,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.content-negotiation :as conneg]
             [drafter.backend.protocols :refer :all]
+            [drafter.backend.endpoints :refer [draft-graph-set]]
             [drafter.util :as util]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
@@ -28,7 +29,7 @@
 
 (defn- get-draftset-executor [backend draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
-    (create-rewriter backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
+    (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
 
 (defn- execute-query-in-draftset [backend draftset-ref request union-with-live?]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)]

@@ -127,14 +127,10 @@
           validated-query-string (validate-query sparql-string)]
       (repo/prepare-query repo validated-query-string)))
 
-(defn- apply-restriction [pquery restriction]
+(defn apply-restriction [pquery restriction]
   (let [dataset (restricted-dataset restriction)]
     (.setDataset pquery dataset)
     pquery))
-
-(defn- prepare-restricted-query [backend sparql-string graph-restriction]
-  (let [pquery (prepare-query backend sparql-string)]
-    (apply-restriction pquery graph-restriction)))
 
 (defmulti exec-sesame-prepared-update (fn [repo prepare-fn] (class repo)))
 (defmethod exec-sesame-prepared-update SPARQLRepository [repo prepare-fn]
@@ -150,7 +146,7 @@
       (let [pquery (prepare-fn conn)]
         (repo/evaluate pquery)))))
 
-(defn- execute-restricted-update [backend update-query restrictions]
+(defn execute-restricted-update [backend update-query restrictions]
   (exec-sesame-prepared-update
    (->sesame-repo backend)
    (fn [conn]
@@ -158,90 +154,3 @@
 
 (defn execute-update [backend update-query]
   (execute-restricted-update backend update-query #{}))
-
-(defn- stringify-graph-mapping [live->draft]
-  (util/map-all #(.stringValue %) live->draft))
-
-(defn- get-rewritten-query-graph-restriction [db live->draft union-with-live?]
-  (mgmt/graph-mapping->graph-restriction db (stringify-graph-mapping live->draft) union-with-live?))
-
-(s/defrecord RewritingSesameSparqlExecutor [db :- Repository
-                                            live->draft :- {URI URI}
-                                            union-with-live? :- Boolean]
-  backend/SparqlExecutor
-  (prepare-query [this sparql-string]
-    (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
-          graph-restriction (get-rewritten-query-graph-restriction db live->draft union-with-live?)
-          prepared-query (prepare-restricted-query this rewritten-query-string graph-restriction)]
-      (rewrite-query-results prepared-query live->draft)))
-
-  (get-query-type [_ pquery]
-    (get-query-type db pquery))
-
-  (create-query-executor [_ writer-fn pquery]
-    (create-query-executor db writer-fn pquery))
-
-  gproto/ITripleReadable
-  (to-statements [_ options] (gproto/to-statements db options))
-
-  gproto/ISPARQLable
-  (query-dataset [_ sparql-string model] (gproto/query-dataset db sparql-string model))
-
-  gproto/ISPARQLUpdateable
-  (update! [this sparql-string] (gproto/update! db sparql-string))
-  
-  ToRepository
-  (->sesame-repo [_] db))
-
-(extend-type RewritingSesameSparqlExecutor
-  gproto/ITripleWriteable
-  (add
-    ([this triples] (gproto/add (->sesame-repo this) triples))
-    ([this graph triples] (gproto/add (->sesame-repo this) graph triples))
-    ([this graph format triple-stream] (gproto/add (->sesame-repo this) graph format triple-stream))
-    ([this graph base-uri format triple-stream] (gproto/add (->sesame-repo this) graph base-uri format triple-stream)))
-
-  (add-statement
-    ([this statement] (gproto/add-statement (->sesame-repo this) statement))
-    ([this graph statement] (gproto/add-statement (->sesame-repo this) graph statement))))
-
-(defrecord RestrictedExecutor [db restriction]
-  backend/SparqlExecutor
-
-  (prepare-query [this query-string]
-    (let [pquery (prepare-query this query-string)]
-      (apply-restriction pquery restriction)))
-
-  (get-query-type [this pquery]
-    (get-query-type this pquery))
-
-  (create-query-executor [this result-format pquery]
-    (create-query-executor this result-format pquery))
-
-  backend/SparqlUpdateExecutor
-  (execute-update [this update-query]
-    (execute-restricted-update this update-query restriction))
-
-  gproto/ITripleReadable
-  (to-statements [_ options] (gproto/to-statements db options))
-
-  gproto/ISPARQLable
-  (query-dataset [_ sparql-string model] (gproto/query-dataset db sparql-string model))
-
-  gproto/ISPARQLUpdateable
-  (update! [this sparql-string] (gproto/update! db sparql-string))
-
-  ToRepository
-  (->sesame-repo [_] db))
-
-(extend-type RestrictedExecutor
-  gproto/ITripleWriteable
-  (add
-    ([this triples] (gproto/add (->sesame-repo this) triples))
-    ([this graph triples] (gproto/add (->sesame-repo this) graph triples))
-    ([this graph format triple-stream] (gproto/add (->sesame-repo this) graph format triple-stream))
-    ([this graph base-uri format triple-stream] (gproto/add (->sesame-repo this) graph base-uri format triple-stream)))
-
-  (add-statement
-    ([this statement] (gproto/add-statement (->sesame-repo this) statement))
-    ([this graph statement] (gproto/add-statement (->sesame-repo this) graph statement))))

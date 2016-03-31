@@ -1,5 +1,5 @@
 (ns drafter.rdf.endpoints
-  (:require [drafter.backend.protocols :refer [create-restricted]]
+  (:require [drafter.backend.endpoints :refer [create-restricted]]
             [drafter.rdf.draft-management :as mgmt]))
 
 (defn live-endpoint
