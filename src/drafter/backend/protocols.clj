@@ -2,7 +2,6 @@
 
 (defprotocol SparqlExecutor
   (prepare-query [this sparql-string])
-  (get-query-type [this prepared-query])
   (create-query-executor [this result-format pquery]))
 
 (defprotocol SparqlUpdateExecutor

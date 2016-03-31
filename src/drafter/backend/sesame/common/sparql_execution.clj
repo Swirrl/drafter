@@ -13,7 +13,7 @@
             [drafter.draftset :as ds]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management.jobs :as jobs]
-            [drafter.rdf.sesame :refer [read-statements]]
+            [drafter.rdf.sesame :refer [read-statements get-query-type]]
             [swirrl-server.async.jobs :refer [create-job create-child-job]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
@@ -92,14 +92,6 @@
   (log/debug "pquery is " pquery " writer is " writer)
   (let [notifying-handler (notifying-rdf-handler result-notify-fn writer)]
     (.evaluate pquery notifying-handler)))
-
-(defn get-query-type [backend pquery]
-  (condp instance? pquery
-      TupleQuery :select
-      BooleanQuery :ask
-      GraphQuery :construct
-      Update :update
-      nil))
 
 (defn create-query-executor [backend result-format pquery]
   (case (get-query-type backend pquery)

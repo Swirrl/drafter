@@ -3,7 +3,8 @@
             [drafter.operations :refer :all]
             [drafter.requests :as request]
             [drafter.responses :refer [not-acceptable-response]]
-            [drafter.backend.protocols :refer [create-query-executor prepare-query get-query-type]]
+            [drafter.backend.protocols :refer [create-query-executor prepare-query]]
+            [drafter.rdf.sesame :refer [get-query-type]]
             [compojure.core :refer [routes GET POST]]
             [drafter.rdf.content-negotiation :as conneg])
   (:import [org.apache.jena.query QueryParseException]))

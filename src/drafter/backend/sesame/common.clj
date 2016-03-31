@@ -11,7 +11,6 @@
 ;;SPARQL execution
 (def default-sparql-query-impl
   {:prepare-query sparql/prepare-query
-   :get-query-type sparql/get-query-type
    :create-query-executor sparql/create-query-executor})
 
 (def default-sparql-update-impl
