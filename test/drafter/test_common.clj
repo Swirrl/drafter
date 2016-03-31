@@ -6,7 +6,7 @@
             [environ.core :refer [env]]
             [drafter.user :as user]
             [drafter.backend.configuration :refer [get-backend]]
-            [drafter.backend.protocols :refer [stop]]
+            [drafter.backend.protocols :refer [stop-backend]]
             [me.raynes.fs :as fs]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph! query update!
                                                   migrate-live!]]
@@ -65,7 +65,7 @@
       (try
           (test-fn)
           (finally
-            (stop backend)
+            (stop-backend backend)
             (stop-writer! *test-writer*))))))
 
 (defn wrap-clean-test-db

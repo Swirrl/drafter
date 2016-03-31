@@ -6,7 +6,7 @@
             [drafter.operations :as ops]
             [drafter.middleware :as middleware]
             [drafter.configuration :as conf]
-            [drafter.backend.protocols :refer [stop]]
+            [drafter.backend.protocols :refer [stop-backend]]
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.util :refer [set-var-root!]]
             [drafter.common.json-encoders :as enc]
@@ -192,7 +192,7 @@
    shuts down, put any clean up code here"
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
-  (stop backend)
+  (stop-backend backend)
   (.close user-repo)
   (stop-writer! writer-service)
   (stop-reaper)

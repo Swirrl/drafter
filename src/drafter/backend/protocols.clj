@@ -1,5 +1,5 @@
 (ns drafter.backend.protocols
-  (:require [grafter.rdf.repository :refer [->connection]]))
+  (:require [grafter.rdf.repository :refer [->connection shutdown]]))
 
 (defprotocol SparqlExecutor
   (prepare-query [this sparql-string]))
@@ -11,10 +11,8 @@
   (->sesame-repo [this]
     "Gets the sesame repository for this backend"))
 
-;; NOTE: We should eventually replace this when we migrate to using Stuart
-;; Sierra's Component.
-(defprotocol Stoppable
-  (stop [this]))
+(defn stop-backend [backend]
+  (shutdown (->sesame-repo backend)))
 
 (defn ->repo-connection [backend]
   "Opens a connection to the underlying Sesame repository for the
