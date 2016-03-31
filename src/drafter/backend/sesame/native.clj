@@ -1,20 +1,6 @@
 (ns drafter.backend.sesame.native
-  (:require [drafter.backend.protocols :as backproto]
-            [drafter.backend.sesame.common :refer :all]
-            [drafter.backend.sesame.common.protocols :as sesproto]
-            [drafter.backend.sesame.native.repository :refer [get-repository]]
-            [grafter.rdf.protocols :as proto]))
-
-(defrecord SesameNativeStoreBackend [repo])
-
-(extend drafter.backend.sesame.native.SesameNativeStoreBackend
-  proto/ITripleReadable default-triple-readable-impl
-  proto/ITripleWriteable default-triple-writeable-impl
-  proto/ISPARQLable default-sparqlable-impl
-  proto/ISPARQLUpdateable default-isparql-updatable-impl
-  backproto/SparqlExecutor default-sparql-query-impl
-  backproto/SparqlUpdateExecutor default-sparql-update-impl
-  backproto/ToRepository {:->sesame-repo :repo})
+  (:require [drafter.backend.sesame.native.repository :refer [get-repository]]
+            [drafter.backend.repository]))
 
 (defn get-backend [env-map]
-  (->SesameNativeStoreBackend (get-repository env-map)))
+  (get-repository env-map))

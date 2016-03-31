@@ -1,6 +1,9 @@
 (ns drafter.rdf.sesame
   (:require [drafter.rdf.draft-management.jobs :as jobs]
             [grafter.rdf :refer [statements]]
+            [grafter.rdf.repository :as repo]
+            [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
+            [drafter.backend.protocols :refer [->sesame-repo]]
             [clojure.tools.logging :as log])
   (:import [java.util ArrayList]
            [org.openrdf.rio Rio]
@@ -38,6 +41,17 @@
       GraphQuery :construct
       Update :update
       nil))
+
+(defn validate-query [query-str]
+  "Validates a query by parsing it using ARQ. If the query is invalid
+  a QueryParseException is thrown."
+  (sparql-string->arq-query query-str)
+  query-str)
+
+(defn prepare-query [backend sparql-string]
+    (let [repo (->sesame-repo backend)
+          validated-query-string (validate-query sparql-string)]
+      (repo/prepare-query repo validated-query-string)))
 
 (defn notifying-query-result-handler [notify-fn inner-handler]
   (reify

@@ -49,17 +49,6 @@
     (repo/make-restricted-dataset :default-graph graph-restrictions
                                     :named-graphs graph-restrictions)))
 
-(defn validate-query [query-str]
-  "Validates a query by parsing it using ARQ. If the query is invalid
-  a QueryParseException is thrown."
-  (sparql-string->arq-query query-str)
-  query-str)
-
-(defn prepare-query [backend sparql-string]
-    (let [repo (->sesame-repo backend)
-          validated-query-string (validate-query sparql-string)]
-      (repo/prepare-query repo validated-query-string)))
-
 (defn apply-restriction [pquery restriction]
   (let [dataset (restricted-dataset restriction)]
     (.setDataset pquery dataset)
@@ -86,4 +75,4 @@
      (repo/prepare-update conn update-query (restricted-dataset restrictions)))))
 
 (defn execute-update [backend update-query]
-  (execute-restricted-update backend update-query #{}))
+  (execute-restricted-update backend update-query nil))
