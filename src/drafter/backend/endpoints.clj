@@ -37,11 +37,11 @@
   {:add add-delegate
    :add-statement add-statement-delegate})
 
-(defrecord RestrictedExecutor [db restriction]
+(defrecord RestrictedExecutor [inner restriction]
   backend/SparqlExecutor
 
   (prepare-query [this query-string]
-    (let [pquery (prepare-query this query-string)]
+    (let [pquery (prepare-query inner query-string)]
       (apply-restriction pquery restriction)))
 
   backend/SparqlUpdateExecutor
@@ -49,7 +49,7 @@
     (execute-restricted-update this update-query restriction))
 
   backend/ToRepository
-  (->sesame-repo [_] db))
+  (->sesame-repo [_] (->sesame-repo inner)))
 
 (extend RestrictedExecutor
   proto/ITripleReadable itriple-readable-delegate
@@ -57,8 +57,7 @@
   proto/ISPARQLable isparqlable-delegate
   proto/ISPARQLUpdateable isparql-updateable-delegate)
 
-(defn create-restricted [backend restriction]
-  (->RestrictedExecutor (->sesame-repo backend) restriction))
+(def create-restricted ->RestrictedExecutor)
 
 (defn- stringify-graph-mapping [live->draft]
   (util/map-all #(.stringValue %) live->draft))
@@ -70,18 +69,19 @@
   (let [pquery (prepare-query backend sparql-string)]
     (apply-restriction pquery graph-restriction)))
 
-(s/defrecord RewritingSesameSparqlExecutor [db :- Repository
+(s/defrecord RewritingSesameSparqlExecutor [inner :- (s/protocol backend/SparqlExecutor)
                                             live->draft :- {URI URI}
                                             union-with-live? :- Boolean]
   backend/SparqlExecutor
   (prepare-query [this sparql-string]
     (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
-          graph-restriction (get-rewritten-query-graph-restriction db live->draft union-with-live?)
-          prepared-query (prepare-restricted-query this rewritten-query-string graph-restriction)]
-      (rewrite-query-results prepared-query live->draft)))
+          graph-restriction (get-rewritten-query-graph-restriction inner live->draft union-with-live?)
+          pquery (prepare-query inner rewritten-query-string)
+          pquery (apply-restriction pquery graph-restriction)]
+      (rewrite-query-results pquery live->draft)))
   
   backend/ToRepository
-  (->sesame-repo [_] db))
+  (->sesame-repo [_] (->sesame-repo inner)))
 
 (extend RewritingSesameSparqlExecutor
   proto/ITripleReadable itriple-readable-delegate
@@ -89,5 +89,4 @@
   proto/ISPARQLable isparqlable-delegate
   proto/ISPARQLUpdateable isparql-updateable-delegate)
 
-(defn draft-graph-set [backend live->draft union-with-live?]
-  (->RewritingSesameSparqlExecutor (->sesame-repo backend) live->draft union-with-live?))
+(def draft-graph-set ->RewritingSesameSparqlExecutor)
