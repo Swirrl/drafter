@@ -5,7 +5,6 @@
             [grafter.rdf.templater :refer [triplify]]
             [environ.core :refer [env]]
             [drafter.user :as user]
-            [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.backend.protocols :refer [stop]]
             [me.raynes.fs :as fs]

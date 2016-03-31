@@ -14,7 +14,7 @@
   proto/ISPARQLUpdateable default-isparql-updatable-impl
   backproto/SparqlExecutor default-sparql-query-impl
   backproto/SparqlUpdateExecutor default-sparql-update-impl
-  sesproto/ToRepository {:->sesame-repo :repo}
+  backproto/ToRepository {:->sesame-repo :repo}
   backproto/Stoppable default-stoppable-impl)
 
 (defn get-backend [env-map]

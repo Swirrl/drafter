@@ -5,7 +5,7 @@
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.draftset-management :as dsmgmt]
             [grafter.rdf.protocols :as proto]
-            [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
+            [drafter.backend.protocols :refer [->sesame-repo]]
             [drafter.backend.sesame.common.sparql-execution :as sparql]))
 
 ;;SPARQL execution

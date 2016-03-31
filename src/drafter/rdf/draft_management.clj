@@ -9,7 +9,7 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :as pr]
             [grafter.rdf.repository :as repo]
-            [drafter.backend.sesame.common.protocols :refer [->repo-connection ->sesame-repo]]
+            [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
             [grafter.rdf.templater :refer [add-properties graph]]
             [clojure.string :as string]
             [swirrl-server.errors :refer [ex-swirrl]]

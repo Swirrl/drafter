@@ -15,7 +15,7 @@
   SparqlExecutor default-sparql-query-impl
   SparqlUpdateExecutor default-sparql-update-impl
   Stoppable default-stoppable-impl
-  sesproto/ToRepository {:->sesame-repo :repo})
+  ToRepository {:->sesame-repo :repo})
 
 (defn get-backend [env-map]
   (let [repo (create-repository-for-environment env-map)]

@@ -1,8 +1,7 @@
 (ns drafter.backend.endpoints
   (:require [grafter.rdf.protocols :as proto]
-            [drafter.backend.sesame.common.protocols :refer [->sesame-repo ToRepository]]
             [drafter.backend.sesame.common.sparql-execution :refer [apply-restriction execute-restricted-update prepare-query]]
-            [drafter.backend.protocols :as backend]
+            [drafter.backend.protocols :refer [->sesame-repo] :as backend]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
@@ -48,7 +47,7 @@
   (execute-update [this update-query]
     (execute-restricted-update this update-query restriction))
 
-  ToRepository
+  backend/ToRepository
   (->sesame-repo [_] db))
 
 (extend RestrictedExecutor
@@ -80,7 +79,7 @@
           prepared-query (prepare-restricted-query this rewritten-query-string graph-restriction)]
       (rewrite-query-results prepared-query live->draft)))
   
-  ToRepository
+  backend/ToRepository
   (->sesame-repo [_] db))
 
 (extend RewritingSesameSparqlExecutor
