@@ -85,6 +85,19 @@
       (inner-handler request)
       (unprocessable-entity-response (str "Graph not found in live")))))
 
+(defn- set-union-with-live [request value]
+  (assoc-in request [:params :union-with-live] false))
+
+(defn- parse-union-with-live-handler [inner-handler]
+  (fn [{{:keys [union-with-live]} :params :as request}]
+    (letfn [(update-request [b] (assoc-in request [:params :union-with-live] b))]
+      (if (nil? union-with-live)
+        (inner-handler (update-request false))
+        (if (boolean (re-matches #"(?i)(true|false)" union-with-live))
+          (let [ub (Boolean/parseBoolean union-with-live)]
+            (inner-handler (update-request ub)))
+          (unprocessable-entity-response "Invalid union-with-live parameter value - expected true or false"))))))
+
 (defn draftset-api-routes [backend user-repo realm]
   (letfn [(authenticated [h] (require-basic-authentication user-repo realm h))
           (required-live-graph-param [h] (required-live-graph-param-handler backend h))
@@ -152,15 +165,16 @@
                     (as-draftset-owner
                      (rdf-response-format-handler
                       (require-graph-for-triples-rdf-format
-                       (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
-                         (if (is-quads-format? rdf-format)
-                           (get-draftset-data backend draftset-id (request/accept request) (or union-with-live false))
+                       (parse-union-with-live-handler
+                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
+                          (if (is-quads-format? rdf-format)
+                            (get-draftset-data backend draftset-id (request/accept request) union-with-live)
 
-                           ;; TODO fix this as it's vulnerable to SPARQL injection
-                           (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                                 escaped-query (RenderUtils/escape unsafe-query)
-                                 query-request (assoc-in request [:params :query] escaped-query)]
-                             (execute-query-in-draftset backend draftset-id query-request (or union-with-live false)))))))))
+                            ;; TODO fix this as it's vulnerable to SPARQL injection
+                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                                  escaped-query (RenderUtils/escape unsafe-query)
+                                  query-request (assoc-in request [:params :query] escaped-query)]
+                              (execute-query-in-draftset backend draftset-id query-request union-with-live)))))))))
 
         (make-route :delete "/draftset/:id/data"
                     (as-draftset-owner
@@ -218,9 +232,11 @@
                     (allowed-methods-handler
                      #{:get :post}
                      (as-draftset-owner
-                      (require-params #{:query}
-                                      (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-                                        (execute-query-in-draftset backend draftset-id request (or union-with-live false)))))))
+                      (require-params
+                       #{:query}
+                       (parse-union-with-live-handler
+                        (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
+                          (execute-query-in-draftset backend draftset-id request union-with-live)))))))
 
         (make-route :post "/draftset/:id/publish"
                     (as-draftset-owner
