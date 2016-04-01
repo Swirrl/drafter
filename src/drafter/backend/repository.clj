@@ -1,7 +1,6 @@
 (ns drafter.backend.repository
   (:require [drafter.backend.protocols :refer :all]
-            [drafter.rdf.sesame :as ses]
-            [drafter.backend.sesame.common.sparql-execution :as exec])
+            [drafter.rdf.sesame :as ses])
   (:import [org.openrdf.repository Repository]))
 
 (extend-type Repository
@@ -11,7 +10,7 @@
 
   SparqlUpdateExecutor
   (execute-update [r update-query]
-    (exec/execute-update r update-query))
+    (ses/execute-update r update-query))
 
   ToRepository
   (->sesame-repo [r] r))

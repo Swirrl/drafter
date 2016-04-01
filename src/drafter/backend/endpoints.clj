@@ -1,7 +1,6 @@
 (ns drafter.backend.endpoints
   (:require [grafter.rdf.protocols :as proto]
-            [drafter.backend.sesame.common.sparql-execution :refer [apply-restriction execute-restricted-update]]
-            [drafter.rdf.sesame :refer [prepare-query]]
+            [drafter.rdf.sesame :refer [prepare-query apply-restriction execute-restricted-update]]
             [drafter.backend.protocols :refer [->sesame-repo] :as backend]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
