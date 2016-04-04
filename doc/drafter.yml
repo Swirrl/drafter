@@ -150,6 +150,8 @@ tags:
     description: Accessing Data in Draftsets
   - name: Users
     description: Querying users
+  - name: SPARQL Endpoints
+    description: SPARQL query endpoints
 produces:
   - application/json
 consumes:
@@ -543,6 +545,53 @@ paths:
       responses:
         '200':
           description: The query results returned according to the SPARQL specification.
+          schema:
+            type: file
+  /sparql/live:
+    get:
+      summary: Queries the published data with SPARQL
+      description: |
+        Query the live data via the SPARQL query langauge and protocol.
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      consumes:
+        - application/sparql-query
+      produces:
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+        - application/sparql-results+xml
+        - application/sparql-results+json
+        - text/csv
+      parameters:
+        - $ref: '#/parameters/query'
+      tags:
+        - SPARQL Endpoints
+      responses:
+        '200':
+          description: The query results returned according to the SPARQL specificiation.
+          schema:
+            type: file
+    post:
+      summary: Queries the published data with SPARQL
+      description: |
+        Query the live data via the SPARQL query langauge and protocol.
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      consumes:
+        - application/sparql-query
+      produces:
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+        - application/sparql-results+xml
+        - application/sparql-results+json
+        - text/csv
+      parameters:
+        - $ref: '#/parameters/query'
+      tags:
+        - SPARQL Endpoints
+      responses:
+        '200':
+          description: The query results returned according to the SPARQL specificiation.
           schema:
             type: file
   /users:
