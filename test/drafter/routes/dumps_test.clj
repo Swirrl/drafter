@@ -2,7 +2,6 @@
   (:require [clojure.test :refer :all]
             [drafter.routes.dumps :refer :all]
             [clojure.template :refer [do-template]]
-            [drafter.routes.sparql :refer [draft-sparql-routes]]
             [drafter.rdf.sparql-protocol :refer [sparql-end-point]]
             [grafter.rdf.formats :refer :all]
             [grafter.rdf :refer [statements]]
@@ -37,15 +36,6 @@
 
         (is (= 2 (count-statements response)))
         (is (= "attachment; filename=\"capybara-data-1.nt\"" (get-in response [:headers "Content-Disposition"])))))))
-
-(deftest dumps-route-draft-test
-  (testing "dumps-endpoint with draft endpoint"
-    (let [draft-graph (make-store-with-draft)]
-
-      (let [dumps (dumps-endpoint "/data/live" draft-sparql-routes *test-backend*)
-            response (dumps (assoc-in dumps-request [:params :graph] draft-graph))]
-
-        (is (= 2 (count-statements response)))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

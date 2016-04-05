@@ -14,8 +14,7 @@
             [drafter.routes.status :refer [status-routes]]
             [drafter.routes.dumps :refer [dumps-endpoint]]
             [drafter.routes.pages :refer [pages-routes]]
-            [drafter.routes.sparql :refer [draft-sparql-routes
-                                           live-sparql-routes
+            [drafter.routes.sparql :refer [live-sparql-routes
                                            raw-sparql-routes
                                            state-sparql-routes]]
             [drafter.routes.sparql-update :refer [live-update-endpoint-route
@@ -104,7 +103,6 @@
 
 (def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route true v1-prefix))
 (def raw-endpoint-spec (specify-endpoint raw-sparql-routes raw-update-endpoint-route true v1-prefix))
-(def draft-endpoint-spec (specify-endpoint draft-sparql-routes nil true))
 (def state-endpoint-spec (specify-endpoint state-sparql-routes state-update-endpoint-route false))
 
 (defn create-sparql-routes [endpoint-map backend]
@@ -116,7 +114,6 @@
 (defn get-sparql-routes [backend]
   (let [endpoints {:live live-endpoint-spec
                    :raw raw-endpoint-spec
-                   :draft draft-endpoint-spec
                    :state state-endpoint-spec}]
     (create-sparql-routes endpoints backend)))
 
