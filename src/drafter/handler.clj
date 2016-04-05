@@ -8,7 +8,7 @@
             [drafter.configuration :as conf]
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.backend.configuration :refer [get-backend]]
-            [drafter.util :refer [set-var-root!]]
+            [drafter.util :refer [set-var-root! conj-if]]
             [drafter.common.json-encoders :as enc]
             [drafter.routes.draftsets-api :refer [draftset-api-routes]]
             [drafter.routes.status :refer [status-routes]]
@@ -65,14 +65,17 @@
 (defn- log-endpoint-config [ep-name endpoint-type config]
   (log/trace (str (name endpoint-type) " endpoint for route '" (name ep-name) "': " config)))
 
-(defn- endpoint-query-path [route-name]
-  (str "/sparql/" (name route-name)))
+(defn- endpoint-query-path [route-name version]
+  (let [suffix (str "/sparql/" (name route-name))]
+    (if (some? version)
+      (str "/" (name version) suffix)
+      suffix)))
 
-(defn endpoint-update-path [route-name]
-  (str (endpoint-query-path route-name) "/update"))
+(defn endpoint-update-path [route-name version]
+  (str (endpoint-query-path route-name version) "/update"))
 
-(defn- endpoint-route [route-name path-fn endpoint-fn route-type repo timeout-config]
-  (let [path (path-fn route-name)
+(defn- endpoint-route [route-name path-fn endpoint-fn route-type version repo timeout-config]
+  (let [path (path-fn route-name version)
         timeouts (conf/get-endpoint-timeout route-name route-type timeout-config)]
     (log-endpoint-config route-name route-type timeouts)
     (endpoint-fn path repo timeouts)))
@@ -83,26 +86,31 @@
         dump-fn #(query-fn %1 %2 query-timeouts)]
     (dumps-endpoint dump-path dump-fn backend)))
 
-(defn create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? backend timeout-config]
-  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query backend timeout-config)
-        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update backend timeout-config))
+(defn- create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? version backend timeout-config]
+  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query version backend timeout-config)
+        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update version backend timeout-config))
         dumps-route (when add-dumps?
                       (create-dumps-route route-name query-fn backend timeout-config))
         routes [query-route update-route]]
     (vec (remove nil? [query-route update-route dumps-route]))))
 
-(defn specify-endpoint [query-fn update-fn has-dump?]
-  {:query-fn query-fn :update-fn update-fn :has-dump has-dump?})
+(defn specify-endpoint
+  ([query-fn update-fn has-dump?]
+   (specify-endpoint query-fn update-fn has-dump? nil))
+  ([query-fn update-fn has-dump? version]
+   {:query-fn query-fn :update-fn update-fn :has-dump has-dump? :version version}))
 
-(def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route true))
-(def raw-endpoint-spec (specify-endpoint raw-sparql-routes raw-update-endpoint-route true))
+(def ^:private v1-prefix :v1)
+
+(def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route true v1-prefix))
+(def raw-endpoint-spec (specify-endpoint raw-sparql-routes raw-update-endpoint-route true v1-prefix))
 (def draft-endpoint-spec (specify-endpoint draft-sparql-routes nil true))
 (def state-endpoint-spec (specify-endpoint state-sparql-routes state-update-endpoint-route false))
 
 (defn create-sparql-routes [endpoint-map backend]
   (let [timeout-conf (conf/get-timeout-config env (keys endpoint-map) ops/default-timeouts)
-        ep-routes (fn [[ep-name {:keys [query-fn update-fn has-dump]}]]
-                    (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump backend timeout-conf))]
+        ep-routes (fn [[ep-name {:keys [query-fn update-fn has-dump version]}]]
+                    (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump version backend timeout-conf))]
     (mapcat ep-routes endpoint-map)))
 
 (defn get-sparql-routes [backend]
