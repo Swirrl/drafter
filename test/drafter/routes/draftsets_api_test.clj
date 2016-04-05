@@ -90,13 +90,6 @@
         response (route request)]
     (await-success finished-jobs (get-in response [:body :finished-job]))))
 
-(defn- create-claim-request [draftset-location user]
-  (with-identity user {:uri (str draftset-location "/claim") :request-method :put}))
-
-(defn- claim-draftset-through-api [draftset-location user]
-  (let [response (route (create-claim-request draftset-location user))]
-    (assert-is-ok-response response)))
-
 (def see-other-response-schema
   (merge ring-response-schema
          {:status (s/eq 303)
@@ -112,6 +105,7 @@
    :created-by s/Str
    (s/optional-key :current-owner) s/Str
    (s/optional-key :claim-role) s/Keyword
+   (s/optional-key :claim-user) s/Str
    (s/optional-key :submitted-by) s/Str})
 
 (def ^:private DraftsetWithoutDescription
@@ -269,6 +263,28 @@
     (assert-is-ok-response response)
     body))
 
+(defn- submit-to-username-request [draftset-location target-username user]
+  (with-identity user
+    {:uri (str draftset-location "/submit-to") :request-method :post :params {:user target-username}}))
+
+(defn- submit-to-user-request [draftset-location target-user user]
+  (submit-to-username-request draftset-location (user/username target-user) user))
+
+(defn- submit-to-user-through-api [draftset-location target-user user]
+  (let [request (submit-to-user-request draftset-location target-user user)
+        response (route request)]
+    (assert-is-ok-response response)))
+
+(defn- create-claim-request [draftset-location user]
+  (with-identity user {:uri (str draftset-location "/claim") :request-method :put}))
+
+(defn- claim-draftset-through-api [draftset-location user]
+  (let [claim-request (create-claim-request draftset-location user)
+        {:keys [body] :as claim-response} (route claim-request)]
+      (assert-is-ok-response claim-response)
+      (assert-schema Draftset body)
+      body))
+
 (deftest get-all-draftsets-test
   (let [owned-ds (create-draftset-through-api test-publisher "owned")
         editing-ds (create-draftset-through-api test-editor "editing")
@@ -342,30 +358,33 @@
     body))
 
 (deftest get-claimable-draftsets-test
-  (let [ds-names (map #(str "Draftset " %) (range 1 5))
-        [ds1 ds2 ds3 ds4] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
+  (let [ds-names (map #(str "Draftset " %) (range 1 6))
+        [ds1 ds2 ds3 ds4 ds5] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
     (submit-draftset-through-api test-editor ds1 :editor)
     (submit-draftset-through-api test-editor ds2 :publisher)
     (submit-draftset-through-api test-editor ds3 :manager)
+    (submit-to-user-through-api ds5 test-publisher test-editor)
 
     ;;editor should be able to claim all draftsets just submitted as they have not been claimed
     (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (let [expected-claimable-names (map #(nth ds-names %) [0 1 2])
+      (let [expected-claimable-names (map #(nth ds-names %) [0 1 2 4])
             claimable-names (map :display-name editor-claimable)]
         (is (= (set expected-claimable-names) (set claimable-names)))))
 
     (let [publisher-claimable (get-claimable-draftsets-through-api test-publisher)]
-      ;;Draftsets 1 and 2 should be on submit to publisher
+      ;;Draftsets 1, 2 and 5 should be on submit to publisher
       ;;Draftset 3 is in too high a role
       ;;Draftset 4 is not available
       (let [claimable-names (map :display-name publisher-claimable)
-            expected-claimable-names (map #(nth ds-names %) [0 1])]
+            expected-claimable-names (map #(nth ds-names %) [0 1 4])]
         (is (= (set expected-claimable-names) (set claimable-names)))))
 
     (doseq [ds [ds1 ds3]]
       (claim-draftset-through-api ds test-manager))
+    
+    (claim-draftset-through-api ds5 test-publisher)
 
-    ;;editor should not be able to see ds1 or ds3 after they have been claimed
+    ;;editor should not be able to see ds1, ds3 or ds5 after they have been claimed
     (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
       (is (= 1 (count editor-claimable)))
       (is (= (:display-name (first editor-claimable)) (nth ds-names 1))))))
@@ -1073,20 +1092,14 @@
         submit-response (route (create-submit-request test-editor draftset-location :invalid))]
     (assert-is-unprocessable-response submit-response)))
 
-(defn- submit-to-username-request [draftset-location target-username user]
-  (with-identity user
-    {:uri (str draftset-location "/submit-to") :request-method :post :params {:user target-username}}))
-
-(defn- submit-to-user-request [draftset-location target-user user]
-  (submit-to-username-request draftset-location (user/username target-user) user))
-
 (deftest submit-draftset-to-user
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-response (route (submit-to-user-request draftset-location test-publisher test-editor))]
     (assert-is-ok-response submit-response)
 
-    (let [{:keys [current-owner] :as ds-info} (get-draftset-info-through-api draftset-location test-publisher)]
-      (is (= (user/username test-publisher) current-owner)))))
+    (let [{:keys [current-owner claim-user] :as ds-info} (get-draftset-info-through-api draftset-location test-publisher)]
+      (is (nil? current-owner))
+      (is (= (user/username test-publisher) claim-user)))))
 
 (deftest submit-draftset-to-user-as-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
@@ -1116,17 +1129,27 @@
         response (route request)]
     (assert-is-unprocessable-response response)))
 
-(deftest claim-draftset
+(deftest claim-draftset-submitted-to-role
   (let [draftset-location (create-draftset-through-api test-editor)]
     (submit-draftset-through-api test-editor draftset-location :publisher)
 
-    (let [claim-request (create-claim-request draftset-location test-publisher)
-          {:keys [body] :as claim-response} (route claim-request)]
-      (assert-is-ok-response claim-response)
-      (assert-schema Draftset body)
+    (let [{:keys [current-owner] :as ds-info} (claim-draftset-through-api draftset-location test-publisher)]
+      (is (= (user/username test-publisher) current-owner)))))
 
-      (let [{:keys [current-owner]} (get-draftset-info-through-api draftset-location test-publisher)]
-        (is (= (user/username test-publisher) current-owner))))))
+(deftest claim-draftset-submitted-to-user
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (submit-to-user-through-api draftset-location test-publisher test-editor)
+  
+    (let [{:keys [current-owner claim-user] :as ds-info} (claim-draftset-through-api draftset-location test-publisher)]
+      (is (= (user/username test-publisher current-owner)))
+      (is (nil? claim-user)))))
+
+(deftest claim-draftset-submitted-to-other-user
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (submit-to-user-through-api draftset-location test-publisher test-editor)
+    (let [claim-request (create-claim-request draftset-location test-manager)
+          claim-response (route claim-request)]
+      (assert-is-forbidden-response claim-response))))
 
 (deftest claim-draftset-owned-by-self
   (let [draftset-location (create-draftset-through-api test-editor)

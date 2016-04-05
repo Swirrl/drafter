@@ -44,7 +44,8 @@
 
 (def SubmittedDraftset
   (merge SchemaCommon
-         {:claim-role s/Keyword}))
+         {(s/optional-key :claim-user) s/Str
+          (s/optional-key :claim-role) s/Keyword}))
 
 (def Draftset (s/either OwnedDraftset SubmittedDraftset))
 
@@ -62,15 +63,21 @@
     description :- s/Str]
    (assoc (create-draftset creator display-name) :description description)))
 
-(defn submit-to-role [draftset submitter role]
+(defn- submit [draftset submitter role-or-user-key role-or-user-value]
   (-> draftset
-      (dissoc :current-owner)
-      (assoc :claim-role role)
+      (dissoc :current-owner :claim-role :claim-user)
+      (assoc role-or-user-key role-or-user-value)
       (assoc :submitted-by submitter)))
+
+(defn submit-to-role [draftset submitter role]
+  (submit draftset submitter :claim-role role))
+
+(defn submit-to-user [draftset submitter username]
+  (submit draftset submitter :claim-user username))
 
 (defn claim [draftset claimant]
   (-> draftset
-      (dissoc :claim-role)
+      (dissoc :submission)
       (assoc :current-owner claimant)))
 
 (def operations #{:delete :edit :submit :publish :claim})

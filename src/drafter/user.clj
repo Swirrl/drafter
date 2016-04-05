@@ -67,12 +67,13 @@ permissions."
 (defn is-submitted-by? [user {:keys [submitted-by] :as draftset}]
   (= (username user) submitted-by))
 
-(defn can-claim? [user {:keys [claim-role] :as draftset}]
+(defn can-claim? [user {:keys [claim-role claim-user] :as draftset}]
   (or (is-owner? user draftset)
       (and (not (has-owner? draftset))
            (is-submitted-by? user draftset))
       (and (some? claim-role)
-           (has-role? user claim-role))))
+           (has-role? user claim-role))
+      (= claim-user (username user))))
 
 (defn can-view? [user draftset]
   (or (can-claim? user draftset)

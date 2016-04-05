@@ -40,15 +40,43 @@
        test-editor (ds/create-draftset (username test-editor)) true
        test-editor (ds/create-draftset (username test-publisher)) false))
 
-(defn- submitted-to-role [owner role]
-  (-> (ds/create-draftset (username owner))
-      (ds/submit-to-role (username owner) role)))
+(defn- submitted-to-role [creator role]
+  (-> (ds/create-draftset (username creator))
+      (ds/submit-to-role (username creator) role)))
+
+(defn- submitted-to-user [creator target]
+  (-> (ds/create-draftset (username creator))
+      (ds/submit-to-user (username creator) (username target))))
 
 (deftest is-submitted-by?-test
   (are [user draftset expected] (= expected (is-submitted-by? user draftset))
     test-editor (submitted-to-role test-editor :publisher) true
     test-publisher (submitted-to-role test-editor :manager) false
     test-editor (ds/create-draftset (username test-editor)) false))
+
+(deftest can-claim?-test
+  (are [user draftset expected] (= expected (can-claim? user draftset))
+    ;;owner can claim their own draftset
+    test-editor (ds/create-draftset (username test-editor)) true
+
+    ;;submitter can re-claim draftset if it has not yet been claimed
+    test-editor (submitted-to-role test-editor :publisher) true
+    test-editor (submitted-to-user test-editor test-manager) true
+
+    ;;user can claim draftset submitted to their role
+    test-publisher (submitted-to-role test-editor :publisher) true
+
+    ;;user can claim draftset submitted to them
+    test-manager (submitted-to-user test-editor test-manager) true
+
+    ;;user cannot claim draftset owned by another user
+    test-publisher (ds/create-draftset (username test-editor)) false
+
+    ;;user cannot claim draftset submitted to role they are not in
+    test-publisher (submitted-to-role test-editor :manager) false
+
+    ;;user cannot claim draftset submitted to other user
+    test-manager (submitted-to-user test-editor test-publisher) false))
 
 (deftest permitted-draftset-operations-test
   (are [user draftset expected-operations] (= expected-operations (permitted-draftset-operations draftset user))
