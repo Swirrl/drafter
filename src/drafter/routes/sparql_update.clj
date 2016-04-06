@@ -91,8 +91,7 @@
    (update-endpoint mount-point executor nil))
 
   ([mount-point executor timeouts]
-     (POST mount-point request
-           (exec-update executor request timeouts))))
+   (make-route :post mount-point (update-request-handler executor timeouts))))
 
 (defn live-update-endpoint-route [mount-point backend timeouts]
   (update-endpoint mount-point (live-endpoint backend) timeouts))
