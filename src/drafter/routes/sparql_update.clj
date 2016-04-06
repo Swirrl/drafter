@@ -8,7 +8,7 @@
             [drafter.responses :refer [submit-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :refer [execute-update]]
-            [drafter.rdf.endpoints :refer [live-endpoint state-endpoint]]
+            [drafter.rdf.endpoints :refer [live-endpoint]]
             [drafter.operations :as ops]
             [drafter.middleware :refer [require-user-role]]
             [pantomime.media :as mt])
@@ -96,9 +96,6 @@
 
 (defn live-update-endpoint-route [mount-point backend timeouts]
   (update-endpoint mount-point (live-endpoint backend) timeouts))
-
-(defn state-update-endpoint-route [mount-point backend timeouts]
-  (update-endpoint mount-point (state-endpoint backend) timeouts))
 
 (defn raw-update-endpoint-route [mount-point backend timeouts user-repo]
   (let [request-handler (update-request-handler backend timeouts)

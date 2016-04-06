@@ -52,13 +52,8 @@
                                                           :else (conj old new))) graph)))
             query-request graphs)))
 
-(def draft-query (partial build-query "/sparql/draft" ))
-
 (defn live-query [qstr]
   (build-query "/sparql/live" qstr nil))
-
-(defn state-query [qstr]
-  (build-query "/sparql/state" qstr nil))
 
 (defn raw-query [qstr]
   (build-query "/sparql/raw" qstr nil))
@@ -95,34 +90,6 @@
                                 (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
 
         (is (not= graph-1-result (second csv-result)))))))
-
-(deftest state-sparql-routes-test
-  (let [;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-backend*)
-        endpoint (state-sparql-routes "/sparql/state" *test-backend* nil)]
-
-    (testing "The state graph should be accessible"
-      (let [result (endpoint (-> (state-query (str "ASK WHERE {"
-                                                   "  GRAPH <" drafter-state-graph "> {"
-                                                   "    ?s ?p ?o ."
-                                                   "  }"
-                                                   "}"))
-                                 (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
-            body (-> result :body stream->string)]
-
-        (is (= "true" body))))
-
-    (testing "The data graphs (live and drafts) should be hidden"
-      (let [result (endpoint
-                    (-> (state-query (str "ASK WHERE {"
-                                          "  GRAPH <" draft-graph-2 "> {"
-                                          "    ?s ?p ?o ."
-                                          "  }"
-                                          "}"))
-                        (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
-            body (-> result :body stream->string)]
-
-        (is (= "false" body))))))
 
 (deftest raw-sparql-routes-test
   (let [;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")

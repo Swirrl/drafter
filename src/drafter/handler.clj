@@ -18,8 +18,7 @@
                                            raw-sparql-routes
                                            state-sparql-routes]]
             [drafter.routes.sparql-update :refer [live-update-endpoint-route
-                                                  raw-update-endpoint-route
-                                                  state-update-endpoint-route]]
+                                                  raw-update-endpoint-route]]
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
@@ -108,8 +107,6 @@
         update-route-fn #(raw-update-endpoint-route %1 %2 %3 user-repo)]
     (specify-endpoint query-route-fn update-route-fn true v1-prefix)))
 
-(def state-endpoint-spec (specify-endpoint state-sparql-routes state-update-endpoint-route false))
-
 (defn create-sparql-routes [endpoint-map backend]
   (let [timeout-conf (conf/get-timeout-config env (keys endpoint-map) ops/default-timeouts)
         ep-routes (fn [[ep-name {:keys [query-fn update-fn has-dump version]}]]
@@ -118,8 +115,7 @@
 
 (defn get-sparql-routes [backend user-repo]
   (let [endpoints {:live live-endpoint-spec
-                   :raw (create-raw-endpoint-spec user-repo)
-                   :state state-endpoint-spec}]
+                   :raw (create-raw-endpoint-spec user-repo)}]
     (create-sparql-routes endpoints backend)))
 
 (defn initialise-app! [backend]
