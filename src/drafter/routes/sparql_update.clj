@@ -1,6 +1,6 @@
 (ns drafter.routes.sparql-update
   (:require [clojure.tools.logging :as log]
-            [compojure.core :refer [POST]]
+            [compojure.core :refer [POST make-route]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [swirrl-server.async.jobs :refer [complete-job!]]
             [swirrl-server.responses :as response]
@@ -10,6 +10,7 @@
             [drafter.backend.protocols :refer [execute-update]]
             [drafter.rdf.endpoints :refer [live-endpoint state-endpoint]]
             [drafter.operations :as ops]
+            [drafter.middleware :refer [require-user-role]]
             [pantomime.media :as mt])
   (:import [java.util.concurrent FutureTask CancellationException]))
 
@@ -80,6 +81,10 @@
                               (response/error-response 500 result)
                               sparql-update-applied-response)))))
 
+(defn- update-request-handler [executor timeouts]
+  (fn [request]
+    (exec-update executor request timeouts)))
+
 (defn update-endpoint
   "Create an endpoint for executing SPARQL updates."
   ([mount-point executor]
@@ -95,5 +100,7 @@
 (defn state-update-endpoint-route [mount-point backend timeouts]
   (update-endpoint mount-point (state-endpoint backend) timeouts))
 
-(defn raw-update-endpoint-route [mount-point backend timeouts]
-  (update-endpoint mount-point backend timeouts))
+(defn raw-update-endpoint-route [mount-point backend timeouts user-repo]
+  (let [request-handler (update-request-handler backend timeouts)
+        authorised-handler (require-user-role :system request-handler)]
+    (make-route :post mount-point authorised-handler)))

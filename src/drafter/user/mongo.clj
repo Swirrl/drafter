@@ -11,7 +11,8 @@
 (def ^:private role-mappings
   {10 :editor
    20 :publisher
-   30 :manager})
+   30 :manager
+   40 :system})
 
 (def ^:private mongo-user-schema
   {(s/required-key :email) s/Str

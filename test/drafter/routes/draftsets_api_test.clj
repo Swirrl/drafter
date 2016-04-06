@@ -42,13 +42,6 @@
     (add serialiser statements)
     (ByteArrayInputStream. (.toByteArray bos))))
 
-(defn- with-identity [user request]
-  (let [unencoded-auth (str (user/username user) ":" test-password)
-        encoded-auth (buddy.core.codecs/str->base64 unencoded-auth)]
-    (-> request
-        (assoc :identity user)
-        (assoc-in [:headers "Authorization"] (str "Basic " encoded-auth)))))
-
 (defn- append-to-draftset-request [user draftset-location data-stream content-type]
   (with-identity user
     {:uri (str draftset-location "/data")

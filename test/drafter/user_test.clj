@@ -8,6 +8,7 @@
 (def test-editor (create-user "editor@example.com" :editor (get-digest test-password)))
 (def test-publisher (create-user "publisher@example.com" :publisher (get-digest test-password)))
 (def test-manager (create-user "manager@example.com" :manager (get-digest test-password)))
+(def test-system (create-user "system@example.com" :system (get-digest test-password)))
 
 (deftest create-user-test
   (testing "Invalid email address"

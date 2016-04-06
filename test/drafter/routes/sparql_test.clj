@@ -1,7 +1,8 @@
 (ns drafter.routes.sparql-test
   (:require [drafter.test-common :refer [throws-exception? test-triples import-data-to-draft!
                                          stream->string select-all-in-graph make-graph-live!
-                                         *test-backend* wrap-clean-test-db wrap-db-setup]]
+                                         *test-backend* wrap-clean-test-db wrap-db-setup with-identity
+                                         assert-is-forbidden-response]]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
             [clojure-csv.core :as csv]
@@ -12,6 +13,8 @@
             [drafter.util :refer [to-coll]]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.draft-management :refer :all]
+            [drafter.user.memory-repository :as memrepo]
+            [drafter.user-test :refer [test-editor test-system]]
             [swirrl-server.errors :refer [encode-error]]
             [schema.test :refer [validate-schemas]]))
 
@@ -124,30 +127,41 @@
 (deftest raw-sparql-routes-test
   (let [;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-backend*)
-        endpoint (raw-sparql-routes "/sparql/raw" *test-backend* nil)]
+        user-repo (memrepo/create-repository* test-editor test-system)
+        endpoint (raw-sparql-routes "/sparql/raw" *test-backend* nil user-repo)]
 
-    (testing "The state graph should be accessible"
-      (let [result (endpoint (-> (raw-query (str "ASK WHERE {"
+    (testing "The state graph should be accessible to system"
+      (let [request (-> (raw-query (str "ASK WHERE {"
                                                    "  GRAPH <" drafter-state-graph "> {"
                                                    "    ?s ?p ?o ."
                                                    "  }"
                                                    "}"))
-                                 (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
-            body (-> result :body stream->string)]
+                                 (assoc-in [:headers "accept"] "text/plain; charset=utf-8"))
+            request (with-identity test-system request)
+            {:keys [body] :as response} (endpoint request)
+            result (slurp body)]
 
-        (is (= "true" body))))
+        (is (= "true" result))))
 
-    (testing "The data graphs (live and drafts) should be accessible"
-      (let [result (endpoint
-                     (-> (raw-query (str "ASK WHERE {"
-                                           "  GRAPH <" draft-graph-2 "> {"
-                                           "    ?s ?p ?o ."
-                                           "  }"
-                                           "}"))
-                         (assoc-in [:headers "accept"] "text/plain; charset=utf-8")))
-            body (-> result :body stream->string)]
+    (testing "The state graph should not be accessible to other users"
+      (let [request (-> (raw-query "ASK WHERE { GRAPH ?g { ?s ?p ?o } }")
+                        (assoc-in [:headers "accept"] "text/plain; charset=utf-8"))
+            request (with-identity test-editor request)
+            response (endpoint request)]
+        (assert-is-forbidden-response response)))
 
-        (is (= "true" body))))))
+    (testing "The data graphs (live and drafts) should be accessible to system"
+      (let [request (-> (raw-query (str "ASK WHERE {"
+                                        "  GRAPH <" draft-graph-2 "> {"
+                                        "    ?s ?p ?o ."
+                                        "  }"
+                                        "}"))
+                        (assoc-in [:headers "accept"] "text/plain; charset=utf-8"))
+            request (with-identity test-system request)
+            {:keys [body] :as response} (endpoint request)
+            result (slurp body)]
+
+        (is (= "true" result))))))
 
 (defn make-new-draft-from-graph! [backend live-guri]
   (let [draft-guri (create-draft-graph! backend live-guri)

@@ -102,7 +102,12 @@
 (def ^:private v1-prefix :v1)
 
 (def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route true v1-prefix))
-(def raw-endpoint-spec (specify-endpoint raw-sparql-routes raw-update-endpoint-route true v1-prefix))
+
+(defn- create-raw-endpoint-spec [user-repo]
+  (let [query-route-fn #(raw-sparql-routes %1 %2 %3 user-repo)
+        update-route-fn #(raw-update-endpoint-route %1 %2 %3 user-repo)]
+    (specify-endpoint query-route-fn update-route-fn true v1-prefix)))
+
 (def state-endpoint-spec (specify-endpoint state-sparql-routes state-update-endpoint-route false))
 
 (defn create-sparql-routes [endpoint-map backend]
@@ -111,9 +116,9 @@
                     (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump version backend timeout-conf))]
     (mapcat ep-routes endpoint-map)))
 
-(defn get-sparql-routes [backend]
+(defn get-sparql-routes [backend user-repo]
   (let [endpoints {:live live-endpoint-spec
-                   :raw raw-endpoint-spec
+                   :raw (create-raw-endpoint-spec user-repo)
                    :state state-endpoint-spec}]
     (create-sparql-routes endpoints backend)))
 
@@ -123,7 +128,7 @@
                         (-> []
                             (add-route (pages-routes backend))
                             (add-route (draftset-api-routes backend user-repo "Drafter"))
-                            (add-routes (get-sparql-routes backend))
+                            (add-routes (get-sparql-routes backend user-repo))
                             (add-route (context "/v1/status" []
                                                 (status-routes global-writes-lock finished-jobs restart-id)))
 

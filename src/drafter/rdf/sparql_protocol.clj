@@ -5,7 +5,8 @@
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.sesame :refer [get-query-type create-query-executor]]
-            [compojure.core :refer [routes GET POST]]
+            [drafter.middleware :refer [allowed-methods-handler]]
+            [compojure.core :refer [make-route]]
             [drafter.rdf.content-negotiation :as conneg])
   (:import [org.apache.jena.query QueryParseException]))
 
@@ -77,6 +78,15 @@
           (log/info "Malformed query: " error-message)
           {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
 
+(defn- sparql-query-request-handler [executor timeouts]
+  (fn [request]
+    (process-sparql-query executor request :query-timeouts timeouts)))
+
+(defn sparql-protocol-handler [executor timeouts]
+  (->> (sparql-query-request-handler executor timeouts)
+       (wrap-sparql-errors)
+       (allowed-methods-handler #{:get :post})))
+
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path, a SPARQL executor and
   an optional restriction function which returns a list of graph uris
@@ -84,13 +94,4 @@
 
   ([mount-path executor] (sparql-end-point mount-path executor nil))
   ([mount-path executor timeouts]
-     ;; TODO make restriction-fn just the set of graphs to restrict to (or nil)
-   (wrap-sparql-errors
-    (routes
-     (GET mount-path request
-          (process-sparql-query executor request                        
-                                :query-timeouts timeouts))
-
-     (POST mount-path request
-           (process-sparql-query executor request                        
-                                 :query-timeouts timeouts))))))
+   (make-route nil mount-path (sparql-protocol-handler executor timeouts))))

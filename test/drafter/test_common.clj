@@ -50,6 +50,15 @@
       (.next scanner)
       "")))
 
+(defn with-identity
+  "Sets the given test user as the user on a request"
+  [user request]
+  (let [unencoded-auth (str (user/username user) ":" "password")
+        encoded-auth (buddy.core.codecs/str->base64 unencoded-auth)]
+    (-> request
+        (assoc :identity user)
+        (assoc-in [:headers "Authorization"] (str "Basic " encoded-auth)))))
+
 (defn wait-for-lock-ms [lock period-ms]
   (if (.tryLock lock period-ms (TimeUnit/MILLISECONDS))
     (.unlock lock)

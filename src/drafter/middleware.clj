@@ -36,7 +36,10 @@
     (if (user/authenticated? user password)
       user)))
 
-(defn basic-authentication [user-repo realm inner-handler]
+(defn basic-authentication
+  "Requires the incoming request is authenticated using basic
+  authentication."
+  [user-repo realm inner-handler]
   (let [conf {:realm realm
               :authfn #(authenticate-user user-repo %1 %2)
               :unauthorized-handler (fn [req err]
@@ -44,7 +47,9 @@
         backend (http-basic-backend conf)]
     (wrap-authorization (wrap-authentication inner-handler backend) backend)))
 
-(defn require-authenticated [inner-handler]
+(defn require-authenticated
+  "Requires the incoming request has been authenticated."
+  [inner-handler]
   (fn [request]
     (if (auth/authenticated? request)
       (inner-handler request)
@@ -55,6 +60,16 @@
   through HTTP Basic authentication."
   [user-repo realm inner-handler]
   (basic-authentication user-repo realm (require-authenticated inner-handler)))
+
+(defn require-user-role
+  "Wraps a handler with one that only permits the request to continue
+  if the associated user is in the required role. If not, a 403
+  Forbidden response is returned."
+  [required-role inner-handler]
+  (fn [{:keys [identity] :as request}]
+    (if (user/has-role? identity required-role)
+      (inner-handler request)
+      (response/forbidden-response "User is not authorised to access this resource"))))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]
