@@ -15,8 +15,7 @@
             [drafter.routes.dumps :refer [dumps-endpoint]]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes
-                                           raw-sparql-routes
-                                           state-sparql-routes]]
+                                           raw-sparql-routes]]
             [drafter.routes.sparql-update :refer [live-update-endpoint-route
                                                   raw-update-endpoint-route]]
             [drafter.write-scheduler :refer [start-writer!
