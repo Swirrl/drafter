@@ -34,11 +34,35 @@ permissions."
 (defn is-known-role? [r]
   (util/seq-contains? roles r))
 
-(defn create-user [email role password-digest]
+(defn- get-valid-email [email]
+  (if-let [valid (util/validate-email-address email)]
+    valid
+    (throw (IllegalArgumentException. (str "Not a valid email address: " email)))))
+
+(defn create-user
+  "Creates a user with a username, role and password digest which can
+  be used to authenticate the user."
+  [email role password-digest]
   {:pre [(is-known-role? role)]}
-  (if-let [address (util/validate-email-address email)]
-     (->User address role password-digest)
-     (throw (IllegalArgumentException. (str "Not a valid email address: " email)))))
+  (let [email (get-valid-email email)]
+     (->User email role password-digest)))
+
+(defn create-authenticated-user
+  "Create a user without any authentication information which is
+  assumed to have previously been authenticated. Once a user has been
+  authenticated for a request, their authentication parameters should
+  no longer be needed, so users are normalised into a model without
+  these parameters."
+  [email role]
+  {:pre [(is-known-role? role)]}
+  (let [email (get-valid-email email)]
+    {:email email :role role}))
+
+(defn authenticated!
+  "Asserts that the given user has been authenticated and returns a
+  representation of the user without authentication information."
+  [user]
+  (dissoc user :password-digest))
 
 (defn get-summary
   "Returns a map containing summary information about a user."
@@ -57,6 +81,14 @@ permissions."
 
 (defn password-valid? [user submitted-key]
   (BCrypt/checkpw submitted-key (password-digest user)))
+
+(defn try-authenticate
+  "Tries to authenticate a user with the given candidate
+  password. Return a representation of the authenticated user if
+  successful, or nil if the authentication failed."
+  [user submitted-password]
+  (when (password-valid? user submitted-password)
+    (authenticated! user)))
 
 (defn has-owner? [draftset]
   (contains? draftset :current-owner))

@@ -34,7 +34,7 @@
         request (create-authorised-request username password)
         {:keys [identity] :as response} (handler request)]
     (is (auth/authenticated? response))
-    (is (= user identity))))
+    (is (= (user/authenticated! user) identity))))
 
 (deftest invalid-password-should-not-authenticate-test
   (let [username "test@example.com"
