@@ -45,7 +45,7 @@
     (->MongoUserRepository conn db "publish_my_data_users")))
 
 (defn- user->mongo-user [user]
-  (let [[email role digest] ((juxt user/username user/role user/api-key) user)
+  (let [[email role digest] ((juxt user/username user/role user/password-digest) user)
         role-number (get (set/map-invert role-mappings) role)]
     {:_id (ObjectId.)
      :email email

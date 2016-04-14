@@ -29,12 +29,12 @@
        test-manager :manager true))
 
 (deftest authenticated?-test
-  (let [api-key (str (UUID/randomUUID))
-        api-key-digest (get-digest api-key)
-        user (create-user "test@example.com" :publisher api-key-digest)]
+  (let [password (str (UUID/randomUUID))
+        password-digest (get-digest password)
+        user (create-user "test@example.com" :publisher password-digest)]
     (are [user key should-authenticate?] (= should-authenticate? (authenticated? user key))
-         user api-key true
-         user (get-digest "different key") false)))
+         user password true
+         user (get-digest "different password") false)))
 
 (deftest is-owner?-test
   (are [user draftset expected] (= expected (is-owner? user draftset))

@@ -12,11 +12,11 @@ permissions."
 
 (def role->permission-level (zipmap roles (iterate inc 1))) ;; e.g. {:editor 1, :publisher 2, :manager 3}
 
-(defrecord User [email role api-key-digest])
+(defrecord User [email role password-digest])
 
 (def username :email)
 (def role :role)
-(def api-key :api-key-digest)
+(def password-digest :password-digest)
 
 (defn username->uri
   "Gets a user's URI from their username."
@@ -31,19 +31,19 @@ permissions."
   (let [uri (URI. user-uri)]
     (.getSchemeSpecificPart uri)))
 
-(defn create-user [email role api-key-digest]
-  {:pre [(util/seq-contains? roles role)]}
+(defn is-known-role? [r]
+  (util/seq-contains? roles r))
+
+(defn create-user [email role password-digest]
+  {:pre [(is-known-role? role)]}
   (if-let [address (util/validate-email-address email)]
-     (->User address role api-key-digest)
+     (->User address role password-digest)
      (throw (IllegalArgumentException. (str "Not a valid email address: " email)))))
 
 (defn get-summary
   "Returns a map containing summary information about a user."
   [{:keys [email role] :as user}]
   {:username email :role role})
-
-(defn is-known-role? [r]
-  (util/seq-contains? roles r))
 
 (defn has-role?
   "Takes a user and a role keyword and tests whether the user is
@@ -55,8 +55,8 @@ permissions."
 (defn get-digest [s]
   (BCrypt/hashpw s (BCrypt/gensalt)))
 
-(defn authenticated? [{:keys [api-key-digest] :as user} submitted-key]
-  (BCrypt/checkpw submitted-key api-key-digest))
+(defn authenticated? [user submitted-key]
+  (BCrypt/checkpw submitted-key (password-digest user)))
 
 (defn has-owner? [draftset]
   (contains? draftset :current-owner))

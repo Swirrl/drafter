@@ -26,22 +26,22 @@
 
 (deftest authenticate-user-test
   (let [username "test@example.com"
-        api-key "dslkfjsejw"
-        api-key-digest (user/get-digest api-key)
-        user (user/create-user username :publisher api-key-digest)
+        password "dslkfjsejw"
+        password-digest (user/get-digest password)
+        user (user/create-user username :publisher password-digest)
         repo (memory-repo/create-repository* user)
         handler (basic-authentication repo "test" identity)
-        request (create-authorised-request username api-key)
+        request (create-authorised-request username password)
         {:keys [identity] :as response} (handler request)]
     (is (auth/authenticated? response))
     (is (= user identity))))
 
-(deftest invalid-api-key-should-not-authenticate-test
+(deftest invalid-password-should-not-authenticate-test
   (let [username "test@example.com"
-        user (user/create-user username :editor (user/get-digest "apikey"))
+        user (user/create-user username :editor (user/get-digest "password"))
         repo (memory-repo/create-repository* user)
         handler (basic-authentication repo "test" identity)
-        request (create-authorised-request username "invalidkey")
+        request (create-authorised-request username "invalidpassword")
         response (handler request)]
     (is (= false (auth/authenticated? response)))))
 
