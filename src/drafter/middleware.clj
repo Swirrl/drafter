@@ -33,7 +33,7 @@
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (if-let [user (user-repo/find-user-by-username user-repo username)]
-    (if (user/authenticated? user password)
+    (if (user/password-valid? user password)
       user)))
 
 (defn basic-authentication

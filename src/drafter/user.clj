@@ -55,7 +55,7 @@ permissions."
 (defn get-digest [s]
   (BCrypt/hashpw s (BCrypt/gensalt)))
 
-(defn authenticated? [user submitted-key]
+(defn password-valid? [user submitted-key]
   (BCrypt/checkpw submitted-key (password-digest user)))
 
 (defn has-owner? [draftset]

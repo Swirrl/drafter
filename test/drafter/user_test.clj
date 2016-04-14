@@ -28,11 +28,11 @@
        test-manager :publisher true
        test-manager :manager true))
 
-(deftest authenticated?-test
+(deftest password-valid?-test
   (let [password (str (UUID/randomUUID))
         password-digest (get-digest password)
         user (create-user "test@example.com" :publisher password-digest)]
-    (are [user key should-authenticate?] (= should-authenticate? (authenticated? user key))
+    (are [user key valid?] (= valid? (password-valid? user key))
          user password true
          user (get-digest "different password") false)))
 
