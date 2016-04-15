@@ -96,7 +96,7 @@
   (let [;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-backend*)
         user-repo (memrepo/create-repository* test-editor test-system)
-        authenticated-fn (middleware/make-authenticated-wrapper user-repo "testauthkey")
+        authenticated-fn (middleware/make-authenticated-wrapper user-repo {})
         endpoint (raw-sparql-routes "/sparql/raw" *test-backend* nil authenticated-fn)]
 
     (testing "The state graph should be accessible to system"

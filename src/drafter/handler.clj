@@ -118,7 +118,7 @@
     (create-sparql-routes endpoints backend)))
 
 (defn initialise-app! [backend]
-  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo "secretkey")]
+  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)]
     (set-var-root! #'app (app-handler
                           ;; add your application routes here
                           (-> []

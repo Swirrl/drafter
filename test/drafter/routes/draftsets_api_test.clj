@@ -1329,7 +1329,7 @@
 
 (defn- setup-route [test-function]
   (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
-        authenticated-fn (middleware/make-authenticated-wrapper users "testauthkey")]
+        authenticated-fn (middleware/make-authenticated-wrapper users {})]
     (binding [*user-repo* users
               *route* (draftset-api-routes *test-backend* users authenticated-fn)]
       (test-function))))

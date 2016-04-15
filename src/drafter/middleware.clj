@@ -79,16 +79,29 @@
   [user-repo inner-handler]
   (basic-authentication user-repo (require-authenticated inner-handler)))
 
-(defn wrap-authenticated [user-repo token-auth-key inner-handler]
+(defn- get-configured-token-auth-backend [env-map]
+  (if-let [signing-key (:drafter-jws-signing-key env-map)]
+    (jws-auth-backend signing-key)
+    (do
+      (log/warn "No JWS Token signing key configured - token authentication will not be available")
+      (log/warn "To configure JWS Token authentication, set the DRAFTER_JWS_SIGNING_KEY environment variable")
+      nil)))
+
+(defn- get-configured-auth-backends [user-repo env-map]
   (let [basic-backend (basic-auth-backend user-repo)
-        jws-backend (jws-auth-backend token-auth-key)
-        auth-handler (wrap-authentication (require-authenticated inner-handler) basic-backend jws-backend)
+        jws-backend (get-configured-token-auth-backend env-map)]
+    (remove nil? [basic-backend jws-backend])))
+
+(defn- wrap-authenticated [auth-backends inner-handler]
+  (let [auth-handler (apply wrap-authentication (require-authenticated inner-handler) auth-backends)
         unauthorised-fn (fn [req err]
                           (response/unauthorised-basic-response "Drafter"))]
     (wrap-authorization auth-handler unauthorised-fn)))
 
-(defn make-authenticated-wrapper [user-repo token-auth-key]
-  #(wrap-authenticated user-repo token-auth-key %))
+(defn make-authenticated-wrapper [user-repo env-map]
+  (let [auth-backends (get-configured-auth-backends user-repo env-map)]
+    (fn [inner-handler]
+      (wrap-authenticated auth-backends inner-handler))))
 
 (defn require-user-role
   "Wraps a handler with one that only permits the request to continue
