@@ -11,6 +11,7 @@
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
             [drafter.util :refer [to-coll]]
+            [drafter.middleware :as middleware]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.draft-management :refer :all]
             [drafter.user.memory-repository :as memrepo]
@@ -95,7 +96,8 @@
   (let [;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-backend*)
         user-repo (memrepo/create-repository* test-editor test-system)
-        endpoint (raw-sparql-routes "/sparql/raw" *test-backend* nil user-repo)]
+        authenticated-fn (middleware/make-authenticated-wrapper user-repo "testauthkey")
+        endpoint (raw-sparql-routes "/sparql/raw" *test-backend* nil authenticated-fn)]
 
     (testing "The state graph should be accessible to system"
       (let [request (-> (raw-query (str "ASK WHERE {"

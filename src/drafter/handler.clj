@@ -101,9 +101,9 @@
 
 (def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route true v1-prefix))
 
-(defn- create-raw-endpoint-spec [user-repo]
-  (let [query-route-fn #(raw-sparql-routes %1 %2 %3 user-repo)
-        update-route-fn #(raw-update-endpoint-route %1 %2 %3 user-repo)]
+(defn- create-raw-endpoint-spec [authenticated-fn]
+  (let [query-route-fn #(raw-sparql-routes %1 %2 %3 authenticated-fn)
+        update-route-fn #(raw-update-endpoint-route %1 %2 %3 authenticated-fn)]
     (specify-endpoint query-route-fn update-route-fn true v1-prefix)))
 
 (defn create-sparql-routes [endpoint-map backend]
@@ -118,29 +118,30 @@
     (create-sparql-routes endpoints backend)))
 
 (defn initialise-app! [backend]
-  (set-var-root! #'app (app-handler
-                        ;; add your application routes here
-                        (-> []
-                            (add-route (pages-routes backend))
-                            (add-route (draftset-api-routes backend user-repo "Drafter"))
-                            (add-routes (get-sparql-routes backend user-repo))
-                            (add-route (context "/v1/status" []
-                                                (status-routes global-writes-lock finished-jobs restart-id)))
+  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo "secretkey")]
+    (set-var-root! #'app (app-handler
+                          ;; add your application routes here
+                          (-> []
+                              (add-route (pages-routes backend))
+                              (add-route (draftset-api-routes backend user-repo authenticated-fn))
+                              (add-routes (get-sparql-routes backend authenticated-fn))
+                              (add-route (context "/v1/status" []
+                                                  (status-routes global-writes-lock finished-jobs restart-id)))
 
-                            (add-route app-routes))
+                              (add-route app-routes))
 
-                        :ring-defaults (assoc-in api-defaults [:params :multipart] true)
-                        ;; add custom middleware here
-                        :middleware [#(wrap-resource % "swagger-ui")
-                                     wrap-verbs
-                                     wrap-encode-errors
-                                     middleware/log-request]
-                        ;; add access rules here
-                        :access-rules []
-                        ;; serialize/deserialize the following data formats
-                        ;; available formats:
-                        ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
-                        :formats [:json-kw :edn])))
+                          :ring-defaults (assoc-in api-defaults [:params :multipart] true)
+                          ;; add custom middleware here
+                          :middleware [#(wrap-resource % "swagger-ui")
+                                       wrap-verbs
+                                       wrap-encode-errors
+                                       middleware/log-request]
+                          ;; add access rules here
+                          :access-rules []
+                          ;; serialize/deserialize the following data formats
+                          ;; available formats:
+                          ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
+                          :formats [:json-kw :edn]))))
 
 (defn initialise-write-service! []
   (set-var-root! #'writer-service  (start-writer!)))

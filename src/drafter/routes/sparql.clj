@@ -7,8 +7,8 @@
 (defn live-sparql-routes [mount-point executor timeouts]
   (sparql-end-point mount-point (live-endpoint executor) timeouts))
 
-(defn raw-sparql-routes [mount-point executor timeouts user-repo]
+(defn raw-sparql-routes [mount-point executor timeouts authenticated-fn]
   (->> (sparql-protocol-handler executor timeouts)
        (require-user-role :system)
-       (require-basic-authentication user-repo "drafter")
+       (authenticated-fn)
        (make-route nil mount-point)))

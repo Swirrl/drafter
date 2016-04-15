@@ -2,6 +2,7 @@
   (:require [drafter.test-common :refer :all]
             [clojure.test :refer :all]
             [clojure.set :as set]
+            [drafter.middleware :as middleware]
             [drafter.routes.draftsets-api :refer :all]
             [drafter.rdf.drafter-ontology :refer [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.user :as user]
@@ -1327,9 +1328,10 @@
     (assert-is-unauthorised-response response)))
 
 (defn- setup-route [test-function]
-  (let [users (memrepo/create-repository* test-editor test-publisher test-manager)]
+  (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
+        authenticated-fn (middleware/make-authenticated-wrapper users "testauthkey")]
     (binding [*user-repo* users
-              *route* (draftset-api-routes *test-backend* users "Test")]
+              *route* (draftset-api-routes *test-backend* users authenticated-fn)]
       (test-function))))
 
 (use-fixtures :once wrap-db-setup)

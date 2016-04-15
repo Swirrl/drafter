@@ -96,7 +96,8 @@
 (defn live-update-endpoint-route [mount-point backend timeouts]
   (update-endpoint mount-point (live-endpoint backend) timeouts))
 
-(defn raw-update-endpoint-route [mount-point backend timeouts user-repo]
-  (let [request-handler (update-request-handler backend timeouts)
-        authorised-handler (require-user-role :system request-handler)]
-    (make-route :post mount-point authorised-handler)))
+(defn raw-update-endpoint-route [mount-point backend timeouts authenticated-fn]
+  (->> (update-request-handler backend timeouts)
+       (require-user-role :system)
+       (authenticated-fn)
+       (make-route :post mount-point)))

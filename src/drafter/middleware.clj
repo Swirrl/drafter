@@ -13,7 +13,9 @@
             [drafter.rdf.sesame :refer [read-statements]]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [buddy.auth :as auth]
+            [buddy.auth.protocols :as authproto]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
+            [buddy.auth.backends.token :refer [jws-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [ring.util.request :as request]
             [pantomime.media :refer [media-type-named]])
@@ -35,15 +37,32 @@
   (if-let [user (user-repo/find-user-by-username user-repo username)]
     (user/try-authenticate user password)))
 
+(defn- basic-auth-backend [user-repo]
+  (let [realm "Drafter"
+        conf {:realm realm
+              :authfn #(authenticate-user user-repo %1 %2)
+              :unauthorized-handler (fn [req err]
+                                      (response/unauthorised-basic-response realm))}]
+    (http-basic-backend conf)))
+
+(defn- jws-auth-backend [token-auth-key]
+  (let [conf {:secret token-auth-key
+              :token-name "Token"
+              :options {:alg :hs256
+                        :iss "publishmydata"
+                        :aud "drafter"}}
+        inner-backend (jws-backend conf)]
+    (reify authproto/IAuthentication
+      (-parse [_ request] (authproto/-parse inner-backend request))
+      (-authenticate [_ request data]
+        (when-let [{:keys [email role] :as token} (authproto/-authenticate inner-backend request data)]
+          (user/create-authenticated-user email (keyword role)))))))
+
 (defn basic-authentication
   "Requires the incoming request is authenticated using basic
   authentication."
-  [user-repo realm inner-handler]
-  (let [conf {:realm realm
-              :authfn #(authenticate-user user-repo %1 %2)
-              :unauthorized-handler (fn [req err]
-                                      (response/unauthorised-basic-response realm))}
-        backend (http-basic-backend conf)]
+  [user-repo inner-handler]
+  (let [backend (basic-auth-backend user-repo)]
     (wrap-authorization (wrap-authentication inner-handler backend) backend)))
 
 (defn require-authenticated
@@ -57,8 +76,19 @@
 (defn require-basic-authentication
   "Wraps a handler in one which requires the request is authenticated
   through HTTP Basic authentication."
-  [user-repo realm inner-handler]
-  (basic-authentication user-repo realm (require-authenticated inner-handler)))
+  [user-repo inner-handler]
+  (basic-authentication user-repo (require-authenticated inner-handler)))
+
+(defn wrap-authenticated [user-repo token-auth-key inner-handler]
+  (let [basic-backend (basic-auth-backend user-repo)
+        jws-backend (jws-auth-backend token-auth-key)
+        auth-handler (wrap-authentication (require-authenticated inner-handler) basic-backend jws-backend)
+        unauthorised-fn (fn [req err]
+                          (response/unauthorised-basic-response "Drafter"))]
+    (wrap-authorization auth-handler unauthorised-fn)))
+
+(defn make-authenticated-wrapper [user-repo token-auth-key]
+  #(wrap-authenticated user-repo token-auth-key %))
 
 (defn require-user-role
   "Wraps a handler with one that only permits the request to continue

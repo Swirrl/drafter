@@ -98,9 +98,8 @@
             (inner-handler (update-request ub)))
           (unprocessable-entity-response "Invalid union-with-live parameter value - expected true or false"))))))
 
-(defn draftset-api-routes [backend user-repo realm]
-  (letfn [(authenticated [h] (require-basic-authentication user-repo realm h))
-          (required-live-graph-param [h] (required-live-graph-param-handler backend h))
+(defn draftset-api-routes [backend user-repo authenticated]
+  (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
           (required-managed-graph-param [h] (required-managed-graph-param-handler backend h))
           (as-draftset-owner [h]
             (authenticated
