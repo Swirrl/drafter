@@ -36,6 +36,15 @@
          user password true
          user (get-digest "different password") false)))
 
+(deftest authenticated!-test
+  (are [user expected] (= expected (authenticated! user))
+    (create-user "test@example.com" :publisher "digest") (create-authenticated-user "test@example.com" :publisher)
+    (create-authenticated-user "test@example.com" :editor) (create-authenticated-user "test@example.com" :editor)
+    (->
+     (create-authenticated-user "test@example.com" :editor)
+     (assoc :x "x")
+     (assoc :y "y")) (create-authenticated-user "test@example.com" :editor)))
+
 (deftest is-owner?-test
   (are [user draftset expected] (= expected (is-owner? user draftset))
        test-editor (ds/create-draftset (username test-editor)) true

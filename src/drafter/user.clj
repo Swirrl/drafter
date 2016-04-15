@@ -61,8 +61,8 @@ permissions."
 (defn authenticated!
   "Asserts that the given user has been authenticated and returns a
   representation of the user without authentication information."
-  [user]
-  (dissoc user :password-digest))
+  [{:keys [email role] :as user}]
+  (create-authenticated-user email role))
 
 (defn get-summary
   "Returns a map containing summary information about a user."
