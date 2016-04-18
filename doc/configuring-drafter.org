@@ -161,6 +161,20 @@ is 3 minutes:
 DRAFTER_TIMEOUT_OPERATION=50
 DRAFTER_TIMEOUT_ENDPOINT_RAW_OPERATION=180
 #+END_SRC
+
+** User Token Signing Key
+
+Drafter can be configured to authenticated users from a JSON Web Signing (JWS) token in the incoming request.
+This token must be signed using the configured HMAC-SHA-256 key. This key should be specified by the
+DRAFTER_JWS_SIGNING_KEY environment variable:
+
+#+BEGIN_SRC shell :exports code
+DRAFTER_JWS_SIGNING_KEY=secretkey
+#+END_SRC 
+
+If the DRAFTER_JWS_SIGNING_KEY environment variable is not present, JWS token authentication will not be
+available.
+
 ** System Properties
 
 The following JVM system properties can be set to configure various
