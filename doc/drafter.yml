@@ -632,6 +632,57 @@ paths:
           description: The query results returned according to the SPARQL specificiation.
           schema:
             type: file
+  /sparql/raw:
+    get:
+      summary: Queries all data with SPARQL
+      description: |
+        Queries all data via the SPARQL query langauge and protocol. This route is only available to users in the system role
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      security:
+        - jws-auth: []
+      consumes:
+        - application/sparql-query
+      produces:
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+        - application/sparql-results+xml
+        - application/sparql-results+json
+        - text/csv
+      parameters:
+        - $ref: '#/parameters/query'
+      tags:
+        - SPARQL Endpoints
+      responses:
+        '200':
+          description: The query results returned according to the SPARQL specificiation.
+          schema:
+            type: file
+    post:
+      summary: Queries all data with SPARQL
+      description: |
+        Queries all data via the SPARQL query langauge and protocol. This route is only available to users in the system role.
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      security:
+        - jws-auth: []
+      consumes:
+        - application/sparql-query
+      produces:
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+        - application/sparql-results+xml
+        - application/sparql-results+json
+        - text/csv
+      parameters:
+        - $ref: '#/parameters/query'
+      tags:
+        - SPARQL Endpoints
+      responses:
+        '200':
+          description: The query results returned according to the SPARQL specificiation.
+          schema:
+            type: file
   /users:
     get:
       summary: Gets all users
