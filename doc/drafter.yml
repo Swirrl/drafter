@@ -587,8 +587,6 @@ paths:
       description: |
         Query the live data via the SPARQL query langauge and protocol.
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
-      security:
-        - jws-auth: []
       consumes:
         - application/sparql-query
       produces:
@@ -612,8 +610,6 @@ paths:
       description: |
         Query the live data via the SPARQL query langauge and protocol.
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
-      security:
-        - jws-auth: []
       consumes:
         - application/sparql-query
       produces:
