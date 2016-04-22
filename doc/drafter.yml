@@ -679,6 +679,23 @@ paths:
           description: The query results returned according to the SPARQL specificiation.
           schema:
             type: file
+  /sparql/raw/update:
+    post:
+      summary: Updates data using SPARQL
+      description: |
+        Updates any data using SPARQL. This route should be used with caution and is only available to users in the system role.
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      security:
+        - jws-auth: []
+      consumes:
+        - application/sparql-update
+      parameters:
+        - $ref: '#/parameters/update'
+      tags:
+        - SPARQL Endpoints
+      responses:
+        '200':
+          description: The update was processed successfully.
   /users:
     get:
       summary: Gets all users
@@ -867,6 +884,12 @@ parameters:
     name: query
     description: URI Encoded SPARQL Query
     in: query
+    required: false
+    type: string
+  update:
+    name: update
+    description: URI Encoded SPARQL update
+    in: body
     required: false
     type: string
   union-with-live:
