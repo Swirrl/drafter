@@ -261,7 +261,7 @@
                          (if-let [target-user (user-repo/find-user-by-username user-repo user)]
                            (do
                              (dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
-                             (response ""))
+                             (response (dsmgmt/get-draftset-info backend draftset-id)))
                            (unprocessable-entity-response (str "User: " user " not found")))
 
                          (some? role)
@@ -269,7 +269,7 @@
                            (if (user/is-known-role? role-kw)
                              (do
                                (dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
-                               (response ""))
+                               (response (dsmgmt/get-draftset-info backend draftset-id)))
                              (unprocessable-entity-response (str "Invalid role: " role))))
 
                          :else

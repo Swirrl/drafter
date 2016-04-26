@@ -1065,12 +1065,11 @@
 (deftest submit-draftset-to-role
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-request (create-submit-to-role-request test-editor draftset-location :publisher)
-        submit-response (route submit-request)]
+        {ds-info :body :as submit-response} (route submit-request)]
     (assert-is-ok-response submit-response)
+    (assert-schema Draftset ds-info)
 
-    ;;NOTE: user should still be able to get draftset info as it has not yet been claimed
-    (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
-      (is (= false (contains? ds-info :current-owner))))))
+    (is (= false (contains? ds-info :current-owner)))))
 
 (deftest submit-non-existent-draftset-to-role
   (let [submit-response (route (create-submit-to-role-request test-editor "/v1/draftset/missing" :publisher))]
@@ -1088,10 +1087,11 @@
 
 (deftest submit-draftset-to-user
   (let [draftset-location (create-draftset-through-api test-editor)
-        submit-response (route (submit-draftset-to-user-request draftset-location test-publisher test-editor))]
+        {:keys [body] :as submit-response} (route (submit-draftset-to-user-request draftset-location test-publisher test-editor))]
     (assert-is-ok-response submit-response)
+    (assert-schema Draftset body)
 
-    (let [{:keys [current-owner claim-user] :as ds-info} (get-draftset-info-through-api draftset-location test-publisher)]
+    (let [{:keys [current-owner claim-user] :as ds-info} body]
       (is (nil? current-owner))
       (is (= (user/username test-publisher) claim-user)))))
 
