@@ -1007,7 +1007,10 @@ definitions:
     required: [type, finished-job, restart-id]
     properties:
       type:
-        $ref: '#/definitions/Type'
+        type: string
+        enum:
+          - ok
+          - error
       finished-job:
         type: string
       restart-id:
@@ -1023,16 +1026,16 @@ definitions:
     required: [type, restart-id]
     properties:
       type:
-        $ref: '#/definitions/Type'
+        type: string
+        enum:
+          - ok
+          - error
+      error:
+        type: string
+      message:
+        type: string
       restart-id:
         type: string
     example:
       type: ok
       restart-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
-  Type:
-    type: string
-    description: The type of response either 'ok' for a successful response or 'error' for an error.
-    properties: {}
-    enum:
-      - ok
-      - error
