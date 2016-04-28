@@ -408,7 +408,7 @@ paths:
       consumes:
         - application/n-quads
         - application/trig
-        - apllication/trix
+        - application/trix
         - application/n-triples
         - application/rdf+xml
         - text/turtle
