@@ -11,7 +11,6 @@
             [drafter.util :as util]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
-            [grafter.rdf.io :refer [mimetype->rdf-format]]
             [environ.core :refer [env]]
             [clojure.string :as string]))
 

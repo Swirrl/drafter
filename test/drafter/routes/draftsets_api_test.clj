@@ -132,12 +132,15 @@
      (assert-is-see-other-response response)
      (get headers "Location"))))
 
-(defn- get-draftset-quads-request [draftset-location user format union-with-live?-str]
+(defn- get-draftset-quads-accept-request [draftset-location user accept union-with-live?-str]
   (with-identity user
     {:uri (str draftset-location "/data")
      :request-method :get
-     :headers {"accept" (.getDefaultMIMEType format)}
+     :headers {"accept" accept}
      :params {:union-with-live union-with-live?-str}}))
+
+(defn- get-draftset-quads-request [draftset-location user format union-with-live?-str]
+  (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType format) union-with-live?-str))
 
 (defn- get-draftset-quads-through-api
   ([draftset-location user]
@@ -957,6 +960,21 @@
     (let [response-quads (set (get-draftset-quads-through-api draftset-location test-editor))
           input-quads (set (eval-statements (statements draftset-data-file)))]
       (is (= input-quads response-quads)))))
+
+(deftest get-draftset-quads-data-with-invalid-accept
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
+    (let [data-request (get-draftset-quads-accept-request draftset-location test-editor "text/invalidrdfformat" "false")
+          data-response (route data-request)]
+      (assert-is-not-acceptable-response data-response))))
+
+(deftest get-draftset-quads-data-with-multiple-accepted
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
+    (let [accepted "application/n-quads,application/trig,application/trix"
+          data-request (get-draftset-quads-accept-request draftset-location test-editor accepted "false")
+          data-response (route data-request)]
+      (assert-is-ok-response data-response))))
 
 (deftest get-draftset-quads-unioned-with-live
   (let [quads (statements "test/resources/test-draftset.trig")

@@ -21,7 +21,6 @@
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
-            [grafter.rdf.io :refer [mimetype->rdf-format]]
             [clojure.java.io :as io])
   (:import [org.openrdf.query TupleQueryResultHandler]
            [org.openrdf OpenRDFException]
@@ -37,10 +36,8 @@
 
 (defn- get-accepted-rdf-format [request]
   (if-let [accept (request/accept request)]
-    (try
-      (mimetype->rdf-format accept)
-      (catch Exception ex
-        nil))))
+    (if-let [[format _] (conneg/negotiate :construct accept)]
+      format)))
 
 (defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
