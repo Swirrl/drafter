@@ -971,7 +971,7 @@
 (deftest get-draftset-quads-data-with-multiple-accepted
   (let [draftset-location (create-draftset-through-api test-editor)]
     (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
-    (let [accepted "application/n-quads,application/trig,application/trix"
+    (let [accepted "application/n-quads,application/trig,apllication/trix,application/n-triples,application/rdf+xml,text/turtle"
           data-request (get-draftset-quads-accept-request draftset-location test-editor accepted "false")
           data-response (route data-request)]
       (assert-is-ok-response data-response))))
@@ -1030,7 +1030,7 @@
                         :headers {"accept" "application/n-triples"}}
           data-request (with-identity test-editor data-request)
           data-response (route data-request)]
-      (assert-is-unprocessable-response data-response))))
+      (assert-is-not-acceptable-response data-response))))
 
 (deftest get-draftset-data-for-missing-draftset
   (let [response (route (with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :get :headers {"accept" "application/n-quads"}}))]

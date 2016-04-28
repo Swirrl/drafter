@@ -59,10 +59,15 @@
       (forbidden-response "Operation only permitted by draftset owner"))))
 
 (defn- rdf-response-format-handler [inner-handler]
-  (fn [request]
-    (if-let [rdf-format (get-accepted-rdf-format request)]
-      (inner-handler (assoc-in request [:params :rdf-format] rdf-format))
-      (not-acceptable-response "Accept header required with MIME type of RDF format to return"))))
+  (fn [{{:keys [graph]} :params :as request}]
+    (let [accept (request/accept request)]
+      (if (some? graph)
+        (if-let [[rdf-format _] (conneg/negotiate-rdf-triples-format accept)]
+          (inner-handler (assoc-in request [:params :rdf-format] rdf-format))
+          (not-acceptable-response "Accept header required with MIME type for RDF triples format to return"))
+        (if-let [[rdf-format _] (conneg/negotiate-rdf-quads-format accept)]
+          (inner-handler (assoc-in request [:params :rdf-format] rdf-format))
+          (not-acceptable-response "Accept header required with MIME type for RDF quads format to return"))))))
 
 (defn- require-graph-for-triples-rdf-format [inner-handler]
   (fn [{{:keys [graph rdf-format]} :params :as request}]
@@ -160,17 +165,16 @@
         (make-route :get "/draftset/:id/data"
                     (as-draftset-owner
                      (rdf-response-format-handler
-                      (require-graph-for-triples-rdf-format
-                       (parse-union-with-live-handler
-                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
-                          (if (is-quads-format? rdf-format)
-                            (get-draftset-data backend draftset-id (request/accept request) union-with-live)
+                      (parse-union-with-live-handler
+                       (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
+                         (if (is-quads-format? rdf-format)
+                           (get-draftset-data backend draftset-id (request/accept request) union-with-live)
 
-                            ;; TODO fix this as it's vulnerable to SPARQL injection
-                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                                  escaped-query (RenderUtils/escape unsafe-query)
-                                  query-request (assoc-in request [:params :query] escaped-query)]
-                              (execute-query-in-draftset backend draftset-id query-request union-with-live)))))))))
+                           ;; TODO fix this as it's vulnerable to SPARQL injection
+                           (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                                 escaped-query (RenderUtils/escape unsafe-query)
+                                 query-request (assoc-in request [:params :query] escaped-query)]
+                             (execute-query-in-draftset backend draftset-id query-request union-with-live))))))))
 
         (make-route :delete "/draftset/:id/data"
                     (as-draftset-owner
