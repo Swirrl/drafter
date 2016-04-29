@@ -308,10 +308,8 @@ paths:
       tags:
         - Updating Data
       responses:
-        '202':
+        '200':
           description: The graph was deleted successfully
-          schema:
-            $ref: '#/definitions/AsyncJob'
 
   /draftset/{id}/changes:
     delete:
@@ -337,13 +335,13 @@ paths:
       tags:
         - Updating Data
       responses:
-        '202':
+        '200':
           description: |
             The request to remove the graph and its changes from the
             Draftset was accepted.  Applications should poll for the
             completion of the AsyncJob.
           schema:
-            $ref: '#/definitions/AsyncJob'
+            $ref: '#/definitions/Draftset'
 
   /draftset/{id}/data:
     put:
