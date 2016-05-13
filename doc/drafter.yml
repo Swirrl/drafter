@@ -156,6 +156,8 @@ tags:
     description: Querying users
   - name: SPARQL Endpoints
     description: SPARQL query endpoints
+  - name: Jobs
+    description: Async jobs
 produces:
   - application/json
 consumes:
@@ -740,7 +742,7 @@ paths:
       parameters:
         - $ref: "#/parameters/jobid"
       tags:
-          - Draftsets
+          - Jobs
       responses:
         '404':
           description: The job is not yet finished.
@@ -769,7 +771,7 @@ paths:
         Returns a boolean true if the system is locked for writes and
         false if it isn't.'
       tags:
-          - Draftsets
+          - Jobs
       responses:
         '200':
           schema:
@@ -1029,12 +1031,17 @@ definitions:
           - ok
           - error
           - not-found
-      error:
+      restart-id:
+        type: string
+      error-class:
         type: string
       message:
         type: string
-      restart-id:
+      details:
         type: string
+    required:
+      - type
+      - restart-id
     example:
       type: ok
       restart-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
