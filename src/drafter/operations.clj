@@ -1,7 +1,9 @@
 (ns drafter.operations
-  (:require [taoensso.timbre :as timbre])
+  (:require [clojure.tools.logging :as log]
+            [clj-logging-config.log4j :as l4j])
   (:import [java.util.concurrent FutureTask TimeUnit Executors]
-           [java.io PipedInputStream PipedOutputStream]))
+           [java.io PipedInputStream PipedOutputStream]
+           [org.apache.log4j MDC]))
 
 (def system-clock {:now-fn #(System/currentTimeMillis)})
 
@@ -45,7 +47,7 @@
   (if-let [op-state (get operations-map operation)]
     (update-in operations-map [operation] #(update-timestamp % timestamp))
     (do
-      (timbre/warn "Received timestamp for unknown operation")
+      (log/warn "Received timestamp for unknown operation")
       operations-map)))
 
 (defn- exceeded-total-time?
@@ -124,7 +126,7 @@
   catches and logs any thrown exceptions."
   [f]
   #(try (f)
-     (catch Exception ex (timbre/error ex "Error executing task function"))))
+        (catch Exception ex (log/error ex "Error executing task function"))))
 
 (defn- repeating-task
   "Creates a starts a new thread which repeatedly executes the given
@@ -134,7 +136,7 @@
   (let [executor-service (Executors/newSingleThreadScheduledExecutor)
         task-future (.scheduleWithFixedDelay executor-service (create-repeating-task-fn f) delay-ms delay-ms TimeUnit/MILLISECONDS)]
     (fn []
-      (timbre/warn "Terminating long running operation as it has exceeded the time out.")
+      (log/warn "Terminating long running operation as it has exceeded the time out.")
       (future-cancel task-future)
       (.shutdown executor-service))))
 
@@ -220,8 +222,15 @@
   [func]
   (let [input-stream  (PipedInputStream.)
         output-stream (PipedOutputStream. input-stream)
+        request-id (MDC/get "reqId")
+        start-time (MDC/get "start-time") ;; this is for logging only and is set in the log4j MDC by our request middleware
         f #(with-open [os output-stream]
-              (func os))]
+             ;; copy the initiating http-request-id onto the new thread for logging purposes
+             (l4j/with-logging-context {:reqId request-id}
+               (log/info "Streaming result with function" func)
+               (func os) ;; run the function
+               (let [total-time (- (System/currentTimeMillis) start-time)]
+                 (log/info "RESPONSE finished.  It took" (str total-time "ms") "to execute"))))]
     [f input-stream]))
 
 (def default-timeouts

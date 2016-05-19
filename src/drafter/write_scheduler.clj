@@ -53,21 +53,25 @@
   an ExceptionInfo is thrown with a data map containing a :type key
   mapped to a :job-enqueue-failed value."
   [job]
-  (log/info "Queueing job: " job)
-  (if (= :exclusive-write (:priority job))
-    (do
-      (log/trace "Queueing :exclusive-write job on queue" writes-queue)
-      (.add writes-queue job))
-    (if (.tryLock global-writes-lock)
-      ;; We try the lock, not because we need the lock, but because we
-      ;; need to 503/refuse the addition of an item if the lock is
-      ;; taken.
-      (try
-        (.add writes-queue job)
-        (finally
-          (.unlock global-writes-lock)))
+  (let [req-id (MDC/get "reqId")
+        job (if req-id
+              (with-meta job {:reqId req-id})
+              job)]
+    (log/info "Queueing job: " job (meta job))
+    (if (= :exclusive-write (:priority job))
+      (do
+        (log/trace "Queueing :exclusive-write job on queue" writes-queue)
+        (.add writes-queue job))
+      (if (.tryLock global-writes-lock)
+        ;; We try the lock, not because we need the lock, but because we
+        ;; need to 503/refuse the addition of an item if the lock is
+        ;; taken.
+        (try
+          (.add writes-queue job)
+          (finally
+            (.unlock global-writes-lock)))
 
-      (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later.")))))
+        (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later."))))))
 
 ;;await-sync-job! :: Job -> ApiResponse
 (defn await-sync-job!
@@ -90,8 +94,9 @@
             priority :priority
             job-id :id
             promis :value-p :as job} (.take writes-queue)]
-
-      (l4j/with-logging-context {:jobId (str "job-" job-id)}
+      (l4j/with-logging-context (assoc
+                                 (meta job)
+                                 :jobId (str "job-" (.substring (str job-id) 0 8)))
         (try
           ;; Note that task functions are responsible for the delivery
           ;; of the promise and the setting of DONE and also preserve
