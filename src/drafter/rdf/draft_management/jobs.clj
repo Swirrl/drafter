@@ -45,7 +45,10 @@
 (defn job-succeeded!
   "Adds the job to the set of finished-jobs as a successfully completed job."
   ([job] (job-succeeded! job {}))
-  ([job details] (complete-job! job (merge {:type :ok} details))))
+  ([job details]
+   (let [completed (complete-job! job (merge {:type :ok} details))]
+     (log/info "Completed job " job)
+     completed)))
 
 (defn- finish-delete-job! [repo graph contents-only? job]
   (when-not contents-only?
@@ -169,6 +172,7 @@
       (let [next-fn (fn [job]
                       (copy-from-live-graph repo live-graph-uri dest-graph-uri (rest batches) job))]
         (copy-graph-batch! repo live-graph-uri dest-graph-uri offset limit)
+        (log/info "There are" (count batches) "remaining batches")
         (queue-job! (create-child-job job next-fn)))
       (job-succeeded! job))))
 
@@ -176,4 +180,5 @@
     (make-job :batch-write [job]
               (let [live-graph-uri (mgmt/lookup-live-graph repo draft-graph-uri)
                     batch-sizes (and live-graph-uri
+                                     (vec (get-graph-clone-batches repo live-graph-uri)))]
                 (copy-from-live-graph repo live-graph-uri draft-graph-uri batch-sizes job))))

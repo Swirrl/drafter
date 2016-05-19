@@ -14,6 +14,7 @@
             [swirrl-server.async.jobs :refer [finished-jobs complete-job! restart-id ->Job]]
             [swirrl-server.errors :refer [ex-swirrl encode-error]])
   (:import (java.util UUID)
+           (org.apache.log4j MDC)
            (java.util.concurrent PriorityBlockingQueue)
            (java.util.concurrent.locks ReentrantLock)
            (org.openrdf.rio RDFParseException)))
@@ -88,18 +89,18 @@
             priority :priority
             job-id :id
             promis :value-p :as job} (.take writes-queue)]
-
+      (MDC/put "jobId" (str "job-" job-id))
       (try
         ;; Note that task functions are responsible for the delivery
         ;; of the promise and the setting of DONE and also preserve
         ;; their job id.
-        (log/info "Executing job" job)
+        (log/info "Executing task" job)
 
         (if (= :exclusive-write priority)
           (with-lock
             (task-f! job))
           (task-f! job))
-
+        (log/info "Finished task")
         (catch Exception ex
           (log/warn ex "A task raised an error delivering error to promise")
           ;; TODO improve error returned
@@ -107,7 +108,7 @@
                          ;; {:type :error
                          ;;  :exception ex}
                          )))
-
+      (MDC/remove "jobId")
       (log/info "Writer waiting for tasks")
       (recur (.take writes-queue))))
 
