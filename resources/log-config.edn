@@ -1,4 +1,4 @@
-(let [console (ConsoleAppender. (EnhancedPatternLayout. "%d{ABSOLUTE} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"))]
+(let [console (ConsoleAppender. (EnhancedPatternLayout. "%d{ISO8601} %-5p %20.20c{1} %12X{jobId} %12X{reqId} :: %m%n"))]
   (set-loggers!
    ["org.openrdf" "drafter"]
    {:name "drafter"

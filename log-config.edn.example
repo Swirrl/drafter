@@ -1,6 +1,5 @@
-(let [log-pattern "%d{ISO8601} %-5p %.20c{1} %-10.10X{reqId}%X{jobId} :: %m%n"
+(let [log-pattern "%d{ISO8601} %-5p %20.20c{1} %12X{jobId} %12X{reqId} :: %m%n"
       max-backups 7
-
       sparql-log (doto (org.apache.log4j.RollingFileAppender.
                         (EnhancedPatternLayout. log-pattern)
                         "logs/sparql.log")
@@ -11,17 +10,12 @@
                     (.setMaxBackupIndex max-backups))]
 
   (set-loggers!
-   ["org.openrdf" "drafter" "drafter.backend.sesame.common.draft-api" "org.apache.http"]
-   {:name "drafter"
-    :level :trace
-    :out drafter-log}
+       ["org.openrdf" "drafter"]
+       {:name "drafter"
+        :level :info
+        :out drafter-log}
 
-   ["grafter.rdf.sesame"]
-   {:name "grafter"
-    :level :trace
-    :out drafter-log }
-
-   ["drafter.rdf.sparql-protocol" "drafter.routes.sparql-update"]
-   {:name "sparql"
-    :level :trace
-    :out sparql-log }))
+       ["drafter.rdf.sparql-protocol" "drafter.routes.sparql-update"]
+       {:name "sparql"
+        :level :info
+        :out sparql-log}))
