@@ -176,6 +176,4 @@
     (make-job :batch-write [job]
               (let [live-graph-uri (mgmt/lookup-live-graph repo draft-graph-uri)
                     batch-sizes (and live-graph-uri
-                                     (get-graph-clone-batches repo live-graph-uri))]
-                (copy-from-live-graph repo live-graph-uri draft-graph-uri batch-sizes job)
-                (job-succeeded! job))))
+                (copy-from-live-graph repo live-graph-uri draft-graph-uri batch-sizes job))))
