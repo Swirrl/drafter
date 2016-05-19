@@ -228,9 +228,11 @@
              ;; copy the initiating http-request-id onto the new thread for logging purposes
              (l4j/with-logging-context {:reqId request-id}
                (log/info "Streaming result with function" func)
-               (func os) ;; run the function
-               (let [total-time (- (System/currentTimeMillis) start-time)]
-                 (log/info "RESPONSE finished.  It took" (str total-time "ms") "to execute"))))]
+
+               (let [result (func os);; run the function
+                     total-time (when start-time (- (System/currentTimeMillis) start-time))]
+                 (log/info "RESPONSE finished." (when start-time " It took" (str total-time "ms") "to execute"))
+                 result)))]
     [f input-stream]))
 
 (def default-timeouts
