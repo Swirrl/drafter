@@ -14,7 +14,7 @@
             [drafter.util :as util]
             [drafter.rdf.draft-management :refer [update! query to-quads with-state-graph drafter-state-graph] :as mgmt]
             [drafter.rdf.draft-management.jobs :as jobs]
-            [swirrl-server.async.jobs :refer [create-job create-child-job]]
+            [swirrl-server.async.jobs :refer [create-job create-child-job job-succeeded!]]
             [drafter.write-scheduler :as scheduler]
             [schema.core :as s]
             [clojure.string :as string])
@@ -617,7 +617,7 @@
           ;;NOTE: do this immediately instead of scheduling a
           ;;continuation since we haven't done any real work yet
           (append-draftset-quads backend draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-      (jobs/job-succeeded! job))
+      (job-succeeded! job))
 
     :copy-graph
     (let [live-graph-uri (:graph state)
@@ -686,7 +686,7 @@
           ;;which does not exist in live
           (recur backend (rest quad-batches) draftset-ref live->draft state job)))
       (let [draftset-info (get-draftset-info backend draftset-ref)]
-        (jobs/job-succeeded! job {:draftset draftset-info})))
+        (job-succeeded! job {:draftset draftset-info})))
 
     :copy-graph
     (let [{:keys [live-graph]} state

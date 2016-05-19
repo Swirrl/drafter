@@ -2,7 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [swirrl-server.responses :as response]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
-            [swirrl-server.async.jobs :refer [submitted-job-response]]
+            [swirrl-server.async.status-routes :refer [submitted-job-response]]
             [swirrl-server.responses :as r]
             [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [await-sync-job! queue-job!]]

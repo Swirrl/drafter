@@ -4,7 +4,7 @@
             [drafter.backend.protocols :refer :all]
             [drafter.util :as util]
             [drafter.rdf.draft-management :as mgmt]
-            [swirrl-server.async.jobs :refer [create-job complete-job! create-child-job]]
+            [swirrl-server.async.jobs :refer [create-job job-succeeded! job-failed! create-child-job]]
             [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
@@ -23,10 +23,7 @@
      ~@forms
      (catch Throwable ext#
        (log/warn ext# "Error whilst executing job")
-       ;; Call in to encode-errors to coerce the exception into the appropriate
-       ;; JSON object but discard the ring-response as job status routes return
-       ;; error information as a 200 OK even if the job errored.
-       (complete-job! ~job (:body (encode-error ext#))))))
+       (job-failed! ~job ext#))))
 
 (defn failed-job-result?
   "Indicates whether the given result object is a failed job result."
@@ -41,11 +38,6 @@
                (fn [~job]
                  (with-job-exception-handling ~job
                    ~@forms))))
-
-(defn job-succeeded!
-  "Adds the job to the set of finished-jobs as a successfully completed job."
-  ([job] (job-succeeded! job {}))
-  ([job details] (complete-job! job (merge {:type :ok} details))))
 
 (defn- finish-delete-job! [repo graph contents-only? job]
   (when-not contents-only?

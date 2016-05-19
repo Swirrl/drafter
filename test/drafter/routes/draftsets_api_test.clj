@@ -199,7 +199,7 @@
 
 (defn- await-delete-statements-response [response]
   (let [job-result (await-success finished-jobs (get-in response [:body :finished-job]))]
-    (:draftset job-result)))
+    (get-in job-result [:details :draftset])))
 
 (defn- create-delete-statements-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)]

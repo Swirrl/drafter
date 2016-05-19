@@ -11,7 +11,7 @@
 
   Jobs can be added to the write queue using the queue-job! function."
   (:require [clojure.tools.logging :as log]
-            [swirrl-server.async.jobs :refer [finished-jobs complete-job! restart-id ->Job]]
+            [swirrl-server.async.jobs :refer [finished-jobs job-failed! restart-id ->Job]]
             [swirrl-server.errors :refer [ex-swirrl encode-error]])
   (:import (java.util UUID)
            (java.util.concurrent PriorityBlockingQueue)
@@ -101,10 +101,7 @@
         (catch Exception ex
           (log/warn ex "A task raised an error delivering error to promise")
           ;; TODO improve error returned
-          (complete-job! job (:body (encode-error ex))
-                         ;; {:type :error
-                         ;;  :exception ex}
-                         )))
+          (job-failed! job ex)))
 
       (log/info "Writer waiting for tasks")
       (recur (.take writes-queue))))
