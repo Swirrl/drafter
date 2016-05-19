@@ -90,7 +90,7 @@
   :aliases {"reindex" ["run" "-m" "drafter.backend.sesame-native/reindex"]}
 
   :target-path "target/%s" ;; ensure profiles don't pollute each other with
-                           ;; compiled classes etc...
+  ;; compiled classes etc...
 
   :clean-targets [:target-path :compile-path]
 
@@ -113,26 +113,26 @@
                                [grafter "0.6.0-alpha5"]
                                ]}
 
-   :dev {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
-                   [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
+   :dev [:dev-common :dev-overrides]
 
-         :dependencies [[ring-mock "0.1.5"]
-                        [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
-                        [org.clojure/data.json "0.2.5"]
-                        [clojure-csv/clojure-csv "2.0.1"]
-                        [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
-                        ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
-                        ;;[criterium "0.4.3"] ;; for easy benchmarking
-                        ;;[clj-http "1.1.0"]
-                        ;;[drafter-client "0.3.6-SNAPSHOT"]
+   :dev-common {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
+                          [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
-                        ]
+                :dependencies [[ring-mock "0.1.5"]
+                               [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
+                               [org.clojure/data.json "0.2.5"]
+                               [clojure-csv/clojure-csv "2.0.1"]
+                               [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
+                               ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
+                               ;;[criterium "0.4.3"] ;; for easy benchmarking
+                               ;;[clj-http "1.1.0"]
+                               ;;[drafter-client "0.3.6-SNAPSHOT"]
 
-         ;;:env {:dev true}
-
-         ;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
-         ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
-         }
+                               ]
+                ;;:env {:dev true}
+                ;;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
+                ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
+                }
    }
 
 
@@ -146,7 +146,7 @@
              ;;"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
              ]
 
-  ;NOTE: expected JVM version to run against is defined in the Dockerfile
+                                        ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
   )
