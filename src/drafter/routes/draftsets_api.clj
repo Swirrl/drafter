@@ -168,7 +168,7 @@
                       (parse-union-with-live-handler
                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
                          (if (is-quads-format? rdf-format)
-                           (get-draftset-data backend draftset-id (request/accept request) union-with-live)
+                           (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live)
 
                            ;; TODO fix this as it's vulnerable to SPARQL injection
                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
