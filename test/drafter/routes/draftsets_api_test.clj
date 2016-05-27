@@ -194,8 +194,10 @@
 
 (defn- delete-draftset-graph-through-api [user draftset-location graph-to-delete]
   (let [delete-graph-request (delete-draftset-graph-request user draftset-location graph-to-delete)
-        delete-graph-response (route delete-graph-request)]
-    (assert-is-ok-response delete-graph-response)))
+        {:keys [body] :as delete-graph-response} (route delete-graph-request)]
+    (assert-is-ok-response delete-graph-response)
+    (assert-schema Draftset body)
+    body))
 
 (defn- await-delete-statements-response [response]
   (let [job-result (await-success finished-jobs (get-in response [:body :finished-job]))]
@@ -654,10 +656,22 @@
 (deftest delete-non-existent-live-graph-in-draftset
   (let [draftset-location (create-draftset-through-api test-editor)
         graph-to-delete "http://live-graph"
-        delete-request (delete-draftset-graph-request test-editor draftset-location "http://live-graph")
-        delete-response (route delete-request)]
+        delete-request (delete-draftset-graph-request test-editor draftset-location "http://live-graph")]
 
-    (assert-is-unprocessable-response delete-response)))
+    (testing "silent"
+      (let [delete-request (assoc-in delete-request [:params :silent] "true")
+            delete-response (route delete-request)]
+        (assert-is-ok-response delete-response)))
+
+    (testing "malformed silent flag"
+      (let [delete-request (assoc-in delete-request [:params :silent] "invalid")
+            delete-response (route delete-request)]
+        (assert-is-unprocessable-response delete-response)))
+
+    (testing "not silent"
+      (let [delete-request (delete-draftset-graph-request test-editor draftset-location "http://live-graph")
+            delete-response (route delete-request)]
+        (assert-is-unprocessable-response delete-response)))))
 
 (deftest delete-live-graph-not-in-draftset
   (let [quads (statements "test/resources/test-draftset.trig")
@@ -666,9 +680,7 @@
         graph-to-delete (first live-graphs)
         draftset-location (create-draftset-through-api test-editor)]
     (publish-quads-through-api quads)
-    (delete-draftset-graph-through-api test-editor draftset-location graph-to-delete)
-
-    (let [{draftset-graphs :changes} (get-draftset-info-through-api draftset-location test-editor)]
+    (let [{draftset-graphs :changes} (delete-draftset-graph-through-api test-editor draftset-location graph-to-delete)]
       (is (= #{graph-to-delete} (set (keys draftset-graphs)))))))
 
 (deftest delete-graph-with-changes-in-draftset
@@ -678,9 +690,8 @@
         added-quads (rest graph-quads)]
     (publish-quads-through-api [published-quad])
     (append-quads-to-draftset-through-api test-editor draftset-location added-quads)
-    (delete-draftset-graph-through-api test-editor draftset-location graph)
-
-    (let [{draftset-graphs :changes} (get-draftset-info-through-api draftset-location test-editor)]
+    
+    (let [{draftset-graphs :changes} (delete-draftset-graph-through-api test-editor draftset-location graph)]
       (is (= #{graph} (set (keys draftset-graphs)))))))
 
 (deftest delete-graph-only-in-draftset
@@ -691,15 +702,12 @@
         [graph _] (first grouped-quads)]
     (append-data-to-draftset-through-api test-editor draftset-location rdf-data-file)
 
-    (delete-draftset-graph-through-api test-editor draftset-location graph)
-
-    (let [remaining-quads (eval-statements (get-draftset-quads-through-api draftset-location test-editor))
-          expected-quads (eval-statements (mapcat second (rest grouped-quads)))]
-      (is (= (set expected-quads) (set remaining-quads))))
-
-    (let [draftset-info (get-draftset-info-through-api draftset-location test-editor)
-          draftset-graphs (keys (:changes draftset-info))
+    (let [{:keys [changes]} (delete-draftset-graph-through-api test-editor draftset-location graph)
+          draftset-graphs (keys changes)
+          remaining-quads (eval-statements (get-draftset-quads-through-api draftset-location test-editor))
+          expected-quads (eval-statements (mapcat second (rest grouped-quads)))
           expected-graphs (keys grouped-quads)]
+      (is (= (set expected-quads) (set remaining-quads)))
       (is (= (set expected-graphs) (set draftset-graphs))))))
 
 (deftest delete-graph-request-for-non-existent-draftset

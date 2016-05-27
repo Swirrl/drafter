@@ -90,15 +90,18 @@
 (defn- set-union-with-live [request value]
   (assoc-in request [:params :union-with-live] false))
 
-(defn- parse-union-with-live-handler [inner-handler]
-  (fn [{{:keys [union-with-live]} :params :as request}]
-    (letfn [(update-request [b] (assoc-in request [:params :union-with-live] b))]
-      (if (nil? union-with-live)
-        (inner-handler (update-request false))
-        (if (boolean (re-matches #"(?i)(true|false)" union-with-live))
-          (let [ub (Boolean/parseBoolean union-with-live)]
+(defn parse-query-param-flag-handler [flag inner-handler]
+  (fn [{:keys [params] :as request}]
+    (letfn [(update-request [b] (assoc-in request [:params flag] b))]
+      (if-let [value (get params flag)]
+        (if (boolean (re-matches #"(?i)(true|false)" value))
+          (let [ub (Boolean/parseBoolean value)]
             (inner-handler (update-request ub)))
-          (unprocessable-entity-response "Invalid union-with-live parameter value - expected true or false"))))))
+          (unprocessable-entity-response (str "Invalid " (name flag) " parameter value - expected true or false")))
+        (inner-handler (update-request false))))))
+
+(defn- parse-union-with-live-handler [inner-handler]
+  (parse-query-param-flag-handler :union-with-live inner-handler))
 
 (defn draftset-api-routes [backend user-repo authenticated]
   (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
@@ -112,7 +115,6 @@
       (context
        version []
        (routes
-
         (make-route :get "/users"
                     (authenticated
                      (fn [r]
@@ -192,10 +194,16 @@
 
         (make-route :delete "/draftset/:id/graph"
                     (as-draftset-owner
-                     (required-managed-graph-param
-                      (fn [{{:keys [draftset-id graph]} :params}]
-                        (dsmgmt/delete-draftset-graph! backend draftset-id graph)
-                        (response "")))))
+                     (parse-query-param-flag-handler
+                      :silent
+                      (fn [{{:keys [draftset-id graph silent] :as params} :params :as request}]
+                        (if (mgmt/is-graph-managed? backend graph)
+                          (do
+                            (dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                            (response (dsmgmt/get-draftset-info backend draftset-id)))
+                          (if silent
+                            (response (dsmgmt/get-draftset-info backend draftset-id))
+                            (unprocessable-entity-response (str "Graph not found"))))))))
 
         (make-route :delete "/draftset/:id/changes"
                     (as-draftset-owner
