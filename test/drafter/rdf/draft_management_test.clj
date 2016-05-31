@@ -1,19 +1,20 @@
 (ns drafter.rdf.draft-management-test
-  (:require
-   [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live!]]
-   [grafter.rdf :refer [s add add-statement]]
-   [grafter.rdf.templater :refer [graph triplify]]
-   [grafter.vocabularies.rdf :refer :all]
-   [grafter.rdf.repository :refer :all]
-   [drafter.backend.protocols :refer [append-data-batch!]]
-   [drafter.backend.sesame.common.protocols :refer [->sesame-repo]]
-   [grafter.rdf.protocols :refer [update!]]
-   [drafter.rdf.draft-management :refer :all]
-   [drafter.rdf.drafter-ontology :refer :all]
-   [clojure.test :refer :all]
-   [schema.test :refer [validate-schemas]])
-
-  (:import [org.openrdf.model.impl URIImpl]))
+  (:require [clojure.test :refer :all]
+            [drafter.backend.protocols :refer [append-data-batch!]]
+            [drafter.rdf
+             [draft-management :refer :all]
+             [drafter-ontology :refer :all]]
+            [drafter.test-common
+             :refer
+             [*test-backend* make-graph-live! wrap-clean-test-db wrap-db-setup]]
+            [grafter.rdf :refer [add s statements]]
+            [grafter.rdf
+             [protocols :refer [update!]]
+             [repository :refer :all]
+             [templater :refer [triplify]]]
+            [grafter.vocabularies.rdf :refer :all]
+            [schema.test :refer [validate-schemas]])
+  (:import org.openrdf.model.impl.URIImpl))
 
 (use-fixtures :each validate-schemas)
 
@@ -160,7 +161,7 @@
 
 (deftest migrate-live!-remove-live-aswell-test
   (testing "migrate-live! DELETION: Deleted draft removes live graph from state graph"
-    (let [test-graph-to-delete-uri "http://example.org/my-other-graph1"
+    (let [test-graph-to-delete-uri "http://example.org/graph-to-be-eventually-deleted"
           graph-to-keep-uri "http://example.org/keep-me-a1"
           graph-to-keep-uri2 "http://example.org/keep-me-a2"
           draft-graph-to-del-uri (create-managed-graph-with-draft!
@@ -181,6 +182,7 @@
         (migrate-live! *test-backend* draft-graph-to-del-uri)
         (let [managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
               keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri)]
+
           (is (not managed-found?)
               "Live graph should no longer be referenced in state graph")
 
@@ -189,6 +191,23 @@
           (testing "Unrelated draft and live graphs should be not be removed from the state graph"
             (is keep-managed-found?)
             (is (draft-exists? *test-backend* draft-graph-to-keep-uri2))))))))
+
+(deftest migrate-live-clean-up-test
+  (let [start-state (set (statements "./test/resources/migrate-live/starting-state.trig"))
+        live:graph-to-be-deleted (str "http://live.org/live/graph-to-be-deleted")
+        draft:the-delete (str "http://publishmydata.com/graphs/drafter/draft/the-delete")]
+
+    (add *test-backend* start-state)
+    (migrate-live! *test-backend* draft:the-delete)
+
+    (is (not (query *test-backend* "PREFIX live: <http://live.org/live/>
+       ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+          live:graph-to-be-deleted ?p ?o .
+
+       }
+    }")))
+
+    ))
 
 (deftest migrate-live!-dont-remove-state-when-other-drafts-test
   (testing "migrate-live! DELETION: Doesn't delete from state graph when there's multiple drafts"

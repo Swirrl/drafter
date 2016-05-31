@@ -1,0 +1,35 @@
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix live: <http://live.org/live/> .
+@prefix data: <http://example.org/data/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+## drafter state graph
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+
+        # this graph shouldn't be cleaned up as it has two drafts on
+        # it, even though one is a deletion we should leave it alone
+        # because the test is deleting the other graph.
+        live:graph-to-be-eventually-deleted a drafter:ManagedGraph ;
+	        drafter:isPublic true ;
+                drafter:hasDraft draft:a-non-blank-draft , draft:another-blank-draft .
+
+        draft:a-non-blank-draft a drafter:DraftGraph ;
+                dct:modified "2016-05-23T16:30:24.471+01:00"^^xsd:dateTime .
+}
+
+live:graph-to-be-eventually-deleted {
+        data:delete-me data:delete-me data:delete-me .
+}
+
+draft:a-non-blank-draft {
+        # Don't delete this graph.
+        data:new-triple data:new-triple data:new-triple .
+}
+
+draft:a-blank-draft-ie-the-deletion {
+   # a blank graph (representing the deletion) - Note this could
+   # technically just not be here but is here for clarity/documentation.
+}

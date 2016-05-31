@@ -5,6 +5,7 @@
             [grafter.rdf :refer [add]]
             [grafter.rdf.protocols :refer [update!]]
             [drafter.util :as util]
+            [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.draft-management :refer [drafter-state-graph] :as mgmt]
             [drafter.backend.sesame.common.protocols :refer [->sesame-repo ->repo-connection]]))
 
@@ -81,14 +82,62 @@
    (graph-empty? repo draft-graph-uri)
    (not (mgmt/has-more-than-one-draft? repo live-graph-uri))))
 
+(defn clean-up-live-state-query [live-graph-uri]
+  #_(str
+   "DELETE {
+      GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+         <" live-graph-uri "> ?dellp ?dello .
+         <" live-graph-uri "> <http://publishmydata.com/def/drafter/isPublic> ?public .
+         <" live-graph-uri "> a ?mg .
+}
+   } WHERE {
+     {
+         SELECT (COUNT(?draft) AS ?numberOfDrafts) WHERE {
+              <" live-graph-uri "> a <" drafter:ManagedGraph "> ;
+              <" drafter:hasDraft "> ?draft .
+         }
+         HAVING(?numberOfDrafts < 2)
+
+     }
+         <" live-graph-uri "> <http://publishmydata.com/def/drafter/isPublic> ?public .
+         <" live-graph-uri "> a ?mg .
+
+}")
+
+  (str
+   "DELETE WHERE {
+      {
+         GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+               <" live-graph-uri "> a <" drafter:ManagedGraph "> ;
+                                      <" drafter:hasDraft "> ?draft .
+            FILTER NOT EXISTS {
+               GRAPH ?draft {
+                 ?s ?p ?o .
+               }
+            }
+         }
+      }
+   }
+
+   "
+
+
+   ))
+
+(defn clean-up-draft-query [draft-graph]
+  ;; TODO
+  )
+
 ;;Repository -> String -> { queries: [String], live-graph-uri: String }
 (defn- migrate-live-queries [db draft-graph-uri]
   (if-let [live-graph-uri (mgmt/lookup-live-graph db draft-graph-uri)]
     (let [move-query (move-graph draft-graph-uri live-graph-uri)
           delete-state-query (mgmt/delete-draft-state-query draft-graph-uri)
           live-public-query (mgmt/set-isPublic-query live-graph-uri true)
-          queries [move-query delete-state-query live-public-query]
-          queries (if (should-delete-live-graph-from-state-after-draft-migrate? db draft-graph-uri live-graph-uri)
+          clean-up-live-state (clean-up-live-state-query live-graph-uri)
+          clean-up-draft-state (clean-up-draft-query draft-graph-uri)
+          queries [move-query delete-state-query live-public-query clean-up-live-state clean-up-draft-state]
+          #_queries #_(if (should-delete-live-graph-from-state-after-draft-migrate? db draft-graph-uri live-graph-uri)
                     (conj queries (mgmt/delete-live-graph-from-state-query live-graph-uri))
                     queries)]
       {:queries queries
@@ -105,5 +154,6 @@
         graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo %)) graphs)
         update-str (util/make-compound-sparql-query graph-migrate-queries)]
     (log/info "Migrate Live with update: " update-str)
+
     (update! repo update-str))
   (log/info "Make-live for graph(s) " graphs " done"))

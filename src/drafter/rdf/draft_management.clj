@@ -56,6 +56,32 @@
                  "}")]
     (query db qry)))
 
+;; PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+;; SELECT * {
+;;   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+;; 	VALUES ?liveGraphToDelete { <http://example.org/graph-to-be-eventually-deleted> }
+;;     ?liveGraphToDelete
+;;          a drafter:ManagedGraph ;
+;;          drafter:hasDraft ?draft .
+
+;;     FILTER NOT EXISTS {
+;;       GRAPH ?liveGraphToDelete {
+;;           ?s ?p ?o .
+;;         }
+;;       }
+;;     FILTER NOT EXISTS {
+;;       {
+;;         SELECT (COUNT(?draft) AS ?count) {
+;;          ?liveGraphToDelete a drafter:ManagedGraph ;
+;;              drafter:hasDraft ?draft .
+;;         }
+;;       }
+;;       FILTER(?count > 1)
+;;     }
+;;   }
+;; }
+
 (defn has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
@@ -67,8 +93,9 @@
                  "        <" drafter:hasDraft "> ?draft ."
                  "    }"
                  "  }"
-                 "  HAVING (?numberOfRefs > 1)"
+                 "  HAVING(?numberOfRefs > 1)"
                  "}")]
+    (log/info qry)
     (query db qry)))
 
 (defn graph-exists?
