@@ -42,7 +42,7 @@
 
                  [swirrl/lib-swirrl-server "0.3.0" :exclusions [clout org.clojure/java.classpath]]
 
-                 [grafter "0.7.1"]
+                 [grafter "0.7.2-SNAPSHOT"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
