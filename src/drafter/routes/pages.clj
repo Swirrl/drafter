@@ -1,6 +1,7 @@
 (ns drafter.routes.pages
   (:require [compojure.core :refer [GET routes]]
             [drafter.layout :as layout]
+            [grafter.rdf.io :refer [default-prefixes]]
             [drafter.rdf.draft-management :refer [drafter-state-graph
                                                   live-graphs]]
             [drafter.backend.protocols :refer [get-all-drafts get-live-graph-for-draft]]
@@ -20,12 +21,18 @@
 (defn upload-form [params]
   (layout/render "upload.html" params ))
 
+(def drafter-prefixes (merge default-prefixes {"draft" "http://publishmydata.com/graphs/drafter/draft/"
+                                               "drafter" "http://publishmydata.com/def/drafter/"}))
+
 (defn dump-database
   "A convenience function intended for development use.  It will dump
   the RAW database as a Trig String for debugging.  Don't use on large
   databases as it will be loaded into memory."
   [db ostream]
-  (add (rdf-serializer ostream :format rdf-trig) (statements db)))
+  (add (rdf-serializer ostream
+                       :format rdf-trig
+                       :prefixes drafter-prefixes
+                       ) (statements db)))
 
 (defn data-page [template dumps-endpoint graphs]
   (layout/render template {:dump-path dumps-endpoint :graphs graphs}))
