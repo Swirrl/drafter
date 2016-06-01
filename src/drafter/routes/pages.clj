@@ -11,7 +11,10 @@
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]))
 
-(def drafter-prefixes (assoc default-prefixes "drafter" (drafter "")))
+(def drafter-prefixes (assoc default-prefixes
+                             "drafter" (drafter "")
+                             "draftset" (drafter "draftset/")
+                             "graph" "http://publishmydata.com/graphs/drafter/draft/"))
 
 (defn query-page [params]
   (layout/render "query-page.html" params))
