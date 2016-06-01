@@ -922,13 +922,6 @@ definitions:
         type: string
         description: The graphs uri
 
-  Graphs:
-    type: object
-    description: A map of graph names to Graph objects
-    properties: {}
-    additionalProperties:
-      $ref: '#/definitions/Graph'
-
   User:
     type: object
     required: [username, role]
@@ -952,7 +945,9 @@ definitions:
         format: uuid
         description: 'Unique identifier representing this draftset'
       changes:
-        $ref: '#/definitions/Graphs'
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Graph'
       display-name:
         type: string
         description: Display name of the Draftset
