@@ -1046,7 +1046,7 @@ definitions:
       message:
         type: string
       details:
-        type: string
+        type: object
     required:
       - type
       - restart-id
