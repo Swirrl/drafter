@@ -22,7 +22,8 @@
   (layout/render "upload.html" params ))
 
 (def drafter-prefixes (merge default-prefixes {"draft" "http://publishmydata.com/graphs/drafter/draft/"
-                                               "drafter" "http://publishmydata.com/def/drafter/"}))
+                                               "drafter" "http://publishmydata.com/def/drafter/"
+                                               "folder" "http://publishmydata.com/def/ontology/folder/"}))
 
 (defn dump-database
   "A convenience function intended for development use.  It will dump
