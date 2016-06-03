@@ -12,6 +12,7 @@
   Jobs can be added to the write queue using the queue-job! function."
   (:require [clojure.tools.logging :as log]
             [clj-logging-config.log4j :as l4j]
+            [drafter.util :refer [log-time-taken]]
             [swirrl-server.async.jobs :refer [finished-jobs complete-job! restart-id ->Job]]
             [swirrl-server.errors :refer [ex-swirrl encode-error]])
   (:import (java.util UUID)
@@ -101,13 +102,13 @@
           ;; Note that task functions are responsible for the delivery
           ;; of the promise and the setting of DONE and also preserve
           ;; their job id.
-          (log/info "Executing task" job)
 
-          (if (= :exclusive-write priority)
-            (with-lock
-              (task-f! job))
-            (task-f! job))
-          (log/info "Finished task")
+          (log-time-taken "task"
+            (if (= :exclusive-write priority)
+              (with-lock
+                (task-f! job))
+              (task-f! job)))
+
           (catch Exception ex
             (log/warn ex "A task raised an error delivering error to promise")
             ;; TODO improve error returned
