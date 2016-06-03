@@ -43,20 +43,11 @@
                  [swirrl/lib-swirrl-server "0.3.0" :exclusions [clout org.clojure/java.classpath]]
 
                  [grafter "0.7.1"]
-                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
                  [grafter/url "0.2.1"]
 
-                 [org.openrdf.sesame/sesame-queryrender "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]
-                 [org.openrdf.sesame/sesame-runtime "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]
-
-                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
-                 ;; see here for the source code that built this release:
-                 ;;
-                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
-
-                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
+                 [org.openrdf.sesame/sesame-runtime "2.7.15"]
 
                  [com.taoensso/timbre "4.0.2"]
                  [clj-logging-config "1.9.12"]

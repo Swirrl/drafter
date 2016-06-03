@@ -15,7 +15,7 @@ public class DrafterSPARQLRepository extends SPARQLRepository {
         if(!this.isInitialized()) {
             throw new RepositoryException("SPARQLRepository not initialized.");
         } else {
-            return new DrafterSPARQLConnection(this, createHTTPClient());
+            return new DrafterSPARQLConnection(this);
         }
     }
 }
