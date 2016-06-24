@@ -1,10 +1,30 @@
 (ns drafter.util
   (:require [clojure.string :as str]
-            [grafter.rdf.protocols :refer [map->Quad]])
+            [grafter.rdf.protocols :refer [map->Quad]]
+            [clojure.pprint :as pp])
   (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]
            [javax.mail.internet InternetAddress AddressException]))
 
-;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
+(defmacro log-time-taken
+  "Macro that logs the time spent doing something at :info level,
+  captures the form execued in the log output."
+  {:style/indent :defn}
+  [msg & forms]
+  (let [md (meta &form)
+        line-num (:line md)
+        col-num (:column md)
+        forms-str (with-out-str (pp/pprint (cons 'do forms)))]
+    `(do
+       (clojure.tools.logging/info "About to execute"
+                                   (str ~msg " (line #" ~line-num ")")
+                                   #_~forms-str)
+       (let [start-time# (System/currentTimeMillis)]
+           ~@forms
+           (let [end-time# (System/currentTimeMillis)
+                 execution-time# (- end-time# start-time#)]
+             (clojure.tools.logging/info ~msg "took" (str execution-time# "ms") #_~forms-str))))))
+
+;;map-values :: (a -> b) -> Map[k, a] -> Map[k, b]
 (defn map-values
   "Maps the values in a map with the given transform function."
   [f m]

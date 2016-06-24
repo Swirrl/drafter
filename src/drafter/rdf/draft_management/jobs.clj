@@ -131,5 +131,6 @@
       (let [next-fn (fn [job]
                       (copy-from-live-graph repo live-graph-uri dest-graph-uri (rest batches) job))]
         (copy-graph-batch! repo live-graph-uri dest-graph-uri offset limit)
+        (log/info "There are" (count batches) "remaining batches")
         (queue-job! (create-child-job job next-fn)))
       (job-succeeded! job))))

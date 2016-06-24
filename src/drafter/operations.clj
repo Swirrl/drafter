@@ -1,7 +1,9 @@
 (ns drafter.operations
-  (:require [clojure.tools.logging :as log])
+  (:require [clojure.tools.logging :as log]
+            [clj-logging-config.log4j :as l4j])
   (:import [java.util.concurrent FutureTask TimeUnit Executors]
-           [java.io PipedInputStream PipedOutputStream]))
+           [java.io PipedInputStream PipedOutputStream]
+           [org.apache.log4j MDC]))
 
 (def system-clock {:now-fn #(System/currentTimeMillis)})
 
@@ -220,8 +222,17 @@
   [func]
   (let [input-stream  (PipedInputStream.)
         output-stream (PipedOutputStream. input-stream)
+        request-id (MDC/get "reqId")
+        start-time (MDC/get "start-time") ;; this is for logging only and is set in the log4j MDC by our request middleware
         f #(with-open [os output-stream]
-              (func os))]
+             ;; copy the initiating http-request-id onto the new thread for logging purposes
+             (l4j/with-logging-context {:reqId request-id}
+               (log/info "Streaming result with function" func)
+
+               (let [result (func os);; run the function
+                     total-time (when start-time (- (System/currentTimeMillis) start-time))]
+                 (log/info "RESPONSE finished." (when start-time " It took" (str total-time "ms") "to execute"))
+                 result)))]
     [f input-stream]))
 
 (def default-timeouts

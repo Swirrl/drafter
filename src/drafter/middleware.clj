@@ -20,18 +20,22 @@
             [ring.util.request :as request]
             [pantomime.media :refer [media-type-named]])
   (:import [clojure.lang ExceptionInfo]
-           [java.io File]))
+           [java.io File]
+           [java.util UUID]))
 
 (defn log-request [handler]
   (fn [req]
     ;; TODO wrap requests with some kind of ID NDC/MDC
-    (l4j/with-logging-context {:reqId (-> (Object.) .hashCode)}
-      (log/info "REQUEST " (:uri req) (-> req :headers (get "accept")) (:params req))
-      (let [start-time (System/currentTimeMillis)
-            resp (handler req)
-            total-time (- (System/currentTimeMillis) start-time)]
-        (log/info "RESPONSE " (:status resp) "took" (str total-time "ms"))
-        resp))))
+    (let [start-time (System/currentTimeMillis)]
+      (l4j/with-logging-context {:reqId (str "req-" (-> (UUID/randomUUID) str (.substring 0 8)))
+                                 :start-time start-time}
+        (log/info "REQUEST" (:uri req) (-> req :headers (get "accept")) (:params req))
+        (let [resp (handler req)
+              headers-time (- (System/currentTimeMillis) start-time)]
+          (if (instance? java.io.InputStream (:body resp))
+            (log/info "RESPONSE " (:status resp) "headers sent after" (str headers-time "ms") "streaming body...")
+            (log/info "RESPONSE " (:status resp) "finished.  It took" (str headers-time "ms") "to execute"))
+          resp)))))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (if-let [user (user-repo/find-user-by-username user-repo username)]
