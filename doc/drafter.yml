@@ -918,9 +918,12 @@ definitions:
     type: object
     description: A graph object
     properties:
-      uri:
+      state:
         type: string
-        description: The graphs uri
+        enum:
+          - created
+          - updated
+          - deleted
 
   User:
     type: object
@@ -976,7 +979,8 @@ definitions:
     example:
       id: de305d54-75b4-431b-adb2-eb6b9e546014
       changes:
-        'http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types': {}
+        'http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types': {'status': 'updated'}
+        'http://opendatacommunities.org/data/labour-force/employment-rate/employment-rate-by-age': {'status': 'deleted'}
       display-name: New Temporary Housing Figures
       description: Quarterly updates for Q4 2015
       updated-at: 2016-01-04T13:35:21+00:00
