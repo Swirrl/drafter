@@ -85,13 +85,20 @@
 (defn- get-draftset-graph-mapping-query [draftset-ref]
   (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
     (str
-     "SELECT ?lg ?dg WHERE { "
+     "SELECT * WHERE { "
      (with-state-graph
-       "<" ds-uri "> a drafter:DraftSet ."
-       "?dg drafter:inDraftSet <" ds-uri "> ."
-       "?lg a drafter:ManagedGraph ; "
-       "    drafter:hasDraft ?dg .")
+       "<" ds-uri "> a <" drafter:DraftSet "> ."
+       "?dg <" drafter:inDraftSet "> <"  ds-uri "> ."
+       "?lg a <" drafter:ManagedGraph "> ;"
+       "    <" drafter:isPublic "> ?public ;"
+       "    <" drafter:hasDraft "> ?dg .")
      "}")))
+
+(defn- graph-exists-query [graph-uri]
+  (str
+   "ASK WHERE {"
+   "  GRAPH <" graph-uri "> { ?s ?p ?o }"
+   "}"))
 
 (defn- get-all-draftset-graph-mappings-query [user]
   (let [user-uri (user/user->uri user)
@@ -104,6 +111,7 @@
        "?dg <" drafter:inDraftSet "> ?ds ."
        "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
        "?lg <" drafter:hasDraft "> ?dg ."
+       "?dg <" drafter:isPublic "> ?public ."
        "{"
        "  ?ds <" drafter:hasOwner "> <" user-uri "> ."
        "} UNION {"
@@ -120,15 +128,25 @@
        "}")
      "}")))
 
-;;seq {"lg" URI "dg" URI} -> {String String}
 (defn- graph-mapping-result-seq->map [mapping-results]
-  (into {} (map (fn [{:strs [lg dg]}] [(.stringValue lg) (.stringValue dg)]) mapping-results)))
+  (into {} (map (fn [{:strs [lg dg public graph-exists]}]
+                  [(.stringValue lg) {:draft-graph-uri (.stringValue dg) :public (.booleanValue public) :draft-graph-exists graph-exists}])
+                mapping-results)))
 
-;;Repository -> String -> Map {String String}
-(defn get-draftset-graph-mapping [repo draftset-ref]
+(defn get-draftset-graph-states [repo draftset-ref]
   (let [mapping-query (get-draftset-graph-mapping-query draftset-ref)
-        results (query repo mapping-query)]
+        graph-results (query repo mapping-query)
+        results (map (fn [{:strs [dg] :as m}]
+                       (let [q (graph-exists-query dg)
+                             exists (query repo q)]
+                         (assoc m "graph-exists" exists)))
+                     graph-results)]
     (graph-mapping-result-seq->map results)))
+
+(defn get-draftset-graph-mapping [repo draftset-ref]
+  (let [graph-states (get-draftset-graph-states repo draftset-ref)
+        mapping-pairs (map (fn [[live-graph {:keys [draft-graph-uri]}]] [live-graph draft-graph-uri]) graph-states)]
+    (into {} mapping-pairs)))
 
 (defn- graph-mapping-draft-graphs [graph-mapping]
   (vals graph-mapping))
@@ -273,6 +291,7 @@
        "?dg <" drafter:inDraftSet "> ?ds ."
        "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
        "?lg <" drafter:hasDraft "> ?dg ."
+       "?dg <" drafter:isPublic "> ?public ."
        "{"
        "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
        "  ?ds <" drafter:hasSubmission "> ?submission ."
@@ -316,14 +335,22 @@
     (if-let [result (first results)]
       (draftset-properties-result->properties draftset-ref result))))
 
-(defn- combine-draftset-properties-and-graphs [properties graph-mapping]
-  (let [live-graph-info (util/map-values (constantly {}) graph-mapping)]
+(defn- get-draftset-graph-state [{:keys [public draft-graph-exists]}]
+  (cond (and public draft-graph-exists) :updated
+        (and public (not draft-graph-exists)) :deleted
+        (and (not public) draft-graph-exists) :created
+        :else :deleted))
+
+(defn- combine-draftset-properties-and-graphs [properties graph-states]
+  (let [graph-info->state (fn [[live-graph draft-graph-state]]
+                            [live-graph {:status (get-draftset-graph-state draft-graph-state)}])
+        live-graph-info (into {} (map graph-info->state graph-states))]
     (assoc properties :changes live-graph-info)))
 
 (defn get-draftset-info [repo draftset-ref]
   (if-let [ds-properties (get-draftset-properties repo draftset-ref)]
-    (let [ds-graph-mapping (get-draftset-graph-mapping repo draftset-ref)]
-      (combine-draftset-properties-and-graphs ds-properties ds-graph-mapping))))
+    (let [ds-graph-states (get-draftset-graph-states repo draftset-ref)]
+      (combine-draftset-properties-and-graphs ds-properties ds-graph-states))))
 
 (defn- combine-all-properties-and-graph-mappings [draftset-properties dataset-graph-mappings]
   (map (fn [{ds-uri "ds" :as result}]

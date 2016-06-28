@@ -94,7 +94,7 @@
 
 (def ^:private DraftsetWithoutTitleOrDescription
   {:id s/Str
-   :changes {s/Str {s/Any s/Any}}
+   :changes {s/Str {:status (s/enum :created :updated :deleted)}}
    :created-at Date
    :created-by s/Str
    (s/optional-key :current-owner) s/Str
@@ -298,6 +298,29 @@
           available-names (set (map :display-name ds-infos))]
       (assert-schema [Draftset] ds-infos)
       (is (= #{"owned" "publishing"} available-names)))))
+
+(deftest get-all-draftsets-changes-test
+  (let [grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
+        [graph1 graph1-quads] (first grouped-quads)
+        [graph2 graph2-quads] (second grouped-quads)
+        draftset-location (create-draftset-through-api test-editor)]
+    (publish-quads-through-api graph1-quads)
+
+    ;;delete quads from graph1 and insert into graph2
+    (delete-quads-through-api test-editor draftset-location (take 1 graph1-quads))
+    (append-quads-to-draftset-through-api test-editor draftset-location graph2-quads)
+
+    (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+      (is (= :updated (get-in changes [graph1 :status])))
+      (is (= :created (get-in changes [graph2 :status]))))
+
+    ;;delete graph1
+    (delete-draftset-graph-through-api test-editor draftset-location graph1)
+    (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+      (is (= :deleted (get-in changes [graph1 :status])))
+      (is (= :created (get-in changes [graph2 :status])))
+      )
+    ))
 
 (deftest get-empty-draftset-without-title-or-description
   (let [draftset-location (create-draftset-through-api test-editor)
@@ -1352,6 +1375,42 @@
 (deftest get-users-unauthenticated
   (let [response (route {:uri "/v1/users" :request-method :get})]
     (assert-is-unauthorised-response response)))
+
+(deftest draftset-graphs-state-test
+  (testing "Graph created"
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (create-draftset-through-api test-editor)]
+      (append-quads-to-draftset-through-api test-editor draftset-location quads)
+      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+        (is (= :created (get-in changes [live-graph :status]))))))
+
+  (testing "Quads deleted from live graph"
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (create-draftset-through-api test-editor)]
+      (publish-quads-through-api quads)
+      (delete-quads-through-api test-editor draftset-location (take 1 quads))
+
+      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+        (is (= :updated (get-in changes [live-graph :status]))))))
+
+  (testing "Quads added to live graph"
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          [published to-add] (split-at 1 quads)
+          draftset-location (create-draftset-through-api test-editor)]
+      (publish-quads-through-api published)
+      (append-quads-to-draftset-through-api test-editor draftset-location to-add)
+
+      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+        (is (= :updated (get-in changes [live-graph :status]))))))
+
+  (testing "Graph deleted"
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (create-draftset-through-api test-editor)]
+      (publish-quads-through-api quads)
+      (delete-draftset-graph-through-api test-editor draftset-location live-graph)
+
+      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+        (is (= :deleted (get-in changes [live-graph :status])))))))
 
 (defn- setup-route [test-function]
   (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
