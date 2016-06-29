@@ -918,7 +918,7 @@ definitions:
     type: object
     description: A graph object
     properties:
-      state:
+      status:
         type: string
         enum:
           - created
