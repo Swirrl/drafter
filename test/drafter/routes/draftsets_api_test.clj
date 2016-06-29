@@ -411,6 +411,26 @@
       (is (= 1 (count editor-claimable)))
       (is (= (:display-name (first editor-claimable)) (nth ds-names 1))))))
 
+(deftest get-claimable-draftsets-changes-test
+  (let [[[g1 g1-quads] [g2 g2-quads]] (seq (group-by context (statements "test/resources/test-draftset.trig")))
+        draftset1 (create-draftset-through-api test-editor "ds1")
+        draftset2 (create-draftset-through-api test-editor "ds2")]
+    (publish-quads-through-api g1-quads)
+
+    ;;delete published graph in draftset1 and create new graph in draftset2
+    (delete-draftset-graph-through-api test-editor draftset1 g1)
+    (append-quads-to-draftset-through-api test-editor draftset2 g2-quads)
+
+    ;;submit both draftsets to publisher role
+    (doseq [ds [draftset1 draftset2]]
+      (submit-draftset-to-role-through-api test-editor ds :publisher))
+
+    (let [ds-infos (get-claimable-draftsets-through-api test-publisher)
+          ds1-info (some #(= "ds1" (:display-name %)) ds-infos)
+          ds2-info (some #(= "ds2" (:display-name %)) ds-infos)]
+      (is (= {:deleted (get-in ds1-info [:changes g1 :status])}))
+      (is (= {:created (get-in ds2-info [:changes g2 :status])})))))
+
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
         quads (statements data-file-path)
