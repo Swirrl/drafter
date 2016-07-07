@@ -183,9 +183,15 @@ paths:
     get:
       summary: List available Draftsets
       description: |
-       Lists all available draftsets
+       Lists draftsets visible to the user. The include parameter can
+       be used to filter the result list to just those owned by the
+       current user, or those not owned which can be claimed by the
+       current user. By default all owned and claimable draftsets are
+       returned.
       security:
         - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/include'
       tags:
         - Draftsets
       responses:
@@ -195,28 +201,6 @@ paths:
             type: array
             items:
               $ref: '#/definitions/Draftset'
-
-  /draftsets/claimable:
-    get:
-      summary: List all the draftsets that are claimable by you
-      description: |
-        Lists all of the draftsets that you can claim.  Claimable
-        draftsets are either submitted draftsets that have been
-        submitted to a pool of draftsets for users of a given role, or
-        unclaimed draftsets which you submitted (i.e. you can
-        withdrawl a submitted draftset.)
-      security:
-        - jws-auth: []
-      tags:
-        - Draftsets
-      responses:
-        '200':
-          description: An array of Draftsets you can claim
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Draftset'
-
 
   /draftset/{id}:
     get:
@@ -817,6 +801,19 @@ parameters:
     in: query
     required: false
     type: string
+
+  include:
+    name: include
+    in: query
+    description: which visible draftsets to include in the results
+    required: false
+    type: string
+    enum:
+      - owned
+      - claimable
+      - all
+    default: all
+    
 
 # message:
 #   name: message
