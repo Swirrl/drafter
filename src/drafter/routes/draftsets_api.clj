@@ -17,7 +17,8 @@
             [drafter.util :as util]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
-            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type temp-file-body]]
+            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type temp-file-body
+                                        optional-enum-param]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
@@ -124,13 +125,19 @@
 
         (make-route :get "/draftsets"
                     (authenticated
-                     (fn [{user :identity :as request}]
-                       (response (dsmgmt/get-all-draftsets-info backend user)))))
+                     (optional-enum-param
+                      :include #{:all :owned :claimable} :all
+                      (fn [{user :identity {:keys [include]} :params :as request}]
+                        (case include
+                          :all (response (dsmgmt/get-all-draftsets-info backend user))
+                          :claimable (response (dsmgmt/get-draftsets-claimable-by backend user))
+                          :owned (response (dsmgmt/get-draftsets-owned-by backend user)))))))
 
         (make-route :get "/draftsets/claimable"
                     (authenticated
-                     (fn [{user :identity :as request}]
-                       (response (dsmgmt/get-draftsets-claimable-by backend user)))))
+                     (optional-enum-param :include #{:all :owned :claimable} :all
+                                          (fn [{user :identity :as request}]
+                                            (response (dsmgmt/get-draftsets-claimable-by backend user))))))
 
         ;;create a new draftset
         (make-route :post "/draftsets"

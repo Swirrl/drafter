@@ -115,6 +115,26 @@
       (is (= false @invoked-inner))
       (tc/assert-is-unprocessable-response response))))
 
+(deftest optional-enum-param-test
+  (let [param-name :p
+        inner-handler (fn [request] (get-in request [:params param-name]))
+        allowed-values #{:foo :bar :quux}
+        default-value :bar
+        handler (optional-enum-param param-name allowed-values default-value inner-handler)]
+    
+    (testing "Missing value"
+      (is (= default-value (handler {}))))
+
+    (testing "Valid value"
+      (let [expected-value (second allowed-values)
+            request {:params {param-name (name expected-value)}}]
+        (is (= expected-value (handler request)))))
+
+    (testing "Invalid value"
+      (let [request {:params {param-name "invalid-value"}}
+            response (handler request)]
+        (tc/assert-is-unprocessable-response response)))))
+
 (deftest allowed-methods-handler-test
   (testing "Allowed method"
     (let [invoked-inner (atom false)

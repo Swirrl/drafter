@@ -289,6 +289,34 @@
        "}")
      "}")))
 
+(defn- get-draftsets-owned-by-query [user]
+  (let [user-uri (user/user->uri user)]
+    (str
+     "SELECT * WHERE { "
+     (with-state-graph
+       "?ds <" rdf:a "> <" drafter:DraftSet "> ."
+       "?ds <" drafter:createdAt "> ?created ."
+       "?ds <" drafter:createdBy "> ?creator ."
+       "?ds <" drafter:hasOwner "> <" user-uri "> ."
+       "BIND (<" user-uri "> as ?owner) ."
+       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
+       "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
+       "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter . }")
+     "}")))
+
+(defn- get-draftsets-owned-by-graph-mappings-query [user]
+  (let [user-uri (user/user->uri user)]
+    (str
+     "SELECT * WHERE { "
+     (with-state-graph
+       "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
+       "?ds <" drafter:hasOwner "> <" user-uri "> ."
+       "?dg <" drafter:inDraftSet "> ?ds ."
+       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+       "?lg <" drafter:hasDraft "> ?dg ."
+       "?lg <" drafter:isPublic "> ?public .")
+     "}")))
+
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
@@ -355,6 +383,17 @@
         submitted-properties (query backend q)
         all-graph-states (get-draftsets-claimable-by-graph-states backend user)]
     (combine-all-properties-and-graph-states submitted-properties all-graph-states)))
+
+(defn- get-draftsets-owned-by-graph-states [repo user]
+  (let [q (get-draftsets-owned-by-graph-mappings-query user)
+        mappings (query repo q)]
+    (draftset-graph-mappings->graph-states repo mappings)))
+
+(defn get-draftsets-owned-by [repo user]
+  (let [properties-query (get-draftsets-owned-by-query user)
+        draftset-properties (query repo properties-query)
+        graph-states (get-draftsets-owned-by-graph-states repo user)]
+    (combine-all-properties-and-graph-states draftset-properties graph-states)))
 
 (defn is-draftset-submitter? [backend draftset-ref user]
   (if-let [{:keys [submitted-by]} (get-draftset-info backend draftset-ref)]

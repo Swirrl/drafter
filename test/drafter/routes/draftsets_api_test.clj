@@ -183,6 +183,11 @@
 (defn- get-draftset-info-request [draftset-location user]
   (with-identity user {:uri draftset-location :request-method :get}))
 
+(defn- ok-response->typed-body [schema {:keys [body] :as response}]
+  (assert-is-ok-response response)
+  (assert-schema schema body)
+  body)
+
 (defn- get-draftset-info-through-api [draftset-location user]
   (let [{:keys [body] :as response} (route (get-draftset-info-request draftset-location user))]
     (assert-is-ok-response response)
@@ -283,6 +288,53 @@
       (assert-is-ok-response claim-response)
       (assert-schema Draftset body)
       body))
+
+(defn- get-draftsets-request [include user]
+  (with-identity user {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
+
+(defn- get-draftsets-through-api [include user]
+  (let [request (get-draftsets-request include user)
+        {:keys [body] :as response} (route request)]
+    (ok-response->typed-body [Draftset] response)))
+
+(deftest get-draftsets-test
+  (let [owned-ds (create-draftset-through-api test-publisher "owned")
+        claimable-ds (create-draftset-through-api test-editor "claimable")
+        unclaimable-ds (create-draftset-through-api test-editor)]
+    
+    ;;offer claimable-ds to publisher role so it can be claimed by publisher
+    (submit-draftset-to-role-through-api test-editor claimable-ds :publisher)
+
+    (testing "All draftsets"
+      (let [all-draftsets (get-draftsets-through-api :all test-publisher)]
+        (is (= 2 (count all-draftsets)))
+        (is (= #{"owned" "claimable"} (set (map :display-name all-draftsets))))))
+
+    (testing "Missing include filter should return all owned and claimable draftsets"
+      (let [request (with-identity test-publisher {:uri "/v1/draftsets" :request-method :get})
+            response (route request)
+            draftsets (ok-response->typed-body [Draftset] response)]
+        (is (= 2 (count draftsets)))
+        (is (= #{"owned" "claimable"} (set (map :display-name draftsets))))))
+
+    (testing "Owned draftsets"
+      (let [draftsets (get-draftsets-through-api :owned test-publisher)]
+        (is (= 1 (count draftsets)))
+        (is (= "owned" (:display-name (first draftsets))))))
+
+    (testing "Claimable draftsets"
+      (let [draftsets (get-draftsets-through-api :claimable test-publisher)]
+        (is (= 1 (count draftsets)))
+        (is (= "claimable" (:display-name (first draftsets))))))
+
+    (testing "Invalid include parameter"
+      (let [request (get-draftsets-request :invalid test-publisher)
+            response (route request)]
+        (assert-is-unprocessable-response response)))
+
+    (testing "Unauthenticated"
+      (let [response (route {:uri "/v1/draftsets" :request-method :get})]
+        (assert-is-unauthorised-response response)))))
 
 (deftest get-all-draftsets-test
   (let [owned-ds (create-draftset-through-api test-publisher "owned")

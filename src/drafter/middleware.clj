@@ -123,6 +123,26 @@
       (response/unprocessable-entity-response (str "Missing required parameters: " (string/join "," (map name missing-keys))))
       (inner-handler request))))
 
+(defn optional-enum-param
+  "Wraps a handler in one which finds an optional parameter in the
+  incoming request and ensures it is a string representation of one of
+  the given valid keyword values. If the value is valid, the incoming
+  string value is replace in the request with the keyword and the
+  inner handler invoked with the modified request. If the value is not
+  valid, a 422 Unprocessable Entity response is returned. If the
+  parameter is not present in the request, the given default is
+  associated with the request and the inner handler invoked."
+  [param-name allowed-values default inner-handler]
+  (fn [{:keys [params] :as request}]
+    (letfn [(invoke-inner [param-val]
+              (inner-handler (assoc-in request [:params param-name] param-val)))]
+      (if-let [val (get params param-name)]
+        (let [kw-val (keyword val)]
+          (if (contains? allowed-values kw-val)
+            (invoke-inner kw-val)
+            (response/unprocessable-entity-response (str "Invalid value for parameter " (name param-name) ": " val))))
+        (invoke-inner default)))))
+
 (defn allowed-methods-handler
   "Wraps a handler with one which checks whether the method of the
   incoming request is allowed with a given predicate. If the request
