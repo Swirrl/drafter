@@ -133,12 +133,6 @@
                           :claimable (response (dsmgmt/get-draftsets-claimable-by backend user))
                           :owned (response (dsmgmt/get-draftsets-owned-by backend user)))))))
 
-        (make-route :get "/draftsets/claimable"
-                    (authenticated
-                     (optional-enum-param :include #{:all :owned :claimable} :all
-                                          (fn [{user :identity :as request}]
-                                            (response (dsmgmt/get-draftsets-claimable-by backend user))))))
-
         ;;create a new draftset
         (make-route :post "/draftsets"
                     (authenticated

@@ -425,11 +425,8 @@
     (assert-is-forbidden-response get-response)))
 
 (defn- get-claimable-draftsets-through-api [user]
-  (let [request (with-identity user {:uri "/v1/draftsets/claimable" :request-method :get})
-        {:keys [body] :as response} (route request)]
-    (assert-is-ok-response response)
-    (assert-schema [Draftset] body)
-    body))
+  (let [request (with-identity user {:uri "/v1/draftsets" :request-method :get :params {:include :claimable}})]
+    (ok-response->typed-body [Draftset] (route request))))
 
 (deftest get-claimable-draftsets-test
   (let [ds-names (map #(str "Draftset " %) (range 1 6))
