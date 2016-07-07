@@ -261,11 +261,16 @@
   (let [response (route (create-draftset-request test-editor "Test title" "Test description"))]
     (assert-is-see-other-response response)))
 
-(defn- get-all-draftsets-through-api [user]
-  (let [request (with-identity user {:uri "/v1/draftsets" :request-method :get})
+(defn- get-draftsets-request [include user]
+  (with-identity user {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
+
+(defn- get-draftsets-through-api [include user]
+  (let [request (get-draftsets-request include user)
         {:keys [body] :as response} (route request)]
-    (assert-is-ok-response response)
-    body))
+    (ok-response->typed-body [Draftset] response)))
+
+(defn- get-all-draftsets-through-api [user]
+  (get-draftsets-through-api :all user))
 
 (defn- submit-draftset-to-username-request [draftset-location target-username user]
   (with-identity user
@@ -288,14 +293,6 @@
       (assert-is-ok-response claim-response)
       (assert-schema Draftset body)
       body))
-
-(defn- get-draftsets-request [include user]
-  (with-identity user {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
-
-(defn- get-draftsets-through-api [include user]
-  (let [request (get-draftsets-request include user)
-        {:keys [body] :as response} (route request)]
-    (ok-response->typed-body [Draftset] response)))
 
 (deftest get-draftsets-test
   (let [owned-ds (create-draftset-through-api test-publisher "owned")
@@ -370,9 +367,7 @@
     (delete-draftset-graph-through-api test-editor draftset-location graph1)
     (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
       (is (= :deleted (get-in changes [graph1 :status])))
-      (is (= :created (get-in changes [graph2 :status])))
-      )
-    ))
+      (is (= :created (get-in changes [graph2 :status]))))))
 
 (deftest get-empty-draftset-without-title-or-description
   (let [draftset-location (create-draftset-through-api test-editor)
@@ -475,10 +470,28 @@
       (submit-draftset-to-role-through-api test-editor ds :publisher))
 
     (let [ds-infos (get-claimable-draftsets-through-api test-publisher)
-          ds1-info (some #(= "ds1" (:display-name %)) ds-infos)
-          ds2-info (some #(= "ds2" (:display-name %)) ds-infos)]
-      (is (= {:deleted (get-in ds1-info [:changes g1 :status])}))
-      (is (= {:created (get-in ds2-info [:changes g2 :status])})))))
+          ds1-info (first (filter #(= "ds1" (:display-name %)) ds-infos))
+          ds2-info (first (filter #(= "ds2" (:display-name %)) ds-infos))]
+      (is (= :deleted (get-in ds1-info [:changes g1 :status])))
+      (is (= :created (get-in ds2-info [:changes g2 :status]))))))
+
+(defn- get-owned-draftsets-through-api [user]
+  (get-draftsets-through-api :owned user))
+
+(deftest get-owned-draftsets-changes-test
+  (let [[[g1 g1-quads] [g2 g2-quads]] (seq (group-by context (statements "test/resources/test-draftset.trig")))
+        draftset-location (create-draftset-through-api test-editor)]
+    (publish-quads-through-api g1-quads)
+
+    ;;delete g1 in draftset and add quads to g2
+    (delete-draftset-graph-through-api test-editor draftset-location g1)
+    (append-quads-to-draftset-through-api test-editor draftset-location g2-quads)
+
+    (let [ds-infos (get-owned-draftsets-through-api test-editor)
+          {:keys [changes] :as ds-info} (first ds-infos)]
+      (is (= 1 (count ds-infos)))
+      (is (= :deleted (get-in changes [g1 :status])))
+      (is (= :created (get-in changes [g2 :status]))))))
 
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
