@@ -149,4 +149,16 @@
                                         ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
+
+  :release-tasks [["vcs" "assert-committed"]
+                  ["change" "version"
+                   "leiningen.release/bump-version" "release"]
+                  ["vcs" "commit"]
+                  ["vcs" "tag"]
+                  ["change" "version" "leiningen.release/bump-version"]
+                  ["vcs" "commit"]
+                  ;;["vcs" "push"]
+                  ]
+
+
   )
