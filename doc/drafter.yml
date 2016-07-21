@@ -957,6 +957,16 @@ definitions:
       submitted-by:
         type: string
         description: The owner who submitted this Draftset for review
+      claim-role:
+        type: string
+        enum:
+          - editor
+          - publisher
+          - manager
+        description: The required role for users who can claim this Draftset
+      claim-user:
+        type: string
+        description: The user who can claim this Draftset
       description:
         type: string
         description: A description of the Draftset
