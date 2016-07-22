@@ -534,8 +534,8 @@ WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
 
 (defn calculate-graph-restriction [public-live-graphs live-graph-drafts supplied-draft-graphs]
   (set/union
-   (set/difference public-live-graphs live-graph-drafts)
-   supplied-draft-graphs))
+   (set/difference (set public-live-graphs) (set live-graph-drafts))
+   (set supplied-draft-graphs)))
 
 (defn graph-mapping->graph-restriction [db graph-mapping union-with-live?]
   (let [live-graphs (if union-with-live? (live-graphs db) #{})]
