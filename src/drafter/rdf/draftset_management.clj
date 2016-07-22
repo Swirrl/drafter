@@ -259,6 +259,7 @@
        "} UNION {"
        "  ?ds <" drafter:hasSubmission "> ?submission ."
        "  ?submission <" drafter:claimUser "> <" user-uri "> ."
+       "  BIND( <" user-uri "> as ?claimuser)"
        "}"
        )
      "}")))
