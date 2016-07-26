@@ -938,12 +938,15 @@ definitions:
 
   Draftset:
     type: object
-    required: [id, graphs, updated-at, created-at]
+    required: [id, graphs, updated-at, created-at, created-by]
     properties:
       id:
         type: string
         format: uuid
         description: 'Unique identifier representing this draftset'
+      created-by:
+        type: string
+        description: The user who created this Draftset
       changes:
         type: object
         additionalProperties:
