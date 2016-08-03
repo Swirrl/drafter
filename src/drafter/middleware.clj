@@ -16,7 +16,7 @@
         (let [resp (handler req)
               headers-time (- (System/currentTimeMillis) start-time)]
           (if (instance? java.io.InputStream (:body resp))
-            (log/info "RESPONSE " (:status resp) "headers sent after" (str headers-time "ms") "streaming body...")
+            (log/info "RESPONSE" (:status resp) "headers sent after" (str headers-time "ms") "streaming body...")
             (log/info "RESPONSE " (:status resp) "finished.  It took" (str headers-time "ms") "to execute"))
 
           resp)))))

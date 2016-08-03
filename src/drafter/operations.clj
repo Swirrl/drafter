@@ -111,6 +111,7 @@
   of the map."
   [operations]
   (doseq [op (keys operations)]
+    (log/warn "Killed long running operation" op @op)
     (future-cancel @op)))
 
 (defn process-categorised
@@ -136,7 +137,7 @@
   (let [executor-service (Executors/newSingleThreadScheduledExecutor)
         task-future (.scheduleWithFixedDelay executor-service (create-repeating-task-fn f) delay-ms delay-ms TimeUnit/MILLISECONDS)]
     (fn []
-      (log/warn "Terminating long running operation as it has exceeded the time out.")
+      (log/info "Timeout monitoring cancelled.")
       (future-cancel task-future)
       (.shutdown executor-service))))
 
@@ -228,10 +229,9 @@
              ;; copy the initiating http-request-id onto the new thread for logging purposes
              (l4j/with-logging-context {:reqId request-id}
                (log/info "Streaming result with function" func)
-
                (let [result (func os);; run the function
                      total-time (when start-time (- (System/currentTimeMillis) start-time))]
-                 (log/info "RESPONSE finished." (when start-time " It took" (str total-time "ms") "to execute"))
+                 (log/info "RESPONSE finished." (when total-time (str " It took " (str total-time "ms") " to execute")))
                  result)))]
     [f input-stream]))
 
@@ -240,4 +240,5 @@
   minutes for the entire operation. Since updates do not produce
   intermediate values the timeout is effectively the operation
   timeout"
-  (create-timeouts 60000 240000))
+  (create-timeouts 60000
+                   240000))

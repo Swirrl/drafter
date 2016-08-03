@@ -42,7 +42,7 @@
 
                  [swirrl/lib-swirrl-server "0.3.0" :exclusions [clout org.clojure/java.classpath]]
 
-                 [grafter "0.7.1"]
+                 [grafter "0.7.4"]
 
                  [grafter/vocabularies "0.1.3"]
                  [grafter/url "0.2.1"]
@@ -140,4 +140,16 @@
                                         ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
+
+  :release-tasks [["vcs" "assert-committed"]
+                  ["change" "version"
+                   "leiningen.release/bump-version" "release"]
+                  ["vcs" "commit"]
+                  ["vcs" "tag"]
+                  ["change" "version" "leiningen.release/bump-version"]
+                  ["vcs" "commit"]
+                  ;;["vcs" "push"]
+                  ]
+
+
   )
