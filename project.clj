@@ -42,7 +42,7 @@
                  [buddy/buddy-auth "0.9.0"]
                  [org.mindrot/jbcrypt "0.3m"]
 
-                 [grafter "0.7.1"]
+                 [grafter "0.7.4"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
