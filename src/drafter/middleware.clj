@@ -60,7 +60,10 @@
   [inner-handler]
   (fn [request]
     (if (auth/authenticated? request)
-      (inner-handler request)
+      (let [email (:email (:identity request))]
+        (l4j/with-logging-context {:user email } ;; wrap a logging context over the request so we can trace the user
+          (log/info "got user" email)
+          (inner-handler request)))
       (auth/throw-unauthorized {:message "Authentication required"}))))
 
 (defn require-basic-authentication
