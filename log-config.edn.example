@@ -10,7 +10,7 @@
                     (.setMaxBackupIndex max-backups))]
 
   (set-loggers!
-       ["org.openrdf" "drafter"]
+       ["org.openrdf" "drafter" "swirrl-server"]
        {:name "drafter"
         :level :info
         :out drafter-log}

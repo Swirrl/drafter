@@ -36,7 +36,7 @@
                  [selmer "0.6.9"]
                  [com.novemberain/monger "3.0.2"]
 
-                 [swirrl/lib-swirrl-server "0.6.1" :exclusions [clout org.clojure/java.classpath]]
+                 [swirrl/lib-swirrl-server "0.6.3-SNAPSHOT" :exclusions [clout org.clojure/java.classpath]]
 
                  [buddy/buddy-core "0.9.0"]
                  [buddy/buddy-auth "0.9.0"]
@@ -58,8 +58,6 @@
 
                  [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
-                 [com.taoensso/timbre "4.0.2"]
-                 [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
                  [ring-middleware-accept "2.0.3"]

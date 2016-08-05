@@ -39,7 +39,7 @@
      * Find the set of leaf nodes it references in the tree
      * Update all matching leaf timeouts to match the setting
   "
-  (:require [taoensso.timbre :as timbre]
+  (:require [clojure.tools.logging :as log]
             [clojure.string :as string])
   (:import [java.util Comparator]
            [java.util.concurrent TimeUnit]))
@@ -251,12 +251,12 @@
 (defn- apply-setting
   "Applies a timeout setting to the current timeout settings tree."
   [timeouts {:keys [timeout selector]}]
-  (timbre/info (str "Applying setting " (format-selector selector) " with timeout " timeout))
+  (log/info (str "Applying setting " (format-selector selector) " with timeout " timeout))
   (update-config timeouts (selector->path selector) timeout))
 
 (defn- log-config-errors [errors]
   (doseq [ex errors]
-    (timbre/warn "Timeout configuration:" (.getMessage ex))))
+    (log/warn "Timeout configuration:" (.getMessage ex))))
 
 (defn get-timeout-config
   "Calculates the timeout configuration tree given a collection of
