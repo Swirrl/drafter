@@ -22,7 +22,7 @@ configuration settings which apply across all backends:
 
 #+BEGIN_EXAMPLE
 DRAFTER_HTTP_PORT:            (default 3001)
-DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
+DRAFTER_BATCHED_WRITE_SIZE:   (default 75000)
 #+END_EXAMPLE
 
 *** drafter.backend.sesame.native
