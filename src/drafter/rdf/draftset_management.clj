@@ -128,36 +128,63 @@
    :public (.booleanValue public)
    :draft-graph-exists (.booleanValue (query repo (graph-exists-query dg)))})
 
+(defn- union-clauses [clauses]
+  (string/join " UNION " clauses))
+
+(defn- get-draftsets-matching-graph-mappings-query [match-clauses]
+  (str
+    "SELECT * WHERE { "
+    (with-state-graph
+      "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
+      "?dg <" drafter:inDraftSet "> ?ds ."
+      "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+      "?lg <" drafter:hasDraft "> ?dg ."
+      "?lg <" drafter:isPublic "> ?public ."
+      "{"
+      "  SELECT DISTINCT ?ds WHERE {"
+      "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
+      (union-clauses match-clauses)
+      "  }"
+      "}")
+    "}"))
+
+(defn- get-draftsets-matching-properties-query [match-clauses]
+  (str
+    "SELECT * WHERE {"
+    (with-state-graph
+      "?ds <" drafter:createdAt "> ?created ."
+      "?ds <" drafter:createdBy "> ?creator ."
+      "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
+      "OPTIONAL { ?ds <" drafter:hasOwner "> ?owner . }"
+      "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
+      "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter. }"
+      "OPTIONAL {"
+      "  ?ds <" drafter:hasSubmission "> ?submission ."
+      "  ?submission <" drafter:claimUser "> ?claimuser ."
+      "}"
+      "OPTIONAL {"
+      "  ?ds <" drafter:hasSubmission "> ?submission ."
+      "  ?submission <" drafter:claimRole "> ?role ."
+      "}"
+      "{"
+      "  SELECT DISTINCT ?ds WHERE {"
+      "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
+      (union-clauses match-clauses)
+      "  }"
+      "}")
+    "}"))
+
+(defn- draftset-uri-clause [draftset-ref]
+  (str
+    "{ VALUES ?ds { <" (str (ds/->draftset-uri draftset-ref)) "> } }"))
+
 (defn- get-draftset-properties-query [draftset-ref]
-  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "SELECT * WHERE { "
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:createdAt "> ?created ."
-       "<" draftset-uri "> <" drafter:createdBy "> ?creator ."
-       "OPTIONAL { <" draftset-uri "> <" drafter:hasOwner "> ?owner . }"
-       "OPTIONAL { <" draftset-uri "> <" rdfs:comment "> ?description . }"
-       "OPTIONAL { <" draftset-uri "> <" rdfs:label "> ?title }"
-       "OPTIONAL {"
-       "  <" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-       "  OPTIONAL { ?submission <" drafter:claimRole "> ?role . }"
-       "  OPTIONAL { ?submission <" drafter:claimUser "> ?claimuser . }"
-       "}"
-       "OPTIONAL { <" draftset-uri "> <" drafter:submittedBy "> ?submitter . }")
-     "}")))
+  (get-draftsets-matching-properties-query
+    [(draftset-uri-clause draftset-ref)]))
 
 (defn- get-draftset-graph-mapping-query [draftset-ref]
-  (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "SELECT * WHERE { "
-     (with-state-graph
-       "<" ds-uri "> a <" drafter:DraftSet "> ."
-       "?dg <" drafter:inDraftSet "> <"  ds-uri "> ."
-       "?lg a <" drafter:ManagedGraph "> ;"
-       "    <" drafter:isPublic "> ?public ;"
-       "    <" drafter:hasDraft "> ?dg .")
-     "}")))
+  (get-draftsets-matching-graph-mappings-query
+    [(draftset-uri-clause draftset-ref)]))
 
 (defn get-draftset-graph-states [repo draftset-ref]
   (->> (get-draftset-graph-mapping-query draftset-ref)
@@ -169,154 +196,68 @@
         mapping-pairs (map #(mapv % [:live-graph-uri :draft-graph-uri]) graph-states)]
     (into {} mapping-pairs)))
 
-(defn- get-all-draftsets-properties-query
-  "Returns a query for finding all draftset properties for draftsets
-  visible to the given user. A draftset is visible if the draftset is
-  owned by or claimable by the given user."
-  [user]
-  (let [user-uri (user/user->uri user)
-        role (user/role user)
+(defn- user-is-owner-clause [user]
+  (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
+
+(defn- user-is-claim-user-clause [user]
+  (str
+    "{"
+    "  ?ds <" drafter:hasSubmission "> ?submission ."
+    "  ?submission <" drafter:claimUser "> <" (user/user->uri user) "> ."
+    "}"))
+
+(defn- user-is-in-claim-role-clause [user]
+  (let [role (user/role user)
         user-role-score (role user/role->permission-level)]
     (str
-     "SELECT * WHERE { "
-     (with-state-graph
-       "?ds <" rdf:a "> <" drafter:DraftSet "> ."
-       "?ds <" drafter:createdAt "> ?created ."
-       "?ds <" drafter:createdBy "> ?creator ."
-       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
-       "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
-       "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter . }"
-       "{"
-       "  ?ds <" drafter:hasOwner "> <" user-uri "> ."
-       "  BIND (<" user-uri "> as ?owner)"
-       "} UNION {"
-       "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?submission <" drafter:claimRole "> ?role ."
-       "  FILTER (" user-role-score " >= ?rv)"
-       "} UNION {"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?submission <" drafter:claimUser "> <" user-uri "> ."
-       "  BIND (<" user-uri "> as ?claimuser)"
-       "} UNION {"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?ds <" drafter:submittedBy "> <" user-uri "> ."
-       "  OPTIONAL { ?ds <" drafter:claimRole "> ?role }"
-       "  OPTIONAL { ?ds <" drafter:claimUser "> ?claimuser }"
-       "}"
-       )
-     "}")))
+      "{"
+      "   VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
+      "  ?ds <" drafter:hasSubmission "> ?submission ."
+      "  ?submission <" drafter:claimRole "> ?role ."
+      "  FILTER (" user-role-score " >= ?rv)"
+      "}")))
+
+(defn- user-is-submitter-clause [user]
+  (str
+    "{"
+    "  ?ds <" drafter:submittedBy "> <" (user/user->uri user) "> ."
+    "  FILTER NOT EXISTS { ?ds <" drafter:hasOwner "> ?owner }"
+    "}")
+  )
 
 (defn- get-all-draftset-graph-mappings-query [user]
-  (let [user-uri (user/user->uri user)
-        role (user/role user)
-        user-role-score (role user/role->permission-level)]
-    (str
-     "SELECT * WHERE { "
-     (with-state-graph
-       "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
-       "?dg <" drafter:inDraftSet "> ?ds ."
-       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-       "?lg <" drafter:hasDraft "> ?dg ."
-       "?lg <" drafter:isPublic "> ?public ."
-       "{"
-       "  ?ds <" drafter:hasOwner "> <" user-uri "> ."
-       "} UNION {"
-       "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?submission <" drafter:claimRole "> ?role ."
-       "  FILTER ( " user-role-score " >= ?rv )"
-       "} UNION {"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?submission <" drafter:claimUser "> <" user-uri "> ."
-       "} UNION {"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?ds <" drafter:submittedBy "> <" user-uri "> ."
-       "}")
-     "}")))
+  (get-draftsets-matching-graph-mappings-query
+    [(user-is-owner-clause user)
+     (user-is-claim-user-clause user)
+     (user-is-in-claim-role-clause user)
+     (user-is-submitter-clause user)]))
+
+(defn- get-all-draftsets-properties-query [user]
+  (get-draftsets-matching-properties-query
+    [(user-is-owner-clause user)
+     (user-is-claim-user-clause user)
+     (user-is-in-claim-role-clause user)
+     (user-is-submitter-clause user)]))
 
 (defn- get-all-draftsets-claimable-by-query [user]
-  (let [role (user/role user)
-        user-uri (user/user->uri user)
-        user-role-score (role user/role->permission-level)]
-    (str
-     "SELECT * WHERE {"
-     (with-state-graph
-       "?ds <" rdf:a "> <" drafter:DraftSet "> ."
-       "?ds <" drafter:createdAt "> ?created ."
-       "?ds <" drafter:createdBy "> ?creator ."
-       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
-       "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
-       "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter. }"
-       "{"
-       "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?submission <" drafter:claimRole "> ?role ."
-       "  FILTER (" user-role-score " >= ?rv )"
-       "} UNION {"
-       "  ?ds <" drafter:submittedBy "> <" user-uri "> ."
-       "  FILTER NOT EXISTS { ?ds <" drafter:hasOwner "> ?owner }"
-       "} UNION {"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?submission <" drafter:claimUser "> <" user-uri "> ."
-       "  BIND( <" user-uri "> as ?claimuser)"
-       "}"
-       )
-     "}")))
+  (get-draftsets-matching-properties-query
+    [(user-is-in-claim-role-clause user)
+     (user-is-claim-user-clause user)
+     (user-is-submitter-clause user)]))
 
 (defn- get-draftsets-claimable-by-graph-mapping-query [user]
-  (let [role (user/role user)
-        user-role-score (role user/role->permission-level)
-        user-uri (user/user->uri user)]
-    (str
-     "SELECT * WHERE { "
-     (with-state-graph
-       "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
-       "?dg <" drafter:inDraftSet "> ?ds ."
-       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-       "?lg <" drafter:hasDraft "> ?dg ."
-       "?lg <" drafter:isPublic "> ?public ."
-       "{"
-       "  VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?submission <" drafter:claimRole "> ?role ."
-       "  FILTER ( " user-role-score " >= ?rv )"
-       "} UNION {"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?submission <" drafter:claimUser "> <" user-uri "> ."
-       "} UNION {"
-       "  ?ds <" drafter:hasSubmission "> ?submission ."
-       "  ?ds <" drafter:submittedBy "> <" user-uri "> ."
-       "}")
-     "}")))
+  (get-draftsets-matching-graph-mappings-query
+    [(user-is-in-claim-role-clause user)
+     (user-is-claim-user-clause user)
+     (user-is-submitter-clause user)]))
 
 (defn- get-draftsets-owned-by-query [user]
-  (let [user-uri (user/user->uri user)]
-    (str
-     "SELECT * WHERE { "
-     (with-state-graph
-       "?ds <" rdf:a "> <" drafter:DraftSet "> ."
-       "?ds <" drafter:createdAt "> ?created ."
-       "?ds <" drafter:createdBy "> ?creator ."
-       "?ds <" drafter:hasOwner "> <" user-uri "> ."
-       "BIND (<" user-uri "> as ?owner) ."
-       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
-       "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
-       "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter . }")
-     "}")))
+  (get-draftsets-matching-properties-query
+    [(user-is-owner-clause user)]))
 
 (defn- get-draftsets-owned-by-graph-mappings-query [user]
-  (let [user-uri (user/user->uri user)]
-    (str
-     "SELECT * WHERE { "
-     (with-state-graph
-       "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
-       "?ds <" drafter:hasOwner "> <" user-uri "> ."
-       "?dg <" drafter:inDraftSet "> ?ds ."
-       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-       "?lg <" drafter:hasDraft "> ?dg ."
-       "?lg <" drafter:isPublic "> ?public .")
-     "}")))
+  (get-draftsets-matching-graph-mappings-query
+    [(user-is-owner-clause user)]))
 
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))

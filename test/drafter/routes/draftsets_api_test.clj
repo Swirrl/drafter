@@ -455,6 +455,23 @@
       (is (= 1 (count editor-claimable)))
       (is (= (:display-name (first editor-claimable)) (nth ds-names 1))))))
 
+(deftest get-claimable-draftset-satisifes-multiple-claim-criteria
+  ;;a draftset may be in a state where it satisified multiple criteria to be claimed by
+  ;;the current user e.g. if a user submits to a role they are in. In this case the user
+  ;;can claim it due to being in the claim role, and because they are the submitter of
+  ;;an unclaimed draftset. Drafter should only return any matching draftsets once in this
+  ;;case
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (submit-draftset-to-role-through-api test-editor draftset-location :editor)
+    (let [claimable-draftsets (get-claimable-draftsets-through-api test-editor)]
+      (is (= 1 (count claimable-draftsets))))))
+
+(deftest get-all-draftsets-satisfied-multiple-claim-criteria
+  (let [draftset-location (create-draftset-through-api test-editor)]
+    (submit-draftset-to-role-through-api test-editor draftset-location :editor)
+    (let [all-draftsets (get-all-draftsets-through-api test-editor)]
+      (is (= 1 (count all-draftsets))))))
+
 (deftest get-claimable-draftsets-changes-test
   (let [[[g1 g1-quads] [g2 g2-quads]] (seq (group-by context (statements "test/resources/test-draftset.trig")))
         draftset1 (create-draftset-through-api test-editor "ds1")
