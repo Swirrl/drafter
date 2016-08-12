@@ -234,30 +234,6 @@
   (conj (user-claimable-clauses user)
         (user-is-owner-clause user)))
 
-(defn- get-all-draftset-graph-mappings-query [user]
-  (get-draftsets-matching-graph-mappings-query
-    (user-all-visible-clauses user)))
-
-(defn- get-all-draftsets-properties-query [user]
-  (get-draftsets-matching-properties-query
-    (user-all-visible-clauses user)))
-
-(defn- get-all-draftsets-claimable-by-query [user]
-  (get-draftsets-matching-properties-query
-    (user-claimable-clauses user)))
-
-(defn- get-draftsets-claimable-by-graph-mapping-query [user]
-  (get-draftsets-matching-graph-mappings-query
-    (user-claimable-clauses user)))
-
-(defn- get-draftsets-owned-by-query [user]
-  (get-draftsets-matching-properties-query
-    [(user-is-owner-clause user)]))
-
-(defn- get-draftsets-owned-by-graph-mappings-query [user]
-  (get-draftsets-matching-graph-mappings-query
-    [(user-is-owner-clause user)]))
-
 (defn- calendar-literal->date [literal]
   (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
 
@@ -276,19 +252,9 @@
                          :submitted-by (and submitter (value->username submitter))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
-(defn- get-draftset-properties [repo draftset-ref]
-  (let [properties-query (get-draftset-properties-query draftset-ref)
-        results (query repo properties-query)]
-    (if-let [result (first results)]
-      (draftset-properties-result->properties draftset-ref result))))
-
 (defn- combine-draftset-properties-and-graph-states [ds-properties graph-states]
   (assoc ds-properties :changes (graph-states->changes-map graph-states)))
 
-(defn get-draftset-info [repo draftset-ref]
-  (if-let [ds-properties (get-draftset-properties repo draftset-ref)]
-    (let [ds-graph-states (get-draftset-graph-states repo draftset-ref)]
-      (combine-draftset-properties-and-graph-states ds-properties ds-graph-states))))
 
 (defn- combine-all-properties-and-graph-states [draftset-properties graph-states]
   (let [ds-uri->graph-states (group-by :draftset-uri graph-states)]
@@ -312,6 +278,9 @@
         graph-mappings (query repo mappings-query)
         graph-states (draftset-graph-mappings->graph-states repo graph-mappings)]
     (combine-all-properties-and-graph-states properties graph-states)))
+
+(defn get-draftset-info [repo draftset-ref]
+  (first (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])))
 
 (defn get-all-draftsets-info [repo user]
   (get-all-draftsets-by repo (user-all-visible-clauses user)))
