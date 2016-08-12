@@ -225,31 +225,30 @@
     "}")
   )
 
+(defn- user-claimable-clauses [user]
+  [(user-is-in-claim-role-clause user)
+   (user-is-claim-user-clause user)
+   (user-is-submitter-clause user)])
+
+(defn- user-all-visible-clauses [user]
+  (conj (user-claimable-clauses user)
+        (user-is-owner-clause user)))
+
 (defn- get-all-draftset-graph-mappings-query [user]
   (get-draftsets-matching-graph-mappings-query
-    [(user-is-owner-clause user)
-     (user-is-claim-user-clause user)
-     (user-is-in-claim-role-clause user)
-     (user-is-submitter-clause user)]))
+    (user-all-visible-clauses user)))
 
 (defn- get-all-draftsets-properties-query [user]
   (get-draftsets-matching-properties-query
-    [(user-is-owner-clause user)
-     (user-is-claim-user-clause user)
-     (user-is-in-claim-role-clause user)
-     (user-is-submitter-clause user)]))
+    (user-all-visible-clauses user)))
 
 (defn- get-all-draftsets-claimable-by-query [user]
   (get-draftsets-matching-properties-query
-    [(user-is-in-claim-role-clause user)
-     (user-is-claim-user-clause user)
-     (user-is-submitter-clause user)]))
+    (user-claimable-clauses user)))
 
 (defn- get-draftsets-claimable-by-graph-mapping-query [user]
   (get-draftsets-matching-graph-mappings-query
-    [(user-is-in-claim-role-clause user)
-     (user-is-claim-user-clause user)
-     (user-is-submitter-clause user)]))
+    (user-claimable-clauses user)))
 
 (defn- get-draftsets-owned-by-query [user]
   (get-draftsets-matching-properties-query
@@ -306,36 +305,22 @@
              (assoc graph-state :draftset-uri (.stringValue ds))))
          mappings))
 
-(defn- get-all-draftset-graph-states [repo user]
-  (let [mappings (query repo (get-all-draftset-graph-mappings-query user))]
-    (draftset-graph-mappings->graph-states repo mappings)))
+(defn- get-all-draftsets-by [repo clauses]
+  (let [properties-query (get-draftsets-matching-properties-query clauses)
+        mappings-query (get-draftsets-matching-graph-mappings-query clauses)
+        properties (query repo properties-query)
+        graph-mappings (query repo mappings-query)
+        graph-states (draftset-graph-mappings->graph-states repo graph-mappings)]
+    (combine-all-properties-and-graph-states properties graph-states)))
 
 (defn get-all-draftsets-info [repo user]
-  (let [all-properties (query repo (get-all-draftsets-properties-query user))
-        all-graph-states (get-all-draftset-graph-states repo user)]
-    (combine-all-properties-and-graph-states all-properties all-graph-states)))
+  (get-all-draftsets-by repo (user-all-visible-clauses user)))
 
-(defn- get-draftsets-claimable-by-graph-states [repo user]
-  (let [q (get-draftsets-claimable-by-graph-mapping-query user)
-        graph-mappings (query repo q)]
-    (draftset-graph-mappings->graph-states repo graph-mappings)))
-
-(defn get-draftsets-claimable-by [backend user]
-  (let [q (get-all-draftsets-claimable-by-query user)
-        submitted-properties (query backend q)
-        all-graph-states (get-draftsets-claimable-by-graph-states backend user)]
-    (combine-all-properties-and-graph-states submitted-properties all-graph-states)))
-
-(defn- get-draftsets-owned-by-graph-states [repo user]
-  (let [q (get-draftsets-owned-by-graph-mappings-query user)
-        mappings (query repo q)]
-    (draftset-graph-mappings->graph-states repo mappings)))
+(defn get-draftsets-claimable-by [repo user]
+  (get-all-draftsets-by repo (user-claimable-clauses user)))
 
 (defn get-draftsets-owned-by [repo user]
-  (let [properties-query (get-draftsets-owned-by-query user)
-        draftset-properties (query repo properties-query)
-        graph-states (get-draftsets-owned-by-graph-states repo user)]
-    (combine-all-properties-and-graph-states draftset-properties graph-states)))
+  (get-all-draftsets-by repo [(user-is-owner-clause user)]))
 
 (defn is-draftset-submitter? [backend draftset-ref user]
   (if-let [{:keys [submitted-by]} (get-draftset-info backend draftset-ref)]
