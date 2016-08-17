@@ -42,7 +42,7 @@
                  [buddy/buddy-auth "0.9.0"]
                  [org.mindrot/jbcrypt "0.3m"]
 
-                 [grafter "0.7.1"]
+                 [grafter "0.7.4"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
@@ -156,4 +156,16 @@
                                         ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
+
+  :release-tasks [["vcs" "assert-committed"]
+                  ["change" "version"
+                   "leiningen.release/bump-version" "release"]
+                  ["vcs" "commit"]
+                  ["vcs" "tag"]
+                  ["change" "version" "leiningen.release/bump-version"]
+                  ["vcs" "commit"]
+                  ;;["vcs" "push"]
+                  ]
+
+
   )

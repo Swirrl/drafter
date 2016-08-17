@@ -14,9 +14,31 @@
             [environ.core :refer [env]]
             [clojure.string :as string]))
 
-;; Note if we change this default value we should also change it in the
-;; drafter-client, and possibly other places too.
-(def batched-write-size (Integer/parseInt (get env :drafter-batched-write-size "10000")))
+;; The following times were taken on stardog 4.1.2, in order to determine a better
+;; batched write size.  The tests were performed with the dataset:
+;;
+;; http://statistics.gov.scot/graph/employment-support-allowance
+;;
+;; This dataset contains 12,268972 quads
+;;
+;; Running on an AWS m4.2xlarge instance running with JVM args:
+;;
+;; -Xms5g -Xmx5g -XX:MaxDirectMemorySize=8g
+;;
+;; The operation was appending a single triple into a graph, but the times are
+;; testing the copy from live that we do as part of our Copy On Write behaviour.
+;;
+;;
+;; |      batch size k | # batches | 1st qu btime (ms) | median btime (ms) | 3rd qu btime (ms) | upper qu (95%) | total time | tput (quads/ps) |
+;; |-------------------+-----------+-------------------+-------------------+-------------------+----------------+------------+-----------------|
+;; | N/A (SPARQL COPY) |         1 |               N/A |               N/A |               N/A |            N/A | 2m 20s     |           84034 |
+;; |                10 |      1227 |              2982 |              3388 |              3887 |           4221 | 49m 52s    |            4100 |
+;; |                50 |       246 |              2872 |              3211 |              3858 |           4439 | 13m 40s    |           14962 |
+;; |                75 |       164 |              2800 |              3357 |              4126 |           4811 | 9m 18s     |           21987 |
+;; |               100 |       123 |              4058 |              4454 |              4714 |           5100 | 9m 9s      |           22347 |
+;; |               200 |        62 |              5570 |              6730 |              8811 |          10781 | 7m 18s     |           28011 |
+
+(def batched-write-size (Integer/parseInt (get env :drafter-batched-write-size "75000")))
 
 (defmacro with-job-exception-handling [job & forms]
   `(try

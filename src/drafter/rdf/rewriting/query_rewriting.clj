@@ -43,8 +43,11 @@
   (log/info "Rewriting query " query-str)
 
   (let [live->draft (zipmap (map str (keys live->draft))
-                            (map str (vals live->draft)))]
-    (str (apply-rewriter (partial uri-constant-rewriter live->draft) query-str))))
+                            (map str (vals live->draft)))
+        rewritten-query (str (apply-rewriter (partial uri-constant-rewriter live->draft) query-str))]
+
+    (log/debug "Rewritten query: " rewritten-query)
+    rewritten-query))
 
 
 (comment
