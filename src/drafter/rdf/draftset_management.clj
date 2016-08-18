@@ -365,7 +365,7 @@
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
        "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> ."
        "OPTIONAL { "
-         "<" draftset-uri "> <" drafter:submittedBy "> ?submitter ."
+       "<" draftset-uri "> <" drafter:submittedBy "> ?submitter ."
        "}"
        )
      "}")))
@@ -426,25 +426,24 @@
      (with-state-graph
        "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> .")
      "} WHERE {"
-     "  <" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-     "  {"
-       (with-state-graph
-         "VALUES (?role ?rv) { " scores-values " }"         
-         "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-         "?submission <" drafter:claimRole "> ?role ."
-         "?submission ?sp ?so ."
-         "FILTER (" user-score " >= ?rv)")
-     "  } UNION {"
-       (with-state-graph
-         "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-         "?submission <" drafter:claimUser "> <" user-uri "> ."
-         "?submission ?sp ?so .")
-     "  } UNION {"
-       (with-state-graph
-         "<" draftset-uri "> <" drafter:submittedBy "> <" user-uri "> ."
-         "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-         "?submission ?sp ?so .")
-     "  }"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
+       "?submission ?sp ?so ."
+       "{"
+       "  SELECT DISTINCT ?submission WHERE {"
+       "    {"
+       "       VALUES (?role ?rv) { " scores-values " }"
+       "       ?submission <" drafter:claimRole "> ?role ."
+       "       FILTER (" user-score " >= ?rv)"
+       "    } UNION {"
+       "      ?submission <" drafter:claimUser "> <" user-uri "> ."
+       "    } UNION {"
+       "      <" draftset-uri "> <" drafter:submittedBy "> <" user-uri "> ."
+       "      <" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
+       "    }"
+       "  }"
+       "}")
      "}")))
 
 (defn- try-claim-draftset!
