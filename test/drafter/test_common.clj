@@ -18,7 +18,6 @@
             [schema.core :as s])
   (:import [java.util Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
-           [org.mindrot.jbcrypt BCrypt]
            [java.io ByteArrayInputStream]))
 
 
