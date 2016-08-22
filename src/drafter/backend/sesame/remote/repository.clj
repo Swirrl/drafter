@@ -1,7 +1,14 @@
 (ns drafter.backend.sesame.remote.repository
   (:require [clojure.string :as str]
-            [clojure.tools.logging :as log])
-  (:import [drafter.rdf DrafterSPARQLRepository]))
+            [clojure.tools.logging :as log]
+            [grafter.rdf.repository.registry :as reg])
+  (:import [drafter.rdf DrafterSPARQLRepository]
+           [java.nio.charset Charset]
+           [org.openrdf.rio RDFParserRegistry RDFFormat]
+           [org.openrdf.query.resultio TupleQueryResultFormat BooleanQueryResultFormat
+            TupleQueryResultParserRegistry
+            BooleanQueryResultParserRegistry]
+           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParserFactory]))
 
 (defn get-required-environment-variable [var-key env-map]
   (if-let [ev (var-key env-map)]
@@ -29,6 +36,12 @@
 (defn create-repository-for-environment [env-map]
   "Creates a new SPARQL repository with the query and update endpoints
   configured in the given environment map."
+
+  (let [updated-registries (update (reg/registered-parser-factories)
+                                   ;; Force removal of TurtleParser
+                                   :construct #(disj % org.openrdf.rio.turtle.TurtleParserFactory))]
+    (reg/register-parser-factories! updated-registries))
+
   (let [query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
         update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)]
     (create-sparql-repository query-endpoint update-endpoint)))

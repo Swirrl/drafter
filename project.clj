@@ -42,7 +42,7 @@
 
                  [swirrl/lib-swirrl-server "0.3.0" :exclusions [clout org.clojure/java.classpath]]
 
-                 [grafter "0.7.4"]
+                 [grafter "0.7.5"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
@@ -142,8 +142,6 @@
              ;; of connections in the SPARQLRepository connection pool:
              ;;
              ;;"-Dhttp.maxConnections=1"
-
-             ;;"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
              ]
 
                                         ;NOTE: expected JVM version to run against is defined in the Dockerfile
