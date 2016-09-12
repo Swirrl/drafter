@@ -1,7 +1,7 @@
 (ns drafter.routes.draftsets-api
   (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes make-route]]
             [clojure.set :as set]
-            [taoensso.timbre :as log]
+            [clojure.tools.logging :as log]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response
                                        unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!
@@ -266,7 +266,7 @@
                        (cond
                          (and (some? user) (some? role))
                          (unprocessable-entity-response "Only one of user and role parameters permitted")
-                         
+
                          (some? user)
                          (if-let [target-user (user-repo/find-user-by-username user-repo user)]
                            (do

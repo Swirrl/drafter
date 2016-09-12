@@ -5,6 +5,7 @@
             [compojure.route :as route]
             [drafter.operations :as ops]
             [drafter.middleware :as middleware]
+            [swirrl-server.middleware.log-request :refer [log-request]]
             [drafter.configuration :as conf]
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.backend.configuration :refer [get-backend]]
@@ -123,7 +124,7 @@
                           :middleware [#(wrap-resource % "swagger-ui")
                                        wrap-verbs
                                        wrap-encode-errors
-                                       middleware/log-request]
+                                       log-request]
                           ;; add access rules here
                           :access-rules []
                           ;; serialize/deserialize the following data formats
