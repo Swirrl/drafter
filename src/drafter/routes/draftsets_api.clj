@@ -17,7 +17,7 @@
             [drafter.util :as util]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
-            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type temp-file-body
+            [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type temp-file-body
                                         optional-enum-param]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]

@@ -24,6 +24,10 @@
   (is (= 401 status))
   (is (contains? headers "WWW-Authenticate")))
 
+(defn basic-authentication [repo handler]
+  (let [wrapper (make-authenticated-wrapper repo {})]
+    (wrapper handler)))
+
 (deftest authenticate-user-test
   (let [username "test@example.com"
         password "dslkfjsejw"
@@ -121,7 +125,7 @@
         allowed-values #{:foo :bar :quux}
         default-value :bar
         handler (optional-enum-param param-name allowed-values default-value inner-handler)]
-    
+
     (testing "Missing value"
       (is (= default-value (handler {}))))
 
