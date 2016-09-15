@@ -52,9 +52,6 @@
   [{:keys [type] :as result}]
   (= :error type))
 
-(defn succeeded-job-result? [{:keys [type] :as result}]
-  (= :ok type))
-
 (defmacro make-job [write-priority [job :as args] & forms]
   `(create-job ~write-priority
                (fn [~job]
