@@ -287,11 +287,6 @@
 (defn get-draftsets-owned-by [repo user]
   (get-all-draftsets-by repo [(user-is-owner-clause user)]))
 
-(defn is-draftset-submitter? [backend draftset-ref user]
-  (if-let [{:keys [submitted-by]} (get-draftset-info backend draftset-ref)]
-    (= submitted-by (user/username user))
-    false))
-
 (defn- delete-draftset-query [draftset-ref draft-graph-uris]
   (let [delete-drafts-query (map mgmt/delete-draft-graph-and-remove-from-state-query draft-graph-uris)
         delete-draftset-query (delete-draftset-statements-query draftset-ref)]

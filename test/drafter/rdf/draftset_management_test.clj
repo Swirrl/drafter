@@ -184,6 +184,11 @@
            "}")]
     (query *test-backend* q)))
 
+(defn is-draftset-submitter? [backend draftset-ref user]
+  (if-let [{:keys [submitted-by]} (get-draftset-info backend draftset-ref)]
+    (= submitted-by (user/username user))
+    false))
+
 (deftest submit-draftset-to-user!-test
   (testing "When owned"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
@@ -204,7 +209,7 @@
   (testing "When not owned"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
           draftset-uri (str (->draftset-uri draftset-id))]
-      
+
       (submit-draftset-to-user! *test-backend* draftset-id test-manager test-publisher)
 
       (is (is-draftset-owner? *test-backend* draftset-id test-editor))
