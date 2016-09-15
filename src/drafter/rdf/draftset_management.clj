@@ -169,7 +169,7 @@
       "{"
       "  SELECT DISTINCT ?ds WHERE {"
       "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
-      (union-clauses match-clauses)
+      "  " (union-clauses match-clauses)
       "  }"
       "}")
     "}"))
@@ -450,7 +450,7 @@
   (let [q (try-claim-draftset-query draftset-ref claimant)]
     (update! backend q)))
 
-(defn- infer-claim-outcome [{:keys [current-owner claim-role claim-user] :as ds-info} claimant] 
+(defn- infer-claim-outcome [{:keys [current-owner claim-role claim-user] :as ds-info} claimant]
   (cond
     (nil? ds-info) :not-found
     (= (user/username claimant) current-owner) :ok
