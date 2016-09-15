@@ -12,10 +12,6 @@
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
 
-(defn unknown-rdf-content-type-response [content-type]
-  (response/bad-request-response
-   (str "Unknown RDF format for content type " content-type)))
-
 (defn not-acceptable-response
   ([] (not-acceptable-response ""))
   ([body] {:status 406 :headers {} :body body}))

@@ -48,13 +48,6 @@
         (when-let [{:keys [email role] :as token} (authproto/-authenticate inner-backend request data)]
           (user/create-authenticated-user email (keyword role)))))))
 
-(defn basic-authentication
-  "Requires the incoming request is authenticated using basic
-  authentication."
-  [user-repo inner-handler]
-  (let [backend (basic-auth-backend user-repo)]
-    (wrap-authorization (wrap-authentication inner-handler backend) backend)))
-
 (defn require-authenticated
   "Requires the incoming request has been authenticated."
   [inner-handler]
@@ -65,12 +58,6 @@
           (log/info "got user" email)
           (inner-handler request)))
       (auth/throw-unauthorized {:message "Authentication required"}))))
-
-(defn require-basic-authentication
-  "Wraps a handler in one which requires the request is authenticated
-  through HTTP Basic authentication."
-  [user-repo inner-handler]
-  (basic-authentication user-repo (require-authenticated inner-handler)))
 
 (defn- get-configured-token-auth-backend [env-map]
   (if-let [signing-key (:drafter-jws-signing-key env-map)]

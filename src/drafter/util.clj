@@ -36,18 +36,6 @@
   [f m]
   (into {} (for [[k v] m] [(f k) (f v)])))
 
-(defn to-coll
-  "Lifts a non-collection value into a collection containing that
-  value. If the input value is already a collection it is returned
-  directly. If the input is not a collection, one is created by
-  passing the value to coll-f. This defaults to vector if none is
-  provided."
-  ([x] (to-coll x vector))
-  ([x coll-f] (if (or (nil? x)
-                      (coll? x))
-                x
-                (coll-f x))))
-
 (defn construct-dynamic
   "Dynamically creates an instance of a class using the given sequence
   of constructor arguments."

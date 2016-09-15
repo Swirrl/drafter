@@ -3,7 +3,7 @@
             [clojure.set :as set]
             [clojure.tools.logging :as log]
             [ring.util.response :refer [redirect-after-post not-found response]]
-            [drafter.responses :refer [unknown-rdf-content-type-response not-acceptable-response unprocessable-entity-response
+            [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
                                        unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!
                                        conflict-detected-response]]
             [drafter.requests :as request]
@@ -17,7 +17,7 @@
             [drafter.util :as util]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
-            [drafter.middleware :refer [require-basic-authentication require-params allowed-methods-handler require-rdf-content-type temp-file-body
+            [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type temp-file-body
                                         optional-enum-param]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
@@ -34,11 +34,6 @@
 (defn- execute-query-in-draftset [backend draftset-ref request union-with-live?]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)]
     (process-sparql-query rewriting-executor request)))
-
-(defn- get-accepted-rdf-format [request]
-  (if-let [accept (request/accept request)]
-    (if-let [[format _] (conneg/negotiate :construct accept)]
-      format)))
 
 (defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
@@ -87,9 +82,6 @@
     (if (mgmt/is-graph-live? backend graph)
       (inner-handler request)
       (unprocessable-entity-response (str "Graph not found in live")))))
-
-(defn- set-union-with-live [request value]
-  (assoc-in request [:params :union-with-live] false))
 
 (defn parse-query-param-flag-handler [flag inner-handler]
   (fn [{:keys [params] :as request}]

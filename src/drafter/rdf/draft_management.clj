@@ -586,9 +586,3 @@ WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
   [backend graph-uris meta-pairs]
   (let [update-query (append-metadata-to-graphs-query graph-uris meta-pairs)]
     (update! backend update-query)))
-
-(defn append-graph-metadata! [backend graph-uri metadata]
-  "Takes a hash-map of metadata key/value pairs and adds them as
-  metadata to the graphs state graph, converting keys into drafter
-  URIs as necessary. Assumes all values are strings."
-  (append-metadata-to-graphs! backend [graph-uri] metadata))

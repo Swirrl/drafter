@@ -10,7 +10,6 @@
             [grafter.rdf :refer [subject predicate object context]]
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :as pr]
-            [drafter.util :refer [to-coll]]
             [drafter.middleware :as middleware]
             [drafter.routes.sparql :refer :all]
             [drafter.rdf.draft-management :refer :all]
@@ -39,19 +38,20 @@
                            :params {:query "SELECT * WHERE { ?s ?p ?o }"}
                            :headers {"accept" "text/csv"}})
 
-(defn- build-query [endpoint-path query graphs]
-  (let [graphs (to-coll graphs)
-        query-request (-> default-sparql-query
-                          (assoc-in [:params :query] query)
-                          (assoc :uri endpoint-path))]
+(defn- build-query
+  ([endpoint-path query] (build-query endpoint-path query))
+  ([endpoint-path query graphs]
+   (let [query-request (-> default-sparql-query
+                           (assoc-in [:params :query] query)
+                           (assoc :uri endpoint-path))]
 
-    (reduce (fn [req graph]
-              (log/spy (update-in req [:params :graph] (fn [old new]
-                                                         (cond
-                                                          (nil? old) new
-                                                          (instance? String old) [old new]
-                                                          :else (conj old new))) graph)))
-            query-request graphs)))
+     (reduce (fn [req graph]
+               (log/spy (update-in req [:params :graph] (fn [old new]
+                                                          (cond
+                                                            (nil? old) new
+                                                            (instance? String old) [old new]
+                                                            :else (conj old new))) graph)))
+             query-request graphs))))
 
 (defn live-query [qstr]
   (build-query "/sparql/live" qstr nil))

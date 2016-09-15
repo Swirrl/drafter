@@ -1,4 +1,6 @@
 (ns drafter.draftset
+  "In memory clojure representations of Draftset objects and functions
+  to operate on them."
   (:require [schema.core :as s]
             [drafter.util :as util])
   (:import [java.net URI]
@@ -49,6 +51,11 @@
 
 (def Draftset (s/either OwnedDraftset SubmittedDraftset))
 
+;; NOTE: this is currently only Used only by tests
+;;
+;; TODO: Make the application use this function when loading a
+;; draftset out of the database, and validate it conforms to our
+;; in-memory/json schema.
 (s/defn create-draftset :- Draftset
   ([creator :- email-schema]
    {:id (->DraftsetId (str (UUID/randomUUID)))
@@ -69,9 +76,11 @@
       (assoc role-or-user-key role-or-user-value)
       (assoc :submitted-by submitter)))
 
+;; Not used outside of tests
 (defn submit-to-role [draftset submitter role]
   (submit draftset submitter :claim-role role))
 
+;; Not used outside of tests
 (defn submit-to-user [draftset submitter username]
   (submit draftset submitter :claim-user username))
 
@@ -80,4 +89,12 @@
       (dissoc :submission)
       (assoc :current-owner claimant)))
 
+
+;; NOTE: This var is currently unreferenced, we should probably try
+;; and use it - tying it into either a SPEC/validation or something.
+;;
+;; It certainly seems useful to have an explicit list of expected
+;; values.
+;;
+;; TODO consider making this a schema enum
 (def operations #{:delete :edit :submit :publish :claim})

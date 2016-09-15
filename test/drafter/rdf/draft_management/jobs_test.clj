@@ -4,6 +4,10 @@
             [drafter.test-common :refer [wrap-db-setup]]
             [drafter.write-scheduler :as scheduler]))
 
+
+(defn succeeded-job-result? [{:keys [type] :as result}]
+  (= :ok type))
+
 (deftest exec-joblets-test
   (let [shared (atom [])
         nums (range 1 10)

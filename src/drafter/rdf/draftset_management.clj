@@ -169,7 +169,7 @@
       "{"
       "  SELECT DISTINCT ?ds WHERE {"
       "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
-      (union-clauses match-clauses)
+      "  " (union-clauses match-clauses)
       "  }"
       "}")
     "}"))
@@ -177,10 +177,6 @@
 (defn- draftset-uri-clause [draftset-ref]
   (str
     "{ VALUES ?ds { <" (str (ds/->draftset-uri draftset-ref)) "> } }"))
-
-(defn- get-draftset-properties-query [draftset-ref]
-  (get-draftsets-matching-properties-query
-    [(draftset-uri-clause draftset-ref)]))
 
 (defn- get-draftset-graph-mapping-query [draftset-ref]
   (get-draftsets-matching-graph-mappings-query
@@ -454,7 +450,7 @@
   (let [q (try-claim-draftset-query draftset-ref claimant)]
     (update! backend q)))
 
-(defn- infer-claim-outcome [{:keys [current-owner claim-role claim-user] :as ds-info} claimant] 
+(defn- infer-claim-outcome [{:keys [current-owner claim-role claim-user] :as ds-info} claimant]
   (cond
     (nil? ds-info) :not-found
     (= (user/username claimant) current-owner) :ok
