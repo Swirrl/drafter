@@ -10,14 +10,6 @@
           outer (Exception. "noooooo" middle)]
       (is (= [outer middle innermost] (get-causes outer))))))
 
-(deftest to-coll-test
-  (are [coll expected] (= coll expected)
-       (to-coll 1) [1]
-       (to-coll [1 2]) [1 2]
-       (to-coll 3 hash-set) #{3}
-       (to-coll [1 2] hash-set) [1 2]
-       (to-coll nil) nil))
-
 (deftest conf-if-test
   (are [test col item expected] (= expected (conj-if test col item))
        true [] 1 [1]

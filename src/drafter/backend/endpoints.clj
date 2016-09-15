@@ -64,10 +64,6 @@
 (defn- get-rewritten-query-graph-restriction [db live->draft union-with-live?]
   (mgmt/graph-mapping->graph-restriction db (stringify-graph-mapping live->draft) union-with-live?))
 
-(defn- prepare-restricted-query [backend sparql-string graph-restriction]
-  (let [pquery (prepare-query backend sparql-string)]
-    (apply-restriction pquery graph-restriction)))
-
 (s/defrecord RewritingSesameSparqlExecutor [inner :- (s/protocol backend/SparqlExecutor)
                                             live->draft :- {URI URI}
                                             union-with-live? :- Boolean]
@@ -78,7 +74,7 @@
           pquery (prepare-query inner rewritten-query-string)
           pquery (apply-restriction pquery graph-restriction)]
       (rewrite-query-results pquery live->draft)))
-  
+
   backend/ToRepository
   (->sesame-repo [_] (->sesame-repo inner)))
 

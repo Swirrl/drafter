@@ -178,10 +178,6 @@
   (str
     "{ VALUES ?ds { <" (str (ds/->draftset-uri draftset-ref)) "> } }"))
 
-(defn- get-draftset-properties-query [draftset-ref]
-  (get-draftsets-matching-properties-query
-    [(draftset-uri-clause draftset-ref)]))
-
 (defn- get-draftset-graph-mapping-query [draftset-ref]
   (get-draftsets-matching-graph-mappings-query
     [(draftset-uri-clause draftset-ref)]))
