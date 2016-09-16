@@ -2,6 +2,7 @@
   (:require
    [drafter.rdf.draftset-management :refer [create-draftset!]]
    [drafter.rdf.draft-management :refer :all]
+   [drafter.test-helpers.draft-management-helpers :as mgmt]
    [drafter.user-test :refer [test-editor]]
    [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live! import-data-to-draft! ask?] :as test]
    [grafter.rdf :refer [s add add-statement]]
@@ -145,12 +146,12 @@
     (is (ask? "<" test-graph-uri "> <" drafter:isPublic "> " true " .")
         "should set the boolean value")))
 
-(deftest migrate-live!-test
-  (testing "migrate-live! data is migrated"
+(deftest migrate-graphs-to-live!-test
+  (testing "migrate-graphs-to-live! data is migrated"
     (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
           expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
       (append-data-batch! *test-backend* draft-graph-uri test-triples)
-      (migrate-live! *test-backend* draft-graph-uri)
+      (migrate-graphs-to-live! *test-backend* [draft-graph-uri])
       (is (not (ask? "GRAPH <" draft-graph-uri "> {"
                      expected-triple-pattern
                      "}"))
@@ -161,7 +162,7 @@
                 "}")
           "Live graph contains the migrated triples")
 
-      (is (= false (draft-exists? *test-backend* draft-graph-uri))
+      (is (= false (mgmt/draft-exists? *test-backend* draft-graph-uri))
           "Draft graph should be removed from the state graph")
 
       (is (= true (is-graph-managed? *test-backend* test-graph-uri))
@@ -173,8 +174,8 @@
                 }")
           "Live graph should have a modified and issued time stamp"))))
 
-(deftest migrate-live!-remove-live-aswell-test
-  (testing "migrate-live! DELETION: Deleted draft removes live graph from state graph"
+(deftest migrate-graphs-to-live!-remove-live-aswell-test
+  (testing "migrate-graphs-to-live! DELETION: Deleted draft removes live graph from state graph"
     (let [test-graph-to-delete-uri "http://example.org/my-other-graph1"
           graph-to-keep-uri "http://example.org/keep-me-a1"
           graph-to-keep-uri2 "http://example.org/keep-me-a2"
@@ -187,26 +188,26 @@
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-del-uri test-triples)
 
-      (migrate-live! *test-backend* draft-graph-to-keep-uri)
-      (migrate-live! *test-backend* draft-graph-to-del-uri)
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri])
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
 
       ;; Draft for deletion has had data published. Now lets create a delete and publish
       (let [draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)]
         ;; We are migrating an empty graph, so this is deleting.
-        (migrate-live! *test-backend* draft-graph-to-del-uri)
+        (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
         (let [managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
               keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri)]
           (is (not managed-found?)
               "Live graph should no longer be referenced in state graph")
 
-          (is (= false (draft-exists? *test-backend* draft-graph-to-del-uri))
+          (is (= false (mgmt/draft-exists? *test-backend* draft-graph-to-del-uri))
               "Draft graph should be removed from the state graph")
           (testing "Unrelated draft and live graphs should be not be removed from the state graph"
             (is keep-managed-found?)
-            (is (draft-exists? *test-backend* draft-graph-to-keep-uri2))))))))
+            (is (mgmt/draft-exists? *test-backend* draft-graph-to-keep-uri2))))))))
 
-(deftest migrate-live!-dont-remove-state-when-other-drafts-test
-  (testing "migrate-live! DELETION: Doesn't delete from state graph when there's multiple drafts"
+(deftest migrate-graphs-to-live!-dont-remove-state-when-other-drafts-test
+  (testing "migrate-graphs-to-live! DELETION: Doesn't delete from state graph when there's multiple drafts"
     (let [test-graph-to-delete-uri "http://example.org/my-other-graph2"
           draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)
           _ (create-managed-graph-with-draft! test-graph-to-delete-uri)
@@ -217,22 +218,22 @@
 
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-keep-uri3 test-triples)
-      (migrate-live! *test-backend* draft-graph-to-keep-uri2)
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri2])
       (is (graph-exists? *test-backend* graph-to-keep-uri2))
 
       ;; We are migrating an empty graph, so this is deleting.
-      (migrate-live! *test-backend* draft-graph-to-del-uri)
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
       (let [draft-managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
             keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri2)]
         (is draft-managed-found?
             "Live graph shouldn't be deleted from state graph if referenced by other drafts")
 
-        (is (= false (draft-exists? *test-backend* draft-graph-to-del-uri))
+        (is (= false (mgmt/draft-exists? *test-backend* draft-graph-to-del-uri))
             "Draft graph should be removed from the state graph")
 
         (testing "Unrelated live & draft graphs should be not be removed from the state graph"
           (is keep-managed-found?)
-          (is (draft-exists? *test-backend* draft-graph-to-keep-uri3)))))))
+          (is (mgmt/draft-exists? *test-backend* draft-graph-to-keep-uri3)))))))
 
 (deftest graph-restricted-queries-test
   (testing "query"
@@ -295,7 +296,7 @@
         draft-2 (create-managed-graph-with-draft! "http://real/graph/2")]
 
        (testing "draft-graphs returns all draft graphs"
-         (is (= #{draft-1 draft-2} (draft-graphs *test-backend*))))
+         (is (= #{draft-1 draft-2} (mgmt/draft-graphs *test-backend*))))
 
        (testing "live-graphs returns all live graphs"
          (is (= #{"http://real/graph/1" "http://real/graph/2"}
@@ -345,7 +346,7 @@
           {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
       (is (= {live-graph-uri draft-graph-uri} graph-map))
       (is (is-graph-managed? *test-backend*  live-graph-uri))
-      (is (draft-exists? *test-backend* draft-graph-uri))))
+      (is (mgmt/draft-exists? *test-backend* draft-graph-uri))))
 
   (testing "Live graph does not exist"
     (let [live-graph-uri "http://live"
@@ -353,7 +354,7 @@
           {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
       (is (= {live-graph-uri draft-graph-uri} graph-map))
       (is (is-graph-managed? *test-backend* live-graph-uri))
-      (is (draft-exists? *test-backend* draft-graph-uri)))))
+      (is (mgmt/draft-exists? *test-backend* draft-graph-uri)))))
 
 (deftest delete-draft-graph!-test
   (testing "With only draft for managed graph"
@@ -378,7 +379,7 @@
 
       (delete-draft-graph! *test-backend* draft-graph-2)
 
-      (is (= true (draft-exists? *test-backend* draft-graph-1)))
+      (is (= true (mgmt/draft-exists? *test-backend* draft-graph-1)))
       (is (= true (is-graph-managed? *test-backend* live-graph-uri))))))
 
 ;; This test attempts to capture the rationale behind the calculation of graph
