@@ -1,14 +1,16 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.tools.logging :as log]
-            [drafter.operations :refer :all]
-            [drafter.requests :as request]
-            [drafter.responses :refer [not-acceptable-response]]
-            [drafter.backend.protocols :refer [prepare-query]]
-            [drafter.rdf.sesame :refer [get-query-type create-query-executor]]
-            [drafter.middleware :refer [allowed-methods-handler]]
             [compojure.core :refer [make-route]]
-            [drafter.rdf.content-negotiation :as conneg])
-  (:import [org.apache.jena.query QueryParseException]))
+            [drafter
+             [middleware :refer [allowed-methods-handler]]
+             [operations :refer :all]
+             [requests :as request]
+             [responses :refer [not-acceptable-response]]]
+            [drafter.backend.protocols :refer [prepare-query]]
+            [drafter.rdf
+             [content-negotiation :as conneg]
+             [sesame :refer [create-query-executor get-query-type]]])
+  (:import org.apache.jena.query.QueryParseException))
 
 ;result-streamer :: (OutputStream -> NotifierFn -> ()) -> NotifierFn -> (OutputStream -> ())
 (defn result-streamer [exec-fn result-notify-fn]

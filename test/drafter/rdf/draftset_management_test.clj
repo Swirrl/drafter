@@ -14,7 +14,8 @@
             [drafter.util :as util]
             [grafter.rdf.repository :refer [query]]
             [grafter.rdf.protocols :refer [->Triple ->Quad]]
-            [grafter.vocabularies.rdf :refer :all]))
+            [grafter.vocabularies.rdf :refer :all])
+  (:import [java.net URI]))
 
 (defn- has-uri-object? [s p uri-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
@@ -32,7 +33,7 @@
 (deftest create-draftset!-test
   (let [title "Test draftset"
         description "Test description"]
-    (testing "Without title or description"
+    #dbg (testing "Without title or description"
       (let [draftset-id (create-draftset! *test-backend* test-editor)
             ds-uri (->draftset-uri draftset-id)]
         (is (draftset-exists? *test-backend* ds-uri))
@@ -142,7 +143,7 @@
           draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
       (make-graph-live! *test-backend* live-graph)
 
-      (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples "http://subject") draftset-id)]
+      (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples (URI. "http://subject")) draftset-id)]
         (is (mgmth/draft-exists? *test-backend* draft-graph))
 
         (delete-draftset-graph! *test-backend* draftset-id live-graph)
@@ -369,7 +370,7 @@
 
 (deftest copy-live-graph-into-draftset-test
   (let [draftset-id (create-draftset! *test-backend* test-editor)
-        live-triples (test-triples "http://test-subject")
+        live-triples (test-triples (URI. "http://test-subject"))
         live-graph-uri (make-graph-live! *test-backend* "http://live" live-triples)
         {:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
     (scheduler/queue-job! copy-job)
@@ -382,9 +383,9 @@
 
 (deftest copy-live-graph-into-existing-draft-graph-in-draftset-test
   (let [draftset-id (create-draftset! *test-backend* test-editor)
-        live-triples (test-triples "http://test-subject")
+        live-triples (test-triples (URI. "http://test-subject"))
         live-graph-uri (make-graph-live! *test-backend* "http://live" live-triples)
-        initial-draft-triples (test-triples "http://temp-subject")
+        initial-draft-triples (test-triples (URI. "http://temp-subject"))
         draft-graph-uri (import-data-to-draft! *test-backend* live-graph-uri initial-draft-triples draftset-id)
         {:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
 

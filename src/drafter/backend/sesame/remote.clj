@@ -1,8 +1,9 @@
 (ns drafter.backend.sesame.remote
-  (:require [drafter.backend.repository]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [clojure.tools.logging :as log])
   (:import [drafter.rdf DrafterSPARQLRepository]))
+
+(require '[drafter.backend.repository]) ;;ensure loaded
 
 (defn get-required-environment-variable [var-key env-map]
   (if-let [ev (var-key env-map)]

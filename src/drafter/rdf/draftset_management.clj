@@ -1,27 +1,30 @@
 (ns drafter.rdf.draftset-management
-  (:require [grafter.vocabularies.rdf :refer :all]
-            [grafter.rdf :refer [add s context]]
-            [grafter.rdf.io :refer [IStatement->sesame-statement]]
-            [grafter.rdf.protocols :refer [map->Triple map->Quad]]
-            [grafter.rdf.repository :as repo]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.sesame :refer [read-statements]]
-            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
-            [drafter.backend.protocols :refer [prepare-query ->sesame-repo]]
-            [drafter.util :as util]
-            [drafter.draftset :as ds]
-            [drafter.user :as user]
-            [drafter.util :as util]
-            [drafter.rdf.draft-management :refer [update! query to-quads with-state-graph drafter-state-graph] :as mgmt]
+  (:require [clojure.string :as string]
+            [drafter
+             [draftset :as ds]
+             [user :as user]
+             [util :as util]
+             [write-scheduler :as scheduler]]
+            [drafter.backend.protocols :refer [->sesame-repo prepare-query]]
+            [drafter.rdf
+             [draft-management :as mgmt :refer [query to-quads update! with-state-graph]]
+             [drafter-ontology :refer :all]
+             [sesame :refer [read-statements]]]
             [drafter.rdf.draft-management.jobs :as jobs]
-            [swirrl-server.async.jobs :refer [create-job create-child-job job-succeeded!]]
-            [drafter.write-scheduler :as scheduler]
-            [schema.core :as s]
-            [clojure.string :as string])
+            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-statement]]
+            [grafter.rdf :refer [add context]]
+            [grafter.rdf
+             [io :refer [IStatement->sesame-statement]]
+             [protocols :refer [map->Quad map->Triple]]
+             [repository :as repo]]
+            [grafter.vocabularies.rdf :refer :all]
+            [swirrl-server.async.jobs
+             :refer
+             [create-child-job create-job job-succeeded!]])
   (:import [java.util Date UUID]
-           [org.openrdf.model Resource URI]
-           [org.openrdf.model.impl ContextStatementImpl]
-           [org.openrdf.query TupleQueryResultHandler GraphQuery]))
+           org.openrdf.model.impl.ContextStatementImpl
+           org.openrdf.model.Resource
+           [org.openrdf.query GraphQuery TupleQueryResultHandler]))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -29,8 +32,8 @@
             [drafter:createdAt created-date]
             [drafter:createdBy user-uri]
             [drafter:hasOwner user-uri]]
-        ss (util/conj-if (some? title) ss [rdfs:label (s title)])]
-    (util/conj-if (some? description) ss [rdfs:comment (s description)])))
+        ss (util/conj-if (some? title) ss [rdfs:label title])]
+    (util/conj-if (some? description) ss [rdfs:comment description])))
 
 (defn create-draftset!
   "Creates a new draftset in the given database and returns its id. If
@@ -624,6 +627,8 @@
                 (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
                       sesame-statements (map IStatement->sesame-statement rewritten-statements)
                       graph-array (into-array Resource (map util/string->sesame-uri (vals live->draft)))]
+
+                  ;; TODO port this to use new grafter delete stuff.
                   (.remove conn sesame-statements graph-array)))
               (let [next-job (create-child-job
                               job

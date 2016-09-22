@@ -99,17 +99,6 @@
 (defn string->sesame-uri [s]
   (URIImpl. s))
 
-(defn seq->iterator
-  "Creates a java Iterator for a sequence."
-  [s]
-  (let [state (atom s)]
-    (reify java.util.Iterator
-      (hasNext [this] (boolean (seq @state)))
-      (next [this]
-        (let [value (first @state)]
-          (swap! state rest)
-          value)))))
-
 ;; Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
 (defn intersection-with
   "Intersects two maps by their keys and combines corresponding values

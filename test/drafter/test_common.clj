@@ -16,6 +16,7 @@
             [schema.test :refer [validate-schemas]]
             [schema.core :as s])
   (:import [java.util Scanner UUID]
+           [java.net URI]
            [java.util.concurrent CountDownLatch TimeUnit]
            [java.io ByteArrayInputStream]))
 
@@ -28,8 +29,8 @@
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri
-             ["http://test.com/hasProperty" "http://test.com/data/1"]
-             ["http://test.com/hasProperty" "http://test.com/data/2"]]))
+             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
+             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]]))
 
 (defn select-all-in-graph [graph-uri]
   (str "SELECT * WHERE {"
@@ -97,14 +98,14 @@
   ([db graph triples draftset-ref]
 
    (create-managed-graph! db graph)
-   (let [draftset-uri (and draftset-ref (str (->draftset-uri draftset-ref)))
+   (let [draftset-uri (and draftset-ref (->draftset-uri draftset-ref))
          draft-graph (create-draft-graph! db graph {} draftset-uri)]
      (add db draft-graph triples)
      draft-graph)))
 
 (defn make-graph-live!
   ([db live-guri]
-     (make-graph-live! db live-guri (test-triples "http://test.com/subject-1")))
+     (make-graph-live! db live-guri (test-triples (URI. "http://test.com/subject-1"))))
 
   ([db live-guri data]
      (let [draft-guri (import-data-to-draft! db live-guri data)]

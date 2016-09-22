@@ -1,8 +1,9 @@
 (ns drafter.backend.sesame.native
-  (:require [drafter.backend.repository]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [environ.core :refer [env]]
             [grafter.rdf.repository :as repo]))
+
+(require '[drafter.backend.repository]) ;; ensure loaded
 
 ;; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
 ;; (but we have to specify 4 char strings, so in some cases last chars don't matter

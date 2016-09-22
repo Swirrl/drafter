@@ -1,31 +1,22 @@
 (ns drafter.routes.draftsets-api
-  (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes make-route]]
-            [clojure.set :as set]
-            [clojure.tools.logging :as log]
-            [ring.util.response :refer [redirect-after-post not-found response]]
-            [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
-                                       unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!
-                                       conflict-detected-response]]
-            [drafter.requests :as request]
-            [swirrl-server.responses :as response]
-            [drafter.rdf.sparql-protocol :refer [process-prepared-query process-sparql-query]]
-            [drafter.rdf.draftset-management :as dsmgmt]
-            [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.content-negotiation :as conneg]
-            [drafter.backend.protocols :refer :all]
+  (:require [compojure.core :refer [context make-route routes]]
+            [drafter
+             [draftset :as ds]
+             [middleware :refer [allowed-methods-handler optional-enum-param require-params require-rdf-content-type temp-file-body]]
+             [requests :as request]
+             [responses :refer [conflict-detected-response forbidden-response not-acceptable-response submit-async-job! unprocessable-entity-response]]
+             [user :as user]
+             [util :as util]]
             [drafter.backend.endpoints :refer [draft-graph-set]]
-            [drafter.util :as util]
-            [drafter.user :as user]
+            [drafter.rdf
+             [content-negotiation :as conneg]
+             [draft-management :as mgmt]
+             [draftset-management :as dsmgmt]
+             [sesame :refer [is-quads-format? is-triples-format?]]
+             [sparql-protocol :refer [process-prepared-query process-sparql-query]]]
             [drafter.user.repository :as user-repo]
-            [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type temp-file-body
-                                        optional-enum-param]]
-            [drafter.draftset :as ds]
-            [grafter.rdf :refer [statements]]
-            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
-            [clojure.java.io :as io])
-  (:import [org.openrdf.query TupleQueryResultHandler]
-           [org.openrdf OpenRDFException]
-           [org.openrdf.queryrender RenderUtils]))
+            [ring.util.response :refer [not-found redirect-after-post response]])
+  (:import org.openrdf.queryrender.RenderUtils))
 
 (defn- get-draftset-executor [backend draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]

@@ -1,20 +1,22 @@
 (ns drafter.rdf.draft-management-test
-  (:require
-   [drafter.rdf.draftset-management :refer [create-draftset!]]
-   [drafter.rdf.draft-management :refer :all]
-   [drafter.test-helpers.draft-management-helpers :as mgmt]
-   [drafter.user-test :refer [test-editor]]
-   [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live! import-data-to-draft! ask?] :as test]
-   [grafter.rdf :refer [s add add-statement]]
-   [grafter.rdf.templater :refer [graph triplify]]
-   [grafter.vocabularies.rdf :refer :all]
-   [grafter.rdf.repository :as repo]
-   [drafter.rdf.drafter-ontology :refer :all]
-   [schema.test :refer [validate-schemas]]
-   [drafter.util :as util]
-   [clojure.test :refer :all])
-  (:import [org.openrdf.model.impl URIImpl]
-           [java.util Date UUID]))
+  (:require [clojure.test :refer :all]
+            [drafter
+             [test-common :as test :refer [*test-backend* ask? import-data-to-draft! make-graph-live! wrap-clean-test-db wrap-db-setup]]
+             [user-test :refer [test-editor]]]
+            [drafter.rdf
+             [draft-management :refer :all]
+             [drafter-ontology :refer :all]
+             [draftset-management :refer [create-draftset!]]]
+            [drafter.test-helpers.draft-management-helpers :as mgmt]
+            [grafter.rdf :refer [add]]
+            [grafter.rdf
+             [repository :as repo]
+             [templater :refer [triplify]]]
+            [grafter.vocabularies.rdf :refer :all]
+            [schema.test :refer [validate-schemas]])
+  (:import [java.util Date UUID]
+           java.net.URI
+           org.openrdf.model.impl.URIImpl))
 
 (use-fixtures :each validate-schemas)
 
@@ -44,27 +46,27 @@
   (clone-data-from-live-to-draft! db draft-graph-uri)
   (append-data-batch! db draft-graph-uri triples))
 
-(def test-triples (triplify ["http://test.com/data/one"
-                             ["http://test.com/hasProperty" "http://test.com/data/1"]
-                             ["http://test.com/hasProperty" "http://test.com/data/2"]]
+(def test-triples (triplify [(URI. "http://test.com/data/one")
+                             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
+                             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]]
 
-                            ["http://test.com/data/two"
-                             ["http://test.com/hasProperty" "http://test.com/data/1"]
-                             ["http://test.com/hasProperty" "http://test.com/data/2"]]))
+                            [(URI. "http://test.com/data/two")
+                             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
+                             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]]))
 
-(def test-triples-2 (triplify ["http://test2.com/data/one"
-                               ["http://test2.com/hasProperty" "http://test2.com/data/1"]
-                               ["http://test2.com/hasProperty" "http://test2.com/data/2"]]
+(def test-triples-2 (triplify [(URI. "http://test2.com/data/one")
+                               [(URI. "http://test2.com/hasProperty") (URI. "http://test2.com/data/1")]
+                               [(URI. "http://test2.com/hasProperty") (URI. "http://test2.com/data/2")]]
 
-                              ["http://test2.com/data/two"
-                               ["http://test2.com/hasProperty" "http://test2.com/data/1"]
-                               ["http://test2.com/hasProperty" "http://test2.com/data/2"]]))
+                              [(URI. "http://test2.com/data/two")
+                               [(URI. "http://test2.com/hasProperty") (URI. "http://test2.com/data/1")]
+                               [(URI. "http://test2.com/hasProperty") (URI. "http://test2.com/data/2")]]))
 
-(def test-graph-uri "http://example.org/my-graph")
+(def test-graph-uri (URI. "http://example.org/my-graph"))
 
 (deftest create-managed-graph-test
   (testing "Creates managed graph"
-    (is (create-managed-graph "http://example.org/my-graph"))))
+    (is (create-managed-graph (URI. "http://example.org/my-graph")))))
 
 (deftest create-managed-graph!-test
   (testing "create-managed-graph!"
@@ -74,14 +76,14 @@
 
 (deftest is-graph-live?-test
   (testing "Non-existent graph"
-    (is (= false (is-graph-live? *test-backend* "http://missing"))))
+    (is (= false (is-graph-live? *test-backend* (URI. "http://missing")))))
 
   (testing "Non-live graph"
-    (let [graph-uri (create-managed-graph! *test-backend* "http://live")]
+    (let [graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))]
       (is (= false (is-graph-live? *test-backend* graph-uri)))))
 
   (testing "Live graph"
-    (let [graph-uri (make-graph-live! *test-backend* "http://live")]
+    (let [graph-uri (make-graph-live! *test-backend* (URI. "http://live"))]
       (is (is-graph-live? *test-backend* graph-uri)))))
 
 (deftest create-draft-graph!-test
@@ -119,10 +121,10 @@
                  <http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .
                }"))))
 
-    (testing "with live graph with existing data, copies data into draft"
+ (testing "with live graph with existing data, copies data into draft"
       (let [live-uri (make-graph-live! *test-backend*
-                                       "http://clones/original/data"
-                                       (triplify ["http://starting/data" ["http://starting/data" "http://starting/data"]]))
+                                       (URI. "http://clones/original/data")
+                                       (triplify [(URI. "http://starting/data") [(URI. "http://starting/data") (URI. "http://starting/data")]]))
             draft-graph-uri (create-managed-graph-with-draft! live-uri)]
 
         (clone-and-append-data! *test-backend* draft-graph-uri test-triples)
@@ -292,8 +294,8 @@
           "Can set many graphs as union graph"))))
 
 (deftest draft-graphs-test
-  (let [draft-1 (create-managed-graph-with-draft! "http://real/graph/1")
-        draft-2 (create-managed-graph-with-draft! "http://real/graph/2")]
+  (let [draft-1 (create-managed-graph-with-draft! (URI. "http://real/graph/1"))
+        draft-2 (create-managed-graph-with-draft! (URI. "http://real/graph/2"))]
 
        (testing "draft-graphs returns all draft graphs"
          (is (= #{draft-1 draft-2} (mgmt/draft-graphs *test-backend*))))
@@ -305,26 +307,29 @@
 (deftest build-draft-map-test
   (let [db (repo/repo)]
     (testing "graph-map associates live graphs with their drafts"
-      (create-managed-graph! db "http://frogs.com/")
-      (create-managed-graph! db "http://dogs.com/")
-      (let [frogs-draft (create-draft-graph! db "http://frogs.com/")
-            dogs-draft (create-draft-graph! db "http://dogs.com/")]
+      (let [frogs-live-graph (URI. "http://frogs.com/")
+            dogs-live-graph (URI. "http://dogs.com/")]
 
-        (is (= {(URIImpl. "http://frogs.com/") (URIImpl. frogs-draft)
-                (URIImpl. "http://dogs.com/")  (URIImpl. dogs-draft)}
+        (create-managed-graph! db frogs-live-graph)
+        (create-managed-graph! db dogs-live-graph)
+        (let [frogs-draft (create-draft-graph! db frogs-live-graph)
+              dogs-draft (create-draft-graph! db dogs-live-graph)]
 
-               (graph-map db #{frogs-draft dogs-draft})))))))
+          (is (= {frogs-live-graph frogs-draft
+                  dogs-live-graph dogs-draft}
+
+                 (graph-map db #{frogs-draft dogs-draft}))))))))
 
 (deftest upsert-single-object-insert-test
   (let [db (repo/repo)]
-    (upsert-single-object! db "http://foo/" "http://bar/" "baz")
+    (upsert-single-object! db (URI. "http://foo/") (URI. "http://bar/") "baz")
     (is (query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
 (deftest upsert-single-object-update-test
   (let [db (repo/repo)
-        subject "http://example.com/subject"
-        predicate "http://example.com/predicate"]
-    (add db (triplify [subject [predicate (s "initial")]]))
+        subject (URI. "http://example.com/subject")
+        predicate (URI. "http://example.com/predicate")]
+    (add db (triplify [subject [predicate "initial"]]))
     (upsert-single-object! db subject predicate "updated")
     (is (query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
                        "<" subject "> <" predicate "> \"updated\""
@@ -332,25 +337,25 @@
 
 (deftest ensure-draft-graph-exists-for-test
   (testing "Draft graph already exists for live graph"
-    (let [draft-graph-uri "http://draft"
-          live-graph-uri  "http://live"
-          ds-uri "http://draftset"
+    (let [draft-graph-uri (URI. "http://draft")
+          live-graph-uri  (URI. "http://live")
+          ds-uri (URI. "http://draftset")
           initial-mapping {live-graph-uri draft-graph-uri}
           {found-draft-uri :draft-graph-uri graph-map :graph-map} (ensure-draft-exists-for *test-backend* live-graph-uri initial-mapping ds-uri)]
       (is (= draft-graph-uri found-draft-uri))
       (is (= initial-mapping graph-map))))
 
   (testing "Live graph exists without draft"
-    (let [live-graph-uri (create-managed-graph! *test-backend* "http://live")
-          ds-uri "http://draftset"
+    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
+          ds-uri (URI. "http://draftset")
           {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
       (is (= {live-graph-uri draft-graph-uri} graph-map))
       (is (is-graph-managed? *test-backend*  live-graph-uri))
       (is (mgmt/draft-exists? *test-backend* draft-graph-uri))))
 
   (testing "Live graph does not exist"
-    (let [live-graph-uri "http://live"
-          ds-uri "http://draftset"
+    (let [live-graph-uri (URI. "http://live")
+          ds-uri (URI. "http://draftset")
           {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
       (is (= {live-graph-uri draft-graph-uri} graph-map))
       (is (is-graph-managed? *test-backend* live-graph-uri))
@@ -358,7 +363,7 @@
 
 (deftest delete-draft-graph!-test
   (testing "With only draft for managed graph"
-    (let [live-graph-uri (create-managed-graph! *test-backend* "http://live")
+    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
           draft-graph-uri (create-draft-graph! *test-backend* live-graph-uri)]
       (append-data-batch! *test-backend* draft-graph-uri test-triples)
       (delete-draft-graph! *test-backend* draft-graph-uri)
@@ -373,7 +378,7 @@
         (is (= false (is-graph-managed? *test-backend* live-graph-uri))))))
 
   (testing "Draft for managed graph with other graphs"
-    (let [live-graph-uri (create-managed-graph! *test-backend* "http://live")
+    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
           draft-graph-1 (create-draft-graph! *test-backend* live-graph-uri)
           draft-graph-2 (create-draft-graph! *test-backend* live-graph-uri)]
 
@@ -413,8 +418,8 @@
 
 (deftest set-timestamp-test
   (let [draftset (create-draftset! *test-backend* test-editor)
-        triples (test/test-triples "http://test-subject")
-        draft-graph-uri (import-data-to-draft! *test-backend* "http://foo/graph" triples draftset)]
+        triples (test/test-triples (URI. "http://test-subject"))
+        draft-graph-uri (import-data-to-draft! *test-backend* (URI. "http://foo/graph") triples draftset)]
 
     (set-modifed-at-on-draft-graph! *test-backend* draft-graph-uri (Date.))
 

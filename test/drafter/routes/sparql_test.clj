@@ -24,9 +24,9 @@
   "Set the state of the database so that we have three managed graphs,
   one of which is made public the other two are still private (draft)."
   [db]
-  (let [draft-made-live-and-deleted (import-data-to-draft! db "http://test.com/made-live-and-deleted-1" (test-triples "http://test.com/subject-1"))
-        draft-2 (import-data-to-draft! db "http://test.com/graph-2" (test-triples "http://test.com/subject-2"))
-        draft-3 (import-data-to-draft! db "http://test.com/graph-3" (test-triples "http://test.com/subject-3"))]
+  (let [draft-made-live-and-deleted (import-data-to-draft! db (URI. "http://test.com/made-live-and-deleted-1") (test-triples (URI. "http://test.com/subject-1")))
+        draft-2 (import-data-to-draft! db "http://test.com/graph-2" (test-triples (URI. "http://test.com/subject-2")))
+        draft-3 (import-data-to-draft! db "http://test.com/graph-3" (test-triples (URI. "http://test.com/subject-3")))]
     (migrate-graphs-to-live! db [draft-made-live-and-deleted])
     [draft-made-live-and-deleted draft-2 draft-3]))
 

@@ -42,10 +42,10 @@
                  [buddy/buddy-auth "0.9.0"]
                  [org.mindrot/jbcrypt "0.3m"]
 
-                 [grafter "0.7.4"]
+                 [grafter "0.8.0-SNAPSHOT"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
-                 [grafter/vocabularies "0.1.3"]
+                 #_[grafter/vocabularies "0.1.3"]
                  [grafter/url "0.2.1"]
 
                  [org.openrdf.sesame/sesame-queryrender "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]

@@ -102,7 +102,7 @@
   (let [draft-graph (create-draft-graph! *test-backend* "http://frogs.com/live-graph")
         graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
 
-    (append-data-batch! *test-backend* draft-graph (test-triples "http://kermit.org/the-frog"))
+    (append-data-batch! *test-backend* draft-graph (test-triples (URI. "http://kermit.org/the-frog")))
 
     (testing "rewrites subject URIs"
       (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { <http://kermit.org/the-frog> ?p ?o } }"

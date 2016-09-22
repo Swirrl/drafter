@@ -15,13 +15,14 @@
 
 
   (:import [java.io ByteArrayOutputStream]
+           [java.net URI]
            [java.util Scanner]
            [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]))
 
 (use-fixtures :each validate-schemas)
 
 (defn add-triple-to-db [db]
-  (pr/add db "http://foo.com/my-graph" (test-triples "http://test.com/data/one")))
+  (pr/add db (URI. "http://foo.com/my-graph") (test-triples (URI. "http://test.com/data/one"))))
 
 (deftest results-streamer-test
   (testing "Streams sparql results into output stream"
@@ -72,7 +73,7 @@
 
         (let [triple-reader (java.io.InputStreamReader. body)
               triples (get-spo-set (rdf/statements triple-reader :format rdf-ntriples))
-              expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
+              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
 
           (is (= expected-triples triples)))))))
 
@@ -90,7 +91,7 @@
 
         (let [csv-result (csv/parse-csv (stream->string body))
               triples (set (drop 1 csv-result))
-              expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
+              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
           (is (= ["s" "p" "o"] (first csv-result)))
           (is (= expected-triples triples)))))))
 

@@ -2,9 +2,11 @@
   "In memory clojure representations of Draftset objects and functions
   to operate on them."
   (:require [schema.core :as s]
-            [drafter.util :as util])
+            [drafter.util :as util]
+            [grafter.rdf.io :as io])
   (:import [java.net URI]
-           [java.util Date UUID]))
+           [java.util Date UUID]
+           org.openrdf.model.impl.URIImpl))
 
 (defprotocol DraftsetRef
   (->draftset-uri [this])
@@ -12,7 +14,11 @@
 
 (defrecord DraftsetURI [uri]
   Object
-  (toString [this] uri))
+  (toString [this] uri)
+
+  io/ISesameRDFConverter
+  (->sesame-rdf-type [this]
+    (URIImpl. (str (:uri this)))))
 
 (defrecord DraftsetId [id]
   DraftsetRef

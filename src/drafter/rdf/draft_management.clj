@@ -1,26 +1,25 @@
 (ns drafter.rdf.draft-management
-  (:require [clojure.tools.logging :as log]
-            [drafter.util :as util]
-            [grafter.rdf :refer [add s]]
-            [drafter.util :refer [map-values]]
-            [clojure.walk :refer [keywordize-keys]]
-            [clojure.set :as set]
-            [grafter.vocabularies.rdf :refer :all]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.rdf.protocols :as pr]
-            [grafter.rdf.repository :as repo]
+  (:require [clojure
+             [set :as set]
+             [string :as string]]
+            [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
-            [grafter.rdf.templater :refer [add-properties graph]]
-            [clojure.string :as string]
-            [swirrl-server.errors :refer [ex-swirrl]]
-            [schema.core :as s])
-  (:import (java.util Date UUID)
-           (java.net URI)
-           (org.openrdf.model.impl URIImpl)))
+            [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.util :as util]
+            [grafter.rdf :refer [add]]
+            [grafter.rdf
+             [protocols :as pr]
+             [repository :as repo]
+             [templater :refer [add-properties graph]]]
+            [grafter.vocabularies.rdf :refer :all]
+            [schema.core :as s]
+            [swirrl-server.errors :refer [ex-swirrl]])
+  (:import [java.util Date UUID]
+           java.net.URI))
 
-(def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
+(def drafter-state-graph (URI. "http://publishmydata.com/graphs/drafter/drafts"))
 
-(def staging-base "http://publishmydata.com/graphs/drafter/draft")
+(def staging-base (URI. "http://publishmydata.com/graphs/drafter/draft"))
 
 (def to-quads (partial graph drafter-state-graph))
 
@@ -46,7 +45,7 @@ PREFIX drafter: <" (drafter "") ">"))
     (pr/update! repo update-string)))
 
 (defn make-draft-graph-uri []
-  (str staging-base "/" (UUID/randomUUID)))
+  (URI. (str staging-base "/" (UUID/randomUUID))))
 
 (defn with-state-graph
   "Wraps the string in a SPARQL
@@ -140,9 +139,8 @@ PREFIX drafter: <" (drafter "") ">"))
                                  [drafter:modifiedAt time]]
            draft-graph-triples (util/conj-if (some? draftset-uri) draft-graph-triples [drafter:inDraftSet draftset-uri])
            triples [live-graph-triples (add-properties draft-graph-triples
-                                                       ;; we need to make the values of the opts into strings by calling `s`.
                                                        (into {} (for [[k v] opts]
-                                                                  [k (s v)])))]]
+                                                                  [k (str v)])))]]
        triples))) ; returns the triples
 
 (defn create-draft-graph!
@@ -351,13 +349,13 @@ PREFIX drafter: <" (drafter "") ">"))
                                      "  ?live a drafter:ManagedGraph ;"
                                      "        drafter:hasDraft ?draft .")
                                    "}")))]
-      (let [live-graphs (map #(get % "live") results)]
+      (let [live-graphs (map #(get % :live) results)]
         (when (has-duplicates? live-graphs)
           (throw (ex-swirrl :multiple-drafts-error
                             "Multiple draft graphs were supplied referencing the same live graph.")))
 
         (zipmap live-graphs
-                (map #(get % "draft") results))))))
+                (map #(get % :draft) results))))))
 
 (defn live-graphs [db & {:keys [online] :or {online true}}]
   "Get all live graph names.  Takes an optional boolean keyword
