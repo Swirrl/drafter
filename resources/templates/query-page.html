@@ -3,6 +3,8 @@
 
 {% include "templates/query-form.html" %}
 
-{% include "templates/update-form.html" %}
+{% if update-endpoint %}
+  {% include "templates/update-form.html" %}
+{% endif %}
 
 {% endblock %}

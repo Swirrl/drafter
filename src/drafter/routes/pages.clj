@@ -30,17 +30,12 @@
 (defn pages-routes [db]
   (routes
    (GET "/" [] (clojure.java.io/resource "swagger-ui/index.html"))
-   (GET "/live" [] (query-page {:endpoint "/sparql/live"
-                                :update-endpoint "/sparql/live/update"
+   (GET "/live" [] (query-page {:endpoint "/v1/sparql/live"
                                 :dump-path "/live/data"
                                 :name "Live" }))
 
-   (GET "/state" [] (query-page {:endpoint "/sparql/state"
-                                 :update-endpoint "/sparql/state/update"
-                                 :name "State" }))
-
-   (GET "/raw" [] (query-page {:endpoint "/sparql/raw"
-                               :update-endpoint "/sparql/raw/update"
+   (GET "/raw" [] (query-page {:endpoint "/v1/sparql/raw"
+                               :update-endpoint "/v1/sparql/raw/update"
                                :name "Raw" }))
 
    (GET "/dump" []
