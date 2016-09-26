@@ -64,9 +64,6 @@
                  [environ "1.0.0"]
 
                  [prismatic/schema "1.0.4"]
-                 ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
-                 ;;[criterium "0.4.3"] ;; for easy benchmarking
-                 ;;[clj-http "1.1.0"]
                  [drafter-client "0.3.6-SNAPSHOT"]
 
                  [metosin/ring-swagger-ui "2.1.4-0"]
