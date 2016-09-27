@@ -764,6 +764,7 @@ paths:
           - Jobs
       responses:
         '200':
+          description: The request returned the status of the writes lock successfully.
           schema:
             $ref: '#/definitions/WritesLocked'
 parameters:
@@ -813,7 +814,7 @@ parameters:
       - claimable
       - all
     default: all
-    
+
 
 # message:
 #   name: message
@@ -894,7 +895,8 @@ parameters:
     description: URI Encoded SPARQL update
     in: body
     required: false
-    type: string
+    schema:
+      type: string
   union-with-live:
     name: union-with-live
     description: Whether or not the query should run against the union of this draftset with the live site.
