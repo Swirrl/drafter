@@ -15,17 +15,36 @@
                               :passphrase :env
                               :snapshots false}]]
 
-  :dependencies [
-                 [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
-                                                                         com.fasterxml.jackson.core/jackson-core
-                                                                         org.slf4j/jcl-over-slf4j
-                                                                         org.apache.httpcomponents/httpclient]]
+  :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.openrdf.sesame/sesame-queryrender "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-runtime "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
 
+                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
+                 ;; see here for the source code that built this release:
+                 ;;
+                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
+
+                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
+
+                 [clj-yaml "0.4.0"]      ;; for loading our Swagger schemas
+                 [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
+
+                 ;; Lock dependency of jackson to a version that
+                 ;; works with sesame's sparql json results renderer
+                 ;; and the scjsv json schema validator.
+                 ;;
+                 ;; NOTE: When we upgrade sesame to RDF4j we can possibly
+                 ;; drop this override.
+                 [com.fasterxml.jackson.core/jackson-core "2.6.7"]
+
+                 ;; Use JENA for our query rewriting
+                 [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
+                                                                org.slf4j/jcl-over-slf4j
+                                                                org.apache.httpcomponents/httpclient]]
                  [org.apache.jena/jena-core "3.0.1" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-base "3.0.1" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-iri "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-
-                 [org.clojure/clojure "1.8.0"]
 
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
@@ -43,20 +62,8 @@
                  [org.mindrot/jbcrypt "0.3m"]
 
                  [grafter "0.7.4"]
-                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
-
                  [grafter/vocabularies "0.1.3"]
                  [grafter/url "0.2.1"]
-
-                 [org.openrdf.sesame/sesame-queryrender "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]
-                 [org.openrdf.sesame/sesame-runtime "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]
-
-                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
-                 ;; see here for the source code that built this release:
-                 ;;
-                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
-
-                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
                  [com.taoensso/tower "2.0.2"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
@@ -112,7 +119,6 @@
                                [criterium "0.4.3"] ;; for easy benchmarking
                                [clj-http "1.1.0"]
                                [drafter-client "0.3.6-SNAPSHOT"]
-                               [grafter "0.6.0-alpha5"]
                                ]}
 
    :dev [:dev-common :dev-overrides]
@@ -122,13 +128,8 @@
 
                 :dependencies [[ring-mock "0.1.5"]
                                [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
-                               [org.clojure/data.json "0.2.5"]
                                [clojure-csv/clojure-csv "2.0.1"]
                                [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
-                               ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
-                               ;;[criterium "0.4.3"] ;; for easy benchmarking
-                               ;;[clj-http "1.1.0"]
-                               ;;[drafter-client "0.3.6-SNAPSHOT"]
                                [prismatic/schema "1.0.4"]]
 
                 ;;:env {:dev true}

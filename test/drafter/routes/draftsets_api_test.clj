@@ -837,9 +837,9 @@
   (let [request (with-identity test-manager {:uri "/v1/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
         response (route request)]
     (assert-is-not-found-response response)))
-
 (deftest delete-graph-by-non-owner
-  (let [draftset-location (create-draftset-through-api test-editor)
+
+ (let [draftset-location (create-draftset-through-api test-editor)
         [graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
 
