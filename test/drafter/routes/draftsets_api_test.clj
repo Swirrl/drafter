@@ -96,6 +96,7 @@
   {:id s/Str
    :changes {s/Str {:status (s/enum :created :updated :deleted)}}
    :created-at Date
+   :updated-at Date
    :created-by s/Str
    (s/optional-key :current-owner) s/Str
    (s/optional-key :claim-role) s/Keyword
@@ -298,7 +299,7 @@
   (let [owned-ds (create-draftset-through-api test-publisher "owned")
         claimable-ds (create-draftset-through-api test-editor "claimable")
         unclaimable-ds (create-draftset-through-api test-editor)]
-    
+
     ;;offer claimable-ds to publisher role so it can be claimed by publisher
     (submit-draftset-to-role-through-api test-editor claimable-ds :publisher)
 
@@ -447,7 +448,7 @@
 
     (doseq [ds [ds1 ds3]]
       (claim-draftset-through-api ds test-manager))
-    
+
     (claim-draftset-through-api ds5 test-publisher)
 
     ;;editor should not be able to see ds1, ds3 or ds5 after they have been claimed
@@ -812,7 +813,7 @@
         added-quads (rest graph-quads)]
     (publish-quads-through-api [published-quad])
     (append-quads-to-draftset-through-api test-editor draftset-location added-quads)
-    
+
     (let [{draftset-graphs :changes} (delete-draftset-graph-through-api test-editor draftset-location graph)]
       (is (= #{graph} (set (keys draftset-graphs)))))))
 
@@ -990,6 +991,7 @@
     (let [result-state (atom #{})
           result-handler (result-set-handler result-state)
           parser (doto (SPARQLResultsJSONParser.) (.setQueryResultHandler result-handler))]
+
       (.parse parser body)
       @result-state)))
 
@@ -1281,7 +1283,7 @@
 (deftest claim-draftset-submitted-to-user
   (let [draftset-location (create-draftset-through-api test-editor)]
     (submit-draftset-to-user-through-api draftset-location test-publisher test-editor)
-  
+
     (let [{:keys [current-owner claim-user] :as ds-info} (claim-draftset-through-api draftset-location test-publisher)]
       (is (= (user/username test-publisher current-owner)))
       (is (nil? claim-user)))))

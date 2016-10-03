@@ -27,6 +27,7 @@
   (let [ss [draftset-uri
             [rdf:a drafter:DraftSet]
             [drafter:createdAt created-date]
+            [drafter:modifiedAt created-date]
             [drafter:createdBy user-uri]
             [drafter:hasOwner user-uri]]
         ss (util/conj-if (some? title) ss [rdfs:label (s title)])]
@@ -153,6 +154,7 @@
     "SELECT * WHERE {"
     (with-state-graph
       "?ds <" drafter:createdAt "> ?created ."
+      "?ds <" drafter:modifiedAt "> ?modified ."
       "?ds <" drafter:createdBy "> ?creator ."
       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
       "OPTIONAL { ?ds <" drafter:hasOwner "> ?owner . }"
@@ -236,10 +238,11 @@
 (defn- value->username [val]
   (user/uri->username (.stringValue val)))
 
-(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner role claimuser submitter]}]
+(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner role claimuser submitter modified] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :created-at (calendar-literal->date created)
-                         :created-by (value->username creator)}
+                         :created-by (value->username creator)
+                         :updated-at (calendar-literal->date modified)}
         optional-fields {:display-name (and title (.stringValue title))
                          :description (and description (.stringValue description))
                          :current-owner (and owner (value->username owner))
@@ -273,6 +276,7 @@
         properties (query repo properties-query)
         graph-mappings (query repo mappings-query)
         graph-states (draftset-graph-mappings->graph-states repo graph-mappings)]
+
     (combine-all-properties-and-graph-states properties graph-states)))
 
 (defn get-draftset-info [repo draftset-ref]
