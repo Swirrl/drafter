@@ -188,8 +188,7 @@
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
   (stop-backend backend)
-  (when (= "drafter.user.mongo" (env :drafter-user-repo-ns))
-    (.close user-repo))
+  (.close user-repo)
   (stop-writer! writer-service)
   (stop-reaper)
   (log/info "drafter has shut down."))
