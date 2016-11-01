@@ -75,20 +75,6 @@ PREFIX drafter: <" (drafter "") ">"))
                 "   <" graph-uri "> drafter:isPublic true ."
                 "}"))))
 
-(defn draft-exists?
-  "Checks state graph to see if a draft graph exists"
-  [db graph-uri]
-  (let [qry (str "ASK WHERE {"
-                 "  SELECT ?s WHERE {"
-                 (with-state-graph
-                 "      ?live a drafter:ManagedGraph ;"
-                 "           drafter:hasDraft <" graph-uri "> ."
-                 "      <" graph-uri "> a drafter:DraftGraph ."
-                 "  }")
-                 "  LIMIT 1"
-                 "}")]
-    (query db qry)))
-
 (defn has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
@@ -344,24 +330,6 @@ PREFIX drafter: <" (drafter "") ">"))
    "}"
    "}"))
 
-(defn delete-live-graph-from-state! [db live-graph-uri]
-  "Delete the live managed graph from the state graph"
-  (update! db (delete-live-graph-from-state-query live-graph-uri))
-  (log/info (str "Deleted live graph '" live-graph-uri "'from state" )))
-
-(defn draft-graphs
-  "Get all the draft graph URIs"
-  [db]
-  (let [query-str (str "SELECT ?draft WHERE {"
-                       (with-state-graph
-                         "?live drafter:hasDraft ?draft .")
-                       "}")
-        res (->> (query db
-                        query-str)
-                 (map #(str (get % "draft")))
-                 (into #{}))]
-    res))
-
 (defn- has-duplicates? [col]
   (not= col
         (distinct col)))
@@ -403,24 +371,6 @@ PREFIX drafter: <" (drafter "") ">"))
                       "}"))
           (map #(str (% "live")))
           (into #{})))
-
-(defn- parse-guid [uri]
-  (.replace (str uri) (draft-uri "") ""))
-
-(def ^:private get-all-drafts-query (str
-                           "SELECT ?draft ?live WHERE {"
-                           "   GRAPH <" drafter-state-graph "> {"
-                           "     ?draft a drafter:DraftGraph . "
-                           "     ?live drafter:hasDraft ?draft . "
-                           "   }"
-                           "}"))
-
-;;SPARQLable -> Map{Keyword String}
-(defn query-all-drafts [queryable]
-  (doall (->> (query queryable get-all-drafts-query)
-                (map keywordize-keys)
-                (map (partial map-values str))
-                (map (fn [m] (assoc m :guid (parse-guid (:draft m))))))))
 
 (defn graph-non-empty-query [graph-uri]
   (str
@@ -529,9 +479,6 @@ WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
 
-(defn migrate-live! [backend graph]
-  (migrate-graphs-to-live! backend [graph]))
-
 (defn calculate-graph-restriction [public-live-graphs live-graph-drafts supplied-draft-graphs]
   (set/union
    (set/difference (set public-live-graphs) (set live-graph-drafts))
@@ -560,29 +507,3 @@ WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
   (if (coll? e)
     (str "(" (string/join " " e) ")")
     e))
-
-(defn- meta-pair->values-binding [[uri value]]
-  [(str "<" uri ">") (str \" value \")])
-
-(defn meta-pairs->values-bindings [meta-pairs]
-  (let [uri-pairs (map meta-pair->values-binding meta-pairs)]
-    (string/join " " (map ->sparql-values-binding uri-pairs))))
-
-(defn- append-metadata-to-graphs-query [graph-uris meta-pairs]
-  (str "WITH <" drafter-state-graph ">
-        DELETE { ?g ?p ?existing }
-        INSERT { ?g ?p ?o }
-        WHERE {
-          VALUES ?g { " (sparql-uri-list graph-uris) " }
-          VALUES (?p ?o) { " (meta-pairs->values-bindings meta-pairs)  " }
-          OPTIONAL { ?g ?p ?existing }
-        }"))
-
-(defn append-metadata-to-graphs!
-  "Takes a hash-map of metadata key/value pairs and adds them as
-  metadata to the state graphs of each of the given graphs, converting
-  keys into drafter URIs as necessary. Assumes all values are
-  strings."
-  [backend graph-uris meta-pairs]
-  (let [update-query (append-metadata-to-graphs-query graph-uris meta-pairs)]
-    (update! backend update-query)))

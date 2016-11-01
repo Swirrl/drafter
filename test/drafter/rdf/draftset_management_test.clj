@@ -1,7 +1,8 @@
 (ns drafter.rdf.draftset-management-test
   (:require [clojure.test :refer :all]
             [drafter.rdf.draftset-management :refer :all]
-            [drafter.rdf.draft-management :refer [draft-exists? with-state-graph] :as mgmt]
+            [drafter.rdf.draft-management :refer [with-state-graph] :as mgmt]
+            [drafter.test-helpers.draft-management-helpers :as mgmth]
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples
                                          select-all-in-graph]]
             [drafter.write-scheduler :as scheduler]
@@ -105,14 +106,14 @@
         draft-graphs (import-data-to-draftset! *test-backend* draftset-id quads)]
 
     (doseq [dg draft-graphs]
-      (is (= true (draft-exists? *test-backend* dg))))
+      (is (= true (mgmth/draft-exists? *test-backend* dg))))
 
     (delete-draftset! *test-backend* draftset-id)
 
     (is (= false (draftset-exists? *test-backend* draftset-id)))
 
     (doseq [dg draft-graphs]
-      (is (= false (draft-exists? *test-backend* dg))))))
+      (is (= false (mgmth/draft-exists? *test-backend* dg))))))
 
 (deftest delete-draftest-graph!-test
   (testing "Delete non-existent live graph"
@@ -134,7 +135,7 @@
       (let [graph-mapping (get-draftset-graph-mapping *test-backend* draftset-id)]
         (is (contains? graph-mapping live-graph))
 
-        (is (mgmt/draft-exists? *test-backend* (get graph-mapping live-graph))))))
+        (is (mgmth/draft-exists? *test-backend* (get graph-mapping live-graph))))))
 
   (testing "Graph already in draftset"
     (let [live-graph "http://live"
@@ -142,11 +143,11 @@
       (make-graph-live! *test-backend* live-graph)
 
       (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples "http://subject") draftset-id)]
-        (is (mgmt/draft-exists? *test-backend* draft-graph))
+        (is (mgmth/draft-exists? *test-backend* draft-graph))
 
         (delete-draftset-graph! *test-backend* draftset-id live-graph)
 
-        (is (mgmt/draft-exists? *test-backend* draft-graph))
+        (is (mgmth/draft-exists? *test-backend* draft-graph))
         (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph))))))))
 
 (defn- draftset-has-claim-role? [draftset-id role]
@@ -184,6 +185,11 @@
            "}")]
     (query *test-backend* q)))
 
+(defn is-draftset-submitter? [backend draftset-ref user]
+  (if-let [{:keys [submitted-by]} (get-draftset-info backend draftset-ref)]
+    (= submitted-by (user/username user))
+    false))
+
 (deftest submit-draftset-to-user!-test
   (testing "When owned"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
@@ -204,7 +210,7 @@
   (testing "When not owned"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
           draftset-uri (str (->draftset-uri draftset-id))]
-      
+
       (submit-draftset-to-user! *test-backend* draftset-id test-manager test-publisher)
 
       (is (is-draftset-owner? *test-backend* draftset-id test-editor))
@@ -321,7 +327,7 @@
     (let [draft-graph (mgmt/create-draft-graph! *test-backend* live-graph {} (str (->draftset-uri draftset-id)))
           result (revert-graph-changes! *test-backend* draftset-id live-graph)]
       (is (= :reverted result))
-      (is (= false (mgmt/draft-exists? *test-backend* draft-graph)))
+      (is (= false (mgmth/draft-exists? *test-backend* draft-graph)))
       (is (= false (mgmt/is-graph-managed? *test-backend* live-graph))))))
 
 (deftest revert-changes-from-graph-which-exists-in-live
@@ -332,7 +338,7 @@
     (let [result (revert-graph-changes! *test-backend* draftset-id live-graph-uri)]
       (is (= :reverted result))
       (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
-      (is (= false (mgmt/draft-exists? *test-backend* draft-graph-uri))))))
+      (is (= false (mgmth/draft-exists? *test-backend* draft-graph-uri))))))
 
 (deftest revert-change-from-graph-which-exists-independently-in-other-draftset
   (let [live-graph-uri (mgmt/create-managed-graph! *test-backend* "http://live")
@@ -344,8 +350,8 @@
     (let [result (revert-graph-changes! *test-backend* ds2-id live-graph-uri)]
       (is (= :reverted result))
       (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
-      (is (= false (draft-exists? *test-backend* draft-graph2-uri)))
-      (is (draft-exists? *test-backend* draft-graph1-uri)))))
+      (is (= false (mgmth/draft-exists? *test-backend* draft-graph2-uri)))
+      (is (mgmth/draft-exists? *test-backend* draft-graph1-uri)))))
 
 (deftest revert-non-existent-change-in-draftset
   (let [draftset-id (create-draftset! *test-backend* test-editor)

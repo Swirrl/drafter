@@ -27,7 +27,7 @@
   (let [draft-made-live-and-deleted (import-data-to-draft! db "http://test.com/made-live-and-deleted-1" (test-triples "http://test.com/subject-1"))
         draft-2 (import-data-to-draft! db "http://test.com/graph-2" (test-triples "http://test.com/subject-2"))
         draft-3 (import-data-to-draft! db "http://test.com/graph-3" (test-triples "http://test.com/subject-3"))]
-    (migrate-live! db draft-made-live-and-deleted)
+    (migrate-graphs-to-live! db [draft-made-live-and-deleted])
     [draft-made-live-and-deleted draft-2 draft-3]))
 
 (def graph-1-result ["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"])
