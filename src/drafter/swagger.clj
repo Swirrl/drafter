@@ -3,33 +3,38 @@
             [scjsv.core :as jsonsch]
             [clojure.string :as string]
             [clojure.java.io :as io]
-            [clojure.walk :as walk]))
+            [clojure.walk :as walk]
+            [clout.core :as clout]))
 
-(defn load-swagger-schema
+(defn- load-spec-file []
+  (-> "public/swagger/drafter.yml"
+      io/resource
+      slurp
+      yaml/parse-string))
+
+(defn- ref->path [ref-str]
+  (->> (string/split ref-str #"/")
+       (rest)
+       (mapv keyword)))
+
+(defn- resolve-refs [m]
+  (letfn [(resolve-ref [v]
+            (if (and (map? v) (contains? v :$ref))
+              (let [ref-path (ref->path (:$ref v))
+                    ref (get-in m ref-path)]
+                ref)
+              v))]
+    (loop [spec m]
+      (let [resolved (walk/postwalk resolve-ref spec)]
+        (if (= spec resolved)
+          resolved
+          (recur resolved))))))
+
+(defn load-spec-and-resolve-refs
   "Load our swagger schemas and inline all the JSON Pointers as a post
-  processing step.  Returns a map of schema names to JSON schema
-  definitions."
+  processing step."
   []
-  (let [schemas (-> "public/swagger/drafter.yml"
-                    io/resource
-                    slurp
-                    yaml/parse-string
-                    :definitions)
-        update-$refs (fn [v]
-                       (if (and (map? v)
-                                (v :$ref))
-                         (let [ref (keyword (string/replace (v :$ref)
-                                                            "#/definitions/" ""))]
-                           (ref schemas))
-                         v))]
-    (walk/postwalk update-$refs schemas)))
-
-
-(defn array-of
-  "Takes a JSON schema and returns a JSON schema for which there
-  should be an array of schema."
-  [schema]
-  {:type "array" :items schema})
+  (resolve-refs (load-spec-file)))
 
 (defn validate-swagger-schema!
   "Function to compare a value to its schema and raise an appropriate
@@ -47,23 +52,26 @@
                                                                                              :value value}))
           value)))))
 
-(defn make-validator
-  "Return a validator function that closes over the loaded schemas.  A
-  thin wrapper over validate-swagger-schema!.
+(defn- swagger-path->clout-path [basePath p]
+  (let [clout-path (string/replace (name p) #"\{([\w-]+)\}" ":$1")]
+    (str basePath "/" clout-path)))
 
-  If the value does not conform to the schema then a :schema-error
-  exception is raised."
-  [schemas]
-  (fn [schema-gen value]
-    (validate-swagger-schema! (schema-gen schemas) value)))
+(defn find-route-spec [{:keys [basePath paths]} {:keys [request-method] :as request}]
+  (if-let [[path v] (first (filter (fn [[path _]]
+                                     (let [cp (swagger-path->clout-path basePath path)]
+                                       (clout/route-matches cp request)))
+                                   paths))]
+    (request-method v)))
 
-(defn make-ring-response-validator
-  "Build a validator as with make-validator, but accept a ring
-  response object as an argument. If the body conforms to the
-  specified schema then return the ring-response.  Otherwiwse
-  a :schema-error is raised. "
-  [schemas]
-  (let [validate-it (make-validator schemas)]
-    (fn [schema-gen ring-resp]
-      (let [val (validate-it schema-gen (:body ring-resp))]
-        ring-resp))))
+(defn response-swagger-validation-handler [spec handler]
+  (fn [request]
+    (let [{:keys [status body] :as response} (handler request)]
+      (if-let [route-spec (find-route-spec spec request)]
+        (if-let [response-schema (get-in route-spec [:responses (keyword (str status)) :schema])]
+          (if (map? body)
+            (do
+              (validate-swagger-schema! response-schema body)
+              response)
+            response)
+          response)
+        response))))

@@ -18,7 +18,8 @@
             [drafter.util :as util]
             [clojure.java.io :as io]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]])
+            [swirrl-server.async.jobs :refer [finished-jobs]]
+            [drafter.swagger :as swagger])
   (:import [java.util Date]
            [java.io ByteArrayOutputStream ByteArrayInputStream BufferedReader]
            [org.openrdf.query QueryResultHandler]
@@ -1515,9 +1516,11 @@
 
 (defn- setup-route [test-function]
   (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
-        authenticated-fn (middleware/make-authenticated-wrapper users {})]
+        authenticated-fn (middleware/make-authenticated-wrapper users {})
+        swagger-spec (swagger/load-spec-and-resolve-refs)
+        api-handler (draftset-api-routes *test-backend* users authenticated-fn)]
     (binding [*user-repo* users
-              *route* (draftset-api-routes *test-backend* users authenticated-fn)]
+              *route* (swagger/response-swagger-validation-handler swagger-spec api-handler)]
       (test-function))))
 
 (use-fixtures :once wrap-db-setup)
