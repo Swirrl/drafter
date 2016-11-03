@@ -1520,7 +1520,7 @@
         swagger-spec (swagger/load-spec-and-resolve-refs)
         api-handler (draftset-api-routes *test-backend* users authenticated-fn)]
     (binding [*user-repo* users
-              *route* (swagger/response-swagger-validation-handler swagger-spec api-handler)]
+              *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
       (test-function))))
 
 (use-fixtures :once wrap-db-setup)
