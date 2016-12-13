@@ -304,6 +304,12 @@
         delete-query (delete-draftset-query draftset-ref draft-graphs)]
     (update! db delete-query)))
 
+(defn delete-draftset-job [backend draftset-ref]
+  (jobs/make-job
+    :batch-write [job]
+    (do (delete-draftset! backend draftset-ref)
+        (job-succeeded! job))))
+
 (defn delete-draftset-graph! [db draftset-ref graph-uri]
   (when (mgmt/is-graph-managed? db graph-uri)
     (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
