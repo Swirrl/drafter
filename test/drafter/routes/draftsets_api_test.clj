@@ -949,10 +949,10 @@
     {:uri draftset-location :request-method :delete}))
 
 (deftest delete-draftset-test
-  (let [rdf-data-file "test/resources/test-draftset.trig"
-        draftset-location (create-draftset-through-api test-editor)
+  (let [draftset-location (create-draftset-through-api test-editor)
         delete-response (route (create-delete-draftset-request draftset-location test-editor))]
-    (assert-is-ok-response delete-response)
+    (assert-is-accepted-response delete-response)
+    (await-success finished-jobs (get-in delete-response [:body :finished-job]))
 
     (let [get-response (route (with-identity test-editor {:uri draftset-location :request-method :get}))]
       (assert-is-not-found-response get-response))))
