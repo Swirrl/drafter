@@ -1285,7 +1285,7 @@
     (submit-draftset-to-user-through-api draftset-location test-publisher test-editor)
 
     (let [{:keys [current-owner claim-user] :as ds-info} (claim-draftset-through-api draftset-location test-publisher)]
-      (is (= (user/username test-publisher current-owner)))
+      (is (= (user/username test-publisher) current-owner))
       (is (nil? claim-user)))))
 
 (deftest claim-draftset-submitted-to-other-user
@@ -1300,7 +1300,7 @@
         claim-request (create-claim-request draftset-location test-editor)
         {:keys [body] :as claim-response} (route claim-request)]
     (assert-is-ok-response claim-response)
-    (is (= (user/username test-editor (:current-owner body))))))
+    (is (= (user/username test-editor) (:current-owner body)))))
 
 (deftest claim-unowned-draftset-submitted-by-self
   (let [draftset-location (create-draftset-through-api test-editor)]
