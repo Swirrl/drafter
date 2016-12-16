@@ -1,18 +1,14 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
-            [swirrl-server.responses :as restapi]
             [drafter.backend.protocols :refer :all]
-            [drafter.util :as util]
             [drafter.rdf.draft-management :as mgmt]
             [swirrl-server.async.jobs :refer [create-job job-succeeded! job-failed! create-child-job]]
             [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.util :as util]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
-            [environ.core :refer [env]]
-            [clojure.string :as string]))
+            [environ.core :refer [env]]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:
@@ -57,11 +53,6 @@
                (fn [~job]
                  (with-job-exception-handling ~job
                    ~@forms))))
-
-(defn- finish-delete-job! [repo graph contents-only? job]
-  (when-not contents-only?
-    (mgmt/delete-draft-graph-state! repo graph))
-  (job-succeeded! job))
 
 (defmacro action-joblet
   "Creates a joblet function which ignores its state parameter and

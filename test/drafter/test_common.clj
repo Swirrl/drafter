@@ -7,8 +7,8 @@
             [drafter.user :as user]
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.backend.protocols :refer [stop-backend]]
-            [me.raynes.fs :as fs]
-            [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live! create-draft-graph! query update!]]
+            [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
+                                                  create-draft-graph! query update!]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]

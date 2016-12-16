@@ -20,10 +20,9 @@
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.util Date]
-           [java.io ByteArrayOutputStream ByteArrayInputStream BufferedReader]
+           [java.io ByteArrayOutputStream ByteArrayInputStream]
            [org.openrdf.query QueryResultHandler]
-           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONParser]
-           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParser]))
+           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONParser]))
 
 (def ^:private ^:dynamic *route*)
 (def ^:private ^:dynamic *user-repo*)

@@ -6,8 +6,7 @@
             [swirrl-server.responses :as r]
             [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [await-sync-job! queue-job!]]
-            [clojure.string :refer [upper-case]])
-  (:import [clojure.lang ExceptionInfo]))
+            [clojure.string :refer [upper-case]]))
 
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))

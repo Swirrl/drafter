@@ -3,15 +3,14 @@
             [drafter.rdf.draftset-management :refer :all]
             [drafter.rdf.draft-management :refer [with-state-graph] :as mgmt]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
-            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft! make-graph-live! test-triples
-                                         select-all-in-graph]]
+            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft!
+                                         make-graph-live! test-triples select-all-in-graph]]
             [drafter.write-scheduler :as scheduler]
             [grafter.rdf :refer [statements context triple=]]
-            [drafter.rdf.drafter-ontology :refer :all :as ont]
+            [drafter.rdf.drafter-ontology :refer :all]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-publisher test-manager]]
             [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
-            [drafter.util :as util]
             [grafter.rdf.repository :refer [query]]
             [grafter.rdf.protocols :refer [->Triple ->Quad]]
             [grafter.vocabularies.rdf :refer :all]))
