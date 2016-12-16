@@ -58,12 +58,17 @@ info:
       - `/publish` which can be used by clients with the `publisher`
         role to publish a reviewed draftset to the live site.
 
-      - `/reject` which can be used to return a draftset to the user
+      - `/offer` to transfer ownership of the draftset to a user in
+        a particular role. The current user yields ownership of the
+        draftset and makes it available to be claimed by a user with
+        sufficient privileges.
+
+      - `/return` which can be used to return a draftset to the user
         who submitted it for review.
 
-      - `/claim` which can be used by users in the `publisher` role to
-        claim exclusive ownership in order to edit the data within a
-        Draftset.
+      - `/claim` which can be used by users in the role specified by 
+        the originating 'offer' to claim exclusive ownership in order 
+        to edit the data within a Draftset.
 
     In addition to these routes there are routes available to list all
     Draftset's in the system and access metadata about an individual
@@ -375,29 +380,28 @@ paths:
           description: The Data in the draftset.
           schema:
             type: file
-  /draftset/{id}/submit:
+  /draftset/{id}/offer:
     put:
-      summary: Submit a Draftset for review
+      summary: Relinquish ownership of a draftset.
       description: |
-        Submits this draftset for review and potential publication.
+        The current user cedes control of the draftset and makes it available to be claimed by a user with the given role.
       parameters:
         - $ref: '#/parameters/id'
+        - $ref: '#/parameters/role'
         - $ref: '#/parameters/message'
         - $ref: '#/parameters/note'
       tags:
         - Draftsets
       responses:
         '200':
-          description: The Draftset was successfully submitted for review.
+          description: The Draftset was successfully offered.
           schema:
             $ref: '#/definitions/Draftset'
-  /draftset/{id}/reject:
+  /draftset/{id}/return:
     put:
-      summary: Reject a Draftset from review
+      summary: Returns a draftset to its creator.
       description: |
-        Rejects this draftset, returning it to the submitter for
-        further ammendments and changes.  Sets the `current-owner` to
-        the draftsets `submitted-by`.
+        Returns ownership of the draftset to its original creator.
       parameters:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/message'
