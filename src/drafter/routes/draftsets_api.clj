@@ -107,7 +107,7 @@
    (submit-sync-job! (as-sync-write-job api-call-fn)
                      resp-fn)))
 
-(defn- drafset-sync-write-response [result backend draftset-id]
+(defn- draftset-sync-write-response [result backend draftset-id]
   (if (failed-job-result? result)
     (response/api-response 500 result)
     (response (dsmgmt/get-draftset-info backend draftset-id))))
@@ -210,7 +210,7 @@
                         (fn [{{:keys [draftset-id graph silent] :as params} :params :as request}]
                           (if (mgmt/is-graph-managed? backend graph)
                             (submit-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
-                                         #(drafset-sync-write-response % backend draftset-id))
+                                         #(draftset-sync-write-response % backend draftset-id))
                             (if silent
                               (response (dsmgmt/get-draftset-info backend draftset-id))
                               (unprocessable-entity-response (str "Graph not found"))))))))
@@ -269,7 +269,7 @@
                     (as-draftset-owner
                       (fn [{{:keys [draftset-id] :as params} :params}]
                         (submit-sync #(dsmgmt/set-draftset-metadata! backend draftset-id params)
-                                     #(drafset-sync-write-response % backend draftset-id)))))
+                                     #(draftset-sync-write-response % backend draftset-id)))))
 
         (make-route :post "/draftset/:id/submit-to"
                     (as-draftset-owner
@@ -281,14 +281,14 @@
                           (some? user)
                           (if-let [target-user (user-repo/find-user-by-username user-repo user)]
                             (submit-sync #(dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
-                                         #(drafset-sync-write-response % backend draftset-id))
+                                         #(draftset-sync-write-response % backend draftset-id))
                             (unprocessable-entity-response (str "User: " user " not found")))
 
                           (some? role)
                           (let [role-kw (keyword role)]
                             (if (user/is-known-role? role-kw)
                               (submit-sync #(dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
-                                           #(drafset-sync-write-response % backend draftset-id))
+                                           #(draftset-sync-write-response % backend draftset-id))
                               (unprocessable-entity-response (str "Invalid role: " role))))
 
                           :else
