@@ -42,7 +42,7 @@
                  [buddy/buddy-auth "0.9.0"]
                  [org.mindrot/jbcrypt "0.3m"]
 
-                 [grafter "0.7.4"]
+                 [grafter "0.7.5"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
@@ -144,8 +144,6 @@
              ;; of connections in the SPARQLRepository connection pool:
              ;;
              ;;"-Dhttp.maxConnections=1"
-
-             ;;"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
              ]
 
                                         ;NOTE: expected JVM version to run against is defined in the Dockerfile
