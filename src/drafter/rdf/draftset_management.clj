@@ -16,10 +16,9 @@
             [drafter.rdf.draft-management.jobs :as jobs]
             [swirrl-server.async.jobs :refer [create-job create-child-job job-succeeded!]]
             [drafter.write-scheduler :as scheduler]
-            [schema.core :as s]
             [clojure.string :as string])
   (:import [java.util Date UUID]
-           [org.openrdf.model Resource URI]
+           [org.openrdf.model Resource]
            [org.openrdf.model.impl ContextStatementImpl]
            [org.openrdf.query TupleQueryResultHandler GraphQuery]))
 
@@ -304,6 +303,12 @@
         delete-query (delete-draftset-query draftset-ref draft-graphs)]
     (update! db delete-query)))
 
+(defn delete-draftset-job [backend draftset-ref]
+  (jobs/make-job
+    :batch-write [job]
+    (do (delete-draftset! backend draftset-ref)
+        (job-succeeded! job))))
+
 (defn delete-draftset-graph! [db draftset-ref graph-uri]
   (when (mgmt/is-graph-managed? db graph-uri)
     (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
@@ -311,7 +316,9 @@
         (do
           (mgmt/delete-graph-contents! db draft-graph-uri)
           draft-graph-uri)
-        (mgmt/create-draft-graph! db graph-uri {} (str (ds/->draftset-uri draftset-ref)))))))
+        (mgmt/create-draft-graph! db graph-uri
+                                  {}
+                                  (str (ds/->draftset-uri draftset-ref)))))))
 
 (def ^:private draftset-param->predicate
   {:display-name rdfs:label

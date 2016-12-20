@@ -249,8 +249,13 @@ paths:
       tags:
         - Draftsets
       responses:
-        '200':
-          description: The Draftset was deleted successfully
+        '202':
+          description: |
+            The request to delete the Draftset was accepted.
+            Applications should poll for the completion of the
+            AsyncJob.
+          schema:
+            $ref: '#/definitions/AsyncJob'
   /draftset/{id}/graph:
     put:
       summary: Copy a graph from live into this Draftset

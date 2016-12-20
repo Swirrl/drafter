@@ -4,12 +4,15 @@
             [clojure.java.io :as io]
             [clojure.edn :as edn]
             [clojure.tools.logging :as log])
-  (:import [java.io PushbackReader FileNotFoundException]))
+  (:import [java.io PushbackReader FileNotFoundException Closeable]))
 
 (defrecord MemoryUserRepository [users]
   UserRepository
   (find-user-by-username [this username] (get @users username))
-  (get-all-users [this] (vals @users)))
+  (get-all-users [this] (vals @users))
+
+  Closeable
+  (close [this]))
 
 (defn create-repository [users]
   (let [user-map (reduce (fn [m user] (assoc m (username user) user)) {} users)]

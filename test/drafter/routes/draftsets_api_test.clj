@@ -21,10 +21,9 @@
             [swirrl-server.async.jobs :refer [finished-jobs]]
             [drafter.swagger :as swagger])
   (:import [java.util Date]
-           [java.io ByteArrayOutputStream ByteArrayInputStream BufferedReader]
+           [java.io ByteArrayOutputStream ByteArrayInputStream]
            [org.openrdf.query QueryResultHandler]
-           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONParser]
-           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVParser]))
+           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONParser]))
 
 (def ^:private ^:dynamic *route*)
 (def ^:private ^:dynamic *user-repo*)
@@ -950,10 +949,10 @@
     {:uri draftset-location :request-method :delete}))
 
 (deftest delete-draftset-test
-  (let [rdf-data-file "test/resources/test-draftset.trig"
-        draftset-location (create-draftset-through-api test-editor)
+  (let [draftset-location (create-draftset-through-api test-editor)
         delete-response (route (create-delete-draftset-request draftset-location test-editor))]
-    (assert-is-ok-response delete-response)
+    (assert-is-accepted-response delete-response)
+    (await-success finished-jobs (get-in delete-response [:body :finished-job]))
 
     (let [get-response (route (with-identity test-editor {:uri draftset-location :request-method :get}))]
       (assert-is-not-found-response get-response))))
@@ -1286,7 +1285,7 @@
     (submit-draftset-to-user-through-api draftset-location test-publisher test-editor)
 
     (let [{:keys [current-owner claim-user] :as ds-info} (claim-draftset-through-api draftset-location test-publisher)]
-      (is (= (user/username test-publisher current-owner)))
+      (is (= (user/username test-publisher) current-owner))
       (is (nil? claim-user)))))
 
 (deftest claim-draftset-submitted-to-other-user
@@ -1301,7 +1300,7 @@
         claim-request (create-claim-request draftset-location test-editor)
         {:keys [body] :as claim-response} (route claim-request)]
     (assert-is-ok-response claim-response)
-    (is (= (user/username test-editor (:current-owner body))))))
+    (is (= (user/username test-editor) (:current-owner body)))))
 
 (deftest claim-unowned-draftset-submitted-by-self
   (let [draftset-location (create-draftset-through-api test-editor)]

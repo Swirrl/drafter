@@ -1,31 +1,29 @@
 (ns drafter.routes.draftsets-api
   (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes make-route]]
-            [clojure.set :as set]
-            [clojure.tools.logging :as log]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
-                                       unsupported-media-type-response method-not-allowed-response forbidden-response submit-async-job!
+                                       unsupported-media-type-response method-not-allowed-response
+                                       forbidden-response submit-async-job! submit-sync-job!
                                        conflict-detected-response]]
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
+            [swirrl-server.async.jobs :refer [job-succeeded!]]
             [drafter.rdf.sparql-protocol :refer [process-prepared-query process-sparql-query]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
             [drafter.rdf.content-negotiation :as conneg]
             [drafter.backend.protocols :refer :all]
             [drafter.backend.endpoints :refer [draft-graph-set]]
             [drafter.util :as util]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
-            [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type temp-file-body
-                                        optional-enum-param]]
+            [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type
+                                        temp-file-body optional-enum-param]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
-            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
-            [clojure.java.io :as io])
-  (:import [org.openrdf.query TupleQueryResultHandler]
-           [org.openrdf OpenRDFException]
-           [org.openrdf.queryrender RenderUtils]))
+            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]])
+  (:import [org.openrdf.queryrender RenderUtils]))
 
 (defn- get-draftset-executor [backend draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
@@ -96,6 +94,24 @@
 (defn- parse-union-with-live-handler [inner-handler]
   (parse-query-param-flag-handler :union-with-live inner-handler))
 
+(defn- as-sync-write-job [f]
+  (make-job
+    :sync-write [job]
+    (let [result (f)]
+      (job-succeeded! job result))))
+
+(defn- submit-sync
+  ([api-call-fn]
+   (submit-sync-job! (as-sync-write-job api-call-fn)))
+  ([api-call-fn resp-fn]
+   (submit-sync-job! (as-sync-write-job api-call-fn)
+                     resp-fn)))
+
+(defn- draftset-sync-write-response [result backend draftset-id]
+  (if (failed-job-result? result)
+    (response/api-response 500 result)
+    (response (dsmgmt/get-draftset-info backend draftset-id))))
+
 (defn draftset-api-routes [backend user-repo authenticated]
   (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
           (required-managed-graph-param [h] (required-managed-graph-param-handler backend h))
@@ -125,12 +141,17 @@
                           :claimable (response (dsmgmt/get-draftsets-claimable-by backend user))
                           :owned (response (dsmgmt/get-draftsets-owned-by backend user)))))))
 
-        ;;create a new draftset
+        ;; create a new draftset
         (make-route :post "/draftsets"
                     (authenticated
-                     (fn [{{:keys [display-name description]} :params user :identity :as request}]
-                       (let [draftset-id (dsmgmt/create-draftset! backend user display-name description)]
-                         (redirect-after-post (str version "/draftset/" draftset-id))))))
+                      (fn [{{:keys [display-name description]} :params user :identity :as request}]
+                        (submit-sync #(dsmgmt/create-draftset! backend user display-name description)
+                                     (fn [result]
+                                       (if (failed-job-result? result)
+                                         (response/api-response 500 result)
+                                         (redirect-after-post (str version
+                                                                   "/draftset/"
+                                                                   (get-in result [:details :id])))))))))
 
         (make-route :get "/draftset/:id"
                     (authenticated
@@ -146,8 +167,7 @@
         (make-route :delete "/draftset/:id"
                     (as-draftset-owner
                      (fn [{{:keys [draftset-id]} :params :as request}]
-                       (dsmgmt/delete-draftset! backend draftset-id)
-                       (response ""))))
+                       (submit-async-job! (dsmgmt/delete-draftset-job backend draftset-id)))))
 
         (make-route :options "/draftset/:id"
                     (authenticated
@@ -164,8 +184,6 @@
                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
                          (if (is-quads-format? rdf-format)
                            (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live)
-
-                           ;; TODO fix this as it's vulnerable to SPARQL injection
                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                                  escaped-query (RenderUtils/escape unsafe-query)
                                  query-request (assoc-in request [:params :query] escaped-query)]
@@ -187,26 +205,27 @@
 
         (make-route :delete "/draftset/:id/graph"
                     (as-draftset-owner
-                     (parse-query-param-flag-handler
-                      :silent
-                      (fn [{{:keys [draftset-id graph silent] :as params} :params :as request}]
-                        (if (mgmt/is-graph-managed? backend graph)
-                          (do
-                            (dsmgmt/delete-draftset-graph! backend draftset-id graph)
-                            (response (dsmgmt/get-draftset-info backend draftset-id)))
-                          (if silent
-                            (response (dsmgmt/get-draftset-info backend draftset-id))
-                            (unprocessable-entity-response (str "Graph not found"))))))))
+                      (parse-query-param-flag-handler
+                        :silent
+                        (fn [{{:keys [draftset-id graph silent] :as params} :params :as request}]
+                          (if (mgmt/is-graph-managed? backend graph)
+                            (submit-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                                         #(draftset-sync-write-response % backend draftset-id))
+                            (if silent
+                              (response (dsmgmt/get-draftset-info backend draftset-id))
+                              (unprocessable-entity-response (str "Graph not found"))))))))
 
         (make-route :delete "/draftset/:id/changes"
                     (as-draftset-owner
-                     (require-params #{:graph}
-                                     (fn [{{:keys [draftset-id graph]} :params}]
-                                       (let [result (dsmgmt/revert-graph-changes! backend draftset-id graph)]
-                                         (if (= :reverted result)
-                                           (response (dsmgmt/get-draftset-info backend draftset-id))
-                                           (not-found "")))))))
-
+                      (require-params #{:graph}
+                                      (fn [{{:keys [draftset-id graph]} :params}]
+                                        (submit-sync #(dsmgmt/revert-graph-changes! backend draftset-id graph)
+                                                     (fn [result]
+                                                       (if (failed-job-result? result)
+                                                         (response/api-response 500 result)
+                                                         (if (= :reverted (:details result))
+                                                           (response (dsmgmt/get-draftset-info backend draftset-id))
+                                                           (not-found "")))))))))
         (make-route :put "/draftset/:id/data"
                     (as-draftset-owner
                      (require-rdf-content-type
@@ -248,45 +267,61 @@
 
         (make-route :put "/draftset/:id"
                     (as-draftset-owner
-                     (fn [{{:keys [draftset-id] :as params} :params}]
-                       (dsmgmt/set-draftset-metadata! backend draftset-id params)
-                       (response (dsmgmt/get-draftset-info backend draftset-id)))))
+                      (fn [{{:keys [draftset-id] :as params} :params}]
+                        (submit-sync #(dsmgmt/set-draftset-metadata! backend draftset-id params)
+                                     #(draftset-sync-write-response % backend draftset-id)))))
 
         (make-route :post "/draftset/:id/submit-to"
                     (as-draftset-owner
-                     (fn [{{:keys [user role draftset-id]} :params owner :identity}]
-                       (cond
-                         (and (some? user) (some? role))
-                         (unprocessable-entity-response "Only one of user and role parameters permitted")
+                      (fn [{{:keys [user role draftset-id]} :params owner :identity}]
+                        (cond
+                          (and (some? user) (some? role))
+                          (unprocessable-entity-response "Only one of user and role parameters permitted")
 
-                         (some? user)
-                         (if-let [target-user (user-repo/find-user-by-username user-repo user)]
-                           (do
-                             (dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
-                             (response (dsmgmt/get-draftset-info backend draftset-id)))
-                           (unprocessable-entity-response (str "User: " user " not found")))
+                          (some? user)
+                          (if-let [target-user (user-repo/find-user-by-username user-repo user)]
+                            (submit-sync #(dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
+                                         #(draftset-sync-write-response % backend draftset-id))
+                            (unprocessable-entity-response (str "User: " user " not found")))
 
-                         (some? role)
-                         (let [role-kw (keyword role)]
-                           (if (user/is-known-role? role-kw)
-                             (do
-                               (dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
-                               (response (dsmgmt/get-draftset-info backend draftset-id)))
-                             (unprocessable-entity-response (str "Invalid role: " role))))
+                          (some? role)
+                          (let [role-kw (keyword role)]
+                            (if (user/is-known-role? role-kw)
+                              (submit-sync #(dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
+                                           #(draftset-sync-write-response % backend draftset-id))
+                              (unprocessable-entity-response (str "Invalid role: " role))))
 
-                         :else
-                         (unprocessable-entity-response (str "user or role parameter required"))))))
+                          :else
+                          (unprocessable-entity-response (str "user or role parameter required"))))))
 
         (make-route :put "/draftset/:id/claim"
                     (authenticated
-                     (existing-draftset-handler
-                      backend
-                      (fn [{{:keys [draftset-id]} :params user :identity}]
-                        (if-let [ds-info (dsmgmt/get-draftset-info backend draftset-id)]
-                          (if (user/can-claim? user ds-info)
-                            (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
-                              (if (= :ok result)
-                                (response ds-info)
-                                (conflict-detected-response "Failed to claim draftset")))
-                            (forbidden-response "User not in role for draftset claim"))
-                          (not-found "Draftset not found")))))))))))
+                      (existing-draftset-handler
+                        backend
+                        (fn [{{:keys [draftset-id]} :params user :identity}]
+                          (if-let [ds-info (dsmgmt/get-draftset-info backend draftset-id)]
+                            (if (user/can-claim? user ds-info)
+                              (let [[result ds-info] (dsmgmt/claim-draftset! backend draftset-id user)]
+                                (if (= :ok result)
+                                  (response ds-info)
+                                  (conflict-detected-response "Failed to claim draftset")))
+                              (forbidden-response "User not in role for draftset claim"))
+                            (not-found "Draftset not found"))))))
+
+        (make-route :put "/draftset/:id/claim"
+                    (authenticated
+                      (existing-draftset-handler
+                        backend
+                        (fn [{{:keys [draftset-id]} :params user :identity}]
+                          (if-let [ds-info (dsmgmt/get-draftset-info backend draftset-id)]
+                            (if (user/can-claim? user ds-info)
+                              (submit-sync #(dsmgmt/claim-draftset! backend draftset-id user)
+                                           (fn [result]
+                                             (if (failed-job-result? result)
+                                               (response/api-response 500 result)
+                                               (let [[claim-outcome ds-info] (:details result)]
+                                                 (if (= :ok claim-outcome)
+                                                   (response ds-info)
+                                                   (conflict-detected-response "Failed to claim draftset"))))))
+                              (forbidden-response "User not in role for draftset claim"))
+                            (not-found "Draftset not found")))))))))))

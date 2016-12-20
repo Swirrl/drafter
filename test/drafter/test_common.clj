@@ -3,12 +3,13 @@
             [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
+            [grafter.rdf.repository.registry :as reg]
             [environ.core :refer [env]]
             [drafter.user :as user]
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.backend.protocols :refer [stop-backend]]
-            [me.raynes.fs :as fs]
-            [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live! create-draft-graph! query update!]]
+            [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
+                                                  create-draft-graph! query update!]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
@@ -17,7 +18,8 @@
             [schema.core :as s])
   (:import [java.util Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
-           [java.io ByteArrayInputStream]))
+           [java.io ByteArrayInputStream]
+           org.openrdf.rio.trig.TriGParserFactory))
 
 
 (use-fixtures :each validate-schemas)
@@ -65,15 +67,19 @@
 (declare ^:dynamic *test-writer*)
 
 (defn wrap-db-setup [test-fn]
-  (let [backend (get-backend (assoc env :drafter-repo-path "test-drafter-db"))]
+  (let [backend (get-backend (assoc env :drafter-repo-path "test-drafter-db"))
+        configured-factories (reg/registered-parser-factories)]
     (binding [*test-backend* backend
               *test-writer* (start-writer!)]
-
-      (try
+      (do
+        ; Some tests need to load and parse trig file data
+        (reg/register-parser-factory! :construct TriGParserFactory)
+        (try
           (test-fn)
           (finally
             (stop-backend backend)
-            (stop-writer! *test-writer*))))))
+            (stop-writer! *test-writer*)
+            (reg/register-parser-factories! configured-factories)))))))
 
 (defn wrap-clean-test-db
   ([test-fn] (wrap-clean-test-db identity test-fn))
@@ -82,7 +88,6 @@
             "DROP ALL ;")
    (setup-state-fn *test-backend*)
    (test-fn)))
-
 
 (defn make-store []
   (repo/repo))
@@ -216,6 +221,9 @@
 
 (defn assert-is-ok-response [response]
   (assert-schema (response-code-schema 200) response))
+
+(defn assert-is-accepted-response [response]
+  (assert-schema (response-code-schema 202) response))
 
 (defn assert-is-not-found-response [response]
   (assert-schema (response-code-schema 404) response))
