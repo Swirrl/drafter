@@ -551,7 +551,7 @@
   then deletes the draftset."
   [backend draftset-ref]
   (jobs/joblet-seq->job [(publish-draftset-graphs-joblet backend draftset-ref)
-                         (delete-draftset-joblet backend draftset-ref)] :batch-write))
+                         (delete-draftset-joblet backend draftset-ref)] :exclusive-write))
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
