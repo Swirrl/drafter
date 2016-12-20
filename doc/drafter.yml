@@ -15,17 +15,17 @@ info:
 
     For display and edit purposes, PublishMyData makes additional
     assumptions about the contents of graphs used for datasets and
-    vocabularies for display and edit purposes (full details to follow).
+    vocabularies for display and edit purposes.
 
-    Future versions of these APIs will provide mechanisms for creating
-    and validating this data conforms to PMD's conventions.
+    Future additions to these APIs will provide mechanisms for
+    creating and validating this data conforms to PMD's conventions.
 
     ## Draftset API Overview
 
     Draftsets are essentially, private working copies, or branches of
     work, that contain changes to RDF data.  When a user creates a
-    draftset they effectively create a 'virtual copy' of the sites
-    data in which they can safely make, review and query changes
+    draftset they effectively create a 'virtual copy' of the live
+    sites data in which they can safely make, review and query changes
     before publishing them to the live site.
 
     When a user creates a draftset they are given a private endpoint
@@ -53,15 +53,20 @@ info:
       - `/submit-to` to relinquish ownership of the drafset and either
         assign ownership to another user, or make it available to
         users in a given role. The user which takes ownership of the
-        draftset can then choose to `/publish` or submit the draftset
-        to a new owner.
+        draftset may depending on their role then choose to make
+        further ammendments, `/publish` or submit the draftset to a
+        new owner.
 
       - `/publish` which can be used by clients with the `publisher`
         role to publish a reviewed draftset to the live site.
 
-      - `/claim` which can be used by users in the `publisher` role to
-        claim exclusive ownership in order to edit the data within a
-        draftset.
+      - `/claim` which a user must call on Draftset's submitted to
+        them before they can perform any actions upon them.  Claiming
+        a Draftset puts it under the exclusive control of the claiming
+        user.  A list of all Draftsets that the current user can lay
+        claim to is available under the `/claimable` route.  Users who
+        have submitted a Draftset may withdraw it by claiming it back
+        providing it has not yet been claimed by another user.
 
     In addition to these routes there are routes available to list all
     Draftset's in the system and access metadata about an individual
@@ -133,7 +138,7 @@ info:
     Draftsets *must* be claimed before they can be reviewed, published
     or edited.
 
-  version: 0.0.4 Draft
+  version: 0.0.5 Draft
 securityDefinitions:
   basic-auth:
     type: basic
@@ -150,7 +155,7 @@ tags:
     description: Editing Draftset contents
   - name: Metadata
     description: Draftset metadata
-  - name: Querying Draftsets
+  - name: Querying
     description: Accessing Data in Draftsets
   - name: Users
     description: Querying users
@@ -444,7 +449,7 @@ paths:
         - application/rdf+xml
         - text/turtle
       tags:
-        - Querying Draftsets
+        - Querying
       responses:
         '200':
           description: The Data in the draftset.
@@ -542,7 +547,7 @@ paths:
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/union-with-live'
       tags:
-        - Querying Draftsets
+        - Querying
       responses:
         '200':
           description: The query results returned according to the SPARQL specification.
@@ -570,7 +575,7 @@ paths:
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/union-with-live'
       tags:
-        - Querying Draftsets
+        - Querying
       responses:
         '200':
           description: The query results returned according to the SPARQL specification.
