@@ -1,4 +1,4 @@
-(defproject drafter "0.6.2-SNAPSHOT"
+(defproject drafter "2.0.0"
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
@@ -16,19 +16,14 @@
                               :snapshots false}]]
 
   :dependencies [
-                 ;; NOTE jena 3.0.0-SNAPSHOT was compiled from source with maven
-                 ;; and pushed into our private repo at commit:
-                 ;; d58c1a1abc7dfb2a58ce5b8c04e176940fecbb9a
-                 ;;
-                 ;; This is necessary for the new rewriting stuff.
-                 [org.apache.jena/jena-arq "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api
+                 [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
                                                                          com.fasterxml.jackson.core/jackson-core
                                                                          org.slf4j/jcl-over-slf4j
                                                                          org.apache.httpcomponents/httpclient]]
 
-                 [org.apache.jena/jena-core "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-base "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-iri "3.0.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-core "3.0.1" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-base "3.0.1" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-iri "3.0.1" :exclusions [org.slf4j/slf4j-api]]
 
                  [org.clojure/clojure "1.8.0"]
 
@@ -39,8 +34,13 @@
                  [ring-server "0.4.0"]
                  [wrap-verbs "0.1.1"]
                  [selmer "0.6.9"]
+                 [com.novemberain/monger "3.0.2"]
 
-                 [swirrl/lib-swirrl-server "0.3.0" :exclusions [clout org.clojure/java.classpath]]
+                 [swirrl/lib-swirrl-server "0.6.3" :exclusions [clout org.clojure/java.classpath]]
+
+                 [buddy/buddy-core "0.9.0"]
+                 [buddy/buddy-auth "0.9.0"]
+                 [org.mindrot/jbcrypt "0.3m"]
 
                  [grafter "0.7.5"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
@@ -58,15 +58,17 @@
 
                  [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
-                 [com.taoensso/timbre "4.0.2"]
-                 [clj-logging-config "1.9.12"]
                  [com.taoensso/tower "2.0.2"]
-                 [markdown-clj "0.9.44"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
                  [ring-middleware-accept "2.0.3"]
                  [environ "1.0.0"]
 
-                 [prismatic/schema "1.0.4"]]
+                 [prismatic/schema "1.0.4"]
+                 [drafter-client "0.3.6-SNAPSHOT"]
+
+                 [metosin/ring-swagger-ui "2.1.4-0"]
+
+                 [com.sun.mail/javax.mail "1.5.5"]]
 
   :java-source-paths ["src-java"]
   :resource-paths ["resources"]
@@ -127,8 +129,8 @@
                                ;;[criterium "0.4.3"] ;; for easy benchmarking
                                ;;[clj-http "1.1.0"]
                                ;;[drafter-client "0.3.6-SNAPSHOT"]
+                               [prismatic/schema "1.0.4"]]
 
-                               ]
                 ;;:env {:dev true}
                 ;;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
                 ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]

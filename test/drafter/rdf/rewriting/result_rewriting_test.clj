@@ -3,8 +3,8 @@
    [drafter.test-common :refer [test-triples *test-backend* wrap-db-setup wrap-clean-test-db]]
    [clojure.set :as set]
    [drafter.util :refer [map-values]]
-   [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph!]]
-   [drafter.backend.protocols :refer [append-data-batch! prepare-query]]
+   [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph! append-data-batch!]]
+   [drafter.backend.protocols :refer [prepare-query]]
    [grafter.rdf.templater :refer [graph triplify]]
    [grafter.rdf :refer [statements]]
    [grafter.rdf.repository :refer [repo prepare-update] :as repo]
@@ -82,7 +82,7 @@
   "Rewrites the results in the query."
   [db query-str query-substitutions]
   (let [rewritten-query (rewrite-sparql-string query-substitutions query-str)
-        prepared-query (prepare-query db rewritten-query nil)]
+        prepared-query (prepare-query db rewritten-query)]
     (rewrite-graph-results query-substitutions prepared-query)))
 
 (defn first-result [results key]

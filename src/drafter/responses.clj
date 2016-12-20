@@ -2,14 +2,39 @@
   (:require [clojure.tools.logging :as log]
             [swirrl-server.responses :as response]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
-            [swirrl-server.async.jobs :refer [submitted-job-response]]
+            [swirrl-server.async.status-routes :refer [submitted-job-response]]
             [swirrl-server.responses :as r]
             [swirrl-server.errors :refer [encode-error]]
-            [drafter.write-scheduler :refer [await-sync-job! queue-job!]])
-  (:import [clojure.lang ExceptionInfo]))
+            [drafter.write-scheduler :refer [await-sync-job! queue-job!]]
+            [clojure.string :refer [upper-case]]))
 
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
+
+(defn not-acceptable-response
+  ([] (not-acceptable-response ""))
+  ([body] {:status 406 :headers {} :body body}))
+
+(defn unprocessable-entity-response [body]
+  {:status 422 :headers {} :body body})
+
+(defn unsupported-media-type-response [body]
+  {:status 415 :headers {} :body body})
+
+(defn method-not-allowed-response [method]
+  {:status 405
+   :headers {}
+   :body (str "Method " (upper-case (name method)) " not supported by this resource")})
+
+(defn unauthorised-basic-response [realm]
+  (let [params (str "Basic realm=\"" realm "\"")]
+    {:status 401 :body "" :headers {"WWW-Authenticate" params}}))
+
+(defn forbidden-response [body]
+  {:status 403 :body body :headers {}})
+
+(defn conflict-detected-response [body]
+  {:status 409 :body body :headers {}})
 
 (defn default-job-result-handler
   "Default handler for creating ring responses from job results. If
@@ -36,19 +61,6 @@
      (let [job-result (await-sync-job! job)]
        (resp-fn job-result)))))
 
-(defmacro handle-sync-job!
-  "Convenience macro for submitting synchronous jobs and converting
-  the results into ring responses. At least three forms are required -
-  the first is for the job, the second for the job result and the
-  remaining are used to construct the ring response. The job result
-  form can be used to destructure the map used to complete the job.
-
-  (handle-sync-job (create-job)
-     {:keys [message] :as result} (create-response message))"
-
-  [job result-form & response-forms]
-  `(submit-sync-job! ~job (fn [~result-form] ~@response-forms)))
-
 ;; submit-async-job! :: Job -> RingResponse
 (defn submit-async-job!
   "Submits an async job and returns a ring response indiciating the
@@ -56,4 +68,4 @@
   [job]
   (log/info "Submitting async job: " job)
   (queue-job! job)
-  (submitted-job-response job))
+  (submitted-job-response "/v1" job))

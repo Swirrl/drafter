@@ -5,23 +5,19 @@
             [compojure.route :as route]
             [drafter.operations :as ops]
             [drafter.middleware :as middleware]
+            [swirrl-server.middleware.log-request :refer [log-request]]
             [drafter.configuration :as conf]
-            [drafter.backend.protocols :refer [stop]]
+            [drafter.backend.protocols :refer [stop-backend]]
             [drafter.backend.configuration :refer [get-backend]]
-            [drafter.util :refer [set-var-root!]]
+            [drafter.util :refer [set-var-root! conj-if]]
             [drafter.common.json-encoders :as enc]
-            [drafter.routes.drafts-api :refer [draft-api-routes
-                                               graph-management-routes]]
+            [drafter.routes.draftsets-api :refer [draftset-api-routes]]
             [drafter.routes.status :refer [status-routes]]
-            [drafter.routes.dumps :refer [dumps-endpoint]]
             [drafter.routes.pages :refer [pages-routes]]
-            [drafter.routes.sparql :refer [draft-sparql-routes
-                                           live-sparql-routes
-                                           raw-sparql-routes
-                                           state-sparql-routes]]
+            [drafter.routes.sparql :refer [live-sparql-routes
+                                           raw-sparql-routes]]
             [drafter.routes.sparql-update :refer [live-update-endpoint-route
-                                                  raw-update-endpoint-route
-                                                  state-update-endpoint-route]]
+                                                  raw-update-endpoint-route]]
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
@@ -31,8 +27,8 @@
             [ring.middleware.verbs :refer [wrap-verbs]]
             [ring.middleware.defaults :refer [api-defaults]]
             [swirrl-server.errors :refer [wrap-encode-errors]]
-            [selmer.parser :as parser]
-            [clojure.string :as str])
+            [ring.middleware.resource :refer [wrap-resource]]
+            [selmer.parser :as parser])
 
   ;; Note that though the classes and requires below aren't used in this namespace
   ;; they are needed by the log-config file which is loaded from here.
@@ -46,6 +42,7 @@
 
 ;; Set these values later when we start the server
 (def backend)
+(def user-repo)
 (def app)
 
 (def ^{:doc "A future to control the single write thread that performs database writes."}
@@ -63,76 +60,77 @@
 (defn- log-endpoint-config [ep-name endpoint-type config]
   (log/trace (str (name endpoint-type) " endpoint for route '" (name ep-name) "': " config)))
 
-(defn- endpoint-query-path [route-name]
-  (str "/sparql/" (name route-name)))
+(defn- endpoint-query-path [route-name version]
+  (let [suffix (str "/sparql/" (name route-name))]
+    (if (some? version)
+      (str "/" (name version) suffix)
+      suffix)))
 
-(defn endpoint-update-path [route-name]
-  (str (endpoint-query-path route-name) "/update"))
+(defn endpoint-update-path [route-name version]
+  (str (endpoint-query-path route-name version) "/update"))
 
-(defn- endpoint-route [route-name path-fn endpoint-fn route-type repo timeout-config]
-  (let [path (path-fn route-name)
+(defn- endpoint-route [route-name path-fn endpoint-fn route-type version repo timeout-config]
+  (let [path (path-fn route-name version)
         timeouts (conf/get-endpoint-timeout route-name route-type timeout-config)]
     (log-endpoint-config route-name route-type timeouts)
     (endpoint-fn path repo timeouts)))
 
-(defn- create-dumps-route [route-name query-fn backend timeout-config]
-  (let [dump-path (str "/data/" (name route-name))
-        query-timeouts (conf/get-endpoint-timeout route-name :query timeout-config)
-        dump-fn #(query-fn %1 %2 query-timeouts)]
-    (dumps-endpoint dump-path dump-fn backend)))
+(defn- create-sparql-endpoint-routes [route-name query-fn update-fn version backend timeout-config]
+  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query version backend timeout-config)
+        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update version backend timeout-config))]
+    (vec (remove nil? [query-route update-route]))))
 
-(defn create-sparql-endpoint-routes [route-name query-fn update-fn add-dumps? backend timeout-config]
-  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query backend timeout-config)
-        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update backend timeout-config))
-        dumps-route (if add-dumps? (create-dumps-route route-name query-fn backend timeout-config) nil)
-        routes [query-route update-route]]
-    (vec (remove nil? [query-route update-route dumps-route]))))
+(defn specify-endpoint
+  ([query-fn update-fn]
+   (specify-endpoint query-fn update-fn nil))
+  ([query-fn update-fn version]
+   {:query-fn query-fn :update-fn update-fn :version version}))
 
-(defn specify-endpoint [query-fn update-fn has-dump?]
-  {:query-fn query-fn :update-fn update-fn :has-dump has-dump?})
+(def ^:private v1-prefix :v1)
 
-(def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route true))
-(def raw-endpoint-spec (specify-endpoint raw-sparql-routes raw-update-endpoint-route true))
-(def draft-endpoint-spec (specify-endpoint draft-sparql-routes nil true))
-(def state-endpoint-spec (specify-endpoint state-sparql-routes state-update-endpoint-route false))
+(def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route v1-prefix))
+
+(defn- create-raw-endpoint-spec [authenticated-fn]
+  (let [query-route-fn #(raw-sparql-routes %1 %2 %3 authenticated-fn)
+        update-route-fn #(raw-update-endpoint-route %1 %2 %3 authenticated-fn)]
+    (specify-endpoint query-route-fn update-route-fn v1-prefix)))
 
 (defn create-sparql-routes [endpoint-map backend]
   (let [timeout-conf (conf/get-timeout-config env (keys endpoint-map) ops/default-timeouts)
-        ep-routes (fn [[ep-name {:keys [query-fn update-fn has-dump]}]]
-                    (create-sparql-endpoint-routes ep-name query-fn update-fn has-dump backend timeout-conf))]
+        ep-routes (fn [[ep-name {:keys [query-fn update-fn version]}]]
+                    (create-sparql-endpoint-routes ep-name query-fn update-fn version backend timeout-conf))]
     (mapcat ep-routes endpoint-map)))
 
-(defn get-sparql-routes [backend]
+(defn get-sparql-routes [backend user-repo]
   (let [endpoints {:live live-endpoint-spec
-                   :raw raw-endpoint-spec
-                   :draft draft-endpoint-spec
-                   :state state-endpoint-spec}]
+                   :raw (create-raw-endpoint-spec user-repo)}]
     (create-sparql-routes endpoints backend)))
 
 (defn initialise-app! [backend]
-  (set-var-root! #'app (app-handler
-                        ;; add your application routes here
-                        (-> []
-                            (add-route (pages-routes backend))
-                            (add-route (draft-api-routes "/draft" backend))
-                            (add-route (graph-management-routes "/graph" backend))
-                            (add-routes (get-sparql-routes backend))
-                            (add-route (context "/status" []
-                                                (status-routes global-writes-lock finished-jobs restart-id)))
+  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)]
+    (set-var-root! #'app (app-handler
+                          ;; add your application routes here
+                          (-> []
+                              (add-route (pages-routes backend))
+                              (add-route (draftset-api-routes backend user-repo authenticated-fn))
+                              (add-routes (get-sparql-routes backend authenticated-fn))
+                              (add-route (context "/v1/status" []
+                                                  (status-routes global-writes-lock finished-jobs restart-id)))
 
-                            (add-route app-routes))
+                              (add-route app-routes))
 
-                        :ring-defaults (assoc-in api-defaults [:params :multipart] true)
-                        ;; add custom middleware here
-                        :middleware [wrap-verbs
-                                     wrap-encode-errors
-                                     middleware/log-request]
-                        ;; add access rules here
-                        :access-rules []
-                        ;; serialize/deserialize the following data formats
-                        ;; available formats:
-                        ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
-                        :formats [:json-kw :edn])))
+                          :ring-defaults (assoc-in api-defaults [:params :multipart] true)
+                          ;; add custom middleware here
+                          :middleware [#(wrap-resource % "swagger-ui")
+                                       wrap-verbs
+                                       wrap-encode-errors
+                                       log-request]
+                          ;; add access rules here
+                          :access-rules []
+                          ;; serialize/deserialize the following data formats
+                          ;; available formats:
+                          ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
+                          :formats [:json-kw :edn]))))
 
 (defn initialise-write-service! []
   (set-var-root! #'writer-service  (start-writer!)))
@@ -143,11 +141,16 @@
   []
   (set-var-root! #'backend (get-backend env)))
 
+(defn- init-user-repo! []
+  (let [repo (drafter.user.repository/get-configured-repository env)]
+    (set-var-root! #'user-repo repo)))
+
 (defn initialise-services! []
   (enc/register-custom-encoders!)
 
   (initialise-write-service!)
   (init-backend!)
+  (init-user-repo!)
   (initialise-app! backend)
   (set-var-root! #'stop-reaper (ops/start-reaper 2000)))
 
@@ -184,7 +187,8 @@
    shuts down, put any clean up code here"
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
-  (stop backend)
+  (stop-backend backend)
+  (.close user-repo)
   (stop-writer! writer-service)
   (stop-reaper)
   (log/info "drafter has shut down."))
