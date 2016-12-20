@@ -15,12 +15,33 @@
                               :passphrase :env
                               :snapshots false}]]
 
-  :dependencies [
-                 [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
-                                                                         com.fasterxml.jackson.core/jackson-core
-                                                                         org.slf4j/jcl-over-slf4j
-                                                                         org.apache.httpcomponents/httpclient]]
+  :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.openrdf.sesame/sesame-queryrender "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-runtime "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
 
+                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
+                 ;; see here for the source code that built this release:
+                 ;;
+                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
+
+                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
+
+                 [clj-yaml "0.4.0"]      ;; for loading our Swagger schemas
+                 [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
+
+                 ;; Lock dependency of jackson to a version that
+                 ;; works with sesame's sparql json results renderer
+                 ;; and the scjsv json schema validator.
+                 ;;
+                 ;; NOTE: When we upgrade sesame to RDF4j we can possibly
+                 ;; drop this override.
+                 [com.fasterxml.jackson.core/jackson-core "2.6.7"]
+
+                 ;; Use JENA for our query rewriting
+                 [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
+                                                                org.slf4j/jcl-over-slf4j
+                                                                org.apache.httpcomponents/httpclient]]
                  [org.apache.jena/jena-core "3.0.1" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-base "3.0.1" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-iri "3.0.1" :exclusions [org.slf4j/slf4j-api]]
@@ -137,7 +158,6 @@
                 }
    }
 
-
   :jvm-opts ["-Djava.awt.headless=true"
 
              ;; Use this property to control number
@@ -146,7 +166,7 @@
              ;;"-Dhttp.maxConnections=1"
              ]
 
-                                        ;NOTE: expected JVM version to run against is defined in the Dockerfile
+  ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
 
@@ -159,6 +179,4 @@
                   ["vcs" "commit"]
                   ;;["vcs" "push"]
                   ]
-
-
   )

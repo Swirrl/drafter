@@ -18,7 +18,8 @@
             [drafter.util :as util]
             [clojure.java.io :as io]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]])
+            [swirrl-server.async.jobs :refer [finished-jobs]]
+            [drafter.swagger :as swagger])
   (:import [java.util Date]
            [java.io ByteArrayOutputStream ByteArrayInputStream]
            [org.openrdf.query QueryResultHandler]
@@ -836,9 +837,9 @@
   (let [request (with-identity test-manager {:uri "/v1/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
         response (route request)]
     (assert-is-not-found-response response)))
-
 (deftest delete-graph-by-non-owner
-  (let [draftset-location (create-draftset-through-api test-editor)
+
+ (let [draftset-location (create-draftset-through-api test-editor)
         [graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
 
@@ -1514,9 +1515,11 @@
 
 (defn- setup-route [test-function]
   (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
-        authenticated-fn (middleware/make-authenticated-wrapper users {})]
+        authenticated-fn (middleware/make-authenticated-wrapper users {})
+        swagger-spec (swagger/load-spec-and-resolve-refs)
+        api-handler (draftset-api-routes *test-backend* users authenticated-fn)]
     (binding [*user-repo* users
-              *route* (draftset-api-routes *test-backend* users authenticated-fn)]
+              *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
       (test-function))))
 
 (use-fixtures :once wrap-db-setup)
