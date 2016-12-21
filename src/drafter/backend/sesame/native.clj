@@ -1,27 +1,42 @@
 (ns drafter.backend.sesame.native
-  (:require [drafter.backend.protocols :as backproto]
-            [drafter.backend.sesame.native.batching :as batching]
-            [drafter.backend.sesame.common :refer :all]
-            [drafter.backend.sesame.common.protocols :as sesproto]
-            [drafter.backend.sesame.native.repository :refer [get-repository]]
-            [drafter.backend.sesame.native.draft-management :as mgmt]
-            [grafter.rdf.protocols :as proto]))
+  (:require [drafter.backend.repository]
+            [clojure.tools.logging :as log]
+            [environ.core :refer [env]]
+            [grafter.rdf.repository :as repo]))
 
-(defrecord SesameNativeStoreBackend [repo])
+;; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
+;; (but we have to specify 4 char strings, so in some cases last chars don't matter
+(def default-indexes "spoc,pocs,ocsp,cspo,cpos,oscp")
 
-(extend drafter.backend.sesame.native.SesameNativeStoreBackend
-  proto/ITripleReadable default-triple-readable-impl
-  proto/ITripleWriteable default-triple-writeable-impl
-  proto/ISPARQLable default-sparqlable-impl
-  proto/ISPARQLUpdateable default-isparql-updatable-impl
-  backproto/SparqlExecutor default-sparql-query-impl
-  backproto/QueryRewritable default-query-rewritable-impl
-  backproto/SparqlUpdateExecutor default-sparql-update-impl
-  backproto/ApiOperations default-api-operations-impl
-  backproto/DraftManagement (assoc default-draft-management-impl :migrate-graphs-to-live! mgmt/migrate-graphs-to-live!)
-  sesproto/ToRepository {:->sesame-repo :repo}
-  backproto/Stoppable default-stoppable-impl
-  sesproto/SesameBatchOperations {:delete-graph-batch! batching/delete-graph-batch!})
+(def default-repo-path "drafter-db")
+
+(def default-store "native-store")
+
+(defn- get-repo-at [repo-path indexes]
+  (let [repo (repo/repo (repo/native-store repo-path indexes))]
+    (log/info "Initialised repo" repo-path)
+    repo))
+
+(defn- get-repo-config [env-map]
+  {:sesame-store (get env-map :sesame-store default-store)
+   :indexes (get env-map :drafter-indexes default-indexes)
+   :repo-path (get env-map :drafter-repo-path default-repo-path)})
+
+(defn get-repository [env-map]
+  (let [{:keys [indexes repo-path sesame-store]} (get-repo-config env-map)]
+    (condp = sesame-store
+      "native-store" (get-repo-at repo-path indexes)
+      "memory-store" (repo/repo))))
+
+(defn reindex
+  "Reindex the database according to the DRAFTER_INDEXES set at
+  DRAFTER_REPO_PATH in the environment.  If no environment variables
+  are set for these values the defaults are used."
+  []
+  (let [{:keys [indexes repo-path]} (get-repo-config env)]
+    (log/info "Reindexing database at" repo-path " with indexes" indexes)
+    (get-repository env)
+    (log/info "Reindexing finished")))
 
 (defn get-backend [env-map]
-  (->SesameNativeStoreBackend (get-repository env-map)))
+  (get-repository env-map))

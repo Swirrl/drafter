@@ -1,10 +1,10 @@
 {% extends "templates/base.html" %}
 {% block content %}
 
-{% include "templates/dump-link.html" %}
-
 {% include "templates/query-form.html" %}
 
-{% include "templates/update-form.html" %}
+{% if update-endpoint %}
+  {% include "templates/update-form.html" %}
+{% endif %}
 
 {% endblock %}

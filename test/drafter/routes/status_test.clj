@@ -10,7 +10,7 @@
   (:import [java.util UUID]
            [java.util.concurrent.locks ReentrantLock]))
 
-(use-fixtures :each validate-schemas)
+(comment use-fixtures :each validate-schemas)
 
 (enc/register-custom-encoders!)
 

@@ -12,10 +12,10 @@ Drafter supports multiple backends for storing RDF data.
 DRAFTER_BACKEND               (default drafter.backend.sesame.native)
 #+END_EXAMPLE
 
-| Namespace                      | Description                                                      |
-|--------------------------------+------------------------------------------------------------------|
-| drafter.backend.sesame.native  | Sesame Native Store Backend                                      |
-| drafter.backend.stardog.sesame | Stardog optimised queries via the Sesame SparqlRepository client |
+| Namespace                     | Description                                                      |
+|-------------------------------+------------------------------------------------------------------|
+| drafter.backend.sesame.native | Sesame Native Store Backend                                      |
+| drafter.backend.sesame.remote | Stardog optimised queries via the Sesame SparqlRepository client |
 
 Different backends have their own configuration options. There are also common
 configuration settings which apply across all backends:
@@ -35,7 +35,7 @@ DRAFTER_INDEXES
 DEFAULT_REPO_PATH
 #+END_EXAMPLE
 
-*** drafter.backend.stardog.sesame
+*** drafter.backend.sesame.remote
 
 The Sesame stardog backend accesses a remote Stardog instance through a Sesame SPARQL repository. The location of the
 query and update endpoints for the Stardog database to use must be configured.
@@ -161,6 +161,20 @@ is 3 minutes:
 DRAFTER_TIMEOUT_OPERATION=50
 DRAFTER_TIMEOUT_ENDPOINT_RAW_OPERATION=180
 #+END_SRC
+
+** User Token Signing Key
+
+Drafter can be configured to authenticated users from a JSON Web Signing (JWS) token in the incoming request.
+This token must be signed using the configured HMAC-SHA-256 key. This key should be specified by the
+DRAFTER_JWS_SIGNING_KEY environment variable:
+
+#+BEGIN_SRC shell :exports code
+DRAFTER_JWS_SIGNING_KEY=secretkey
+#+END_SRC
+
+If the DRAFTER_JWS_SIGNING_KEY environment variable is not present, JWS token authentication will not be
+available.
+
 ** System Properties
 
 The following JVM system properties can be set to configure various

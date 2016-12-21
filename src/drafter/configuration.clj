@@ -8,7 +8,7 @@
   corresponding timeout value. The tree is represented with nested
   maps e.g. for a single endpoint :live the tree will look like
 
-  {:live {:update {:result-timeout 10 :operation-timeout 100} 
+  {:live {:update {:result-timeout 10 :operation-timeout 100}
           :query {:result-timeout 10 :operation-timeout 100}}}
 
   if the default timeouts are 10 for query results and 100 for the
@@ -33,13 +33,13 @@
   Calculating the endpoint timeout configuration therefore proceeds as
   follows:
 
-  1. Find all timeout settings in the environment map 
-  2. Order all settings from least to most specific 
-  3. For each setting: 
-     * Find the set of leaf nodes it references in the tree 
+  1. Find all timeout settings in the environment map
+  2. Order all settings from least to most specific
+  3. For each setting:
+     * Find the set of leaf nodes it references in the tree
      * Update all matching leaf timeouts to match the setting
   "
-  (:require [taoensso.timbre :as timbre]
+  (:require [clojure.tools.logging :as log]
             [clojure.string :as string])
   (:import [java.util Comparator]
            [java.util.concurrent TimeUnit]))
@@ -70,7 +70,8 @@
       (let [endpoint (keyword (.group matcher "endpoint"))
             method (keyword (.group matcher "method"))
             scope-group (.group matcher "scope")
-            scope (if (nil? scope-group) nil (keyword (str scope-group "-timeout")))]
+            scope (when-not (nil? scope-group)
+                    (keyword (str scope-group "-timeout")))]
         (create-selector endpoint method scope))
       (Exception. (str "Invalid format for drafter timeout variable '" p "'")))))
 
@@ -84,7 +85,7 @@
   "Returns whether a selector is 'less than' (i.e. less specific) than
   another."
   [s1 s2]
-  (< (compare (selector->path s1) (selector->path s2)) 0))
+  (neg? (compare (selector->path s1) (selector->path s2))))
 
 ;lift-f :: (Any* -> a) -> Try[Any]* -> Try[a]
 (defn- lift-f [f & values]
@@ -105,7 +106,7 @@
   [s]
   (try
     (let [timeout (Integer/parseInt s)]
-      (if (> timeout 0)
+      (if (pos? timeout)
         (.toMillis TimeUnit/SECONDS timeout)
         (Exception. "Timeout values must be non-negative")))
     (catch NumberFormatException ex
@@ -250,12 +251,12 @@
 (defn- apply-setting
   "Applies a timeout setting to the current timeout settings tree."
   [timeouts {:keys [timeout selector]}]
-  (timbre/info (str "Applying setting " (format-selector selector) " with timeout " timeout))
+  (log/info (str "Applying setting " (format-selector selector) " with timeout " timeout))
   (update-config timeouts (selector->path selector) timeout))
 
 (defn- log-config-errors [errors]
   (doseq [ex errors]
-    (timbre/warn "Timeout configuration:" (.getMessage ex))))
+    (log/warn "Timeout configuration:" (.getMessage ex))))
 
 (defn get-timeout-config
   "Calculates the timeout configuration tree given a collection of

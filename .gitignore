@@ -20,3 +20,4 @@ user_repl.clj
 drafter.iml
 profiles.clj
 /test-drafter-db/
+/test-users.edn

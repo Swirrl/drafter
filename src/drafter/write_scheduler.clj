@@ -13,17 +13,13 @@
   (:require [clojure.tools.logging :as log]
             [clj-logging-config.log4j :as l4j]
             [drafter.util :refer [log-time-taken]]
-            [swirrl-server.async.jobs :refer [finished-jobs complete-job! restart-id ->Job]]
+            [swirrl-server.async.jobs :refer [finished-jobs job-failed! restart-id ->Job]]
             [swirrl-server.errors :refer [ex-swirrl encode-error]])
-  (:import (java.util UUID)
-           (org.apache.log4j MDC)
+  (:import (org.apache.log4j MDC)
            (java.util.concurrent PriorityBlockingQueue)
-           (java.util.concurrent.locks ReentrantLock)
-           (org.openrdf.rio RDFParseException)))
+           (java.util.concurrent.locks ReentrantLock)))
 
 (def priority-levels-map {:sync-write 0 :exclusive-write 1 :batch-write 2})
-
-(def all-priority-types (into #{} (keys priority-levels-map)))
 
 (def compare-jobs (comparator
                    (fn [job1 job2]
@@ -112,10 +108,7 @@
           (catch Exception ex
             (log/warn ex "A task raised an error delivering error to promise")
             ;; TODO improve error returned
-            (complete-job! job (:body (encode-error ex))
-                           ;; {:type :error
-                           ;;  :exception ex}
-                           ))))
+            (job-failed! job ex))))
       (log/info "Writer waiting for tasks")
       (recur (.take writes-queue))))
 

@@ -48,7 +48,7 @@
 (extend-protocol ToSSE
   String
   (->sse-item [s]
-    (-> s SSE/parseItem))
+    (SSE/parseItem s))
 
   Item
   (->sse-item [i]
@@ -125,7 +125,7 @@
             ;; context doesn't need to know about the URI mapping (if any), and
             ;; should in theory be more generic.
 
-            (and (.isDescribeType q) (not (empty? (.getResultURIs q))))
+            (and (.isDescribeType q) (seq (.getResultURIs q)))
             (sparql-string->arq-query
              (apply str "DESCRIBE " (apply-rewriter-to-describe-uris rewriter (.getResultURIs q))))
 
