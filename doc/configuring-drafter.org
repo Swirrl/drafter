@@ -162,6 +162,18 @@ DRAFTER_TIMEOUT_OPERATION=50
 DRAFTER_TIMEOUT_ENDPOINT_RAW_OPERATION=180
 #+END_SRC
 
+** Users Database
+
+For the mongo database user backend you can set the environment variables:
+
+`DRAFTER_USER_DB_NAME=pmd-app2_development`
+`DRAFTER_USER_REPO_NS=drafter.user.mongo`
+
+For an in memory database of users configured in via a
+`test-users.edn` file you can set:
+
+`DRAFTER_USER_REPO_NS=drafter.user.memory-repository`
+
 ** User Token Signing Key
 
 Drafter can be configured to authenticated users from a JSON Web Signing (JWS) token in the incoming request.
