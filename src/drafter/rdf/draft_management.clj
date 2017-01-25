@@ -290,16 +290,17 @@ PREFIX drafter: <" (drafter "") ">"))
    "   ?lg a drafter:ManagedGraph ."
    "   ?lg drafter:isPublic false ."
    "   ?lg ?lp ?lo ."
-   "   FILTER NOT EXISTS {"
+   "   MINUS {"
    "      ?lg drafter:hasDraft ?odg ."
    "      FILTER (?odg != <" draft-graph-uri ">)"
    "   }"
    "}"))
 
 (defn- delete-draft-graph-query [draft-graph-uri]
-  (util/make-compound-sparql-query
-   [(delete-draft-graph-and-remove-from-state-query draft-graph-uri)
-    (delete-dependent-private-managed-graph-query draft-graph-uri)]))
+  (let [q (util/make-compound-sparql-query
+           [(delete-draft-graph-and-remove-from-state-query draft-graph-uri)
+            (delete-dependent-private-managed-graph-query draft-graph-uri)])]
+    q))
 
 (defn delete-draft-graph!
   "Deletes a draft graph's contents and all references to it in the
