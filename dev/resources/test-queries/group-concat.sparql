@@ -1,0 +1,31 @@
+PREFIX qb: <http://purl.org/linked-data/cube#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sdmx-attribute: <http://purl.org/linked-data/sdmx/2009/attribute#>
+
+SELECT DISTINCT (GROUP_CONCAT(?unitLabel;separator=',') as ?unitLabels) # we only group concat if there are multiple units
+?label ?uri
+WHERE {
+  {
+    SELECT DISTINCT ?unitLabel ?uri WHERE {
+      {
+        SELECT DISTINCT ?unit (?measure_uri as ?uri) WHERE
+        {
+          # a BIND would be much quicker here if we know there's only 1
+          BIND ( <http://statistics.gov.scot/def/measure-properties/ratio> as ?measure_uri )
+
+          GRAPH <http://statistics.gov.scot/graph/poverty> {
+            ?obs qb:measureType ?measure_uri .
+            #if there is more than one measure in the dsd, we need to work out which units go with which.
+            ?obs <http://purl.org/linked-data/cube#measureType> <http://statistics.gov.scot/def/measure-properties/ratio> .
+            ?obs <http://purl.org/linked-data/sdmx/2009/dimension#refPeriod> <http://reference.data.gov.uk/id/government-year/1997-1998> .
+            ?obs <http://statistics.gov.scot/def/dimension/housingCosts> <http://statistics.gov.scot/def/concept/housing-costs/after-housing-costs> .
+            ?obs sdmx-attribute:unitMeasure ?unit .
+          } # end graph
+        } # end where
+        LIMIT 5 # <-- This is a perf hack
+      } # end inner query 1
+      ?unit rdfs:label ?unitLabel .
+    }
+  }
+  ?uri rdfs:label ?label .
+} GROUP BY ?uri ?label
