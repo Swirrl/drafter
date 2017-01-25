@@ -39,12 +39,19 @@
                  [com.fasterxml.jackson.core/jackson-core "2.6.7"]
 
                  ;; Use JENA for our query rewriting
-                 [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
+                 [org.apache.jena/jena-arq "3.1.1" :exclusions [org.slf4j/slf4j-api
                                                                 org.slf4j/jcl-over-slf4j
                                                                 org.apache.httpcomponents/httpclient]]
-                 [org.apache.jena/jena-core "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-base "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-iri "3.0.1" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-core "3.1.1" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-base "3.1.1" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-iri "3.1.1" :exclusions [org.slf4j/slf4j-api]]
+
+                 ;; [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
+                 ;;                                                org.slf4j/jcl-over-slf4j
+                 ;;                                                org.apache.httpcomponents/httpclient]]
+                 ;; [org.apache.jena/jena-core "3.0.1" :exclusions [org.slf4j/slf4j-api]]
+                 ;; [org.apache.jena/jena-base "3.0.1" :exclusions [org.slf4j/slf4j-api]]
+                 ;; [org.apache.jena/jena-iri "3.0.1" :exclusions [org.slf4j/slf4j-api]]
 
                  [org.clojure/clojure "1.8.0"]
 
@@ -140,6 +147,9 @@
 
    :dev-common {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                           [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
+
+                :source-paths ["dev/clj"]
+                :resource-paths ["dev/resources"]
 
                 :dependencies [[ring-mock "0.1.5"]
                                [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
