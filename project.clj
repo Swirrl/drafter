@@ -42,13 +42,6 @@
                  [org.apache.jena/jena-base "3.1.1" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-iri "3.1.1" :exclusions [org.slf4j/slf4j-api]]
 
-                 ;; [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
-                 ;;                                                org.slf4j/jcl-over-slf4j
-                 ;;                                                org.apache.httpcomponents/httpclient]]
-                 ;; [org.apache.jena/jena-core "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-                 ;; [org.apache.jena/jena-base "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-                 ;; [org.apache.jena/jena-iri "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-
                  [org.clojure/clojure "1.8.0"]
 
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
