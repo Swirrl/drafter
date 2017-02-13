@@ -20,6 +20,8 @@ cd $WORKING_DIR
 echo "> Permissions.."
 sudo chown -R travis /opt/stardog/releases
 sudo chmod +wx /opt/stardog/releases
+sudo chown -R travis $STARDOG_HOME
+sudo chmod +wx $STARDOG_HOME
 
 echo '> Adding license...'
 sudo cp $WORKING_DIR/travis/stardog-license-key.bin /var/lib/stardog-home
