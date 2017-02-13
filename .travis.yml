@@ -1,11 +1,13 @@
 language: clojure
+jdk:
+- oraclejdk8
 env:
 - SPARQL_QUERY_ENDPOINT="http://localhost:5820/drafter/query"
 - DRAFTER_BACKEND="drafter.backend.sesame.remote"
 - SPARQL_UPDATE_ENDPOINT="http://localhost:5820/drafter/update"
 before_install:
-  - sudo apt-get -qq update
-  - sudo apt-get install -qq -y git unzip build-essential apache2-utils lxc wget bsdtar python-pip openjdk-8-jdk
+  - sudo apt-get update
+  - sudo apt-get install -y git unzip build-essential apache2-utils lxc wget bsdtar python-pip
   - ./travis/bootstrap_stardog.sh
 before_script:
   - sleep 15
