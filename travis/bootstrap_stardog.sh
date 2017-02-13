@@ -15,6 +15,11 @@ echo '> Downloading and unzipping Stardog...'
 cd /opt/stardog/releases
 sudo curl -O https://stardog-versions.s3.amazonaws.com/stardog-4.1.2.zip
 sudo unzip stardog-4.1.2.zip
+cd $WORKING_DIR
+
+echo "> Permissions.."
+sudo chown -R travis /opt/stardog/releases
+sudo chmod +wx /opt/stardog/releases
 
 echo '> Adding license...'
 sudo cp $WORKING_DIR/travis/stardog-license-key.bin /var/lib/stardog-home
