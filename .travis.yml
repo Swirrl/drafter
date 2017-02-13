@@ -1,5 +1,12 @@
+language: clojure
 env:
 - SPARQL_QUERY_ENDPOINT="http://localhost:5820/drafter/query"
 - DRAFTER_BACKEND="drafter.backend.sesame.remote"
 - SPARQL_UPDATE_ENDPOINT="http://localhost:5820/drafter/update"
-language: clojure
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -qq -y git unzip build-essential apache2-utils lxc wget bsdtar python-pip openjdk-8-jdk
+  - ./travis/bootstrap_stardog.sh
+before_script:
+  - sleep 15
+  - sudo /opt/stardog/stardog/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false -o query.all.graphs=true -o reasoning.type=none -- # create stardog dbs
