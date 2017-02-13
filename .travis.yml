@@ -7,7 +7,7 @@ env:
 - SPARQL_UPDATE_ENDPOINT="http://localhost:5820/drafter/update"
 before_install:
   - sudo apt-get update
-  - sudo apt-get install -y git unzip build-essential apache2-utils lxc wget bsdtar python-pip
+  - sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
   - ./travis/bootstrap_stardog.sh
 before_script:
   - sleep 15
