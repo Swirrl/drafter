@@ -1,1 +1,5 @@
+env:
+- SPARQL_QUERY_ENDPOINT="http://localhost:5820/drafter/query"
+- DRAFTER_BACKEND="drafter.backend.sesame.remote"
+- SPARQL_UPDATE_ENDPOINT="http://localhost:5820/drafter/update"
 language: clojure
