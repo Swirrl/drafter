@@ -8,6 +8,7 @@ env:
 before_install:
   - sudo apt-get update
   - sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
+  - sudo chown -R travis ./travis/bootstrap_stardog.sh
   - ./travis/bootstrap_stardog.sh
 before_script:
   - sleep 15
