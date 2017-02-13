@@ -1,6 +1,6 @@
 #!/bin/bash
 
-WORKING_DIR=`pwd`
+export WORKING_DIR=`pwd`
 echo "> Working dir: $WORKING_DIR"
 
 # install stardog
@@ -8,7 +8,7 @@ sudo mkdir -p /opt/stardog/releases
 sudo mkdir -p /var/lib/stardog-home
 sudo mkdir -p /opt/stardog/stardog
 
-STARDOG_HOME=/var/lib/stardog-home
+export STARDOG_HOME=/var/lib/stardog-home
 echo "> Stardog home: $STARDOG_HOME"
 
 echo '> Downloading and unzipping Stardog...'
