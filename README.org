@@ -6,6 +6,8 @@ data updates between draft and live triple stores.
 Be sure to see the [[https://github.com/Swirrl/drafter/blob/master/doc/getting-started.org][Getting Started Guide]] for how to use Drafter and
 set up your Dev environment.
 
+Remember that in order to access the Swirrl Private Jars you will need a LEIN_USERNAME and LEIN_PASSPHRASE set.
+
 ** Configuring Drafter
 
 Drafter uses [[https://github.com/weavejester/environ][environ]] for its configuration.  This means it uses
