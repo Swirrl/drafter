@@ -14,6 +14,7 @@ before_install:
 - sudo chown -R travis ./travis/bootstrap_stardog.sh
 - sudo chmod +x ./travis/bootstrap_stardog.sh
 - "./travis/bootstrap_stardog.sh"
+- echo $AWS_ACCESS_KEY_ID
 before_script:
 - sleep 15
 - sudo /opt/stardog/stardog/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false
