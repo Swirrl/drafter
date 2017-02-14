@@ -6,13 +6,11 @@
 
   :repositories [["snapshots" {:url "s3p://swirrl-jars/snapshots/"
                                :sign-releases false
-                               :username :env
-                               :passphrase :env
+                               :no-auth true
                                :releases false}]
                  ["releases" {:url "s3p://swirrl-jars/releases/"
                               :sign-releases true
-                              :username :env
-                              :passphrase :env
+                              :no-auth true
                               :snapshots false}]]
 
   :dependencies [[org.clojure/clojure "1.8.0"]
