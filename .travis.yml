@@ -2,15 +2,19 @@ language: clojure
 jdk:
 - oraclejdk8
 env:
+  matrix:
   - SPARQL_QUERY_ENDPOINT="http://localhost:5820/drafter/query"
   - DRAFTER_BACKEND="drafter.backend.sesame.remote"
   - SPARQL_UPDATE_ENDPOINT="http://localhost:5820/drafter/update"
+  global:
+    secure: iRzoDaIf6xfSr/JUg3pXJBPIQp2OqYQPq1e9mBLOScudBNas/GyI09Cm3oDlFaUZPQ2Q6Dyy3YjC0EotRK6wjR3QaOtaYx87YZM+bS7V1QhctQSkV+AF/lTP5pAi34zcfi9Ak9kT3vTLG3C6DOCSI0n6PRfaEMXl+XBqkbnBW10=
 before_install:
-  - sudo apt-get update
-  - sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
-  - sudo chown -R travis ./travis/bootstrap_stardog.sh
-  - sudo chmod +x ./travis/bootstrap_stardog.sh
-  - ./travis/bootstrap_stardog.sh
+- sudo apt-get update
+- sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
+- sudo chown -R travis ./travis/bootstrap_stardog.sh
+- sudo chmod +x ./travis/bootstrap_stardog.sh
+- "./travis/bootstrap_stardog.sh"
 before_script:
-  - sleep 15
-  - sudo /opt/stardog/stardog/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false -o query.all.graphs=true -o reasoning.type=none -- # create stardog dbs
+- sleep 15
+- sudo /opt/stardog/stardog/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false
+  -o query.all.graphs=true -o reasoning.type=none --
