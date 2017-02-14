@@ -2,13 +2,15 @@ language: clojure
 lein: 2.7.1
 jdk:
 - oraclejdk8
+services:
+  - mongodb
 env:
   global:
   - SPARQL_QUERY_ENDPOINT="http://localhost:5820/drafter/query"
   - DRAFTER_BACKEND="drafter.backend.sesame.remote"
   - SPARQL_UPDATE_ENDPOINT="http://localhost:5820/drafter/update"
-  - secure: fanfSvB+Jqlm0+NsBOQbA2X3KpXV4IPeOZ4bqEm4hmhSBtzCn+cPCGQMCM3KFpcf3L/WtEuLe4TFWLikBaDZzxk9KB4pINxgX8+nG5aBErVpFuhSqYcCUCMHA5fNvy3/zT3F5UiJbLN6DhW5n/JhLau+CQZ2wOOdQBH2eXvslhY=
-  - secure: nAz71Tw+rz0cH+r9Uzi4vWXIGGwMgoGkHDIKINFg3vpMvcKeVhFHr7PZUDqPUb82C/isk513wxO3lrAkOA6c+EfS9fAKOE03Y7q34x6Z/XWuw+a2h8r7DZ0/NmAAqKG202pbpZRFLNSm7Cpq0nx4mo35DoeFLkpG0SMxbwPeTag=
+  - secure: fanfSvB+Jqlm0+NsBOQbA2X3KpXV4IPeOZ4bqEm4hmhSBtzCn+cPCGQMCM3KFpcf3L/WtEuLe4TFWLikBaDZzxk9KB4pINxgX8+nG5aBErVpFuhSqYcCUCMHA5fNvy3/zT3F5UiJbLN6DhW5n/JhLau+CQZ2wOOdQBH2eXvslhY= # AWS Creds
+  - secure: nAz71Tw+rz0cH+r9Uzi4vWXIGGwMgoGkHDIKINFg3vpMvcKeVhFHr7PZUDqPUb82C/isk513wxO3lrAkOA6c+EfS9fAKOE03Y7q34x6Z/XWuw+a2h8r7DZ0/NmAAqKG202pbpZRFLNSm7Cpq0nx4mo35DoeFLkpG0SMxbwPeTag= # Lein Passphrase
 before_install:
 - sudo apt-get update
 - sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
