@@ -18,5 +18,5 @@ before_install:
 - "./travis/bootstrap_stardog.sh"
 before_script:
 - sleep 15
-- sudo /opt/stardog/stardog/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false
+- sudo /opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false
   -o query.all.graphs=true -o reasoning.type=none --
