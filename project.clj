@@ -112,6 +112,8 @@
             [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]
             [perforate "0.3.4"]]
 
+  :uberjar-name "drafter.jar"
+
   :ring {:handler drafter.handler/app
          :init    drafter.handler/init
          :destroy drafter.handler/destroy
