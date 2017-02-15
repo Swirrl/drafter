@@ -21,3 +21,16 @@ before_script:
 - sleep 15
 - sudo /opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false
   -o query.all.graphs=true -o reasoning.type=none --
+before_deploy:
+- mkdir -p dist
+- cp target/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
+- cp target/drafter.jar dist/drafter-private-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar
+deploy:
+  - provider: s3
+    access_key_id: AKIAJZVFELTIBDDYV5OQ
+    secret_access_key:
+      secure: BIaToFo+lK7GB+/IQhEAR44Ix18+ykJt+HIR6uxzZi3WRDuAP+JjngPf+A9rwKQ3fooyAgNZLnIp4EP00rpJ+YfAdUeQzxpcJxeMeUgH0hAR7o8udMTujqBLsTjxwI7B8nZGUHpUpVZiAG4SWhgm7QaU/x5/tTSmGk9inO6SJQY=
+    bucket: travis-drafter-jars
+    local-dir: dist
+    upload-dir: travis-master
+    skip_cleanup: true
