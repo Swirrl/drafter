@@ -24,11 +24,9 @@ before_script:
 after_success:
 - env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
 before_deploy:
-- echo `ls target`
-- echo `ls target/uberjar`
 - mkdir -p dist
-- cp target/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
-- cp target/drafter.jar dist/drafter-private-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar
+- cp target/uberjar/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
+- cp target/uberjar/drafter.jar dist/drafter-private-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar
 deploy:
   - provider: s3
     access_key_id: AKIAJZVFELTIBDDYV5OQ
