@@ -34,3 +34,6 @@ deploy:
     local-dir: dist
     upload-dir: travis-master
     skip_cleanup: true
+    on:
+      repo: Swirrl/drafter
+      branch: travisify
