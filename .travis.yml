@@ -21,6 +21,8 @@ before_script:
 - sleep 15
 - sudo /opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false
   -o query.all.graphs=true -o reasoning.type=none --
+after_script:
+- lein uberjar
 before_deploy:
 - mkdir -p dist
 - cp target/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
