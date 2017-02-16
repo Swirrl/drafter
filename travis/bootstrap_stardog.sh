@@ -29,4 +29,4 @@ sudo cp $WORKING_DIR/travis/stardog.properties /var/lib/stardog-home
 sudo ln -s /opt/stardog/releases/stardog-4.1.2 /opt/stardog/stardog
 
 # start stardog
-/opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin server start --disable-security
+env STARDOG_JAVA_ARGS="-Xms12g -Xmx12g" /opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin server start --disable-security
