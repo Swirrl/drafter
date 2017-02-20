@@ -17,6 +17,7 @@
 
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.openrdf.sesame/sesame-queryrender "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [swirrl/drafter-sparql-repository "1.0-SNAPSHOT"]
                  [org.openrdf.sesame/sesame-runtime "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
 
@@ -24,6 +25,7 @@
                  ;; see here for the source code that built this release:
                  ;;
                  ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
+
 
                  [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
@@ -46,15 +48,6 @@
                  [org.apache.jena/jena-base "3.1.1" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-iri "3.1.1" :exclusions [org.slf4j/slf4j-api]]
 
-                 ;; [org.apache.jena/jena-arq "3.0.1" :exclusions [org.slf4j/slf4j-api
-                 ;;                                                org.slf4j/jcl-over-slf4j
-                 ;;                                                org.apache.httpcomponents/httpclient]]
-                 ;; [org.apache.jena/jena-core "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-                 ;; [org.apache.jena/jena-base "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-                 ;; [org.apache.jena/jena-iri "3.0.1" :exclusions [org.slf4j/slf4j-api]]
-
-                 [org.clojure/clojure "1.8.0"]
-
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [ring "1.4.0" :exclusions [org.clojure/java.classpath]]
@@ -71,20 +64,9 @@
                  [org.mindrot/jbcrypt "0.3m"]
 
                  [grafter "0.7.5"]
-                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.9"]
 
                  [grafter/vocabularies "0.1.3"]
                  [grafter/url "0.2.1"]
-
-                 [org.openrdf.sesame/sesame-queryrender "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]
-                 [org.openrdf.sesame/sesame-runtime "2.8.9" :exclusions [org.openrdf.sesame/sesame-http-client]]
-
-                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
-                 ;; see here for the source code that built this release:
-                 ;;
-                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
-
-                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
                  [com.taoensso/tower "2.0.2"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
