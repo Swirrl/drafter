@@ -1,0 +1,43 @@
+language: clojure
+sudo: required
+lein: 2.7.1
+jdk:
+- oraclejdk8
+services:
+  - mongodb
+env:
+  global:
+  - SPARQL_QUERY_ENDPOINT="http://localhost:5820/drafter/query"
+  - DRAFTER_BACKEND="drafter.backend.sesame.remote"
+  - SPARQL_UPDATE_ENDPOINT="http://localhost:5820/drafter/update"
+  - secure: fanfSvB+Jqlm0+NsBOQbA2X3KpXV4IPeOZ4bqEm4hmhSBtzCn+cPCGQMCM3KFpcf3L/WtEuLe4TFWLikBaDZzxk9KB4pINxgX8+nG5aBErVpFuhSqYcCUCMHA5fNvy3/zT3F5UiJbLN6DhW5n/JhLau+CQZ2wOOdQBH2eXvslhY= # AWS Creds
+  - secure: nAz71Tw+rz0cH+r9Uzi4vWXIGGwMgoGkHDIKINFg3vpMvcKeVhFHr7PZUDqPUb82C/isk513wxO3lrAkOA6c+EfS9fAKOE03Y7q34x6Z/XWuw+a2h8r7DZ0/NmAAqKG202pbpZRFLNSm7Cpq0nx4mo35DoeFLkpG0SMxbwPeTag= # Lein Passphrase
+before_install:
+- sudo apt-get update
+- sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
+- sudo chown -R travis ./travis/bootstrap_stardog.sh
+- sudo chmod +x ./travis/bootstrap_stardog.sh
+- "./travis/bootstrap_stardog.sh"
+before_script:
+- sleep 15
+- sudo /opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false
+  -o query.all.graphs=true -o reasoning.type=none --
+after_success:
+- env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
+before_deploy:
+- mkdir -p dist
+- cp target/uberjar/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
+- cp target/uberjar/drafter.jar dist/drafter-private-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar
+deploy:
+  - provider: s3
+    access_key_id: AKIAJZVFELTIBDDYV5OQ
+    secret_access_key:
+      secure: BIaToFo+lK7GB+/IQhEAR44Ix18+ykJt+HIR6uxzZi3WRDuAP+JjngPf+A9rwKQ3fooyAgNZLnIp4EP00rpJ+YfAdUeQzxpcJxeMeUgH0hAR7o8udMTujqBLsTjxwI7B8nZGUHpUpVZiAG4SWhgm7QaU/x5/tTSmGk9inO6SJQY=
+    bucket: travis-drafter-jars
+    local-dir: dist
+    upload-dir: travis-master
+    region: eu-west-1
+    skip_cleanup: true
+    on:
+      repo: Swirrl/drafter
+      branch: travisify
