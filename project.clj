@@ -103,7 +103,6 @@
   :pedantic :abort
 
   :repl-options {:init-ns drafter.repl
-                 :init (-main)
                  :timeout 180000}
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
