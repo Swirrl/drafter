@@ -1,5 +1,6 @@
 package drafter.rdf;
 
+import org.openrdf.http.client.SesameClient;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.sparql.SPARQLRepository;
@@ -17,5 +18,9 @@ public class DrafterSPARQLRepository extends SPARQLRepository {
         } else {
             return new DrafterSPARQLConnection(this, createHTTPClient());
         }
+    }
+
+    @Override public synchronized SesameClient getSesameClient() {
+        return new DrafterSesameClientImpl();
     }
 }
