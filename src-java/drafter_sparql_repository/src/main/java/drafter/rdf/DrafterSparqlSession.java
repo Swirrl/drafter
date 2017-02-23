@@ -1,12 +1,10 @@
 package drafter.rdf;
 
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.ParseException;
+import org.apache.http.*;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
 import org.openrdf.OpenRDFException;
@@ -14,9 +12,7 @@ import org.openrdf.http.client.SparqlSession;
 import org.openrdf.http.protocol.UnauthorizedException;
 import org.openrdf.http.protocol.error.ErrorInfo;
 import org.openrdf.http.protocol.error.ErrorType;
-import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.QueryInterruptedException;
-import org.openrdf.query.UnsupportedQueryLanguageException;
+import org.openrdf.query.*;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.UnsupportedRDFormatException;
@@ -24,6 +20,8 @@ import org.openrdf.rio.UnsupportedRDFormatException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 public class DrafterSparqlSession extends SparqlSession {
@@ -81,7 +79,41 @@ public class DrafterSparqlSession extends SparqlSession {
         else return false;
     }
 
+    private static final String TIMEOUT_QUERY_PARAM_NAME = "timeout";
+
+    private static void removeTimeoutQueryParams(List<NameValuePair> queryPairs) {
+        List<NameValuePair> toRemove = new ArrayList<NameValuePair>();
+        for(NameValuePair pair : queryPairs) {
+            if(TIMEOUT_QUERY_PARAM_NAME.equals(pair.getName())) {
+                toRemove.add(pair);
+            }
+        }
+        queryPairs.removeAll(toRemove);
+    }
+
+    @Override protected List<NameValuePair> getQueryMethodParameters(QueryLanguage ql, String query, String baseURI, Dataset dataset, boolean includeInferred, int maxQueryTime, Binding... bindings) {
+        List<NameValuePair> pairs = super.getQueryMethodParameters(ql, query, baseURI, dataset, includeInferred, maxQueryTime, bindings);
+
+        //sesame adds a timeout=period_seconds query parameter if the maximum query time is set
+        //remove this parameter and replace it with our own
+        removeTimeoutQueryParams(pairs);
+
+        //add timeout if specified (i.e. maxQueryTime > 0)
+        if(maxQueryTime > 0) {
+            //add Stardog timeout=period_ms query parameter
+            //maxQueryTime is the maximum time in seconds whereas Stardog's timeout is measured in Milliseconds
+            Integer timeoutMs = 1000 * maxQueryTime;
+            pairs.add(new BasicNameValuePair(TIMEOUT_QUERY_PARAM_NAME, timeoutMs.toString()));
+        }
+
+        return pairs;
+    }
+
     @Override protected HttpResponse execute(HttpUriRequest method) throws IOException, OpenRDFException {
+        //NOTE: the implementation of this method is based on SparqlSession.execute(HttpUriRequest)
+        //This class cannot access the private HttpClient and HttpClientContext fields used by the base implementation
+        //so fetches them using reflection(!). It also inspects the received response to check if it appears to indicate
+        //a query timeout and throws a QueryInterruptedException in that case.
         HttpParams params = getHttpParams();
         HttpClient httpClient = getHttpClient();
         HttpClientContext httpContext = getHttpContext();
