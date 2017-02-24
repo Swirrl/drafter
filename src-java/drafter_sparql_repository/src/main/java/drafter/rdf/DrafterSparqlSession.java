@@ -3,8 +3,12 @@ package drafter.rdf;
 import org.apache.http.*;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.conn.params.ConnConnectionPNames;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
 import org.openrdf.OpenRDFException;
@@ -119,6 +123,8 @@ public class DrafterSparqlSession extends SparqlSession {
         HttpClientContext httpContext = getHttpContext();
 
         boolean consume = true;
+        HttpConnectionParams.setConnectionTimeout(params, 100);
+        params.setLongParameter(ClientPNames.CONN_MANAGER_TIMEOUT,1);
         method.setParams(params);
         HttpResponse response = httpClient.execute(method, httpContext);
 
