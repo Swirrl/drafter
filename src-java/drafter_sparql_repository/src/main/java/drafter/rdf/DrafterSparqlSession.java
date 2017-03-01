@@ -4,10 +4,11 @@ import org.apache.http.*;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.params.ClientPNames;
+import org.apache.http.client.params.CookiePolicy;
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.conn.params.ConnConnectionPNames;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.CoreConnectionPNames;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
@@ -41,6 +42,7 @@ public class DrafterSparqlSession extends SparqlSession {
         this.setUpdateURL(updateEndpointUrl);
     }
 
+    @SuppressWarnings("unchecked")
     private static <T> T readField(Class cls, Object receiver, String fieldName) {
         try {
             Field f = cls.getDeclaredField(fieldName);
@@ -53,9 +55,26 @@ public class DrafterSparqlSession extends SparqlSession {
         }
     }
 
+    @SuppressWarnings("deprecation")
+    /**
+     * Constructs the parameters to be used by the HTTP request. This is based on the params member of SparqlSession
+     * which is configured within the constructor and by setConnectionTimeout in the base class.
+     */
     private HttpParams getHttpParams() {
-        //oh jesus...
-        return readField(SparqlSession.class, this, "params");
+        BasicHttpParams params = new BasicHttpParams();
+        params.setBooleanParameter(ClientPNames.HANDLE_REDIRECTS, true);
+        params.setParameter(ClientPNames.COOKIE_POLICY, CookiePolicy.RFC_2109);
+
+        //set timeouts:
+        // - SO_TIMEOUT is the timeout between consecutive data packets received by the underlying connection
+        // - CONNECTION_TIMEOUT is the time to establish the TCP connection
+        // - CONN_MANAGER_TIMEOUT is the timeout for obtaining a connection from the connection pool
+        int socketTimeout = (int)this.getConnectionTimeout();
+        params.setIntParameter(CoreConnectionPNames.SO_TIMEOUT, socketTimeout);
+        HttpConnectionParams.setConnectionTimeout(params, 100);
+        params.setLongParameter(ClientPNames.CONN_MANAGER_TIMEOUT,1);
+
+        return params;
     }
 
     private HttpClientContext getHttpContext() {
@@ -128,18 +147,18 @@ public class DrafterSparqlSession extends SparqlSession {
         return query.length() > STARDOG_MAXIMUM_URL_LENGTH;
     }
 
+    @SuppressWarnings("deprecation")
     @Override protected HttpResponse execute(HttpUriRequest method) throws IOException, OpenRDFException {
         //NOTE: the implementation of this method is based on SparqlSession.execute(HttpUriRequest)
-        //This class cannot access the private HttpClient and HttpClientContext fields used by the base implementation
-        //so fetches them using reflection(!). It also inspects the received response to check if it appears to indicate
+        //This class cannot access the private HttpClientContext fields used by the base implementation
+        //so fetches it using reflection(!). It also inspects the received response to check if it appears to indicate
         //a query timeout and throws a QueryInterruptedException in that case.
-        HttpParams params = getHttpParams();
         HttpClient httpClient = getHttpClient();
         HttpClientContext httpContext = getHttpContext();
 
         boolean consume = true;
-        HttpConnectionParams.setConnectionTimeout(params, 100);
-        params.setLongParameter(ClientPNames.CONN_MANAGER_TIMEOUT,1);
+
+        HttpParams params = getHttpParams();
         method.setParams(params);
         HttpResponse response = httpClient.execute(method, httpContext);
 
