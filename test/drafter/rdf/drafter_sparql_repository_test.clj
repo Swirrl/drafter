@@ -8,9 +8,15 @@
            [org.openrdf.query QueryEvaluationException QueryInterruptedException]
            (java.net URI ServerSocket InetSocketAddress SocketException)
            (java.util.concurrent CountDownLatch TimeUnit ExecutionException)
-           (org.apache.http.impl.io HttpTransportMetricsImpl SessionInputBufferImpl DefaultHttpRequestParser SessionOutputBufferImpl DefaultHttpResponseWriter)
+           (org.apache.http.impl.io HttpTransportMetricsImpl SessionInputBufferImpl DefaultHttpRequestParser SessionOutputBufferImpl DefaultHttpResponseWriter ChunkedOutputStream IdentityOutputStream ContentLengthOutputStream)
            (org.apache.http.message BasicHttpResponse)
-           (org.apache.http ProtocolVersion)))
+           (org.apache.http ProtocolVersion)
+           (org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter)
+           (java.io ByteArrayOutputStream)
+           (java.util ArrayList)
+           (org.apache.http.entity StringEntity ContentType ContentLengthStrategy)
+           (java.nio.charset Charset)
+           (org.apache.http.impl.entity StrictContentLengthStrategy)))
 
 (defn query-timeout-handler
   "Handler which always returns a query timeout response in the format used by Stardog"
@@ -35,16 +41,18 @@
          (.stop server#)
          (.join server#)))))
 
-(defmacro ignore-exceptions [& body]
-  `(try
-     ~@body
-     (catch Throwable ~'ex nil)))
+(defn- empty-spo-json-body []
+  (let [baos (ByteArrayOutputStream. 1024)
+        writer (SPARQLResultsJSONWriter. baos)]
+    (.startQueryResult writer (ArrayList. ["s" "p" "o"]))
+    (.endQueryResult writer)
+    (String. (.toByteArray baos))))
 
 (defn- extract-query-params-handler [params-ref]
   (wrap-params
     (fn [{:keys [query-params] :as req}]
       (reset! params-ref query-params)
-      {:status 200 :headers {} :body ""})))
+      {:status 200 :headers {"Content-Type" "application/sparql-results+json"} :body (empty-spo-json-body)})))
 
 (deftest query-timeout-test
   (testing "Raises QueryInterruptedException on timeout response"
@@ -58,14 +66,14 @@
       (with-server (extract-query-params-handler query-params)
                    (let [pquery (repo/prepare-query repo "SELECT * WHERE { ?s ?p ?o }")]
                      (.setMaxExecutionTime pquery 2)
-                     (ignore-exceptions (.evaluate pquery))
+                     (.evaluate pquery)
                      (is (= "2000" (get @query-params "timeout")))))))
 
   (testing "does not send timeout header when maxExecutionTime not set"
     (let [query-params (atom nil)
           repo (get-test-repo)]
       (with-server (extract-query-params-handler query-params)
-                   (ignore-exceptions (repo/query repo "SELECT * WHERE { ?s ?p ?o }"))
+                   (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
                    (is (= false (contains? @query-params "timeout")))))))
 
 (defn- read-http-request [input-stream]
@@ -80,10 +88,20 @@
         buf (SessionOutputBufferImpl. metrics (* 8 1024))]
     (.bind buf output-stream)
     (let [writer (DefaultHttpResponseWriter. buf)
-          response (BasicHttpResponse. (ProtocolVersion. "HTTP" 1 1) 200 "OK")]
-      ;;TODO: Construct a valid tuple query response
-      (.write writer response)
-      (.flush buf))))
+          response (BasicHttpResponse. (ProtocolVersion. "HTTP" 1 1) 200 "OK")
+          content-type (ContentType/create "application/sparql-results+json" (Charset/forName "UTF8"))
+          entity (StringEntity. (empty-spo-json-body) content-type)]
+      (.addHeader response "Content-Type" "application/sparql-results+json")
+      (.setEntity response entity)
+
+      (let [len (.determineLength (StrictContentLengthStrategy.) response)]
+        (with-open [os (cond
+                         (= len (long ContentLengthStrategy/CHUNKED)) (ChunkedOutputStream. 2048 buf)
+                         (= len (long ContentLengthStrategy/IDENTITY)) (IdentityOutputStream. buf)
+                         :else (ContentLengthOutputStream. buf len))]
+          (.write writer response)
+          (.writeTo entity os)
+          (.flush buf))))))
 
 (defn- handle-latched-http-client [client-socket connection-latch release-latch]
   ;;notify connection has been accepted
@@ -130,8 +148,7 @@
 
 (defn- make-blocking-connection [repo idx]
   (future
-    (ignore-exceptions
-      (repo/query repo "SELECT * WHERE { ?s ?p ?o }"))
+    (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
     (keyword (str "future-" idx))))
 
 (deftest connection-timeout
