@@ -29,6 +29,12 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 public class DrafterSparqlSession extends SparqlSession {
+    /**
+     * The longest URL length accepted by stardog. SPARQL queries which result in a URL longer than this length
+     * should be sent as POST requests instead.
+     */
+    public static final int STARDOG_MAXIMUM_URL_LENGTH = 4083;
+
     public DrafterSparqlSession(String queryEndpointUrl, String updateEndpointUrl, HttpClient client, ExecutorService executor) {
         super(client, executor);
         this.setQueryURL(queryEndpointUrl);
@@ -111,6 +117,15 @@ public class DrafterSparqlSession extends SparqlSession {
         }
 
         return pairs;
+    }
+
+    /**
+     * Whether the given SPARQL query should be sent as the body of a POST request.
+     * @param query The SPARQL query
+     * @return Whether to use a POST request to submit the query
+     */
+    @Override protected boolean shouldUsePost(String query) {
+        return query.length() > STARDOG_MAXIMUM_URL_LENGTH;
     }
 
     @Override protected HttpResponse execute(HttpUriRequest method) throws IOException, OpenRDFException {

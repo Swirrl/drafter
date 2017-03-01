@@ -3,8 +3,8 @@
             [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]
             [ring.middleware.params :refer [wrap-params]]
-            [clojure.java.io :as io])
-  (:import [drafter.rdf DrafterSPARQLRepository]
+            [grafter.sequences :refer [alphabetical-column-names]])
+  (:import [drafter.rdf DrafterSPARQLRepository DrafterSparqlSession]
            [org.openrdf.query QueryEvaluationException QueryInterruptedException]
            (java.net URI ServerSocket InetSocketAddress SocketException)
            (java.util.concurrent CountDownLatch TimeUnit ExecutionException)
@@ -48,11 +48,19 @@
     (.endQueryResult writer)
     (String. (.toByteArray baos))))
 
+(def ok-spo-query-response
+  {:status 200 :headers {"Content-Type" "application/sparql-results+json"} :body (empty-spo-json-body)})
+
 (defn- extract-query-params-handler [params-ref]
   (wrap-params
     (fn [{:keys [query-params] :as req}]
       (reset! params-ref query-params)
-      {:status 200 :headers {"Content-Type" "application/sparql-results+json"} :body (empty-spo-json-body)})))
+      ok-spo-query-response)))
+
+(defn- extract-method-handler [method-ref]
+  (fn [{:keys [request-method]}]
+    (reset! method-ref request-method)
+    ok-spo-query-response))
 
 (deftest query-timeout-test
   (testing "Raises QueryInterruptedException on timeout response"
@@ -75,6 +83,30 @@
       (with-server (extract-query-params-handler query-params)
                    (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
                    (is (= false (contains? @query-params "timeout")))))))
+
+(deftest query-method-test
+  (testing "short query should be GET request"
+    (let [method (atom nil)
+          repo (get-test-repo)]
+      (with-server (extract-method-handler method)
+                   (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
+                   (is (= :get @method)))))
+
+  (testing "long query should be POST request"
+    (let [uris (map #(str "http://s/" (inc %)) (range))
+          bindings (map #(format "<%s>" %) uris)
+          sb (StringBuilder. "SELECT * WHERE { VALUES ?u { ")
+          method (atom nil)
+          repo (get-test-repo)]
+      (loop [s bindings]
+        (when (< (.length sb) DrafterSparqlSession/STARDOG_MAXIMUM_URL_LENGTH)
+          (.append sb (first s))
+          (.append sb " ")
+          (recur (rest bindings))))
+      (.append sb "} ?u ?p ?o }")
+      (with-server (extract-method-handler method)
+                   (repo/query repo (str sb))
+                   (is (= :post @method))))))
 
 (defn- read-http-request [input-stream]
   (let [metrics (HttpTransportMetricsImpl.)
