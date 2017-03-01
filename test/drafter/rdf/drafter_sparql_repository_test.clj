@@ -12,7 +12,7 @@
            (org.apache.http.message BasicHttpResponse)
            (org.apache.http ProtocolVersion)
            (org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter)
-           (java.io ByteArrayOutputStream)
+           (java.io ByteArrayOutputStream PrintWriter OutputStream)
            (java.util ArrayList)
            (org.apache.http.entity StringEntity ContentType ContentLengthStrategy)
            (java.nio.charset Charset)
@@ -33,8 +33,20 @@
     (.initialize repo)
     repo))
 
+(defn- null-output-stream []
+  (proxy [OutputStream] []
+         (close [])
+         (flush [])
+         (write
+           ([_])
+           ([bytes offset length]))))
+
+(defmacro suppress-stdout [& body]
+  `(binding [*out* (PrintWriter. (null-output-stream))]
+     ~@body))
+
 (defmacro with-server [handler & body]
-  `(let [server# (ring-server/serve ~handler {:port test-port :join? false :open-browser? false})]
+  `(let [server# (suppress-stdout (ring-server/serve ~handler {:port test-port :join? false :open-browser? false}))]
      (try
        ~@body
        (finally
