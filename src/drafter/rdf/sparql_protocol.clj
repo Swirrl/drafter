@@ -48,7 +48,7 @@
       input-stream))
 
 (defn process-prepared-query [executor pquery accept query-timeouts]
-  (let [query-type (get-query-type executor pquery)
+  (let [query-type (get-query-type pquery)
         query-timeouts (or query-timeouts default-timeouts)]
     (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
       (let [exec-fn (create-query-executor executor result-format pquery)

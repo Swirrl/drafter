@@ -5,18 +5,14 @@
             [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
             [drafter.backend.protocols :refer [->sesame-repo]]
             [clojure.tools.logging :as log])
-  (:import [java.util ArrayList]
-           [org.openrdf.rio Rio]
-           [org.openrdf.rio.helpers StatementCollector]
-           [org.openrdf.query TupleQuery TupleQueryResult
-            TupleQueryResultHandler BooleanQueryResultHandler
-            BindingSet QueryLanguage BooleanQuery GraphQuery Update]
-           [org.openrdf.rio Rio RDFWriter RDFHandler]
+  (:import [org.openrdf.rio Rio]
+           [org.openrdf.query TupleQuery TupleQueryResultHandler
+                              BooleanQuery GraphQuery Update]
+           [org.openrdf.rio Rio RDFHandler]
            [org.openrdf.repository Repository]
            [org.openrdf.repository.sparql SPARQLRepository]           
            [org.openrdf.query Dataset]
-           [org.openrdf.query.resultio QueryResultWriter QueryResultIO]
-           [org.openrdf.model.impl ContextStatementImpl]))
+           [org.openrdf.query.resultio QueryResultIO]))
 
 (defn is-quads-format? [rdf-format]
   (.supportsContexts rdf-format))
@@ -37,7 +33,7 @@
   "Returns a keyword indicating the type query represented by the
   given prepared query. Returns nil if the query could not be
   classified."
-  [backend pquery]
+  [pquery]
   (condp instance? pquery
       TupleQuery :select
       BooleanQuery :ask
@@ -147,7 +143,7 @@
     (.evaluate pquery notifying-handler)))
 
 (defn create-query-executor [backend result-format pquery]
-  (case (get-query-type backend pquery)
+  (case (get-query-type pquery)
     :select (fn [os notifier-fn]
               (let [w (QueryResultIO/createWriter result-format os)]
                 (exec-tuple-query w pquery notifier-fn)))

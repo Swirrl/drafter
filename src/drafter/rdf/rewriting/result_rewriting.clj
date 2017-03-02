@@ -2,17 +2,14 @@
   "The other side of query rewriting; result rewriting.  Result rewriting
   rewrites results and solutions."
   (:require
-   [grafter.rdf.repository :as repo]
    [grafter.rdf :refer [prefixer]]
    [grafter.rdf.protocols :refer [map->Quad]]
    [drafter.util :as util]
-   [drafter.rdf.draft-management :as mgmt]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
-  (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery Update QueryResultHandler TupleQueryResultHandler BindingSet Binding]
+  (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery TupleQueryResultHandler]
            [org.openrdf.query.impl BindingImpl MapBindingSet]
-           [org.openrdf.rio Rio RDFWriter RDFHandler]
-           [org.openrdf.query.algebra.evaluation.function Function FunctionRegistry]
+           [org.openrdf.rio RDFHandler]
            [org.openrdf.model.impl StatementImpl ContextStatementImpl]))
 
 (defn- rewrite-binding
