@@ -215,9 +215,8 @@
                 (try
                   (.get rf 5000 TimeUnit/MILLISECONDS)
                   (catch ExecutionException ex
-                    (is (instance? QueryEvaluationException (.getCause ex))))
+                    (is (instance? QueryInterruptedException (.getCause ex))))
                   (catch Throwable ex
-                    (.printStackTrace ex)
                     (is false "Expected query to be rejected due to timeout"))))
 
               ;;release previous connections and wait for them to complete

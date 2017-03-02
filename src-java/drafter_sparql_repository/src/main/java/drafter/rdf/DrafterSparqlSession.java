@@ -6,6 +6,7 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.params.CookiePolicy;
 import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.conn.ConnectionPoolTimeoutException;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.CoreConnectionPNames;
@@ -160,7 +161,13 @@ public class DrafterSparqlSession extends SparqlSession {
 
         HttpParams params = getHttpParams();
         method.setParams(params);
-        HttpResponse response = httpClient.execute(method, httpContext);
+        HttpResponse response;
+        try {
+            response = httpClient.execute(method, httpContext);
+        }
+        catch (ConnectionPoolTimeoutException ex) {
+            throw new QueryInterruptedException();
+        }
 
         try {
             int httpCode = response.getStatusLine().getStatusCode();
