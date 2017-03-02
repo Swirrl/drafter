@@ -12,10 +12,7 @@
    [clojure-csv.core :as csv]
    [clojure.test :refer :all]
    [schema.test :refer [validate-schemas]])
-
-
   (:import [java.io ByteArrayOutputStream]
-           [java.util Scanner]
            [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]))
 
 (use-fixtures :each validate-schemas)
@@ -27,8 +24,7 @@
   (testing "Streams sparql results into output stream"
     (let [baos (ByteArrayOutputStream.)
           preped-query (backend/prepare-query *test-backend* "SELECT * WHERE { ?s ?p ?o }")
-          streamer! (result-streamer (fn [ostream notify] (.evaluate preped-query (SPARQLResultsJSONWriter. ostream)))
-                                     (fn []))]
+          streamer! (result-streamer (fn [ostream] (.evaluate preped-query (SPARQLResultsJSONWriter. ostream))))]
 
       (streamer! baos)
 

@@ -27,30 +27,6 @@
     (or t1 t2)
     (max t1 t2)))
 
-(defn- combine-timestamps
-  "Finds the latest timestamps between the existing and next for an
-  operation. The next timestamp cannot be nil."
-  [existing next]
-  {:pre [(some? next)]}
-  (max-timestamp existing next))
-
-(defn- update-timestamp
-  "Updates the latest timestamp for an operation and returns the new
-  state."
-  [operation-state timestamp]
-  (update-in operation-state [:timestamp] #(combine-timestamps % timestamp)))
-
-(defn update-operation-timestamp
-  "Updates the latest timestamp for an operation in the operations
-  map. If the operation does not exsist in the map then it is not
-  inserted and the timestamp is ignored."
-  [operations-map operation timestamp]
-  (if-let [op-state (get operations-map operation)]
-    (update-in operations-map [operation] #(update-timestamp % timestamp))
-    (do
-      (log/warn "Received timestamp for unknown operation")
-      operations-map)))
-
 (defn- exceeded-total-time?
   "Calculates whether the operation has exceeded the total timeout
   according to the given clock."
@@ -58,22 +34,10 @@
   (let [max-operation-time (offset clock started-at operation-timeout)]
     (> (now-by clock) max-operation-time)))
 
-(defn- exceeded-result-timeout?
-  [clock result-timeout last-timestamp]
-  (let [now (now-by clock)]
-    (> now (offset clock last-timestamp result-timeout))))
-
-(defn- exceeded-result-time?
-  "Calculates whether the operation has exceeded the timeout for
-  writing the next result according to the given clock."
-  [clock {:keys [started-at timestamp operation-timeout result-timeout]}]
-  (exceeded-result-timeout? clock result-timeout (or timestamp started-at)))
-
 (defn timed-out?
   "Whether an operation has timed out according to a clock."
   [clock operation-state]
-  (or (exceeded-total-time? clock operation-state)
-      (exceeded-result-time? clock operation-state)))
+  (exceeded-total-time? clock operation-state))
 
 (defn get-status-p
   "Gets the status of a query operation given its current state and a
@@ -119,7 +83,7 @@
   "Given a categorised map (see categorise) of operations, cancels all
   those that have timed out and returns the map of those still in
   progress."
-  [{:keys [in-progress completed timed-out]}]
+  [{:keys [in-progress timed-out]}]
   (cancel-all timed-out)
   in-progress)
 
@@ -163,28 +127,19 @@
         stop-reaper-fn (repeating-task reaper-fn monitor-period-ms)]
     stop-reaper-fn))
 
-(defn create-operation-publish-fn
-  "Creates a function which when called publishes the last result
-  write time for the operation according to the given clock."
-  [key clock operations]
-  (fn []
-    (swap! operations #(update-operation-timestamp % key (now-by clock)))
-    nil))
-
 (defn create-operation
   "Creates an unconnected operation on an operations map with the
   given clock."
   ([] (create-operation query-operations))
   ([operations-atom] (create-operation operations-atom system-clock))
   ([operations-atom clock]
-     (let [task-p (promise)
-           publish-fn (create-operation-publish-fn task-p clock operations-atom)]
-       {:publish publish-fn :operation-ref task-p :clock clock :operations-atom operations-atom})))
+     (let [task-p (promise)]
+       {:operation-ref task-p :clock clock :operations-atom operations-atom})))
 
 (defn create-timeouts
   "Specifies the timeouts for an operation."
-  [result-timeout operation-timeout]
-  {:result-timeout result-timeout :operation-timeout operation-timeout})
+  [operation-timeout]
+  {:operation-timeout operation-timeout})
 
 (defn- get-initial-state [timeouts clock]
   (assoc timeouts :started-at (now-by clock)))
@@ -222,7 +177,7 @@
   vector containing the thunk for the write operation and the input
   stream which will be written to by the write operation."
   [func]
-  (let [input-stream  (PipedInputStream.)
+  (let [input-stream (PipedInputStream.)
         output-stream (PipedOutputStream. input-stream)
         logging-f (make-response-logger func) ;; wrap f with a logging context that captures reqId, start-time, total-time metrics
         f #(with-open [os output-stream]
@@ -231,9 +186,6 @@
     [f input-stream]))
 
 (def default-timeouts
-  "default timeouts for SPARQL operations - 60s for each result and 4
-  minutes for the entire operation. Since updates do not produce
-  intermediate values the timeout is effectively the operation
-  timeout"
-  (create-timeouts 60000
-                   240000))
+  "default timeouts for SPARQL operations - 4
+  minutes for the entire operation."
+  (create-timeouts 240000))

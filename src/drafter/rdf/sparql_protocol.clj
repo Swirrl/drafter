@@ -10,8 +10,8 @@
             [drafter.rdf.content-negotiation :as conneg])
   (:import [org.apache.jena.query QueryParseException]))
 
-;result-streamer :: (OutputStream -> NotifierFn -> ()) -> NotifierFn -> (OutputStream -> ())
-(defn result-streamer [exec-fn result-notify-fn]
+;result-streamer :: (OutputStream -> NotifierFn -> ()) -> (OutputStream -> ())
+(defn result-streamer [exec-fn]
   "Returns a function that handles the errors and closes the SPARQL
   results stream when it's done.
 
@@ -19,7 +19,7 @@
   logged."
   (fn [ostream]
     (try
-      (exec-fn ostream result-notify-fn)
+      (exec-fn ostream)
 
       (catch Exception ex
         ;; Note that if we error here it's now too late to return a
@@ -40,18 +40,18 @@
     mime-type))
 
 (defn stream-sparql-response [exec-fn query-timeouts]
-  (let [{:keys [publish] :as query-operation} (create-operation)
-        streamer (result-streamer exec-fn publish)
+  (let [query-operation (create-operation)
+        streamer (result-streamer exec-fn)
         [write-fn input-stream] (connect-piped-output-stream streamer)]
 
       (execute-operation query-operation write-fn query-timeouts)
       input-stream))
 
-(defn process-prepared-query [executor pquery accept query-timeouts]
+(defn process-prepared-query [pquery accept query-timeouts]
   (let [query-type (get-query-type pquery)
         query-timeouts (or query-timeouts default-timeouts)]
     (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
-      (let [exec-fn (create-query-executor executor result-format pquery)
+      (let [exec-fn (create-query-executor result-format pquery)
             body (stream-sparql-response exec-fn query-timeouts)
             response-content-type (get-sparql-response-content-type media-type)]
         {:status 200
@@ -67,7 +67,7 @@
   (let [query-str (request/query request)
         pquery (prepare-query executor query-str)]
     (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
-    (process-prepared-query executor pquery (request/accept request) query-timeouts)))
+    (process-prepared-query pquery (request/accept request) query-timeouts)))
 
 (defn wrap-sparql-errors [handler]
   (fn [request]

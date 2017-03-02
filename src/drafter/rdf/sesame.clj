@@ -6,9 +6,8 @@
             [drafter.backend.protocols :refer [->sesame-repo]]
             [clojure.tools.logging :as log])
   (:import [org.openrdf.rio Rio]
-           [org.openrdf.query TupleQuery TupleQueryResultHandler
-                              BooleanQuery GraphQuery Update]
-           [org.openrdf.rio Rio RDFHandler]
+           [org.openrdf.query TupleQuery BooleanQuery GraphQuery Update]
+           [org.openrdf.rio Rio]
            [org.openrdf.repository Repository]
            [org.openrdf.repository.sparql SPARQLRepository]           
            [org.openrdf.query Dataset]
@@ -99,60 +98,30 @@
 (defn execute-update [backend update-query]
   (execute-restricted-update backend update-query nil))
 
-(defn notifying-query-result-handler [notify-fn inner-handler]
-  (reify
-    TupleQueryResultHandler
-    (handleBoolean [this b]
-      (notify-fn)
-      (.handleBoolean inner-handler b))
-    (handleLinks [this links] (.handleLinks inner-handler links))
-    (startQueryResult [this binding-names] (.startQueryResult inner-handler binding-names))
-    (endQueryResult [this] (.endQueryResult inner-handler))
-    (handleSolution [this binding-set]
-      (notify-fn)
-      (.handleSolution inner-handler binding-set))))
-
-(defn notifying-rdf-handler [notify-fn inner-handler]
-  (reify
-    RDFHandler
-    (startRDF [this]
-      (.startRDF inner-handler))
-    (endRDF [this]
-      (.endRDF inner-handler))
-    (handleNamespace [this prefix uri]
-      (.handleNamespace inner-handler prefix uri))
-    (handleStatement [this statement]
-      (notify-fn)
-      (.handleStatement inner-handler statement))
-    (handleComment [this comment]
-      (.handleComment inner-handler comment))))
-
-(defn- exec-ask-query [writer pquery result-notify-fn]
-  (let [notifying-handler (notifying-query-result-handler result-notify-fn writer)
-           result (.evaluate pquery)]
-       (doto notifying-handler
+(defn- exec-ask-query [writer pquery]
+  (let [result (.evaluate pquery)]
+       (doto writer
          (.handleBoolean result))))
 
-(defn- exec-tuple-query [writer pquery result-notify-fn]
+(defn- exec-tuple-query [writer pquery]
   (log/debug "pquery (default) is " pquery " writer is " writer)
-  (.evaluate pquery (notifying-query-result-handler result-notify-fn writer)))
+  (.evaluate pquery writer))
 
-(defn- exec-graph-query [writer pquery result-notify-fn]
+(defn- exec-graph-query [writer pquery]
   (log/debug "pquery is " pquery " writer is " writer)
-  (let [notifying-handler (notifying-rdf-handler result-notify-fn writer)]
-    (.evaluate pquery notifying-handler)))
+  (.evaluate pquery writer))
 
-(defn create-query-executor [backend result-format pquery]
+(defn create-query-executor [result-format pquery]
   (case (get-query-type pquery)
-    :select (fn [os notifier-fn]
+    :select (fn [os]
               (let [w (QueryResultIO/createWriter result-format os)]
-                (exec-tuple-query w pquery notifier-fn)))
+                (exec-tuple-query w pquery)))
 
-    :ask (fn [os notifier-fn]
+    :ask (fn [os]
            (let [w (QueryResultIO/createWriter result-format os)]
-             (exec-ask-query w pquery notifier-fn)))
+             (exec-ask-query w pquery)))
 
-    :construct (fn [os notifier-fn]
+    :construct (fn [os]
                  (let [w (Rio/createWriter result-format os)]
-                   (exec-graph-query w pquery notifier-fn)))
+                   (exec-graph-query w pquery)))
     (throw (IllegalArgumentException. (str "Invalid query type")))))

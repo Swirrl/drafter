@@ -36,7 +36,7 @@
 (defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
         pquery (dsmgmt/all-quads-query rewriting-executor)]
-    (process-prepared-query rewriting-executor pquery accept-content-type nil)))
+    (process-prepared-query pquery accept-content-type nil)))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]

@@ -47,27 +47,14 @@
          first-result second-result second-result
          second-result first-result second-result)))
 
-(deftest update-operation-timestamp-test
-  (let [operation-map {:op {:timestamp 100}}]
-    (testing "should update latest timestamp for known operation"
-      (let [next-timestamp 200
-            updated-map (update-operation-timestamp operation-map :op next-timestamp)]
-        (is (= {:op {:timestamp next-timestamp}} updated-map))))
-
-    (testing "should ignore timestamp for unknown operation"
-      (let [updated-map (update-operation-timestamp operation-map :unknown 300)]
-        (is (= operation-map updated-map))))))
-
 (deftest timed-out-test
-  (let [initial-state (assoc (create-timeouts 100 1000) :started-at 100)
+  (let [initial-state (assoc (create-timeouts 1000) :started-at 100)
         set-last-timestamp (fn [e] (assoc initial-state :timestamp e))]
     (are [timestamp now should-be-timed-out?]
       (= should-be-timed-out? (timed-out? (fixed-clock now) (set-last-timestamp timestamp)))
-         nil 250 true   ;first result exceeded timeout
          nil 150 false  ;first result not yet exceeded timeout
          150 200 false  ;next result not yet exceeded timeout
-         150 300 true   ;next result exceeded timeout
-         1150 1200 true ;next result not timed out but total timeout exceeded
+         1150 1200 true ;total timeout exceeded
          )))
 
 (deftest get-status-p-test
@@ -105,21 +92,10 @@
     (testing "should only keep in-progress operations"
       (is (= {in-progress1 {}} remaining)))))
 
-(deftest create-operation-publish-fn-test
-  (let [now 200
-        key :op
-        operations (atom {:op {}})
-        publish-fn (create-operation-publish-fn :op (fixed-clock now) operations)]
-
-    (publish-fn)
-
-    (let [timestamp (get-in @operations [:op :timestamp])]
-      (is (= now timestamp)))))
-
 (deftest execute-operation-test
   (let [operations (atom {})
         now 100
-        timeouts (create-timeouts 100 1000)
+        timeouts (create-timeouts 1000)
         ran-op (atom false)
         expected-state (assoc timeouts :started-at now)
         {:keys [operations-atom operation-ref] :as operation} (create-operation operations (fixed-clock now))]
@@ -133,7 +109,7 @@
 (deftest register-for-cancellation-on-timeout-test
   (let [operations (atom {})
         now 100
-        timeouts (create-timeouts 200 5000)
+        timeouts (create-timeouts 5000)
         expected-state (assoc timeouts :started-at now)
         fut (FutureTask. (fn [] 1))]
 
@@ -145,11 +121,10 @@
       (is (= expected-state state)))))
 
 (deftest reaper-fn-test
-  (let [[task1 task2 task3] (take 3 (repeatedly cancel-only-future))
+  (let [[task2 task3] (take 2 (repeatedly cancel-only-future))
         task4 (completed-future)
         checked-at 1500
-        operations {(atom task1) {:started-at 100 :result-timeout 1000 :operation-timeout 10000}
-                    (atom task2) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :timestamp 1400}
+        operations {(atom task2) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :timestamp 1400}
                     (atom task3) {:started-at 100 :result-timeout 500  :operation-timeout 10000 :timestamp 1200}
                     (atom task4) {:started-at 100 :result-timeout 200  :operation-timeout 1000  :timestamp 1400}}
         operations-atom (atom operations)
@@ -157,13 +132,11 @@
 
     (reaper-fn)
 
-    ;task1 has exceeded the last result timeout
     ;task2 has exceeded the total operation timeout
     ;task3 has not timed out and is still in progress
     ;task4 has completed normally
     (let [survived @operations-atom]
       (is (= [task3] (vec (map (fn [r] @r) (keys survived)))))
-      (is (.isCancelled task1))
       (is (.isCancelled task2)))))
 
 (deftest connect-piped-input-stream-test
