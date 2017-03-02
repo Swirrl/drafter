@@ -21,7 +21,7 @@ before_script:
 - env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java /opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false
   -o query.all.graphs=true -o reasoning.type=none --
 - sleep 10
-script: env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
+script: travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
 after_success:
 - env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
 before_deploy:
