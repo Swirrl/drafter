@@ -107,10 +107,8 @@
                                                    "}"))
                                  (assoc-in [:headers "accept"] "text/plain; charset=utf-8"))
             request (with-identity test-system request)
-            {:keys [body] :as response} (endpoint request)
-            result (slurp body)]
-
-        (is (= "true" result))))
+            {:keys [body] :as response} (endpoint request)]
+        (is (= "true" body))))
 
     (testing "The state graph should not be accessible to other users"
       (let [request (-> (raw-query "ASK WHERE { GRAPH ?g { ?s ?p ?o } }")
@@ -127,10 +125,8 @@
                                         "}"))
                         (assoc-in [:headers "accept"] "text/plain; charset=utf-8"))
             request (with-identity test-system request)
-            {:keys [body] :as response} (endpoint request)
-            result (slurp body)]
-
-        (is (= "true" result))))))
+            {:keys [body] :as response} (endpoint request)]
+        (is (= "true" body))))))
 
 (defn make-new-draft-from-graph! [backend live-guri]
   (let [draft-guri (create-draft-graph! backend live-guri)

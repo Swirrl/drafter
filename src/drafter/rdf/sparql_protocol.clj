@@ -4,30 +4,15 @@
             [drafter.requests :as request]
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [prepare-query]]
-            [drafter.rdf.sesame :refer [get-query-type create-query-executor]]
+            [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
             [drafter.middleware :refer [allowed-methods-handler]]
             [compojure.core :refer [make-route]]
             [drafter.rdf.content-negotiation :as conneg])
-  (:import [org.apache.jena.query QueryParseException]))
-
-;result-streamer :: (OutputStream -> NotifierFn -> ()) -> (OutputStream -> ())
-(defn result-streamer [exec-fn]
-  "Returns a function that handles the errors and closes the SPARQL
-  results stream when it's done.
-
-  If an error is thrown the stream will be closed and an exception
-  logged."
-  (fn [ostream]
-    (try
-      (exec-fn ostream)
-
-      (catch Exception ex
-        ;; Note that if we error here it's now too late to return a
-        ;; HTTP RESPONSE code error
-        (log/error ex "Error streaming results"))
-
-      (finally
-        (.close ostream)))))
+  (:import [org.apache.jena.query QueryParseException]
+           (java.io ByteArrayOutputStream PipedInputStream PipedOutputStream)
+           (org.openrdf.query QueryInterruptedException)
+           (org.openrdf.query.resultio QueryResultIO)
+           (java.util.concurrent ArrayBlockingQueue TimeUnit)))
 
 (defn get-sparql-response-content-type [mime-type]
   (case mime-type
@@ -39,26 +24,66 @@
     "text/plain" "text/plain; charset=utf-8"
     mime-type))
 
-(defn stream-sparql-response [exec-fn query-timeouts]
-  (let [query-operation (create-operation)
-        streamer (result-streamer exec-fn)
-        [write-fn input-stream] (connect-piped-output-stream streamer)]
+(defn- execute-boolean-query [pquery result-format response-content-type]
+  (let [os (ByteArrayOutputStream. 1024)
+        writer (QueryResultIO/createWriter result-format os)]
+    (with-open [_ os]
+      (let [result (.evaluate pquery)]
+        (.handleBoolean writer result)))
+    {:status 200
+     :headers {"Content-Type" response-content-type}
+     :body (String. (.toByteArray os))}))
 
-      (execute-operation query-operation write-fn query-timeouts)
-      input-stream))
+(defn- execute-streaming-query [pquery result-format response-content-type]
+  (let [is (PipedInputStream.)
+        os (PipedOutputStream. is)
+        signal-queue (ArrayBlockingQueue. 1)
+        result-handler (create-signalling-query-handler pquery os result-format signal-queue)
+        timeout (inc (.getMaxExecutionTime pquery))
+        ;;start query execution in its own thread
+        ;;once results have been recieved
+        query-f (future
+                  (try
+                    (.evaluate pquery result-handler)
+                    (catch Exception ex
+                      (when (zero? (.size signal-queue))
+                        (.add signal-queue ex)))
+                    (finally
+                      (.close os))))]
+    ;;wait for signal from query execution thread that the response has been received and begun streaming
+    ;;results
+    ;;NOTE: This could block for as long as the query execution timeout period
+    (if-let [signal (.poll signal-queue timeout TimeUnit/SECONDS)]
+      (cond
+        ;;began streaming results
+        (= (:ok signal))
+        {:status 200 :headers {"Content-Type" response-content-type} :body is}
+
+        ;;query execution timed out
+        (instance? Exception signal)
+        (throw signal)
+
+        :else
+        {:status 500 :headers {"Content-Type" "text/plain"} :body "An unknown error occured"})
+      (do
+        ;;.poll timed out without recieving a signal from the query thread
+        ;;cancel the operation and return a timeout response
+        (future-cancel query-f)
+        (throw (QueryInterruptedException.))))))
+
+(defn- get-query-timeout-seconds [{:keys [operation-timeout]}]
+  ;;NOTE: operation-timeout is specified in milliseconds
+  (max 1 (int (Math/ceil (/ operation-timeout 1000)))))
 
 (defn process-prepared-query [pquery accept query-timeouts]
   (let [query-type (get-query-type pquery)
         query-timeouts (or query-timeouts default-timeouts)]
     (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
-      (let [exec-fn (create-query-executor result-format pquery)
-            body (stream-sparql-response exec-fn query-timeouts)
-            response-content-type (get-sparql-response-content-type media-type)]
-        {:status 200
-         :headers {"Content-Type" response-content-type}
-         ;; Designed to work with piped-input-stream this fn will be run
-         ;; in another thread to stream the results to the client.
-         :body body})
+      (let [response-content-type (get-sparql-response-content-type media-type)]
+        (.setMaxExecutionTime pquery (get-query-timeout-seconds query-timeouts))
+        (if (= :ask query-type)
+          (execute-boolean-query pquery result-format response-content-type)
+          (execute-streaming-query pquery result-format response-content-type)))
 
       (not-acceptable-response))))
 
@@ -73,6 +98,10 @@
   (fn [request]
     (try
       (handler request)
+      (catch QueryInterruptedException ex
+        {:status 503
+         :headers {"Content-Type" "text/plain; charset=utf-8"}
+         :body "Query execution timed out"})
       (catch QueryParseException ex
         (let [error-message (.getMessage ex)]
           (log/info "Malformed query: " error-message)

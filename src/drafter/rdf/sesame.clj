@@ -7,10 +7,10 @@
             [clojure.tools.logging :as log])
   (:import [org.openrdf.rio Rio]
            [org.openrdf.query TupleQuery BooleanQuery GraphQuery Update]
-           [org.openrdf.rio Rio]
+           [org.openrdf.rio Rio RDFHandler]
            [org.openrdf.repository Repository]
-           [org.openrdf.repository.sparql SPARQLRepository]           
-           [org.openrdf.query Dataset]
+           [org.openrdf.repository.sparql SPARQLRepository]
+           [org.openrdf.query Dataset TupleQueryResultHandler]
            [org.openrdf.query.resultio QueryResultIO]))
 
 (defn is-quads-format? [rdf-format]
@@ -110,6 +110,51 @@
 (defn- exec-graph-query [writer pquery]
   (log/debug "pquery is " pquery " writer is " writer)
   (.evaluate pquery writer))
+
+(defn create-tuple-query-writer [os result-format]
+  (QueryResultIO/createWriter result-format os))
+
+(defn create-construct-query-writer [os result-format]
+  (Rio/createWriter result-format os))
+
+(defn create-rdf-writer [pquery output-stream result-format]
+  (case (get-query-type pquery)
+    :select (create-tuple-query-writer output-stream result-format)
+    :construct (create-construct-query-writer output-stream result-format)
+    (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query.")))
+
+(defn signalling-tuple-query-handler [signalling-queue writer]
+  (reify TupleQueryResultHandler
+    (startQueryResult [this binding-names]
+      (.add signalling-queue :ok)
+      (.startQueryResult writer binding-names))
+    (endQueryResult [this]
+      (.endQueryResult writer))
+    (handleSolution [this binding-set]
+      (.handleSolution writer binding-set))
+    (handleBoolean [this b]
+      (.handleBoolean writer b))
+    (handleLinks [this link-urls]
+      (.handleLinks writer link-urls))))
+
+(defn signalling-rdf-handler [signalling-queue handler]
+  (reify RDFHandler
+    (startRDF [this]
+      (.add signalling-queue :ok)
+      (.startRDF handler))
+    (endRDF [this]
+      (.endRDF handler))
+    (handleNamespace [this prefix uri]
+      (.handleNamespace handler prefix uri))
+    (handleStatement [this s]
+      (.handleStatement handler s))
+    (handleComment [this comment] (.handleComment comment))))
+
+(defn create-signalling-query-handler [pquery output-stream result-format signalling-queue]
+  (case (get-query-type pquery)
+    :select (signalling-tuple-query-handler signalling-queue (create-tuple-query-writer output-stream result-format))
+    :construct (signalling-rdf-handler signalling-queue (create-construct-query-writer output-stream result-format))
+    (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query.")))
 
 (defn create-query-executor [result-format pquery]
   (case (get-query-type pquery)

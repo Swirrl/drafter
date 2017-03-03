@@ -723,7 +723,11 @@
 (defn- spog-tuple-query->graph-query [tuple-query]
   (reify GraphQuery
     (evaluate [this rdf-handler]
-      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))))
+      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))
+    (getMaxExecutionTime [this]
+      (.getMaxExecutionTime tuple-query))
+    (setMaxExecutionTime [this max]
+      (.setMaxExecutionTime tuple-query max))))
 
 (defn all-quads-query
   "Returns a Sesame GraphQuery for all quads in the draftset

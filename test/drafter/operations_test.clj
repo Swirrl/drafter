@@ -92,20 +92,6 @@
     (testing "should only keep in-progress operations"
       (is (= {in-progress1 {}} remaining)))))
 
-(deftest execute-operation-test
-  (let [operations (atom {})
-        now 100
-        timeouts (create-timeouts 1000)
-        ran-op (atom false)
-        expected-state (assoc timeouts :started-at now)
-        {:keys [operations-atom operation-ref] :as operation} (create-operation operations (fixed-clock now))]
-
-    (execute-operation operation #(reset! ran-op true) timeouts (current-thread-executor))
-
-    (is (= true @ran-op))
-    (is (= expected-state (get @operations-atom operation-ref)))
-    (is (realized? operation-ref))))
-
 (deftest register-for-cancellation-on-timeout-test
   (let [operations (atom {})
         now 100
@@ -139,16 +125,3 @@
       (is (= [task3] (vec (map (fn [r] @r) (keys survived)))))
       (is (.isCancelled task2)))))
 
-(deftest connect-piped-input-stream-test
-  (let [msg "Hello world!"
-        charset (Charset/forName "UTF-8")
-        msg-bytes (.getBytes msg charset)
-        dest-buf (byte-array (count msg-bytes))
-        write-fn (fn [os] (.write os msg-bytes))
-        [op-fn input-stream] (connect-piped-output-stream write-fn)
-        f (future-call op-fn)]
-    (.read input-stream dest-buf)
-    (.get f 500 TimeUnit/MILLISECONDS)
-    (.close input-stream)
-
-    (is (= (seq msg-bytes) (seq dest-buf)))))

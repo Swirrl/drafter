@@ -4,32 +4,15 @@
    [grafter.rdf.formats :refer [rdf-ntriples]]
    [grafter.rdf :as rdf]
    [grafter.rdf.protocols :as pr]
-   [grafter.rdf.repository :as repo]
-   [drafter.backend.protocols :as backend]
    [drafter.rdf.sparql-protocol :refer :all]
-   [clojure.java.io :as io]
-   [clojure.data.json :as json]
    [clojure-csv.core :as csv]
    [clojure.test :refer :all]
-   [schema.test :refer [validate-schemas]])
-  (:import [java.io ByteArrayOutputStream]
-           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]))
+   [schema.test :refer [validate-schemas]]))
 
 (use-fixtures :each validate-schemas)
 
 (defn add-triple-to-db [db]
   (pr/add db "http://foo.com/my-graph" (test-triples "http://test.com/data/one")))
-
-(deftest results-streamer-test
-  (testing "Streams sparql results into output stream"
-    (let [baos (ByteArrayOutputStream.)
-          preped-query (backend/prepare-query *test-backend* "SELECT * WHERE { ?s ?p ?o }")
-          streamer! (result-streamer (fn [ostream] (.evaluate preped-query (SPARQLResultsJSONWriter. ostream))))]
-
-      (streamer! baos)
-
-      (let [output (-> baos .toByteArray String. json/read-str)]
-        (is (map? output))))))
 
 (deftest sparql-end-point-test
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
@@ -47,9 +30,6 @@
           (is (= ["s" "p" "o"] (first csv-result)))
           (is (= ["http://test.com/data/one" "http://test.com/hasProperty" "http://test.com/data/1"]
                  (second csv-result))))))))
-
-(defn get-spo [{:keys [s p o]}]
-  [s p o])
 
 (defn get-spo-set [triples]
   (set (map (fn [{:keys [s p o]}] [s p o]) triples)))

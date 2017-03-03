@@ -1,10 +1,7 @@
 (ns drafter.operations
   (:require [clojure.tools.logging :as log]
-            [swirrl-server.middleware.log-request :refer [make-response-logger]]
-            [clj-logging-config.log4j :as l4j])
-  (:import [java.util.concurrent FutureTask TimeUnit Executors]
-           [java.io PipedInputStream PipedOutputStream]
-           [org.apache.log4j MDC]))
+            [swirrl-server.middleware.log-request :refer [make-response-logger]])
+  (:import [java.util.concurrent TimeUnit Executors]))
 
 (def system-clock {:now-fn #(System/currentTimeMillis)})
 
@@ -156,34 +153,6 @@
            init-state (get-initial-state timeouts clock)]
        (swap! operations-atom #(assoc % op-ref init-state))
        nil)))
-
-(defn execute-operation
-  "Submits an operation for execution on an ExecutorService."
-  ([operation op-fn timeouts] (execute-operation operation op-fn timeouts clojure.lang.Agent/soloExecutor))
-  ([{:keys [operation-ref clock operations-atom] :as operation} op-fn timeouts executor]
-     {:pre [(not (realized? operation-ref))]}
-     (let [init-state (get-initial-state timeouts clock)
-           fut (FutureTask. op-fn)
-           reg-fn (fn [op-map]
-                    (deliver operation-ref fut)
-                    (.execute executor fut)
-                    (assoc op-map operation-ref init-state))]
-       (swap! operations-atom reg-fn)
-       nil)))
-
-(defn connect-piped-output-stream
-  "Creates a no-argument thunk from a function which takes a single
-  OutputStream argument which it writes to when executed. Returns a
-  vector containing the thunk for the write operation and the input
-  stream which will be written to by the write operation."
-  [func]
-  (let [input-stream (PipedInputStream.)
-        output-stream (PipedOutputStream. input-stream)
-        logging-f (make-response-logger func) ;; wrap f with a logging context that captures reqId, start-time, total-time metrics
-        f #(with-open [os output-stream]
-             (logging-f os))] ;; run the function
-
-    [f input-stream]))
 
 (def default-timeouts
   "default timeouts for SPARQL operations - 4

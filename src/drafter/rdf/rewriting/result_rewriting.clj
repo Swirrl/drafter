@@ -92,13 +92,21 @@
   (let [draft->live (set/map-invert live->draft)]
     (reify GraphQuery
       (evaluate [this handler]
-        (.evaluate inner-query (rewriting-rdf-handler handler draft->live))))))
+        (.evaluate inner-query (rewriting-rdf-handler handler draft->live)))
+      (getMaxExecutionTime [this]
+        (.getMaxExecutionTime inner-query))
+      (setMaxExecutionTime [this max]
+        (.setMaxExecutionTime inner-query max)))))
 
 (defn- rewrite-tuple-query-results [inner-query live->draft]
   (let [draft->live (set/map-invert live->draft)]
     (reify TupleQuery
       (evaluate [this handler]
-        (.evaluate inner-query (make-select-result-rewriter draft->live handler))))))
+        (.evaluate inner-query (make-select-result-rewriter draft->live handler)))
+      (getMaxExecutionTime [this]
+        (.getMaxExecutionTime inner-query))
+      (setMaxExecutionTime [this max]
+        (.setMaxExecutionTime inner-query max)))))
 
 (defn rewrite-query-results [inner-query live->draft]
   (cond
