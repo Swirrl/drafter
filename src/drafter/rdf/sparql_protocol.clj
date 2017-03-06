@@ -6,13 +6,14 @@
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
             [drafter.middleware :refer [allowed-methods-handler]]
+            [drafter.channels :refer :all]
             [compojure.core :refer [make-route]]
             [drafter.rdf.content-negotiation :as conneg])
   (:import [org.apache.jena.query QueryParseException]
            (java.io ByteArrayOutputStream PipedInputStream PipedOutputStream)
            (org.openrdf.query QueryInterruptedException)
            (org.openrdf.query.resultio QueryResultIO)
-           (java.util.concurrent ArrayBlockingQueue TimeUnit)))
+           (java.util.concurrent TimeUnit)))
 
 (defn get-sparql-response-content-type [mime-type]
   (case mime-type
@@ -37,8 +38,8 @@
 (defn- execute-streaming-query [pquery result-format response-content-type]
   (let [is (PipedInputStream.)
         os (PipedOutputStream. is)
-        signal-queue (ArrayBlockingQueue. 1)
-        result-handler (create-signalling-query-handler pquery os result-format signal-queue)
+        [send recv] (create-send-once-channel)
+        result-handler (create-signalling-query-handler pquery os result-format send)
         timeout (inc (.getMaxExecutionTime pquery))
         ;;start query execution in its own thread
         ;;once results have been recieved
@@ -46,30 +47,29 @@
                   (try
                     (.evaluate pquery result-handler)
                     (catch Exception ex
-                      (when (zero? (.size signal-queue))
-                        (.add signal-queue ex)))
+                      (send ex))
                     (finally
                       (.close os))))]
     ;;wait for signal from query execution thread that the response has been received and begun streaming
     ;;results
     ;;NOTE: This could block for as long as the query execution timeout period
-    (if-let [signal (.poll signal-queue timeout TimeUnit/SECONDS)]
+    (let [result (recv timeout TimeUnit/SECONDS)]
       (cond
         ;;began streaming results
-        (= (:ok signal))
+        (channel-ok? result)
         {:status 200 :headers {"Content-Type" response-content-type} :body is}
 
-        ;;query execution timed out
-        (instance? Exception signal)
-        (throw signal)
+        ;;error while executing query
+        (channel-error? result)
+        (throw result)
 
         :else
-        {:status 500 :headers {"Content-Type" "text/plain"} :body "An unknown error occured"})
-      (do
-        ;;.poll timed out without recieving a signal from the query thread
-        ;;cancel the operation and return a timeout response
-        (future-cancel query-f)
-        (throw (QueryInterruptedException.))))))
+        (do
+          (assert (channel-timeout? result))
+          ;;.poll timed out without recieving a signal from the query thread
+          ;;cancel the operation and return a timeout response
+          (future-cancel query-f)
+          (throw (QueryInterruptedException.)))))))
 
 (defn process-prepared-query [pquery accept query-timeouts]
   (let [query-type (get-query-type pquery)
