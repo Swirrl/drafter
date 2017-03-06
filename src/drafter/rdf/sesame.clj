@@ -114,12 +114,6 @@
 (defn create-construct-query-writer [os result-format]
   (Rio/createWriter result-format os))
 
-(defn create-rdf-writer [pquery output-stream result-format]
-  (case (get-query-type pquery)
-    :select (create-tuple-query-writer output-stream result-format)
-    :construct (create-construct-query-writer output-stream result-format)
-    (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query.")))
-
 (defn signalling-tuple-query-handler [signalling-queue writer]
   (reify TupleQueryResultHandler
     (startQueryResult [this binding-names]
