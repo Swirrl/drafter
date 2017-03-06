@@ -68,7 +68,7 @@
               (nil? %))]}
   (when-let [graph-restrictions (get-restrictions graph-restrictions)]
     (repo/make-restricted-dataset :default-graph graph-restrictions
-                                    :named-graphs graph-restrictions)))
+                                  :named-graphs graph-restrictions)))
 
 (defn apply-restriction [pquery restriction]
   (let [dataset (restricted-dataset restriction)]
@@ -89,14 +89,11 @@
       (let [pquery (prepare-fn conn)]
         (repo/evaluate pquery)))))
 
-(defn execute-restricted-update [backend update-query restrictions]
-  (exec-sesame-prepared-update
-   (->sesame-repo backend)
-   (fn [conn]
-     (repo/prepare-update conn update-query (restricted-dataset restrictions)))))
+(defn prepare-restricted-update [repo update-query restrictions]
+  (repo/prepare-update repo update-query (restricted-dataset restrictions)))
 
-(defn execute-update [backend update-query]
-  (execute-restricted-update backend update-query nil))
+(defn prepare-update [repo update-query]
+  (prepare-restricted-update repo update-query nil))
 
 (defn- exec-ask-query [writer pquery]
   (let [result (.evaluate pquery)]

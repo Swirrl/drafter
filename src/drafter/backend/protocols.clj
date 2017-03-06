@@ -5,7 +5,7 @@
   (prepare-query [this sparql-string]))
 
 (defprotocol SparqlUpdateExecutor
-  (execute-update [this update-query]))
+  (prepare-update [this update-query]))
 
 (defprotocol ToRepository
   (->sesame-repo [this]

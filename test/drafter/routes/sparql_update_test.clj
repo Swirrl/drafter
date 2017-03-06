@@ -2,18 +2,13 @@
   (:require [drafter.routes.sparql-update :refer :all]
             [drafter.test-common :refer [throws-exception?]]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!]]
-            [swirrl-server.async.jobs :as jobs]
             [clojure.test :refer :all]
             [clojure.template :refer [do-template]]
-            [ring.util.codec :as codec]
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db stream->string
                                          select-all-in-graph during-exclusive-write]]
             [grafter.rdf.repository :refer [query]]
             [swirrl-server.errors :refer [encode-error]])
-  (:import [java.util UUID]
-           [java.util.concurrent CountDownLatch TimeUnit]
-           [java.nio.charset StandardCharsets]
-           [java.io ByteArrayInputStream]))
+  (:import [java.nio.charset StandardCharsets]))
 
 (defn ->input-stream
   "Convert a string into an Input Stream"
@@ -99,7 +94,7 @@
       (let [request (application-sparql-update-request "INSERT { GRAPH <http://example.com/> {
                                                           <http://test/> <http://test/> <http://test/> .
                                                         }} WHERE { }")
-            {:keys [status body headers]} (endpoint request)]
+            {:keys [status body headers] :as resp} (endpoint request)]
         (is (= 200 status)
             "returns 200 success")
 

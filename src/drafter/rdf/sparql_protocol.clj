@@ -71,10 +71,6 @@
         (future-cancel query-f)
         (throw (QueryInterruptedException.))))))
 
-(defn- get-query-timeout-seconds [{:keys [operation-timeout]}]
-  ;;NOTE: operation-timeout is specified in milliseconds
-  (max 1 (int (Math/ceil (/ operation-timeout 1000)))))
-
 (defn process-prepared-query [pquery accept query-timeouts]
   (let [query-type (get-query-type pquery)
         query-timeouts (or query-timeouts default-timeouts)]

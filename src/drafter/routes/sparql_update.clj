@@ -6,13 +6,11 @@
             [swirrl-server.responses :as response]
             [swirrl-server.errors :refer [ex-swirrl]]
             [drafter.responses :refer [submit-sync-job!]]
-            [drafter.rdf.draft-management :as mgmt]
-            [drafter.backend.protocols :refer [execute-update]]
+            [drafter.backend.protocols :refer [prepare-update]]
             [drafter.rdf.endpoints :refer [live-endpoint]]
             [drafter.operations :as ops]
             [drafter.middleware :refer [require-user-role]]
-            [pantomime.media :as mt])
-  (:import [java.util.concurrent FutureTask CancellationException]))
+            [pantomime.media :as mt]))
 
 (defmulti parse-update-request
   "Convert a request into an String representing the SPARQL update
@@ -41,31 +39,13 @@
 (defn create-update-job [executor request timeouts]
   (jobs/make-job :sync-write [job]
                  (let [timeouts (or timeouts ops/default-timeouts)
+                       query-timeout-seconds (ops/get-query-timeout-seconds timeouts)
                        parsed-query (parse-update-request request)
                        query-string (:update parsed-query)
-                       update-future (FutureTask. #(execute-update executor query-string))]
-                   (try
-                     (log/debug "Executing update-query " parsed-query)
-                     ;; The 'reaper' framework monitors instances of the
-                     ;; Future interface and cancels them if they timeout
-                     ;; create a Future for the update, register it for
-                     ;; cancellation on timeout and then run it on this
-                     ;; thread.
-                     (ops/register-for-cancellation-on-timeout update-future timeouts)
-                     (.run update-future)
-                     (.get update-future)
-                     (job-succeeded! job)
-                     (catch CancellationException cex
-                       ;; update future was run on the current
-                       ;; thread so it was interrupted when the
-                       ;; future was cancelled clear the interrupted
-                       ;; flag on this thread
-                       (Thread/interrupted)
-                       (log/fatal cex "Update operation cancelled due to timeout")
-                       (throw cex))
-                     (catch Exception ex
-                       (log/fatal ex "An exception was thrown when executing a SPARQL update!")
-                       (throw ex))))))
+                       pquery (prepare-update executor query-string)]
+                   (.setMaxExecutionTime pquery query-timeout-seconds)
+                   (.execute pquery)
+                   (job-succeeded! job))))
 
 (def ^:private sparql-update-applied-response {:status 200 :body "OK"})
 
@@ -77,7 +57,8 @@
                               ;; NOTE: We could repackage the resulting error
                               ;; into a ex-info exception and throw it to
                               ;; restore the status code and other details from
-                              ;; the response that have been lost, if we want more precise
+                              ;; the response that have been lost, if we want
+                              ;; to be more precise
                               (response/error-response 500 result)
                               sparql-update-applied-response)))))
 

@@ -154,6 +154,10 @@
        (swap! operations-atom #(assoc % op-ref init-state))
        nil)))
 
+(defn get-query-timeout-seconds [{:keys [operation-timeout]}]
+  ;;NOTE: operation-timeout is specified in milliseconds
+  (max 1 (int (Math/ceil (/ operation-timeout 1000)))))
+
 (def default-timeouts
   "default timeouts for SPARQL operations - 4
   minutes for the entire operation."
