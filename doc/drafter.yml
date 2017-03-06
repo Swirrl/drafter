@@ -3,7 +3,7 @@ swagger: '2.0'
 info:
   title: 'Publish My Data: Drafter API'
   description: |
-    This document serves as a **DRAFT** specification for Drafter's
+    This document serves as a specification for Drafter's
     API.  Drafter is a backend service used by Publish My Data to
     support PMD's publication workflow.  It describes how clients
     including the PMD application, control data publishing through the
@@ -15,14 +15,14 @@ info:
 
     For display and edit purposes, PublishMyData makes additional
     assumptions about the contents of graphs used for datasets and
-    vocabularies for display and edit purposes.
+    vocabularies.
 
     Future additions to these APIs will provide mechanisms for
     creating and validating this data conforms to PMD's conventions.
 
     ## Draftset API Overview
 
-    Draftsets are essentially, private working copies, or branches of
+    Draftsets are essentially private working copies, or branches of
     work, that contain changes to RDF data.  When a user creates a
     draftset they effectively create a 'virtual copy' of the live
     sites data in which they can safely make, review and query changes
@@ -124,21 +124,18 @@ info:
     |    3 | manager         | Can do everything a publisher can, but also manage user accounts (not via this API)  |
 
 
-    **Note:** roles their ranks and permissions may be adjusted in the
-    future.
-
     Roles are also what users use to exchange Draftsets.  Users submit
     a Draftset to a role, which puts it in that roles pool of
     claimable Draftsets.  Draftsets are then only claimable out of the
-    roles pool by users with a role of an equal or higher rank.  In
+    role's pool by users with a role of an equal or higher rank.  In
     addition to this the user who submitted the draftset to the role
     can also withdraw it from submission by claiming it back -
-    regarldess of their roles rank.
+    regarldess of their role's rank.
 
     Draftsets *must* be claimed before they can be reviewed, published
     or edited.
 
-  version: 0.0.5 Draft
+  version: 1.0.0
 securityDefinitions:
   basic-auth:
     type: basic
