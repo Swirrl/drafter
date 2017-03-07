@@ -5,15 +5,14 @@
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
-            [drafter.middleware :refer [allowed-methods-handler]]
+            [drafter.middleware :refer [allowed-methods-handler wrap-sparql-errors]]
             [drafter.channels :refer :all]
             [compojure.core :refer [make-route]]
             [drafter.rdf.content-negotiation :as conneg])
-  (:import [org.apache.jena.query QueryParseException]
-           (java.io ByteArrayOutputStream PipedInputStream PipedOutputStream)
-           (org.openrdf.query QueryInterruptedException)
-           (org.openrdf.query.resultio QueryResultIO)
-           (java.util.concurrent TimeUnit)))
+  (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
+           [org.openrdf.query QueryInterruptedException]
+           [org.openrdf.query.resultio QueryResultIO]
+           [java.util.concurrent TimeUnit]))
 
 (defn get-sparql-response-content-type [mime-type]
   (case mime-type
@@ -89,19 +88,6 @@
         pquery (prepare-query executor query-str)]
     (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
     (process-prepared-query pquery (request/accept request) query-timeouts)))
-
-(defn wrap-sparql-errors [handler]
-  (fn [request]
-    (try
-      (handler request)
-      (catch QueryInterruptedException ex
-        {:status 503
-         :headers {"Content-Type" "text/plain; charset=utf-8"}
-         :body "Query execution timed out"})
-      (catch QueryParseException ex
-        (let [error-message (.getMessage ex)]
-          (log/info "Malformed query: " error-message)
-          {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
 
 (defn- sparql-query-request-handler [executor timeouts]
   (fn [request]

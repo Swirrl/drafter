@@ -249,5 +249,8 @@
 (defn assert-is-bad-request-response [response]
   (assert-schema (response-code-schema 400) response))
 
+(defn assert-is-service-unavailable-response [response]
+  (assert-schema (response-code-schema 503) response))
+
 (defn string->input-stream [s]
   (ByteArrayInputStream. (.getBytes s)))

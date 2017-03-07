@@ -11,7 +11,9 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-publisher test-editor]])
   (:import [clojure.lang ExceptionInfo]
-           [java.io File]))
+           [java.io File]
+           (org.openrdf.query QueryInterruptedException)
+           (org.apache.jena.query QueryParseException)))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -216,4 +218,23 @@
           body-text "The quick brown fox jumped"
           body-stream (tc/string->input-stream body-text)
           result (handler {:uri "/test" :request-method :post :body body-stream})]
-      (is (= body-text result )))))
+      (is (= body-text result)))))
+
+(deftest wrap-sparql-errors-test
+  (testing "Successful request"
+    (let [response {:status 200 :headers {} :body "OK!"}
+          inner-handler (fn [req] response)
+          handler (wrap-sparql-errors inner-handler)]
+      (is (= response (handler {:uri "/test"})))))
+
+  (testing "Query interrupted"
+    (let [inner-handler (fn [req] (throw (QueryInterruptedException.)))
+          handler (wrap-sparql-errors inner-handler)
+          response (handler {:uri "/test"})]
+      (tc/assert-is-service-unavailable-response response)))
+
+  (testing "Query parse failure"
+    (let [inner-handler (fn [req] (throw (QueryParseException. 1 2)))
+          handler (wrap-sparql-errors inner-handler)
+          response (handler {:uri "/test"})]
+      (tc/assert-is-bad-request-response response))))

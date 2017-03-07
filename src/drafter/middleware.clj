@@ -5,7 +5,6 @@
             [clojure.set :as set]
             [clojure.java.io :as io]
             [environ.core :refer [env]]
-            [selmer.parser :as parser]
             [drafter.util :as util]
             [drafter.responses :as response]
             [drafter.user :as user]
@@ -19,9 +18,9 @@
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [ring.util.request :as request]
             [pantomime.media :refer [media-type-named]])
-  (:import [clojure.lang ExceptionInfo]
-           [java.io File]
-           [java.util UUID]))
+  (:import [java.io File]
+           (org.openrdf.query QueryInterruptedException)
+           (org.apache.jena.query QueryParseException)))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (if-let [user (user-repo/find-user-by-username user-repo username)]
@@ -172,3 +171,16 @@
     (let [temp-file (File/createTempFile "drafter-body" nil)]
       (io/copy body temp-file)
       (inner-handler (assoc request :body temp-file)))))
+
+(defn wrap-sparql-errors [handler]
+  (fn [request]
+    (try
+      (handler request)
+      (catch QueryInterruptedException ex
+        {:status 503
+         :headers {"Content-Type" "text/plain; charset=utf-8"}
+         :body "Query execution timed out"})
+      (catch QueryParseException ex
+        (let [error-message (.getMessage ex)]
+          (log/info "Malformed query: " error-message)
+          {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
