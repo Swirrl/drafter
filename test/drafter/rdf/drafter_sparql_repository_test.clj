@@ -16,7 +16,8 @@
            (java.util ArrayList)
            (org.apache.http.entity StringEntity ContentType ContentLengthStrategy)
            (java.nio.charset Charset)
-           (org.apache.http.impl.entity StrictContentLengthStrategy)))
+           (org.apache.http.impl.entity StrictContentLengthStrategy)
+           (java.lang AutoCloseable)))
 
 (defn query-timeout-handler
   "Handler which always returns a query timeout response in the format used by Stardog"
@@ -184,11 +185,12 @@
         server-fn ^Runnable (fn [] (latched-http-server listener connection-latch release-latch))
         server-thread (Thread. server-fn "Test server thread")]
     (.start server-thread)
-    (fn []
-      (.close listener)
-      (try
-        (.join server-thread 500)
-        (catch InterruptedException ex nil)))))
+    (reify AutoCloseable
+      (close [this]
+        (.close listener)
+        (try
+          (.join server-thread 500)
+          (catch InterruptedException ex nil))))))
 
 (defn- make-blocking-connection [repo idx]
   (future
@@ -201,28 +203,25 @@
       (let [max-connections (int 2)
             connection-latch (CountDownLatch. max-connections)
             release-latch (CountDownLatch. 1)
-            stop-server-fn (latched-http-handler connection-latch release-latch)
-            repo (doto (get-test-repo) (.setMaxConcurrentHttpConnections max-connections))
-            blocked-connections (doall (map #(make-blocking-connection repo %) (range 1 (inc max-connections))))]
-        (try
-          ;;wait for max number of connections to be accepted by the server
-          (if (.await connection-latch 5000 TimeUnit/MILLISECONDS)
-            (do
-              ;;server has accepted max number of connections so next query attempt should see a connection timeout
-              (let [rf (future
-                         (repo/query repo "SELECT * WHERE { ?s ?p ?o }"))]
-                ;;should be rejected almost immediately
-                (try
-                  (.get rf 5000 TimeUnit/MILLISECONDS)
-                  (catch ExecutionException ex
-                    (is (instance? QueryInterruptedException (.getCause ex))))
-                  (catch Throwable ex
-                    (is false "Expected query to be rejected due to timeout"))))
+            repo (doto (get-test-repo) (.setMaxConcurrentHttpConnections max-connections))]
+        (with-open [server (latched-http-handler connection-latch release-latch)]
+          (let [blocked-connections (doall (map #(make-blocking-connection repo %) (range 1 (inc max-connections))))]
+            ;;wait for max number of connections to be accepted by the server
+            (if (.await connection-latch 5000 TimeUnit/MILLISECONDS)
+              (do
+                ;;server has accepted max number of connections so next query attempt should see a connection timeout
+                (let [rf (future
+                           (repo/query repo "SELECT * WHERE { ?s ?p ?o }"))]
+                  ;;should be rejected almost immediately
+                  (try
+                    (.get rf 5000 TimeUnit/MILLISECONDS)
+                    (catch ExecutionException ex
+                      (is (instance? QueryInterruptedException (.getCause ex))))
+                    (catch Throwable ex
+                      (is false "Expected query to be rejected due to timeout"))))
 
-              ;;release previous connections and wait for them to complete
-              (.countDown release-latch)
-              (doseq [f blocked-connections]
-                (.get f 1000 TimeUnit/MILLISECONDS)))
-            (throw (RuntimeException. "Server failed to accept connections within timeout")))
-          (finally
-            (stop-server-fn)))))))
+                ;;release previous connections and wait for them to complete
+                (.countDown release-latch)
+                (doseq [f blocked-connections]
+                  (.get f 1000 TimeUnit/MILLISECONDS)))
+              (throw (RuntimeException. "Server failed to accept connections within timeout")))))))))
