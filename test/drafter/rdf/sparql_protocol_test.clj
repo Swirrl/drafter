@@ -1,13 +1,16 @@
 (ns drafter.rdf.sparql-protocol-test
   (:require
-   [drafter.test-common :refer :all]
-   [grafter.rdf.formats :refer [rdf-ntriples]]
-   [grafter.rdf :as rdf]
-   [grafter.rdf.protocols :as pr]
-   [drafter.rdf.sparql-protocol :refer :all]
-   [clojure-csv.core :as csv]
-   [clojure.test :refer :all]
-   [schema.test :refer [validate-schemas]]))
+    [drafter.test-common :refer :all]
+    [grafter.rdf.formats :refer [rdf-ntriples]]
+    [grafter.rdf :as rdf]
+    [grafter.rdf.protocols :as pr]
+    [drafter.rdf.sparql-protocol :refer :all]
+    [clojure-csv.core :as csv]
+    [clojure.test :refer :all]
+    [schema.test :refer [validate-schemas]])
+  (:import (java.util.concurrent CountDownLatch TimeUnit ExecutionException)
+           (java.net URI)
+           (drafter.rdf DrafterSPARQLRepository)))
 
 (use-fixtures :each validate-schemas)
 
@@ -107,6 +110,40 @@
                    :headers {"accept" "text/plain"}}
           {:keys [status]} (endpoint request)]
       (is (= 400 status)))))
+
+(defn- get-test-repo [port]
+  (let [uri (URI. "http" nil "localhost" port nil nil nil)
+        repo (DrafterSPARQLRepository. (str uri))]
+    (.initialize repo)
+    repo))
+
+(deftest sparql-endpoint-query-timeout
+  (let [test-port 8080
+        max-connections (int 2)
+        connection-latch (CountDownLatch. max-connections)
+        release-latch (CountDownLatch. 1)
+        repo (doto (get-test-repo test-port) (.setMaxConcurrentHttpConnections max-connections))
+        endpoint (sparql-end-point "/live/sparql" repo)
+        test-request {:uri "/live/sparql"
+                      :request-method :get
+                      :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                      :headers {"accept" "application/sparql-results+json"}}]
+    (with-open [server (latched-http-handler test-port connection-latch release-latch (get-spo-http-response))]
+      (let [blocked-connections (doall (map (fn [i] (future (endpoint test-request))) (range 1 (inc max-connections))))]
+        ;;wait for max number of connections to be accepted by the server
+        (if (.await connection-latch 5000 TimeUnit/MILLISECONDS)
+          (do
+            ;;server has accepted max number of connections so next query attempt should see a connection timeout
+            (let [rf (future (endpoint test-request))]
+              ;;should be rejected almost immediately
+              (let [response (.get rf 5000 TimeUnit/MILLISECONDS)]
+                (assert-is-service-unavailable-response response)))
+
+            ;;release previous connections and wait for them to complete
+            (.countDown release-latch)
+            (doseq [f blocked-connections]
+              (.get f 100 TimeUnit/MILLISECONDS)))
+          (throw (RuntimeException. "Server failed to accept connections within timeout")))))))
 
 (use-fixtures :once wrap-db-setup)
 
