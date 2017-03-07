@@ -12,8 +12,7 @@
             [drafter.user-test :refer [test-publisher test-editor]])
   (:import [clojure.lang ExceptionInfo]
            [java.io File]
-           (org.openrdf.query QueryInterruptedException)
-           (org.apache.jena.query QueryParseException)))
+           [org.openrdf.query QueryInterruptedException]))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -220,21 +219,26 @@
           result (handler {:uri "/test" :request-method :post :body body-stream})]
       (is (= body-text result)))))
 
-(deftest wrap-sparql-errors-test
-  (testing "Successful request"
-    (let [response {:status 200 :headers {} :body "OK!"}
-          inner-handler (fn [req] response)
-          handler (wrap-sparql-errors inner-handler)]
-      (is (= response (handler {:uri "/test"})))))
+(deftest sparql-negotiation-handler-test
+  (testing "Valid request"
+    (let [handler (sparql-negotiation-handler identity)
+          accept-content-type "application/n-triples"
+          submitted-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
+          request {:uri "/sparql"
+                   :params {:query submitted-query}
+                   :headers {"accept" accept-content-type}}
+          {{:keys [format response-content-type query]} :sparql} (handler request)]
+      (is (= accept-content-type response-content-type))
+      (is (= query submitted-query))))
+  
+  (testing "Content negotiation failure"
+    (let [handler (sparql-negotiation-handler identity)
+          response (handler {:uri "/test"
+                             :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                             :headers {"accept" "text/trig"}})]
+      (tc/assert-is-not-acceptable-response response)))
 
-  (testing "Query interrupted"
-    (let [inner-handler (fn [req] (throw (QueryInterruptedException.)))
-          handler (wrap-sparql-errors inner-handler)
-          response (handler {:uri "/test"})]
-      (tc/assert-is-service-unavailable-response response)))
-
-  (testing "Query parse failure"
-    (let [inner-handler (fn [req] (throw (QueryParseException. 1 2)))
-          handler (wrap-sparql-errors inner-handler)
-          response (handler {:uri "/test"})]
+  (testing "Malformed SPARQL query"
+    (let [handler (sparql-negotiation-handler identity)
+          response (handler {:uri "/test" :params {:query "NOT A SPARQL QUERY"}})]
       (tc/assert-is-bad-request-response response))))

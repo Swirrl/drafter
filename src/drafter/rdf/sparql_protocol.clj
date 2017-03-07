@@ -1,28 +1,16 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.tools.logging :as log]
             [drafter.operations :refer :all]
-            [drafter.requests :as request]
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
-            [drafter.middleware :refer [allowed-methods-handler wrap-sparql-errors]]
+            [drafter.middleware :refer [allowed-methods-handler sparql-negotiation-handler]]
             [drafter.channels :refer :all]
-            [compojure.core :refer [make-route]]
-            [drafter.rdf.content-negotiation :as conneg])
+            [compojure.core :refer [make-route]])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            [org.openrdf.query QueryInterruptedException]
            [org.openrdf.query.resultio QueryResultIO]
            [java.util.concurrent TimeUnit]))
-
-(defn get-sparql-response-content-type [mime-type]
-  (case mime-type
-    ;; if they ask for html they're probably a browser so serve it as
-    ;; text/plain
-    "text/html" "text/plain; charset=utf-8"
-    ;; force a charset of UTF-8 in this case... NOTE this should
-    ;; really consult the Accept-Charset header
-    "text/plain" "text/plain; charset=utf-8"
-    mime-type))
 
 (defn- execute-boolean-query [pquery result-format response-content-type]
   (let [os (ByteArrayOutputStream. 1024)
@@ -70,32 +58,27 @@
           (future-cancel query-f)
           (throw (QueryInterruptedException.)))))))
 
-(defn process-prepared-query [pquery accept query-timeouts]
-  (let [query-type (get-query-type pquery)
-        query-timeouts (or query-timeouts default-timeouts)]
-    (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
-      (let [response-content-type (get-sparql-response-content-type media-type)]
-        (.setMaxExecutionTime pquery (get-query-timeout-seconds query-timeouts))
-        (if (= :ask query-type)
-          (execute-boolean-query pquery result-format response-content-type)
-          (execute-streaming-query pquery result-format response-content-type)))
+(defn execute-prepared-query [pquery format response-content-type query-timeouts]
+  (let [query-type (get-query-type pquery)]
+    (.setMaxExecutionTime pquery (get-query-timeout-seconds (or query-timeouts default-timeouts)))
+    (try
+      (if (= :ask query-type)
+        (execute-boolean-query pquery format response-content-type)
+        (execute-streaming-query pquery format response-content-type))
+      (catch QueryInterruptedException ex
+        {:status 503
+         :headers {"Content-Type" "text/plain; charset=utf-8"}
+         :body "Query execution timed out"}))))
 
-      (not-acceptable-response))))
-
-(defn process-sparql-query [executor request & {:keys [query-timeouts]
-                                                :or {query-timeouts default-timeouts}}]
-  (let [query-str (request/query request)
-        pquery (prepare-query executor query-str)]
-    (log/info (str "Running query\n" query-str "\nwith graph restrictions"))
-    (process-prepared-query pquery (request/accept request) query-timeouts)))
-
-(defn- sparql-query-request-handler [executor timeouts]
-  (fn [request]
-    (process-sparql-query executor request :query-timeouts timeouts)))
+(defn sparql-execution-handler [executor query-timeouts]
+  (fn [{{:keys [query format response-content-type]} :sparql :as request}]
+    (let [pquery (prepare-query executor query)]
+      (log/info (str "Running query\n" query "\nwith graph restrictions"))
+      (execute-prepared-query pquery format response-content-type query-timeouts))))
 
 (defn sparql-protocol-handler [executor timeouts]
-  (->> (sparql-query-request-handler executor timeouts)
-       (wrap-sparql-errors)
+  (->> (sparql-execution-handler executor timeouts)
+       (sparql-negotiation-handler)
        (allowed-methods-handler #{:get :post})))
 
 (defn sparql-end-point

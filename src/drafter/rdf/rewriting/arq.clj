@@ -3,9 +3,16 @@
   particular interest are sse-zipper and apply-rewriter."
   (:require [clojure.zip :as z])
   (:import [org.apache.jena.query QueryFactory Query Syntax]
-           [org.apache.jena.sparql.sse SSE Item ItemList]
+           [org.apache.jena.sparql.sse SSE Item]
            [org.apache.jena.sparql.algebra Op OpAsQuery Algebra]
-           [org.apache.jena.graph NodeFactory Node Node_URI]))
+           [org.apache.jena.graph NodeFactory]))
+
+(defn get-query-type [query]
+  (cond
+    (.isSelectType query) :select
+    (.isConstructType query) :construct
+    (.isAskType query) :ask
+    (.isDescribeType query) :describe))
 
 (defprotocol ToArqQuery
   (sparql-string->arq-query [this]

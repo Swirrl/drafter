@@ -17,7 +17,10 @@
             [buddy.auth.backends.token :refer [jws-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [ring.util.request :as request]
-            [pantomime.media :refer [media-type-named]])
+            [drafter.requests :as drafter-request]
+            [pantomime.media :refer [media-type-named]]
+            [drafter.rdf.content-negotiation :as conneg]
+            [drafter.rdf.rewriting.arq :as arq])
   (:import [java.io File]
            (org.openrdf.query QueryInterruptedException)
            (org.apache.jena.query QueryParseException)))
@@ -172,15 +175,30 @@
       (io/copy body temp-file)
       (inner-handler (assoc request :body temp-file)))))
 
-(defn wrap-sparql-errors [handler]
+(defn get-sparql-response-content-type [mime-type]
+  (case mime-type
+    ;; if they ask for html they're probably a browser so serve it as
+    ;; text/plain
+    "text/html" "text/plain; charset=utf-8"
+    ;; force a charset of UTF-8 in this case... NOTE this should
+    ;; really consult the Accept-Charset header
+    "text/plain" "text/plain; charset=utf-8"
+    mime-type))
+
+(defn sparql-negotiation-handler [inner-handler]
   (fn [request]
-    (try
-      (handler request)
-      (catch QueryInterruptedException ex
-        {:status 503
-         :headers {"Content-Type" "text/plain; charset=utf-8"}
-         :body "Query execution timed out"})
-      (catch QueryParseException ex
-        (let [error-message (.getMessage ex)]
-          (log/info "Malformed query: " error-message)
-          {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
+    (let [query-str (drafter-request/query request)
+          accept (drafter-request/accept request)]
+      (try
+        (let [arq-query (arq/sparql-string->arq-query query-str)
+              query-type (arq/get-query-type arq-query)]
+          (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
+            (inner-handler (assoc request :sparql
+                                          {:query query-str
+                                           :format result-format
+                                           :response-content-type (get-sparql-response-content-type media-type)}))
+            (response/not-acceptable-response)))
+        (catch QueryParseException ex
+          (let [error-message (.getMessage ex)]
+            (log/info "Malformed query: " error-message)
+            {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message}))))))

@@ -8,7 +8,7 @@
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
             [swirrl-server.async.jobs :refer [job-succeeded!]]
-            [drafter.rdf.sparql-protocol :refer [process-prepared-query process-sparql-query]]
+            [drafter.rdf.sparql-protocol :refer [execute-prepared-query sparql-protocol-handler]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
@@ -30,13 +30,16 @@
     (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
 
 (defn- execute-query-in-draftset [backend draftset-ref request union-with-live?]
-  (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)]
-    (process-sparql-query rewriting-executor request)))
+  (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
+        handler (sparql-protocol-handler rewriting-executor nil)]
+    (handler request)))
 
 (defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
         pquery (dsmgmt/all-quads-query rewriting-executor)]
-    (process-prepared-query pquery accept-content-type nil)))
+    (if-let [[rdf-format response-content-type] (conneg/negotiate-rdf-quads-format accept-content-type)]
+      (execute-prepared-query pquery rdf-format response-content-type nil)
+      (not-acceptable-response))))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
