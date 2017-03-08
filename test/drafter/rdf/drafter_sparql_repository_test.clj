@@ -5,20 +5,10 @@
             [ring.middleware.params :refer [wrap-params]]
             [grafter.sequences :refer [alphabetical-column-names]]
             [drafter.test-common :as tc])
-  (:import [drafter.rdf DrafterSPARQLRepository DrafterSparqlSession]
-           [org.openrdf.query QueryEvaluationException QueryInterruptedException]
-           (java.net URI ServerSocket InetSocketAddress SocketException)
-           (java.util.concurrent CountDownLatch TimeUnit ExecutionException)
-           (org.apache.http.impl.io HttpTransportMetricsImpl SessionInputBufferImpl DefaultHttpRequestParser SessionOutputBufferImpl DefaultHttpResponseWriter ChunkedOutputStream IdentityOutputStream ContentLengthOutputStream)
-           (org.apache.http.message BasicHttpResponse)
-           (org.apache.http ProtocolVersion)
-           (org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter)
-           (java.io ByteArrayOutputStream PrintWriter OutputStream)
-           (java.util ArrayList)
-           (org.apache.http.entity StringEntity ContentType ContentLengthStrategy)
-           (java.nio.charset Charset)
-           (org.apache.http.impl.entity StrictContentLengthStrategy)
-           (java.lang AutoCloseable)))
+  (:import [drafter.rdf DrafterSparqlSession]
+           [org.openrdf.query QueryInterruptedException]
+           [java.util.concurrent CountDownLatch TimeUnit ExecutionException]
+           [java.io ByteArrayOutputStream PrintWriter OutputStream]))
 
 (defn query-timeout-handler
   "Handler which always returns a query timeout response in the format used by Stardog"
@@ -28,12 +18,6 @@
    :body "com.complexible.stardog.plan.eval.operator.OperatorException: Query execution cancelled: Execution time exceeded query timeout"})
 
 (def ^:private test-port 8080)
-
-(defn- get-test-repo []
-  (let [uri (URI. "http" nil "localhost" test-port nil nil nil)
-        repo (DrafterSPARQLRepository. (str uri))]
-    (.initialize repo)
-    repo))
 
 (defn- null-output-stream []
   (proxy [OutputStream] []
@@ -71,13 +55,13 @@
 
 (deftest query-timeout-test
   (testing "Raises QueryInterruptedException on timeout response"
-    (let [repo (get-test-repo)]
+    (let [repo (tc/get-latched-http-server-repo test-port)]
       (with-server query-timeout-handler
                    (is (thrown? QueryInterruptedException (repo/query repo "SELECT * WHERE { ?s ?p ?o }"))))))
 
   (testing "sends timeout header when maxExecutionTime set"
     (let [query-params (atom nil)
-          repo (get-test-repo)]
+          repo (tc/get-latched-http-server-repo test-port)]
       (with-server (extract-query-params-handler query-params)
                    (let [pquery (repo/prepare-query repo "SELECT * WHERE { ?s ?p ?o }")]
                      (.setMaxExecutionTime pquery 2)
@@ -86,7 +70,7 @@
 
   (testing "does not send timeout header when maxExecutionTime not set"
     (let [query-params (atom nil)
-          repo (get-test-repo)]
+          repo (tc/get-latched-http-server-repo test-port)]
       (with-server (extract-query-params-handler query-params)
                    (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
                    (is (= false (contains? @query-params "timeout")))))))
@@ -94,7 +78,7 @@
 (deftest query-method-test
   (testing "short query should be GET request"
     (let [method (atom nil)
-          repo (get-test-repo)]
+          repo (tc/get-latched-http-server-repo test-port)]
       (with-server (extract-method-handler method)
                    (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
                    (is (= :get @method)))))
@@ -104,7 +88,7 @@
           bindings (map #(format "<%s>" %) uris)
           sb (StringBuilder. "SELECT * WHERE { VALUES ?u { ")
           method (atom nil)
-          repo (get-test-repo)]
+          repo (tc/get-latched-http-server-repo test-port)]
       (loop [s bindings]
         (when (< (.length sb) DrafterSparqlSession/STARDOG_MAXIMUM_URL_LENGTH)
           (.append sb (first s))
@@ -130,8 +114,8 @@
     (let [max-connections (int 2)
           connection-latch (CountDownLatch. max-connections)
           release-latch (CountDownLatch. 1)
-          repo (doto (get-test-repo) (.setMaxConcurrentHttpConnections max-connections))]
-      (with-open [server (tc/latched-http-handler test-port connection-latch release-latch (tc/get-spo-http-response))]
+          repo (doto (tc/get-latched-http-server-repo test-port) (.setMaxConcurrentHttpConnections max-connections))]
+      (with-open [server (tc/latched-http-server test-port connection-latch release-latch (tc/get-spo-http-response))]
         (let [blocked-connections (doall (map #(make-blocking-connection repo %) (range 1 (inc max-connections))))]
           ;;wait for max number of connections to be accepted by the server
           (if (.await connection-latch 5000 TimeUnit/MILLISECONDS)

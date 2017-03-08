@@ -27,8 +27,9 @@
            (org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter)
            (org.apache.http.impl.io HttpTransportMetricsImpl SessionInputBufferImpl DefaultHttpRequestParser SessionOutputBufferImpl DefaultHttpResponseWriter ChunkedOutputStream IdentityOutputStream ContentLengthOutputStream)
            (org.apache.http.impl.entity StrictContentLengthStrategy)
-           (java.net InetSocketAddress SocketException ServerSocket)
-           (java.lang AutoCloseable)))
+           (java.net InetSocketAddress SocketException ServerSocket URI)
+           (java.lang AutoCloseable)
+           (drafter.rdf DrafterSPARQLRepository)))
 
 
 (use-fixtures :each validate-schemas)
@@ -264,7 +265,7 @@
     ;;write response
     (write-response response (.getOutputStream socket))))
 
-(defn- latched-http-server [port listener connection-latch release-latch response]
+(defn- latched-http-handler [port listener connection-latch release-latch response]
   (let [client-threads (atom [])]
     (try
       (.bind listener (InetSocketAddress. port))
@@ -282,9 +283,9 @@
         (doseq [ct @client-threads]
           (.join ct 200))))))
 
-(defn latched-http-handler [port connection-latch release-latch response]
+(defn latched-http-server [port connection-latch release-latch response]
   (let [listener (ServerSocket.)
-        server-fn ^Runnable (fn [] (latched-http-server port listener connection-latch release-latch response))
+        server-fn ^Runnable (fn [] (latched-http-handler port listener connection-latch release-latch response))
         server-thread (Thread. server-fn "Test server thread")]
     (.start server-thread)
     (reify AutoCloseable
@@ -293,6 +294,15 @@
         (try
           (.join server-thread 500)
           (catch InterruptedException ex nil))))))
+
+(defn get-latched-http-server-repo
+  "Returns a DrafterSPARQLRepository with a query URI matching latched-http-handler
+   listening on the given port."
+  [port]
+  (let [uri (URI. "http" nil "localhost" port nil nil nil)
+        repo (DrafterSPARQLRepository. (str uri))]
+    (.initialize repo)
+    repo))
 
 (defn key-set
   "Gets a set containing the keys in the given map."

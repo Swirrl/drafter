@@ -8,9 +8,7 @@
     [clojure-csv.core :as csv]
     [clojure.test :refer :all]
     [schema.test :refer [validate-schemas]])
-  (:import (java.util.concurrent CountDownLatch TimeUnit ExecutionException)
-           (java.net URI)
-           (drafter.rdf DrafterSPARQLRepository)))
+  (:import [java.util.concurrent CountDownLatch TimeUnit]))
 
 (use-fixtures :each validate-schemas)
 
@@ -111,24 +109,18 @@
           {:keys [status]} (endpoint request)]
       (is (= 400 status)))))
 
-(defn- get-test-repo [port]
-  (let [uri (URI. "http" nil "localhost" port nil nil nil)
-        repo (DrafterSPARQLRepository. (str uri))]
-    (.initialize repo)
-    repo))
-
 (deftest sparql-endpoint-query-timeout
   (let [test-port 8080
         max-connections (int 2)
         connection-latch (CountDownLatch. max-connections)
         release-latch (CountDownLatch. 1)
-        repo (doto (get-test-repo test-port) (.setMaxConcurrentHttpConnections max-connections))
+        repo (doto (get-latched-http-server-repo test-port) (.setMaxConcurrentHttpConnections max-connections))
         endpoint (sparql-end-point "/live/sparql" repo)
         test-request {:uri "/live/sparql"
                       :request-method :get
                       :params {:query "SELECT * WHERE { ?s ?p ?o }"}
                       :headers {"accept" "application/sparql-results+json"}}]
-    (with-open [server (latched-http-handler test-port connection-latch release-latch (get-spo-http-response))]
+    (with-open [server (latched-http-server test-port connection-latch release-latch (get-spo-http-response))]
       (let [blocked-connections (doall (map (fn [i] (future (endpoint test-request))) (range 1 (inc max-connections))))]
         ;;wait for max number of connections to be accepted by the server
         (if (.await connection-latch 5000 TimeUnit/MILLISECONDS)
