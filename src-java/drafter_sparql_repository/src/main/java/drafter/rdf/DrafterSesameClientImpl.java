@@ -10,6 +10,8 @@ import java.util.concurrent.Executors;
 
 public class DrafterSesameClientImpl extends SesameClientImpl {
 
+    private static final ExecutorService QUERY_EXECUTOR = Executors.newCachedThreadPool();
+
     public DrafterSesameClientImpl(HttpClient httpClient) {
         this.setHttpClient(httpClient);
     }
@@ -18,8 +20,8 @@ public class DrafterSesameClientImpl extends SesameClientImpl {
         //NOTE: The two-argument constructor (HttpClient, ExecutorService) of SesameClientImpl does not seem to be
         //used and the executor is created by the initialize() method called from the default constructor. initialize()
         //sets the executor to Executors.newCachedThreadPool()
-        ExecutorService executor = Executors.newCachedThreadPool();
+        //ExecutorService executor = Executors.newCachedThreadPool();
 
-        return new DrafterSparqlSession(queryEndpointUrl, updateEndpointUrl, this.getHttpClient(), executor);
+        return new DrafterSparqlSession(queryEndpointUrl, updateEndpointUrl, this.getHttpClient(), QUERY_EXECUTOR);
     }
 }
