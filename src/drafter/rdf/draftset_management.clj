@@ -533,9 +533,9 @@
 
 (defn copy-live-graph-into-draftset-job [backend draftset-ref live-graph]
   (jobs/make-job :batch-write [job]
-                 (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph)
-                       batches (jobs/get-graph-clone-batches backend live-graph)]
-                   (jobs/copy-from-live-graph backend live-graph draft-graph-uri batches job))))
+                 (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph)]
+                   (mgmt/copy-graph backend live-graph draft-graph-uri {:silent true})
+                   (job-succeeded! job))))
 
 (defn- publish-draftset-graphs-joblet [backend draftset-ref]
   (jobs/action-joblet
