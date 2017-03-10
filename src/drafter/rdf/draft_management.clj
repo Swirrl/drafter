@@ -214,6 +214,8 @@ PREFIX drafter: <" (drafter "") ">"))
   (partial set-timestamp-on-instance-of-class! drafter:DraftGraph drafter:modifiedAt))
 
 (defn ensure-draft-exists-for
+  "Finds or creates a draft graph for the given live graph in the
+  draftset."
   [repo live-graph graph-map draftset-uri]
   (if-let [draft-graph (get graph-map live-graph)]
     {:draft-graph-uri draft-graph :graph-map graph-map}
