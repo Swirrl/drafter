@@ -7,9 +7,7 @@ services:
   - mongodb
 env:
   global:
-  - SPARQL_QUERY_ENDPOINT="http://localhost:5820/drafter/query"
-  - DRAFTER_BACKEND="drafter.backend.sesame.remote"
-  - SPARQL_UPDATE_ENDPOINT="http://localhost:5820/drafter/update"
+  - STARDOG_VERSION='stardog-4.1.2'
 before_install:
 - sudo apt-get update
 - sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip

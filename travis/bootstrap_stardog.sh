@@ -13,8 +13,8 @@ echo "> Stardog home: $STARDOG_HOME"
 
 echo '> Downloading and unzipping Stardog...'
 cd /opt/stardog/releases
-sudo curl -O https://stardog-versions.s3.amazonaws.com/stardog-4.1.2.zip
-sudo unzip stardog-4.1.2.zip
+sudo curl -O https://stardog-versions.s3.amazonaws.com/$STARDOG_VERSION.zip
+sudo unzip $STARDOG_VERSION.zip
 cd $WORKING_DIR
 
 echo "> Permissions.."
@@ -26,7 +26,7 @@ sudo chmod +wx $STARDOG_HOME
 echo '> Adding license...'
 sudo cp $WORKING_DIR/travis/stardog-license-key.bin /var/lib/stardog-home
 sudo cp $WORKING_DIR/travis/stardog.properties /var/lib/stardog-home
-sudo ln -s /opt/stardog/releases/stardog-4.1.2 /opt/stardog/stardog
+sudo ln -s /opt/stardog/releases/$STARDOG_VERSION /opt/stardog/stardog
 
 # start stardog
-/opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin server start --disable-security
+/opt/stardog/stardog/$STARDOG_VERSION/bin/stardog-admin server start --disable-security
