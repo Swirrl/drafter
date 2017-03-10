@@ -644,28 +644,17 @@
 
     :copy-graph
     (let [{:keys [live-graph]} state
-          draft-graph-uri (mgmt/create-draft-graph! backend live-graph {} (str (ds/->draftset-uri draftset-ref)))
-          copy-batches (jobs/get-graph-clone-batches backend live-graph)
-          copy-state {:op :copy-graph-batches
-                      :graph live-graph
-                      :draft-graph-uri draft-graph-uri
-                      :batches copy-batches}]
-      ;;NOTE: Do this immediately as no work has been done yet
-      (recur backend quad-batches draftset-ref (assoc live->draft live-graph draft-graph-uri) (merge state copy-state) job))
+          ds-uri (str (ds/->draftset-uri draftset-ref))
+          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph live->draft ds-uri)]
 
-    :copy-graph-batches
-    (let [{:keys [graph batches draft-graph-uri]} state]
-      (if-let [[offset limit] (first batches)]
-        (do
-          (jobs/copy-graph-batch! backend graph draft-graph-uri offset limit)
-          (let [next-state (update-in state [:batches] rest)
-                next-job (create-child-job
-                          job
-                          (partial delete-quads-from-draftset backend quad-batches draftset-ref live->draft (merge state next-state)))]
-            (scheduler/queue-job! next-job)))
-        ;;graph copy completed so continue deleting quads
-        ;;NOTE: do this immediately since we haven't done any work on this iteration
-        (recur backend quad-batches draftset-ref live->draft (merge state {:op :delete}) job)))))
+      (mgmt/copy-graph backend live-graph draft-graph-uri {:silent true})
+      ;; Now resume appending the batch
+      (recur backend
+             quad-batches
+             draftset-ref
+             (assoc live->draft live-graph draft-graph-uri)
+             (merge state {:op :delete})
+             job))))
 
 (defn- batch-and-delete-quads-from-draftset [backend quads draftset-ref live->draft job]
   (let [quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
