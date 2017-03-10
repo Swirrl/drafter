@@ -106,7 +106,7 @@
               (task-f! job)))
 
           (catch Exception ex
-            (log/warn ex "A task raised an error delivering error to promise")
+            (log/warn ex "A task raised an error.  Delivering error to promise")
             ;; TODO improve error returned
             (job-failed! job ex))))
       (log/info "Writer waiting for tasks")
