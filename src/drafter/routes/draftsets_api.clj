@@ -3,7 +3,7 @@
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
                                        unsupported-media-type-response method-not-allowed-response
-                                       forbidden-response submit-async-job! submit-sync-job!
+                                       forbidden-response submit-async-job! run-sync-job!
                                        conflict-detected-response]]
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
@@ -100,11 +100,11 @@
     (let [result (f)]
       (job-succeeded! job result))))
 
-(defn- submit-sync
+(defn- run-sync
   ([api-call-fn]
-   (submit-sync-job! (as-sync-write-job api-call-fn)))
+   (run-sync-job! (as-sync-write-job api-call-fn)))
   ([api-call-fn resp-fn]
-   (submit-sync-job! (as-sync-write-job api-call-fn)
+   (run-sync-job! (as-sync-write-job api-call-fn)
                      resp-fn)))
 
 (defn- draftset-sync-write-response [result backend draftset-id]
@@ -145,7 +145,7 @@
         (make-route :post "/draftsets"
                     (authenticated
                       (fn [{{:keys [display-name description]} :params user :identity :as request}]
-                        (submit-sync #(dsmgmt/create-draftset! backend user display-name description)
+                        (run-sync #(dsmgmt/create-draftset! backend user display-name description)
                                      (fn [result]
                                        (if (failed-job-result? result)
                                          (response/api-response 500 result)
@@ -209,7 +209,7 @@
                         :silent
                         (fn [{{:keys [draftset-id graph silent] :as params} :params :as request}]
                           (if (mgmt/is-graph-managed? backend graph)
-                            (submit-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                            (run-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
                                          #(draftset-sync-write-response % backend draftset-id))
                             (if silent
                               (response (dsmgmt/get-draftset-info backend draftset-id))
@@ -219,7 +219,7 @@
                     (as-draftset-owner
                       (require-params #{:graph}
                                       (fn [{{:keys [draftset-id graph]} :params}]
-                                        (submit-sync #(dsmgmt/revert-graph-changes! backend draftset-id graph)
+                                        (run-sync #(dsmgmt/revert-graph-changes! backend draftset-id graph)
                                                      (fn [result]
                                                        (if (failed-job-result? result)
                                                          (response/api-response 500 result)
@@ -268,7 +268,7 @@
         (make-route :put "/draftset/:id"
                     (as-draftset-owner
                       (fn [{{:keys [draftset-id] :as params} :params}]
-                        (submit-sync #(dsmgmt/set-draftset-metadata! backend draftset-id params)
+                        (run-sync #(dsmgmt/set-draftset-metadata! backend draftset-id params)
                                      #(draftset-sync-write-response % backend draftset-id)))))
 
         (make-route :post "/draftset/:id/submit-to"
@@ -280,14 +280,14 @@
 
                           (some? user)
                           (if-let [target-user (user-repo/find-user-by-username user-repo user)]
-                            (submit-sync #(dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
+                            (run-sync #(dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
                                          #(draftset-sync-write-response % backend draftset-id))
                             (unprocessable-entity-response (str "User: " user " not found")))
 
                           (some? role)
                           (let [role-kw (keyword role)]
                             (if (user/is-known-role? role-kw)
-                              (submit-sync #(dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
+                              (run-sync #(dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
                                            #(draftset-sync-write-response % backend draftset-id))
                               (unprocessable-entity-response (str "Invalid role: " role))))
 
@@ -315,7 +315,7 @@
                         (fn [{{:keys [draftset-id]} :params user :identity}]
                           (if-let [ds-info (dsmgmt/get-draftset-info backend draftset-id)]
                             (if (user/can-claim? user ds-info)
-                              (submit-sync #(dsmgmt/claim-draftset! backend draftset-id user)
+                              (run-sync #(dsmgmt/claim-draftset! backend draftset-id user)
                                            (fn [result]
                                              (if (failed-job-result? result)
                                                (response/api-response 500 result)

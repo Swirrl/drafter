@@ -36,14 +36,14 @@
   (testing "Returns job result"
     (let [result {:status :ok}
           job (const-job :sync-write result)
-          {:keys [type details]} (await-sync-job! job)]
+          {:keys [type details]} (exec-sync-job! job)]
       (is (= :ok type))
       (is (= result details))))
 
   (testing "Throws exception if job cannot be queued"
     (let [sync-job (const-job :sync-write {:status :ok})]
       (during-exclusive-write
-       (is (thrown? ExceptionInfo (await-sync-job! sync-job)))))))
+       (is (thrown? ExceptionInfo (exec-sync-job! sync-job)))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

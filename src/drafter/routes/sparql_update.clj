@@ -5,7 +5,7 @@
             [swirrl-server.async.jobs :refer [job-succeeded!]]
             [swirrl-server.responses :as response]
             [swirrl-server.errors :refer [ex-swirrl]]
-            [drafter.responses :refer [submit-sync-job!]]
+            [drafter.responses :refer [run-sync-job!]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.backend.protocols :refer [execute-update]]
             [drafter.rdf.endpoints :refer [live-endpoint]]
@@ -72,7 +72,7 @@
 ;exec-update :: SparqlUpdateExecutor -> Request -> Response
 (defn exec-update [executor request timeouts]
   (let [job (create-update-job executor request timeouts)]
-    (submit-sync-job! job (fn [result]
+    (run-sync-job! job (fn [result]
                             (if (jobs/failed-job-result? result)
                               ;; NOTE: We could repackage the resulting error
                               ;; into a ex-info exception and throw it to

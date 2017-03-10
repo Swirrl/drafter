@@ -19,11 +19,11 @@
         (catch clojure.lang.ExceptionInfo ex
           (= 503 (:status (encode-error ex)))))))))
 
-(deftest submit-sync-job-test
+(deftest run-sync-job-test
   (testing "Invokes response handler with job result"
     (let [job-result {:status :ok :message "success!"}
           job (const-job :sync-write job-result)
-          {:keys [status body]} (submit-sync-job! job (fn [r] {:body r :status 200}))]
+          {:keys [status body]} (run-sync-job! job (fn [r] {:body r :status 200}))]
       (is (= 200 status)
           (= job-result body))))
 
@@ -31,7 +31,7 @@
     (let [job (const-job :sync-write {:result :ok})]
       (during-exclusive-write
        (throws-exception?
-        (submit-sync-job! job)
+        (run-sync-job! job)
         (catch clojure.lang.ExceptionInfo ex
           (= 503 (:status (encode-error ex)))))))))
 
