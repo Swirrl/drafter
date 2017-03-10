@@ -71,13 +71,17 @@
         (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later."))))))
 
 ;;await-sync-job! :: Job -> ApiResponse
-(defn await-sync-job!
-  "Submits a sync job to the queue and blocks waiting for it to
-  complete. Returns the result of the job execution."
-  [{:keys [value-p priority] :as job}]
+(defn exec-sync-job!
+  "Executes a sync job waits for it to complete. Returns the result of
+  the job execution.  Sync jobs skip the queue entirely and just run
+  on the calling thread.  They do however check the writes-lock and
+  will 503 if it's locked."
+  [{job-function :function :keys [value-p priority] :as job}]
   {:pre [(= :sync-write priority)]}
-  (queue-job! job)
-  @value-p)
+
+  (if (.isLocked global-writes-lock)
+    (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable.  Please try again later."))
+    (job-function job)))
 
 (defn- write-loop
   "Start the write loop running.  Note this function does not return
