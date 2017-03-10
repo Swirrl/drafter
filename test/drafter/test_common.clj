@@ -152,7 +152,7 @@
   [form & catch-forms]
   `(try
      ~form
-     (is false (str "Expected " (pr-str (quote ~form)) " to raise exception"))
+     (is false (str "Expected " (pr-str (quote ~form)) " to raise exception. DONT be confused by the 'false false' test failure here, it failed because no exception was thrown."))
      ~@catch-forms))
 
 (defn ask? [& graphpatterns]
