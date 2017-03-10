@@ -331,6 +331,26 @@ PREFIX drafter: <" (drafter "") ">"))
    "}"
    "}"))
 
+(defn copy-graph-query
+  [from to {:keys [silent] :as opts :or {silent false}}]
+  (let [silent (if silent
+                 "SILENT"
+                 "")]
+    (str
+     "\n"
+     "COPY " silent " <" from "> TO <" to ">")))
+
+(defn copy-graph
+  "Copies source graph to destination graph.  Accepts an optional map
+  of options.
+
+  Currently the only supported option is the boolean value :silent
+  which will ensure the copy always succeeds, whether or not their is
+  a source graph etc."
+  ([repo from to] (copy-graph repo from to {}))
+  ([repo from to opts]
+   (update! repo (copy-graph-query from to opts))))
+
 (defn- has-duplicates? [col]
   (not= col
         (distinct col)))

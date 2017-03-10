@@ -424,8 +424,24 @@
                 "<" draft-graph-uri "> <" drafter:modifiedAt "> ?modified . "
                 "}")))))
 
+(defn test-quads [g]
+  (map #(assoc % :c g)
+       (test/test-triples "http://test-subject")))
 
+(deftest copy-graph-test
+  (let [repo (repo/repo)]
+    (add repo (test-quads "http://test-graph/1"))
 
+    (copy-graph repo "http://test-graph/1" "http://test-graph/2")
+
+    (let [source-graph (set (query repo "SELECT * WHERE { GRAPH <http://test-graph/1> { ?s ?p ?o }}"))
+          dest-graph   (set (query repo "SELECT * WHERE { GRAPH <http://test-graph/2> { ?s ?p ?o }}"))]
+
+      (is (not (empty? dest-graph))
+          "Should not be empty (and have the data we loaded)")
+      (is (= source-graph
+             dest-graph)
+          "Should be a copy of the source graph"))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
