@@ -16,8 +16,6 @@
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes
                                            raw-sparql-routes]]
-            [drafter.routes.sparql-update :refer [live-update-endpoint-route
-                                                  raw-update-endpoint-route]]
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
@@ -66,39 +64,34 @@
       (str "/" (name version) suffix)
       suffix)))
 
-(defn endpoint-update-path [route-name version]
-  (str (endpoint-query-path route-name version) "/update"))
-
 (defn- endpoint-route [route-name path-fn endpoint-fn route-type version repo timeout-config]
   (let [path (path-fn route-name version)
         timeouts (conf/get-endpoint-timeout route-name route-type timeout-config)]
     (log-endpoint-config route-name route-type timeouts)
     (endpoint-fn path repo timeouts)))
 
-(defn- create-sparql-endpoint-routes [route-name query-fn update-fn version backend timeout-config]
-  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query version backend timeout-config)
-        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update version backend timeout-config))]
-    (vec (remove nil? [query-route update-route]))))
+(defn- create-sparql-endpoint-routes [route-name query-fn version backend timeout-config]
+  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query version backend timeout-config)]
+    (vec (remove nil? [query-route]))))
 
-(defn specify-endpoint
-  ([query-fn update-fn]
-   (specify-endpoint query-fn update-fn nil))
-  ([query-fn update-fn version]
-   {:query-fn query-fn :update-fn update-fn :version version}))
+(defn- specify-endpoint
+  ([query-fn]
+   (specify-endpoint query-fn nil))
+  ([query-fn version]
+   {:query-fn query-fn :version version}))
 
 (def ^:private v1-prefix :v1)
 
-(def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route v1-prefix))
+(def live-endpoint-spec (specify-endpoint live-sparql-routes v1-prefix))
 
 (defn- create-raw-endpoint-spec [authenticated-fn]
-  (let [query-route-fn #(raw-sparql-routes %1 %2 %3 authenticated-fn)
-        update-route-fn #(raw-update-endpoint-route %1 %2 %3 authenticated-fn)]
-    (specify-endpoint query-route-fn update-route-fn v1-prefix)))
+  (let [query-route-fn #(raw-sparql-routes %1 %2 %3 authenticated-fn)]
+    (specify-endpoint query-route-fn v1-prefix)))
 
 (defn create-sparql-routes [endpoint-map backend]
   (let [timeout-conf (conf/get-timeout-config env (keys endpoint-map) ops/default-timeouts)
-        ep-routes (fn [[ep-name {:keys [query-fn update-fn version]}]]
-                    (create-sparql-endpoint-routes ep-name query-fn update-fn version backend timeout-conf))]
+        ep-routes (fn [[ep-name {:keys [query-fn version]}]]
+                    (create-sparql-endpoint-routes ep-name query-fn version backend timeout-conf))]
     (mapcat ep-routes endpoint-map)))
 
 (defn get-sparql-routes [backend user-repo]
