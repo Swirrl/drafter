@@ -120,8 +120,6 @@
          :destroy drafter.handler/destroy
          :open-browser? false }
 
-  :aliases {"reindex" ["run" "-m" "drafter.backend.sesame-native/reindex"]}
-
   :target-path "target/%s" ;; ensure profiles don't pollute each other with
   ;; compiled classes etc...
 
