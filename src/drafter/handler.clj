@@ -15,8 +15,7 @@
             [drafter.routes.draftsets-api :refer [draftset-api-routes]]
             [drafter.routes.status :refer [status-routes]]
             [drafter.routes.pages :refer [pages-routes]]
-            [drafter.routes.sparql :refer [live-sparql-routes
-                                           raw-sparql-routes]]
+            [drafter.routes.sparql :refer [live-sparql-routes]]
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
@@ -85,10 +84,6 @@
 
 (def live-endpoint-spec (specify-endpoint live-sparql-routes v1-prefix))
 
-(defn- create-raw-endpoint-spec [authenticated-fn]
-  (let [query-route-fn #(raw-sparql-routes %1 %2 %3 authenticated-fn)]
-    (specify-endpoint query-route-fn v1-prefix)))
-
 (defn create-sparql-routes [endpoint-map backend]
   (let [timeout-conf (conf/get-timeout-config env (keys endpoint-map) ops/default-timeouts)
         ep-routes (fn [[ep-name {:keys [query-fn version]}]]
@@ -96,8 +91,7 @@
     (mapcat ep-routes endpoint-map)))
 
 (defn get-sparql-routes [backend user-repo]
-  (let [endpoints {:live live-endpoint-spec
-                   :raw (create-raw-endpoint-spec user-repo)}]
+  (let [endpoints {:live live-endpoint-spec}]
     (create-sparql-routes endpoints backend)))
 
 (defn initialise-app! [backend]
