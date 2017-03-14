@@ -38,4 +38,4 @@ deploy:
     skip_cleanup: true
     on:
       repo: Swirrl/drafter
-      branch: travisify
+      branch: master
