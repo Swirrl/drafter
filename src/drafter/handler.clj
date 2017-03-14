@@ -7,6 +7,7 @@
             [drafter.middleware :as middleware]
             [swirrl-server.middleware.log-request :refer [log-request]]
             [drafter.configuration :as conf]
+            [drafter.env :as denv]
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.util :refer [set-var-root! conj-if]]
@@ -110,6 +111,7 @@
                               (add-route (context "/v1/status" []
                                                   (status-routes global-writes-lock finished-jobs restart-id)))
 
+                              (add-routes (denv/env-specific-routes backend))
                               (add-route app-routes))
 
                           :ring-defaults (assoc-in api-defaults [:params :multipart] true)

@@ -15,6 +15,9 @@
                               :passphrase :env
                               :snapshots false}]]
 
+  :classifiers {:prod :uberjar
+                :dev :dev}
+
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.openrdf.sesame/sesame-queryrender "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
                  [org.openrdf.sesame/sesame-runtime "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
@@ -27,7 +30,7 @@
 
                  [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
-                 [clj-yaml "0.4.0"]      ;; for loading our Swagger schemas
+                 [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
 
                  ;; Lock dependency of jackson to a version that
@@ -129,27 +132,22 @@
 
    :uberjar {:aot :all
              :main drafter.repl
-             }
-
-   :production {:ring {:open-browser? false
-                       :stacktraces?  false
-                       :auto-reload?  false}}
-
+             :source-paths ["env/prod/clj"]
+             :resource-paths ["env/prod/resources"]}
 
    :perforate { :dependencies [[perforate "0.3.4"] ;; include perforate and criterium in repl environments
                                [criterium "0.4.3"] ;; for easy benchmarking
                                [clj-http "1.1.0"]
                                [drafter-client "0.3.6-SNAPSHOT"]
-                               [grafter "0.6.0-alpha5"]
-                               ]}
+                               [grafter "0.6.0-alpha5"]]}
 
    :dev [:dev-common :dev-overrides]
 
    :dev-common {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                           [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
-                :source-paths ["dev/clj"]
-                :resource-paths ["dev/resources"]
+                :source-paths ["env/dev/clj"]
+                :resource-paths ["env/dev/resources"]
 
                 :dependencies [[ring-mock "0.1.5"]
                                [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
@@ -162,7 +160,6 @@
                                ;;[drafter-client "0.3.6-SNAPSHOT"]
                                [prismatic/schema "1.0.4"]]
 
-                ;;:env {:dev true}
                 ;;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
                 ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
                 }
@@ -176,7 +173,7 @@
              ;;"-Dhttp.maxConnections=1"
              ]
 
-  ;NOTE: expected JVM version to run against is defined in the Dockerfile
+                                        ;NOTE: expected JVM version to run against is defined in the Dockerfile
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
 
