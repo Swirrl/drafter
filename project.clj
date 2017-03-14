@@ -103,7 +103,6 @@
   :pedantic :abort
 
   :repl-options {:init-ns drafter.repl
-                 :init (-main)
                  :timeout 180000}
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
@@ -111,6 +110,8 @@
             [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]
             [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]
             [perforate "0.3.4"]]
+
+  :uberjar-name "drafter.jar"
 
   :ring {:handler drafter.handler/app
          :init    drafter.handler/init
