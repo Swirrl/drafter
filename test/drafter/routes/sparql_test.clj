@@ -56,9 +56,6 @@
 (defn live-query [qstr]
   (build-query "/sparql/live" qstr nil))
 
-(defn raw-query [qstr]
-  (build-query "/sparql/raw" qstr nil))
-
 (defn csv-> [{:keys [body]}]
   "Parse a response into a CSV"
   (-> body stream->string csv/parse-csv))
