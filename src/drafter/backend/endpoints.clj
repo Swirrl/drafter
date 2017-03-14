@@ -83,5 +83,3 @@
   proto/ITripleWriteable itriple-writeable-delegate
   proto/ISPARQLable isparqlable-delegate
   proto/ISPARQLUpdateable isparql-updateable-delegate)
-
-(def draft-graph-set ->RewritingSesameSparqlExecutor)
