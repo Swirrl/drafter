@@ -21,10 +21,10 @@
   (create-job priority (fn [job] (job-succeeded! job ret))))
 
 (deftest job-sort-order-test
-  (let [unordered-jobs [(mock-job 4 :batch-write 2)
-                        (mock-job 3 :batch-write 1)
-                        (mock-job 2 :exclusive-write 2)
-                        (mock-job 1 :exclusive-write 1)]
+  (let [unordered-jobs [(mock-job 4 :exclusive-write 2)
+                        (mock-job 3 :exclusive-write 1)
+                        (mock-job 2 :batch-write 2)
+                        (mock-job 1 :batch-write 1)]
 
         ordered-jobs (sort compare-jobs unordered-jobs)]
 
