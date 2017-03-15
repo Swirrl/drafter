@@ -19,7 +19,7 @@
            (java.util.concurrent PriorityBlockingQueue)
            (java.util.concurrent.locks ReentrantLock)))
 
-(def priority-levels-map {:sync-write 0 :exclusive-write 1 :batch-write 2})
+(def priority-levels-map { :exclusive-write 1 :batch-write 2})
 
 (def compare-jobs (comparator
                    (fn [job1 job2]
