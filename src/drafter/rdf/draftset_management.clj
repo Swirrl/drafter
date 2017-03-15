@@ -98,11 +98,11 @@
      (with-state-graph
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
        "<" draftset-uri "> <" drafter:hasOwner "> ?owner .")
-     "}")))
+     "} LIMIT 1")))
 
 (defn get-draftset-owner [backend draftset-ref]
   (let [q (get-draftset-owner-query draftset-ref)
-        result (first (query backend q))
+        result (first (util/query-eager-seq backend q))
         owner-lit (get result "owner")]
     (and owner-lit (user/uri->username (.stringValue owner-lit)))))
 
@@ -185,7 +185,7 @@
 
 (defn get-draftset-graph-states [repo draftset-ref]
   (->> (get-draftset-graph-mapping-query draftset-ref)
-       (query repo)
+       (util/query-eager-seq repo)
        (map #(graph-mapping-result->graph-state repo %))))
 
 (defn get-draftset-graph-mapping [repo draftset-ref]
@@ -269,11 +269,17 @@
              (assoc graph-state :draftset-uri (.stringValue ds))))
          mappings))
 
+(defn- get-all-draftsets-properties-by [repo clauses]
+  (let [properties-query (get-draftsets-matching-properties-query clauses)]
+    (util/query-eager-seq repo properties-query)))
+
+(defn- get-all-draftsets-mappings-by [repo clauses]
+  (let [mappings-query (get-draftsets-matching-graph-mappings-query clauses)]
+    (util/query-eager-seq repo mappings-query)))
+
 (defn- get-all-draftsets-by [repo clauses]
-  (let [properties-query (get-draftsets-matching-properties-query clauses)
-        mappings-query (get-draftsets-matching-graph-mappings-query clauses)
-        properties (query repo properties-query)
-        graph-mappings (query repo mappings-query)
+  (let [properties (get-all-draftsets-properties-by repo clauses)
+        graph-mappings (get-all-draftsets-mappings-by repo clauses)
         graph-states (draftset-graph-mappings->graph-states repo graph-mappings)]
 
     (combine-all-properties-and-graph-states properties graph-states)))
@@ -501,7 +507,7 @@
        "?dg <" drafter:inDraftSet "> <" draftset-uri "> ."
        "<" live-graph "> <" rdf:a "> <" drafter:ManagedGraph "> ."
        "<" live-graph "> <" drafter:hasDraft "> ?dg .")
-     "}")))
+     "} LIMIT 1")))
 
 (defn find-draftset-draft-graph
   "Finds the draft graph for a live graph inside a draftset if one
@@ -509,7 +515,7 @@
   contain a draft for the graph."
   [backend draftset-ref live-graph]
   (let [q (find-draftset-draft-graph-query draftset-ref live-graph)]
-    (when-let [[result] (query backend q)]
+    (when-let [[result] (util/query-eager-seq backend q)]
       (.stringValue (get result "dg")))))
 
 (defn revert-graph-changes!

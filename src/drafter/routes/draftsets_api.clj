@@ -114,7 +114,6 @@
 
 (defn draftset-api-routes [backend user-repo authenticated]
   (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
-          (required-managed-graph-param [h] (required-managed-graph-param-handler backend h))
           (as-draftset-owner [h]
             (authenticated
              (existing-draftset-handler

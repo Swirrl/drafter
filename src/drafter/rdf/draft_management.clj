@@ -2,7 +2,6 @@
   (:require [clojure.tools.logging :as log]
             [drafter.util :as util]
             [grafter.rdf :refer [add s]]
-            [drafter.util :refer [map-values]]
             [clojure.walk :refer [keywordize-keys]]
             [clojure.set :as set]
             [grafter.vocabularies.rdf :refer :all]
@@ -14,9 +13,7 @@
             [clojure.string :as string]
             [swirrl-server.errors :refer [ex-swirrl]]
             [schema.core :as s])
-  (:import (java.util Date UUID)
-           (java.net URI)
-           (org.openrdf.model.impl URIImpl)))
+  (:import [java.util Date UUID]))
 
 (def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
 
@@ -312,12 +309,12 @@ PREFIX drafter: <" (drafter "") ">"))
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph. Returns nil if not
   found."
-  (when-let [live-uri (-> (query db
-                                 (str "SELECT ?live WHERE {"
-                                      (with-state-graph
-                                        "?live a drafter:ManagedGraph ; "
-                                        "      drafter:hasDraft <" draft-graph-uri "> . ")
-                                      "} LIMIT 1"))
+  (when-let [live-uri (-> (doall (query db
+                                        (str "SELECT ?live WHERE {"
+                                             (with-state-graph
+                                               "?live a drafter:ManagedGraph ; "
+                                               "      drafter:hasDraft <" draft-graph-uri "> . ")
+                                             "} LIMIT 1")))
                           first
                           (get "live"))]
     (str live-uri)))
@@ -345,13 +342,13 @@ PREFIX drafter: <" (drafter "") ">"))
   (if (empty? draft-set)
     {}
     (let [drafts (clojure.string/join " " (map #(str "<" % ">") draft-set))
-          results (->> (query db
-                              (str "SELECT ?live ?draft WHERE {"
-                                   (with-state-graph
-                                     "  VALUES ?draft {" drafts "}"
-                                     "  ?live a drafter:ManagedGraph ;"
-                                     "        drafter:hasDraft ?draft .")
-                                   "}")))]
+          results (->> (doall (query db
+                                     (str "SELECT ?live ?draft WHERE {"
+                                          (with-state-graph
+                                            "  VALUES ?draft {" drafts "}"
+                                            "  ?live a drafter:ManagedGraph ;"
+                                            "        drafter:hasDraft ?draft .")
+                                          "}"))))]
       (let [live-graphs (map #(get % "live") results)]
         (when (has-duplicates? live-graphs)
           (throw (ex-swirrl :multiple-drafts-error
