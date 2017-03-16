@@ -50,27 +50,21 @@
   "Adds a write job to the job queue. If the job cannot be queued then
   an ExceptionInfo is thrown with a data map containing a :type key
   mapped to a :job-enqueue-failed value."
-  [job]
+  [{:keys [priority] :as job}]
   (let [req-id (MDC/get "reqId")
         job (if req-id
               (with-meta job {:reqId req-id})
               job)]
     (log/info "Queueing job: " job (meta job))
-    (if (= :exclusive-write (:priority job))
+    ;;exclusive-writes jobs can always be queued immediately
+    ;;other jobs can be queued unless there is an exclusive write job in progress
+    (if (or (= :exclusive-write priority)
+            (not (.isLocked global-writes-lock)))
       (do
-        (log/trace "Queueing :exclusive-write job on queue" writes-queue)
-        (.add writes-queue job))
-      (let [locked (.tryLock global-writes-lock 10 TimeUnit/MILLISECONDS)]
-        (if locked
-          ;; We try the lock, not because we need the lock, but because we
-          ;; need to 503/refuse the addition of an item if the lock is
-          ;; taken.
-          (try
-            (.add writes-queue job)
-            (finally
-              (.unlock global-writes-lock)))
-
-          (throw (ex-swirrl :writes-temporarily-disabled (str "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later."))))))))
+        (log/trace (str "Queueing " priority " job on queue") job)
+        (.add writes-queue job)
+        nil)
+      (throw (ex-swirrl :writes-temporarily-disabled (str "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later."))))))
 
 ;;await-sync-job! :: Job -> ApiResponse
 (defn await-sync-job!
