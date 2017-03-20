@@ -16,8 +16,9 @@
             [swirrl-server.async.jobs :refer [finished-jobs job-failed! restart-id ->Job]]
             [swirrl-server.errors :refer [ex-swirrl encode-error]])
   (:import (org.apache.log4j MDC)
-           (java.util.concurrent PriorityBlockingQueue)
-           (java.util.concurrent.locks ReentrantLock)))
+           (java.util.concurrent PriorityBlockingQueue TimeUnit)
+           (java.util.concurrent.locks ReentrantLock)
+           (java.util.concurrent.atomic AtomicBoolean)))
 
 (def priority-levels-map {:sync-write 0 :exclusive-write 1 :batch-write 2})
 
@@ -49,26 +50,21 @@
   "Adds a write job to the job queue. If the job cannot be queued then
   an ExceptionInfo is thrown with a data map containing a :type key
   mapped to a :job-enqueue-failed value."
-  [job]
+  [{:keys [priority] :as job}]
   (let [req-id (MDC/get "reqId")
         job (if req-id
               (with-meta job {:reqId req-id})
               job)]
     (log/info "Queueing job: " job (meta job))
-    (if (= :exclusive-write (:priority job))
+    ;;exclusive-writes jobs can always be queued immediately
+    ;;other jobs can be queued unless there is an exclusive write job in progress
+    (if (or (= :exclusive-write priority)
+            (not (.isLocked global-writes-lock)))
       (do
-        (log/trace "Queueing :exclusive-write job on queue" writes-queue)
-        (.add writes-queue job))
-      (if (.tryLock global-writes-lock)
-        ;; We try the lock, not because we need the lock, but because we
-        ;; need to 503/refuse the addition of an item if the lock is
-        ;; taken.
-        (try
-          (.add writes-queue job)
-          (finally
-            (.unlock global-writes-lock)))
-
-        (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later."))))))
+        (log/trace (str "Queueing " priority " job on queue") job)
+        (.add writes-queue job)
+        nil)
+      (throw (ex-swirrl :writes-temporarily-disabled (str "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later."))))))
 
 ;;await-sync-job! :: Job -> ApiResponse
 (defn await-sync-job!
@@ -84,37 +80,44 @@
   and is supposed to be run asynchronously on a future or thread.
 
   Users should normally use start-writer! to set this running."
-
-  []
+  [flag]
   (log/info "Writer started waiting for tasks")
-    (loop [{task-f! :function
-            priority :priority
-            job-id :id
-            promis :value-p :as job} (.take writes-queue)]
-      (l4j/with-logging-context (assoc
-                                 (meta job)
-                                 :jobId (str "job-" (.substring (str job-id) 0 8)))
-        (try
-          ;; Note that task functions are responsible for the delivery
-          ;; of the promise and the setting of DONE and also preserve
-          ;; their job id.
+  (loop []
+    (when (.get flag)
+      (let [{task-f! :function
+             priority :priority
+             job-id :id :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS)]
+        (when job
+          ;; job exists on the queue so execute it. If the priority is :exclusive-write it needs to be executed
+          ;; under the write lock so queue attempts are rejected while the job is running
+          (l4j/with-logging-context (assoc
+                                      (meta job)
+                                      :jobId (str "job-" (.substring (str job-id) 0 8)))
+                                    (try
+                                      ;; Note that task functions are responsible for the delivery
+                                      ;; of the promise and the setting of DONE and also preserve
+                                      ;; their job id.
 
-          (log-time-taken "task"
-            (if (= :exclusive-write priority)
-              (with-lock
-                (task-f! job))
-              (task-f! job)))
+                                      (log-time-taken "task"
+                                                      (if (= :exclusive-write priority)
+                                                        (with-lock
+                                                          (task-f! job))
+                                                        (task-f! job)))
 
-          (catch Exception ex
-            (log/warn ex "A task raised an error delivering error to promise")
-            ;; TODO improve error returned
-            (job-failed! job ex))))
-      (log/info "Writer waiting for tasks")
-      (recur (.take writes-queue))))
+                                      (catch Exception ex
+                                        (log/warn ex "A task raised an error delivering error to promise")
+                                        ;; TODO improve error returned
+                                        (job-failed! job ex)))))
+
+        (recur)))))
 
 (defn start-writer! []
-  (future
-    (write-loop)))
+  (let [flag (AtomicBoolean. true)
+        ^Runnable writer #(write-loop flag)
+        t (Thread. writer "Drafter write-loop thread")]
+    (.start t)
+    {:should-continue flag :thread t}))
 
-(defn stop-writer! [writer]
-  (future-cancel writer))
+(defn stop-writer! [{:keys [should-continue thread]}]
+  (.set should-continue false)
+  (.join thread))
