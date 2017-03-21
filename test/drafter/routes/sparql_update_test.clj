@@ -2,18 +2,13 @@
   (:require [drafter.routes.sparql-update :refer :all]
             [drafter.test-common :refer [throws-exception?]]
             [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!]]
-            [swirrl-server.async.jobs :as jobs]
             [clojure.test :refer :all]
             [clojure.template :refer [do-template]]
-            [ring.util.codec :as codec]
             [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db stream->string
-                                         select-all-in-graph during-exclusive-write]]
+                                         select-all-in-graph during-exclusive-write assert-is-ok-response]]
             [grafter.rdf.repository :refer [query]]
             [swirrl-server.errors :refer [encode-error]])
-  (:import [java.util UUID]
-           [java.util.concurrent CountDownLatch TimeUnit]
-           [java.nio.charset StandardCharsets]
-           [java.io ByteArrayInputStream]))
+  (:import [java.nio.charset StandardCharsets]))
 
 (defn ->input-stream
   "Convert a string into an Input Stream"
@@ -58,9 +53,8 @@
 
     (testing "POST /update"
       (testing "with a valid SPARQL update"
-        (let [{:keys [status body headers]} (endpoint (application-sparql-update-request))]
-          (is (= 200 status)
-              "returns 200 success")
+        (let [response (endpoint (application-sparql-update-request))]
+          (assert-is-ok-response response)
           (is (query *test-backend* "ASK { <http://test/> <http://test/> <http://test/> . }")
               "Inserts the data"))))))
 
@@ -79,16 +73,15 @@
                 "The exception that is thrown encodes a 503 response")))))
 
       ;; should be able to submit updates again
-      (let [{:keys [status]} (endpoint (application-sparql-update-request))]
-        (is (= 200 status))))))
+      (let [response (endpoint (application-sparql-update-request))]
+        (assert-is-ok-response response)))))
 
 (deftest application-x-form-urlencoded-test
   (let [endpoint (update-endpoint "/update" *test-backend*)]
     (testing "POST /update"
       (testing "with a SPARQL update"
-        (let [{:keys [status body headers]} (endpoint (x-form-urlencoded-update-request))]
-          (is (= 200 status)
-              "returns 200 success")
+        (let [response (endpoint (x-form-urlencoded-update-request))]
+          (assert-is-ok-response response)
           (is (query *test-backend* "ASK { <http://test/> <http://test/> <http://test/> . }")
               "Inserts the data"))))))
 
@@ -99,9 +92,8 @@
       (let [request (application-sparql-update-request "INSERT { GRAPH <http://example.com/> {
                                                           <http://test/> <http://test/> <http://test/> .
                                                         }} WHERE { }")
-            {:keys [status body headers]} (endpoint request)]
-        (is (= 200 status)
-            "returns 200 success")
+            response (endpoint request)]
+        (assert-is-ok-response response)
 
         (is (query *test-backend* "ASK { <http://test/> <http://test/> <http://test/> . }"
                    :default-graph ["http://example.com/"]

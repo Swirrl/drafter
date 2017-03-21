@@ -1,14 +1,13 @@
 (ns drafter.backend.endpoints
   (:require [grafter.rdf.protocols :as proto]
-            [drafter.rdf.sesame :refer [prepare-query apply-restriction execute-restricted-update]]
+            [drafter.rdf.sesame :refer [prepare-query apply-restriction prepare-restricted-update]]
             [drafter.backend.protocols :refer [->sesame-repo] :as backend]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
             [drafter.util :as util]
             [schema.core :as s])
-  (:import [org.openrdf.repository Repository]
-           [org.openrdf.model URI]))
+  (:import [org.openrdf.model URI]))
 
 (def ^:private itriple-readable-delegate
   {:to-statements (fn [this options]
@@ -44,8 +43,8 @@
       (apply-restriction pquery restriction)))
 
   backend/SparqlUpdateExecutor
-  (execute-update [this update-query]
-    (execute-restricted-update this update-query restriction))
+  (prepare-update [this update-query]
+    (prepare-restricted-update (->sesame-repo this) update-query restriction))
 
   backend/ToRepository
   (->sesame-repo [_] (->sesame-repo inner)))

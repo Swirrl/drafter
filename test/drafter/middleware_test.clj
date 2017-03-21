@@ -11,7 +11,8 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-publisher test-editor]])
   (:import [clojure.lang ExceptionInfo]
-           [java.io File]))
+           [java.io File]
+           [org.openrdf.query QueryInterruptedException]))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -216,4 +217,28 @@
           body-text "The quick brown fox jumped"
           body-stream (tc/string->input-stream body-text)
           result (handler {:uri "/test" :request-method :post :body body-stream})]
-      (is (= body-text result )))))
+      (is (= body-text result)))))
+
+(deftest sparql-negotiation-handler-test
+  (testing "Valid request"
+    (let [handler (sparql-negotiation-handler identity)
+          accept-content-type "application/n-triples"
+          submitted-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
+          request {:uri "/sparql"
+                   :params {:query submitted-query}
+                   :headers {"accept" accept-content-type}}
+          {{:keys [format response-content-type query]} :sparql} (handler request)]
+      (is (= accept-content-type response-content-type))
+      (is (= query submitted-query))))
+  
+  (testing "Content negotiation failure"
+    (let [handler (sparql-negotiation-handler identity)
+          response (handler {:uri "/test"
+                             :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                             :headers {"accept" "text/trig"}})]
+      (tc/assert-is-not-acceptable-response response)))
+
+  (testing "Malformed SPARQL query"
+    (let [handler (sparql-negotiation-handler identity)
+          response (handler {:uri "/test" :params {:query "NOT A SPARQL QUERY"}})]
+      (tc/assert-is-bad-request-response response))))

@@ -48,8 +48,6 @@
 (def ^{:doc "A future to control the single write thread that performs database writes."}
   writer-service)
 
-(def stop-reaper (fn []))
-
 (defroutes app-routes
   (route/resources "/")
   (route/not-found "Not Found"))
@@ -151,8 +149,7 @@
   (initialise-write-service!)
   (init-backend!)
   (init-user-repo!)
-  (initialise-app! backend)
-  (set-var-root! #'stop-reaper (ops/start-reaper 2000)))
+  (initialise-app! backend))
 
 (defn- load-logging-configuration [config-file]
   (-> config-file slurp read-string))
@@ -190,5 +187,4 @@
   (stop-backend backend)
   (.close user-repo)
   (stop-writer! writer-service)
-  (stop-reaper)
   (log/info "drafter has shut down."))

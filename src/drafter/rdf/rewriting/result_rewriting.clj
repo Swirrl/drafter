@@ -2,17 +2,14 @@
   "The other side of query rewriting; result rewriting.  Result rewriting
   rewrites results and solutions."
   (:require
-   [grafter.rdf.repository :as repo]
    [grafter.rdf :refer [prefixer]]
    [grafter.rdf.protocols :refer [map->Quad]]
    [drafter.util :as util]
-   [drafter.rdf.draft-management :as mgmt]
    [clojure.set :as set]
    [clojure.tools.logging :as log])
-  (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery Update QueryResultHandler TupleQueryResultHandler BindingSet Binding]
+  (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery TupleQueryResultHandler]
            [org.openrdf.query.impl BindingImpl MapBindingSet]
-           [org.openrdf.rio Rio RDFWriter RDFHandler]
-           [org.openrdf.query.algebra.evaluation.function Function FunctionRegistry]
+           [org.openrdf.rio RDFHandler]
            [org.openrdf.model.impl StatementImpl ContextStatementImpl]))
 
 (defn- rewrite-binding
@@ -95,13 +92,21 @@
   (let [draft->live (set/map-invert live->draft)]
     (reify GraphQuery
       (evaluate [this handler]
-        (.evaluate inner-query (rewriting-rdf-handler handler draft->live))))))
+        (.evaluate inner-query (rewriting-rdf-handler handler draft->live)))
+      (getMaxExecutionTime [this]
+        (.getMaxExecutionTime inner-query))
+      (setMaxExecutionTime [this max]
+        (.setMaxExecutionTime inner-query max)))))
 
 (defn- rewrite-tuple-query-results [inner-query live->draft]
   (let [draft->live (set/map-invert live->draft)]
     (reify TupleQuery
       (evaluate [this handler]
-        (.evaluate inner-query (make-select-result-rewriter draft->live handler))))))
+        (.evaluate inner-query (make-select-result-rewriter draft->live handler)))
+      (getMaxExecutionTime [this]
+        (.getMaxExecutionTime inner-query))
+      (setMaxExecutionTime [this max]
+        (.setMaxExecutionTime inner-query max)))))
 
 (defn rewrite-query-results [inner-query live->draft]
   (cond
