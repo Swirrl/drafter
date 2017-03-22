@@ -11,8 +11,10 @@ env:
 before_install:
 - sudo apt-get update
 - sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
-- sudo chown -R travis ./travis/bootstrap_stardog.sh
-- sudo chmod +x ./travis/bootstrap_stardog.sh
+- sudo chown -R travis ./travis/*
+- sudo chmod +x ./travis/*
+- sudo mkdir -p ~/.lein
+- sudo mv ./travis/profiles.clj ~/.lein/profiles.clj
 - "./travis/bootstrap_stardog.sh"
 before_script:
 - sleep 15

@@ -4,17 +4,6 @@
   :license {:name "Proprietary & Commercially Licensed Only"
             :url "http://swirrl.com/"}
 
-  :repositories [["snapshots" {:url "s3p://swirrl-jars/snapshots/"
-                               :sign-releases false
-                               :username :env
-                               :passphrase :env
-                               :releases false}]
-                 ["releases" {:url "s3p://swirrl-jars/releases/"
-                              :sign-releases true
-                              :username :env
-                              :passphrase :env
-                              :snapshots false}]]
-
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.openrdf.sesame/sesame-queryrender "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
                  [org.openrdf.sesame/sesame-runtime "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
