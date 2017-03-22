@@ -93,25 +93,29 @@
         update-route-fn #(raw-update-endpoint-route %1 %2 %3 authenticated-fn)]
     (specify-endpoint query-route-fn update-route-fn v1-prefix)))
 
-(defn create-sparql-routes [endpoint-map backend]
-  (let [timeout-conf (conf/get-timeout-config env (keys endpoint-map) ops/default-timeouts)
-        ep-routes (fn [[ep-name {:keys [query-fn update-fn version]}]]
-                    (create-sparql-endpoint-routes ep-name query-fn update-fn version backend timeout-conf))]
+(defn- get-sparql-endpoint-timeout-config []
+  (conf/get-timeout-config env #{:raw :live :draftset} ops/default-timeouts))
+
+(defn- create-sparql-routes [endpoint-map backend timeouts-config]
+  (let [ep-routes (fn [[ep-name {:keys [query-fn update-fn version]}]]
+                    (create-sparql-endpoint-routes ep-name query-fn update-fn version backend timeouts-config))]
     (mapcat ep-routes endpoint-map)))
 
-(defn get-sparql-routes [backend user-repo]
+(defn- get-sparql-routes [backend user-repo timeouts-config]
   (let [endpoints {:live live-endpoint-spec
                    :raw (create-raw-endpoint-spec user-repo)}]
-    (create-sparql-routes endpoints backend)))
+    (create-sparql-routes endpoints backend timeouts-config)))
 
 (defn initialise-app! [backend]
-  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)]
+  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)
+        sparql-timeouts-config (get-sparql-endpoint-timeout-config)
+        draftset-sparql-query-timeout (conf/get-endpoint-timeout :draftset :query sparql-timeouts-config)]
     (set-var-root! #'app (app-handler
                           ;; add your application routes here
                           (-> []
                               (add-route (pages-routes backend))
-                              (add-route (draftset-api-routes backend user-repo authenticated-fn))
-                              (add-routes (get-sparql-routes backend authenticated-fn))
+                              (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout))
+                              (add-routes (get-sparql-routes backend authenticated-fn sparql-timeouts-config))
                               (add-route (context "/v1/status" []
                                                   (status-routes global-writes-lock finished-jobs restart-id)))
 
