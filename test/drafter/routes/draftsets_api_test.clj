@@ -1517,7 +1517,7 @@
   (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
         authenticated-fn (middleware/make-authenticated-wrapper users {})
         swagger-spec (swagger/load-spec-and-resolve-refs)
-        api-handler (draftset-api-routes *test-backend* users authenticated-fn)]
+        api-handler (draftset-api-routes *test-backend* users authenticated-fn nil)]
     (binding [*user-repo* users
               *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
       (test-function))))

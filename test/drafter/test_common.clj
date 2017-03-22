@@ -5,6 +5,8 @@
             [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf.repository.registry :as reg]
             [environ.core :refer [env]]
+            [ring.middleware.params :refer [wrap-params]]
+            [ring.server.standalone :as ring-server]
             [drafter.user :as user]
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.backend.protocols :refer [stop-backend]]
@@ -18,7 +20,7 @@
             [schema.core :as s])
   (:import [java.util Scanner UUID ArrayList]
            [java.util.concurrent CountDownLatch TimeUnit]
-           [java.io ByteArrayInputStream ByteArrayOutputStream]
+           [java.io ByteArrayInputStream ByteArrayOutputStream PrintWriter OutputStream]
            org.openrdf.rio.trig.TriGParserFactory
            (org.apache.http.message BasicHttpResponse)
            (org.apache.http ProtocolVersion)
@@ -303,6 +305,40 @@
         repo (DrafterSPARQLRepository. (str uri))]
     (.initialize repo)
     repo))
+
+(defn null-output-stream []
+  (proxy [OutputStream] []
+    (close [])
+    (flush [])
+    (write
+      ([_])
+      ([bytes offset length]))))
+
+(defmacro suppress-stdout [& body]
+  `(binding [*out* (PrintWriter. (null-output-stream))]
+     ~@body))
+
+(defmacro with-server [port handler & body]
+  `(let [server# (suppress-stdout (ring-server/serve ~handler {:port ~port :join? false :open-browser? false}))]
+     (try
+       ~@body
+       (finally
+         (.stop server#)
+         (.join server#)))))
+
+(def ok-spo-query-response
+  {:status 200 :headers {"Content-Type" "application/sparql-results+json"} :body (empty-spo-json-body)})
+
+(defn extract-query-params-handler [params-ref response]
+  (wrap-params
+    (fn [{:keys [query-params] :as req}]
+      (reset! params-ref query-params)
+      response)))
+
+(defn extract-method-handler [method-ref response]
+  (fn [{:keys [request-method]}]
+    (reset! method-ref request-method)
+    response))
 
 (defn key-set
   "Gets a set containing the keys in the given map."

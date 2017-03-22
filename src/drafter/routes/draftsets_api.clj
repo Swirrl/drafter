@@ -29,16 +29,16 @@
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
     (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
 
-(defn- execute-query-in-draftset [backend draftset-ref request union-with-live?]
+(defn- execute-query-in-draftset [backend draftset-ref request union-with-live? query-timeout]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
-        handler (sparql-protocol-handler rewriting-executor nil)]
+        handler (sparql-protocol-handler rewriting-executor query-timeout)]
     (handler request)))
 
-(defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
+(defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live? query-timeout]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
         pquery (dsmgmt/all-quads-query rewriting-executor)]
     (if-let [[rdf-format response-content-type] (conneg/negotiate-rdf-quads-format accept-content-type)]
-      (execute-prepared-query pquery rdf-format response-content-type nil)
+      (execute-prepared-query pquery rdf-format response-content-type query-timeout)
       (not-acceptable-response))))
 
 (defn- existing-draftset-handler [backend inner-handler]
@@ -71,12 +71,6 @@
     (if (util/implies (is-triples-format? rdf-format) (some? graph))
       (inner-handler request)
       (unprocessable-entity-response "Graph parameter required for triples RDF format"))))
-
-(defn- required-managed-graph-param-handler [backend inner-handler]
-  (fn [{{:keys [graph]} :params :as request}]
-    (if (mgmt/is-graph-managed? backend graph)
-      (inner-handler request)
-      (unprocessable-entity-response (str "Graph not found")))))
 
 (defn- required-live-graph-param-handler [backend inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
@@ -115,9 +109,8 @@
     (response/api-response 500 result)
     (response (dsmgmt/get-draftset-info backend draftset-id))))
 
-(defn draftset-api-routes [backend user-repo authenticated]
+(defn draftset-api-routes [backend user-repo authenticated query-timeout]
   (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
-          (required-managed-graph-param [h] (required-managed-graph-param-handler backend h))
           (as-draftset-owner [h]
             (authenticated
              (existing-draftset-handler
@@ -186,11 +179,11 @@
                       (parse-union-with-live-handler
                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
                          (if (is-quads-format? rdf-format)
-                           (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live)
+                           (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live query-timeout)
                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                                  escaped-query (RenderUtils/escape unsafe-query)
                                  query-request (assoc-in request [:params :query] escaped-query)]
-                             (execute-query-in-draftset backend draftset-id query-request union-with-live))))))))
+                             (execute-query-in-draftset backend draftset-id query-request union-with-live query-timeout))))))))
 
         (make-route :delete "/draftset/:id/data"
                     (as-draftset-owner
@@ -259,7 +252,7 @@
                        #{:query}
                        (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-                          (execute-query-in-draftset backend draftset-id request union-with-live)))))))
+                          (execute-query-in-draftset backend draftset-id request union-with-live query-timeout)))))))
 
         (make-route :post "/draftset/:id/publish"
                     (as-draftset-owner
