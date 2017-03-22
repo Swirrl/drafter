@@ -14,7 +14,7 @@ before_install:
 - sudo chown -R travis ./travis/*
 - sudo chmod +x ./travis/*
 - sudo mkdir -p ~/.lein
-- sudo mv ./travis/profiles.clj ~/.lein/profiles.clj
+- sudo mv ./travis/profiles.clj ./profiles.clj
 - "./travis/bootstrap_stardog.sh"
 before_script:
 - sleep 15

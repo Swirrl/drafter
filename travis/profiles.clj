@@ -1,4 +1,5 @@
-{:repositories
+{:default
+  {:repositories
   [["swirrl-jars-snapshots"
     {:url "s3p://swirrl-jars/snapshots/"
      :username :env
@@ -8,4 +9,4 @@
     {:url "s3p://swirrl-jars/releases/"
      :username :env
      :passphrase :env
-     :snapshots false}]]}
+     :snapshots false}]]}}
