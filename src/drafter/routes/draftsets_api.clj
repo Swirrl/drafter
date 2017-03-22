@@ -72,12 +72,6 @@
       (inner-handler request)
       (unprocessable-entity-response "Graph parameter required for triples RDF format"))))
 
-(defn- required-managed-graph-param-handler [backend inner-handler]
-  (fn [{{:keys [graph]} :params :as request}]
-    (if (mgmt/is-graph-managed? backend graph)
-      (inner-handler request)
-      (unprocessable-entity-response (str "Graph not found")))))
-
 (defn- required-live-graph-param-handler [backend inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
     (if (mgmt/is-graph-live? backend graph)
@@ -117,7 +111,6 @@
 
 (defn draftset-api-routes [backend user-repo authenticated]
   (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
-          (required-managed-graph-param [h] (required-managed-graph-param-handler backend h))
           (as-draftset-owner [h]
             (authenticated
              (existing-draftset-handler
