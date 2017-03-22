@@ -1,14 +1,12 @@
 (ns drafter.rdf.drafter-sparql-repository-test
-  (:require [ring.server.standalone :as ring-server]
-            [clojure.test :refer :all]
+  (:require [clojure.test :refer :all]
             [grafter.rdf.repository :as repo]
-            [ring.middleware.params :refer [wrap-params]]
             [grafter.sequences :refer [alphabetical-column-names]]
             [drafter.test-common :as tc])
   (:import [drafter.rdf DrafterSparqlSession]
            [org.openrdf.query QueryInterruptedException]
            [java.util.concurrent CountDownLatch TimeUnit ExecutionException]
-           [java.io ByteArrayOutputStream PrintWriter OutputStream]))
+           [java.io ByteArrayOutputStream]))
 
 (defn query-timeout-handler
   "Handler which always returns a query timeout response in the format used by Stardog"
@@ -19,50 +17,16 @@
 
 (def ^:private test-port 8080)
 
-(defn- null-output-stream []
-  (proxy [OutputStream] []
-         (close [])
-         (flush [])
-         (write
-           ([_])
-           ([bytes offset length]))))
-
-(defmacro suppress-stdout [& body]
-  `(binding [*out* (PrintWriter. (null-output-stream))]
-     ~@body))
-
-(defmacro with-server [handler & body]
-  `(let [server# (suppress-stdout (ring-server/serve ~handler {:port test-port :join? false :open-browser? false}))]
-     (try
-       ~@body
-       (finally
-         (.stop server#)
-         (.join server#)))))
-
-(def ok-spo-query-response
-  {:status 200 :headers {"Content-Type" "application/sparql-results+json"} :body (tc/empty-spo-json-body)})
-
-(defn- extract-query-params-handler [params-ref]
-  (wrap-params
-    (fn [{:keys [query-params] :as req}]
-      (reset! params-ref query-params)
-      ok-spo-query-response)))
-
-(defn- extract-method-handler [method-ref]
-  (fn [{:keys [request-method]}]
-    (reset! method-ref request-method)
-    ok-spo-query-response))
-
 (deftest query-timeout-test
   (testing "Raises QueryInterruptedException on timeout response"
     (let [repo (tc/get-latched-http-server-repo test-port)]
-      (with-server query-timeout-handler
+      (tc/with-server test-port query-timeout-handler
                    (is (thrown? QueryInterruptedException (repo/query repo "SELECT * WHERE { ?s ?p ?o }"))))))
 
   (testing "sends timeout header when maxExecutionTime set"
     (let [query-params (atom nil)
           repo (tc/get-latched-http-server-repo test-port)]
-      (with-server (extract-query-params-handler query-params)
+      (tc/with-server test-port (tc/extract-query-params-handler query-params tc/ok-spo-query-response)
                    (let [pquery (repo/prepare-query repo "SELECT * WHERE { ?s ?p ?o }")]
                      (.setMaxExecutionTime pquery 2)
                      (.evaluate pquery)
@@ -71,7 +35,7 @@
   (testing "does not send timeout header when maxExecutionTime not set"
     (let [query-params (atom nil)
           repo (tc/get-latched-http-server-repo test-port)]
-      (with-server (extract-query-params-handler query-params)
+      (tc/with-server test-port (tc/extract-query-params-handler query-params tc/ok-spo-query-response)
                    (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
                    (is (= false (contains? @query-params "timeout")))))))
 
@@ -79,7 +43,7 @@
   (testing "short query should be GET request"
     (let [method (atom nil)
           repo (tc/get-latched-http-server-repo test-port)]
-      (with-server (extract-method-handler method)
+      (tc/with-server test-port (tc/extract-method-handler method tc/ok-spo-query-response)
                    (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
                    (is (= :get @method)))))
 
@@ -95,7 +59,7 @@
           (.append sb " ")
           (recur (rest bindings))))
       (.append sb "} ?u ?p ?o }")
-      (with-server (extract-method-handler method)
+      (tc/with-server test-port (tc/extract-method-handler method tc/ok-spo-query-response)
                    (repo/query repo (str sb))
                    (is (= :post @method))))))
 
