@@ -8,7 +8,8 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.rdf :refer [statements]]
-            [environ.core :refer [env]]))
+            [environ.core :refer [env]]
+            [drafter.util :as util]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:
@@ -131,7 +132,7 @@
 (defn get-graph-clone-batches
   ([repo graph-uri] (get-graph-clone-batches repo graph-uri batched-write-size))
   ([repo graph-uri batch-size]
-   (let [m (first (mgmt/query repo (graph-count-query graph-uri)))
+   (let [m (first (util/query-eager-seq repo (graph-count-query graph-uri)))
          graph-count (Integer/parseInt (.stringValue (get m "c")))]
      (calculate-offsets graph-count batch-size))))
 

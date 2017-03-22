@@ -6,7 +6,8 @@
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
             [drafter.util :as util]
-            [schema.core :as s])
+            [schema.core :as s]
+            [grafter.rdf.repository :as repo])
   (:import [org.openrdf.repository Repository]
            [org.openrdf.model URI]))
 
@@ -21,6 +22,10 @@
 (def ^:private isparql-updateable-delegate
   {:update! (fn [this sparql-string]
               (proto/update! (->sesame-repo this) sparql-string))})
+
+(def ^:private to-connection-delegate
+  {:->connection (fn [this]
+                   (repo/->connection (backend/->sesame-repo this)))})
 
 (defn- add-delegate
   ([this triples] (proto/add (->sesame-repo this) triples))
@@ -54,7 +59,8 @@
   proto/ITripleReadable itriple-readable-delegate
   proto/ITripleWriteable itriple-writeable-delegate
   proto/ISPARQLable isparqlable-delegate
-  proto/ISPARQLUpdateable isparql-updateable-delegate)
+  proto/ISPARQLUpdateable isparql-updateable-delegate
+  repo/ToConnection to-connection-delegate)
 
 (def create-restricted ->RestrictedExecutor)
 
@@ -82,6 +88,7 @@
   proto/ITripleReadable itriple-readable-delegate
   proto/ITripleWriteable itriple-writeable-delegate
   proto/ISPARQLable isparqlable-delegate
-  proto/ISPARQLUpdateable isparql-updateable-delegate)
+  proto/ISPARQLUpdateable isparql-updateable-delegate
+  repo/ToConnection to-connection-delegate)
 
 (def draft-graph-set ->RewritingSesameSparqlExecutor)
