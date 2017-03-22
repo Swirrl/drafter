@@ -6,6 +6,5 @@
   (max 1 (int (Math/ceil (/ operation-timeout 1000)))))
 
 (def default-timeouts
-  "default timeouts for SPARQL operations - 4
-  minutes for the entire operation."
-  240000)
+  "default timeouts for SPARQL operations (30 seconds)."
+  30000)
