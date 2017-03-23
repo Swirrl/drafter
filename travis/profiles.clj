@@ -1,4 +1,4 @@
-{:default
+{:system
   {:repositories
   [["swirrl-jars-snapshots"
     {:url "s3p://swirrl-jars/snapshots/"
