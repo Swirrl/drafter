@@ -3,7 +3,7 @@
   responsible for ensuring writes are linearised without synchronous operations
   blocking for too long.
 
-  Long running synchronous operations can be scheduled as :exclusive-writes
+  Long running synchronous operations can be scheduled as :publish-writes
   meaning any other concurrent write attempts will fail fast, rather block.
 
   The public functions in this namespace are concerned with submitting jobs and
@@ -16,10 +16,10 @@
             [swirrl-server.async.jobs :refer [finished-jobs job-failed! restart-id ->Job]]
             [swirrl-server.errors :refer [ex-swirrl encode-error]])
   (:import (org.apache.log4j MDC)
-           (java.util.concurrent PriorityBlockingQueue)
+           (java.util.concurrent PriorityBlockingQueue TimeUnit)
            (java.util.concurrent.locks ReentrantLock)))
 
-(def priority-levels-map { :exclusive-write 2 :batch-write 1})
+(def priority-levels-map { :publish-write 2 :background-write 1})
 
 (def compare-jobs (comparator
                    (fn [job1 job2]
@@ -30,18 +30,30 @@
                        (= -1 (compare [(ordering type1) time1]
                                       [(ordering type2) time2]))))))
 
-(defonce global-writes-lock (ReentrantLock.))
+(def fairness
+  "Set to true for a fair lock policy, false for unfair.  See
+  ReentrantLock javadocs for details."
+  true)
+
+(def global-writes-lock (ReentrantLock. fairness))
 
 (defonce ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
-(defmacro with-lock [& forms]
+(defmacro with-lock
+  "Macro for executing forms inside a lock.  Takes a keyword for
+  logging purposes and executes the supplied forms inside a lock.
+  Requests to take the lock will wait forever for the lock to be
+  released.  After the forms have executed the lock is guaranteed to
+  be released."
+  [operation-type & forms]
   `(do
-     (log/info "Locking for an :exclusive-write")
+     (log/info "Locking for" ~operation-type)
      (.lock global-writes-lock)
      (try
+       (log/info "Acquired lock for " ~operation-type)
        ~@forms
        (finally
-         (log/info "Unlocking :exclusive-write lock")
+         (log/info "Releasing lock for" ~operation-type)
          (.unlock global-writes-lock)))))
 
 ;;queue-job :: Job -> ()
@@ -55,20 +67,7 @@
               (with-meta job {:reqId req-id})
               job)]
     (log/info "Queueing job: " job (meta job))
-    (if (= :exclusive-write (:priority job))
-      (do
-        (log/trace "Queueing :exclusive-write job on queue" writes-queue)
-        (.add writes-queue job))
-      (if (.tryLock global-writes-lock)
-        ;; We try the lock, not because we need the lock, but because we
-        ;; need to 503/refuse the addition of an item if the lock is
-        ;; taken.
-        (try
-          (.add writes-queue job)
-          (finally
-            (.unlock global-writes-lock)))
-
-        (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable.  Failed to queue job.  Please try again later."))))))
+    (.add writes-queue job)))
 
 ;;await-sync-job! :: Job -> ApiResponse
 (defn exec-sync-job!
@@ -77,11 +76,17 @@
   on the calling thread.  They do however check the writes-lock and
   will 503 if it's locked."
   [{job-function :function :keys [value-p priority] :as job}]
-  {:pre [(= :sync-write priority)]}
+  {:pre [(= :blocking-write priority)]}
 
-  (if (.isLocked global-writes-lock)
-    (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable.  Please try again later."))
-    (job-function job)))
+  ;; Try the lock & wait up to 10 seconds for it to let us in.  If it
+  ;; doesn't raise an error.
+  (if (.tryLock global-writes-lock 10 TimeUnit/SECONDS)
+    ;; if we get the lock run the job immediately
+    (try
+      (job-function job)
+      (finally
+        (.unlock global-writes-lock)))
+    (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable, due to other large write operations.  Please try again later."))))
 
 (defn- write-loop
   "Start the write loop running.  Note this function does not return
@@ -104,8 +109,8 @@
           ;; their job id.
 
           (log-time-taken "task"
-            (if (= :exclusive-write priority)
-              (with-lock
+            (if (= :publish-write priority)
+              (with-lock :publish
                 (task-f! job))
               (task-f! job)))
 

@@ -119,7 +119,7 @@
 (defn during-exclusive-write-f [f]
   (let [p (promise)
         latch (CountDownLatch. 1)
-        exclusive-job (create-job :exclusive-write
+        exclusive-job (create-job :publish-write
                                   (fn [j]
                                     (.countDown latch)
                                     @p))]

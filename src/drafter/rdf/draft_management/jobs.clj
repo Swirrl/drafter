@@ -83,7 +83,7 @@
 (defn joblet-seq->job
   "Creates a new job from a sequence of joblets. If provided the state
   is passed to the first joblet on execution."
-  ([joblet-seq] (joblet-seq->job joblet-seq :batch-write nil))
+  ([joblet-seq] (joblet-seq->job joblet-seq :background-write nil))
   ([joblet-seq write-priority] (joblet-seq->job joblet-seq write-priority nil))
   ([joblet-seq write-priority state]
    (make-job write-priority [job]

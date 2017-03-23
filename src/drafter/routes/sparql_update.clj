@@ -39,7 +39,7 @@
   (throw (ex-swirrl :invalid-content-type (str "Invalid Content-Type: " (:content-type request)))))
 
 (defn create-update-job [executor request timeouts]
-  (jobs/make-job :sync-write [job]
+  (jobs/make-job :blocking-write [job]
                  (let [timeouts (or timeouts ops/default-timeouts)
                        parsed-query (parse-update-request request)
                        query-string (:update parsed-query)

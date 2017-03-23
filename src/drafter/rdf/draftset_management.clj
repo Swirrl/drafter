@@ -1,26 +1,30 @@
 (ns drafter.rdf.draftset-management
-  (:require [grafter.vocabularies.rdf :refer :all]
-            [grafter.rdf :refer [add s context]]
-            [grafter.rdf.io :refer [IStatement->sesame-statement]]
-            [grafter.rdf.protocols :refer [map->Triple map->Quad]]
-            [grafter.rdf.repository :as repo]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.sesame :refer [read-statements]]
-            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
-            [drafter.backend.protocols :refer [prepare-query ->sesame-repo]]
-            [drafter.util :as util]
-            [drafter.draftset :as ds]
-            [drafter.user :as user]
-            [drafter.util :as util]
-            [drafter.rdf.draft-management :refer [update! query to-quads with-state-graph drafter-state-graph] :as mgmt]
+  (:require [clojure.string :as string]
+            [drafter
+             [draftset :as ds]
+             [user :as user]
+             [util :as util]
+             [write-scheduler :as writes]]
+            [drafter.backend.protocols :refer [->sesame-repo prepare-query]]
+            [drafter.rdf
+             [draft-management :as mgmt :refer [drafter-state-graph query to-quads update! with-state-graph]]
+             [drafter-ontology :refer :all]
+             [sesame :refer [read-statements]]]
             [drafter.rdf.draft-management.jobs :as jobs]
-            [swirrl-server.async.jobs :refer [create-job create-child-job job-succeeded!]]
-            [drafter.write-scheduler :as scheduler]
-            [clojure.string :as string])
+            [swirrl-server.async.jobs :as ajobs]
+            [drafter.rdf.rewriting.result-rewriting
+             :refer
+             [rewrite-query-results rewrite-statement]]
+            [grafter.rdf :refer [add context s]]
+            [grafter.rdf
+             [io :refer [IStatement->sesame-statement]]
+             [protocols :refer [map->Quad map->Triple]]
+             [repository :as repo]]
+            [grafter.vocabularies.rdf :refer :all])
   (:import [java.util Date UUID]
-           [org.openrdf.model Resource]
-           [org.openrdf.model.impl ContextStatementImpl]
-           [org.openrdf.query TupleQueryResultHandler GraphQuery]))
+           org.openrdf.model.impl.ContextStatementImpl
+           org.openrdf.model.Resource
+           [org.openrdf.query GraphQuery TupleQueryResultHandler]))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -305,9 +309,9 @@
 
 (defn delete-draftset-job [backend draftset-ref]
   (jobs/make-job
-    :batch-write [job]
+    :background-write [job]
     (do (delete-draftset! backend draftset-ref)
-        (job-succeeded! job))))
+        (ajobs/job-succeeded! job))))
 
 (defn delete-draftset-graph! [db draftset-ref graph-uri]
   (when (mgmt/is-graph-managed? db graph-uri)
@@ -531,27 +535,38 @@
       draft-graph-uri)
     (mgmt/create-draft-graph! backend live-graph {} (str (ds/->draftset-uri draftset-ref)))))
 
+(defn lock-writes-and-copy-graph
+  "Calls mgmt/copy-graph to copy a live graph into the draftset, but
+  does so with the writes lock engaged.  This allows us to fail
+  concurrent sync-writes fast."
+  [backend live-graph-uri draft-graph-uri opts]
+  (writes/with-lock :copy-graph
+    (mgmt/copy-graph backend live-graph-uri draft-graph-uri opts)))
+
 (defn copy-live-graph-into-draftset-job [backend draftset-ref live-graph]
-  (jobs/make-job :batch-write [job]
+  (jobs/make-job :background-write [job]
                  (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph)]
-                   (mgmt/copy-graph backend live-graph draft-graph-uri {:silent true})
-                   (job-succeeded! job))))
+                   (lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
+                   (ajobs/job-succeeded! job))))
 
-(defn- publish-draftset-graphs-joblet [backend draftset-ref]
-  (jobs/action-joblet
-   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
-     (mgmt/migrate-graphs-to-live! backend (vals graph-mapping)))))
-
-(defn- delete-draftset-joblet [backend draftset-ref]
-  (jobs/action-joblet
-   (delete-draftset-statements! backend draftset-ref)))
+(defn- publish-draftset-graphs! [backend draftset-ref]
+  (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
+    (mgmt/migrate-graphs-to-live! backend (vals graph-mapping))))
 
 (defn publish-draftset-job
   "Return a job that publishes the graphs in a draftset to live and
   then deletes the draftset."
   [backend draftset-ref]
-  (jobs/joblet-seq->job [(publish-draftset-graphs-joblet backend draftset-ref)
-                         (delete-draftset-joblet backend draftset-ref)] :exclusive-write))
+  ;; TODO combine these into a single job as priorities have now
+  ;; changed how these will be applied.
+
+  (jobs/make-job :publish-write [job]
+                 (try
+                   (publish-draftset-graphs! backend draftset-ref)
+                   (delete-draftset-statements! backend draftset-ref)
+                   (ajobs/job-succeeded! job)
+                   (catch Exception ex
+                     (ajobs/job-failed! job ex)))))
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
@@ -572,14 +587,14 @@
         (do
           (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
           (mgmt/append-data-batch! backend draft-graph-uri triples)
-          (let [next-job (create-child-job
+          (let [next-job (ajobs/create-child-job
                           job
                           (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) (merge state {:op :append})))]
-            (scheduler/queue-job! next-job)))
+            (writes/queue-job! next-job)))
         ;;NOTE: do this immediately instead of scheduling a
         ;;continuation since we haven't done any real work yet
         (append-draftset-quads backend draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-    (job-succeeded! job)))
+    (ajobs/job-succeeded! job)))
 
 (defn- copy-graph-for-append*
   [state draftset-ref backend live->draft quad-batches job]
@@ -587,7 +602,7 @@
         ds-uri (str (ds/->draftset-uri draftset-ref))
         {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri)]
 
-    (mgmt/copy-graph backend live-graph-uri draft-graph-uri {:silent true})
+    (lock-writes-and-copy-graph backend live-graph-uri draft-graph-uri {:silent true})
     ;; Now resume appending the batch
     (append-draftset-quads backend draftset-ref graph-map quad-batches (merge state {:op :append}) job)))
 
@@ -605,7 +620,7 @@
         now (java.util.Date.)
         append-data (partial append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append
                                                                                                 :job-started-at now })]
-    (create-job :batch-write append-data)))
+    (ajobs/create-job :background-write append-data)))
 
 (defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
   (append-quads-to-draftset-job backend draftset-ref (read-statements tempfile rdf-format)))
@@ -629,10 +644,10 @@
                       sesame-statements (map IStatement->sesame-statement rewritten-statements)
                       graph-array (into-array Resource (map util/string->sesame-uri (vals live->draft)))]
                   (.remove conn sesame-statements graph-array)))
-              (let [next-job (create-child-job
+              (let [next-job (ajobs/create-child-job
                               job
                               (partial delete-quads-from-draftset backend (rest quad-batches) draftset-ref live->draft state))]
-                (scheduler/queue-job! next-job)))
+                (writes/queue-job! next-job)))
             ;;NOTE: Do this immediately as we haven't done any real work yet
             (recur backend quad-batches draftset-ref live->draft (merge state {:op :copy-graph :live-graph live-graph}) job))
           ;;live graph does not exist so do not create a draft graph
@@ -640,14 +655,14 @@
           ;;which does not exist in live
           (recur backend (rest quad-batches) draftset-ref live->draft state job)))
       (let [draftset-info (get-draftset-info backend draftset-ref)]
-        (job-succeeded! job {:draftset draftset-info})))
+        (ajobs/job-succeeded! job {:draftset draftset-info})))
 
     :copy-graph
     (let [{:keys [live-graph]} state
           ds-uri (str (ds/->draftset-uri draftset-ref))
           {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph live->draft ds-uri)]
 
-      (mgmt/copy-graph backend live-graph draft-graph-uri {:silent true})
+      (lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
       ;; Now resume appending the batch
       (recur backend
              quad-batches
@@ -672,14 +687,14 @@
 
 (defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format]
   (jobs/make-job
-   :batch-write [job]
+   :background-write [job]
    (let [quads (read-statements serialised rdf-format)
          graph-mapping (stringified-draftset-backend-graph-mapping backend)]
      (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
 
 (defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format]
   (jobs/make-job
-     :batch-write [job]
+     :background-write [job]
      (let [triples (read-statements serialised rdf-format)
            quads (map #(util/make-quad-statement % graph) triples)
            graph-mapping (stringified-draftset-backend-graph-mapping backend)]

@@ -7,7 +7,7 @@
                                        conflict-detected-response]]
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
-            [swirrl-server.async.jobs :refer [job-succeeded!]]
+            [swirrl-server.async.jobs :as ajobs ]
             [drafter.rdf.sparql-protocol :refer [process-prepared-query process-sparql-query]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
@@ -96,9 +96,9 @@
 
 (defn- as-sync-write-job [f]
   (make-job
-    :sync-write [job]
+   :blocking-write [job]
     (let [result (f)]
-      (job-succeeded! job result))))
+      (ajobs/job-succeeded! job result))))
 
 (defn- run-sync
   ([api-call-fn]
