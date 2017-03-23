@@ -22,8 +22,8 @@
             [drafter.rdf.content-negotiation :as conneg]
             [drafter.rdf.rewriting.arq :as arq])
   (:import [java.io File]
-           (org.openrdf.query QueryInterruptedException)
-           (org.apache.jena.query QueryParseException)))
+           [org.apache.jena.query QueryParseException]
+           [clojure.lang ExceptionInfo]))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (if-let [user (user-repo/find-user-by-username user-repo username)]
@@ -47,8 +47,12 @@
     (reify authproto/IAuthentication
       (-parse [_ request] (authproto/-parse inner-backend request))
       (-authenticate [_ request data]
-        (when-let [{:keys [email role] :as token} (authproto/-authenticate inner-backend request data)]
-          (user/create-authenticated-user email (keyword role)))))))
+        (when-let [token (authproto/-authenticate inner-backend request data)]
+          (try
+            (user/validate-token! token)
+            (catch ExceptionInfo ex
+              (log/error ex "Token authentication failed due to an invalid user token")
+              (auth/throw-unauthorized {:message "Invalid token"}))))))))
 
 (defn require-authenticated
   "Requires the incoming request has been authenticated."
@@ -56,7 +60,7 @@
   (fn [request]
     (if (auth/authenticated? request)
       (let [email (:email (:identity request))]
-        (l4j/with-logging-context {:user email } ;; wrap a logging context over the request so we can trace the user
+        (l4j/with-logging-context {:user email} ;; wrap a logging context over the request so we can trace the user
           (log/info "got user" email)
           (inner-handler request)))
       (auth/throw-unauthorized {:message "Authentication required"}))))

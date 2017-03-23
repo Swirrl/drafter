@@ -3,7 +3,6 @@
             [clojure.tools.logging :as log]
             [compojure.core :refer [defroutes context]]
             [compojure.route :as route]
-            [drafter.operations :as ops]
             [drafter.middleware :as middleware]
             [swirrl-server.middleware.log-request :refer [log-request]]
             [drafter.configuration :as conf]
@@ -94,7 +93,7 @@
     (specify-endpoint query-route-fn update-route-fn v1-prefix)))
 
 (defn- get-sparql-endpoint-timeout-config []
-  (conf/get-timeout-config env #{:raw :live :draftset} ops/default-timeouts))
+  (conf/get-timeout-config env #{:raw :live :draftset}))
 
 (defn- create-sparql-routes [endpoint-map backend timeouts-config]
   (let [ep-routes (fn [[ep-name {:keys [query-fn update-fn version]}]]

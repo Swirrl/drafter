@@ -8,9 +8,11 @@
             [drafter.responses :refer [submit-sync-job!]]
             [drafter.backend.protocols :refer [prepare-update]]
             [drafter.rdf.endpoints :refer [live-endpoint]]
-            [drafter.operations :as ops]
+            [drafter.timeouts :as timeouts]
             [drafter.middleware :refer [require-user-role]]
-            [pantomime.media :as mt]))
+            [pantomime.media :as mt]
+            [drafter.requests :as request]
+            [drafter.user :as user]))
 
 (defmulti parse-update-request
   "Convert a request into an String representing the SPARQL update
@@ -36,10 +38,10 @@
 (defmethod parse-update-request :default [request]
   (throw (ex-swirrl :invalid-content-type (str "Invalid Content-Type: " (:content-type request)))))
 
-(defn create-update-job [executor request timeouts]
+(defn create-update-job [executor request endpoint-timeout]
   (jobs/make-job :sync-write [job]
-                 (let [timeouts (or timeouts ops/default-timeouts)
-                       query-timeout-seconds (ops/get-query-timeout-seconds timeouts)
+                 (let [user (request/get-user request)
+                       query-timeout-seconds (timeouts/calculate-query-timeout (user/query-timeout user) endpoint-timeout)
                        parsed-query (parse-update-request request)
                        query-string (:update parsed-query)
                        pquery (prepare-update executor query-string)]

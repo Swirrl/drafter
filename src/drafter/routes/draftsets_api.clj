@@ -34,11 +34,11 @@
         handler (sparql-protocol-handler rewriting-executor query-timeout)]
     (handler request)))
 
-(defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live? query-timeout]
+(defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live? user query-timeout]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
         pquery (dsmgmt/all-quads-query rewriting-executor)]
     (if-let [[rdf-format response-content-type] (conneg/negotiate-rdf-quads-format accept-content-type)]
-      (execute-prepared-query pquery rdf-format response-content-type query-timeout)
+      (execute-prepared-query pquery rdf-format response-content-type user query-timeout)
       (not-acceptable-response))))
 
 (defn- existing-draftset-handler [backend inner-handler]
@@ -177,9 +177,9 @@
                     (as-draftset-owner
                      (rdf-response-format-handler
                       (parse-union-with-live-handler
-                       (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
+                       (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params user :identity :as request}]
                          (if (is-quads-format? rdf-format)
-                           (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live query-timeout)
+                           (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live user query-timeout)
                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                                  escaped-query (RenderUtils/escape unsafe-query)
                                  query-request (assoc-in request [:params :query] escaped-query)]

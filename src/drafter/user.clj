@@ -1,7 +1,7 @@
 (ns drafter.user
   (:require [buddy.core.codecs :refer [str->bytes base64->bytes]]
-            [buddy.core.bytes :as bytes]
-            [drafter.util :as util])
+            [drafter.util :as util]
+            [drafter.timeouts :as timeouts])
   (:import [org.mindrot.jbcrypt BCrypt]
            [java.net URI]))
 
@@ -17,6 +17,7 @@ permissions."
 (def username :email)
 (def role :role)
 (def password-digest :password-digest)
+(def query-timeout :query-timeout)
 
 (defn username->uri
   "Gets a user's URI from their username."
@@ -53,10 +54,14 @@ permissions."
   authenticated for a request, their authentication parameters should
   no longer be needed, so users are normalised into a model without
   these parameters."
-  [email role]
-  {:pre [(is-known-role? role)]}
-  (let [email (get-valid-email email)]
-    {:email email :role role}))
+  ([email role] (create-authenticated-user email role nil))
+  ([email role query-timeout]
+   {:pre [(is-known-role? role)]}
+   (let [email (get-valid-email email)
+         user {:email email :role role}]
+     (if (some? query-timeout)
+       (assoc user :query-timeout query-timeout)
+       user))))
 
 (defn authenticated!
   "Asserts that the given user has been authenticated and returns a
@@ -89,6 +94,26 @@ permissions."
   [user submitted-password]
   (when (password-valid? user submitted-password)
     (authenticated! user)))
+
+(defn- user-token-invalid [token invalid-key info]
+  (let [msg (str "User token invalid: " info " (" invalid-key " = '" (invalid-key token) "')")]
+    (throw (ex-info msg {:token token}))))
+
+(defn validate-token!
+  "Given a user JWT token from a request, returns a record describing the corresponding user.
+   Throws a Buddy 'unauthorised' exception if the token is malformed."
+  [token]
+  (if-let [email (util/validate-email-address (:email token))]
+    (let [role (keyword (:role token))]
+      (if (is-known-role? role)
+        (if-let [timeout-str (:query-timeout token)]
+          (let [timeout-or-ex (timeouts/try-parse-timeout timeout-str)]
+            (if (instance? Exception timeout-or-ex)
+              (user-token-invalid token :query-timeout (.getMessage timeout-or-ex))
+              (create-authenticated-user email role timeout-or-ex)))
+          (create-authenticated-user email role))
+        (user-token-invalid token :role "Unknown role")))
+    (user-token-invalid token :email "Invalid address")))
 
 (defn has-owner? [draftset]
   (contains? draftset :current-owner))

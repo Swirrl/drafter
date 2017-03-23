@@ -1,12 +1,14 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.tools.logging :as log]
-            [drafter.operations :refer :all]
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
             [drafter.middleware :refer [allowed-methods-handler sparql-negotiation-handler]]
             [drafter.channels :refer :all]
-            [compojure.core :refer [make-route]])
+            [compojure.core :refer [make-route]]
+            [drafter.timeouts :as timeouts]
+            [drafter.user :as user]
+            [drafter.requests :as request])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            [org.openrdf.query QueryInterruptedException]
            [org.openrdf.query.resultio QueryResultIO]
@@ -58,9 +60,10 @@
           (future-cancel query-f)
           (throw (QueryInterruptedException.)))))))
 
-(defn execute-prepared-query [pquery format response-content-type query-timeouts]
-  (let [query-type (get-query-type pquery)]
-    (.setMaxExecutionTime pquery (get-query-timeout-seconds (or query-timeouts default-timeouts)))
+(defn execute-prepared-query [pquery format response-content-type user endpoint-query-timeout]
+  (let [query-type (get-query-type pquery)
+        query-timeout (timeouts/calculate-query-timeout (user/query-timeout user) endpoint-query-timeout)]
+    (.setMaxExecutionTime pquery query-timeout)
     (try
       (if (= :ask query-type)
         (execute-boolean-query pquery format response-content-type)
@@ -74,7 +77,7 @@
   (fn [{{:keys [query format response-content-type]} :sparql :as request}]
     (let [pquery (prepare-query executor query)]
       (log/info (str "Running query\n" query "\nwith graph restrictions"))
-      (execute-prepared-query pquery format response-content-type query-timeouts))))
+      (execute-prepared-query pquery format response-content-type (request/get-user request) query-timeouts))))
 
 (defn sparql-protocol-handler [executor timeouts]
   (->> (sparql-execution-handler executor timeouts)

@@ -2,7 +2,8 @@
   (:require [drafter.user :refer :all]
             [clojure.test :refer :all]
             [drafter.draftset :as ds])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           (clojure.lang ExceptionInfo)))
 
 (def test-password "password")
 (def test-editor (create-user "editor@example.com" :editor (get-digest test-password)))
@@ -32,9 +33,28 @@
   (let [password (str (UUID/randomUUID))
         password-digest (get-digest password)
         user (create-user "test@example.com" :publisher password-digest)]
-    (are [user key valid?] (= valid? (password-valid? user key))
-         user password true
-         user (get-digest "different password") false)))
+    (are [key valid?] (= valid? (password-valid? user key))
+         password true
+         (get-digest "different password") false)))
+
+(deftest validate-token!-test
+  (testing "Invalid email"
+    (is (thrown? ExceptionInfo (validate-token! {:email "not an email address" :role "publisher"}))))
+
+  (testing "Invalid role"
+    (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "invalid"}))))
+
+  (testing "Negative query timeout"
+    (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "editor" :query-timeout "-1"}))))
+
+  (testing "Non-numeric query timeout"
+    (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "manager" :query-timeout "abc"}))))
+
+  (testing "Valid token"
+    (is (= {:email "foo@bar.com" :role :editor} (validate-token! {:email "foo@bar.com" :role "editor"}))))
+
+  (testing "Valid token with query timeout"
+    (is (= {:email "foo@bar.com" :role :publisher :query-timeout 4} (validate-token! {:email "foo@bar.com" :role "publisher" :query-timeout "4"})))))
 
 (deftest authenticated!-test
   (are [user expected] (= expected (authenticated! user))
