@@ -37,7 +37,8 @@
      * Update all matching leaf timeouts to match the setting
   "
   (:require [clojure.tools.logging :as log]
-            [clojure.string :as string])
+            [clojure.string :as string]
+            [drafter.timeouts :as timeouts])
   (:import [java.util.concurrent TimeUnit]))
 
 (def timeout-param-prefix "drafter-timeout")
@@ -90,19 +91,6 @@
     (Exception. (f (.getMessage v))))
   v)
 
-;try-parse-timeout :: String -> Try[Timeout]
-(defn try-parse-timeout
-  "Attempts to parse a string into a timeout value. Returns an
-  exception describing the error if the input cannot be parsed."
-  [s]
-  (try
-    (let [timeout (Integer/parseInt s)]
-      (if (pos? timeout)
-        (.toMillis TimeUnit/SECONDS timeout)
-        (Exception. "Timeout values must be non-negative")))
-    (catch NumberFormatException ex
-      (Exception. (str "Timeout value '" s "' is not an integer")))))
-
 (defn create-setting
   "A timeout setting contains a selector for a set of nodes in the
   timeout config tree along with a timeout value to use for those
@@ -113,7 +101,7 @@
 ;parse-timeout-setting :: String -> String -> Try[Setting]
 (defn- parse-timeout-setting [name value]
   (let [selector (match-timeout-selector name)
-        timeout (->> (try-parse-timeout value)
+        timeout (->> (timeouts/try-parse-timeout value)
                      (map-error-msg (fn [m] (str "Invalid value for timeout parameter '" name "': " m))))]
     (lift-f create-setting selector timeout)))
 
@@ -238,13 +226,14 @@
   "Calculates the timeout configuration tree given a collection of
   endpoints, the default timeouts for all operations and the current
   environment map."
-  [env endpoints default-timeouts]
-  (let [default-config (create-initial-timeouts endpoints default-timeouts)
-        endpoint-set (set endpoints)
-        {:keys [errors settings]} (find-timeout-variables env endpoint-set)
-        ordered-params (order-settings settings)]
-    (log-config-errors errors)
-    (reduce apply-setting default-config ordered-params)))
+  ([env endpoints] (get-timeout-config env endpoints timeouts/default-query-timeout))
+  ([env endpoints default-timeouts]
+   (let [default-config (create-initial-timeouts endpoints default-timeouts)
+         endpoint-set (set endpoints)
+         {:keys [errors settings]} (find-timeout-variables env endpoint-set)
+         ordered-params (order-settings settings)]
+     (log-config-errors errors)
+     (reduce apply-setting default-config ordered-params))))
 
 (defn get-endpoint-timeout
   "Gets the timeout for the endpoint type (query or update) on the

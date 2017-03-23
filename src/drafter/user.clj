@@ -1,7 +1,7 @@
 (ns drafter.user
   (:require [buddy.core.codecs :refer [str->bytes base64->bytes]]
             [drafter.util :as util]
-            [drafter.configuration :as config])
+            [drafter.timeouts :as timeouts])
   (:import [org.mindrot.jbcrypt BCrypt]
            [java.net URI]))
 
@@ -17,6 +17,7 @@ permissions."
 (def username :email)
 (def role :role)
 (def password-digest :password-digest)
+(def query-timeout :query-timeout)
 
 (defn username->uri
   "Gets a user's URI from their username."
@@ -106,7 +107,7 @@ permissions."
     (let [role (keyword (:role token))]
       (if (is-known-role? role)
         (if-let [timeout-str (:query-timeout token)]
-          (let [timeout-or-ex (config/try-parse-timeout timeout-str)]
+          (let [timeout-or-ex (timeouts/try-parse-timeout timeout-str)]
             (if (instance? Exception timeout-or-ex)
               (user-token-invalid token :query-timeout (.getMessage timeout-or-ex))
               (create-authenticated-user email role timeout-or-ex)))

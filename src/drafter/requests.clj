@@ -9,3 +9,8 @@
   "Returns the query string for a request map"
   [request]
   (get-in request [:params :query]))
+
+(defn get-user
+  "Gets the user associated with the request if one exists"
+  [request]
+  (:identity request))

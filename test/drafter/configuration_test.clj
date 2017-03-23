@@ -32,16 +32,6 @@
        (create-selector nil :query) (create-selector :live nil)
        (create-selector :raw nil) (create-selector :raw :query)))
 
-(deftest try-parse-timeout-test
-  (testing "non-numeric timeouts invalid"
-    (is (instance? Exception (try-parse-timeout "abc"))))
-
-  (testing "negative timeouts invalid"
-    (is (instance? Exception (try-parse-timeout "-22"))))
-
-  (testing "should convert valid to milliseconds"
-    (is (= 34000 (try-parse-timeout "34")))))
-
 (deftest parse-and-validate-timeout-setting-test
   (testing "invalid settings"
     (are [name value endpoints]
@@ -64,12 +54,12 @@
   (testing "valid settings"
     (are [name value endpoints expected]
       (= expected (parse-and-validate-timeout-setting name value endpoints))
-      :drafter-timeout-endpoint-live "30" #{:raw :live} (create-setting (create-selector :live nil) 30000)
-      :drafter-timeout "10" #{:live} (create-setting (create-selector nil nil) 10000))))
+      :drafter-timeout-endpoint-live "30" #{:raw :live} (create-setting (create-selector :live nil) 30)
+      :drafter-timeout "10" #{:live} (create-setting (create-selector nil nil) 10))))
 
 (deftest find-timeout-variables-test
-  (let [setting1 (create-setting (create-selector :live :query) 10000)
-        setting2 (create-setting (create-selector nil :update) 20000)
+  (let [setting1 (create-setting (create-selector :live :query) 10)
+        setting2 (create-setting (create-selector nil :update) 20)
         endpoints #{:live :raw}
         env {:drafter-timeout-query-endpoint-live "10"
              :drafter-timeout-update "20"

@@ -54,7 +54,7 @@
     (is (= {:email "foo@bar.com" :role :editor} (validate-token! {:email "foo@bar.com" :role "editor"}))))
 
   (testing "Valid token with query timeout"
-    (is (= {:email "foo@bar.com" :role :publisher :query-timeout 4000} (validate-token! {:email "foo@bar.com" :role "publisher" :query-timeout "4"})))))
+    (is (= {:email "foo@bar.com" :role :publisher :query-timeout 4} (validate-token! {:email "foo@bar.com" :role "publisher" :query-timeout "4"})))))
 
 (deftest authenticated!-test
   (are [user expected] (= expected (authenticated! user))
