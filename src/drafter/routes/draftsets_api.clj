@@ -42,7 +42,7 @@
              :sparql {:prepared-query pquery
                       :format rdf-format
                       :response-content-type response-content-type}}
-        handler (sparql-timeout-handler endpoint-timeout (sparql-execution-handler))]
+        handler (sparql-timeout-handler endpoint-timeout sparql-execution-handler)]
     (handler req)))
 
 (defn- existing-draftset-handler [backend inner-handler]
@@ -232,9 +232,7 @@
                       (require-graph-for-triples-rdf-format
                        (temp-file-body
                         (fn [{{draftset-id :draftset-id
-                               request-content-type :content-type
                                rdf-format :rdf-format
-                               content-type :rdf-content-type
                                graph :graph} :params body :body :as request}]
                           (if (is-quads-format? rdf-format)
                             (let [append-job (dsmgmt/append-data-to-draftset-job backend draftset-id body rdf-format)]
@@ -249,14 +247,12 @@
                         (submit-async-job! (dsmgmt/copy-live-graph-into-draftset-job backend draftset-id graph))))))
 
         (make-route nil "/draftset/:id/query"
-                    (allowed-methods-handler
-                     #{:get :post}
-                     (as-draftset-owner
-                      (require-params
-                       #{:query}
-                       (parse-union-with-live-handler
+                    (as-draftset-owner
+                      (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-                          (execute-query-in-draftset backend draftset-id request union-with-live query-timeout)))))))
+                          (let [executor (get-draftset-executor backend draftset-id union-with-live)
+                                handler (sparql-protocol-handler executor query-timeout)]
+                            (handler request))))))
 
         (make-route :post "/draftset/:id/publish"
                     (as-draftset-owner

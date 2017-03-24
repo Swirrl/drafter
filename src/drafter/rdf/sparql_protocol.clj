@@ -3,10 +3,9 @@
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
-            [drafter.middleware :refer [allowed-methods-handler sparql-negotiation-handler sparql-timeout-handler sparql-prepare-query-handler]]
+            [drafter.middleware :refer [allowed-methods-handler sparql-negotiation-handler sparql-timeout-handler sparql-prepare-query-handler require-params]]
             [drafter.channels :refer :all]
-            [compojure.core :refer [make-route]]
-            [drafter.requests :as request])
+            [compojure.core :refer [make-route]])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            [org.openrdf.query QueryInterruptedException]
            [org.openrdf.query.resultio QueryResultIO]
@@ -58,7 +57,7 @@
           (future-cancel query-f)
           (throw (QueryInterruptedException.)))))))
 
-(defn execute-prepared-query [pquery format response-content-type]
+(defn- execute-prepared-query [pquery format response-content-type]
   (let [query-type (get-query-type pquery)]
     (try
       (if (= :ask query-type)
@@ -69,17 +68,20 @@
          :headers {"Content-Type" "text/plain; charset=utf-8"}
          :body "Query execution timed out"}))))
 
-(defn sparql-execution-handler []
-  (fn [{{:keys [prepared-query format response-content-type]} :sparql :as request}]
-    (log/info (str "Running query\n" prepared-query "\nwith graph restrictions"))
-    (execute-prepared-query prepared-query format response-content-type)))
+(defn sparql-execution-handler [{{:keys [prepared-query format response-content-type]} :sparql :as request}]
+  (log/info (str "Running query\n" prepared-query "\nwith graph restrictions"))
+  (execute-prepared-query prepared-query format response-content-type))
 
-(defn sparql-protocol-handler [executor endpoint-timeout]
-  (->> (sparql-execution-handler)
+(defn build-sparql-protocol-handler [prepare-handler exec-handler endpoint-timeout]
+  (->> exec-handler
        (sparql-timeout-handler endpoint-timeout)
        (sparql-negotiation-handler)
-       (sparql-prepare-query-handler executor)
+       (prepare-handler)
+       (require-params #{:query})
        (allowed-methods-handler #{:get :post})))
+
+(defn sparql-protocol-handler [executor endpoint-timeout]
+  (build-sparql-protocol-handler #(sparql-prepare-query-handler executor %) sparql-execution-handler endpoint-timeout))
 
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path, a SPARQL executor and
