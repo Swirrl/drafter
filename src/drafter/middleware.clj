@@ -9,7 +9,7 @@
             [drafter.responses :as response]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
-            [drafter.rdf.sesame :refer [read-statements]]
+            [drafter.rdf.sesame :refer [read-statements] :as ses]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
             [buddy.auth :as auth]
             [buddy.auth.protocols :as authproto]
@@ -20,7 +20,8 @@
             [drafter.requests :as drafter-request]
             [pantomime.media :refer [media-type-named]]
             [drafter.rdf.content-negotiation :as conneg]
-            [drafter.rdf.rewriting.arq :as arq])
+            [drafter.timeouts :as timeouts]
+            [drafter.backend.protocols :refer [prepare-query]])
   (:import [java.io File]
            [org.apache.jena.query QueryParseException]
            [clojure.lang ExceptionInfo]))
@@ -189,20 +190,43 @@
     "text/plain" "text/plain; charset=utf-8"
     mime-type))
 
-(defn sparql-negotiation-handler [inner-handler]
+(defn sparql-prepare-query-handler
+  "Returns a ring handler which extracts a SPARQL query string from an incoming request, validates it and prepares it
+   using the given executor. The prepared query is associated into the request at the [:sparql :prepared-query] key
+   for access in downstream handlers."
+  [executor inner-handler]
   (fn [request]
-    (let [query-str (drafter-request/query request)
+    (try
+      (let [validated-query-str (ses/validate-query (drafter-request/query request))
+            pquery (prepare-query executor validated-query-str)]
+        (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
+      (catch QueryParseException ex
+        (let [error-message (.getMessage ex)]
+          (log/info "Malformed query: " error-message)
+          {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
+
+(defn sparql-negotiation-handler
+  "Performs content negotiation on an incoming SPARQL request and associates the sesame format and response content
+   type into the outgoing request into the :format and :response-content-type keys respecitvely within the :sparql
+   map. This handler expects to find the prepared sesame query at the path [:sparql :prepared-query] within the
+   incoming request map - prepare-sparql-query-handler is a handler which populates this value."
+  [inner-handler]
+  (fn [request]
+    (let [pquery (get-in request [:sparql :prepared-query])
           accept (drafter-request/accept request)]
-      (try
-        (let [arq-query (arq/sparql-string->arq-query query-str)
-              query-type (arq/get-query-type arq-query)]
-          (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
-            (inner-handler (assoc request :sparql
-                                          {:query query-str
-                                           :format result-format
-                                           :response-content-type (get-sparql-response-content-type media-type)}))
-            (response/not-acceptable-response)))
-        (catch QueryParseException ex
-          (let [error-message (.getMessage ex)]
-            (log/info "Malformed query: " error-message)
-            {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message}))))))
+      (let [query-type (ses/get-query-type pquery)]
+        (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
+          (let [to-assoc {:format                result-format
+                          :response-content-type (get-sparql-response-content-type media-type)}
+                updated-request (update request :sparql #(merge % to-assoc))]
+            (inner-handler updated-request))
+          (response/not-acceptable-response))))))
+
+(defn sparql-timeout-handler [endpoint-timeout inner-handler]
+  (fn [{user :identity {request-timeout-str :timeout} :params {pquery :prepared-query} :sparql :as request}]
+    (let [request-timeout (some-> request-timeout-str (timeouts/try-parse-timeout))]
+      (if (instance? Exception request-timeout)
+        {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body (.getMessage request-timeout)}
+        (let [query-timeout (timeouts/calculate-query-timeout request-timeout (user/query-timeout user) endpoint-timeout)]
+          (.setMaxExecutionTime pquery query-timeout)
+          (inner-handler (assoc-in request [:sparql :timeout] request-timeout)))))))

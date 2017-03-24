@@ -3,11 +3,9 @@
             [drafter.responses :refer [not-acceptable-response]]
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
-            [drafter.middleware :refer [allowed-methods-handler sparql-negotiation-handler]]
+            [drafter.middleware :refer [allowed-methods-handler sparql-negotiation-handler sparql-timeout-handler sparql-prepare-query-handler]]
             [drafter.channels :refer :all]
             [compojure.core :refer [make-route]]
-            [drafter.timeouts :as timeouts]
-            [drafter.user :as user]
             [drafter.requests :as request])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            [org.openrdf.query QueryInterruptedException]
@@ -60,10 +58,8 @@
           (future-cancel query-f)
           (throw (QueryInterruptedException.)))))))
 
-(defn execute-prepared-query [pquery format response-content-type user endpoint-query-timeout]
-  (let [query-type (get-query-type pquery)
-        query-timeout (timeouts/calculate-query-timeout (user/query-timeout user) endpoint-query-timeout)]
-    (.setMaxExecutionTime pquery query-timeout)
+(defn execute-prepared-query [pquery format response-content-type]
+  (let [query-type (get-query-type pquery)]
     (try
       (if (= :ask query-type)
         (execute-boolean-query pquery format response-content-type)
@@ -73,15 +69,16 @@
          :headers {"Content-Type" "text/plain; charset=utf-8"}
          :body "Query execution timed out"}))))
 
-(defn sparql-execution-handler [executor query-timeouts]
-  (fn [{{:keys [query format response-content-type]} :sparql :as request}]
-    (let [pquery (prepare-query executor query)]
-      (log/info (str "Running query\n" query "\nwith graph restrictions"))
-      (execute-prepared-query pquery format response-content-type (request/get-user request) query-timeouts))))
+(defn sparql-execution-handler []
+  (fn [{{:keys [prepared-query format response-content-type]} :sparql :as request}]
+    (log/info (str "Running query\n" prepared-query "\nwith graph restrictions"))
+    (execute-prepared-query prepared-query format response-content-type)))
 
-(defn sparql-protocol-handler [executor timeouts]
-  (->> (sparql-execution-handler executor timeouts)
+(defn sparql-protocol-handler [executor endpoint-timeout]
+  (->> (sparql-execution-handler)
+       (sparql-timeout-handler endpoint-timeout)
        (sparql-negotiation-handler)
+       (sparql-prepare-query-handler executor)
        (allowed-methods-handler #{:get :post})))
 
 (defn sparql-end-point

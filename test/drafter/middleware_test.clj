@@ -9,7 +9,11 @@
             [drafter.user :as user]
             [drafter.user.memory-repository :as memory-repo]
             [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-publisher test-editor]])
+            [drafter.user-test :refer [test-publisher test-editor]]
+            [grafter.rdf.repository :as repo]
+            [drafter.rdf.sesame :as ses]
+            [drafter.backend.repository]
+            [drafter.timeouts :as timeouts])
   (:import [clojure.lang ExceptionInfo]
            [java.io File]
            [org.openrdf.query QueryInterruptedException]))
@@ -219,26 +223,76 @@
           result (handler {:uri "/test" :request-method :post :body body-stream})]
       (is (= body-text result)))))
 
+(deftest sparql-prepare-query-handler-test
+  (let [r (repo/repo)
+        handler (sparql-prepare-query-handler r identity)]
+    (testing "Valid query"
+      (let [req (handler {:params {:query "SELECT * WHERE { ?s ?p ?o }"}})]
+        (is (some? (get-in req [:sparql :prepared-query])))))
+
+    (testing "Malformed SPARQL query"
+      (let [response (handler {:params {:query "NOT A SPARQL QUERY"}})]
+        (tc/assert-is-bad-request-response response)))))
+
+(defn- prepare-query-str [query-str]
+  (ses/prepare-query (repo/repo) query-str))
+
 (deftest sparql-negotiation-handler-test
   (testing "Valid request"
     (let [handler (sparql-negotiation-handler identity)
           accept-content-type "application/n-triples"
-          submitted-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
+          pquery (prepare-query-str "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")
           request {:uri "/sparql"
-                   :params {:query submitted-query}
+                   :sparql {:prepared-query pquery}
                    :headers {"accept" accept-content-type}}
-          {{:keys [format response-content-type query]} :sparql} (handler request)]
+          {{:keys [format response-content-type]} :sparql} (handler request)]
       (is (= accept-content-type response-content-type))
-      (is (= query submitted-query))))
+      (is (some? format))))
   
   (testing "Content negotiation failure"
     (let [handler (sparql-negotiation-handler identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
           response (handler {:uri "/test"
-                             :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                             :sparql {:prepared-query pquery}
                              :headers {"accept" "text/trig"}})]
-      (tc/assert-is-not-acceptable-response response)))
+      (tc/assert-is-not-acceptable-response response))))
 
-  (testing "Malformed SPARQL query"
-    (let [handler (sparql-negotiation-handler identity)
-          response (handler {:uri "/test" :params {:query "NOT A SPARQL QUERY"}})]
+(deftest sparql-timeout-handler-test
+  (testing "With query timeout"
+    (let [handler (sparql-timeout-handler nil identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          req {:params {:timeout "30"}
+               :sparql {:prepared-query pquery}}
+          _ (handler req)]
+      (is (= 30 (.getMaxQueryTime pquery)))))
+
+  (testing "With user timeout"
+    (let [handler (sparql-timeout-handler nil identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          user (user/create-authenticated-user "test@swirrl.com" :editor 20)
+          req {:identity user
+               :sparql {:prepared-query pquery}}
+          _ (handler req)]
+      (is (= 20 (.getMaxQueryTime pquery)))))
+
+  (testing "With endpoint timeout"
+    (let [handler (sparql-timeout-handler 10 identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          req {:sparql {:prepared-query pquery}}
+          _ (handler req)]
+      (is (= 10 (.getMaxQueryTime pquery)))))
+
+  (testing "With no timeout"
+    (let [handler (sparql-timeout-handler nil identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          req {:sparql {:prepared-query pquery}}
+          _ (handler req)]
+      (is (= timeouts/default-query-timeout (.getMaxQueryTime pquery)))))
+
+  (testing "Invalid timeout"
+    (let [handler (sparql-timeout-handler nil identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          req {:params {:timeout "invalid timeout"}
+               :sparql {:prepared-query pquery}}
+          response (handler req)]
       (tc/assert-is-bad-request-response response))))

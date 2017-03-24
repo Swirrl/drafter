@@ -8,7 +8,7 @@
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
             [swirrl-server.async.jobs :refer [job-succeeded!]]
-            [drafter.rdf.sparql-protocol :refer [execute-prepared-query sparql-protocol-handler]]
+            [drafter.rdf.sparql-protocol :refer [sparql-protocol-handler sparql-execution-handler]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
@@ -19,7 +19,7 @@
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
             [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type
-                                        temp-file-body optional-enum-param]]
+                                        temp-file-body optional-enum-param sparql-timeout-handler]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]])
@@ -34,12 +34,16 @@
         handler (sparql-protocol-handler rewriting-executor query-timeout)]
     (handler request)))
 
-(defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live? user query-timeout]
+(defn- get-draftset-quads [backend draftset-ref rdf-format union-with-live? user endpoint-timeout]
   (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
-        pquery (dsmgmt/all-quads-query rewriting-executor)]
-    (if-let [[rdf-format response-content-type] (conneg/negotiate-rdf-quads-format accept-content-type)]
-      (execute-prepared-query pquery rdf-format response-content-type user query-timeout)
-      (not-acceptable-response))))
+        pquery (dsmgmt/all-quads-query rewriting-executor)
+        response-content-type (.getDefaultMIMEType rdf-format)
+        req {:identity user
+             :sparql {:prepared-query pquery
+                      :format rdf-format
+                      :response-content-type response-content-type}}
+        handler (sparql-timeout-handler endpoint-timeout (sparql-execution-handler))]
+    (handler req)))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
@@ -179,7 +183,7 @@
                       (parse-union-with-live-handler
                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params user :identity :as request}]
                          (if (is-quads-format? rdf-format)
-                           (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live user query-timeout)
+                           (get-draftset-quads backend draftset-id rdf-format union-with-live user query-timeout)
                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                                  escaped-query (RenderUtils/escape unsafe-query)
                                  query-request (assoc-in request [:params :query] escaped-query)]
