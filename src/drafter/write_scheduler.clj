@@ -79,7 +79,9 @@
   {:pre [(= :blocking-write priority)]}
 
   ;; Try the lock & wait up to 10 seconds for it to let us in.  If it
-  ;; doesn't raise an error.
+  ;; doesn't raise an error.  This ensure's :blocking-write's
+  ;; pass/fail within an acceptable time, and that only one writer is
+  ;; writing to the database at a time.
   (if (.tryLock global-writes-lock 10 TimeUnit/SECONDS)
     ;; if we get the lock run the job immediately
     (try
@@ -110,7 +112,9 @@
 
           (log-time-taken "task"
             (if (= :publish-write priority)
-              (with-lock :publish
+              ;; If we're a publish operation we take the lock to
+              ;; ensure nobody else can write to the database.
+              (with-lock :publish-write
                 (task-f! job))
               (task-f! job)))
 
