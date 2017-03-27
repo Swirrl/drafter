@@ -1,11 +1,14 @@
 (ns drafter.rdf.draftset-management
   (:require [clojure.string :as string]
+            [drafter.rdf.sparql-protocol :as sparql-protocol]
             [drafter
              [draftset :as ds]
              [user :as user]
              [util :as util]
              [write-scheduler :as writes]]
-            [drafter.backend.protocols :refer [->sesame-repo prepare-query]]
+            [drafter.backend
+             [endpoints :refer [draft-graph-set]]
+             [protocols :refer :all]]
             [drafter.rdf
              [draft-management :as mgmt :refer [to-quads with-state-graph]]
              [drafter-ontology :refer :all]
@@ -13,16 +16,14 @@
              [sesame :refer [read-statements]]
              [sparql :as sparql]]
             [drafter.rdf.draft-management.jobs :as jobs]
-            [swirrl-server.async.jobs :as ajobs]
-            [drafter.rdf.rewriting.result-rewriting
-             :refer
-             [rewrite-query-results rewrite-statement]]
+            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-statement]]
             [grafter.rdf :refer [add context s]]
             [grafter.rdf
              [io :refer [IStatement->sesame-statement]]
              [protocols :refer [map->Quad map->Triple]]
              [repository :as repo]]
-            [grafter.vocabularies.rdf :refer :all])
+            [grafter.vocabularies.rdf :refer :all]
+            [swirrl-server.async.jobs :as ajobs])
   (:import [java.util Date UUID]
            org.openrdf.model.impl.ContextStatementImpl
            org.openrdf.model.Resource
@@ -198,6 +199,52 @@
   (let [graph-states (get-draftset-graph-states repo draftset-ref)
         mapping-pairs (map #(mapv % [:live-graph-uri :draft-graph-uri]) graph-states)]
     (into {} mapping-pairs)))
+
+
+(defn get-draftset-executor
+  "Build a SPARQL queryable repo representing the draftset"
+  [{:keys [backend draftset-ref union-with-live?]}]
+  (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
+    (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
+
+(defn execute-query-in-draftset [backend draftset-ref request union-with-live?]
+  (let [rewriting-executor (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? union-with-live? })]
+    (sparql-protocol/process-sparql-query rewriting-executor request)))
+
+(defn- rdf-handler->spog-tuple-handler [rdf-handler]
+  (reify TupleQueryResultHandler
+    (handleSolution [this bindings]
+      (let [subj (.getValue bindings "s")
+            pred (.getValue bindings "p")
+            obj (.getValue bindings "o")
+            graph (.getValue bindings "g")
+            stmt (ContextStatementImpl. subj pred obj graph)]
+        (.handleStatement rdf-handler stmt)))
+
+    (handleBoolean [this b])
+    (handleLinks [this links])
+    (startQueryResult [this binding-names]
+      (.startRDF rdf-handler))
+    (endQueryResult [this]
+      (.endRDF rdf-handler))))
+
+(defn- spog-tuple-query->graph-query [tuple-query]
+  (reify GraphQuery
+    (evaluate [this rdf-handler]
+      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))))
+
+(defn all-quads-query
+  "Returns a Sesame GraphQuery for all quads in the draftset
+  represented by the given backend."
+  [backend]
+  (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
+    (spog-tuple-query->graph-query tuple-query)))
+
+
+(defn get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
+  (let [rewriting-executor (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? union-with-live? })
+        pquery (dsmgmt/all-quads-query rewriting-executor)]
+    (sparql-protocol/process-prepared-query rewriting-executor pquery accept-content-type nil)))
 
 (defn- user-is-owner-clause [user]
   (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
@@ -603,6 +650,15 @@
         (append-draftset-quads backend draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
     (ajobs/job-succeeded! job)))
 
+(defn- draftset-contains-draft-of-graph?-query [draftset live-graph]
+  (str "ASK {"
+       "  ?dg " drafter:inDraftSet "<" draftset "> . \n"
+       "  ?lg " drafter:hasDraft "?dg . \n"
+       "}"))
+
+(defn draftset-contains-draft-of-graph? [repo draftset live-graph]
+  (sparql/query (draftset-contains-draft-of-graph? draftset live-graph)))
+
 (defn- copy-graph-for-append*
   [state draftset-ref backend live->draft quad-batches job]
   (let [live-graph-uri (:graph state)
@@ -622,12 +678,12 @@
     (copy-graph-for-append* state draftset-ref backend live->draft quad-batches job)))
 
 (defn- append-quads-to-draftset-job [backend draftset-ref quads]
-  (let [graph-map (get-draftset-graph-mapping backend draftset-ref)
-        quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-        now (java.util.Date.)
-        append-data (partial append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append
-                                                                                                :job-started-at now })]
-    (ajobs/create-job :background-write append-data)))
+  (ajobs/create-job :background-write
+                    (fn [job]
+                      (let [graph-map (get-draftset-graph-mapping backend draftset-ref)
+                            quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
+                            now (java.util.Date.)]
+                        (append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append :job-started-at now } job)))))
 
 (defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
   (append-quads-to-draftset-job backend draftset-ref (read-statements tempfile rdf-format)))
@@ -693,45 +749,16 @@
     (util/map-all #(.stringValue %) graph-mapping)))
 
 (defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format]
-  (jobs/make-job
-   :background-write [job]
-   (let [quads (read-statements serialised rdf-format)
-         graph-mapping (stringified-draftset-backend-graph-mapping backend)]
-     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
+  (jobs/make-job :background-write [job]
+                 (let [backend (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? false})
+                       quads (read-statements serialised rdf-format)
+                       graph-mapping (stringified-draftset-backend-graph-mapping backend)]
+                   (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
 
 (defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format]
-  (jobs/make-job
-     :background-write [job]
-     (let [triples (read-statements serialised rdf-format)
-           quads (map #(util/make-quad-statement % graph) triples)
-           graph-mapping (stringified-draftset-backend-graph-mapping backend)]
-       (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
-
-(defn- rdf-handler->spog-tuple-handler [rdf-handler]
-  (reify TupleQueryResultHandler
-    (handleSolution [this bindings]
-      (let [subj (.getValue bindings "s")
-            pred (.getValue bindings "p")
-            obj (.getValue bindings "o")
-            graph (.getValue bindings "g")
-            stmt (ContextStatementImpl. subj pred obj graph)]
-        (.handleStatement rdf-handler stmt)))
-
-    (handleBoolean [this b])
-    (handleLinks [this links])
-    (startQueryResult [this binding-names]
-      (.startRDF rdf-handler))
-    (endQueryResult [this]
-      (.endRDF rdf-handler))))
-
-(defn- spog-tuple-query->graph-query [tuple-query]
-  (reify GraphQuery
-    (evaluate [this rdf-handler]
-      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))))
-
-(defn all-quads-query
-  "Returns a Sesame GraphQuery for all quads in the draftset
-  represented by the given backend."
-  [backend]
-  (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
-    (spog-tuple-query->graph-query tuple-query)))
+  (jobs/make-job :background-write [job]
+                 (let [backend (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? false})
+                       triples (read-statements serialised rdf-format)
+                       quads (map #(util/make-quad-statement % graph) triples)
+                       graph-mapping (stringified-draftset-backend-graph-mapping backend)]
+                   (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))

@@ -174,11 +174,11 @@
                       (parse-union-with-live-handler
                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
                          (if (is-quads-format? rdf-format)
-                           (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live)
+                           (dsmgmt/get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live)
                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                                  escaped-query (RenderUtils/escape unsafe-query)
                                  query-request (assoc-in request [:params :query] escaped-query)]
-                             (execute-query-in-draftset backend draftset-id query-request union-with-live))))))))
+                             (dsmgmt/execute-query-in-draftset backend draftset-id query-request union-with-live))))))))
 
         (make-route :delete "/draftset/:id/data"
                     (as-draftset-owner
@@ -186,12 +186,11 @@
                       (require-graph-for-triples-rdf-format
                        (temp-file-body
                         (fn [{{draftset-id :draftset-id
-                               graph :graph
-                               rdf-format :rdf-format} :params body :body :as request}]
-                          (let [ds-executor (get-draftset-executor backend draftset-id false)
-                                delete-job (if (is-quads-format? rdf-format)
-                                             (dsmgmt/delete-quads-from-draftset-job ds-executor draftset-id body rdf-format)
-                                             (dsmgmt/delete-triples-from-draftset-job ds-executor draftset-id graph body rdf-format))]
+                              graph :graph
+                              rdf-format :rdf-format} :params body :body :as request}]
+                          (let [delete-job (if (is-quads-format? rdf-format)
+                                             (dsmgmt/delete-quads-from-draftset-job backend draftset-id body rdf-format)
+                                             (dsmgmt/delete-triples-from-draftset-job backend draftset-id graph body rdf-format))]
                             (submit-async-job! delete-job))))))))
 
         (make-route :delete "/draftset/:id/graph"
@@ -247,7 +246,7 @@
                        #{:query}
                        (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-                          (execute-query-in-draftset backend draftset-id request union-with-live)))))))
+                          (dsmgmt/execute-query-in-draftset backend draftset-id request union-with-live)))))))
 
         (make-route :post "/draftset/:id/publish"
                     (as-draftset-owner
