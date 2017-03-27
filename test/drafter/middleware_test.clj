@@ -15,8 +15,7 @@
             [drafter.backend.repository]
             [drafter.timeouts :as timeouts])
   (:import [clojure.lang ExceptionInfo]
-           [java.io File]
-           [org.openrdf.query QueryInterruptedException]))
+           [java.io File]))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -296,3 +295,21 @@
                :sparql {:prepared-query pquery}}
           response (handler req)]
       (tc/assert-is-bad-request-response response))))
+
+(deftest negotiate-sparql-results-content-type-with-test
+  (testing "Negotiation succeeds"
+    (let [format formats/rdf-ntriples
+          response-content-type "text/plain"
+          handler (negotiate-sparql-results-content-type-with (constantly [format response-content-type]) ":(" identity)
+          request {:headers {"accept" "text/plain"}}
+          inner-request (handler request)]
+      (is (= format (get-in inner-request [:sparql :format])))
+      (is (= response-content-type (get-in inner-request [:sparql :response-content-type])))))
+
+  (testing "Negotiation fails"
+    (let [handler (negotiate-sparql-results-content-type-with (constantly nil) ":(" identity)
+          request {:uri "/test"
+                   :request-method :get
+                   :headers {"accept" "text/plain"}}
+          response (handler request)]
+      (tc/assert-is-not-acceptable-response response))))

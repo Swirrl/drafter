@@ -205,6 +205,13 @@
           (log/info "Malformed query: " error-message)
           {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
 
+(defn sparql-constant-prepared-query-handler
+  "Returns a handler which associates the given prepared SPARQL query into the request at the key expected
+   by later stages in the SPARQL processing pipeline."
+  [pquery inner-handler]
+  (fn [request]
+    (inner-handler (assoc-in request [:sparql :prepared-query] pquery))))
+
 (defn sparql-negotiation-handler
   "Performs content negotiation on an incoming SPARQL request and associates the sesame format and response content
    type into the outgoing request into the :format and :response-content-type keys respecitvely within the :sparql
@@ -222,7 +229,36 @@
             (inner-handler updated-request))
           (response/not-acceptable-response))))))
 
-(defn sparql-timeout-handler [endpoint-timeout inner-handler]
+(defn negotiate-sparql-results-content-type-with
+  "Returns a handler which performs content negotiation for a SPARQL query with the given negotiation function.
+   The negotitation function should return a pair [rdf-format response-content-type] if negotiation succeeds, or nil
+   on failure. If negotiation fails a 406 Not Acceptable response is returned with the given message."
+  [negotiate-f not-acceptable-message inner-handler]
+  (fn [request]
+    (let [accept (drafter-request/accept request)]
+      (if-let [[rdf-format response-content-type] (negotiate-f accept)]
+        (let [to-assoc {:format rdf-format
+                        :response-content-type response-content-type}
+              updated-request (update request :sparql #(merge % to-assoc))]
+          (inner-handler updated-request))
+        (response/not-acceptable-response not-acceptable-message)))))
+
+(defn negotiate-quads-content-type-handler
+  "Returns a handler which negotiates an RDF quads content type for SPARQL query responses."
+  [inner-handler]
+  (negotiate-sparql-results-content-type-with conneg/negotiate-rdf-quads-format "RDF quads format required" inner-handler))
+
+(defn negotiate-triples-content-type-handler
+  "Returns a handler which negotiates an RDF triples content type for SPARQL query responses."
+  [inner-handler]
+  (negotiate-sparql-results-content-type-with conneg/negotiate-rdf-triples-format "RDF triples format required" inner-handler))
+
+
+(defn sparql-timeout-handler
+  "Returns a handler which configures the timeout for the prepared SPARQL query associated with the request.
+   The timeout is calculated based on the timeout query parameter and user configured on the request along
+   with the timeout specified for the endpoint."
+  [endpoint-timeout inner-handler]
   (fn [{user :identity {request-timeout-str :timeout} :params {pquery :prepared-query} :sparql :as request}]
     (let [request-timeout (some-> request-timeout-str (timeouts/try-parse-timeout))]
       (if (instance? Exception request-timeout)

@@ -5,25 +5,23 @@
                                        unsupported-media-type-response method-not-allowed-response
                                        forbidden-response submit-async-job! submit-sync-job!
                                        conflict-detected-response]]
-            [drafter.requests :as request]
             [swirrl-server.responses :as response]
             [swirrl-server.async.jobs :refer [job-succeeded!]]
-            [drafter.rdf.sparql-protocol :refer [sparql-protocol-handler sparql-execution-handler build-sparql-protocol-handler]]
+            [drafter.rdf.sparql-protocol :refer [sparql-protocol-handler sparql-execution-handler]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
-            [drafter.rdf.content-negotiation :as conneg]
             [drafter.backend.protocols :refer :all]
             [drafter.backend.endpoints :refer [draft-graph-set]]
             [drafter.util :as util]
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
             [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type
-                                        temp-file-body optional-enum-param sparql-timeout-handler]]
+                                        temp-file-body optional-enum-param sparql-timeout-handler sparql-constant-prepared-query-handler
+                                        negotiate-quads-content-type-handler negotiate-triples-content-type-handler]]
             [drafter.draftset :as ds]
             [grafter.rdf :refer [statements]]
-            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]])
-  (:import [org.openrdf.queryrender RenderUtils]))
+            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]))
 
 (defn- get-draftset-executor [backend draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
@@ -42,16 +40,6 @@
     (if (dsmgmt/is-draftset-owner? backend draftset-id user)
       (inner-handler request)
       (forbidden-response "Operation only permitted by draftset owner"))))
-
-(defn- negotiate-sparql-results-content-type-with [negotiate-f format-type inner-handler]
-  (fn [request]
-    (let [accept (request/accept request)]
-      (if-let [[rdf-format response-content-type] (negotiate-f accept)]
-        (let [to-assoc {:format rdf-format
-                        :response-content-type response-content-type}
-              updated-request (update request :sparql #(merge % to-assoc))]
-          (inner-handler updated-request))
-        (not-acceptable-response (format "Accept header required with MIME type for RDF %s format to return" format-type))))))
 
 (defn- require-graph-for-triples-rdf-format [inner-handler]
   (fn [{{:keys [graph rdf-format]} :params :as request}]
@@ -165,21 +153,17 @@
                       (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
                           (let [executor (get-draftset-executor backend draftset-id union-with-live)
-                                conneg (if (contains? params :graph)
-                                         #(negotiate-sparql-results-content-type-with conneg/negotiate-rdf-triples-format "triples" %)
-                                         #(negotiate-sparql-results-content-type-with conneg/negotiate-rdf-quads-format "quads" %))
-                                pquery (if (contains? params :graph)
-                                         (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                                               escaped-query (RenderUtils/escape unsafe-query)]
-                                           (prepare-query executor escaped-query))
+                                is-triples-query? (contains? params :graph)
+                                conneg (if is-triples-query?
+                                         negotiate-triples-content-type-handler
+                                         negotiate-quads-content-type-handler)
+                                pquery (if is-triples-query?
+                                         (dsmgmt/all-graph-triples-query executor graph)
                                          (dsmgmt/all-quads-query executor))
-                                prepare-handler (fn [inner-handler]
-                                                  (fn [request]
-                                                    (inner-handler (assoc-in request [:sparql :prepared-query] pquery))))
                                 handler (->> sparql-execution-handler
                                              (sparql-timeout-handler query-timeout)
                                              (conneg)
-                                             (prepare-handler))]
+                                             (sparql-constant-prepared-query-handler pquery))]
                             (handler request))))))
 
         (make-route :delete "/draftset/:id/data"

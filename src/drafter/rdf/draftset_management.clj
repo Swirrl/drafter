@@ -20,7 +20,8 @@
   (:import [java.util Date UUID]
            [org.openrdf.model Resource]
            [org.openrdf.model.impl ContextStatementImpl]
-           [org.openrdf.query TupleQueryResultHandler GraphQuery]))
+           [org.openrdf.query TupleQueryResultHandler GraphQuery]
+           (org.openrdf.queryrender RenderUtils)))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -735,3 +736,8 @@
   [backend]
   (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
     (spog-tuple-query->graph-query tuple-query)))
+
+(defn all-graph-triples-query [executor graph]
+  (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+        escaped-query (RenderUtils/escape unsafe-query)]
+    (prepare-query executor escaped-query)))
