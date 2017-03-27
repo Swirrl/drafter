@@ -2,6 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer :all]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.sparql :as sparql]
             [swirrl-server.async.jobs :refer [create-job job-succeeded! job-failed! create-child-job]]
             [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [queue-job!]]
@@ -110,7 +111,7 @@
   into the given destination graph."
   [repo source-graph dest-graph offset limit]
   (let [query (copy-graph-batch-query source-graph dest-graph offset limit)]
-    (mgmt/update! repo query)))
+    (sparql/update! repo query)))
 
 (defn calculate-offsets [count batch-size]
   "Given a total number of items and a batch size, returns a sequence
@@ -128,13 +129,15 @@
           GRAPH <" graph "> { ?s ?p ?o }
         }"))
 
+;; TODO remove this
 (defn get-graph-clone-batches
   ([repo graph-uri] (get-graph-clone-batches repo graph-uri batched-write-size))
   ([repo graph-uri batch-size]
-   (let [m (first (mgmt/query repo (graph-count-query graph-uri)))
+   (let [m (first (sparql/query repo (graph-count-query graph-uri)))
          graph-count (Integer/parseInt (.stringValue (get m "c")))]
      (calculate-offsets graph-count batch-size))))
 
+;; TODO remove this
 (defn copy-from-live-graph [repo live-graph-uri dest-graph-uri batches job]
   (with-job-exception-handling job
     (if-let [[offset limit] (first batches)]

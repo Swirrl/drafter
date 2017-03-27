@@ -5,7 +5,8 @@
             [drafter.util :refer [map-values]]
             [clojure.walk :refer [keywordize-keys]]
             [clojure.set :as set]
-            [drafter.rdf.draft-management :refer [update! delete-draft-state-query drafter-state-graph with-state-graph query xsd-datetime] :as mgmt]
+            [drafter.rdf.draft-management :refer [delete-draft-state-query drafter-state-graph with-state-graph xsd-datetime] :as mgmt]
+            [drafter.rdf.sparql :as sparql]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :as pr]
@@ -31,7 +32,7 @@
                  "  }")
                  "  LIMIT 1"
                  "}")]
-    (query db qry)))
+    (sparql/query db qry)))
 
 (defn draft-graphs
   "Get all the draft graph URIs"
@@ -40,7 +41,7 @@
                        (with-state-graph
                          "?live drafter:hasDraft ?draft .")
                        "}")
-        res (->> (query db
+        res (->> (sparql/query db
                         query-str)
                  (map #(str (get % "draft")))
                  (into #{}))]

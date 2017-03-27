@@ -7,9 +7,11 @@
              [write-scheduler :as writes]]
             [drafter.backend.protocols :refer [->sesame-repo prepare-query]]
             [drafter.rdf
-             [draft-management :as mgmt :refer [drafter-state-graph query to-quads update! with-state-graph]]
+             [draft-management :as mgmt :refer [to-quads with-state-graph]]
              [drafter-ontology :refer :all]
-             [sesame :refer [read-statements]]]
+             [draftset-management :as dsmgmt]
+             [sesame :refer [read-statements]]
+             [sparql :as sparql]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [swirrl-server.async.jobs :as ajobs]
             [drafter.rdf.rewriting.result-rewriting
@@ -64,7 +66,7 @@
 
 (defn draftset-exists? [db draftset-ref]
   (let [q (draftset-exists-query draftset-ref)]
-    (query db q)))
+    (sparql/query db q)))
 
 (defn- delete-draftset-statements-query [draftset-ref]
   (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
@@ -86,7 +88,7 @@
 
 (defn delete-draftset-statements! [db draftset-ref]
   (let [delete-query (delete-draftset-statements-query draftset-ref)]
-    (update! db delete-query)))
+    (sparql/update! db delete-query)))
 
 (defn- role-scores-values-clause [scored-roles]
   (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
@@ -106,7 +108,7 @@
 
 (defn get-draftset-owner [backend draftset-ref]
   (let [q (get-draftset-owner-query draftset-ref)
-        result (first (query backend q))
+        result (first (sparql/query backend q))
         owner-lit (get result "owner")]
     (and owner-lit (user/uri->username (.stringValue owner-lit)))))
 
@@ -130,7 +132,7 @@
   {:live-graph-uri (.stringValue lg)
    :draft-graph-uri (.stringValue dg)
    :public (.booleanValue public)
-   :draft-graph-exists (.booleanValue (query repo (graph-exists-query dg)))})
+   :draft-graph-exists (.booleanValue (sparql/query repo (graph-exists-query dg)))})
 
 (defn- union-clauses [clauses]
   (string/join " UNION " clauses))
@@ -189,7 +191,7 @@
 
 (defn get-draftset-graph-states [repo draftset-ref]
   (->> (get-draftset-graph-mapping-query draftset-ref)
-       (query repo)
+       (sparql/query repo)
        (map #(graph-mapping-result->graph-state repo %))))
 
 (defn get-draftset-graph-mapping [repo draftset-ref]
@@ -276,8 +278,8 @@
 (defn- get-all-draftsets-by [repo clauses]
   (let [properties-query (get-draftsets-matching-properties-query clauses)
         mappings-query (get-draftsets-matching-graph-mappings-query clauses)
-        properties (query repo properties-query)
-        graph-mappings (query repo mappings-query)
+        properties (sparql/query repo properties-query)
+        graph-mappings (sparql/query repo mappings-query)
         graph-states (draftset-graph-mappings->graph-states repo graph-mappings)]
 
     (combine-all-properties-and-graph-states properties graph-states)))
@@ -305,7 +307,7 @@
   (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)
         draft-graphs (graph-mapping-draft-graphs graph-mapping)
         delete-query (delete-draftset-query draftset-ref draft-graphs)]
-    (update! db delete-query)))
+    (sparql/update! db delete-query)))
 
 (defn delete-draftset-job [backend draftset-ref]
   (jobs/make-job
@@ -348,7 +350,7 @@
   [backend draftset-ref meta-map]
   (when-let [update-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
     (let [q (set-draftset-metadata-query (ds/->draftset-uri draftset-ref) update-pairs)]
-      (update! backend q))))
+      (sparql/update! backend q))))
 
 (defn- submit-draftset-to-role-query [draftset-ref submission-id owner role]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
@@ -384,7 +386,7 @@
   not the current owner of the draftset, no changes are made."
   [backend draftset-ref owner role]
   (let [q (submit-draftset-to-role-query draftset-ref (UUID/randomUUID) owner role)]
-    (update! backend q)))
+    (sparql/update! backend q)))
 
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
@@ -415,7 +417,7 @@
 
 (defn submit-draftset-to-user! [backend draftset-ref submitter target]
   (let [q (submit-to-user-query draftset-ref (UUID/randomUUID) submitter target)]
-    (update! backend q)))
+    (sparql/update! backend q)))
 
 (defn- try-claim-draftset-query [draftset-ref claimant]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
@@ -458,7 +460,7 @@
      - the claiming user is in the appropriate role"
   [backend draftset-ref claimant]
   (let [q (try-claim-draftset-query draftset-ref claimant)]
-    (update! backend q)))
+    (sparql/update! backend q)))
 
 (defn- infer-claim-outcome [{:keys [current-owner claim-role claim-user] :as ds-info} claimant]
   (cond
@@ -513,7 +515,7 @@
   contain a draft for the graph."
   [backend draftset-ref live-graph]
   (let [q (find-draftset-draft-graph-query draftset-ref live-graph)]
-    (when-let [[result] (query backend q)]
+    (when-let [[result] (sparql/query backend q)]
       (.stringValue (get result "dg")))))
 
 (defn revert-graph-changes!

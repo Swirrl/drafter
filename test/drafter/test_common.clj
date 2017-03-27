@@ -9,7 +9,8 @@
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
-                                                  create-draft-graph! query update!]]
+                                                  create-draft-graph!]]
+            [drafter.rdf.sparql :as sparql]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
@@ -84,7 +85,7 @@
 (defn wrap-clean-test-db
   ([test-fn] (wrap-clean-test-db identity test-fn))
   ([setup-state-fn test-fn]
-   (update! *test-backend*
+   (sparql/update! *test-backend*
             "DROP ALL ;")
    (setup-state-fn *test-backend*)
    (test-fn)))
@@ -157,7 +158,7 @@
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
-  (query *test-backend* (str "ASK WHERE {"
+  (sparql/query *test-backend* (str "ASK WHERE {"
 
                         (-> (apply str (interpose " " graphpatterns))
                             (.replace " >" ">")
