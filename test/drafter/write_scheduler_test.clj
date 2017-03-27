@@ -21,12 +21,13 @@
 (deftest job-sort-order-test
   (let [unordered-jobs [(mock-job 4 :publish-write 2)
                         (mock-job 3 :publish-write 1)
-                        (mock-job 2 :background-write 2)
-                        (mock-job 1 :background-write 1)]
+                        (mock-job 2 :background-write 1000) ;; check even later backgrounds sort before earlier publishes
+                        (mock-job 1 :background-write 2)
+                        (mock-job 0 :background-write 1)]
 
         ordered-jobs (sort compare-jobs unordered-jobs)]
 
-    (is (= [1 2 3 4] (map :id ordered-jobs)))))
+    (is (= [0 1 2 3 4] (map :id ordered-jobs)))))
 
 
 (deftest run-sync-job!-test
