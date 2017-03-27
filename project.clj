@@ -17,7 +17,6 @@
 
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.openrdf.sesame/sesame-queryrender "2.8.11"]
-                 [swirrl/drafter-sparql-repository "1.0-SNAPSHOT"]
                  [org.openrdf.sesame/sesame-runtime "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
 
@@ -72,7 +71,9 @@
 
                  [com.sun.mail/javax.mail "1.5.5"]]
 
-  :java-source-paths ["src-java"]
+  ;; Ensure we build the java sub project source code too!
+  :java-source-paths ["src-java/drafter_sparql_repository/src/main/java"]
+
   :resource-paths ["resources"]
   :pedantic :abort
 
