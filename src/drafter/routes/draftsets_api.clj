@@ -8,7 +8,7 @@
             [drafter.requests :as request]
             [swirrl-server.responses :as response]
             [swirrl-server.async.jobs :refer [job-succeeded!]]
-            [drafter.rdf.sparql-protocol :refer [sparql-protocol-handler sparql-execution-handler]]
+            [drafter.rdf.sparql-protocol :refer [sparql-protocol-handler sparql-execution-handler build-sparql-protocol-handler]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
@@ -29,22 +29,6 @@
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
     (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
 
-(defn- execute-query-in-draftset [backend draftset-ref request union-with-live? query-timeout]
-  (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
-        handler (sparql-protocol-handler rewriting-executor query-timeout)]
-    (handler request)))
-
-(defn- get-draftset-quads [backend draftset-ref rdf-format union-with-live? user endpoint-timeout]
-  (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
-        pquery (dsmgmt/all-quads-query rewriting-executor)
-        response-content-type (.getDefaultMIMEType rdf-format)
-        req {:identity user
-             :sparql {:prepared-query pquery
-                      :format rdf-format
-                      :response-content-type response-content-type}}
-        handler (sparql-timeout-handler endpoint-timeout sparql-execution-handler)]
-    (handler req)))
-
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
     (let [draftset-id (ds/->DraftsetId id)]
@@ -59,16 +43,15 @@
       (inner-handler request)
       (forbidden-response "Operation only permitted by draftset owner"))))
 
-(defn- rdf-response-format-handler [inner-handler]
-  (fn [{{:keys [graph]} :params :as request}]
+(defn- negotiate-sparql-results-content-type-with [negotiate-f format-type inner-handler]
+  (fn [request]
     (let [accept (request/accept request)]
-      (if (some? graph)
-        (if-let [[rdf-format _] (conneg/negotiate-rdf-triples-format accept)]
-          (inner-handler (assoc-in request [:params :rdf-format] rdf-format))
-          (not-acceptable-response "Accept header required with MIME type for RDF triples format to return"))
-        (if-let [[rdf-format _] (conneg/negotiate-rdf-quads-format accept)]
-          (inner-handler (assoc-in request [:params :rdf-format] rdf-format))
-          (not-acceptable-response "Accept header required with MIME type for RDF quads format to return"))))))
+      (if-let [[rdf-format response-content-type] (negotiate-f accept)]
+        (let [to-assoc {:format rdf-format
+                        :response-content-type response-content-type}
+              updated-request (update request :sparql #(merge % to-assoc))]
+          (inner-handler updated-request))
+        (not-acceptable-response (format "Accept header required with MIME type for RDF %s format to return" format-type))))))
 
 (defn- require-graph-for-triples-rdf-format [inner-handler]
   (fn [{{:keys [graph rdf-format]} :params :as request}]
@@ -179,15 +162,25 @@
 
         (make-route :get "/draftset/:id/data"
                     (as-draftset-owner
-                     (rdf-response-format-handler
                       (parse-union-with-live-handler
-                       (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params user :identity :as request}]
-                         (if (is-quads-format? rdf-format)
-                           (get-draftset-quads backend draftset-id rdf-format union-with-live user query-timeout)
-                           (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-                                 escaped-query (RenderUtils/escape unsafe-query)
-                                 query-request (assoc-in request [:params :query] escaped-query)]
-                             (execute-query-in-draftset backend draftset-id query-request union-with-live query-timeout))))))))
+                        (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
+                          (let [executor (get-draftset-executor backend draftset-id union-with-live)
+                                conneg (if (contains? params :graph)
+                                         #(negotiate-sparql-results-content-type-with conneg/negotiate-rdf-triples-format "triples" %)
+                                         #(negotiate-sparql-results-content-type-with conneg/negotiate-rdf-quads-format "quads" %))
+                                pquery (if (contains? params :graph)
+                                         (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                                               escaped-query (RenderUtils/escape unsafe-query)]
+                                           (prepare-query executor escaped-query))
+                                         (dsmgmt/all-quads-query executor))
+                                prepare-handler (fn [inner-handler]
+                                                  (fn [request]
+                                                    (inner-handler (assoc-in request [:sparql :prepared-query] pquery))))
+                                handler (->> sparql-execution-handler
+                                             (sparql-timeout-handler query-timeout)
+                                             (conneg)
+                                             (prepare-handler))]
+                            (handler request))))))
 
         (make-route :delete "/draftset/:id/data"
                     (as-draftset-owner
@@ -207,7 +200,7 @@
                     (as-draftset-owner
                       (parse-query-param-flag-handler
                         :silent
-                        (fn [{{:keys [draftset-id graph silent] :as params} :params :as request}]
+                        (fn [{{:keys [draftset-id graph silent]} :params :as request}]
                           (if (mgmt/is-graph-managed? backend graph)
                             (submit-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
                                          #(draftset-sync-write-response % backend draftset-id))
