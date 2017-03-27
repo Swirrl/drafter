@@ -47,7 +47,7 @@
   be released."
   [operation-type & forms]
   `(do
-     (log/info "Locking for" ~operation-type)
+     (log/debug "Locking for" ~operation-type)
      (.lock global-writes-lock)
      (try
        (log/info "Acquired lock for " ~operation-type)
@@ -63,8 +63,12 @@
   mapped to a :job-enqueue-failed value."
   [job]
   (let [req-id (MDC/get "reqId")
+        req-method (MDC/get "method")
+        req-route (MDC/get "route")
         job (if req-id
-              (with-meta job {:reqId req-id})
+              (with-meta job {:reqId req-id
+                              :method req-method
+                              :route req-route})
               job)]
     (log/info "Queueing job: " job (meta job))
     (.add writes-queue job)))
@@ -97,7 +101,7 @@
   Users should normally use start-writer! to set this running."
 
   []
-  (log/info "Writer started waiting for tasks")
+  (log/debug "Writer started waiting for tasks")
     (loop [{task-f! :function
             priority :priority
             job-id :id
@@ -122,7 +126,7 @@
             (log/warn ex "A task raised an error.  Delivering error to promise")
             ;; TODO improve error returned
             (job-failed! job ex))))
-      (log/info "Writer waiting for tasks")
+      (log/debug "Writer waiting for tasks")
       (recur (.take writes-queue))))
 
 (defn start-writer! []

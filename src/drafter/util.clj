@@ -15,7 +15,7 @@
         col-num (:column md)
         forms-str (with-out-str (pp/pprint (cons 'do forms)))]
     `(do
-       (clojure.tools.logging/info "About to execute"
+       (clojure.tools.logging/debug "About to execute"
                                    (str ~msg " (line #" ~line-num ")")
                                    #_~forms-str)
        (let [start-time# (System/currentTimeMillis)]
