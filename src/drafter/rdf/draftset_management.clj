@@ -650,15 +650,6 @@
         (append-draftset-quads backend draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
     (ajobs/job-succeeded! job)))
 
-(defn- draftset-contains-draft-of-graph?-query [draftset live-graph]
-  (str "ASK {"
-       "  ?dg " drafter:inDraftSet "<" draftset "> . \n"
-       "  ?lg " drafter:hasDraft "?dg . \n"
-       "}"))
-
-(defn draftset-contains-draft-of-graph? [repo draftset live-graph]
-  (sparql/query (draftset-contains-draft-of-graph? draftset live-graph)))
-
 (defn- copy-graph-for-append*
   [state draftset-ref backend live->draft quad-batches job]
   (let [live-graph-uri (:graph state)
