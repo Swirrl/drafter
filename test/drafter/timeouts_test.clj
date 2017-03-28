@@ -22,8 +22,11 @@
        10 8 nil 8                                           ;;query timeout > user timeout
        3 nil 10 3                                           ;;query timeout < endpoint timeout
        10 nil 5 5                                           ;;query timeout > endpoint timeout
-       nil 3 5 5                                            ;;user timeout < endpoint timeout
+       nil 3 5 3                                            ;;user timeout < endpoint timeout
        nil 10 5 10                                          ;;user timeout > endpoint timeout
        2 10 5 2                                             ;;query timeout < (max user-timeout endpoint-timeout)
        10 5 nil 5                                           ;;query timeout > (max user-timeout endpoint-timeout)
-               ))
+
+       100 10 5 10                                          ;;query timeout > user-timeout > endpoint-timeout
+       100 5 10 5                                           ;;query timeout > endpoint-timeout > user-timeout
+       ))

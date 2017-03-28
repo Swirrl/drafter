@@ -17,9 +17,11 @@
   "default timeouts for SPARQL operations (30 seconds)."
   30)
 
-(defn- lift-nil [f]
+(defn- lift-nil
+  "Protect f from nil args, return nil if any nils are present"
+  [f]
   (fn [& args]
-    (if-let [somes (seq (remove nil? args))]
+    (when-let [somes (seq (remove nil? args))]
       (apply f somes))))
 
 (defn- nil-or-pos? [x]
@@ -36,6 +38,9 @@
          (nil-or-pos? user-timeout)
          (nil-or-pos? endpoint-timeout)]
    :post [(pos? %)]}
-  (-> ((lift-nil max) user-timeout endpoint-timeout)
-       ((lift-nil min) query-timeout)
-       (or default-query-timeout)))
+  (let [max-timeout (if user-timeout
+                      user-timeout
+                      endpoint-timeout)
+        min (lift-nil min)]
+    (or (min max-timeout query-timeout)
+        default-query-timeout)))
