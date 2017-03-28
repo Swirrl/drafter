@@ -55,41 +55,6 @@
                  (with-job-exception-handling ~job
                    ~@forms))))
 
-(defmacro action-joblet
-  "Creates a joblet function which ignores its state parameter and
-  returns nil."
-  [& body]
-  `(fn [_#]
-     ~@body
-     nil))
-
-(defn exec-joblets
-  "Executes a sequence of joblets under the given job. A joblet is a
-  function (State -> State) which should also have some side-effect
-  which represents a batch of work the larger job should execute. The
-  State parameter is available for joblets to communicate some extra
-  information to the next joblet. The first joblet is executed
-  immediately and each subsequent job is re-scheduled for later
-  execution. After all joblets have been executed the job is completed
-  with the result of the last joblet."
-  ([joblet-seq job] (exec-joblets joblet-seq nil job))
-  ([joblet-seq state job]
-   (with-job-exception-handling job
-     (if-let [joblet (first joblet-seq)]
-       (let [next-state (joblet state)
-             next-job (partial exec-joblets (rest joblet-seq) next-state)]
-         (queue-job! (create-child-job job next-job)))
-       (job-succeeded! job state)))))
-
-(defn joblet-seq->job
-  "Creates a new job from a sequence of joblets. If provided the state
-  is passed to the first joblet on execution."
-  ([joblet-seq] (joblet-seq->job joblet-seq :background-write nil))
-  ([joblet-seq write-priority] (joblet-seq->job joblet-seq write-priority nil))
-  ([joblet-seq write-priority state]
-   (make-job write-priority [job]
-                  (exec-joblets joblet-seq state job))))
-
 (defn copy-graph-batch-query
   "Query to copy a range of data in a source graph into a destination
   graph."
