@@ -45,16 +45,16 @@
     (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "invalid"}))))
 
   (testing "Negative query timeout"
-    (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "editor" :query-timeout "-1"}))))
+    (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "editor" :max-query-timeout "-1"}))))
 
   (testing "Non-numeric query timeout"
-    (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "manager" :query-timeout "abc"}))))
+    (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "manager" :max-query-timeout "abc"}))))
 
   (testing "Valid token"
     (is (= {:email "foo@bar.com" :role :editor} (validate-token! {:email "foo@bar.com" :role "editor"}))))
 
   (testing "Valid token with query timeout"
-    (is (= {:email "foo@bar.com" :role :publisher :query-timeout 4} (validate-token! {:email "foo@bar.com" :role "publisher" :query-timeout "4"})))))
+    (is (= {:email "foo@bar.com" :role :publisher :max-query-timeout 4} (validate-token! {:email "foo@bar.com" :role "publisher" :max-query-timeout "4"})))))
 
 (deftest authenticated!-test
   (are [user expected] (= expected (authenticated! user))

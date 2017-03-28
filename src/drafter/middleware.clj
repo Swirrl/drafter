@@ -263,6 +263,6 @@
     (let [request-timeout (some-> request-timeout-str (timeouts/try-parse-timeout))]
       (if (instance? Exception request-timeout)
         {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body (.getMessage request-timeout)}
-        (let [query-timeout (timeouts/calculate-query-timeout request-timeout (user/query-timeout user) endpoint-timeout)]
+        (let [query-timeout (timeouts/calculate-query-timeout request-timeout (user/max-query-timeout user) endpoint-timeout)]
           (.setMaxExecutionTime pquery query-timeout)
           (inner-handler (assoc-in request [:sparql :timeout] request-timeout)))))))
