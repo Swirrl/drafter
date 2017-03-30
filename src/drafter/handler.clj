@@ -54,56 +54,31 @@
 (def add-route conj)
 (def add-routes into)
 
-(defn- log-endpoint-config [ep-name endpoint-type config]
-  (log/trace (str (name endpoint-type) " endpoint for route '" (name ep-name) "': " config)))
-
 (defn- endpoint-query-path [route-name version]
   (let [suffix (str "/sparql/" (name route-name))]
     (if (some? version)
       (str "/" (name version) suffix)
       suffix)))
 
-(defn endpoint-update-path [route-name version]
-  (str (endpoint-query-path route-name version) "/update"))
-
-(defn- endpoint-route [route-name path-fn endpoint-fn route-type version repo timeout-config]
-  (let [path (path-fn route-name version)
-        timeouts (conf/get-endpoint-timeout route-name route-type timeout-config)]
-    (log-endpoint-config route-name route-type timeouts)
-    (endpoint-fn path repo timeouts)))
-
-(defn- create-sparql-endpoint-routes [route-name query-fn update-fn version backend timeout-config]
-  (let [query-route (endpoint-route route-name endpoint-query-path query-fn :query version backend timeout-config)
-        update-route (and update-fn (endpoint-route route-name endpoint-update-path update-fn :update version backend timeout-config))]
-    (vec (remove nil? [query-route update-route]))))
-
-(defn specify-endpoint
-  ([query-fn update-fn]
-   (specify-endpoint query-fn update-fn nil))
-  ([query-fn update-fn version]
-   {:query-fn query-fn :update-fn update-fn :version version}))
-
 (def ^:private v1-prefix :v1)
-
-(def live-endpoint-spec (specify-endpoint live-sparql-routes live-update-endpoint-route v1-prefix))
-
-(defn- create-raw-endpoint-spec [authenticated-fn]
-  (let [query-route-fn #(raw-sparql-routes %1 %2 %3 authenticated-fn)
-        update-route-fn #(raw-update-endpoint-route %1 %2 %3 authenticated-fn)]
-    (specify-endpoint query-route-fn update-route-fn v1-prefix)))
 
 (defn- get-sparql-endpoint-timeout-config []
   (conf/get-timeout-config env #{:raw :live :draftset}))
 
-(defn- create-sparql-routes [endpoint-map backend timeouts-config]
-  (let [ep-routes (fn [[ep-name {:keys [query-fn update-fn version]}]]
-                    (create-sparql-endpoint-routes ep-name query-fn update-fn version backend timeouts-config))]
-    (mapcat ep-routes endpoint-map)))
+(defn- get-live-sparql-query-route [backend timeouts-config]
+  (let [live-timeouts (conf/get-endpoint-timeout :live :query timeouts-config)
+        mount-point (endpoint-query-path :live v1-prefix)]
+    (live-sparql-routes mount-point backend live-timeouts)))
 
-(defn- get-sparql-routes [backend user-repo timeouts-config]
-  (let [endpoints {:live live-endpoint-spec
-                   :raw (create-raw-endpoint-spec user-repo)}]
-    (create-sparql-routes endpoints backend timeouts-config)))
+(defn- get-raw-sparql-query-route [backend authentication-fn timeouts-config]
+  (let [raw-timeouts (conf/get-endpoint-timeout :raw :query timeouts-config)
+        mount-point (endpoint-query-path :raw v1-prefix)]
+    (raw-sparql-routes mount-point backend raw-timeouts authentication-fn)))
+
+(defn- get-sparql-routes [backend authentication-fn timeouts-config]
+  (let [raw-query-route (get-raw-sparql-query-route backend authentication-fn timeouts-config)
+        live-query-route (get-live-sparql-query-route backend timeouts-config)]
+    [raw-query-route live-query-route]))
 
 (defn initialise-app! [backend]
   (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)
