@@ -84,7 +84,7 @@
     (response/api-response 500 result)
     (response (dsmgmt/get-draftset-info backend draftset-id))))
 
-(defn draftset-api-routes [backend user-repo authenticated query-timeout]
+(defn draftset-api-routes [backend user-repo authenticated query-timeout-fn]
   (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
           (as-draftset-owner [h]
             (authenticated
@@ -161,7 +161,7 @@
                                          (dsmgmt/all-graph-triples-query executor graph)
                                          (dsmgmt/all-quads-query executor))
                                 handler (->> sparql-execution-handler
-                                             (sparql-timeout-handler query-timeout)
+                                             (sparql-timeout-handler query-timeout-fn)
                                              (conneg)
                                              (sparql-constant-prepared-query-handler pquery))]
                             (handler request))))))
@@ -228,7 +228,7 @@
                       (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
                           (let [executor (get-draftset-executor backend draftset-id union-with-live)
-                                handler (sparql-protocol-handler executor query-timeout)]
+                                handler (sparql-protocol-handler executor query-timeout-fn)]
                             (handler request))))))
 
         (make-route :post "/draftset/:id/publish"

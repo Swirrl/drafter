@@ -15,8 +15,7 @@
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes
                                            raw-sparql-routes]]
-            [drafter.routes.sparql-update :refer [live-update-endpoint-route
-                                                  raw-update-endpoint-route]]
+            [drafter.routes.sparql-update :refer [raw-update-endpoint-route]]
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
@@ -35,7 +34,8 @@
            [org.apache.log4j.helpers DateLayout]
            [java.util UUID])
 
-  (:require [clj-logging-config.log4j :refer [set-loggers!]]))
+  (:require [clj-logging-config.log4j :refer [set-loggers!]]
+            [drafter.timeouts :as timeouts]))
 
 (require 'drafter.errors)
 
@@ -65,10 +65,17 @@
 (defn- get-sparql-endpoint-timeout-config []
   (conf/get-timeout-config env #{:raw :live :draftset}))
 
+(defn- get-endpoint-query-timeout-fn [endpoint-timeouts]
+  (let [signing-key (:drafter-jws-signing-key env)]
+    (when (nil? signing-key)
+      (log/warn "DRAFTER_JWS_SIGNING_KEY not configured - any PMD query timeouts will be ignored"))
+    (timeouts/calculate-request-query-timeout endpoint-timeouts signing-key)))
+
 (defn- get-live-sparql-query-route [backend timeouts-config]
   (let [live-timeouts (conf/get-endpoint-timeout :live :query timeouts-config)
+        timeout-fn (get-endpoint-query-timeout-fn live-timeouts)
         mount-point (endpoint-query-path :live v1-prefix)]
-    (live-sparql-routes mount-point backend live-timeouts)))
+    (live-sparql-routes mount-point backend timeout-fn)))
 
 (defn- get-raw-sparql-query-route [backend authentication-fn timeouts-config]
   (let [raw-timeouts (conf/get-endpoint-timeout :raw :query timeouts-config)
@@ -83,12 +90,13 @@
 (defn initialise-app! [backend]
   (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)
         sparql-timeouts-config (get-sparql-endpoint-timeout-config)
-        draftset-sparql-query-timeout (conf/get-endpoint-timeout :draftset :query sparql-timeouts-config)]
+        draftset-sparql-query-timeout (conf/get-endpoint-timeout :draftset :query sparql-timeouts-config)
+        draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-sparql-query-timeout)]
     (set-var-root! #'app (app-handler
                           ;; add your application routes here
                           (-> []
                               (add-route (pages-routes backend))
-                              (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout))
+                              (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout-fn))
                               (add-routes (get-sparql-routes backend authenticated-fn sparql-timeouts-config))
                               (add-route (context "/v1/status" []
                                                   (status-routes global-writes-lock finished-jobs restart-id)))

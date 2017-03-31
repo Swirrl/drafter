@@ -19,7 +19,8 @@
             [clojure.java.io :as io]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]]
-            [drafter.swagger :as swagger])
+            [drafter.swagger :as swagger]
+            [drafter.timeouts :as timeouts])
   (:import [java.util Date]
            [java.io ByteArrayOutputStream ByteArrayInputStream]
            [org.openrdf.query QueryResultHandler]
@@ -1517,7 +1518,7 @@
   (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
         authenticated-fn (middleware/make-authenticated-wrapper users {})
         swagger-spec (swagger/load-spec-and-resolve-refs)
-        api-handler (draftset-api-routes *test-backend* users authenticated-fn nil)]
+        api-handler (draftset-api-routes *test-backend* users authenticated-fn timeouts/calculate-default-request-timeout)]
     (binding [*user-repo* users
               *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
       (test-function))))

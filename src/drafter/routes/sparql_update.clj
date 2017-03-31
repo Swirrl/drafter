@@ -40,8 +40,7 @@
 
 (defn create-update-job [executor request endpoint-timeout]
   (jobs/make-job :sync-write [job]
-                 (let [user (request/get-user request)
-                       query-timeout-seconds (timeouts/calculate-query-timeout nil (user/max-query-timeout user) endpoint-timeout)
+                 (let [query-timeout-seconds (or endpoint-timeout timeouts/default-query-timeout)
                        parsed-query (parse-update-request request)
                        query-string (:update parsed-query)
                        pquery (prepare-update executor query-string)]

@@ -257,44 +257,21 @@
       (tc/assert-is-not-acceptable-response response))))
 
 (deftest sparql-timeout-handler-test
-  (testing "With query timeout"
-    (let [handler (sparql-timeout-handler nil identity)
+  (testing "With valid timeout"
+    (let [timeout 30
+          handler (sparql-timeout-handler (constantly timeout) identity)
           pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
-          req {:params {:timeout "30"}
-               :sparql {:prepared-query pquery}}
-          _ (handler req)]
-      (is (= 30 (.getMaxQueryTime pquery)))))
+          request {:sparql {:prepared-query pquery}}]
+      (handler request)
+      (is (= timeout (.getMaxQueryTime pquery)))))
 
-  (testing "With user timeout"
-    (let [handler (sparql-timeout-handler nil identity)
+  (testing "With invalid timeout"
+    (let [ex (IllegalArgumentException. "Invalid timeout")
+          handler (sparql-timeout-handler (constantly ex) identity)
           pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
-          user (user/create-authenticated-user "test@swirrl.com" :editor 20)
-          req {:identity user
-               :sparql {:prepared-query pquery}}
-          _ (handler req)]
-      (is (= 20 (.getMaxQueryTime pquery)))))
-
-  (testing "With endpoint timeout"
-    (let [handler (sparql-timeout-handler 10 identity)
-          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
-          req {:sparql {:prepared-query pquery}}
-          _ (handler req)]
-      (is (= 10 (.getMaxQueryTime pquery)))))
-
-  (testing "With no timeout"
-    (let [handler (sparql-timeout-handler nil identity)
-          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
-          req {:sparql {:prepared-query pquery}}
-          _ (handler req)]
-      (is (= timeouts/default-query-timeout (.getMaxQueryTime pquery)))))
-
-  (testing "Invalid timeout"
-    (let [handler (sparql-timeout-handler nil identity)
-          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
-          req {:params {:timeout "invalid timeout"}
-               :sparql {:prepared-query pquery}}
-          response (handler req)]
-      (tc/assert-is-bad-request-response response))))
+          request {:sparql {:prepared-query pquery}}
+          response (handler request)]
+      (is (tc/assert-is-bad-request-response response)))))
 
 (deftest negotiate-sparql-results-content-type-with-test
   (testing "Negotiation succeeds"
