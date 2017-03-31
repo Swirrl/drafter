@@ -2,6 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer :all]
             [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.sparql :as sparql]
             [swirrl-server.async.jobs :refer [create-job job-succeeded! job-failed! create-child-job]]
             [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [queue-job!]]
@@ -55,41 +56,6 @@
                  (with-job-exception-handling ~job
                    ~@forms))))
 
-(defmacro action-joblet
-  "Creates a joblet function which ignores its state parameter and
-  returns nil."
-  [& body]
-  `(fn [_#]
-     ~@body
-     nil))
-
-(defn exec-joblets
-  "Executes a sequence of joblets under the given job. A joblet is a
-  function (State -> State) which should also have some side-effect
-  which represents a batch of work the larger job should execute. The
-  State parameter is available for joblets to communicate some extra
-  information to the next joblet. The first joblet is executed
-  immediately and each subsequent job is re-scheduled for later
-  execution. After all joblets have been executed the job is completed
-  with the result of the last joblet."
-  ([joblet-seq job] (exec-joblets joblet-seq nil job))
-  ([joblet-seq state job]
-   (with-job-exception-handling job
-     (if-let [joblet (first joblet-seq)]
-       (let [next-state (joblet state)
-             next-job (partial exec-joblets (rest joblet-seq) next-state)]
-         (queue-job! (create-child-job job next-job)))
-       (job-succeeded! job state)))))
-
-(defn joblet-seq->job
-  "Creates a new job from a sequence of joblets. If provided the state
-  is passed to the first joblet on execution."
-  ([joblet-seq] (joblet-seq->job joblet-seq :batch-write nil))
-  ([joblet-seq write-priority] (joblet-seq->job joblet-seq write-priority nil))
-  ([joblet-seq write-priority state]
-   (make-job write-priority [job]
-                  (exec-joblets joblet-seq state job))))
-
 (defn copy-graph-batch-query
   "Query to copy a range of data in a source graph into a destination
   graph."
@@ -111,7 +77,7 @@
   into the given destination graph."
   [repo source-graph dest-graph offset limit]
   (let [query (copy-graph-batch-query source-graph dest-graph offset limit)]
-    (mgmt/update! repo query)))
+    (sparql/update! repo query)))
 
 (defn calculate-offsets [count batch-size]
   "Given a total number of items and a batch size, returns a sequence
@@ -129,13 +95,15 @@
           GRAPH <" graph "> { ?s ?p ?o }
         }"))
 
+;; TODO remove this
 (defn get-graph-clone-batches
   ([repo graph-uri] (get-graph-clone-batches repo graph-uri batched-write-size))
   ([repo graph-uri batch-size]
-   (let [m (first (util/query-eager-seq repo (graph-count-query graph-uri)))
+   (let [m (first (sparql/query-eager-seq repo (graph-count-query graph-uri)))
          graph-count (Integer/parseInt (.stringValue (get m "c")))]
      (calculate-offsets graph-count batch-size))))
 
+;; TODO remove this
 (defn copy-from-live-graph [repo live-graph-uri dest-graph-uri batches job]
   (with-job-exception-handling job
     (if-let [[offset limit] (first batches)]

@@ -9,7 +9,8 @@
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
-                                                  create-draft-graph! query update!]]
+                                                  create-draft-graph!]]
+            [drafter.rdf.sparql :as sparql]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
@@ -84,7 +85,7 @@
 (defn wrap-clean-test-db
   ([test-fn] (wrap-clean-test-db identity test-fn))
   ([setup-state-fn test-fn]
-   (update! *test-backend*
+   (sparql/update! *test-backend*
             "DROP ALL ;")
    (setup-state-fn *test-backend*)
    (test-fn)))
@@ -119,7 +120,7 @@
 (defn during-exclusive-write-f [f]
   (let [p (promise)
         latch (CountDownLatch. 1)
-        exclusive-job (create-job :exclusive-write
+        exclusive-job (create-job :publish-write
                                   (fn [j]
                                     (.countDown latch)
                                     @p))]
@@ -152,12 +153,12 @@
   [form & catch-forms]
   `(try
      ~form
-     (is false (str "Expected " (pr-str (quote ~form)) " to raise exception"))
+     (is false (str "Expected " (pr-str (quote ~form)) " to raise exception. DONT be confused by the 'false false' test failure here, it failed because no exception was thrown."))
      ~@catch-forms))
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
-  (query *test-backend* (str "ASK WHERE {"
+  (sparql/query *test-backend* (str "ASK WHERE {"
 
                         (-> (apply str (interpose " " graphpatterns))
                             (.replace " >" ">")

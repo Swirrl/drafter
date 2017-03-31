@@ -1,42 +1,25 @@
 (ns drafter.routes.draftsets-api
-  (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes make-route]]
-            [ring.util.response :refer [redirect-after-post not-found response]]
-            [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
-                                       unsupported-media-type-response method-not-allowed-response
-                                       forbidden-response submit-async-job! submit-sync-job!
-                                       conflict-detected-response]]
-            [drafter.requests :as request]
-            [swirrl-server.responses :as response]
-            [swirrl-server.async.jobs :refer [job-succeeded!]]
-            [drafter.rdf.sparql-protocol :refer [process-prepared-query process-sparql-query]]
-            [drafter.rdf.draftset-management :as dsmgmt]
-            [drafter.rdf.draft-management :as mgmt]
+  (:require [clj-logging-config.log4j :as l4j]
+            [compojure.core :as compojure :refer [context routes]]
+            [drafter
+             [draftset :as ds]
+             [middleware :refer [allowed-methods-handler optional-enum-param require-params require-rdf-content-type temp-file-body]]
+             [requests :as request]
+             [responses :refer [conflict-detected-response forbidden-response not-acceptable-response run-sync-job! submit-async-job! unprocessable-entity-response]]
+             [user :as user]
+             [util :as util]]
+            [drafter.rdf
+             [content-negotiation :as conneg]
+             [draft-management :as mgmt]
+             [draftset-management :as dsmgmt]
+             [sesame :refer [is-quads-format? is-triples-format?]]
+             [sparql-protocol :refer [process-prepared-query process-sparql-query]]]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
-            [drafter.rdf.content-negotiation :as conneg]
-            [drafter.backend.protocols :refer :all]
-            [drafter.backend.endpoints :refer [draft-graph-set]]
-            [drafter.util :as util]
-            [drafter.user :as user]
             [drafter.user.repository :as user-repo]
-            [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type
-                                        temp-file-body optional-enum-param]]
-            [drafter.draftset :as ds]
-            [grafter.rdf :refer [statements]]
-            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]])
-  (:import [org.openrdf.queryrender RenderUtils]))
-
-(defn- get-draftset-executor [backend draftset-ref union-with-live?]
-  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
-    (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
-
-(defn- execute-query-in-draftset [backend draftset-ref request union-with-live?]
-  (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)]
-    (process-sparql-query rewriting-executor request)))
-
-(defn- get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
-  (let [rewriting-executor (get-draftset-executor backend draftset-ref union-with-live?)
-        pquery (dsmgmt/all-quads-query rewriting-executor)]
-    (process-prepared-query rewriting-executor pquery accept-content-type nil)))
+            [ring.util.response :refer [not-found redirect-after-post response]]
+            [swirrl-server.async.jobs :as ajobs]
+            [swirrl-server.responses :as response])
+  (:import org.openrdf.queryrender.RenderUtils))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
@@ -96,21 +79,29 @@
 
 (defn- as-sync-write-job [f]
   (make-job
-    :sync-write [job]
+   :blocking-write [job]
     (let [result (f)]
-      (job-succeeded! job result))))
+      (ajobs/job-succeeded! job result))))
 
-(defn- submit-sync
+(defn- run-sync
   ([api-call-fn]
-   (submit-sync-job! (as-sync-write-job api-call-fn)))
+   (run-sync-job! (as-sync-write-job api-call-fn)))
   ([api-call-fn resp-fn]
-   (submit-sync-job! (as-sync-write-job api-call-fn)
+   (run-sync-job! (as-sync-write-job api-call-fn)
                      resp-fn)))
 
 (defn- draftset-sync-write-response [result backend draftset-id]
   (if (failed-job-result? result)
     (response/api-response 500 result)
     (response (dsmgmt/get-draftset-info backend draftset-id))))
+
+(defn make-route [method route handler-fn]
+  (compojure/make-route method route
+                        (fn [req]
+                          (l4j/with-logging-context
+                            {:method method
+                             :route route}
+                            (handler-fn req)))))
 
 (defn draftset-api-routes [backend user-repo authenticated]
   (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
@@ -144,7 +135,7 @@
         (make-route :post "/draftsets"
                     (authenticated
                       (fn [{{:keys [display-name description]} :params user :identity :as request}]
-                        (submit-sync #(dsmgmt/create-draftset! backend user display-name description)
+                        (run-sync #(dsmgmt/create-draftset! backend user display-name description)
                                      (fn [result]
                                        (if (failed-job-result? result)
                                          (response/api-response 500 result)
@@ -182,11 +173,11 @@
                       (parse-union-with-live-handler
                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
                          (if (is-quads-format? rdf-format)
-                           (get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live)
+                           (dsmgmt/get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live)
                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
                                  escaped-query (RenderUtils/escape unsafe-query)
                                  query-request (assoc-in request [:params :query] escaped-query)]
-                             (execute-query-in-draftset backend draftset-id query-request union-with-live))))))))
+                             (dsmgmt/execute-query-in-draftset backend draftset-id query-request union-with-live))))))))
 
         (make-route :delete "/draftset/:id/data"
                     (as-draftset-owner
@@ -194,12 +185,11 @@
                       (require-graph-for-triples-rdf-format
                        (temp-file-body
                         (fn [{{draftset-id :draftset-id
-                               graph :graph
-                               rdf-format :rdf-format} :params body :body :as request}]
-                          (let [ds-executor (get-draftset-executor backend draftset-id false)
-                                delete-job (if (is-quads-format? rdf-format)
-                                             (dsmgmt/delete-quads-from-draftset-job ds-executor draftset-id body rdf-format)
-                                             (dsmgmt/delete-triples-from-draftset-job ds-executor draftset-id graph body rdf-format))]
+                              graph :graph
+                              rdf-format :rdf-format} :params body :body :as request}]
+                          (let [delete-job (if (is-quads-format? rdf-format)
+                                             (dsmgmt/delete-quads-from-draftset-job backend draftset-id body rdf-format)
+                                             (dsmgmt/delete-triples-from-draftset-job backend draftset-id graph body rdf-format))]
                             (submit-async-job! delete-job))))))))
 
         (make-route :delete "/draftset/:id/graph"
@@ -208,7 +198,7 @@
                         :silent
                         (fn [{{:keys [draftset-id graph silent] :as params} :params :as request}]
                           (if (mgmt/is-graph-managed? backend graph)
-                            (submit-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                            (run-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
                                          #(draftset-sync-write-response % backend draftset-id))
                             (if silent
                               (response (dsmgmt/get-draftset-info backend draftset-id))
@@ -218,7 +208,7 @@
                     (as-draftset-owner
                       (require-params #{:graph}
                                       (fn [{{:keys [draftset-id graph]} :params}]
-                                        (submit-sync #(dsmgmt/revert-graph-changes! backend draftset-id graph)
+                                        (run-sync #(dsmgmt/revert-graph-changes! backend draftset-id graph)
                                                      (fn [result]
                                                        (if (failed-job-result? result)
                                                          (response/api-response 500 result)
@@ -255,7 +245,7 @@
                        #{:query}
                        (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-                          (execute-query-in-draftset backend draftset-id request union-with-live)))))))
+                          (dsmgmt/execute-query-in-draftset backend draftset-id request union-with-live)))))))
 
         (make-route :post "/draftset/:id/publish"
                     (as-draftset-owner
@@ -267,7 +257,7 @@
         (make-route :put "/draftset/:id"
                     (as-draftset-owner
                       (fn [{{:keys [draftset-id] :as params} :params}]
-                        (submit-sync #(dsmgmt/set-draftset-metadata! backend draftset-id params)
+                        (run-sync #(dsmgmt/set-draftset-metadata! backend draftset-id params)
                                      #(draftset-sync-write-response % backend draftset-id)))))
 
         (make-route :post "/draftset/:id/submit-to"
@@ -279,14 +269,14 @@
 
                           (some? user)
                           (if-let [target-user (user-repo/find-user-by-username user-repo user)]
-                            (submit-sync #(dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
+                            (run-sync #(dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
                                          #(draftset-sync-write-response % backend draftset-id))
                             (unprocessable-entity-response (str "User: " user " not found")))
 
                           (some? role)
                           (let [role-kw (keyword role)]
                             (if (user/is-known-role? role-kw)
-                              (submit-sync #(dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
+                              (run-sync #(dsmgmt/submit-draftset-to-role! backend draftset-id owner role-kw)
                                            #(draftset-sync-write-response % backend draftset-id))
                               (unprocessable-entity-response (str "Invalid role: " role))))
 
@@ -314,7 +304,7 @@
                         (fn [{{:keys [draftset-id]} :params user :identity}]
                           (if-let [ds-info (dsmgmt/get-draftset-info backend draftset-id)]
                             (if (user/can-claim? user ds-info)
-                              (submit-sync #(dsmgmt/claim-draftset! backend draftset-id user)
+                              (run-sync #(dsmgmt/claim-draftset! backend draftset-id user)
                                            (fn [result]
                                              (if (failed-job-result? result)
                                                (response/api-response 500 result)

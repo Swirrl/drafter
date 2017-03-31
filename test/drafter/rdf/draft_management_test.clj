@@ -1,6 +1,7 @@
 (ns drafter.rdf.draft-management-test
   (:require
    [drafter.rdf.draftset-management :refer [create-draftset!]]
+   [drafter.rdf.sparql :as sparql]
    [drafter.rdf.draft-management :refer :all]
    [drafter.test-helpers.draft-management-helpers :as mgmt]
    [drafter.user-test :refer [test-editor]]
@@ -38,7 +39,7 @@
   specified draft."
 
   [repo draft-graph-uri]
-  (update! repo (clone-data-from-live-to-draft-query draft-graph-uri)))
+  (sparql/update! repo (clone-data-from-live-to-draft-query draft-graph-uri)))
 
 (defn clone-and-append-data! [db draft-graph-uri triples]
   (clone-data-from-live-to-draft! db draft-graph-uri)
@@ -244,7 +245,7 @@
       (add *test-backend* "http://example.org/graph/2"
               test-triples-2)
 
-      (is (query *test-backend*
+      (is (sparql/query *test-backend*
                  (str "ASK WHERE {
                          GRAPH <http://example.org/graph/2> {
                            ?s ?p ?o .
@@ -252,7 +253,7 @@
                       }") :named-graphs ["http://example.org/graph/2"])
           "Can query triples in named graph 2")
 
-      (is (query *test-backend*
+      (is (sparql/query *test-backend*
                  (str "ASK WHERE {
                          GRAPH <http://example.org/graph/1> {
                            <http://test.com/data/one>  ?p1 ?o1 .
@@ -263,7 +264,7 @@
                       }") :named-graphs ["http://example.org/graph/1" "http://example.org/graph/2"])
           "Can specify many named graphs as a query restriction.")
 
-      (is (= false (query *test-backend*
+      (is (= false (sparql/query *test-backend*
                           (str "ASK WHERE {
                                   GRAPH <http://example.org/graph/2> {
                                     ?s ?p ?o .
@@ -272,19 +273,19 @@
                           :named-graphs ["http://example.org/graph/1"]))
           "Can't query triples in named graph 2")
 
-      (is (= false (query *test-backend*
+      (is (= false (sparql/query *test-backend*
                           (str "ASK WHERE {
                            ?s ?p ?o .
                       }") :default-graph []))
           "Can't query triples in union graph")
 
-      (is (query *test-backend*
+      (is (sparql/query *test-backend*
                  (str "ASK WHERE {
                            ?s ?p ?o .
                       }") :default-graph ["http://example.org/graph/1"])
           "Can query triples in union graph")
 
-      (is (query *test-backend*
+      (is (sparql/query *test-backend*
                  (str "ASK WHERE {
                            <http://test.com/data/one>  ?p1 ?o1 .
                            <http://test2.com/data/one> ?p2 ?o2 .
@@ -318,7 +319,7 @@
 (deftest upsert-single-object-insert-test
   (let [db (repo/repo)]
     (upsert-single-object! db "http://foo/" "http://bar/" "baz")
-    (is (query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
+    (is (sparql/query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
 (deftest upsert-single-object-update-test
   (let [db (repo/repo)
@@ -326,7 +327,7 @@
         predicate "http://example.com/predicate"]
     (add db (triplify [subject [predicate (s "initial")]]))
     (upsert-single-object! db subject predicate "updated")
-    (is (query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
+    (is (sparql/query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
                        "<" subject "> <" predicate "> \"updated\""
                        "} }")))))
 
@@ -418,14 +419,30 @@
 
     (set-modifed-at-on-draft-graph! *test-backend* draft-graph-uri (Date.))
 
-    (is (query *test-backend*
+    (is (sparql/query *test-backend*
                (str
                 "ASK {"
                 "<" draft-graph-uri "> <" drafter:modifiedAt "> ?modified . "
                 "}")))))
 
+(defn test-quads [g]
+  (map #(assoc % :c g)
+       (test/test-triples "http://test-subject")))
 
+(deftest copy-graph-test
+  (let [repo (repo/repo)]
+    (add repo (test-quads "http://test-graph/1"))
 
+    (copy-graph repo "http://test-graph/1" "http://test-graph/2")
+
+    (let [source-graph (set (sparql/query repo "SELECT * WHERE { GRAPH <http://test-graph/1> { ?s ?p ?o }}"))
+          dest-graph   (set (sparql/query repo "SELECT * WHERE { GRAPH <http://test-graph/2> { ?s ?p ?o }}"))]
+
+      (is (not (empty? dest-graph))
+          "Should not be empty (and have the data we loaded)")
+      (is (= source-graph
+             dest-graph)
+          "Should be a copy of the source graph"))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
