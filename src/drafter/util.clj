@@ -3,7 +3,8 @@
             [grafter.rdf.protocols :refer [map->Quad]]
             [clojure.pprint :as pp])
   (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]
-           [javax.mail.internet InternetAddress AddressException]))
+           [javax.mail.internet InternetAddress AddressException]
+           (java.nio.charset Charset)))
 
 (defmacro log-time-taken
   "Macro that logs the time spent doing something at :info level,
@@ -153,3 +154,8 @@
        (.validate ia)
        (.getAddress ia))
      (catch AddressException ex false))))
+
+(def utf8 (Charset/forName "UTF-8"))
+
+(defn throwable? [x]
+  (instance? Throwable x))

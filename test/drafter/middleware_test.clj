@@ -9,10 +9,13 @@
             [drafter.user :as user]
             [drafter.user.memory-repository :as memory-repo]
             [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-publisher test-editor]])
+            [drafter.user-test :refer [test-publisher test-editor]]
+            [grafter.rdf.repository :as repo]
+            [drafter.rdf.sesame :as ses]
+            [drafter.backend.repository]
+            [drafter.timeouts :as timeouts])
   (:import [clojure.lang ExceptionInfo]
-           [java.io File]
-           [org.openrdf.query QueryInterruptedException]))
+           [java.io File]))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -219,26 +222,71 @@
           result (handler {:uri "/test" :request-method :post :body body-stream})]
       (is (= body-text result)))))
 
+(deftest sparql-prepare-query-handler-test
+  (let [r (repo/repo)
+        handler (sparql-prepare-query-handler r identity)]
+    (testing "Valid query"
+      (let [req (handler {:params {:query "SELECT * WHERE { ?s ?p ?o }"}})]
+        (is (some? (get-in req [:sparql :prepared-query])))))
+
+    (testing "Malformed SPARQL query"
+      (let [response (handler {:params {:query "NOT A SPARQL QUERY"}})]
+        (tc/assert-is-bad-request-response response)))))
+
+(defn- prepare-query-str [query-str]
+  (ses/prepare-query (repo/repo) query-str))
+
 (deftest sparql-negotiation-handler-test
   (testing "Valid request"
     (let [handler (sparql-negotiation-handler identity)
           accept-content-type "application/n-triples"
-          submitted-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
+          pquery (prepare-query-str "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")
           request {:uri "/sparql"
-                   :params {:query submitted-query}
+                   :sparql {:prepared-query pquery}
                    :headers {"accept" accept-content-type}}
-          {{:keys [format response-content-type query]} :sparql} (handler request)]
+          {{:keys [format response-content-type]} :sparql} (handler request)]
       (is (= accept-content-type response-content-type))
-      (is (= query submitted-query))))
+      (is (some? format))))
   
   (testing "Content negotiation failure"
     (let [handler (sparql-negotiation-handler identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
           response (handler {:uri "/test"
-                             :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                             :sparql {:prepared-query pquery}
                              :headers {"accept" "text/trig"}})]
-      (tc/assert-is-not-acceptable-response response)))
+      (tc/assert-is-not-acceptable-response response))))
 
-  (testing "Malformed SPARQL query"
-    (let [handler (sparql-negotiation-handler identity)
-          response (handler {:uri "/test" :params {:query "NOT A SPARQL QUERY"}})]
-      (tc/assert-is-bad-request-response response))))
+(deftest sparql-timeout-handler-test
+  (testing "With valid timeout"
+    (let [timeout 30
+          handler (sparql-timeout-handler (constantly timeout) identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          request {:sparql {:prepared-query pquery}}]
+      (handler request)
+      (is (= timeout (.getMaxQueryTime pquery)))))
+
+  (testing "With invalid timeout"
+    (let [ex (IllegalArgumentException. "Invalid timeout")
+          handler (sparql-timeout-handler (constantly ex) identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          request {:sparql {:prepared-query pquery}}
+          response (handler request)]
+      (is (tc/assert-is-bad-request-response response)))))
+
+(deftest negotiate-sparql-results-content-type-with-test
+  (testing "Negotiation succeeds"
+    (let [format formats/rdf-ntriples
+          response-content-type "text/plain"
+          handler (negotiate-sparql-results-content-type-with (constantly [format response-content-type]) ":(" identity)
+          request {:headers {"accept" "text/plain"}}
+          inner-request (handler request)]
+      (is (= format (get-in inner-request [:sparql :format])))
+      (is (= response-content-type (get-in inner-request [:sparql :response-content-type])))))
+
+  (testing "Negotiation fails"
+    (let [handler (negotiate-sparql-results-content-type-with (constantly nil) ":(" identity)
+          request {:uri "/test"
+                   :request-method :get
+                   :headers {"accept" "text/plain"}}
+          response (handler request)]
+      (tc/assert-is-not-acceptable-response response))))

@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    NOTE: This pom.xml is intended to be used in development to provide code completion
+          to intelliJ or your IDE only.  We don't actually build a maven artifact for this
+          dependency and instead just set the :java-source-paths in the parent leiningen project
+          to build and include ./src/main/java for us.
+-->
+
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -28,6 +36,10 @@
 
     <dependencies>
         <dependency>
+            <!--
+                NOTE: this version of sesame should be kept in sync with the version in the parent
+                leiningen project.clj.
+            -->
             <groupId>org.openrdf.sesame</groupId>
             <artifactId>sesame-runtime</artifactId>
             <version>2.8.11</version>
