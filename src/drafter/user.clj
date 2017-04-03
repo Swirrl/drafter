@@ -17,7 +17,6 @@ permissions."
 (def username :email)
 (def role :role)
 (def password-digest :password-digest)
-(def max-query-timeout :max-query-timeout)
 
 (defn username->uri
   "Gets a user's URI from their username."
@@ -54,14 +53,10 @@ permissions."
   authenticated for a request, their authentication parameters should
   no longer be needed, so users are normalised into a model without
   these parameters."
-  ([email role] (create-authenticated-user email role nil))
-  ([email role max-query-timeout]
-   {:pre [(is-known-role? role)]}
-   (let [email (get-valid-email email)
-         user {:email email :role role}]
-     (if (some? max-query-timeout)
-       (assoc user :max-query-timeout max-query-timeout)
-       user))))
+  [email role]
+  {:pre [(is-known-role? role)]}
+  (let [email (get-valid-email email)]
+    {:email email :role role}))
 
 (defn authenticated!
   "Asserts that the given user has been authenticated and returns a
@@ -106,12 +101,7 @@ permissions."
   (if-let [email (util/validate-email-address (:email token))]
     (let [role (keyword (:role token))]
       (if (is-known-role? role)
-        (if-let [timeout-str (:max-query-timeout token)]
-          (let [timeout-or-ex (timeouts/try-parse-timeout timeout-str)]
-            (if (instance? Exception timeout-or-ex)
-              (user-token-invalid token :max-query-timeout (.getMessage timeout-or-ex))
-              (create-authenticated-user email role timeout-or-ex)))
-          (create-authenticated-user email role))
+        (create-authenticated-user email role)
         (user-token-invalid token :role "Unknown role")))
     (user-token-invalid token :email "Invalid address")))
 
