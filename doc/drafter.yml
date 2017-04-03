@@ -426,6 +426,7 @@ paths:
         - $ref: "#/parameters/id"
         - $ref: '#/parameters/graph'
         - $ref: '#/parameters/union-with-live'
+        - $ref: '#/parameters/timeout'
       summary: Access the quads inside this Draftset
       description: |
         Request the contents of this draftset in any supported RDF
@@ -543,6 +544,8 @@ paths:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/union-with-live'
+        - $ref: '#/parameters/timeout'
+
       tags:
         - Querying
       responses:
@@ -571,6 +574,7 @@ paths:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/union-with-live'
+        - $ref: '#/parameters/timeout'
       tags:
         - Querying
       responses:
@@ -595,6 +599,7 @@ paths:
         - text/csv
       parameters:
         - $ref: '#/parameters/query'
+        - $ref: '#/parameters/timeout'
       tags:
         - SPARQL Endpoints
       responses:
@@ -754,6 +759,12 @@ parameters:
       - all
     default: all
 
+  timeout:
+    name: timeout
+    in: query
+    description: Request a desired timeout in seconds after which the query/operation will be aborted.  You may be granted less than you ask for.
+    required: false
+    type: integer
 
 # message:
 #   name: message

@@ -5,6 +5,8 @@
             [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf.repository.registry :as reg]
             [environ.core :refer [env]]
+            [ring.middleware.params :refer [wrap-params]]
+            [ring.server.standalone :as ring-server]
             [drafter.user :as user]
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.backend.protocols :refer [stop-backend]]
@@ -17,10 +19,20 @@
             [swirrl-server.async.jobs :refer [create-job]]
             [schema.test :refer [validate-schemas]]
             [schema.core :as s])
-  (:import [java.util Scanner UUID]
+  (:import [java.util Scanner UUID ArrayList]
            [java.util.concurrent CountDownLatch TimeUnit]
-           [java.io ByteArrayInputStream]
-           org.openrdf.rio.trig.TriGParserFactory))
+           [java.io ByteArrayInputStream ByteArrayOutputStream PrintWriter OutputStream]
+           org.openrdf.rio.trig.TriGParserFactory
+           (org.apache.http.message BasicHttpResponse)
+           (org.apache.http ProtocolVersion)
+           (org.apache.http.entity ContentType StringEntity ContentLengthStrategy)
+           (java.nio.charset Charset)
+           (org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter)
+           (org.apache.http.impl.io HttpTransportMetricsImpl SessionInputBufferImpl DefaultHttpRequestParser SessionOutputBufferImpl DefaultHttpResponseWriter ChunkedOutputStream IdentityOutputStream ContentLengthOutputStream)
+           (org.apache.http.impl.entity StrictContentLengthStrategy)
+           (java.net InetSocketAddress SocketException ServerSocket URI)
+           (java.lang AutoCloseable)
+           (drafter.rdf DrafterSPARQLRepository)))
 
 
 (use-fixtures :each validate-schemas)
@@ -203,6 +215,132 @@
      (is (= :ok (:type job-result#)) (str "job failed: " (:exception job-result#)))
      job-result#))
 
+(defn empty-spo-json-body []
+  (let [baos (ByteArrayOutputStream. 1024)
+        writer (SPARQLResultsJSONWriter. baos)]
+    (.startQueryResult writer (ArrayList. ["s" "p" "o"]))
+    (.endQueryResult writer)
+    (String. (.toByteArray baos))))
+
+(defn get-spo-http-response []
+  (let [response (BasicHttpResponse. (ProtocolVersion. "HTTP" 1 1) 200 "OK")
+        content-type (ContentType/create "application/sparql-results+json" (Charset/forName "UTF8"))
+        entity (StringEntity. (empty-spo-json-body) content-type)]
+    (.addHeader response "Content-Type" "application/sparql-results+json")
+    (.setEntity response entity)
+    response))
+
+(defn- read-http-request [input-stream]
+  (let [metrics (HttpTransportMetricsImpl.)
+        buf (SessionInputBufferImpl. metrics (* 8 1024))]
+    (.bind buf input-stream)
+    (let [parser (DefaultHttpRequestParser. buf)]
+      (.parse parser))))
+
+(defn write-response [response output-stream]
+  (let [metrics (HttpTransportMetricsImpl.)
+        buf (SessionOutputBufferImpl. metrics (* 8 1024))]
+    (.bind buf output-stream)
+    (let [writer (DefaultHttpResponseWriter. buf)]
+
+      (.write writer response)
+      (if-let [entity (.getEntity response)]
+        (let [len (.determineLength (StrictContentLengthStrategy.) response)]
+          (with-open [os (cond
+                           (= len (long ContentLengthStrategy/CHUNKED)) (ChunkedOutputStream. 2048 buf)
+                           (= len (long ContentLengthStrategy/IDENTITY)) (IdentityOutputStream. buf)
+                           :else (ContentLengthOutputStream. buf len))]
+
+            (.writeTo entity os))))
+      (.flush buf))))
+
+(defn- handle-latched-http-client [client-socket connection-latch release-latch response]
+  ;;notify connection has been accepted
+  (.countDown connection-latch)
+
+  (with-open [socket client-socket]
+    ;;read entire request
+    (read-http-request (.getInputStream socket))
+
+    ;;wait for signal
+    (.await release-latch)
+
+    ;;write response
+    (write-response response (.getOutputStream socket))))
+
+(defn- latched-http-handler [port listener connection-latch release-latch response]
+  (let [client-threads (atom [])]
+    (try
+      (.bind listener (InetSocketAddress. port))
+      (loop [client-socket (.accept listener)]
+        (let [^Runnable client-handler #(handle-latched-http-client client-socket connection-latch release-latch response)
+              client-thread (Thread. client-handler "Client handler thread")]
+          (.start client-thread)
+          (swap! client-threads conj client-thread)
+          (recur (.accept listener))))
+      (catch SocketException ex
+        ;;we expect this exception to occur since it is thrown by .accept when the ServerSocket is closed
+        )
+      (finally
+        ;;wait for all clients to complete
+        (doseq [ct @client-threads]
+          (.join ct 200))))))
+
+(defn latched-http-server [port connection-latch release-latch response]
+  (let [listener (ServerSocket.)
+        server-fn ^Runnable (fn [] (latched-http-handler port listener connection-latch release-latch response))
+        server-thread (Thread. server-fn "Test server thread")]
+    (.start server-thread)
+    (reify AutoCloseable
+      (close [_]
+        (.close listener)
+        (try
+          (.join server-thread 500)
+          (catch InterruptedException ex nil))))))
+
+(defn get-latched-http-server-repo
+  "Returns a DrafterSPARQLRepository with a query URI matching latched-http-handler
+   listening on the given port."
+  [port]
+  (let [uri (URI. "http" nil "localhost" port nil nil nil)
+        repo (DrafterSPARQLRepository. (str uri))]
+    (.initialize repo)
+    repo))
+
+(defn null-output-stream []
+  (proxy [OutputStream] []
+    (close [])
+    (flush [])
+    (write
+      ([_])
+      ([bytes offset length]))))
+
+(defmacro suppress-stdout [& body]
+  `(binding [*out* (PrintWriter. (null-output-stream))]
+     ~@body))
+
+(defmacro with-server [port handler & body]
+  `(let [server# (suppress-stdout (ring-server/serve ~handler {:port ~port :join? false :open-browser? false}))]
+     (try
+       ~@body
+       (finally
+         (.stop server#)
+         (.join server#)))))
+
+(def ok-spo-query-response
+  {:status 200 :headers {"Content-Type" "application/sparql-results+json"} :body (empty-spo-json-body)})
+
+(defn extract-query-params-handler [params-ref response]
+  (wrap-params
+    (fn [{:keys [query-params] :as req}]
+      (reset! params-ref query-params)
+      response)))
+
+(defn extract-method-handler [method-ref response]
+  (fn [{:keys [request-method]}]
+    (reset! method-ref request-method)
+    response))
+
 (defn key-set
   "Gets a set containing the keys in the given map."
   [m]
@@ -249,6 +387,9 @@
 
 (defn assert-is-bad-request-response [response]
   (assert-schema (response-code-schema 400) response))
+
+(defn assert-is-service-unavailable-response [response]
+  (assert-schema (response-code-schema 503) response))
 
 (defn string->input-stream [s]
   (ByteArrayInputStream. (.getBytes s)))

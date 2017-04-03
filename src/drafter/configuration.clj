@@ -1,21 +1,19 @@
 (ns drafter.configuration
   "Namespace for calculating the SPARQL endpoint timeout settings. The
-  timeout settings are represented as a complete three-level tree,
+  timeout settings are represented as a complete two-level tree,
   where each level represents a facet of the endpoint timeouts. The
   first level is the endpoint name, then second whether it is a query
-  or update endpoint, and lowest level whether the timeout is for a
-  result or the entire operation. The leaves in the tree contain the
+  or update endpoint. The leaves in the tree contain the
   corresponding timeout value. The tree is represented with nested
   maps e.g. for a single endpoint :live the tree will look like
 
-  {:live {:update {:result-timeout 10 :operation-timeout 100}
-          :query {:result-timeout 10 :operation-timeout 100}}}
+  {:live {:update 100
+          :query  100}}
 
-  if the default timeouts are 10 for query results and 100 for the
-  entire operation.
+  if the default timeouts are 100 for the entire operation.
 
   Every leaf timeout value in the tree has an associated path e.g.
-  [:live :update :result-timeout] and every timeout configuration
+  [:live :update] and every timeout configuration
   variable identifies a set of leaf nodes to update. A configuration
   setting consists of two parts - a 'selector' which defines the leaf
   nodes it affects, and a timeout value to update the leaves
@@ -25,10 +23,9 @@
 
   Finding the paths for a selector involves walking the configuration
   tree and keeping track of all matching paths seen so far. Each step
-  of the walk corresponds to one of the facets of the endpoint - name,
-  update/query and the result/operation timeout. If a selector does
-  not define a value for a facet, then it is represented as nil and
-  matches all subtrees at the current level.
+  of the walk corresponds to one of the facets of the endpoint - name and
+  update/query. If a selector does not define a value for a facet, then
+  it is represented as nil and matches all subtrees at the current level.
 
   Calculating the endpoint timeout configuration therefore proceeds as
   follows:
@@ -40,24 +37,22 @@
      * Update all matching leaf timeouts to match the setting
   "
   (:require [clojure.tools.logging :as log]
-            [clojure.string :as string])
-  (:import [java.util Comparator]
-           [java.util.concurrent TimeUnit]))
+            [clojure.string :as string]
+            [drafter.timeouts :as timeouts])
+  (:import [java.util.concurrent TimeUnit]))
 
 (def timeout-param-prefix "drafter-timeout")
-(def timeout-param-pattern #"drafter-timeout(-(?<method>(update|query)))?(-endpoint-(?<endpoint>([a-z]+)))?(-(?<scope>(result|operation)))?")
+(def timeout-param-pattern #"drafter-timeout(-(?<method>(update|query)))?(-endpoint-(?<endpoint>([a-z]+)))?")
 
 (defn create-selector
   "A configuration 'selector' identifies a set of configuration leaf
   nodes in the timeout configuration tree which are to be modified by
   a timeout setting. Each node in the tree has an endpoint (.e.g live,
   raw, draft), a method (query or update endpoint) and a
-  scope (whether the timeout is for the next result or the entire
-  operation)."
-  [endpoint method scope]
-  {:pre [(contains? #{:update :query nil} method)
-         (contains? #{:result-timeout :operation-timeout nil} scope)]}
-  {:endpoint endpoint :method method :scope scope})
+  scope (always operation)."
+  [endpoint method]
+  {:pre [(contains? #{:update :query nil} method)]}
+  {:endpoint endpoint :method method})
 
 ;match-timeout-selector :: Keyword -> Try[Selector]
 (defn match-timeout-selector
@@ -68,18 +63,15 @@
   (let [matcher (re-matcher timeout-param-pattern (name p))]
     (if (.matches matcher)
       (let [endpoint (keyword (.group matcher "endpoint"))
-            method (keyword (.group matcher "method"))
-            scope-group (.group matcher "scope")
-            scope (when-not (nil? scope-group)
-                    (keyword (str scope-group "-timeout")))]
-        (create-selector endpoint method scope))
+            method (keyword (.group matcher "method"))]
+        (create-selector endpoint method))
       (Exception. (str "Invalid format for drafter timeout variable '" p "'")))))
 
 ;selector->path :: Selector -> Vector[Keyword]
 (defn- selector->path
   "Converts a selector into a path in the timeout settings tree."
   [s]
-  ((juxt :endpoint :method :scope) s))
+  ((juxt :endpoint :method) s))
 
 (defn selector-lt?
   "Returns whether a selector is 'less than' (i.e. less specific) than
@@ -99,19 +91,6 @@
     (Exception. (f (.getMessage v))))
   v)
 
-;try-parse-timeout :: String -> Try[Timeout]
-(defn try-parse-timeout
-  "Attempts to parse a string into a timeout value. Returns an
-  exception describing the error if the input cannot be parsed."
-  [s]
-  (try
-    (let [timeout (Integer/parseInt s)]
-      (if (pos? timeout)
-        (.toMillis TimeUnit/SECONDS timeout)
-        (Exception. "Timeout values must be non-negative")))
-    (catch NumberFormatException ex
-      (Exception. (str "Timeout value '" s "' is not an integer")))))
-
 (defn create-setting
   "A timeout setting contains a selector for a set of nodes in the
   timeout config tree along with a timeout value to use for those
@@ -122,13 +101,13 @@
 ;parse-timeout-setting :: String -> String -> Try[Setting]
 (defn- parse-timeout-setting [name value]
   (let [selector (match-timeout-selector name)
-        timeout (->> (try-parse-timeout value)
+        timeout (->> (timeouts/try-parse-timeout value)
                      (map-error-msg (fn [m] (str "Invalid value for timeout parameter '" name "': " m))))]
     (lift-f create-setting selector timeout)))
 
 ;format-selector :: Selector -> String
 (defn- format-selector [s]
-  (let [pairs (map (fn [k] [k (k s)]) [:endpoint :method :scope])
+  (let [pairs (map (fn [k] [k (k s)]) [:endpoint :method])
         segments (map (fn [[aspect value]] (str (name aspect) " => " (string/upper-case (name (or value :any))))) pairs)]
     (string/join ", " segments)))
 
@@ -139,20 +118,6 @@
       setting
       (Exception. (str "Unknown endpoint '" (name ep) "' for setting: " (format-selector selector))))))
 
-(defn- is-update-result-selector? [selector]
-  (= [:update :result-timeout] ((juxt :method :scope) selector)))
-
-;validate-setting-applicable :: Setting -> Try[Setting]
-(defn- validate-setting-applicable
-  "Validates that the timeout setting can be applied. Result timeouts
-  for update operations cannot be applied since updates do not produce
-  results. Returns an exception instance describing this condition if
-  the setting is for an update result timeout."
-  [{:keys [selector] :as setting}]
-  (if (is-update-result-selector? selector)
-    (Exception. (str "Cannot apply result timeout for update endpoint for setting: " (format-selector selector)))
-    setting))
-
 ;parse-and-validate-timeout-setting :: String -> String -> Set[Endpoint] -> Try[Setting]
 (defn parse-and-validate-timeout-setting
   "Parses the selector and timeout value which specifies a timeout
@@ -160,8 +125,7 @@
   configuration."
   [name value endpoints]
   (->> (parse-timeout-setting name value)
-       (lift-f #(validate-setting-endpoint endpoints %))
-       (lift-f validate-setting-applicable)))
+       (lift-f #(validate-setting-endpoint endpoints %))))
 
 (defn- looks-like-timeout-parameter?
   "Whether a pair looks like a definition for a timeout setting."
@@ -262,13 +226,14 @@
   "Calculates the timeout configuration tree given a collection of
   endpoints, the default timeouts for all operations and the current
   environment map."
-  [env endpoints default-timeouts]
-  (let [default-config (create-initial-timeouts endpoints default-timeouts)
-        endpoint-set (set endpoints)
-        {:keys [errors settings]} (find-timeout-variables env endpoint-set)
-        ordered-params (order-settings settings)]
-    (log-config-errors errors)
-    (reduce apply-setting default-config ordered-params)))
+  ([env endpoints] (get-timeout-config env endpoints timeouts/default-query-timeout))
+  ([env endpoints default-timeouts]
+   (let [default-config (create-initial-timeouts endpoints default-timeouts)
+         endpoint-set (set endpoints)
+         {:keys [errors settings]} (find-timeout-variables env endpoint-set)
+         ordered-params (order-settings settings)]
+     (log-config-errors errors)
+     (reduce apply-setting default-config ordered-params))))
 
 (defn get-endpoint-timeout
   "Gets the timeout for the endpoint type (query or update) on the

@@ -5,7 +5,7 @@
 
 (use-fixtures :each validate-schemas)
 
-(def selector-all (create-selector nil nil nil))
+(def selector-all (create-selector nil nil))
 
 (deftest match-timeout-selector-test
   (testing "should not match"
@@ -15,42 +15,22 @@
 
   (testing "should match"
     (are [input expected] (= expected (match-timeout-selector input))
-         :drafter-timeout (create-selector nil nil nil)
-         :drafter-timeout-endpoint-live (create-selector :live nil nil)
-         :drafter-timeout-update (create-selector nil :update nil)
-         :drafter-timeout-query (create-selector nil :query nil)
-         :drafter-timeout-result (create-selector nil nil :result-timeout)
-         :drafter-timeout-operation (create-selector nil nil :operation-timeout)
-         :drafter-timeout-update-endpoint-raw (create-selector :raw :update nil)
-         :drafter-timeout-query-endpoint-dump (create-selector :dump :query nil)
-         :drafter-timeout-endpoint-live-result (create-selector :live nil :result-timeout)
-         :drafter-timeout-endpoint-raw-operation (create-selector :raw nil :operation-timeout)
-         :drafter-timeout-update-result (create-selector nil :update :result-timeout)
-         :drafter-timeout-query-operation (create-selector nil :query :operation-timeout)
-         :drafter-timeout-update-endpoint-live-result (create-selector :live :update :result-timeout))))
+         :drafter-timeout (create-selector nil nil)
+         :drafter-timeout-endpoint-live (create-selector :live nil)
+         :drafter-timeout-update (create-selector nil :update)
+         :drafter-timeout-query (create-selector nil :query)
+         :drafter-timeout-update-endpoint-raw (create-selector :raw :update)
+         :drafter-timeout-query-endpoint-dump (create-selector :dump :query)
+         :drafter-timeout-endpoint-raw (create-selector :raw nil))))
 
 (deftest selector-lt?-test
   (are [s1 s2] (= true (selector-lt? s1 s2))
-       selector-all (create-selector nil nil :result-timeout)
-       selector-all (create-selector nil :query nil)
-       selector-all (create-selector :live nil nil)
-       (create-selector nil nil :result-timeout) (create-selector nil :update nil)
-       (create-selector nil nil :operation-timeout) (create-selector :raw nil nil)
-       (create-selector nil :query nil) (create-selector :dump nil nil)
-       (create-selector nil :query :operation-timeout) (create-selector :live nil nil)
-       (create-selector :live nil nil) (create-selector :live nil :result-timeout)
-       (create-selector :raw nil :operation-timeout) (create-selector :raw :query nil)
-       (create-selector :dump :update nil) (create-selector :dump :update :operation-timeout)))
-
-(deftest try-parse-timeout-test
-  (testing "non-numeric timeouts invalid"
-    (is (instance? Exception (try-parse-timeout "abc"))))
-
-  (testing "negative timeouts invalid"
-    (is (instance? Exception (try-parse-timeout "-22"))))
-
-  (testing "should convert valid to milliseconds"
-    (is (= 34000 (try-parse-timeout "34")))))
+       selector-all (create-selector nil :query)
+       selector-all (create-selector :live nil)
+       (create-selector nil nil) (create-selector :raw nil)
+       (create-selector nil :query) (create-selector :dump nil)
+       (create-selector nil :query) (create-selector :live nil)
+       (create-selector :raw nil) (create-selector :raw :query)))
 
 (deftest parse-and-validate-timeout-setting-test
   (testing "invalid settings"
@@ -74,15 +54,15 @@
   (testing "valid settings"
     (are [name value endpoints expected]
       (= expected (parse-and-validate-timeout-setting name value endpoints))
-      :drafter-timeout-endpoint-live-result "30" #{:raw :live} (create-setting (create-selector :live nil :result-timeout) 30000)
-      :drafter-timeout-operation "10" #{:live} (create-setting (create-selector nil nil :operation-timeout) 10000))))
+      :drafter-timeout-endpoint-live "30" #{:raw :live} (create-setting (create-selector :live nil) 30)
+      :drafter-timeout "10" #{:live} (create-setting (create-selector nil nil) 10))))
 
 (deftest find-timeout-variables-test
-  (let [setting1 (create-setting (create-selector :live :query nil) 10000)
-        setting2 (create-setting (create-selector nil nil :result-timeout) 20000)
+  (let [setting1 (create-setting (create-selector :live :query) 10)
+        setting2 (create-setting (create-selector nil :update) 20)
         endpoints #{:live :raw}
         env {:drafter-timeout-query-endpoint-live "10"
-             :drafter-timeout-result "20"
+             :drafter-timeout-update "20"
              :drafter-timeout-endpoint-nonexistent "50"
              :other-setting "other-value"
              :drafter-timeout-invalid "invalid"

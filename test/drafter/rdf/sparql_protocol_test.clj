@@ -1,39 +1,19 @@
 (ns drafter.rdf.sparql-protocol-test
   (:require
-   [drafter.test-common :refer :all]
-   [grafter.rdf.formats :refer [rdf-ntriples]]
-   [grafter.rdf :as rdf]
-   [grafter.rdf.protocols :as pr]
-   [grafter.rdf.repository :as repo]
-   [drafter.backend.protocols :as backend]
-   [drafter.rdf.sparql-protocol :refer :all]
-   [clojure.java.io :as io]
-   [clojure.data.json :as json]
-   [clojure-csv.core :as csv]
-   [clojure.test :refer :all]
-   [schema.test :refer [validate-schemas]])
-
-
-  (:import [java.io ByteArrayOutputStream]
-           [java.util Scanner]
-           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter]))
+    [drafter.test-common :refer :all]
+    [grafter.rdf.formats :refer [rdf-ntriples]]
+    [grafter.rdf :as rdf]
+    [grafter.rdf.protocols :as pr]
+    [drafter.rdf.sparql-protocol :refer :all]
+    [clojure-csv.core :as csv]
+    [clojure.test :refer :all]
+    [schema.test :refer [validate-schemas]])
+  (:import [java.util.concurrent CountDownLatch TimeUnit]))
 
 (use-fixtures :each validate-schemas)
 
 (defn add-triple-to-db [db]
   (pr/add db "http://foo.com/my-graph" (test-triples "http://test.com/data/one")))
-
-(deftest results-streamer-test
-  (testing "Streams sparql results into output stream"
-    (let [baos (ByteArrayOutputStream.)
-          preped-query (backend/prepare-query *test-backend* "SELECT * WHERE { ?s ?p ?o }")
-          streamer! (result-streamer (fn [ostream notify] (.evaluate preped-query (SPARQLResultsJSONWriter. ostream)))
-                                     (fn []))]
-
-      (streamer! baos)
-
-      (let [output (-> baos .toByteArray String. json/read-str)]
-        (is (map? output))))))
 
 (deftest sparql-end-point-test
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
@@ -51,9 +31,6 @@
           (is (= ["s" "p" "o"] (first csv-result)))
           (is (= ["http://test.com/data/one" "http://test.com/hasProperty" "http://test.com/data/1"]
                  (second csv-result))))))))
-
-(defn get-spo [{:keys [s p o]}]
-  [s p o])
 
 (defn get-spo-set [triples]
   (set (map (fn [{:keys [s p o]}] [s p o]) triples)))
@@ -131,6 +108,34 @@
                    :headers {"accept" "text/plain"}}
           {:keys [status]} (endpoint request)]
       (is (= 400 status)))))
+
+(deftest sparql-endpoint-query-timeout
+  (let [test-port 8080
+        max-connections (int 2)
+        connection-latch (CountDownLatch. max-connections)
+        release-latch (CountDownLatch. 1)
+        repo (doto (get-latched-http-server-repo test-port) (.setMaxConcurrentHttpConnections max-connections))
+        endpoint (sparql-end-point "/live/sparql" repo)
+        test-request {:uri "/live/sparql"
+                      :request-method :get
+                      :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                      :headers {"accept" "application/sparql-results+json"}}]
+    (with-open [server (latched-http-server test-port connection-latch release-latch (get-spo-http-response))]
+      (let [blocked-connections (doall (map (fn [i] (future (endpoint test-request))) (range 1 (inc max-connections))))]
+        ;;wait for max number of connections to be accepted by the server
+        (if (.await connection-latch 5000 TimeUnit/MILLISECONDS)
+          (do
+            ;;server has accepted max number of connections so next query attempt should see a connection timeout
+            (let [rf (future (endpoint test-request))]
+              ;;should be rejected almost immediately
+              (let [response (.get rf 5000 TimeUnit/MILLISECONDS)]
+                (assert-is-service-unavailable-response response)))
+
+            ;;release previous connections and wait for them to complete
+            (.countDown release-latch)
+            (doseq [f blocked-connections]
+              (.get f 100 TimeUnit/MILLISECONDS)))
+          (throw (RuntimeException. "Server failed to accept connections within timeout")))))))
 
 (use-fixtures :once wrap-db-setup)
 

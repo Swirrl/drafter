@@ -27,7 +27,9 @@
   (:import [java.util Date UUID]
            org.openrdf.model.impl.ContextStatementImpl
            org.openrdf.model.Resource
-           [org.openrdf.query GraphQuery TupleQueryResultHandler]))
+           [org.openrdf.query GraphQuery TupleQueryResultHandler]
+           [org.openrdf.queryrender RenderUtils]))
+
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -207,7 +209,7 @@
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
     (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
 
-(defn execute-query-in-draftset [backend draftset-ref request union-with-live?]
+#_(defn execute-query-in-draftset [backend draftset-ref request union-with-live?]
   (let [rewriting-executor (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? union-with-live? })]
     (sparql-protocol/process-sparql-query rewriting-executor request)))
 
@@ -241,7 +243,7 @@
     (spog-tuple-query->graph-query tuple-query)))
 
 
-(defn get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
+#_(defn get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
   (let [rewriting-executor (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? union-with-live? })
         pquery (dsmgmt/all-quads-query rewriting-executor)]
     (sparql-protocol/process-prepared-query rewriting-executor pquery accept-content-type nil)))
@@ -754,8 +756,45 @@
 
 (defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format]
   (jobs/make-job :background-write [job]
-                 (let [backend (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? false})
-                       triples (read-statements serialised rdf-format)
+                 (let [triples (read-statements serialised rdf-format)
                        quads (map #(util/make-quad-statement % graph) triples)
                        graph-mapping (stringified-draftset-backend-graph-mapping backend)]
                    (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
+
+(defn- rdf-handler->spog-tuple-handler [rdf-handler]
+  (reify TupleQueryResultHandler
+    (handleSolution [this bindings]
+      (let [subj (.getValue bindings "s")
+            pred (.getValue bindings "p")
+            obj (.getValue bindings "o")
+            graph (.getValue bindings "g")
+            stmt (ContextStatementImpl. subj pred obj graph)]
+        (.handleStatement rdf-handler stmt)))
+
+    (handleBoolean [this b])
+    (handleLinks [this links])
+    (startQueryResult [this binding-names]
+      (.startRDF rdf-handler))
+    (endQueryResult [this]
+      (.endRDF rdf-handler))))
+
+(defn- spog-tuple-query->graph-query [tuple-query]
+  (reify GraphQuery
+    (evaluate [this rdf-handler]
+      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))
+    (getMaxExecutionTime [this]
+      (.getMaxExecutionTime tuple-query))
+    (setMaxExecutionTime [this max]
+      (.setMaxExecutionTime tuple-query max))))
+
+(defn all-quads-query
+  "Returns a Sesame GraphQuery for all quads in the draftset
+  represented by the given backend."
+  [backend]
+  (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
+    (spog-tuple-query->graph-query tuple-query)))
+
+(defn all-graph-triples-query [executor graph]
+  (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+        escaped-query (RenderUtils/escape unsafe-query)]
+    (prepare-query executor escaped-query)))
