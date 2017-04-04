@@ -83,7 +83,7 @@
                  [prismatic/schema "1.0.4"]
                  [drafter-client "0.3.6-SNAPSHOT"]
 
-                 [metosin/ring-swagger-ui "2.1.4-0"]
+                 [metosin/ring-swagger-ui "2.2.10"]
 
                  [com.sun.mail/javax.mail "1.5.5"]]
 
