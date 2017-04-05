@@ -30,7 +30,8 @@
             [swirrl-server.middleware.log-request :refer [log-request]]))
 
 ;; Note that though the classes and requires below aren't used in this
-;; namespace they are needed by the log-config file which is loaded from here.
+;; namespace they are needed by the log-config file which is loaded
+;; from here.
 (import '[org.apache.log4j ConsoleAppender DailyRollingFileAppender RollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
         '[org.apache.log4j.helpers DateLayout]
         '[java.util UUID])
