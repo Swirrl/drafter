@@ -1,6 +1,5 @@
 (ns drafter.backend.sesame.native
-  (:require [drafter.backend.repository]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [environ.core :refer [env]]
             [grafter.rdf.repository :as repo]))
 

@@ -1,12 +1,11 @@
 (ns drafter.rdf.drafter-sparql-repository-test
   (:require [clojure.test :refer :all]
-            [grafter.rdf.repository :as repo]
-            [grafter.sequences :refer [alphabetical-column-names]]
-            [drafter.test-common :as tc])
-  (:import [drafter.rdf DrafterSparqlSession]
-           [org.openrdf.query QueryInterruptedException]
-           [java.util.concurrent CountDownLatch TimeUnit ExecutionException]
-           [java.io ByteArrayOutputStream]))
+            [drafter.test-common :as tc]
+            [grafter.rdf.repository :as repo])
+  (:import drafter.rdf.DrafterSparqlSession
+           java.io.ByteArrayOutputStream
+           [java.util.concurrent CountDownLatch ExecutionException TimeUnit]
+           org.openrdf.query.QueryInterruptedException))
 
 (defn query-timeout-handler
   "Handler which always returns a query timeout response in the format used by Stardog"

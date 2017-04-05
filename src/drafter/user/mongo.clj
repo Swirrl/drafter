@@ -1,13 +1,15 @@
 (ns drafter.user.mongo
-  (:require [monger.core :as mg]
-            [monger.collection :as mc]
-            [schema.core :as s]
+  (:require [clojure
+             [set :as set]
+             [string :as string]]
             [drafter.user :as user]
             [drafter.user.repository :refer :all]
-            [clojure.set :as set]
-            [clojure.string :as string])
-  (:import [java.io Closeable]
-           [org.bson.types ObjectId]))
+            [monger
+             [collection :as mc]
+             [core :as mg]]
+            [schema.core :as s])
+  (:import java.io.Closeable
+           org.bson.types.ObjectId))
 
 (def ^:private role-mappings
   {10 :editor

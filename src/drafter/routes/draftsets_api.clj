@@ -1,48 +1,23 @@
 (ns drafter.routes.draftsets-api
-  (:require
-   [clj-logging-config.log4j :as l4j]
-   [compojure.core :as compojure :refer [context routes]]
-   [drafter
-    [draftset :as ds]
-    [middleware :refer [allowed-methods-handler optional-enum-param require-params require-rdf-content-type temp-file-body]]
-    [requests :as request]
-    [responses :refer [conflict-detected-response forbidden-response not-acceptable-response run-sync-job! submit-async-job! unprocessable-entity-response]]
-    [user :as user]
-    [util :as util]]
-   [drafter.rdf
-    [content-negotiation :as conneg]
-    [draft-management :as mgmt]
-    [draftset-management :as dsmgmt]
-    [sesame :refer [is-quads-format? is-triples-format?]]]
-   [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
-   [drafter.user.repository :as user-repo]
-   [ring.util.response :refer [not-found redirect-after-post response]]
-   [swirrl-server.async.jobs :as ajobs]
-   [swirrl-server.responses :as response]
-   [ring.util.response :refer [redirect-after-post not-found response]]
-   [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
-                              unsupported-media-type-response method-not-allowed-response
-                              forbidden-response submit-async-job! run-sync-job!
-                              conflict-detected-response]]
-   [swirrl-server.responses :as response]
-   [swirrl-server.async.jobs :refer [job-succeeded!]]
-   [drafter.rdf.sparql-protocol :refer [sparql-protocol-handler sparql-execution-handler]]
-   [drafter.rdf.draftset-management :as dsmgmt]
-   [drafter.rdf.draft-management :as mgmt]
-   [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
-   [drafter.backend.protocols :refer :all]
-   [drafter.backend.endpoints :refer [draft-graph-set]]
-   [drafter.util :as util]
-   [drafter.user :as user]
-   [drafter.user.repository :as user-repo]
-   [drafter.middleware :refer [require-params allowed-methods-handler require-rdf-content-type
-                               temp-file-body optional-enum-param sparql-timeout-handler sparql-constant-prepared-query-handler
-                               negotiate-quads-content-type-handler negotiate-triples-content-type-handler]]
-   [drafter.draftset :as ds]
-   [grafter.rdf :refer [statements]]
-   [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]])
-
-  (:import org.openrdf.queryrender.RenderUtils))
+  (:require [clj-logging-config.log4j :as l4j]
+            [compojure.core :as compojure :refer [context routes]]
+            [drafter
+             [draftset :as ds]
+             [middleware :refer [negotiate-quads-content-type-handler negotiate-triples-content-type-handler optional-enum-param require-params require-rdf-content-type sparql-constant-prepared-query-handler sparql-timeout-handler temp-file-body]]
+             [responses :refer [conflict-detected-response forbidden-response run-sync-job! submit-async-job! unprocessable-entity-response]]
+             [user :as user]
+             [util :as util]]
+            [drafter.backend.endpoints :refer [draft-graph-set]]
+            [drafter.rdf
+             [draft-management :as mgmt]
+             [draftset-management :as dsmgmt]
+             [sesame :refer [is-quads-format? is-triples-format?]]
+             [sparql-protocol :refer [sparql-execution-handler sparql-protocol-handler]]]
+            [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
+            [drafter.user.repository :as user-repo]
+            [ring.util.response :refer [not-found redirect-after-post response]]
+            [swirrl-server.async.jobs :as ajobs]
+            [swirrl-server.responses :as response]))
 
 (defn- get-draftset-executor [backend draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]

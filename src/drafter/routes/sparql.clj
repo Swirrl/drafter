@@ -1,8 +1,9 @@
 (ns drafter.routes.sparql
-  (:require [drafter.rdf.sparql-protocol :refer [sparql-end-point sparql-protocol-handler]]
-            [drafter.rdf.endpoints :refer [live-endpoint]]
-            [compojure.core :refer [make-route]]
-            [drafter.middleware :refer [require-user-role]]))
+  (:require [compojure.core :refer [make-route]]
+            [drafter.middleware :refer [require-user-role]]
+            [drafter.rdf
+             [endpoints :refer [live-endpoint]]
+             [sparql-protocol :refer [sparql-end-point sparql-protocol-handler]]]))
 
 (defn live-sparql-routes [mount-point executor query-timeout-fn]
   (sparql-end-point mount-point (live-endpoint executor) query-timeout-fn))

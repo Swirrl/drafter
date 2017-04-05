@@ -1,15 +1,17 @@
 (ns drafter.backend.endpoints
-  (:require [grafter.rdf.protocols :as proto]
-            [drafter.rdf.sesame :refer [prepare-query apply-restriction prepare-restricted-update]]
-            [drafter.backend.protocols :refer [->sesame-repo] :as backend]
-            [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
+  (:require [drafter.backend.protocols :as backend :refer [->sesame-repo]]
+            [drafter.rdf
+             [draft-management :as mgmt]
+             [sesame :refer [apply-restriction prepare-query prepare-restricted-update]]]
+            [drafter.rdf.rewriting
+             [query-rewriting :refer [rewrite-sparql-string]]
+             [result-rewriting :refer [rewrite-query-results]]]
             [drafter.util :as util]
-            [schema.core :as s]
-            [grafter.rdf.repository :as repo])
-  (:import [org.openrdf.repository Repository]
-           [org.openrdf.model URI]))
+            [grafter.rdf
+             [protocols :as proto]
+             [repository :as repo]]
+            [schema.core :as s])
+  (:import org.openrdf.model.URI))
 
 (def ^:private itriple-readable-delegate
   {:to-statements (fn [this options]

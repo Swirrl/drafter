@@ -1,9 +1,9 @@
 (ns drafter.draftset
   "In memory clojure representations of Draftset objects and functions
   to operate on them."
-  (:require [schema.core :as s]
-            [drafter.util :as util])
-  (:import [java.net URI]
+  (:require [drafter.util :as util]
+            [schema.core :as s])
+  (:import java.net.URI
            [java.util Date UUID]))
 
 (defprotocol DraftsetRef

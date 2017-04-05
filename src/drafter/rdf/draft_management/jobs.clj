@@ -1,16 +1,11 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
-            [drafter.backend.protocols :refer :all]
-            [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.sparql :as sparql]
-            [swirrl-server.async.jobs :refer [create-job job-succeeded! job-failed! create-child-job]]
-            [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [queue-job!]]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.vocabularies.rdf :refer :all]
-            [grafter.rdf :refer [statements]]
             [environ.core :refer [env]]
-            [drafter.util :as util]))
+            [swirrl-server.async.jobs
+             :refer
+             [create-child-job create-job job-failed! job-succeeded!]]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:

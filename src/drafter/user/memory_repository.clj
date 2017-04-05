@@ -1,10 +1,10 @@
 (ns drafter.user.memory-repository
-  (:require [drafter.user :refer [username create-user get-digest]]
-            [drafter.user.repository :refer :all]
+  (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.edn :as edn]
-            [clojure.tools.logging :as log])
-  (:import [java.io PushbackReader FileNotFoundException Closeable]))
+            [clojure.tools.logging :as log]
+            [drafter.user :refer [create-user get-digest username]]
+            [drafter.user.repository :refer :all])
+  (:import [java.io Closeable FileNotFoundException PushbackReader]))
 
 (defrecord MemoryUserRepository [users]
   UserRepository

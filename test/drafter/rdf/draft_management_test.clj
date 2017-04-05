@@ -1,21 +1,22 @@
 (ns drafter.rdf.draft-management-test
-  (:require
-   [drafter.rdf.draftset-management :refer [create-draftset!]]
-   [drafter.rdf.sparql :as sparql]
-   [drafter.rdf.draft-management :refer :all]
-   [drafter.test-helpers.draft-management-helpers :as mgmt]
-   [drafter.user-test :refer [test-editor]]
-   [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db make-graph-live! import-data-to-draft! ask?] :as test]
-   [grafter.rdf :refer [s add add-statement]]
-   [grafter.rdf.templater :refer [graph triplify]]
-   [grafter.vocabularies.rdf :refer :all]
-   [grafter.rdf.repository :as repo]
-   [drafter.rdf.drafter-ontology :refer :all]
-   [schema.test :refer [validate-schemas]]
-   [drafter.util :as util]
-   [clojure.test :refer :all])
-  (:import [org.openrdf.model.impl URIImpl]
-           [java.util Date UUID]))
+  (:require [clojure.test :refer :all]
+            [drafter
+             [test-common :as test :refer [*test-backend* ask? import-data-to-draft! make-graph-live! wrap-clean-test-db wrap-db-setup]]
+             [user-test :refer [test-editor]]]
+            [drafter.rdf
+             [draft-management :refer :all]
+             [drafter-ontology :refer :all]
+             [draftset-management :refer [create-draftset!]]
+             [sparql :as sparql]]
+            [drafter.test-helpers.draft-management-helpers :as mgmt]
+            [grafter.rdf :refer [add s]]
+            [grafter.rdf
+             [repository :as repo]
+             [templater :refer [triplify]]]
+            [grafter.vocabularies.rdf :refer :all]
+            [schema.test :refer [validate-schemas]])
+  (:import [java.util Date UUID]
+           org.openrdf.model.impl.URIImpl))
 
 (use-fixtures :each validate-schemas)
 

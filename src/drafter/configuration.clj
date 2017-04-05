@@ -36,10 +36,9 @@
      * Find the set of leaf nodes it references in the tree
      * Update all matching leaf timeouts to match the setting
   "
-  (:require [clojure.tools.logging :as log]
-            [clojure.string :as string]
-            [drafter.timeouts :as timeouts])
-  (:import [java.util.concurrent TimeUnit]))
+  (:require [clojure.string :as string]
+            [clojure.tools.logging :as log]
+            [drafter.timeouts :as timeouts]))
 
 (def timeout-param-prefix "drafter-timeout")
 (def timeout-param-pattern #"drafter-timeout(-(?<method>(update|query)))?(-endpoint-(?<endpoint>([a-z]+)))?")

@@ -1,21 +1,21 @@
 (ns drafter.middleware-test
-  (:require [drafter.middleware :refer :all]
-            [grafter.rdf.formats :as formats]
-            [clojure.test :refer :all]
-            [clojure.java.io :as io]
-            [ring.util.response :refer [response]]
+  (:require [buddy.auth :as auth]
             [buddy.core.codecs :refer [str->base64]]
-            [buddy.auth :as auth]
-            [drafter.user :as user]
-            [drafter.user.memory-repository :as memory-repo]
-            [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-publisher test-editor]]
-            [grafter.rdf.repository :as repo]
+            [clojure.java.io :as io]
+            [clojure.test :refer :all]
+            [drafter
+             [middleware :refer :all]
+             [test-common :as tc]
+             [user :as user]
+             [user-test :refer [test-editor test-publisher]]]
             [drafter.rdf.sesame :as ses]
-            [drafter.backend.repository]
-            [drafter.timeouts :as timeouts])
-  (:import [clojure.lang ExceptionInfo]
-           [java.io File]))
+            [drafter.user.memory-repository :as memory-repo]
+            [grafter.rdf
+             [formats :as formats]
+             [repository :as repo]]
+            [ring.util.response :refer [response]])
+  (:import clojure.lang.ExceptionInfo
+           java.io.File))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -247,7 +247,7 @@
           {{:keys [format response-content-type]} :sparql} (handler request)]
       (is (= accept-content-type response-content-type))
       (is (some? format))))
-  
+
   (testing "Content negotiation failure"
     (let [handler (sparql-negotiation-handler identity)
           pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")

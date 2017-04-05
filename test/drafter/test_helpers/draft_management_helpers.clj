@@ -1,15 +1,7 @@
 (ns drafter.test-helpers.draft-management-helpers
-  (:require [grafter.rdf :refer [add s]]
-            [drafter.util :refer [map-values]]
-            [clojure.walk :refer [keywordize-keys]]
-            [clojure.set :as set]
-            [drafter.rdf.draft-management :refer [delete-draft-state-query drafter-state-graph with-state-graph xsd-datetime] :as mgmt]
-            [drafter.rdf.sparql :as sparql]
-            [grafter.vocabularies.rdf :refer :all]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
-            [grafter.rdf.templater :refer [add-properties graph]]
-            [swirrl-server.errors :refer [ex-swirrl]]))
+  (:require [drafter.rdf
+             [draft-management :as mgmt :refer [with-state-graph]]
+             [sparql :as sparql]]))
 
 (defn draft-exists?
   "Checks state graph to see if a draft graph exists"

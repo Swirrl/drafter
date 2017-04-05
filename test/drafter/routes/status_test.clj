@@ -1,14 +1,14 @@
 (ns drafter.routes.status-test
   (:require [clojure.test :refer :all]
-            [ring.mock.request :refer :all]
             [drafter.common.json-encoders :as enc]
             [drafter.routes.status :refer :all]
-            [swirrl-server.async.status-routes :refer [JobNotFinishedResponse]]
-            [schema.core :as s]
-            [schema.test :refer [validate-schemas]])
-
-  (:import [java.util UUID]
-           [java.util.concurrent.locks ReentrantLock]))
+            [ring.mock.request :refer :all]
+            [schema
+             [core :as s]
+             [test :refer [validate-schemas]]]
+            [swirrl-server.async.status-routes :refer [JobNotFinishedResponse]])
+  (:import java.util.concurrent.locks.ReentrantLock
+           java.util.UUID))
 
 (comment use-fixtures :each validate-schemas)
 

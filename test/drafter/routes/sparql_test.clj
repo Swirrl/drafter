@@ -1,23 +1,17 @@
 (ns drafter.routes.sparql-test
-  (:require [drafter.test-common :refer [throws-exception? test-triples import-data-to-draft!
-                                         stream->string select-all-in-graph make-graph-live!
-                                         *test-backend* wrap-clean-test-db wrap-db-setup with-identity
-                                         assert-is-forbidden-response]]
+  (:require [clojure-csv.core :as csv]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
-            [clojure-csv.core :as csv]
-            [clojure.data.json :as json]
-            [grafter.rdf :refer [subject predicate object context]]
-            [grafter.rdf.repository :as repo]
-            [grafter.rdf.protocols :as pr]
-            [drafter.middleware :as middleware]
-            [drafter.routes.sparql :refer :all]
+            [drafter
+             [middleware :as middleware]
+             [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft! select-all-in-graph stream->string test-triples with-identity wrap-clean-test-db wrap-db-setup]]
+             [timeouts :as timeouts]
+             [user-test :refer [test-editor test-system]]]
             [drafter.rdf.draft-management :refer :all]
+            [drafter.routes.sparql :refer :all]
             [drafter.user.memory-repository :as memrepo]
-            [drafter.user-test :refer [test-editor test-system]]
-            [swirrl-server.errors :refer [encode-error]]
-            [schema.test :refer [validate-schemas]]
-            [drafter.timeouts :as timeouts]))
+            [grafter.rdf.repository :as repo]
+            [schema.test :refer [validate-schemas]]))
 
 (use-fixtures :each validate-schemas)
 

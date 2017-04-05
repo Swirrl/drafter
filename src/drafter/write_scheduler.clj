@@ -10,15 +10,15 @@
   waiting for their results.
 
   Jobs can be added to the write queue using the queue-job! function."
-  (:require [clojure.tools.logging :as log]
-            [clj-logging-config.log4j :as l4j]
+  (:require [clj-logging-config.log4j :as l4j]
+            [clojure.tools.logging :as log]
             [drafter.util :refer [log-time-taken]]
-            [swirrl-server.async.jobs :refer [finished-jobs job-failed! restart-id ->Job]]
-            [swirrl-server.errors :refer [ex-swirrl encode-error]])
-  (:import (org.apache.log4j MDC)
-           (java.util.concurrent PriorityBlockingQueue TimeUnit)
-           (java.util.concurrent.locks ReentrantLock)
-           (java.util.concurrent.atomic AtomicBoolean)))
+            [swirrl-server.async.jobs :refer [job-failed!]]
+            [swirrl-server.errors :refer [ex-swirrl]])
+  (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
+           java.util.concurrent.atomic.AtomicBoolean
+           java.util.concurrent.locks.ReentrantLock
+           org.apache.log4j.MDC))
 
 (def priority-levels-map { :publish-write 2 :background-write 1})
 

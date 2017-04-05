@@ -1,39 +1,41 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
-            [grafter.rdf.repository :as repo]
-            [grafter.rdf.protocols :refer [add]]
-            [grafter.rdf.templater :refer [triplify]]
-            [grafter.rdf.repository.registry :as reg]
+            [drafter
+             [draftset :refer [->draftset-uri]]
+             [user :as user]
+             [write-scheduler :refer [global-writes-lock queue-job! start-writer! stop-writer!]]]
+            [drafter.backend
+             [configuration :refer [get-backend]]
+             [protocols :refer [stop-backend]]]
+            [drafter.rdf
+             [draft-management :refer [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
+             [sparql :as sparql]]
             [environ.core :refer [env]]
+            [grafter.rdf
+             [protocols :refer [add]]
+             [repository :as repo]
+             [templater :refer [triplify]]]
+            [grafter.rdf.repository.registry :as reg]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
-            [drafter.user :as user]
-            [drafter.backend.configuration :refer [get-backend]]
-            [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
-                                                  create-draft-graph!]]
-            [drafter.rdf.sparql :as sparql]
-            [drafter.draftset :refer [->draftset-uri]]
-            [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
-                                             global-writes-lock]]
-            [swirrl-server.async.jobs :refer [create-job]]
-            [schema.test :refer [validate-schemas]]
-            [schema.core :as s])
-  (:import [java.util Scanner UUID ArrayList]
+            [schema
+             [core :as s]
+             [test :refer [validate-schemas]]]
+            [swirrl-server.async.jobs :refer [create-job]])
+  (:import drafter.rdf.DrafterSPARQLRepository
+           [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
+           java.lang.AutoCloseable
+           [java.net InetSocketAddress ServerSocket SocketException URI]
+           java.nio.charset.Charset
+           [java.util ArrayList Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
-           [java.io ByteArrayInputStream ByteArrayOutputStream PrintWriter OutputStream]
-           org.openrdf.rio.trig.TriGParserFactory
-           (org.apache.http.message BasicHttpResponse)
-           (org.apache.http ProtocolVersion)
-           (org.apache.http.entity ContentType StringEntity ContentLengthStrategy)
-           (java.nio.charset Charset)
-           (org.openrdf.query.resultio.sparqljson SPARQLResultsJSONWriter)
-           (org.apache.http.impl.io HttpTransportMetricsImpl SessionInputBufferImpl DefaultHttpRequestParser SessionOutputBufferImpl DefaultHttpResponseWriter ChunkedOutputStream IdentityOutputStream ContentLengthOutputStream)
-           (org.apache.http.impl.entity StrictContentLengthStrategy)
-           (java.net InetSocketAddress SocketException ServerSocket URI)
-           (java.lang AutoCloseable)
-           (drafter.rdf DrafterSPARQLRepository)))
-
+           [org.apache.http.entity ContentLengthStrategy ContentType StringEntity]
+           org.apache.http.impl.entity.StrictContentLengthStrategy
+           [org.apache.http.impl.io ChunkedOutputStream ContentLengthOutputStream DefaultHttpRequestParser DefaultHttpResponseWriter HttpTransportMetricsImpl IdentityOutputStream SessionInputBufferImpl SessionOutputBufferImpl]
+           org.apache.http.message.BasicHttpResponse
+           org.apache.http.ProtocolVersion
+           org.openrdf.query.resultio.sparqljson.SPARQLResultsJSONWriter
+           org.openrdf.rio.trig.TriGParserFactory))
 
 (use-fixtures :each validate-schemas)
 

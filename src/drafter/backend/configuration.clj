@@ -1,6 +1,5 @@
 (ns drafter.backend.configuration
-  (:require [clojure.tools.logging :as log]
-            [clojure.string :as string]))
+  (:require [clojure.tools.logging :as log]))
 
 (defn get-backend [env-map]
   (let [backend-ns (symbol (get env-map :drafter-backend "drafter.backend.sesame.remote"))]

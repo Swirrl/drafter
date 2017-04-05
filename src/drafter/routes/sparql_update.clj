@@ -1,19 +1,17 @@
 (ns drafter.routes.sparql-update
-  (:require [clojure.tools.logging :as log]
-            [compojure.core :refer [POST make-route]]
-            [drafter.rdf.draft-management.jobs :as jobs]
-            [swirrl-server.async.jobs :refer [job-succeeded!]]
-            [swirrl-server.responses :as response]
-            [swirrl-server.errors :refer [ex-swirrl]]
-            [drafter.responses :refer [run-sync-job!]]
-            [drafter.rdf.draft-management :as mgmt]
+  (:require [compojure.core :refer [make-route]]
+            [drafter
+             [middleware :refer [require-user-role]]
+             [responses :refer [run-sync-job!]]
+             [timeouts :as timeouts]]
             [drafter.backend.protocols :refer [prepare-update]]
+            [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.endpoints :refer [live-endpoint]]
-            [drafter.timeouts :as timeouts]
-            [drafter.middleware :refer [require-user-role]]
             [pantomime.media :as mt]
-            [drafter.requests :as request]
-            [drafter.user :as user]))
+            [swirrl-server
+             [errors :refer [ex-swirrl]]
+             [responses :as response]]
+            [swirrl-server.async.jobs :refer [job-succeeded!]]))
 
 (defmulti parse-update-request
   "Convert a request into an String representing the SPARQL update

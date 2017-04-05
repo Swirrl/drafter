@@ -1,12 +1,12 @@
 (ns drafter.responses
-  (:require [clojure.tools.logging :as log]
-            [swirrl-server.responses :as response]
+  (:require [clojure.string :refer [upper-case]]
+            [clojure.tools.logging :as log]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
-            [swirrl-server.async.status-routes :refer [submitted-job-response]]
-            [swirrl-server.responses :as r]
-            [swirrl-server.errors :refer [encode-error]]
             [drafter.write-scheduler :refer [exec-sync-job! queue-job!]]
-            [clojure.string :refer [upper-case]]))
+            [swirrl-server
+             [errors :refer [encode-error]]
+             [responses :as r]]
+            [swirrl-server.async.status-routes :refer [submitted-job-response]]))
 
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
@@ -42,8 +42,8 @@
   response."
   [result]
   (if (failed-job-result? result)
-    (response/api-response 500 result)
-    (response/api-response 200 result)))
+    (r/api-response 500 result)
+    (r/api-response 200 result)))
 
 ;; run-sync-job! :: Job -> RingResponse
 ;; run-sync-job! :: Job -> (ApiResponse -> RingResponse) -> RingResponse

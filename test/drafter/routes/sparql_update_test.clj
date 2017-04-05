@@ -1,14 +1,18 @@
 (ns drafter.routes.sparql-update-test
-  (:require [drafter.routes.sparql-update :refer :all]
-            [drafter.test-common :refer [throws-exception?]]
-            [drafter.rdf.draft-management :refer [create-managed-graph! create-draft-graph!]]
-            [clojure.test :refer :all]
-            [clojure.template :refer [do-template]]
-            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db stream->string
-                                         select-all-in-graph during-exclusive-write assert-is-ok-response]]
+  (:require [clojure.test :refer :all]
+            [drafter.rdf.draft-management :refer [create-managed-graph!]]
+            [drafter.routes.sparql-update :refer :all]
+            [drafter.test-common
+             :refer
+             [*test-backend*
+              assert-is-ok-response
+              during-exclusive-write
+              throws-exception?
+              wrap-clean-test-db
+              wrap-db-setup]]
             [grafter.rdf.repository :refer [query]]
             [swirrl-server.errors :refer [encode-error]])
-  (:import [java.nio.charset StandardCharsets]))
+  (:import java.nio.charset.StandardCharsets))
 
 (defn ->input-stream
   "Convert a string into an Input Stream"

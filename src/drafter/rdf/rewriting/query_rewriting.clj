@@ -1,10 +1,10 @@
 (ns drafter.rdf.rewriting.query-rewriting
   "Functions related to syntactically rewriting drafter queries."
-  (:require [clojure.zip :as z]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
+            [clojure.zip :as z]
             [drafter.rdf.rewriting.arq :refer [apply-rewriter]])
-  (:import [org.apache.jena.sparql.sse SSE Item ItemList]
-           [org.apache.jena.graph NodeFactory]))
+  (:import org.apache.jena.graph.NodeFactory
+           org.apache.jena.sparql.sse.Item))
 
 (defn- uri-node?
   "Predicate function that tests if the Item is a URI node."

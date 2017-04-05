@@ -1,12 +1,13 @@
 (ns drafter.repl
-  (:require [drafter.handler :as service]
-            [environ.core :refer [env]]
-            [clojure.string :as s]
-            [ring.middleware.file-info :refer :all]
-            [ring.middleware.resource :refer :all]
-            [ring.server.standalone :refer [serve]])
   (:gen-class)
-  (:import (java.lang.management ManagementFactory)))
+  (:require [clojure.string :as s]
+            [drafter.handler :as service]
+            [environ.core :refer [env]]
+            [ring.middleware
+             [file-info :refer :all]
+             [resource :refer :all]]
+            [ring.server.standalone :refer [serve]])
+  (:import java.lang.management.ManagementFactory))
 
 (defonce server (atom nil))
 

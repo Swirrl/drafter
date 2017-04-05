@@ -1,6 +1,6 @@
 (ns drafter.timeouts-test
-  (:require [drafter.timeouts :refer :all]
-            [clojure.test :refer :all]))
+  (:require [clojure.test :refer :all]
+            [drafter.timeouts :refer :all]))
 
 (deftest try-parse-timeout-test
   (testing "non-numeric timeouts invalid"

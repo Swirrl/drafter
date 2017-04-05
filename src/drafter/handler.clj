@@ -1,43 +1,43 @@
 (ns drafter.handler
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [compojure.core :refer [defroutes context]]
-            [compojure.route :as route]
-            [drafter.middleware :as middleware]
-            [swirrl-server.middleware.log-request :refer [log-request]]
-            [drafter.configuration :as conf]
-            [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.backend.configuration :refer [get-backend]]
-            [drafter.util :refer [set-var-root! conj-if]]
+            [compojure
+             [core :refer [context defroutes]]
+             [route :as route]]
+            [drafter
+             [configuration :as conf]
+             [middleware :as middleware]
+             [util :refer [set-var-root!]]
+             [write-scheduler :refer [global-writes-lock start-writer! stop-writer!]]]
+            [drafter.backend
+             [configuration :refer [get-backend]]
+             [protocols :refer [stop-backend]]]
             [drafter.common.json-encoders :as enc]
-            [drafter.routes.draftsets-api :refer [draftset-api-routes]]
-            [drafter.routes.status :refer [status-routes]]
-            [drafter.routes.pages :refer [pages-routes]]
-            [drafter.routes.sparql :refer [live-sparql-routes
-                                           raw-sparql-routes]]
-            [drafter.routes.sparql-update :refer [raw-update-endpoint-route]]
-            [drafter.write-scheduler :refer [start-writer!
-                                             global-writes-lock
-                                             stop-writer!]]
-            [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
+            [drafter.routes
+             [draftsets-api :refer [draftset-api-routes]]
+             [pages :refer [pages-routes]]
+             [sparql :refer [live-sparql-routes raw-sparql-routes]]
+             [status :refer [status-routes]]]
             [environ.core :refer [env]]
             [noir.util.middleware :refer [app-handler]]
-            [ring.middleware.verbs :refer [wrap-verbs]]
-            [ring.middleware.defaults :refer [api-defaults]]
+            [ring.middleware
+             [defaults :refer [api-defaults]]
+             [resource :refer [wrap-resource]]
+             [verbs :refer [wrap-verbs]]]
+            [selmer.parser :as parser]
+            [swirrl-server.async.jobs :refer [finished-jobs restart-id]]
             [swirrl-server.errors :refer [wrap-encode-errors]]
-            [ring.middleware.resource :refer [wrap-resource]]
-            [selmer.parser :as parser])
+            [swirrl-server.middleware.log-request :refer [log-request]]))
 
-  ;; Note that though the classes and requires below aren't used in this namespace
-  ;; they are needed by the log-config file which is loaded from here.
-  (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender RollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
-           [org.apache.log4j.helpers DateLayout]
-           [java.util UUID])
+;; Note that though the classes and requires below aren't used in this
+;; namespace they are needed by the log-config file which is loaded from here.
+(import '[org.apache.log4j ConsoleAppender DailyRollingFileAppender RollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
+        '[org.apache.log4j.helpers DateLayout]
+        '[java.util UUID])
 
-  (:require [clj-logging-config.log4j :refer [set-loggers!]]
-            [drafter.timeouts :as timeouts]))
-
-(require 'drafter.errors)
+(require '[clj-logging-config.log4j :refer [set-loggers!]]
+         '[drafter.timeouts :as timeouts]
+         'drafter.errors)
 
 ;; Set these values later when we start the server
 (def backend)

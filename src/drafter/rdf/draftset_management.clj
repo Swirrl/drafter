@@ -1,6 +1,5 @@
 (ns drafter.rdf.draftset-management
   (:require [clojure.string :as string]
-            [drafter.rdf.sparql-protocol :as sparql-protocol]
             [drafter
              [draftset :as ds]
              [user :as user]
@@ -12,7 +11,6 @@
             [drafter.rdf
              [draft-management :as mgmt :refer [to-quads with-state-graph]]
              [drafter-ontology :refer :all]
-             [draftset-management :as dsmgmt]
              [sesame :refer [read-statements]]
              [sparql :as sparql]]
             [drafter.rdf.draft-management.jobs :as jobs]
@@ -28,8 +26,7 @@
            org.openrdf.model.impl.ContextStatementImpl
            org.openrdf.model.Resource
            [org.openrdf.query GraphQuery TupleQueryResultHandler]
-           [org.openrdf.queryrender RenderUtils]))
-
+           org.openrdf.queryrender.RenderUtils))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri

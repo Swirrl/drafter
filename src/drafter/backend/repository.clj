@@ -1,7 +1,7 @@
 (ns drafter.backend.repository
   (:require [drafter.backend.protocols :refer :all]
             [drafter.rdf.sesame :as ses])
-  (:import [org.openrdf.repository Repository]))
+  (:import org.openrdf.repository.Repository))
 
 (extend-type Repository
   SparqlExecutor

@@ -1,13 +1,13 @@
 (ns drafter.rdf.sparql-protocol-test
-  (:require
-    [drafter.test-common :refer :all]
-    [grafter.rdf.formats :refer [rdf-ntriples]]
-    [grafter.rdf :as rdf]
-    [grafter.rdf.protocols :as pr]
-    [drafter.rdf.sparql-protocol :refer :all]
-    [clojure-csv.core :as csv]
-    [clojure.test :refer :all]
-    [schema.test :refer [validate-schemas]])
+  (:require [clojure-csv.core :as csv]
+            [clojure.test :refer :all]
+            [drafter.rdf.sparql-protocol :refer :all]
+            [drafter.test-common :refer :all]
+            [grafter.rdf :as rdf]
+            [grafter.rdf
+             [formats :refer [rdf-ntriples]]
+             [protocols :as pr]]
+            [schema.test :refer [validate-schemas]])
   (:import [java.util.concurrent CountDownLatch TimeUnit]))
 
 (use-fixtures :each validate-schemas)

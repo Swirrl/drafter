@@ -1,7 +1,7 @@
 (ns drafter.common.json-encoders-test
-  (:require [drafter.common.json-encoders :refer :all]
+  (:require [cheshire.core :refer [generate-string parse-string]]
             [clojure.test :refer :all]
-            [cheshire.core :refer [generate-string parse-string]]
+            [drafter.common.json-encoders :refer :all]
             [schema.test :refer [validate-schemas]]))
 
 (use-fixtures :each validate-schemas)

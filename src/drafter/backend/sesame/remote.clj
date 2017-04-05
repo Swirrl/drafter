@@ -1,15 +1,12 @@
 (ns drafter.backend.sesame.remote
   (:require [clojure.string :as str]
-            [drafter.backend.repository]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository.registry :as reg])
   (:import drafter.rdf.DrafterSPARQLRepository
-           org.openrdf.query.resultio.sparqljson.SPARQLResultsJSONParserFactory
-           org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLParserFactory
-           org.openrdf.rio.nquads.NQuadsParserFactory
-           org.openrdf.query.resultio.sparqljson.SPARQLBooleanJSONParserFactory
+           [org.openrdf.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
+           [org.openrdf.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
            org.openrdf.query.resultio.text.BooleanTextParserFactory
-           org.openrdf.query.resultio.sparqlxml.SPARQLBooleanXMLParserFactory
+           org.openrdf.rio.nquads.NQuadsParserFactory
            org.openrdf.rio.ntriples.NTriplesParserFactory))
 
 (defn get-required-environment-variable [var-key env-map]

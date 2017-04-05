@@ -1,30 +1,33 @@
 (ns drafter.middleware
-  (:require [clj-logging-config.log4j :as l4j]
-            [clojure.tools.logging :as log]
-            [clojure.string :as string]
-            [clojure.set :as set]
+  (:require [buddy.auth :as auth]
+            [buddy.auth
+             [middleware :refer [wrap-authentication wrap-authorization]]
+             [protocols :as authproto]]
+            [buddy.auth.backends
+             [httpbasic :refer [http-basic-backend]]
+             [token :refer [jws-backend]]]
+            [clj-logging-config.log4j :as l4j]
+            [clojure
+             [set :as set]
+             [string :as string]]
             [clojure.java.io :as io]
-            [environ.core :refer [env]]
-            [drafter.util :as util]
-            [drafter.responses :as response]
-            [drafter.user :as user]
+            [clojure.tools.logging :as log]
+            [drafter
+             [requests :as drafter-request]
+             [responses :as response]
+             [user :as user]
+             [util :as util]]
+            [drafter.backend.protocols :refer [prepare-query]]
+            [drafter.rdf
+             [content-negotiation :as conneg]
+             [sesame :as ses]]
             [drafter.user.repository :as user-repo]
-            [drafter.rdf.sesame :refer [read-statements] :as ses]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
-            [buddy.auth :as auth]
-            [buddy.auth.protocols :as authproto]
-            [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
-            [buddy.auth.backends.token :refer [jws-backend]]
-            [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
-            [ring.util.request :as request]
-            [drafter.requests :as drafter-request]
             [pantomime.media :refer [media-type-named]]
-            [drafter.rdf.content-negotiation :as conneg]
-            [drafter.timeouts :as timeouts]
-            [drafter.backend.protocols :refer [prepare-query]])
-  (:import [java.io File]
-           [org.apache.jena.query QueryParseException]
-           [clojure.lang ExceptionInfo]))
+            [ring.util.request :as request])
+  (:import clojure.lang.ExceptionInfo
+           java.io.File
+           org.apache.jena.query.QueryParseException))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (if-let [user (user-repo/find-user-by-username user-repo username)]

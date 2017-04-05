@@ -1,8 +1,9 @@
 (ns drafter.write-scheduler-test
   (:require [clojure.test :refer :all]
-            [drafter.responses :as resp]
+            [drafter
+             [responses :as resp]
+             [write-scheduler :refer :all]]
             [drafter.test-helpers.lock-manager :as lm]
-            [drafter.write-scheduler :refer :all]
             [schema.test :refer [validate-schemas]]
             [swirrl-server.async.jobs :refer [->Job create-job job-succeeded!]]))
 

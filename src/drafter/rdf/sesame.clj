@@ -1,17 +1,15 @@
 (ns drafter.rdf.sesame
-  (:require [drafter.rdf.draft-management.jobs :as jobs]
-            [grafter.rdf :refer [statements]]
-            [grafter.rdf.repository :as repo]
-            [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
+  (:require [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer [->sesame-repo]]
-            [clojure.tools.logging :as log])
-  (:import [org.openrdf.rio Rio]
-           [org.openrdf.query TupleQuery BooleanQuery GraphQuery Update]
-           [org.openrdf.rio Rio RDFHandler]
-           [org.openrdf.repository Repository]
-           [org.openrdf.repository.sparql SPARQLRepository]
-           [org.openrdf.query Dataset TupleQueryResultHandler]
-           [org.openrdf.query.resultio QueryResultIO]))
+            [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
+            [grafter.rdf :refer [statements]]
+            [grafter.rdf.repository :as repo])
+  (:import [org.openrdf.query BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler Update]
+           org.openrdf.query.resultio.QueryResultIO
+           org.openrdf.repository.Repository
+           org.openrdf.repository.sparql.SPARQLRepository
+           [org.openrdf.rio RDFHandler Rio]))
 
 (defn is-quads-format? [rdf-format]
   (.supportsContexts rdf-format))

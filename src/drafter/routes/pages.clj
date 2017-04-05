@@ -1,15 +1,12 @@
 (ns drafter.routes.pages
   (:require [compojure.core :refer [GET routes]]
             [drafter.layout :as layout]
-            [drafter.rdf.draft-management :refer [drafter-state-graph
-                                                  live-graphs]]
-            [drafter.rdf.drafter-ontology :refer [drafter]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
-            [grafter.rdf.formats :refer [rdf-trig]]
-            [grafter.rdf.io :refer [rdf-serializer default-prefixes]]
-            [ring.util.io :as rio]
-            [ring.util.response :refer [not-found]]))
+            [grafter.rdf
+             [formats :refer [rdf-trig]]
+             [io :refer [default-prefixes rdf-serializer]]]
+            [ring.util.io :as rio]))
 
 (def drafter-prefixes (assoc default-prefixes
                              "drafter" (drafter "")

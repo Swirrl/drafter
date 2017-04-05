@@ -1,11 +1,10 @@
 (ns drafter.util
-  (:require [clojure.string :as str]
-            [grafter.rdf.protocols :refer [map->Quad]]
-            [grafter.rdf.repository :as repo]
-            [clojure.pprint :as pp])
-  (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]
-           [javax.mail.internet InternetAddress AddressException]
-           (java.nio.charset Charset)))
+  (:require [clojure
+             [pprint :as pp]
+             [string :as str]])
+  (:import java.nio.charset.Charset
+           [javax.mail.internet AddressException InternetAddress]
+           org.openrdf.model.impl.URIImpl))
 
 (defmacro log-time-taken
   "Macro that logs the time spent doing something at :info level,

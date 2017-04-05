@@ -1,12 +1,9 @@
 (ns drafter.user.mongo-test
-  (:require [drafter.user.mongo :refer :all]
-            [drafter.user.repository :refer :all]
+  (:require [clojure.test :refer :all]
             [drafter.user :as user]
-            [clojure.test :refer :all]
-            [monger.core :as mg]
-            [monger.collection :as mc]
-            [monger.db :as db])
-  (:import [org.bson.types ObjectId]))
+            [drafter.user.repository :refer :all]
+            [monger.core :as mg])
+  (:import org.bson.types.ObjectId))
 
 (def ^:private ^:dynamic *user-repo*)
 
@@ -54,4 +51,3 @@
           (test-function))))))
 
 (use-fixtures :each with-clean-mongo-db)
-

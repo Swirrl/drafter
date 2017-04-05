@@ -2,8 +2,7 @@
   "A test helper for managing ReentrantLock states in tests.  Works by
   spawning a thread to lock/release the Lock and using promises to
   instruct it on the transitions to take and when."
-  (:import [java.util.concurrent TimeUnit]
-           [java.util.concurrent.locks ReentrantLock]))
+  (:import java.util.concurrent.TimeUnit))
 
 (defn take-lock! [{:keys [lock-request locked] :as lock-mgr}]
   (deliver lock-request :ok)

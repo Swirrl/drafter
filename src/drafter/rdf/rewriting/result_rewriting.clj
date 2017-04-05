@@ -1,16 +1,14 @@
 (ns drafter.rdf.rewriting.result-rewriting
   "The other side of query rewriting; result rewriting.  Result rewriting
   rewrites results and solutions."
-  (:require
-   [grafter.rdf :refer [prefixer]]
-   [grafter.rdf.protocols :refer [map->Quad]]
-   [drafter.util :as util]
-   [clojure.set :as set]
-   [clojure.tools.logging :as log])
-  (:import [org.openrdf.query GraphQuery BooleanQuery TupleQuery TupleQueryResultHandler]
+  (:require [clojure.set :as set]
+            [clojure.tools.logging :as log]
+            [drafter.util :as util]
+            [grafter.rdf.protocols :refer [map->Quad]])
+  (:import [org.openrdf.model.impl ContextStatementImpl StatementImpl]
+           [org.openrdf.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler]
            [org.openrdf.query.impl BindingImpl MapBindingSet]
-           [org.openrdf.rio RDFHandler]
-           [org.openrdf.model.impl StatementImpl ContextStatementImpl]))
+           org.openrdf.rio.RDFHandler))
 
 (defn- rewrite-binding
   "Rewrites the value of a Binding if it appears in the given graph map"

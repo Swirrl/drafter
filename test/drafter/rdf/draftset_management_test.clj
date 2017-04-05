@@ -1,21 +1,23 @@
 (ns drafter.rdf.draftset-management-test
-  (:require [clojure.test :refer :all]
-            [drafter.rdf.draftset-management :refer :all]
-            [drafter.rdf.draft-management :refer [with-state-graph] :as mgmt]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
+            [drafter
+             [draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
+             [test-common :refer [*test-backend* ask? import-data-to-draft! make-graph-live! select-all-in-graph test-triples wrap-clean-test-db wrap-db-setup]]
+             [user :as user]
+             [user-test :refer [test-editor test-manager test-publisher]]
+             [write-scheduler :as scheduler]]
+            [drafter.rdf
+             [draft-management :as mgmt :refer [with-state-graph]]
+             [drafter-ontology :refer :all]
+             [draftset-management :refer :all]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
-            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft!
-                                         make-graph-live! test-triples select-all-in-graph]]
-            [drafter.write-scheduler :as scheduler]
-            [grafter.rdf :refer [statements context triple=]]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-publisher test-manager]]
-            [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
-            [grafter.rdf.repository :refer [query]]
-            [grafter.rdf.protocols :refer [->Triple ->Quad]]
-            [grafter.vocabularies.rdf :refer :all]
-            [clojure.java.io :as io])
-  (:import [org.openrdf.rio RDFFormat]))
+            [grafter.rdf :refer [context statements triple=]]
+            [grafter.rdf
+             [protocols :refer [->Quad ->Triple]]
+             [repository :refer [query]]]
+            [grafter.vocabularies.rdf :refer :all])
+  (:import org.openrdf.rio.RDFFormat))
 
 (defn- has-uri-object? [s p uri-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))

@@ -1,7 +1,6 @@
 (ns drafter.rdf.sparql
   (:require [clojure.tools.logging :as log]
-            [drafter.rdf
-             [drafter-ontology :refer :all]]
+            [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf
              [protocols :as pr]
              [repository :as repo]]))
