@@ -7,21 +7,40 @@
              [responses :refer [conflict-detected-response forbidden-response run-sync-job! submit-async-job! unprocessable-entity-response]]
              [user :as user]
              [util :as util]]
-            [drafter.backend.endpoints :refer [draft-graph-set]]
             [drafter.rdf
              [draft-management :as mgmt]
              [draftset-management :as dsmgmt]
              [sesame :refer [is-quads-format? is-triples-format?]]
              [sparql-protocol :refer [sparql-execution-handler sparql-protocol-handler]]]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
+            )
+  (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes]]
+            [ring.util.response :refer [redirect-after-post not-found response]]
+            [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
+                                       unsupported-media-type-response method-not-allowed-response
+                                       forbidden-response submit-async-job! run-sync-job!
+                                       conflict-detected-response]]
+            [drafter.requests :as request]
+            [swirrl-server.responses :as response]
+            [swirrl-server.async.jobs :refer [job-succeeded!]]
+            [drafter.rdf.draftset-management :as dsmgmt]
+            [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
+            [drafter.rdf.content-negotiation :as conneg]
+            [drafter.backend.protocols :refer :all]
+            [drafter.backend.endpoints :as endpoints]
+            [drafter.util :as util]
+            [drafter.user :as user]
+
             [drafter.user.repository :as user-repo]
             [ring.util.response :refer [not-found redirect-after-post response]]
             [swirrl-server.async.jobs :as ajobs]
             [swirrl-server.responses :as response]))
 
+
 (defn- get-draftset-executor [backend draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
-    (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
+    (endpoints/->RewritingSesameSparqlExecutor backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]

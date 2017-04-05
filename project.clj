@@ -4,9 +4,36 @@
   :license {:name "Proprietary & Commercially Licensed Only"
             :url "http://swirrl.com/"}
 
+  :repositories [["snapshots" {:url "s3p://swirrl-jars/snapshots/"
+                               :sign-releases false
+                               :username :env
+                               :passphrase :env
+                               :releases false}]
+                 ["releases" {:url "s3p://swirrl-jars/releases/"
+                              :sign-releases true
+                              :username :env
+                              :passphrase :env
+                              :snapshots false}]]
+
+  :classifiers {:prod :uberjar
+                :dev :dev}
+
   :dependencies [[buddy/buddy-auth "0.9.0"]
                  [buddy/buddy-core "0.9.0"]
+                 [org.clojure/clojure "1.8.0"]
+                 [org.openrdf.sesame/sesame-queryrender "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-runtime "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
+
+                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
+                 ;; see here for the source code that built this release:
+                 ;;
+                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
+
+                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
+
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
+                 [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
 
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
@@ -74,8 +101,6 @@
          :destroy drafter.handler/destroy
          :open-browser? false }
 
-  :aliases {"reindex" ["run" "-m" "drafter.backend.sesame-native/reindex"]}
-
   :target-path "target/%s" ;; ensure profiles don't pollute each other with
   ;; compiled classes etc...
 
@@ -86,12 +111,8 @@
 
    :uberjar {:aot :all
              :main drafter.repl
-             }
-
-   :production {:ring {:open-browser? false
-                       :stacktraces?  false
-                       :auto-reload?  false}}
-
+             :source-paths ["env/prod/clj"]
+             :resource-paths ["env/prod/resources"]}
 
    :perforate { :dependencies [[clj-http "1.1.0"]
                                [criterium "0.4.3"] ;; for easy benchmarking
@@ -100,13 +121,14 @@
                                [perforate "0.3.4"] ;; include perforate and criterium in repl environments
                                ]}
 
+
    :dev [:dev-common :dev-overrides]
 
    :dev-common {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                           [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
-                :source-paths ["dev/clj"]
-                :resource-paths ["dev/resources"]
+                :source-paths ["env/dev/clj"]
+                :resource-paths ["env/dev/resources"]
 
                 :dependencies [ ;;[clj-http "1.1.0"]
                                [clojure-csv/clojure-csv "2.0.1"]
@@ -119,7 +141,6 @@
                                [ring-mock "0.1.5"]
                                [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
 
-                ;;:env {:dev true}
                 ;;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
                 ;;:jvm-opts ["-Djava.awt.headless=true" "-XX:+UnlockCommercialFeatures"  "-XX:+FlightRecorder" "-XX:FlightRecorderOptions=defaultrecording=true,disk=true"]
                 }

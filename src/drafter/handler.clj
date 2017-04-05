@@ -5,6 +5,7 @@
              [core :refer [context defroutes]]
              [route :as route]]
             [drafter
+             [env :as denv]
              [configuration :as conf]
              [middleware :as middleware]
              [util :refer [set-var-root!]]
@@ -16,7 +17,7 @@
             [drafter.routes
              [draftsets-api :refer [draftset-api-routes]]
              [pages :refer [pages-routes]]
-             [sparql :refer [live-sparql-routes raw-sparql-routes]]
+             [sparql :refer [live-sparql-routes]]
              [status :refer [status-routes]]]
             [environ.core :refer [env]]
             [noir.util.middleware :refer [app-handler]]
@@ -61,10 +62,10 @@
       (str "/" (name version) suffix)
       suffix)))
 
-(def ^:private v1-prefix :v1)
-
 (defn- get-sparql-endpoint-timeout-config []
-  (conf/get-timeout-config env #{:raw :live :draftset}))
+  (conf/get-timeout-config env #{:live :draftset}))
+
+(def ^:private v1-prefix :v1)
 
 (defn- get-endpoint-query-timeout-fn [endpoint-timeouts]
   (let [signing-key (:drafter-jws-signing-key env)]
@@ -78,16 +79,6 @@
         mount-point (endpoint-query-path :live v1-prefix)]
     (live-sparql-routes mount-point backend timeout-fn)))
 
-(defn- get-raw-sparql-query-route [backend authentication-fn timeouts-config]
-  (let [raw-timeouts (conf/get-endpoint-timeout :raw :query timeouts-config)
-        mount-point (endpoint-query-path :raw v1-prefix)]
-    (raw-sparql-routes mount-point backend raw-timeouts authentication-fn)))
-
-(defn- get-sparql-routes [backend authentication-fn timeouts-config]
-  (let [raw-query-route (get-raw-sparql-query-route backend authentication-fn timeouts-config)
-        live-query-route (get-live-sparql-query-route backend timeouts-config)]
-    [raw-query-route live-query-route]))
-
 (defn initialise-app! [backend]
   (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)
         sparql-timeouts-config (get-sparql-endpoint-timeout-config)
@@ -98,10 +89,12 @@
                           (-> []
                               (add-route (pages-routes backend))
                               (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout-fn))
-                              (add-routes (get-sparql-routes backend authenticated-fn sparql-timeouts-config))
+                              (add-route (get-live-sparql-query-route backend sparql-timeouts-config))
+                              ;;(add-routes (get-sparql-routes backend authenticated-fn sparql-timeouts-config))
                               (add-route (context "/v1/status" []
                                                   (status-routes global-writes-lock finished-jobs restart-id)))
 
+                              (add-routes (denv/env-specific-routes backend))
                               (add-route app-routes))
 
                           :ring-defaults (assoc-in api-defaults [:params :multipart] true)

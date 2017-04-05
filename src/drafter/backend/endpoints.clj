@@ -13,6 +13,8 @@
             [schema.core :as s])
   (:import org.openrdf.model.URI))
 
+(require 'drafter.backend.repository)
+
 (def ^:private itriple-readable-delegate
   {:to-statements (fn [this options]
                     (proto/to-statements (->sesame-repo this) options))})
@@ -92,5 +94,3 @@
   proto/ISPARQLable isparqlable-delegate
   proto/ISPARQLUpdateable isparql-updateable-delegate
   repo/ToConnection to-connection-delegate)
-
-(def draft-graph-set ->RewritingSesameSparqlExecutor)

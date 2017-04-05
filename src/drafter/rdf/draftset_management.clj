@@ -6,7 +6,7 @@
              [util :as util]
              [write-scheduler :as writes]]
             [drafter.backend
-             [endpoints :refer [draft-graph-set]]
+             [endpoints :refer [->RewritingSesameSparqlExecutor]]
              [protocols :refer :all]]
             [drafter.rdf
              [draft-management :as mgmt :refer [to-quads with-state-graph]]
@@ -205,11 +205,7 @@
   "Build a SPARQL queryable repo representing the draftset"
   [{:keys [backend draftset-ref union-with-live?]}]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
-    (draft-graph-set backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
-
-#_(defn execute-query-in-draftset [backend draftset-ref request union-with-live?]
-  (let [rewriting-executor (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? union-with-live? })]
-    (sparql-protocol/process-sparql-query rewriting-executor request)))
+    (->RewritingSesameSparqlExecutor backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
 
 (defn- rdf-handler->spog-tuple-handler [rdf-handler]
   (reify TupleQueryResultHandler
@@ -239,12 +235,6 @@
   [backend]
   (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
     (spog-tuple-query->graph-query tuple-query)))
-
-
-#_(defn get-draftset-data [backend draftset-ref accept-content-type union-with-live?]
-  (let [rewriting-executor (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? union-with-live? })
-        pquery (dsmgmt/all-quads-query rewriting-executor)]
-    (sparql-protocol/process-prepared-query rewriting-executor pquery accept-content-type nil)))
 
 (defn- user-is-owner-clause [user]
   (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
