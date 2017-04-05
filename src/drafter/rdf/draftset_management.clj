@@ -193,15 +193,16 @@
     [(draftset-uri-clause draftset-ref)]))
 
 (defn get-draftset-graph-states [repo draftset-ref]
-  (->> (get-draftset-graph-mapping-query draftset-ref)
-       (sparql/query-eager-seq repo)
-       (map #(graph-mapping-result->graph-state repo %))))
+  (let [q (get-draftset-graph-mapping-query draftset-ref)]
+    (->> q
+         (sparql/query-eager-seq repo)
+         (map #(graph-mapping-result->graph-state repo %)))))
 
 (defn get-draftset-graph-mapping [repo draftset-ref]
   (let [graph-states (get-draftset-graph-states repo draftset-ref)
-        mapping-pairs (map #(mapv % [:live-graph-uri :draft-graph-uri]) graph-states)]
-    (into {} mapping-pairs)))
-
+        mapping-pairs (map #(mapv % [:live-graph-uri :draft-graph-uri]) graph-states)
+        ret (into {} mapping-pairs)]
+    ret))
 
 (defn get-draftset-executor
   "Build a SPARQL queryable repo representing the draftset"
@@ -641,14 +642,26 @@
 
 (declare append-draftset-quads)
 
+(defn append-data-batch!
+  "Appends a sequence of triples to the given draft graph."
+  [conn graph-uri triple-batch]
+  ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
+  ;;so only create one if there is data in the batch
+  (when-not (empty? triple-batch)
+    ;;WARNING: This assumes the backend is a sesame backend which is
+    ;;true for all current backends.
+    (add conn graph-uri triple-batch)))
+
 (defn- append-draftset-quads*
   [quad-batches live->draft backend job-started-at job draftset-ref state]
   (if-let [batch (first quad-batches)]
     (let [{:keys [graph-uri triples]} (quad-batch->graph-triples batch)]
       (if-let [draft-graph-uri (get live->draft graph-uri)]
         (do
+          (append-data-batch! backend draft-graph-uri triples)
           (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
-          (mgmt/append-data-batch! backend draft-graph-uri triples)
+
+
           (let [next-job (ajobs/create-child-job
                           job
                           (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) (merge state {:op :append})))]
@@ -700,8 +713,8 @@
         (if (mgmt/is-graph-managed? backend live-graph)
           (if-let [draft-graph-uri (get live->draft live-graph)]
             (do
-              (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
               (with-open [conn (repo/->connection (->sesame-repo backend))]
+                (mgmt/set-modifed-at-on-draft-graph! conn draft-graph-uri job-started-at)
                 (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
                       sesame-statements (map IStatement->sesame-statement rewritten-statements)
                       graph-array (into-array Resource (map util/string->sesame-uri (vals live->draft)))]
@@ -751,14 +764,15 @@
   (jobs/make-job :background-write [job]
                  (let [backend (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? false})
                        quads (read-statements serialised rdf-format)
-                       graph-mapping (stringified-draftset-backend-graph-mapping backend)]
+                       graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
                    (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
 
 (defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format]
   (jobs/make-job :background-write [job]
-                 (let [triples (read-statements serialised rdf-format)
+                 (let [backend (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? false})
+                       triples (read-statements serialised rdf-format)
                        quads (map #(util/make-quad-statement % graph) triples)
-                       graph-mapping (stringified-draftset-backend-graph-mapping backend)]
+                       graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
                    (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
 
 (defn- rdf-handler->spog-tuple-handler [rdf-handler]

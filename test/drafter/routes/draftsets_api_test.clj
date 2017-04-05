@@ -573,26 +573,21 @@
         (is (instance? Date first-timestamp))
 
         (testing "Publishing more triples afterwards updates the modified time"
-          (Thread/sleep 500)
 
           (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
-
           (let [second-timestamp (get-draft-graph-modified-at)]
             (is (instance? Date second-timestamp))
 
             (is (< (.getTime first-timestamp)
                    (.getTime second-timestamp))
-                "Modified time is updated")
-
-
-            (Thread/sleep 500)
+                "Modified time is updated after append")
 
             (delete-triples-through-api test-editor draftset-location quads "http://foo/")
             (let [third-timestamp (get-draft-graph-modified-at)]
 
               (is (< (.getTime second-timestamp)
                      (.getTime third-timestamp))
-                  "Modified time is updated"))))))))
+                  "Modified time is updated after delete"))))))))
 
 (deftest append-triples-to-graph-which-exists-in-live
   (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))

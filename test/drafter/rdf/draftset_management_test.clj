@@ -13,7 +13,9 @@
             [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
             [grafter.rdf.repository :refer [query]]
             [grafter.rdf.protocols :refer [->Triple ->Quad]]
-            [grafter.vocabularies.rdf :refer :all]))
+            [grafter.vocabularies.rdf :refer :all]
+            [clojure.java.io :as io])
+  (:import [org.openrdf.rio RDFFormat]))
 
 (defn- has-uri-object? [s p uri-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
@@ -403,6 +405,48 @@
           {:keys [graph-uri triples]} (quad-batch->graph-triples quads)]
       (is (= guri graph-uri))
       (is (every? identity (map triple= quads triples))))))
+
+(defn apply-job! [{fun :function :as job}]
+  (fun job))
+
+(defn fetch-draft-graph-modified-at [draftset live-graph]
+  (let [ds-uri (draftset-uri (:id draftset))
+        modified-query (str "SELECT ?modified {"
+                            "   <" live-graph "> <" drafter:hasDraft "> ?draftgraph ."
+                            "   ?draftgraph a <" drafter:DraftGraph "> ;"
+                            "                 <" drafter:inDraftSet "> <" ds-uri "> ;"
+                            "                 <" drafter:modifiedAt "> ?modified ."
+
+                            "} LIMIT 2")]
+
+    (let [res (-> *test-backend*
+                  (query modified-query))]
+
+      (assert (= 1 (count res)) "There were multiple modifiedAt timestamps, we expect just one.")
+
+      (-> res first
+          (get "modified")
+          .calendarValue
+          .toGregorianCalendar
+          .getTime))))
+
+(deftest append-data-to-draftset-job-test
+  (let [ds (create-draftset! *test-backend* test-editor)]
+    (apply-job! (append-triples-to-draftset-job *test-backend* ds (io/file "./test/test-triple.nt") RDFFormat/NTRIPLES "http://foo/graph"))
+    (let [ts-1 (fetch-draft-graph-modified-at ds "http://foo/graph")]
+      (apply-job! (append-triples-to-draftset-job *test-backend* ds (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES "http://foo/graph"))
+      (let [ts-2 (fetch-draft-graph-modified-at ds "http://foo/graph")]
+        (is (< (.getTime ts-1)
+               (.getTime ts-2))
+            "Modified time is updated after append")
+
+        (apply-job! (delete-triples-from-draftset-job *test-backend* ds  "http://foo/graph" (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES))
+        (let [ts-3 (fetch-draft-graph-modified-at ds "http://foo/graph")]
+          (is (< (.getTime ts-2)
+               (.getTime ts-3))
+              "Modified time is updated after delete")
+          )
+        ))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)
