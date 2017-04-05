@@ -16,7 +16,8 @@
             [drafter.user.memory-repository :as memrepo]
             [drafter.user-test :refer [test-editor test-system]]
             [swirrl-server.errors :refer [encode-error]]
-            [schema.test :refer [validate-schemas]]))
+            [schema.test :refer [validate-schemas]]
+            [drafter.timeouts :as timeouts]))
 
 (use-fixtures :each validate-schemas)
 
@@ -65,7 +66,7 @@
 
 (deftest live-sparql-routes-test
   (let [[draft-graph-1 draft-graph-2] (add-test-data! *test-backend*)
-        endpoint (live-sparql-routes "/sparql/live" *test-backend* nil)
+        endpoint (live-sparql-routes "/sparql/live" *test-backend* timeouts/calculate-default-request-timeout)
         {:keys [status headers body]
          :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
         csv-result (csv-> result)]
@@ -97,7 +98,7 @@
         [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-backend*)
         user-repo (memrepo/create-repository* test-editor test-system)
         authenticated-fn (middleware/make-authenticated-wrapper user-repo {})
-        endpoint (raw-sparql-routes "/sparql/raw" *test-backend* nil authenticated-fn)]
+        endpoint (raw-sparql-routes "/sparql/raw" *test-backend* timeouts/calculate-default-request-timeout authenticated-fn)]
 
     (testing "The state graph should be accessible to system"
       (let [request (-> (raw-query (str "ASK WHERE {"

@@ -253,16 +253,15 @@
   [inner-handler]
   (negotiate-sparql-results-content-type-with conneg/negotiate-rdf-triples-format "RDF triples format required" inner-handler))
 
-
 (defn sparql-timeout-handler
   "Returns a handler which configures the timeout for the prepared SPARQL query associated with the request.
-   The timeout is calculated based on the timeout query parameter and user configured on the request along
-   with the timeout specified for the endpoint."
-  [endpoint-timeout inner-handler]
-  (fn [{user :identity {request-timeout-str :timeout} :params {pquery :prepared-query} :sparql :as request}]
-    (let [request-timeout (some-> request-timeout-str (timeouts/try-parse-timeout))]
-      (if (instance? Exception request-timeout)
-        {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body (.getMessage request-timeout)}
-        (let [query-timeout (timeouts/calculate-query-timeout request-timeout (user/max-query-timeout user) endpoint-timeout)]
+   The timeout is calculated based on the optional timeout and max-query-timeout parameters on the request
+   along with the timeout specified for the endpoint."
+  [calculate-timeout-fn inner-handler]
+  (fn [{{pquery :prepared-query} :sparql :as request}]
+    (let [timeout-or-ex (calculate-timeout-fn request)]
+      (if (instance? Exception timeout-or-ex)
+        {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body (.getMessage timeout-or-ex)}
+        (let [query-timeout timeout-or-ex]
           (.setMaxExecutionTime pquery query-timeout)
-          (inner-handler (assoc-in request [:sparql :timeout] request-timeout)))))))
+          (inner-handler (assoc-in request [:sparql :timeout] query-timeout)))))))

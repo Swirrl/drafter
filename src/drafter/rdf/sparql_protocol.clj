@@ -5,7 +5,8 @@
             [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
             [drafter.middleware :refer [allowed-methods-handler sparql-negotiation-handler sparql-timeout-handler sparql-prepare-query-handler require-params]]
             [drafter.channels :refer :all]
-            [compojure.core :refer [make-route]])
+            [compojure.core :refer [make-route]]
+            [drafter.timeouts :as timeouts])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            [org.openrdf.query QueryInterruptedException]
            [org.openrdf.query.resultio QueryResultIO]
@@ -72,22 +73,22 @@
   (log/info (str "Running query\n" prepared-query "\nwith graph restrictions"))
   (execute-prepared-query prepared-query format response-content-type))
 
-(defn build-sparql-protocol-handler [prepare-handler exec-handler endpoint-timeout]
+(defn build-sparql-protocol-handler [prepare-handler exec-handler query-timeout-fn]
   (->> exec-handler
-       (sparql-timeout-handler endpoint-timeout)
+       (sparql-timeout-handler query-timeout-fn)
        (sparql-negotiation-handler)
        (prepare-handler)
        (require-params #{:query})
        (allowed-methods-handler #{:get :post})))
 
-(defn sparql-protocol-handler [executor endpoint-timeout]
-  (build-sparql-protocol-handler #(sparql-prepare-query-handler executor %) sparql-execution-handler endpoint-timeout))
+(defn sparql-protocol-handler [executor query-timeout-fn]
+  (build-sparql-protocol-handler #(sparql-prepare-query-handler executor %) sparql-execution-handler query-timeout-fn))
 
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path, a SPARQL executor and
   an optional restriction function which returns a list of graph uris
   to restrict both the union and named-graph queries too."
 
-  ([mount-path executor] (sparql-end-point mount-path executor nil))
-  ([mount-path executor timeouts]
-   (make-route nil mount-path (sparql-protocol-handler executor timeouts))))
+  ([mount-path executor] (sparql-end-point mount-path executor (fn [request] timeouts/default-query-timeout)))
+  ([mount-path executor query-timeout-fn]
+   (make-route nil mount-path (sparql-protocol-handler executor query-timeout-fn))))

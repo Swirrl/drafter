@@ -113,7 +113,7 @@
                              :route route}
                             (handler-fn req)))))
 
-(defn draftset-api-routes [backend user-repo authenticated query-timeout]
+(defn draftset-api-routes [backend user-repo authenticated query-timeout-fn]
   (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
           (as-draftset-owner [h]
             (authenticated
@@ -180,15 +180,6 @@
         (make-route :get "/draftset/:id/data"
                     (as-draftset-owner
                       (parse-union-with-live-handler
-;; <<<<<<< HEAD
-;;                        (fn [{{:keys [draftset-id graph union-with-live rdf-format]} :params :as request}]
-;;                          (if (is-quads-format? rdf-format)
-;;                            (dsmgmt/get-draftset-data backend draftset-id (.getDefaultMIMEType rdf-format) union-with-live)
-;;                            (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-;;                                  escaped-query (RenderUtils/escape unsafe-query)
-;;                                  query-request (assoc-in request [:params :query] escaped-query)]
-;;                              (dsmgmt/execute-query-in-draftset backend draftset-id query-request union-with-live))))))))
-;; =======
                        (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
                           (let [executor (get-draftset-executor backend draftset-id union-with-live)
                                 is-triples-query? (contains? params :graph)
@@ -199,11 +190,10 @@
                                          (dsmgmt/all-graph-triples-query executor graph)
                                          (dsmgmt/all-quads-query executor))
                                 handler (->> sparql-execution-handler
-                                             (sparql-timeout-handler query-timeout)
+                                             (sparql-timeout-handler query-timeout-fn)
                                              (conneg)
                                              (sparql-constant-prepared-query-handler pquery))]
                             (handler request))))))
-;; >>>>>>> sparql_protocol_timeout
 
         (make-route :delete "/draftset/:id/data"
                     (as-draftset-owner
@@ -265,13 +255,9 @@
                     (as-draftset-owner
                       (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-;; <<<<<<< HEAD
-;;                           (dsmgmt/execute-query-in-draftset backend draftset-id request union-with-live)))))))
-;; =======
                           (let [executor (get-draftset-executor backend draftset-id union-with-live)
-                                handler (sparql-protocol-handler executor query-timeout)]
+                                handler (sparql-protocol-handler executor query-timeout-fn)]
                             (handler request))))))
-;; >>>>>>> sparql_protocol_timeout
 
         (make-route :post "/draftset/:id/publish"
                     (as-draftset-owner

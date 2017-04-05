@@ -40,9 +40,8 @@
   (throw (ex-swirrl :invalid-content-type (str "Invalid Content-Type: " (:content-type request)))))
 
 (defn create-update-job [executor request endpoint-timeout]
-  (jobs/make-job :blocking-write [job]
-                 (let [user (request/get-user request)
-                       query-timeout-seconds (timeouts/calculate-query-timeout nil (user/max-query-timeout user) endpoint-timeout)
+  (jobs/make-job  :blocking-write [job]
+                 (let [query-timeout-seconds (or endpoint-timeout timeouts/default-query-timeout)
                        parsed-query (parse-update-request request)
                        query-string (:update parsed-query)
                        pquery (prepare-update executor query-string)]
