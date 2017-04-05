@@ -1,4 +1,4 @@
-(defproject drafter "2.1.0-SNAPSHOT"
+(defproject drafter "2.1.1-SNAPSHOT"
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
@@ -52,7 +52,7 @@
                  [grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
-                 [metosin/ring-swagger-ui "2.1.4-0"]
+                 [metosin/ring-swagger-ui "2.2.10"]
                  [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
 
 
