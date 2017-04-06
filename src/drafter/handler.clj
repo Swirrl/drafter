@@ -20,7 +20,6 @@
                                              stop-writer!]]
             [drafter.configuration :refer [get-configuration]]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
-            [environ.core :refer [env]]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.verbs :refer [wrap-verbs]]
             [ring.middleware.defaults :refer [api-defaults]]
@@ -82,7 +81,7 @@
     [raw-query-route live-query-route]))
 
 (defn initialise-app! [backend {:keys [draftset-query-timeout] :as config}]
-  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)
+  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo config)
         draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-query-timeout config)]
     (set-var-root! #'app (app-handler
                           ;; add your application routes here
