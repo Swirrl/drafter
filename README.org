@@ -8,7 +8,7 @@ set up your Dev environment.
 
 ** Configuring Drafter
 
-Drafter uses [[https://github.com/weavejester/environ][environ]] for its configuration.  This means it uses
+Drafter uses [[https://github.com/juxt/aero][aero]] for its configuration.  This means it uses
 environment variables (and/or java properties) to pass configuration
 variables from the environment.
 
