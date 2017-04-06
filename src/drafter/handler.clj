@@ -15,6 +15,7 @@
             [drafter.routes.sparql :refer [live-sparql-routes
                                            raw-sparql-routes]]
             [drafter.routes.sparql-update :refer [raw-update-endpoint-route]]
+            [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
@@ -123,6 +124,7 @@
 (defn initialise-services! [config]
   (enc/register-custom-encoders!)
 
+  (jobs/init-job-settings! config)
   (initialise-write-service!)
   (init-backend! config)
   (init-user-repo! config)

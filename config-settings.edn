@@ -6,6 +6,7 @@
  :user-repo-ns #or [#env DRAFTER_USER_REPO_NS "drafter.user.memory-repository"]
  :log-config-file #or [#env LOG_CONFIG_FILE "log-config.edn"]
  :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY
+ :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
 
  ;;sesame remote backend config settings
  :sparql-query-endpoint #env SPARQL_QUERY_ENDPOINT

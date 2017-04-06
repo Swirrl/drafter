@@ -7,8 +7,7 @@
             [drafter.write-scheduler :refer [queue-job!]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.vocabularies.rdf :refer :all]
-            [grafter.rdf :refer [statements]]
-            [environ.core :refer [env]]))
+            [grafter.rdf :refer [statements]]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:
@@ -34,7 +33,13 @@
 ;; |               100 |       123 |              4058 |              4454 |              4714 |           5100 | 9m 9s      |           22347 |
 ;; |               200 |        62 |              5570 |              6730 |              8811 |          10781 | 7m 18s     |           28011 |
 
-(def batched-write-size (Integer/parseInt (get env :drafter-batched-write-size "75000")))
+(def batched-write-size 75000)
+
+(defn init-job-settings!
+  "Initialised job settings from the given configuration map."
+  [config]
+  (when-let [configured-batch-size (:batched-write-size config)]
+    (alter-var-root #'batched-write-size (constantly configured-batch-size))))
 
 (defmacro with-job-exception-handling [job & forms]
   `(try

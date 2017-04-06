@@ -24,6 +24,24 @@
       (catch Exception ex
         ex))))
 
+(defmethod aero/reader 'opt-nat
+  [opts tag value]
+  (cond (number? value)
+        (if (pos? value)
+          value
+          (IllegalArgumentException. "Value must be > 0"))
+
+        (nil? value) nil
+
+        (string? value)
+        (try
+          (aero/reader {} 'opt-nat (Long/parseLong value))
+          (catch Exception ex
+            ex))
+
+        :else
+        (IllegalArgumentException. "Expected numeric or string value")))
+
 (defn validate-configuration! [config]
   (let [invalid (filter (fn [[k v]] (util/throwable? v)) config)]
     (when-not (empty? invalid)
