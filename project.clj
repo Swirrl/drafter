@@ -15,7 +15,7 @@
                               :passphrase :env
                               :snapshots false}]]
 
-  :classifiers {:prod :uberjar
+  :classifiers {:prod :prod
                 :dev :dev}
 
   :dependencies [[buddy/buddy-auth "0.9.0"]
@@ -45,7 +45,6 @@
                  [com.novemberain/monger "3.0.2"]
                  [com.sun.mail/javax.mail "1.5.5"]
                  [com.taoensso/tower "2.0.2"]
-                 [drafter-client "0.3.6-SNAPSHOT"]
                  [environ "1.0.0"]
                  [grafter "0.7.5"]
                  [grafter/url "0.2.1"]
@@ -90,18 +89,14 @@
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
             [lein-environ "1.0.0"]
-            [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]
-            [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]
-            [perforate "0.3.4"]]
-
-  :uberjar-name "drafter.jar"
+            [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
 
   :ring {:handler drafter.handler/app
          :init    drafter.handler/init
          :destroy drafter.handler/destroy
          :open-browser? false }
 
-  :target-path "target/%s" ;; ensure profiles don't pollute each other with
+  ;;:target-path "target/%s" ;; ensure profiles don't pollute each other with
   ;; compiled classes etc...
 
   :clean-targets [:target-path :compile-path]
@@ -109,18 +104,13 @@
   :profiles
   {
 
-   :uberjar {:aot :all
-             :main drafter.repl
-             :source-paths ["env/prod/clj"]
-             :resource-paths ["env/prod/resources"]}
+   :uberjar [:prod
+             {:aot :all
+              :main drafter.repl}]
 
-   :perforate { :dependencies [[clj-http "1.1.0"]
-                               [criterium "0.4.3"] ;; for easy benchmarking
-                               [drafter-client "0.3.6-SNAPSHOT"]
-                               [grafter "0.6.0-alpha5"]
-                               [perforate "0.3.4"] ;; include perforate and criterium in repl environments
-                               ]}
-
+   :prod {:uberjar-name "drafter.jar"
+          :source-paths ["env/prod/clj"]
+          :resource-paths ["env/prod/resources"]}
 
    :dev [:dev-common :dev-overrides]
 
@@ -130,13 +120,8 @@
                 :source-paths ["env/dev/clj"]
                 :resource-paths ["env/dev/resources"]
 
-                :dependencies [ ;;[clj-http "1.1.0"]
-                               [clojure-csv/clojure-csv "2.0.1"]
-                               [com.aphyr/prism "0.1.1" :exclusions [org.clojure/clojure]]
-                               ;;[criterium "0.4.3"] ;; for easy benchmarking
-                               ;;[drafter-client "0.3.6-SNAPSHOT"]
+                :dependencies [[clojure-csv/clojure-csv "2.0.1"]
                                [org.clojure/data.json "0.2.5"]
-                               ;;[perforate "0.3.4"] ;; include perforate and criterium in repl environments
                                [prismatic/schema "1.0.4"]
                                [ring-mock "0.1.5"]
                                [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]]
@@ -147,14 +132,13 @@
    }
 
   :jvm-opts ["-Djava.awt.headless=true"
-
              ;; Use this property to control number
              ;; of connections in the SPARQLRepository connection pool:
              ;;
              ;;"-Dhttp.maxConnections=1"
              ]
 
-                                        ;NOTE: expected JVM version to run against is defined in the Dockerfile
+  ;; Target JDK 7 expected JVM version (though we may now be able to target JDK8 in production)
   :javac-options ["-target" "7" "-source" "7"]
   :min-lein-version "2.5.0"
 
