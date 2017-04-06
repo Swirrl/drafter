@@ -19,11 +19,11 @@
         (log/warn "To configure the user repository, set the DRAFTER_USER_REPO_NS environment variable")
         default-ns-name))))
 
-(defn get-configured-repository [env-map]
-  (let [repo-ns-name (symbol (get-repository-ns-name env-map))]
+(defn get-configured-repository [{:keys [user-repo-ns] :as config}]
+  (let [repo-ns-name (symbol user-repo-ns)]
     (require repo-ns-name)
     (if-let [repo-ns (find-ns repo-ns-name)]
       (if-let [get-repo-fn-var (.findInternedVar repo-ns 'get-repository)]
-        (@get-repo-fn-var env-map)
+        (@get-repo-fn-var config)
         (throw (RuntimeException. (str "No var get-repository found in namespace " repo-ns-name))))
       (throw (RuntimeException. (str "Cannot find namespace " repo-ns-name))))))

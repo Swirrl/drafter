@@ -126,8 +126,8 @@
   [config]
   (set-var-root! #'backend (get-backend config)))
 
-(defn- init-user-repo! []
-  (let [repo (drafter.user.repository/get-configured-repository env)]
+(defn- init-user-repo! [config]
+  (let [repo (drafter.user.repository/get-configured-repository config)]
     (set-var-root! #'user-repo repo)))
 
 (defn initialise-services! [config]
@@ -135,7 +135,7 @@
 
   (initialise-write-service!)
   (init-backend! config)
-  (init-user-repo!)
+  (init-user-repo! config)
   (initialise-app! backend))
 
 (defn- load-logging-configuration [config-file]
