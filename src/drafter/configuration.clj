@@ -6,25 +6,29 @@
             [drafter.util :as util]
             [clojure.java.io :as io]))
 
+;;Reads a timeout setting from the configuration. Timeout configurations
+;;are optional. Returns an exception if the timeout string is invalid.
 (defmethod aero/reader 'timeout
   [opts tag value]
-  (when (some? value)
-    (let [timeout-or-ex (timeouts/try-parse-timeout value)]
-      (if (util/throwable? timeout-or-ex)
-        timeout-or-ex
-        timeout-or-ex))))
+  (some-> value (timeouts/try-parse-timeout)))
 
+;;Reads a configuration setting corresponding to a TCP port. If specified the
+;;setting should be a string representation of a number in the valid range for
+;;TCP ports i.e. (0 65536]. Returns an exception if the input is invalid.
 (defmethod aero/reader 'port
   [opts tag value]
   (when (some? value)
     (try
       (let [port (Long/parseLong value)]
-        (if (pos? port)
+        (if (and (pos? port) (< port 65536))
           port
           (IllegalArgumentException. "Port must be in range (0 65536]")))
       (catch Exception ex
         ex))))
 
+;;Reads an optional configuration setting representing a natural number.
+;;The value to read can be either a number or a string representation of a
+;;number. Returns an exception if the input is invalid.
 (defmethod aero/reader 'opt-nat
   [opts tag value]
   (cond (number? value)
