@@ -1,5 +1,4 @@
-(ns drafter.user.repository
-  (:require [clojure.tools.logging :as log]))
+(ns drafter.user.repository)
 
 (defprotocol UserRepository
   (find-user-by-username [this username]
@@ -8,16 +7,6 @@
 
   (get-all-users [this]
     "Returns all users in this repository"))
-
-(defn- get-repository-ns-name [env-map]
-  (let [repo-ns (:drafter-user-repo-ns env-map)
-        default-ns-name "drafter.user.memory-repository"]
-    (if (some? repo-ns)
-      repo-ns
-      (do
-        (log/warn "No user repository namespace configured, using default: " default-ns-name)
-        (log/warn "To configure the user repository, set the DRAFTER_USER_REPO_NS environment variable")
-        default-ns-name))))
 
 (defn get-configured-repository [{:keys [user-repo-ns] :as config}]
   (let [repo-ns-name (symbol user-repo-ns)]

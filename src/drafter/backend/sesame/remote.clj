@@ -49,7 +49,7 @@
 
 (defn get-backend [config]
   "Creates a new SPARQL repository with the query and update endpoints
-  configured in the given environment map."
+  configured in the given configuration map."
 
   ;; This call here obliterates the sesame defaults for registered
   ;; parsers.  Forcing content negotiation to work only with the

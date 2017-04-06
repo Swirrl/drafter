@@ -1,6 +1,5 @@
 (ns drafter.repl
   (:require [drafter.handler :as service]
-            [environ.core :refer [env]]
             [clojure.string :as s]
             [ring.middleware.file-info :refer :all]
             [ring.middleware.resource :refer :all]

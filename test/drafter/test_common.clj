@@ -1,10 +1,8 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
-            [grafter.rdf.repository :as repo]
             [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf.repository.registry :as reg]
-            [environ.core :refer [env]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
             [drafter.user :as user]
@@ -102,12 +100,6 @@
             "DROP ALL ;")
    (setup-state-fn *test-backend*)
    (test-fn)))
-
-(defn make-store []
-  (repo/repo))
-
-(defn make-backend []
-  (get-backend env))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
