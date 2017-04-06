@@ -271,12 +271,7 @@
       (let [msg (string/join (map #(.getMessage (second %)) invalid))]
         (throw (RuntimeException. (str "Configuration invalid: " msg)))))))
 
-(def read-config (atom nil))
-
 (defn get-configuration []
-  (if-let [config @read-config]
-    config
-    (let [config (aero/read-config "config-settings.edn")]
-      (validate-configuration! config)
-      (reset! read-config config)
-      config)))
+  (let [config (aero/read-config "config-settings.edn")]
+    (validate-configuration! config)
+    config))

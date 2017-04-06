@@ -66,39 +66,34 @@
 (defn- get-sparql-endpoint-timeout-config []
   (conf/get-timeout-config env #{:raw :live :draftset}))
 
-(defn- get-endpoint-query-timeout-fn [endpoint-timeouts]
-  (let [signing-key (:drafter-jws-signing-key env)]
-    (when (nil? signing-key)
-      (log/warn "DRAFTER_JWS_SIGNING_KEY not configured - any PMD query timeouts will be ignored"))
-    (timeouts/calculate-request-query-timeout endpoint-timeouts signing-key)))
+(defn- get-endpoint-query-timeout-fn [endpoint-timeout {:keys [jws-signing-key] :as config}]
+  (when (nil? jws-signing-key)
+    (log/warn "jws-signing-key not configured - any PMD query timeouts will be ignored"))
+  (timeouts/calculate-request-query-timeout endpoint-timeout jws-signing-key))
 
-(defn- get-live-sparql-query-route [backend timeouts-config]
-  (let [live-timeouts (conf/get-endpoint-timeout :live :query timeouts-config)
-        timeout-fn (get-endpoint-query-timeout-fn live-timeouts)
+(defn- get-live-sparql-query-route [backend {:keys [live-query-timeout] :as config}]
+  (let [timeout-fn (get-endpoint-query-timeout-fn live-query-timeout config)
         mount-point (endpoint-query-path :live v1-prefix)]
     (live-sparql-routes mount-point backend timeout-fn)))
 
-(defn- get-raw-sparql-query-route [backend authentication-fn timeouts-config]
-  (let [raw-timeouts (conf/get-endpoint-timeout :raw :query timeouts-config)
-        mount-point (endpoint-query-path :raw v1-prefix)]
-    (raw-sparql-routes mount-point backend raw-timeouts authentication-fn)))
+(defn- get-raw-sparql-query-route [backend authentication-fn]
+  (let [mount-point (endpoint-query-path :raw v1-prefix)]
+    (raw-sparql-routes mount-point backend timeouts/calculate-default-request-timeout authentication-fn)))
 
-(defn- get-sparql-routes [backend authentication-fn timeouts-config]
-  (let [raw-query-route (get-raw-sparql-query-route backend authentication-fn timeouts-config)
-        live-query-route (get-live-sparql-query-route backend timeouts-config)]
+(defn- get-sparql-routes [backend authentication-fn config]
+  (let [raw-query-route (get-raw-sparql-query-route backend authentication-fn)
+        live-query-route (get-live-sparql-query-route backend config)]
     [raw-query-route live-query-route]))
 
-(defn initialise-app! [backend]
+(defn initialise-app! [backend {:keys [draftset-query-timeout] :as config}]
   (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)
-        sparql-timeouts-config (get-sparql-endpoint-timeout-config)
-        draftset-sparql-query-timeout (conf/get-endpoint-timeout :draftset :query sparql-timeouts-config)
-        draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-sparql-query-timeout)]
+        draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-query-timeout config)]
     (set-var-root! #'app (app-handler
                           ;; add your application routes here
                           (-> []
                               (add-route (pages-routes backend))
                               (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout-fn))
-                              (add-routes (get-sparql-routes backend authenticated-fn sparql-timeouts-config))
+                              (add-routes (get-sparql-routes backend authenticated-fn config))
                               (add-route (context "/v1/status" []
                                                   (status-routes global-writes-lock finished-jobs restart-id)))
 
@@ -136,7 +131,7 @@
   (initialise-write-service!)
   (init-backend! config)
   (init-user-repo! config)
-  (initialise-app! backend))
+  (initialise-app! backend config))
 
 (defn- load-logging-configuration [config-file]
   (-> config-file slurp read-string))
