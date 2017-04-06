@@ -64,7 +64,6 @@
                  [com.taoensso/tower "2.0.2"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
                  [ring-middleware-accept "2.0.3"]
-                 [environ "1.0.0"]
 
                  [prismatic/schema "1.0.4"]
                  [drafter-client "0.3.6-SNAPSHOT"]
@@ -84,7 +83,6 @@
                  :timeout 180000}
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
-            [lein-environ "1.0.0"]
             [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]
             [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]
             [perforate "0.3.4"]]
