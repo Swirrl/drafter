@@ -12,6 +12,7 @@
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
                                                   create-draft-graph! query update!]]
+            [drafter.configuration :refer [get-configuration]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
@@ -38,7 +39,7 @@
 
 (def ^:dynamic *test-backend*)
 
-(def test-db-path "drafter-test-db")
+(def test-db-path "test-drafter-db")
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri
@@ -79,7 +80,8 @@
 (declare ^:dynamic *test-writer*)
 
 (defn wrap-db-setup [test-fn]
-  (let [backend (get-backend (assoc env :drafter-repo-path "test-drafter-db"))
+  (let [config (get-configuration)
+        backend (get-backend (assoc config :repo-path test-db-path))
         configured-factories (reg/registered-parser-factories)]
     (binding [*test-backend* backend
               *test-writer* (start-writer!)]

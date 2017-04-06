@@ -19,6 +19,7 @@
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
+            [drafter.configuration :refer [get-configuration]]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [environ.core :refer [env]]
             [noir.util.middleware :refer [app-handler]]
@@ -122,18 +123,18 @@
 (defn- init-backend!
   "Creates the backend for the current configuration and sets the
   backend var."
-  []
-  (set-var-root! #'backend (get-backend env)))
+  [config]
+  (set-var-root! #'backend (get-backend config)))
 
 (defn- init-user-repo! []
   (let [repo (drafter.user.repository/get-configured-repository env)]
     (set-var-root! #'user-repo repo)))
 
-(defn initialise-services! []
+(defn initialise-services! [config]
   (enc/register-custom-encoders!)
 
   (initialise-write-service!)
-  (init-backend!)
+  (init-backend! config)
   (init-user-repo!)
   (initialise-app! backend))
 
@@ -155,15 +156,17 @@
   app server such as Tomcat put any initialization code here"
   []
 
-  (configure-logging! (io/file (get env :log-config-file "log-config.edn")))
+  (let [{:keys [log-config-file is-dev] :as config} (get-configuration)]
 
-  (when (env :dev)
-    (parser/cache-off!))
+    (configure-logging! (io/file log-config-file))
 
-  (log/info "Initialising repository")
-  (initialise-services!)
+    (when is-dev
+      (parser/cache-off!))
 
-  (log/info "drafter started successfully"))
+    (log/info "Initialising repository")
+    (initialise-services! config)
+
+    (log/info "drafter started successfully")))
 
 (defn destroy
   "destroy will be called when your application

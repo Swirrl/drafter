@@ -247,7 +247,6 @@
 (defmethod aero/reader 'timeout
   [opts tag value]
   (when (some? value)
-    (println "VALUE: " value)
     (let [timeout-or-ex (timeouts/try-parse-timeout value)]
       (if (util/throwable? timeout-or-ex)
         timeout-or-ex
