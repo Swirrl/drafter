@@ -5,7 +5,6 @@
             [compojure.route :as route]
             [drafter.middleware :as middleware]
             [swirrl-server.middleware.log-request :refer [log-request]]
-            [drafter.configuration :as conf]
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.backend.configuration :refer [get-backend]]
             [drafter.util :refer [set-var-root! conj-if]]
@@ -62,9 +61,6 @@
       suffix)))
 
 (def ^:private v1-prefix :v1)
-
-(defn- get-sparql-endpoint-timeout-config []
-  (conf/get-timeout-config env #{:raw :live :draftset}))
 
 (defn- get-endpoint-query-timeout-fn [endpoint-timeout {:keys [jws-signing-key] :as config}]
   (when (nil? jws-signing-key)
