@@ -3,7 +3,8 @@
   (:require [clojure.string :as string]
             [drafter.timeouts :as timeouts]
             [aero.core :as aero]
-            [drafter.util :as util]))
+            [drafter.util :as util]
+            [clojure.java.io :as io]))
 
 (defmethod aero/reader 'timeout
   [opts tag value]
@@ -51,6 +52,6 @@
         (throw (RuntimeException. (str "Configuration invalid: " msg)))))))
 
 (defn get-configuration []
-  (let [config (aero/read-config "config-settings.edn")]
+  (let [config (aero/read-config (io/resource "drafter-configuration-settings.edn"))]
     (validate-configuration! config)
     config))
