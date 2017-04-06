@@ -23,6 +23,8 @@
                  [clj-yaml "0.4.0"]      ;; for loading our Swagger schemas
                  [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
 
+                 [aero "1.1.2"]
+
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
                  ;; and the scjsv json schema validator.
