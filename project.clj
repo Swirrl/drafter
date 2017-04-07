@@ -46,9 +46,9 @@
                  [com.sun.mail/javax.mail "1.5.5"]
                  [com.taoensso/tower "2.0.2"]
                  [environ "1.0.0"]
-                 [grafter "0.7.5"]
+                 [grafter "0.8.8"]
                  [grafter/url "0.2.1"]
-                 [grafter/vocabularies "0.1.3"]
+                 ;[grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
                  [metosin/ring-swagger-ui "2.2.10"]

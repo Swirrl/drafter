@@ -6,7 +6,6 @@
             [drafter.rdf.rewriting
              [query-rewriting :refer [rewrite-sparql-string]]
              [result-rewriting :refer [rewrite-query-results]]]
-            [drafter.util :as util]
             [grafter.rdf
              [protocols :as proto]
              [repository :as repo]]
@@ -64,19 +63,13 @@
 
 (def create-restricted ->RestrictedExecutor)
 
-(defn- stringify-graph-mapping [live->draft]
-  (util/map-all #(.stringValue %) live->draft))
-
-(defn- get-rewritten-query-graph-restriction [db live->draft union-with-live?]
-  (mgmt/graph-mapping->graph-restriction db (stringify-graph-mapping live->draft) union-with-live?))
-
 (s/defrecord RewritingSesameSparqlExecutor [inner :- (s/protocol backend/SparqlExecutor)
                                             live->draft :- {URI URI}
                                             union-with-live? :- Boolean]
   backend/SparqlExecutor
   (prepare-query [this sparql-string]
     (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
-          graph-restriction (get-rewritten-query-graph-restriction inner live->draft union-with-live?)
+          graph-restriction (mgmt/graph-mapping->graph-restriction inner live->draft union-with-live?)
           pquery (prepare-query inner rewritten-query-string)
           pquery (apply-restriction pquery graph-restriction)]
       (rewrite-query-results pquery live->draft)))

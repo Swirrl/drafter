@@ -15,13 +15,14 @@
              [sparql :as sparql]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-statement]]
-            [grafter.rdf :refer [add context s]]
+            [grafter.rdf :refer [add context]]
             [grafter.rdf
              [io :refer [IStatement->sesame-statement]]
              [protocols :refer [map->Quad map->Triple]]
              [repository :as repo]]
             [grafter.vocabularies.rdf :refer :all]
-            [swirrl-server.async.jobs :as ajobs])
+            [swirrl-server.async.jobs :as ajobs]
+            [grafter.url :as url])
   (:import [java.util Date UUID]
            org.openrdf.model.impl.ContextStatementImpl
            org.openrdf.model.Resource
@@ -35,8 +36,8 @@
             [drafter:modifiedAt created-date]
             [drafter:createdBy user-uri]
             [drafter:hasOwner user-uri]]
-        ss (util/conj-if (some? title) ss [rdfs:label (s title)])]
-    (util/conj-if (some? description) ss [rdfs:comment (s description)])))
+        ss (util/conj-if (some? title) ss [rdfs:label title])]
+    (util/conj-if (some? description) ss [rdfs:comment description])))
 
 (defn create-draftset!
   "Creates a new draftset in the given database and returns its id. If
@@ -47,7 +48,7 @@
   ([db creator title description] (create-draftset! db creator title description (UUID/randomUUID) (Date.)))
   ([db creator title description draftset-id created-date]
    (let [user-uri (user/user->uri creator)
-         template (create-draftset-statements user-uri title description (draftset-uri draftset-id) created-date)
+         template (create-draftset-statements user-uri title description (url/append-path-segments draftset-uri draftset-id) created-date)
          quads (to-quads template)]
      (add db quads)
      (ds/->DraftsetId (str draftset-id)))))
@@ -108,9 +109,9 @@
 
 (defn get-draftset-owner [backend draftset-ref]
   (let [q (get-draftset-owner-query draftset-ref)
-        result (first (sparql/query-eager-seq backend q))
-        owner-lit (get result "owner")]
-    (and owner-lit (user/uri->username (.stringValue owner-lit)))))
+        result (first (sparql/query-eager-seq backend q))]
+    (when-let [owner-uri (:owner result)]
+      (user/uri->username owner-uri))))
 
 (defn is-draftset-owner? [backend draftset-ref user]
   (let [username (user/username user)
@@ -128,11 +129,11 @@
                   [live-graph-uri {:status (get-draftset-graph-status state)}])
                  states)))
 
-(defn- graph-mapping-result->graph-state [repo {:strs [lg dg public]}]
-  {:live-graph-uri (.stringValue lg)
-   :draft-graph-uri (.stringValue dg)
-   :public (.booleanValue public)
-   :draft-graph-exists (.booleanValue (sparql/query repo (graph-exists-query dg)))})
+(defn- graph-mapping-result->graph-state [repo {:keys [lg dg public]}]
+  {:live-graph-uri lg
+   :draft-graph-uri dg
+   :public public
+   :draft-graph-exists (repo/query repo (graph-exists-query dg))})
 
 (defn- union-clauses [clauses]
   (string/join " UNION " clauses))
@@ -197,44 +198,14 @@
 
 (defn get-draftset-graph-mapping [repo draftset-ref]
   (let [graph-states (get-draftset-graph-states repo draftset-ref)
-        mapping-pairs (map #(mapv % [:live-graph-uri :draft-graph-uri]) graph-states)
-        ret (into {} mapping-pairs)]
-    ret))
+        mapping-pairs (map (juxt :live-graph-uri :draft-graph-uri) graph-states)]
+    (into {} mapping-pairs)))
 
 (defn get-draftset-executor
   "Build a SPARQL queryable repo representing the draftset"
   [{:keys [backend draftset-ref union-with-live?]}]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
-    (->RewritingSesameSparqlExecutor backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
-
-(defn- rdf-handler->spog-tuple-handler [rdf-handler]
-  (reify TupleQueryResultHandler
-    (handleSolution [this bindings]
-      (let [subj (.getValue bindings "s")
-            pred (.getValue bindings "p")
-            obj (.getValue bindings "o")
-            graph (.getValue bindings "g")
-            stmt (ContextStatementImpl. subj pred obj graph)]
-        (.handleStatement rdf-handler stmt)))
-
-    (handleBoolean [this b])
-    (handleLinks [this links])
-    (startQueryResult [this binding-names]
-      (.startRDF rdf-handler))
-    (endQueryResult [this]
-      (.endRDF rdf-handler))))
-
-(defn- spog-tuple-query->graph-query [tuple-query]
-  (reify GraphQuery
-    (evaluate [this rdf-handler]
-      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))))
-
-(defn all-quads-query
-  "Returns a Sesame GraphQuery for all quads in the draftset
-  represented by the given backend."
-  [backend]
-  (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
-    (spog-tuple-query->graph-query tuple-query)))
+    (->RewritingSesameSparqlExecutor backend graph-mapping union-with-live?)))
 
 (defn- user-is-owner-clause [user]
   (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
@@ -274,23 +245,17 @@
   (conj (user-claimable-clauses user)
         (user-is-owner-clause user)))
 
-(defn- calendar-literal->date [literal]
-  (.. literal (calendarValue) (toGregorianCalendar) (getTime)))
-
-(defn- value->username [val]
-  (user/uri->username (.stringValue val)))
-
-(defn- draftset-properties-result->properties [draftset-ref {:strs [created title description creator owner role claimuser submitter modified] :as ds}]
+(defn- draftset-properties-result->properties [draftset-ref {:keys [created title description creator owner role claimuser submitter modified] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
-                         :created-at (calendar-literal->date created)
-                         :created-by (value->username creator)
-                         :updated-at (calendar-literal->date modified)}
-        optional-fields {:display-name (and title (.stringValue title))
-                         :description (and description (.stringValue description))
-                         :current-owner (and owner (value->username owner))
-                         :claim-role (and role (keyword (.stringValue role)))
-                         :claim-user (and claimuser (value->username claimuser))
-                         :submitted-by (and submitter (value->username submitter))}]
+                         :created-at created
+                         :created-by (user/uri->username creator)
+                         :updated-at modified}
+        optional-fields {:display-name title
+                         :description description
+                         :current-owner (some-> owner (user/uri->username))
+                         :claim-role (some-> role (keyword))
+                         :claim-user (some-> claimuser (user/uri->username))
+                         :submitted-by (some-> submitter (user/uri->username))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
 (defn- combine-draftset-properties-and-graph-states [ds-properties graph-states]
@@ -299,17 +264,16 @@
 
 (defn- combine-all-properties-and-graph-states [draftset-properties graph-states]
   (let [ds-uri->graph-states (group-by :draftset-uri graph-states)]
-    (map (fn [{ds-uri "ds" :as result}]
-           (let [ds-uri (.stringValue ds-uri)
-                 properties (draftset-properties-result->properties (ds/->DraftsetURI ds-uri) result)
+    (map (fn [{ds-uri :ds :as result}]
+           (let [properties (draftset-properties-result->properties (ds/->DraftsetURI ds-uri) result)
                  ds-graph-states (get ds-uri->graph-states ds-uri)]
              (combine-draftset-properties-and-graph-states properties ds-graph-states)))
          draftset-properties)))
 
 (defn- draftset-graph-mappings->graph-states [repo mappings]
-  (map (fn [{:strs [ds] :as m}]
+  (map (fn [{:keys [ds] :as m}]
            (let [graph-state (graph-mapping-result->graph-state repo m)]
-             (assoc graph-state :draftset-uri (.stringValue ds))))
+             (assoc graph-state :draftset-uri ds)))
          mappings))
 
 (defn- get-all-draftsets-properties-by [repo clauses]
@@ -365,9 +329,7 @@
         (do
           (mgmt/delete-graph-contents! db draft-graph-uri)
           draft-graph-uri)
-        (mgmt/create-draft-graph! db graph-uri
-                                  {}
-                                  (str (ds/->draftset-uri draftset-ref)))))))
+        (mgmt/create-draft-graph! db graph-uri draftset-ref)))))
 
 (def ^:private draftset-param->predicate
   {:display-name rdfs:label
@@ -397,7 +359,7 @@
 
 (defn- submit-draftset-to-role-query [draftset-ref submission-id owner role]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
-        submit-uri (submission-uri submission-id)
+        submit-uri (submission-id->uri submission-id)
         user-uri (user/user->uri owner)]
     (str
      "DELETE {"
@@ -434,7 +396,7 @@
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
         target-uri (user/user->uri target)
-        submit-uri (submission-uri submission-id)
+        submit-uri (submission-id->uri submission-id)
         draftset-uri (str (ds/->draftset-uri draftset-ref))]
     (str
      "DELETE {"
@@ -557,9 +519,9 @@
   exists. Returns nil if the draftset does not exist, or does not
   contain a draft for the graph."
   [backend draftset-ref live-graph]
-  (let [q (find-draftset-draft-graph-query draftset-ref live-graph)]
-    (when-let [[result] (sparql/query-eager-seq backend q)]
-      (.stringValue (get result "dg")))))
+  (let [q (find-draftset-draft-graph-query draftset-ref live-graph)
+        [result] (sparql/query-eager-seq backend q)]
+    (:dg result)))
 
 (defn revert-graph-changes!
   "Reverts the changes made to a live graph inside the given
@@ -568,7 +530,7 @@
     - :not-found If the draftset does not exist or no changes exist within it."
   [backend draftset-ref graph]
   (if-let [draft-graph-uri (find-draftset-draft-graph backend draftset-ref graph)]
-    (let [ds-uri (ds/->draftset-uri draftset-ref)]
+    (do
       (mgmt/delete-draft-graph! backend draft-graph-uri)
       :reverted)
     :not-found))
@@ -578,7 +540,7 @@
     (do
       (mgmt/delete-graph-contents! backend draft-graph-uri)
       draft-graph-uri)
-    (mgmt/create-draft-graph! backend live-graph {} (str (ds/->draftset-uri draftset-ref)))))
+    (mgmt/create-draft-graph! backend live-graph draftset-ref)))
 
 (defn lock-writes-and-copy-graph
   "Calls mgmt/copy-graph to copy a live graph into the draftset, but
@@ -682,7 +644,7 @@
                       (let [graph-map (get-draftset-graph-mapping backend draftset-ref)
                             quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
                             now (java.util.Date.)]
-                        (append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append :job-started-at now } job)))))
+                        (append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append :job-started-at now} job)))))
 
 (defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
   (append-quads-to-draftset-job backend draftset-ref (read-statements tempfile rdf-format)))
@@ -704,7 +666,7 @@
                 (mgmt/set-modifed-at-on-draft-graph! conn draft-graph-uri job-started-at)
                 (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
                       sesame-statements (map IStatement->sesame-statement rewritten-statements)
-                      graph-array (into-array Resource (map util/string->sesame-uri (vals live->draft)))]
+                      graph-array (into-array Resource (map util/uri->sesame-uri (vals live->draft)))]
                   (.remove conn sesame-statements graph-array)))
               (let [next-job (ajobs/create-child-job
                               job

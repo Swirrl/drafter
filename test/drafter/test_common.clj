@@ -19,7 +19,8 @@
             [schema
              [core :as s]
              [test :refer [validate-schemas]]]
-            [swirrl-server.async.jobs :refer [create-job]])
+            [swirrl-server.async.jobs :refer [create-job]]
+            [grafter.url :as url])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -41,8 +42,8 @@
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri
-             ["http://test.com/hasProperty" "http://test.com/data/1"]
-             ["http://test.com/hasProperty" "http://test.com/data/2"]]))
+             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
+             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]]))
 
 (defn select-all-in-graph [graph-uri]
   (str "SELECT * WHERE {"
@@ -110,19 +111,19 @@
   ([db graph triples draftset-ref]
 
    (create-managed-graph! db graph)
-   (let [draftset-uri (and draftset-ref (str (->draftset-uri draftset-ref)))
-         draft-graph (create-draft-graph! db graph {} draftset-uri)]
+   (let [draftset-uri (and draftset-ref (url/->java-uri draftset-ref))
+         draft-graph (create-draft-graph! db graph draftset-uri)]
      (add db draft-graph triples)
      draft-graph)))
 
 (defn make-graph-live!
-  ([db live-guri]
-     (make-graph-live! db live-guri (test-triples "http://test.com/subject-1")))
+  ([db live-graph-uri]
+     (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1"))))
 
-  ([db live-guri data]
-     (let [draft-guri (import-data-to-draft! db live-guri data)]
-       (migrate-graphs-to-live! db [draft-guri]))
-     live-guri))
+  ([db live-graph-uri data]
+     (let [draft-graph-uri (import-data-to-draft! db live-graph-uri data)]
+       (migrate-graphs-to-live! db [draft-graph-uri]))
+     live-graph-uri))
 
 (defn during-exclusive-write-f [f]
   (let [p (promise)

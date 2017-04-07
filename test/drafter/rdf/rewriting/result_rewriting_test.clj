@@ -14,7 +14,8 @@
              [repository :as repo]
              [templater :refer [triplify]]]
             [schema.test :refer [validate-schemas]])
-  (:import org.openrdf.model.impl.URIImpl))
+  (:import org.openrdf.model.impl.URIImpl
+           [java.net URI]))
 
 (use-fixtures :each validate-schemas)
 
@@ -82,70 +83,62 @@
     (rewrite-graph-results query-substitutions prepared-query)))
 
 (defn first-result [results key]
-  (-> results first (get key) str))
-
-(defn juxt-keys [ks]
-  (let [fns (map (fn [k] (fn [m] (get m k))) ks)]
-    (apply juxt fns)))
-
-(defn result-keys [m ks]
-  (mapv str ((juxt-keys ks) m)))
+  (-> results first (get key)))
 
 (defn first-result-keys [results ks]
-  (result-keys (first results) ks))
+  ((apply juxt ks) (first results)))
 
 (deftest query-and-result-rewriting-test
-  (let [draft-graph (create-draft-graph! *test-backend* "http://frogs.com/live-graph")
-        graph-map {(URIImpl. "http://frogs.com/live-graph") (URIImpl. draft-graph)}]
+  (let [draft-graph (create-draft-graph! *test-backend* (URI. "http://frogs.com/live-graph"))
+        graph-map {(URI. "http://frogs.com/live-graph") draft-graph}]
 
-    (append-data-batch! *test-backend* draft-graph (test-triples "http://kermit.org/the-frog"))
+    (append-data-batch! *test-backend* draft-graph (test-triples (URI. "http://kermit.org/the-frog")))
 
     (testing "rewrites subject URIs"
       (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { <http://kermit.org/the-frog> ?p ?o } }"
-            mapped-subject "http://mapped-subject"
-            graph-map (assoc graph-map (URIImpl. "http://kermit.org/the-frog") (URIImpl. mapped-subject))
-            po ["http://predicate" "http://object"]
+            mapped-subject (URI. "http://mapped-subject")
+            graph-map (assoc graph-map (URI. "http://kermit.org/the-frog") mapped-subject)
+            po [(URI. "http://predicate") (URI. "http://object")]
             mapped-triples (triplify [mapped-subject po])]
 
         (append-data-batch! *test-backend* draft-graph mapped-triples)
 
-        (is (= po
-               (-> *test-backend*
-                   (evaluate-with-graph-rewriting query graph-map)
-                   (first-result-keys ["p" "o"]))))))
+        (let [results (evaluate-with-graph-rewriting *test-backend* query graph-map)
+              result-po (first-result-keys results [:p :o])]
+          (is (= result-po po)))))
 
     (testing "rewrites predicate URIs"
       (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { ?s <http://source-predicate> ?o } }"
-            mapped-predicate "http://mapped-predicate"
-            graph-map (assoc graph-map (URIImpl. "http://source-predicate") (URIImpl. mapped-predicate))
-            mapped-triples (triplify ["http://kermit.org/the-frog" [mapped-predicate "http://object"]])]
+            mapped-predicate (URI. "http://mapped-predicate")
+            graph-map (assoc graph-map (URI. "http://source-predicate") mapped-predicate)
+            mapped-triples (triplify [(URI. "http://kermit.org/the-frog") [mapped-predicate (URI. "http://object")]])]
 
         (append-data-batch! *test-backend* draft-graph mapped-triples)
 
-        (is (= ["http://kermit.org/the-frog" "http://object"]
-               (-> *test-backend*
-                   (evaluate-with-graph-rewriting query graph-map)
-                   (first-result-keys ["s" "o"]))))))
+        (let [results (evaluate-with-graph-rewriting *test-backend* query graph-map)
+              result-so (first-result-keys results [:s :o])]
+          (is (= [(URI. "http://kermit.org/the-frog") (URI. "http://object")] result-so)))))
 
     (testing "rewrites object URIs"
       (let [query "SELECT * WHERE { GRAPH <http://frogs.com/live-graph> { ?s ?p <http://source-object> } }"
-            mapped-object "http://mapped-object"
-            graph-map (assoc graph-map (URIImpl. "http://source-object") (URIImpl. mapped-object))
-            mapped-triples (triplify ["http://kermit.org/the-frog" ["http://predicate" mapped-object]])]
+            mapped-object (URI. "http://mapped-object")
+            graph-map (assoc graph-map (URI. "http://source-object") mapped-object)
+            mapped-triples (triplify [(URI. "http://kermit.org/the-frog") [(URI. "http://predicate") mapped-object]])]
 
         (append-data-batch! *test-backend* draft-graph mapped-triples)
 
-        (is (= ["http://kermit.org/the-frog" "http://predicate"]
+        (is (= [(URI. "http://kermit.org/the-frog") (URI. "http://predicate")]
                (-> *test-backend*
                    (evaluate-with-graph-rewriting query graph-map)
-                   (first-result-keys ["s" "p"]))))))
+                   (first)
+                   ((juxt :s :p)))))))
 
     (testing "rewrites query to query draft graph"
       ;; NOTE this query rewrites the URI constant <http://frogs.com/live-graph>
-      (is (= "http://kermit.org/the-frog"
+      (is (= (URI. "http://kermit.org/the-frog")
              (-> *test-backend*
                  (evaluate-with-graph-rewriting graph-constant-query graph-map)
-                 (first-result "s"))))
+                 (first-result :s))))
 
     (testing "rewrites SPARQL URI/IRI functions to query with substitution"
 
@@ -169,34 +162,31 @@
                      (first-result "g"))))))
 
       (testing "rewrites source graphs in VALUES clause"
-        (is (= "http://frogs.com/live-graph"
+        (is (= (URI. "http://frogs.com/live-graph")
                (-> *test-backend*
                    (evaluate-with-graph-rewriting graph-values-query graph-map)
-                   (first-result "g")))))
+                   (first-result :g)))))
 
       (testing "rewrites source graph literals in FILTER clause"
-        (is (= "http://frogs.com/live-graph"
+        (is (= (URI. "http://frogs.com/live-graph")
                (-> *test-backend*
                    (evaluate-with-graph-rewriting graph-filter-query graph-map)
-                   (first-result "g")))))))))
+                   (first-result :g)))))))))
 
 (deftest more-query-and-result-rewriting-test
   (testing "rewrites all result URIs"
-    (let [draft-graph (create-draft-graph! *test-backend* "http://frogs.com/live-graph")
-          live-triple ["http://live-subject" "http://live-predicate" "http://live-object"]
-          draft-triple ["http://draft-subject" "http://draft-predicate" "http://draft-object"]
-          [live-subject live-predicate live-object] live-triple
+    (let [draft-graph (create-draft-graph! *test-backend* (URI. "http://frogs.com/live-graph"))
+          live-triple [(URI. "http://live-subject") (URI. "http://live-predicate") (URI. "http://live-object")]
+          draft-triple [(URI. "http://draft-subject") (URI. "http://draft-predicate") (URI. "http://draft-object")]
           [draft-subject draft-predicate draft-object] draft-triple
-          graph-map (zipmap (map #(URIImpl. %) live-triple)      ;; live-uri -> draft-uri
-                            (map #(URIImpl. %) draft-triple))]
+          graph-map (zipmap live-triple draft-triple)]
 
       (append-data-batch! *test-backend* draft-graph (triplify [draft-subject [draft-predicate draft-object]]))
 
       (let [query "SELECT * WHERE { ?s ?p ?o }"
             results (evaluate-with-graph-rewriting *test-backend* query graph-map)]
 
-        (is (some #{live-triple}
-                  (map #(result-keys % ["s" "p" "o"]) results)))))))
+        (is (some #{live-triple} (map (juxt :s :p :o) results)))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

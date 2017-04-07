@@ -1,30 +1,31 @@
 (ns drafter.rdf.draft-management
   (:require [clojure
-             [set :as set]
-             [string :as string]]
+             [set :as set]]
             [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
             [drafter.rdf
              [drafter-ontology :refer :all]
              [sparql :refer [query update!]]]
             [drafter.util :as util]
-            [grafter.rdf :refer [add s]]
-             [grafter.rdf
+            [grafter.rdf :refer [add]]
+            [grafter.rdf
              [repository :as repo]
              [templater :refer [add-properties graph]]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.core :as s]
-            [swirrl-server.errors :refer [ex-swirrl]])
-  (:import [java.util Date UUID]))
+            [swirrl-server.errors :refer [ex-swirrl]]
+            [grafter.url :as url])
+  (:import [java.util Date UUID]
+           (java.net URI)))
 
-(def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
+(def drafter-state-graph (URI. "http://publishmydata.com/graphs/drafter/drafts"))
 
-(def staging-base "http://publishmydata.com/graphs/drafter/draft")
+(def staging-base (URI. "http://publishmydata.com/graphs/drafter/draft"))
 
 (def to-quads (partial graph drafter-state-graph))
 
 (defn make-draft-graph-uri []
-  (str staging-base "/" (UUID/randomUUID)))
+  (url/->java-uri (url/append-path-segments staging-base (str (UUID/randomUUID)))))
 
 (defn with-state-graph
   "Wraps the string in a SPARQL
@@ -38,19 +39,18 @@
                  " }")))
 
 (defn is-graph-managed? [db graph-uri]
-  (query db
+  (repo/query db
          (str "ASK WHERE {"
               (with-state-graph
-                "<" graph-uri "> a drafter:ManagedGraph ."
-                "}")
-              )))
+                "<" graph-uri "> a <" drafter:ManagedGraph "> ."
+                "}"))))
 
 (defn is-graph-live? [db graph-uri]
-  (query db
+  (repo/query db
          (str "ASK WHERE {"
               (with-state-graph
-                "   <" graph-uri "> a drafter:ManagedGraph ."
-                "   <" graph-uri "> drafter:isPublic true ."
+                "   <" graph-uri "> a <" drafter:ManagedGraph "> ."
+                "   <" graph-uri "> <" drafter:isPublic "> true ."
                 "}"))))
 
 (defn has-more-than-one-draft?
@@ -81,47 +81,34 @@
 
 (defn create-managed-graph
   "Returns some RDF statements to represent the ManagedGraphs state."
-  ([graph-uri] (create-managed-graph graph-uri {}))
-  ([graph-uri meta-data]
-     (let [rdf-template [graph-uri
-                         [rdf:a drafter:ManagedGraph]
-                         [drafter:isPublic false]]]
-       ; add the options as extra properties
-       (add-properties rdf-template meta-data))))
+  [graph-uri]
+  [graph-uri
+   [rdf:a drafter:ManagedGraph]
+   [drafter:isPublic false]])
 
 (defn create-managed-graph!
   "Create a record of a managed graph in the database, returns the
   graph-uri that was passed in."
-  ([db graph-uri] (create-managed-graph! db graph-uri {}))
-  ([db graph-uri meta-data]
-     ;; We only do anything if it's not already a managed graph
+  [db graph-uri]
+  ;; We only do anything if it's not already a managed graph
 
-     ;; FIXME: Is this a potential race condition? i.e. we check for existence (and it's false) and before executing someone else makes
-     ;; the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
-     (if (not (is-graph-managed? db graph-uri))
-       (let [managed-graph-quads (to-quads (create-managed-graph graph-uri meta-data))]
-         (add db managed-graph-quads)))
-       graph-uri))
+  ;; FIXME: Is this a potential race condition? i.e. we check for existence (and it's false) and before executing someone else makes
+  ;; the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
+  (if (not (is-graph-managed? db graph-uri))
+    (let [managed-graph-quads (to-quads (create-managed-graph graph-uri))]
+      (add db managed-graph-quads)))
+  graph-uri)
 
 (defn create-draft-graph
-  ([live-graph-uri draft-graph-uri time]
-   (create-draft-graph live-graph-uri draft-graph-uri time {}))
-  ([live-graph-uri draft-graph-uri time opts]
-   (create-draft-graph live-graph-uri draft-graph-uri time opts nil))
-  ([live-graph-uri draft-graph-uri time opts draftset-uri]
-
-     (let [live-graph-triples [live-graph-uri
-                               [drafter:hasDraft draft-graph-uri]]
-           draft-graph-triples  [draft-graph-uri
-                                 [rdf:a drafter:DraftGraph]
-                                 [drafter:createdAt time]
-                                 [drafter:modifiedAt time]]
-           draft-graph-triples (util/conj-if (some? draftset-uri) draft-graph-triples [drafter:inDraftSet draftset-uri])
-           triples [live-graph-triples (add-properties draft-graph-triples
-                                                       ;; we need to make the values of the opts into strings by calling `s`.
-                                                       (into {} (for [[k v] opts]
-                                                                  [k (s v)])))]]
-       triples))) ; returns the triples
+  [live-graph-uri draft-graph-uri time draftset-uri]
+  (let [live-graph-triples [live-graph-uri
+                            [drafter:hasDraft draft-graph-uri]]
+        draft-graph-triples [draft-graph-uri
+                             [rdf:a drafter:DraftGraph]
+                             [drafter:createdAt time]
+                             [drafter:modifiedAt time]]
+        draft-graph-triples (util/conj-if (some? draftset-uri) draft-graph-triples [drafter:inDraftSet draftset-uri])]
+    [live-graph-triples draft-graph-triples]))
 
 (defn create-draft-graph!
   "Creates a new draft graph with a unique graph name, expects the
@@ -135,16 +122,15 @@
   added connecting the created draft graph to the given draft set. No
   validation is done that the draftset actually exists."
   ([db live-graph-uri]
-   (create-draft-graph! db live-graph-uri {}))
-  ([db live-graph-uri opts]
-   (create-draft-graph! db live-graph-uri opts nil))
-  ([db live-graph-uri opts draftset-uri]
-   (create-draft-graph! db live-graph-uri opts draftset-uri (java.util.Date.)))
-  ([db live-graph-uri opts draftset-uri now]
-   (let [draft-graph-uri (make-draft-graph-uri)]
-     ;; adds the triples returned by crate-draft-graph to the state graph
-     (add db (->> (create-draft-graph live-graph-uri draft-graph-uri now opts draftset-uri)
-                  (apply to-quads)))
+   (create-draft-graph! db live-graph-uri nil))
+  ([db live-graph-uri draftset-ref]
+   (create-draft-graph! db live-graph-uri draftset-ref (java.util.Date.)))
+  ([db live-graph-uri draftset-ref now]
+   (let [draft-graph-uri (make-draft-graph-uri)
+         draftset-uri (some-> draftset-ref (url/->java-uri))
+         triple-templates (create-draft-graph live-graph-uri draft-graph-uri now draftset-uri)
+         quads (apply to-quads triple-templates)]
+     (add db quads)
 
      draft-graph-uri)))
 
@@ -198,7 +184,7 @@
   (if-let [draft-graph (get graph-map live-graph)]
     {:draft-graph-uri draft-graph :graph-map graph-map}
     (let [live-graph-uri (create-managed-graph! repo live-graph)
-          draft-graph-uri (create-draft-graph! repo live-graph-uri {} draftset-uri)]
+          draft-graph-uri (create-draft-graph! repo live-graph-uri draftset-uri)]
       {:draft-graph-uri draft-graph-uri :graph-map (assoc graph-map live-graph-uri draft-graph-uri)})))
 
 (defn- escape-sparql-value [val]
@@ -283,15 +269,14 @@
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph. Returns nil if not
   found."
-  (when-let [live-uri (-> (doall (query db
-                                        (str "SELECT ?live WHERE {"
-                                             (with-state-graph
-                                               "?live a drafter:ManagedGraph ; "
-                                               "      drafter:hasDraft <" draft-graph-uri "> . ")
-                                             "} LIMIT 1")))
-                          first
-                          (get "live"))]
-    (str live-uri)))
+  (let [q (str "SELECT ?live WHERE {"
+               (with-state-graph
+                 "?live a <" drafter:ManagedGraph "> ;"
+                 "      <" drafter:hasDraft "> <" draft-graph-uri "> . ")
+               "} LIMIT 1")]
+    (-> (doall (query db q))
+        first
+        (:live))))
 
 (defn delete-live-graph-from-state-query [live-graph-uri]
   (str
@@ -336,33 +321,33 @@
   (if (empty? draft-set)
     {}
     (let [drafts (clojure.string/join " " (map #(str "<" % ">") draft-set))
-          results (->> (doall (query db
-                                     (str "SELECT ?live ?draft WHERE {"
-                                          (with-state-graph
-                                            "  VALUES ?draft {" drafts "}"
-                                            "  ?live a drafter:ManagedGraph ;"
-                                            "        drafter:hasDraft ?draft .")
-                                          "}"))))]
-      (let [live-graphs (map #(get % "live") results)]
+          q (str "SELECT ?live ?draft WHERE {"
+                (with-state-graph
+                  "  VALUES ?draft {" drafts "}"
+                  "  ?live a <" drafter:ManagedGraph "> ;"
+                  "        <" drafter:hasDraft "> ?draft .")
+                "}")
+          results (->> (doall (grafter.rdf.repository/query db q)))]
+
+      (let [live-graphs (map :live results)]
         (when (has-duplicates? live-graphs)
           (throw (ex-swirrl :multiple-drafts-error
                             "Multiple draft graphs were supplied referencing the same live graph.")))
 
         (zipmap live-graphs
-                (map #(get % "draft") results))))))
+                (map :draft results))))))
 
 (defn live-graphs [db & {:keys [online] :or {online true}}]
   "Get all live graph names.  Takes an optional boolean keyword
   argument of :online to allow querying for all online/offline live
   graphs."
-  (->> (query db
-                 (str "SELECT ?live WHERE {"
-                      (with-state-graph
-                        "?live a drafter:ManagedGraph ;"
-                        "      drafter:isPublic " online " .")
-                      "}"))
-          (map #(str (% "live")))
-          (into #{})))
+  (let [q (str "SELECT ?live WHERE {"
+               (with-state-graph
+                 "?live a <" drafter:ManagedGraph "> ;"
+                 "      <" drafter:isPublic "> " online " .")
+               "}")
+        results (repo/query db q)]
+    (into #{} (map :live results))))
 
 (defn graph-non-empty-query [graph-uri]
   (str

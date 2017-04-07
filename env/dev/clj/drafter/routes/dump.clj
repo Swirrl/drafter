@@ -1,20 +1,19 @@
 (ns drafter.routes.dump
   (:require [compojure.core :refer [GET routes context]]
-            [drafter.layout :as layout]
-            [drafter.rdf.draft-management :refer [drafter-state-graph
-                                                  live-graphs]]
+            [drafter.rdf.draft-management :refer [drafter-state-graph]]
             [drafter.rdf.drafter-ontology :refer [drafter]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
             [grafter.rdf.io :refer [rdf-serializer default-prefixes]]
             [ring.util.io :as rio]
-            [ring.util.response :refer [not-found]]))
+            [ring.util.response :refer [not-found]]
+            [grafter.url :as url]))
 
 (def drafter-prefixes (assoc default-prefixes
-                             "drafter" (drafter "")
-                             "draftset" (drafter "draftset/")
-                             "graph" "http://publishmydata.com/graphs/drafter/draft/"))
+                             "drafter" drafter
+                             "draftset" (url/append-path-segments drafter "draftset/")
+                             "graph" (url/->grafter-url "http://publishmydata.com/graphs/drafter/draft/")))
 
 (defn dump-database
   "A convenience function intended for development use.  It will dump

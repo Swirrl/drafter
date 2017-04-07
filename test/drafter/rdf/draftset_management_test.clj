@@ -16,8 +16,11 @@
             [grafter.rdf
              [protocols :refer [->Quad ->Triple]]
              [repository :refer [query]]]
-            [grafter.vocabularies.rdf :refer :all])
-  (:import org.openrdf.rio.RDFFormat))
+            [grafter.vocabularies.rdf :refer :all]
+            [drafter.util :as util]
+            [grafter.url :as url])
+  (:import org.openrdf.rio.RDFFormat
+           (java.net URI)))
 
 (defn- has-uri-object? [s p uri-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
@@ -68,7 +71,7 @@
   (testing "Non-existent draftset"
     (is (= false (draftset-exists? *test-backend* (->DraftsetId "missing"))))))
 
-(deftest get-draftest-owner
+(deftest get-draftset-owner-test
   (testing "With owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)
           owner (get-draftset-owner *test-backend* draftset-id)]
@@ -97,11 +100,11 @@
 (deftest delete-draftset-statements!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
     (delete-draftset-statements! *test-backend* draftset-id)
-    (is (= false (ask? (str "<" (draftset-uri draftset-id) ">") "?p" "?o")))))
+    (is (= false (ask? (str "<" (draftset-id->uri draftset-id) ">") "?p" "?o")))))
 
 (defn- import-data-to-draftset! [db draftset-id quads]
   (let [graph-quads (group-by context quads)]
-    (doall (map (fn [[live qs]] (import-data-to-draft! *test-backend* live qs draftset-id)) graph-quads))))
+    (doall (map (fn [[live qs]] (import-data-to-draft! db live qs draftset-id)) graph-quads))))
 
 (deftest delete-draftset!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
@@ -121,14 +124,14 @@
 (deftest delete-draftest-graph!-test
   (testing "Delete non-existent live graph"
     (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
-          graph-to-delete "http://missing"]
+          graph-to-delete (URI. "http://missing")]
       (delete-draftset-graph! *test-backend* draftset-id graph-to-delete)
 
       (is (= false (mgmt/is-graph-managed? *test-backend* graph-to-delete)))
       (is (empty? (get-draftset-graph-mapping *test-backend* draftset-id)))))
 
   (testing "Delete live graph not already in draftset"
-    (let [live-graph "http://live"
+    (let [live-graph (URI. "http://live")
           draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
       (make-graph-live! *test-backend* live-graph)
       (delete-draftset-graph! *test-backend* draftset-id live-graph)
@@ -141,11 +144,11 @@
         (is (mgmth/draft-exists? *test-backend* (get graph-mapping live-graph))))))
 
   (testing "Graph already in draftset"
-    (let [live-graph "http://live"
+    (let [live-graph (URI. "http://live")
           draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
       (make-graph-live! *test-backend* live-graph)
 
-      (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples "http://subject") draftset-id)]
+      (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples (URI. "http://subject")) draftset-id)]
         (is (mgmth/draft-exists? *test-backend* draft-graph))
 
         (delete-draftset-graph! *test-backend* draftset-id live-graph)
@@ -195,8 +198,7 @@
 
 (deftest submit-draftset-to-user!-test
   (testing "When owned"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
-          draftset-uri (str (->draftset-uri draftset-id))]
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
 
       (is (= nil (get-draftset-owner *test-backend* draftset-id)))
@@ -324,19 +326,18 @@
       (is (= :not-found result)))))
 
 (deftest revert-changes-from-graph-only-in-draftset
-  (let [live-graph "http://live"
+  (let [live-graph (URI. "http://live")
         draftset-id (create-draftset! *test-backend* test-editor)]
     (mgmt/create-managed-graph! *test-backend* live-graph)
-    (let [draft-graph (mgmt/create-draft-graph! *test-backend* live-graph {} (str (->draftset-uri draftset-id)))
+    (let [draft-graph (mgmt/create-draft-graph! *test-backend* live-graph draftset-id)
           result (revert-graph-changes! *test-backend* draftset-id live-graph)]
       (is (= :reverted result))
       (is (= false (mgmth/draft-exists? *test-backend* draft-graph)))
       (is (= false (mgmt/is-graph-managed? *test-backend* live-graph))))))
 
 (deftest revert-changes-from-graph-which-exists-in-live
-  (let [live-graph-uri (make-graph-live! *test-backend* "http://live")
+  (let [live-graph-uri (make-graph-live! *test-backend* (URI. "http://live"))
         draftset-id (create-draftset! *test-backend* test-editor)
-        draftset-uri (str (->draftset-uri draftset-id))
         draft-graph-uri (delete-draftset-graph! *test-backend* draftset-id live-graph-uri)]
     (let [result (revert-graph-changes! *test-backend* draftset-id live-graph-uri)]
       (is (= :reverted result))
@@ -344,11 +345,11 @@
       (is (= false (mgmth/draft-exists? *test-backend* draft-graph-uri))))))
 
 (deftest revert-change-from-graph-which-exists-independently-in-other-draftset
-  (let [live-graph-uri (mgmt/create-managed-graph! *test-backend* "http://live")
+  (let [live-graph-uri (mgmt/create-managed-graph! *test-backend* (URI. "http://live"))
         ds1-id (create-draftset! *test-backend* test-editor)
         ds2-id (create-draftset! *test-backend* test-publisher)
-        draft-graph1-uri (mgmt/create-draft-graph! *test-backend* live-graph-uri {} (str (->draftset-uri ds1-id)))
-        draft-graph2-uri (mgmt/create-draft-graph! *test-backend* live-graph-uri {} (str (->draftset-uri ds2-id)))]
+        draft-graph1-uri (mgmt/create-draft-graph! *test-backend* live-graph-uri ds1-id)
+        draft-graph2-uri (mgmt/create-draft-graph! *test-backend* live-graph-uri ds2-id)]
 
     (let [result (revert-graph-changes! *test-backend* ds2-id live-graph-uri)]
       (is (= :reverted result))
@@ -358,22 +359,22 @@
 
 (deftest revert-non-existent-change-in-draftset
   (let [draftset-id (create-draftset! *test-backend* test-editor)
-        result (revert-graph-changes! *test-backend* draftset-id "http://missing")]
+        result (revert-graph-changes! *test-backend* draftset-id (URI. "http://missing"))]
     (is (= :not-found result))))
 
 (deftest revert-changes-in-non-existent-draftset
-  (let [live-graph (make-graph-live! *test-backend* "http://live")
+  (let [live-graph (make-graph-live! *test-backend* (URI. "http://live"))
         result (revert-graph-changes! *test-backend* (->DraftsetId "missing") live-graph)]
     (is (= :not-found result))))
 
 (defn- get-graph-triples [graph-uri]
   (let [results (query *test-backend* (select-all-in-graph graph-uri))]
-    (map (fn [{:strs [s p o]}] (->Triple (str s) (str p) (str o))) results)))
+    (map (fn [{:keys [s p o]}] (->Triple s p o)) results)))
 
 (deftest copy-live-graph-into-draftset-test
   (let [draftset-id (create-draftset! *test-backend* test-editor)
-        live-triples (test-triples "http://test-subject")
-        live-graph-uri (make-graph-live! *test-backend* "http://live" live-triples)
+        live-triples (test-triples (URI. "http://test-subject"))
+        live-graph-uri (make-graph-live! *test-backend* (URI. "http://live") live-triples)
         {:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
     (scheduler/queue-job! copy-job)
 
@@ -385,9 +386,9 @@
 
 (deftest copy-live-graph-into-existing-draft-graph-in-draftset-test
   (let [draftset-id (create-draftset! *test-backend* test-editor)
-        live-triples (test-triples "http://test-subject")
-        live-graph-uri (make-graph-live! *test-backend* "http://live" live-triples)
-        initial-draft-triples (test-triples "http://temp-subject")
+        live-triples (test-triples (URI. "http://test-subject"))
+        live-graph-uri (make-graph-live! *test-backend* (URI. "http://live") live-triples)
+        initial-draft-triples (test-triples (URI. "http://temp-subject"))
         draft-graph-uri (import-data-to-draft! *test-backend* live-graph-uri initial-draft-triples draftset-id)
         {:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
 
@@ -412,7 +413,7 @@
   (fun job))
 
 (defn fetch-draft-graph-modified-at [draftset live-graph]
-  (let [ds-uri (draftset-uri (:id draftset))
+  (let [ds-uri (draftset-id->uri (:id draftset))
         modified-query (str "SELECT ?modified {"
                             "   <" live-graph "> <" drafter:hasDraft "> ?draftgraph ."
                             "   ?draftgraph a <" drafter:DraftGraph "> ;"
@@ -426,29 +427,23 @@
 
       (assert (= 1 (count res)) "There were multiple modifiedAt timestamps, we expect just one.")
 
-      (-> res first
-          (get "modified")
-          .calendarValue
-          .toGregorianCalendar
-          .getTime))))
+      (-> res first :modified))))
 
 (deftest append-data-to-draftset-job-test
   (let [ds (create-draftset! *test-backend* test-editor)]
-    (apply-job! (append-triples-to-draftset-job *test-backend* ds (io/file "./test/test-triple.nt") RDFFormat/NTRIPLES "http://foo/graph"))
+    (apply-job! (append-triples-to-draftset-job *test-backend* ds (io/file "./test/test-triple.nt") RDFFormat/NTRIPLES (URI. "http://foo/graph")))
     (let [ts-1 (fetch-draft-graph-modified-at ds "http://foo/graph")]
-      (apply-job! (append-triples-to-draftset-job *test-backend* ds (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES "http://foo/graph"))
+      (apply-job! (append-triples-to-draftset-job *test-backend* ds (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES (URI. "http://foo/graph")))
       (let [ts-2 (fetch-draft-graph-modified-at ds "http://foo/graph")]
         (is (< (.getTime ts-1)
                (.getTime ts-2))
             "Modified time is updated after append")
 
-        (apply-job! (delete-triples-from-draftset-job *test-backend* ds  "http://foo/graph" (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES))
+        (apply-job! (delete-triples-from-draftset-job *test-backend* ds (URI. "http://foo/graph") (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES))
         (let [ts-3 (fetch-draft-graph-modified-at ds "http://foo/graph")]
           (is (< (.getTime ts-2)
                (.getTime ts-3))
-              "Modified time is updated after delete")
-          )
-        ))))
+              "Modified time is updated after delete"))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

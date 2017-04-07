@@ -30,7 +30,8 @@
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            java.util.Date
            org.openrdf.query.QueryResultHandler
-           org.openrdf.query.resultio.sparqljson.SPARQLResultsJSONParser))
+           org.openrdf.query.resultio.sparqljson.SPARQLResultsJSONParser
+           (java.net URI)))
 
 (def ^:private ^:dynamic *route*)
 (def ^:private ^:dynamic *user-repo*)
@@ -84,7 +85,7 @@
 
 (defn- statements->append-triples-request [user draftset-location triples graph]
   (-> (statements->append-request user draftset-location triples formats/rdf-ntriples)
-      (assoc-in [:params :graph] graph)))
+      (assoc-in [:params :graph] (str graph))))
 
 (defn- append-triples-to-draftset-through-api [user draftset-location triples graph]
   (let [request (statements->append-triples-request user draftset-location triples graph)
@@ -101,7 +102,7 @@
 
 (def ^:private DraftsetWithoutTitleOrDescription
   {:id s/Str
-   :changes {s/Str {:status (s/enum :created :updated :deleted)}}
+   :changes {URI {:status (s/enum :created :updated :deleted)}}
    :created-at Date
    :updated-at Date
    :created-by s/Str
@@ -160,10 +161,10 @@
      (concrete-statements (:body data-response) formats/rdf-nquads))))
 
 (defn- get-draftset-graph-triples-through-api [draftset-location user graph union-with-live?-str]
-  (let [data-request {:uri (str draftset-location "/data")
+  (let [data-request {:uri            (str draftset-location "/data")
                       :request-method :get
-                      :headers {"accept" "application/n-triples"}
-                      :params {:union-with-live union-with-live?-str :graph graph}}
+                      :headers        {"accept" "application/n-triples"}
+                      :params         {:union-with-live union-with-live?-str :graph (str graph)}}
         data-request (with-identity user data-request)
         {:keys [body] :as data-response} (route data-request)]
     (assert-is-ok-response data-response)
@@ -203,7 +204,7 @@
     body))
 
 (defn- delete-draftset-graph-request [user draftset-location graph-to-delete]
-  (with-identity user {:uri (str draftset-location "/graph") :request-method :delete :params {:graph graph-to-delete}}))
+  (with-identity user {:uri (str draftset-location "/graph") :request-method :delete :params {:graph (str graph-to-delete)}}))
 
 (defn- delete-draftset-graph-through-api [user draftset-location graph-to-delete]
   (let [delete-graph-request (delete-draftset-graph-request user draftset-location graph-to-delete)
@@ -222,7 +223,7 @@
 
 (defn- create-delete-triples-request [user draftset-location statements graph]
   (assoc-in (create-delete-statements-request user draftset-location statements formats/rdf-ntriples)
-            [:params :graph] graph))
+            [:params :graph] (str graph)))
 
 (defn- delete-triples-through-api [user draftset-location triples graph]
   (-> (create-delete-triples-request user draftset-location triples graph)
@@ -236,7 +237,7 @@
 
 (defn- delete-draftset-triples-through-api [user draftset-location triples graph]
   (let [delete-request (create-delete-statements-request user draftset-location triples formats/rdf-ntriples)
-        delete-request (assoc-in delete-request [:params :graph] graph)
+        delete-request (assoc-in delete-request [:params :graph] (str graph))
         delete-response (route delete-request)]
     (await-delete-statements-response delete-response)))
 
@@ -568,10 +569,7 @@
                                                 "                 <" drafter:modifiedAt ">   ?modified ."
                                                 "}"))
                                           first
-                                          (get "modified")
-                                          .calendarValue
-                                          .toGregorianCalendar
-                                          .getTime))]
+                                          (:modified)))]
 
     (testing "Publishing some triples sets the modified time"
       (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
@@ -649,8 +647,8 @@
 
 (deftest delete-quads-from-graph-not-in-live
   (let [draftset-location (create-draftset-through-api test-editor)
-        to-delete [(->Quad "http://s1" "http://p1" "http://o1" "http://missing-graph1")
-                   (->Quad "http://s2" "http://p2" "http://o2" "http://missing-graph2")]
+        to-delete [(->Quad (URI. "http://s1") (URI. "http://p1") (URI. "http://o1") (URI. "http://missing-graph1"))
+                   (->Quad (URI. "http://s2") (URI. "http://p2") (URI. "http://o2") (URI. "http://missing-graph2"))]
         draftset-info (delete-quads-through-api test-editor draftset-location to-delete)]
     (is (empty? (keys (:changes draftset-info))))))
 
@@ -706,9 +704,9 @@
 
 (deftest delete-triples-from-graph-not-in-live
   (let [draftset-location (create-draftset-through-api test-editor)
-        to-delete [(->Triple "http://s1" "http://p1" "http://o1")
-                   (->Triple "http://s2" "http://p2" "http://o2")]
-        draftset-info (delete-draftset-triples-through-api test-editor draftset-location to-delete "http://missing")
+        to-delete [(->Triple (URI. "http://s1") (URI. "http://p1") (URI. "http://o1"))
+                   (->Triple (URI. "http://s2") (URI. "http://p2") (URI. "http://o2"))]
+        draftset-info (delete-draftset-triples-through-api test-editor draftset-location to-delete (URI. "http://missing"))
         draftset-quads (get-draftset-quads-through-api draftset-location test-editor "false")]
 
     ;;graph should not exist in draftset since it was not in live
@@ -1347,7 +1345,7 @@
     (assert-is-not-found-response response)))
 
 (defn- revert-draftset-graph-changes-request [draftset-location user graph]
-  (with-identity user {:uri (str draftset-location "/changes") :request-method :delete :params {:graph graph}}))
+  (with-identity user {:uri (str draftset-location "/changes") :request-method :delete :params {:graph (str graph)}}))
 
 (defn- revert-draftset-graph-changes-through-api [draftset-location user graph]
   (let [{:keys [body] :as response} (route (revert-draftset-graph-changes-request draftset-location user graph))]
@@ -1411,8 +1409,9 @@
     (assert-is-unprocessable-response response)))
 
 (defn- copy-live-graph-into-draftset-request [draftset-location user live-graph]
-  (with-identity user
-    {:uri (str draftset-location "/graph") :request-method :put :params {:graph live-graph}}))
+  (with-identity
+    user
+    {:uri (str draftset-location "/graph") :request-method :put :params {:graph (str live-graph)}}))
 
 (defn- copy-live-graph-into-draftset [draftset-location user live-graph]
   (let [request (copy-live-graph-into-draftset-request draftset-location user live-graph)
@@ -1425,8 +1424,9 @@
     (publish-quads-through-api quads)
     (copy-live-graph-into-draftset draftset-location test-editor live-graph)
 
-    (let [ds-quads (get-draftset-quads-through-api draftset-location test-editor "false")]
-      (is (= (set (eval-statements quads)) (set ds-quads))))))
+    (let [ds-quads (get-draftset-quads-through-api draftset-location test-editor "false")
+          expected-quads (eval-statements quads)]
+      (is (= (set expected-quads) (set ds-quads))))))
 
 (deftest copy-live-graph-with-existing-draft-into-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))

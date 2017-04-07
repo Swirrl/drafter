@@ -1,5 +1,5 @@
 (ns drafter.common.json-encoders
-  (:require [cheshire.generate :refer [add-encoder encode-map]]
+  (:require [cheshire.generate :refer [add-encoder encode-map encode-str]]
             [drafter.util :as util]))
 
 (defn- exception-map [cause-map ex]
@@ -31,4 +31,5 @@
 (defn register-custom-encoders!
   "Registers JSON encoders for types which may need to be serialised."
   []
-  (add-encoder java.lang.Exception encode-exception))
+  (add-encoder java.lang.Exception encode-exception)
+  (add-encoder java.net.URI encode-str))

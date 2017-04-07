@@ -8,12 +8,13 @@
              [formats :refer [rdf-ntriples]]
              [protocols :as pr]]
             [schema.test :refer [validate-schemas]])
-  (:import [java.util.concurrent CountDownLatch TimeUnit]))
+  (:import [java.util.concurrent CountDownLatch TimeUnit]
+           [java.net URI]))
 
 (use-fixtures :each validate-schemas)
 
 (defn add-triple-to-db [db]
-  (pr/add db "http://foo.com/my-graph" (test-triples "http://test.com/data/one")))
+  (pr/add db (URI. "http://foo.com/my-graph") (test-triples (URI. "http://test.com/data/one"))))
 
 (deftest sparql-end-point-test
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
@@ -49,25 +50,24 @@
 
         (let [triple-reader (java.io.InputStreamReader. body)
               triples (get-spo-set (rdf/statements triple-reader :format rdf-ntriples))
-              expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
+              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
 
           (is (= expected-triples triples)))))))
 
 (deftest sparql-end-point-tuple-query-accept-test
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "Tuple SPARQL query with multiple accepted MIME types and qualities"
-      (let [{:keys [status headers body]
-             :as result} (end-point {:request-method :get
-                                     :uri "/live/sparql"
-                                     :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
-                                     :headers {"accept" "text/csv,application/sparql-results+json;q=0.9,*/*;q=0.8"}})]
+      (let [{:keys [status headers body]} (end-point {:request-method :get
+                                                      :uri "/live/sparql"
+                                                      :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
+                                                      :headers {"accept" "text/csv,application/sparql-results+json;q=0.9,*/*;q=0.8"}})]
 
         (is (= 200 status))
         (is (= "text/csv" (headers "Content-Type")))
 
         (let [csv-result (csv/parse-csv (stream->string body))
-              triples (set (drop 1 csv-result))
-              expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
+              triples (set (map (fn [row] (map #(URI. %) row)) (drop 1 csv-result)))
+              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
           (is (= ["s" "p" "o"] (first csv-result)))
           (is (= expected-triples triples)))))))
 

@@ -3,15 +3,13 @@
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
             [drafter
-             [middleware :as middleware]
              [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft! select-all-in-graph stream->string test-triples with-identity wrap-clean-test-db wrap-db-setup]]
              [timeouts :as timeouts]
              [user-test :refer [test-editor test-system]]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.routes.sparql :refer :all]
-            [drafter.user.memory-repository :as memrepo]
-            [grafter.rdf.repository :as repo]
-            [schema.test :refer [validate-schemas]]))
+            [schema.test :refer [validate-schemas]])
+  (:import (java.net URI)))
 
 (use-fixtures :each validate-schemas)
 
@@ -19,14 +17,13 @@
   "Set the state of the database so that we have three managed graphs,
   one of which is made public the other two are still private (draft)."
   [db]
-  (let [draft-made-live-and-deleted (import-data-to-draft! db "http://test.com/made-live-and-deleted-1" (test-triples "http://test.com/subject-1"))
-        draft-2 (import-data-to-draft! db "http://test.com/graph-2" (test-triples "http://test.com/subject-2"))
-        draft-3 (import-data-to-draft! db "http://test.com/graph-3" (test-triples "http://test.com/subject-3"))]
+  (let [draft-made-live-and-deleted (import-data-to-draft! db (URI. "http://test.com/made-live-and-deleted-1") (test-triples (URI. "http://test.com/subject-1")))
+        draft-2 (import-data-to-draft! db (URI. "http://test.com/graph-2") (test-triples (URI. "http://test.com/subject-2")))
+        draft-3 (import-data-to-draft! db (URI. "http://test.com/graph-3") (test-triples (URI. "http://test.com/subject-3")))]
     (migrate-graphs-to-live! db [draft-made-live-and-deleted])
     [draft-made-live-and-deleted draft-2 draft-3]))
 
-(def graph-1-result ["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"])
-(def graph-2-result ["http://test.com/subject-2" "http://test.com/hasProperty" "http://test.com/data/1"])
+(def graph-1-result [(URI. "http://test.com/subject-1") (URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")])
 
 (def default-sparql-query {:request-method :get
                            :uri "/sparql/live"
@@ -68,7 +65,7 @@
     (is (= ["s" "p" "o"] (first csv-result))
         "Returns CSV")
 
-    (is (= graph-1-result (second csv-result))
+    (is (= graph-1-result (map #(URI. %) (second csv-result)))
         "Named (live) graph is publicly queryable")
 
     (testing "Draft graphs are not exposed"
@@ -83,15 +80,6 @@
                                 (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
 
         (is (not= graph-1-result (second csv-result)))))))
-
-(defn make-new-draft-from-graph! [backend live-guri]
-  (let [draft-guri (create-draft-graph! backend live-guri)
-        query-str (str "CONSTRUCT { ?s ?p ?o } WHERE
-                         { GRAPH <" live-guri "> { ?s ?p ?o } }")
-        source-data (repo/query backend query-str)]
-    (append-data-batch! backend draft-guri source-data)
-
-    draft-guri))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each (partial wrap-clean-test-db))
