@@ -18,6 +18,6 @@ user_repl.clj
 /log-config.edn
 .idea/
 drafter.iml
-profiles.clj
+/profiles.clj
 /test-drafter-db/
 /test-users.edn

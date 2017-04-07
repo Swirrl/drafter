@@ -1,12 +1,12 @@
 (ns drafter.responses
-  (:require [clojure.tools.logging :as log]
-            [swirrl-server.responses :as response]
+  (:require [clojure.string :refer [upper-case]]
+            [clojure.tools.logging :as log]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
-            [swirrl-server.async.status-routes :refer [submitted-job-response]]
-            [swirrl-server.responses :as r]
-            [swirrl-server.errors :refer [encode-error]]
-            [drafter.write-scheduler :refer [await-sync-job! queue-job!]]
-            [clojure.string :refer [upper-case]]))
+            [drafter.write-scheduler :refer [exec-sync-job! queue-job!]]
+            [swirrl-server
+             [errors :refer [encode-error]]
+             [responses :as r]]
+            [swirrl-server.async.status-routes :refer [submitted-job-response]]))
 
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
@@ -42,23 +42,23 @@
   response."
   [result]
   (if (failed-job-result? result)
-    (response/api-response 500 result)
-    (response/api-response 200 result)))
+    (r/api-response 500 result)
+    (r/api-response 200 result)))
 
-;; submit-sync-job! :: Job -> RingResponse
-;; submit-sync-job! :: Job -> (ApiResponse -> RingResponse) -> RingResponse
-(defn submit-sync-job!
-  "Submits a sync job, blocks waiting for it to complete and returns a
+;; run-sync-job! :: Job -> RingResponse
+;; run-sync-job! :: Job -> (ApiResponse -> RingResponse) -> RingResponse
+(defn run-sync-job!
+  "Runs a sync job, blocks waiting for it to complete and returns a
   ring response using the given handler function. The handler function
   is passed the result of the job and should return a corresponding
   ring result map. If no handler is provided, the default job handler
   is used. If the job could not be queued, then a 503 'unavailable'
   response is returned."
-  ([job] (submit-sync-job! job default-job-result-handler))
+  ([job] (run-sync-job! job default-job-result-handler))
   ([job resp-fn]
    (log/info "Submitting sync job: " job)
    (try
-     (let [job-result (await-sync-job! job)]
+     (let [job-result (exec-sync-job! job)]
        (resp-fn job-result)))))
 
 ;; submit-async-job! :: Job -> RingResponse

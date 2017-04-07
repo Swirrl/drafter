@@ -1,8 +1,6 @@
 (ns drafter.routes.status
   (:require [compojure.core :refer [GET routes]]
-            [ring.util.response :refer [not-found response]]
-            [swirrl-server.async.status-routes :as st])
-  (:import [java.util UUID]))
+            [swirrl-server.async.status-routes :as st]))
 
 (defn status-routes [writes-lock finished-jobs restart-id]
   (routes

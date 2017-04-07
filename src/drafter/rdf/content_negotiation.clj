@@ -1,14 +1,12 @@
 (ns drafter.rdf.content-negotiation
-  (:require [clojure.java.io :as io]
-            [grafter.rdf.formats :as formats]
-            [ring.middleware.accept :refer [wrap-accept]])
-  (:import [java.nio.charset Charset]
-           [java.io Writer OutputStream]
-           [org.openrdf.query.impl MapBindingSet]
-           [org.openrdf.rio RDFFormat RDFWriter RDFWriterFactory RDFWriterRegistry]
+  (:require [ring.middleware.accept :refer [wrap-accept]])
+  (:import [java.io OutputStream Writer]
+           java.nio.charset.Charset
+           org.openrdf.query.impl.MapBindingSet
            [org.openrdf.query.resultio BooleanQueryResultFormat TupleQueryResultFormat]
-           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
-           [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]))
+           org.openrdf.query.resultio.text.csv.SPARQLResultsCSVWriter
+           org.openrdf.query.resultio.text.tsv.SPARQLResultsTSVWriter
+           [org.openrdf.rio RDFFormat RDFWriter RDFWriterFactory RDFWriterRegistry]))
 
 (def ^:private ascii (Charset/forName "US-ASCII"))
 (def csv-rdf-format (RDFFormat. "CSV" "text/csv" ascii "csv" false true))

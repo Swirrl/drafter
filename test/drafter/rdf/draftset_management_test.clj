@@ -1,19 +1,23 @@
 (ns drafter.rdf.draftset-management-test
-  (:require [clojure.test :refer :all]
-            [drafter.rdf.draftset-management :refer :all]
-            [drafter.rdf.draft-management :refer [with-state-graph] :as mgmt]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
+            [drafter
+             [draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
+             [test-common :refer [*test-backend* ask? import-data-to-draft! make-graph-live! select-all-in-graph test-triples wrap-clean-test-db wrap-db-setup]]
+             [user :as user]
+             [user-test :refer [test-editor test-manager test-publisher]]
+             [write-scheduler :as scheduler]]
+            [drafter.rdf
+             [draft-management :as mgmt :refer [with-state-graph]]
+             [drafter-ontology :refer :all]
+             [draftset-management :refer :all]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
-            [drafter.test-common :refer [*test-backend* wrap-db-setup wrap-clean-test-db ask? import-data-to-draft!
-                                         make-graph-live! test-triples select-all-in-graph]]
-            [drafter.write-scheduler :as scheduler]
-            [grafter.rdf :refer [statements context triple=]]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-publisher test-manager]]
-            [drafter.draftset :refer [->DraftsetId ->DraftsetURI ->draftset-uri]]
-            [grafter.rdf.repository :refer [query]]
-            [grafter.rdf.protocols :refer [->Triple ->Quad]]
-            [grafter.vocabularies.rdf :refer :all]))
+            [grafter.rdf :refer [context statements triple=]]
+            [grafter.rdf
+             [protocols :refer [->Quad ->Triple]]
+             [repository :refer [query]]]
+            [grafter.vocabularies.rdf :refer :all])
+  (:import org.openrdf.rio.RDFFormat))
 
 (defn- has-uri-object? [s p uri-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
@@ -403,6 +407,48 @@
           {:keys [graph-uri triples]} (quad-batch->graph-triples quads)]
       (is (= guri graph-uri))
       (is (every? identity (map triple= quads triples))))))
+
+(defn apply-job! [{fun :function :as job}]
+  (fun job))
+
+(defn fetch-draft-graph-modified-at [draftset live-graph]
+  (let [ds-uri (draftset-uri (:id draftset))
+        modified-query (str "SELECT ?modified {"
+                            "   <" live-graph "> <" drafter:hasDraft "> ?draftgraph ."
+                            "   ?draftgraph a <" drafter:DraftGraph "> ;"
+                            "                 <" drafter:inDraftSet "> <" ds-uri "> ;"
+                            "                 <" drafter:modifiedAt "> ?modified ."
+
+                            "} LIMIT 2")]
+
+    (let [res (-> *test-backend*
+                  (query modified-query))]
+
+      (assert (= 1 (count res)) "There were multiple modifiedAt timestamps, we expect just one.")
+
+      (-> res first
+          (get "modified")
+          .calendarValue
+          .toGregorianCalendar
+          .getTime))))
+
+(deftest append-data-to-draftset-job-test
+  (let [ds (create-draftset! *test-backend* test-editor)]
+    (apply-job! (append-triples-to-draftset-job *test-backend* ds (io/file "./test/test-triple.nt") RDFFormat/NTRIPLES "http://foo/graph"))
+    (let [ts-1 (fetch-draft-graph-modified-at ds "http://foo/graph")]
+      (apply-job! (append-triples-to-draftset-job *test-backend* ds (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES "http://foo/graph"))
+      (let [ts-2 (fetch-draft-graph-modified-at ds "http://foo/graph")]
+        (is (< (.getTime ts-1)
+               (.getTime ts-2))
+            "Modified time is updated after append")
+
+        (apply-job! (delete-triples-from-draftset-job *test-backend* ds  "http://foo/graph" (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES))
+        (let [ts-3 (fetch-draft-graph-modified-at ds "http://foo/graph")]
+          (is (< (.getTime ts-2)
+               (.getTime ts-3))
+              "Modified time is updated after delete")
+          )
+        ))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

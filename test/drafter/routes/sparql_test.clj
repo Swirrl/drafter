@@ -1,23 +1,17 @@
 (ns drafter.routes.sparql-test
-  (:require [drafter.test-common :refer [throws-exception? test-triples import-data-to-draft!
-                                         stream->string select-all-in-graph make-graph-live!
-                                         *test-backend* wrap-clean-test-db wrap-db-setup with-identity
-                                         assert-is-forbidden-response]]
+  (:require [clojure-csv.core :as csv]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
-            [clojure-csv.core :as csv]
-            [clojure.data.json :as json]
-            [grafter.rdf :refer [subject predicate object context]]
-            [grafter.rdf.repository :as repo]
-            [grafter.rdf.protocols :as pr]
-            [drafter.middleware :as middleware]
-            [drafter.routes.sparql :refer :all]
+            [drafter
+             [middleware :as middleware]
+             [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft! select-all-in-graph stream->string test-triples with-identity wrap-clean-test-db wrap-db-setup]]
+             [timeouts :as timeouts]
+             [user-test :refer [test-editor test-system]]]
             [drafter.rdf.draft-management :refer :all]
+            [drafter.routes.sparql :refer :all]
             [drafter.user.memory-repository :as memrepo]
-            [drafter.user-test :refer [test-editor test-system]]
-            [swirrl-server.errors :refer [encode-error]]
-            [schema.test :refer [validate-schemas]]
-            [drafter.timeouts :as timeouts]))
+            [grafter.rdf.repository :as repo]
+            [schema.test :refer [validate-schemas]]))
 
 (use-fixtures :each validate-schemas)
 
@@ -57,9 +51,6 @@
 (defn live-query [qstr]
   (build-query "/sparql/live" qstr nil))
 
-(defn raw-query [qstr]
-  (build-query "/sparql/raw" qstr nil))
-
 (defn csv-> [{:keys [body]}]
   "Parse a response into a CSV"
   (-> body stream->string csv/parse-csv))
@@ -92,42 +83,6 @@
                                 (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
 
         (is (not= graph-1-result (second csv-result)))))))
-
-(deftest raw-sparql-routes-test
-  (let [;;drafts-request (assoc-in [:headers "accept"] "text/plain; charset=utf-8")
-        [draft-graph-1 draft-graph-2 draft-graph-3] (add-test-data! *test-backend*)
-        user-repo (memrepo/create-repository* test-editor test-system)
-        authenticated-fn (middleware/make-authenticated-wrapper user-repo {})
-        endpoint (raw-sparql-routes "/sparql/raw" *test-backend* timeouts/calculate-default-request-timeout authenticated-fn)]
-
-    (testing "The state graph should be accessible to system"
-      (let [request (-> (raw-query (str "ASK WHERE {"
-                                                   "  GRAPH <" drafter-state-graph "> {"
-                                                   "    ?s ?p ?o ."
-                                                   "  }"
-                                                   "}"))
-                                 (assoc-in [:headers "accept"] "text/plain; charset=utf-8"))
-            request (with-identity test-system request)
-            {:keys [body] :as response} (endpoint request)]
-        (is (= "true" body))))
-
-    (testing "The state graph should not be accessible to other users"
-      (let [request (-> (raw-query "ASK WHERE { GRAPH ?g { ?s ?p ?o } }")
-                        (assoc-in [:headers "accept"] "text/plain; charset=utf-8"))
-            request (with-identity test-editor request)
-            response (endpoint request)]
-        (assert-is-forbidden-response response)))
-
-    (testing "The data graphs (live and drafts) should be accessible to system"
-      (let [request (-> (raw-query (str "ASK WHERE {"
-                                        "  GRAPH <" draft-graph-2 "> {"
-                                        "    ?s ?p ?o ."
-                                        "  }"
-                                        "}"))
-                        (assoc-in [:headers "accept"] "text/plain; charset=utf-8"))
-            request (with-identity test-system request)
-            {:keys [body] :as response} (endpoint request)]
-        (is (= "true" body))))))
 
 (defn make-new-draft-from-graph! [backend live-guri]
   (let [draft-guri (create-draft-graph! backend live-guri)

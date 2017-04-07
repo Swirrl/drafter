@@ -1,5 +1,5 @@
 (ns drafter.channels
-  (:import [java.util.concurrent ArrayBlockingQueue]))
+  (:import java.util.concurrent.ArrayBlockingQueue))
 
 (defn create-send-once-channel
   "Creates a channel which allows a single value to be sent from the sender to the receiver.
@@ -42,4 +42,3 @@
 (defn channel-ok? [v] (= :ok v))
 (defn channel-error? [v] (instance? Throwable v))
 (defn channel-timeout? [v] (nil? v))
-

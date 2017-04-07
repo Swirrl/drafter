@@ -1,7 +1,7 @@
 (ns drafter.util-test
-  (:require [drafter.util :refer :all]
+  (:require [clojure.math.combinatorics :refer [permutations]]
             [clojure.test :refer :all]
-            [clojure.math.combinatorics :refer [permutations]]))
+            [drafter.util :refer :all]))
 
 (deftest get-causes-test
   (testing "Returns all causes"

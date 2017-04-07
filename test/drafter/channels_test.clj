@@ -1,7 +1,7 @@
 (ns drafter.channels-test
-  (:require [drafter.channels :refer :all]
-            [clojure.test :refer :all])
-  (:import [java.util.concurrent TimeUnit]))
+  (:require [clojure.test :refer :all]
+            [drafter.channels :refer :all])
+  (:import java.util.concurrent.TimeUnit))
 
 (deftest create-send-once-channel-test
   (testing "sends ok"

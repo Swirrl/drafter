@@ -1,30 +1,36 @@
 (ns drafter.routes.draftsets-api-test
-  (:require [drafter.test-common :refer :all]
-            [clojure.test :refer :all]
-            [clojure.set :as set]
-            [drafter.middleware :as middleware]
-            [drafter.routes.draftsets-api :refer :all]
-            [drafter.rdf.drafter-ontology :refer [drafter:DraftGraph drafter:modifiedAt]]
-            [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-publisher test-manager test-password]]
-            [drafter.user.repository :as user-repo]
-            [drafter.user.memory-repository :as memrepo]
-            [grafter.rdf :refer [statements context add]]
-            [grafter.rdf.io :refer [rdf-serializer]]
-            [grafter.rdf.formats :as formats]
-            [grafter.rdf.protocols :refer [->Triple map->Triple ->Quad map->Quad]]
-            [grafter.rdf.repository :as repo]
-            [drafter.rdf.draft-management.jobs :as jobs]
-            [drafter.util :as util]
+  (:require [clojure
+             [set :as set]
+             [test :refer :all]]
             [clojure.java.io :as io]
+            [drafter
+             [middleware :as middleware]
+             [swagger :as swagger]
+             [test-common :refer :all]
+             [timeouts :as timeouts]
+             [user :as user]
+             [user-test :refer [test-editor test-manager test-password test-publisher]]
+             [util :as util]]
+            [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.rdf.drafter-ontology
+             :refer
+             [drafter:DraftGraph drafter:modifiedAt]]
+            [drafter.routes.draftsets-api :refer :all]
+            [drafter.user
+             [memory-repository :as memrepo]
+             [repository :as user-repo]]
+            [grafter.rdf :refer [add context statements]]
+            [grafter.rdf
+             [formats :as formats]
+             [io :refer [rdf-serializer]]
+             [protocols :refer [->Quad ->Triple map->Triple]]
+             [repository :as repo]]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
-            [drafter.swagger :as swagger]
-            [drafter.timeouts :as timeouts])
-  (:import [java.util Date]
-           [java.io ByteArrayOutputStream ByteArrayInputStream]
-           [org.openrdf.query QueryResultHandler]
-           [org.openrdf.query.resultio.sparqljson SPARQLResultsJSONParser]))
+            [swirrl-server.async.jobs :refer [finished-jobs]])
+  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
+           java.util.Date
+           org.openrdf.query.QueryResultHandler
+           org.openrdf.query.resultio.sparqljson.SPARQLResultsJSONParser))
 
 (def ^:private ^:dynamic *route*)
 (def ^:private ^:dynamic *user-repo*)
@@ -574,26 +580,21 @@
         (is (instance? Date first-timestamp))
 
         (testing "Publishing more triples afterwards updates the modified time"
-          (Thread/sleep 500)
 
           (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
-
           (let [second-timestamp (get-draft-graph-modified-at)]
             (is (instance? Date second-timestamp))
 
             (is (< (.getTime first-timestamp)
                    (.getTime second-timestamp))
-                "Modified time is updated")
-
-
-            (Thread/sleep 500)
+                "Modified time is updated after append")
 
             (delete-triples-through-api test-editor draftset-location quads "http://foo/")
             (let [third-timestamp (get-draft-graph-modified-at)]
 
               (is (< (.getTime second-timestamp)
                      (.getTime third-timestamp))
-                  "Modified time is updated"))))))))
+                  "Modified time is updated after delete"))))))))
 
 (deftest append-triples-to-graph-which-exists-in-live
   (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))

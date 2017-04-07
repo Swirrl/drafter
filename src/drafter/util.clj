@@ -1,10 +1,10 @@
 (ns drafter.util
-  (:require [clojure.string :as str]
-            [grafter.rdf.protocols :refer [map->Quad]]
-            [clojure.pprint :as pp])
-  (:import [org.openrdf.model.impl URIImpl ContextStatementImpl]
-           [javax.mail.internet InternetAddress AddressException]
-           (java.nio.charset Charset)))
+  (:require [clojure
+             [pprint :as pp]
+             [string :as str]])
+  (:import java.nio.charset.Charset
+           [javax.mail.internet AddressException InternetAddress]
+           org.openrdf.model.impl.URIImpl))
 
 (defmacro log-time-taken
   "Macro that logs the time spent doing something at :info level,
@@ -16,7 +16,7 @@
         col-num (:column md)
         forms-str (with-out-str (pp/pprint (cons 'do forms)))]
     `(do
-       (clojure.tools.logging/info "About to execute"
+       (clojure.tools.logging/debug "About to execute"
                                    (str ~msg " (line #" ~line-num ")")
                                    #_~forms-str)
        (let [start-time# (System/currentTimeMillis)]

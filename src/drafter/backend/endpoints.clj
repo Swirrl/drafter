@@ -1,13 +1,19 @@
 (ns drafter.backend.endpoints
-  (:require [grafter.rdf.protocols :as proto]
-            [drafter.rdf.sesame :refer [prepare-query apply-restriction prepare-restricted-update]]
-            [drafter.backend.protocols :refer [->sesame-repo] :as backend]
-            [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results rewrite-statement]]
+  (:require [drafter.backend.protocols :as backend :refer [->sesame-repo]]
+            [drafter.rdf
+             [draft-management :as mgmt]
+             [sesame :refer [apply-restriction prepare-query prepare-restricted-update]]]
+            [drafter.rdf.rewriting
+             [query-rewriting :refer [rewrite-sparql-string]]
+             [result-rewriting :refer [rewrite-query-results]]]
             [drafter.util :as util]
+            [grafter.rdf
+             [protocols :as proto]
+             [repository :as repo]]
             [schema.core :as s])
-  (:import [org.openrdf.model URI]))
+  (:import org.openrdf.model.URI))
+
+(require 'drafter.backend.repository)
 
 (def ^:private itriple-readable-delegate
   {:to-statements (fn [this options]
@@ -20,6 +26,10 @@
 (def ^:private isparql-updateable-delegate
   {:update! (fn [this sparql-string]
               (proto/update! (->sesame-repo this) sparql-string))})
+
+(def ^:private to-connection-delegate
+  {:->connection (fn [this]
+                   (repo/->connection (backend/->sesame-repo this)))})
 
 (defn- add-delegate
   ([this triples] (proto/add (->sesame-repo this) triples))
@@ -53,7 +63,8 @@
   proto/ITripleReadable itriple-readable-delegate
   proto/ITripleWriteable itriple-writeable-delegate
   proto/ISPARQLable isparqlable-delegate
-  proto/ISPARQLUpdateable isparql-updateable-delegate)
+  proto/ISPARQLUpdateable isparql-updateable-delegate
+  repo/ToConnection to-connection-delegate)
 
 (def create-restricted ->RestrictedExecutor)
 
@@ -81,6 +92,5 @@
   proto/ITripleReadable itriple-readable-delegate
   proto/ITripleWriteable itriple-writeable-delegate
   proto/ISPARQLable isparqlable-delegate
-  proto/ISPARQLUpdateable isparql-updateable-delegate)
-
-(def draft-graph-set ->RewritingSesameSparqlExecutor)
+  proto/ISPARQLUpdateable isparql-updateable-delegate
+  repo/ToConnection to-connection-delegate)

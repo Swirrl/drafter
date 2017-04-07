@@ -3,7 +3,7 @@ swagger: '2.0'
 info:
   title: 'Publish My Data: Drafter API'
   description: |
-    This document serves as a **DRAFT** specification for Drafter's
+    This document serves as a specification for Drafter's
     API.  Drafter is a backend service used by Publish My Data to
     support PMD's publication workflow.  It describes how clients
     including the PMD application, control data publishing through the
@@ -15,14 +15,14 @@ info:
 
     For display and edit purposes, PublishMyData makes additional
     assumptions about the contents of graphs used for datasets and
-    vocabularies for display and edit purposes.
+    vocabularies.
 
     Future additions to these APIs will provide mechanisms for
     creating and validating this data conforms to PMD's conventions.
 
     ## Draftset API Overview
 
-    Draftsets are essentially, private working copies, or branches of
+    Draftsets are essentially private working copies, or branches of
     work, that contain changes to RDF data.  When a user creates a
     draftset they effectively create a 'virtual copy' of the live
     sites data in which they can safely make, review and query changes
@@ -124,16 +124,13 @@ info:
     |    3 | manager         | Can do everything a publisher can, but also manage user accounts (not via this API)  |
 
 
-    **Note:** roles their ranks and permissions may be adjusted in the
-    future.
-
     Roles are also what users use to exchange Draftsets.  Users submit
     a Draftset to a role, which puts it in that roles pool of
     claimable Draftsets.  Draftsets are then only claimable out of the
-    roles pool by users with a role of an equal or higher rank.  In
+    role's pool by users with a role of an equal or higher rank.  In
     addition to this the user who submitted the draftset to the role
     can also withdraw it from submission by claiming it back -
-    regarldess of their roles rank.
+    regarldess of their role's rank.
 
     Draftsets *must* be claimed before they can be reviewed, published
     or edited.
@@ -565,7 +562,7 @@ paths:
       security:
         - jws-auth: []
       consumes:
-        - application/sparql-query
+        - application/x-www-form-urlencoded
       produces:
         - application/n-triples
         - application/rdf+xml
@@ -575,7 +572,7 @@ paths:
         - text/csv
       parameters:
         - $ref: '#/parameters/id'
-        - $ref: '#/parameters/query'
+        - $ref: '#/parameters/post_query'
         - $ref: '#/parameters/union-with-live'
         - $ref: '#/parameters/timeout'
       tags:
@@ -592,7 +589,7 @@ paths:
         Query the live data via the SPARQL query langauge and protocol.
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
       consumes:
-        - application/sparql-query
+        - application/x-www-form-urlencoded
       produces:
         - application/n-triples
         - application/rdf+xml
@@ -625,7 +622,7 @@ paths:
         - application/sparql-results+json
         - text/csv
       parameters:
-        - $ref: '#/parameters/query'
+        - $ref: '#/parameters/post_query'
       tags:
         - SPARQL Endpoints
       responses:
@@ -633,74 +630,6 @@ paths:
           description: The query results returned according to the SPARQL specificiation.
           schema:
             type: file
-  /sparql/raw:
-    get:
-      summary: Queries all data with SPARQL
-      description: |
-        Queries all data via the SPARQL query langauge and protocol. This route is only available to users in the system role
-        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
-      security:
-        - jws-auth: []
-      consumes:
-        - application/sparql-query
-      produces:
-        - application/n-triples
-        - application/rdf+xml
-        - text/turtle
-        - application/sparql-results+xml
-        - application/sparql-results+json
-        - text/csv
-      parameters:
-        - $ref: '#/parameters/query'
-      tags:
-        - SPARQL Endpoints
-      responses:
-        '200':
-          description: The query results returned according to the SPARQL specificiation.
-          schema:
-            type: file
-    post:
-      summary: Queries all data with SPARQL
-      description: |
-        Queries all data via the SPARQL query langauge and protocol. This route is only available to users in the system role.
-        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
-      security:
-        - jws-auth: []
-      consumes:
-        - application/sparql-query
-      produces:
-        - application/n-triples
-        - application/rdf+xml
-        - text/turtle
-        - application/sparql-results+xml
-        - application/sparql-results+json
-        - text/csv
-      parameters:
-        - $ref: '#/parameters/query'
-      tags:
-        - SPARQL Endpoints
-      responses:
-        '200':
-          description: The query results returned according to the SPARQL specificiation.
-          schema:
-            type: file
-  /sparql/raw/update:
-    post:
-      summary: Updates data using SPARQL
-      description: |
-        Updates any data using SPARQL. This route should be used with caution and is only available to users in the system role.
-        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
-      security:
-        - jws-auth: []
-      consumes:
-        - application/sparql-update
-      parameters:
-        - $ref: '#/parameters/update'
-      tags:
-        - SPARQL Endpoints
-      responses:
-        '200':
-          description: The update was processed successfully.
   /users:
     get:
       summary: Gets all users
@@ -909,7 +838,13 @@ parameters:
     name: query
     description: URI Encoded SPARQL Query
     in: query
-    required: false
+    required: true
+    type: string
+  post_query:
+    name: query
+    description: URI Encoded SPARQL Query in the HTTP body
+    in: formData
+    required: true
     type: string
   update:
     name: update
@@ -1083,9 +1018,6 @@ definitions:
         type: string
       details:
         type: object
-    required:
-      - type
-      - restart-id
     example:
       type: ok
       restart-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97

@@ -1,6 +1,5 @@
 (ns drafter.common.json-encoders
-  (:require [cheshire.core :as ch]
-            [cheshire.generate :refer [add-encoder encode-map]]
+  (:require [cheshire.generate :refer [add-encoder encode-map]]
             [drafter.util :as util]))
 
 (defn- exception-map [cause-map ex]

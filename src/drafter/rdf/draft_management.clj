@@ -1,49 +1,27 @@
 (ns drafter.rdf.draft-management
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure
+             [set :as set]
+             [string :as string]]
+            [clojure.tools.logging :as log]
+            [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
+            [drafter.rdf
+             [drafter-ontology :refer :all]
+             [sparql :refer [query update!]]]
             [drafter.util :as util]
             [grafter.rdf :refer [add s]]
-            [drafter.util :refer [map-values]]
-            [clojure.walk :refer [keywordize-keys]]
-            [clojure.set :as set]
+             [grafter.rdf
+             [repository :as repo]
+             [templater :refer [add-properties graph]]]
             [grafter.vocabularies.rdf :refer :all]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.rdf.protocols :as pr]
-            [grafter.rdf.repository :as repo]
-            [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
-            [grafter.rdf.templater :refer [add-properties graph]]
-            [clojure.string :as string]
-            [swirrl-server.errors :refer [ex-swirrl]]
-            [schema.core :as s])
-  (:import (java.util Date UUID)
-           (java.net URI)
-           (org.openrdf.model.impl URIImpl)))
+            [schema.core :as s]
+            [swirrl-server.errors :refer [ex-swirrl]])
+  (:import [java.util Date UUID]))
 
 (def drafter-state-graph "http://publishmydata.com/graphs/drafter/drafts")
 
 (def staging-base "http://publishmydata.com/graphs/drafter/draft")
 
 (def to-quads (partial graph drafter-state-graph))
-
-(def prefixes (str "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-PREFIX dcterms: <http://purl.org/dc/terms/>
-PREFIX owl: <http://www.w3.org/2002/07/owl#>
-PREFIX qb: <http://purl.org/linked-data/cube#>
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-PREFIX drafter: <" (drafter "") ">"))
-
-
-(defn- mapply [f & args]
-  (apply f (apply concat (butlast args) (last args))))
-
-(defn query [repo query-str & {:as opts}]
-  (mapply repo/query repo (str prefixes query-str) opts))
-
-(defn update! [repo update-string]
-  (let [update-string (str prefixes update-string)]
-    (log/info "Running update: " update-string)
-    (pr/update! repo update-string)))
 
 (defn make-draft-graph-uri []
   (str staging-base "/" (UUID/randomUUID)))
@@ -214,6 +192,8 @@ PREFIX drafter: <" (drafter "") ">"))
   (partial set-timestamp-on-instance-of-class! drafter:DraftGraph drafter:modifiedAt))
 
 (defn ensure-draft-exists-for
+  "Finds or creates a draft graph for the given live graph in the
+  draftset."
   [repo live-graph graph-map draftset-uri]
   (if-let [draft-graph (get graph-map live-graph)]
     {:draft-graph-uri draft-graph :graph-map graph-map}
@@ -312,12 +292,12 @@ PREFIX drafter: <" (drafter "") ">"))
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph. Returns nil if not
   found."
-  (when-let [live-uri (-> (query db
-                                 (str "SELECT ?live WHERE {"
-                                      (with-state-graph
-                                        "?live a drafter:ManagedGraph ; "
-                                        "      drafter:hasDraft <" draft-graph-uri "> . ")
-                                      "} LIMIT 1"))
+  (when-let [live-uri (-> (doall (query db
+                                        (str "SELECT ?live WHERE {"
+                                             (with-state-graph
+                                               "?live a drafter:ManagedGraph ; "
+                                               "      drafter:hasDraft <" draft-graph-uri "> . ")
+                                             "} LIMIT 1")))
                           first
                           (get "live"))]
     (str live-uri)))
@@ -330,6 +310,26 @@ PREFIX drafter: <" (drafter "") ">"))
    "   ?p ?o ."
    "}"
    "}"))
+
+(defn copy-graph-query
+  [from to {:keys [silent] :as opts :or {silent false}}]
+  (let [silent (if silent
+                 "SILENT"
+                 "")]
+    (str
+     "\n"
+     "COPY " silent " <" from "> TO <" to ">")))
+
+(defn copy-graph
+  "Copies source graph to destination graph.  Accepts an optional map
+  of options.
+
+  Currently the only supported option is the boolean value :silent
+  which will ensure the copy always succeeds, whether or not their is
+  a source graph etc."
+  ([repo from to] (copy-graph repo from to {}))
+  ([repo from to opts]
+   (update! repo (copy-graph-query from to opts))))
 
 (defn- has-duplicates? [col]
   (not= col
@@ -345,13 +345,13 @@ PREFIX drafter: <" (drafter "") ">"))
   (if (empty? draft-set)
     {}
     (let [drafts (clojure.string/join " " (map #(str "<" % ">") draft-set))
-          results (->> (query db
-                              (str "SELECT ?live ?draft WHERE {"
-                                   (with-state-graph
-                                     "  VALUES ?draft {" drafts "}"
-                                     "  ?live a drafter:ManagedGraph ;"
-                                     "        drafter:hasDraft ?draft .")
-                                   "}")))]
+          results (->> (doall (query db
+                                     (str "SELECT ?live ?draft WHERE {"
+                                          (with-state-graph
+                                            "  VALUES ?draft {" drafts "}"
+                                            "  ?live a drafter:ManagedGraph ;"
+                                            "        drafter:hasDraft ?draft .")
+                                          "}"))))]
       (let [live-graphs (map #(get % "live") results)]
         (when (has-duplicates? live-graphs)
           (throw (ex-swirrl :multiple-drafts-error

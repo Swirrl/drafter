@@ -1,10 +1,7 @@
 (ns drafter.user
-  (:require [buddy.core.codecs :refer [str->bytes base64->bytes]]
-            [drafter.util :as util]
-            [drafter.timeouts :as timeouts])
-  (:import [org.mindrot.jbcrypt BCrypt]
-           [java.net URI]))
-
+  (:require [drafter.util :as util])
+  (:import java.net.URI
+           org.mindrot.jbcrypt.BCrypt))
 
 (def ^{:doc "Ordered list of roles from least permissions to greatest
 permissions."

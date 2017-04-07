@@ -12,32 +12,34 @@
             [drafter.routes.draftsets-api :refer [draftset-api-routes]]
             [drafter.routes.status :refer [status-routes]]
             [drafter.routes.pages :refer [pages-routes]]
-            [drafter.routes.sparql :refer [live-sparql-routes
-                                           raw-sparql-routes]]
-            [drafter.routes.sparql-update :refer [raw-update-endpoint-route]]
+            [drafter.routes.sparql :refer [live-sparql-routes]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
             [drafter.configuration :refer [get-configuration]]
+            [drafter.env :as denv]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [noir.util.middleware :refer [app-handler]]
-            [ring.middleware.verbs :refer [wrap-verbs]]
-            [ring.middleware.defaults :refer [api-defaults]]
+            [ring.middleware
+             [defaults :refer [api-defaults]]
+             [resource :refer [wrap-resource]]
+             [verbs :refer [wrap-verbs]]]
+            [selmer.parser :as parser]
+            [swirrl-server.async.jobs :refer [finished-jobs restart-id]]
             [swirrl-server.errors :refer [wrap-encode-errors]]
-            [ring.middleware.resource :refer [wrap-resource]]
-            [selmer.parser :as parser])
+            [swirrl-server.middleware.log-request :refer [log-request]]))
 
-  ;; Note that though the classes and requires below aren't used in this namespace
-  ;; they are needed by the log-config file which is loaded from here.
-  (:import [org.apache.log4j ConsoleAppender DailyRollingFileAppender RollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
-           [org.apache.log4j.helpers DateLayout]
-           [java.util UUID])
+;; Note that though the classes and requires below aren't used in this
+;; namespace they are needed by the log-config file which is loaded
+;; from here.
+(import '[org.apache.log4j ConsoleAppender DailyRollingFileAppender RollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
+        '[org.apache.log4j.helpers DateLayout]
+        '[java.util UUID])
 
-  (:require [clj-logging-config.log4j :refer [set-loggers!]]
-            [drafter.timeouts :as timeouts]))
-
-(require 'drafter.errors)
+(require '[clj-logging-config.log4j :refer [set-loggers!]]
+         '[drafter.timeouts :as timeouts]
+         'drafter.errors)
 
 ;; Set these values later when we start the server
 (def backend)
@@ -72,15 +74,6 @@
         mount-point (endpoint-query-path :live v1-prefix)]
     (live-sparql-routes mount-point backend timeout-fn)))
 
-(defn- get-raw-sparql-query-route [backend authentication-fn]
-  (let [mount-point (endpoint-query-path :raw v1-prefix)]
-    (raw-sparql-routes mount-point backend timeouts/calculate-default-request-timeout authentication-fn)))
-
-(defn- get-sparql-routes [backend authentication-fn config]
-  (let [raw-query-route (get-raw-sparql-query-route backend authentication-fn)
-        live-query-route (get-live-sparql-query-route backend config)]
-    [raw-query-route live-query-route]))
-
 (defn initialise-app! [backend {:keys [draftset-query-timeout] :as config}]
   (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo config)
         draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-query-timeout config)]
@@ -89,10 +82,11 @@
                           (-> []
                               (add-route (pages-routes backend))
                               (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout-fn))
-                              (add-routes (get-sparql-routes backend authenticated-fn config))
+                              (add-route (get-live-sparql-query-route backend config))
                               (add-route (context "/v1/status" []
                                                   (status-routes global-writes-lock finished-jobs restart-id)))
 
+                              (add-routes (denv/env-specific-routes backend))
                               (add-route app-routes))
 
                           :ring-defaults (assoc-in api-defaults [:params :multipart] true)

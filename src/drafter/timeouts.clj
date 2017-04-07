@@ -1,11 +1,12 @@
 (ns drafter.timeouts
-  (:require [buddy.core.mac :as mac]
-            [buddy.core.codecs :as codecs]
-            [buddy.core.bytes :as bytes]
+  (:require [buddy.core
+             [bytes :as bytes]
+             [codecs :as codecs]
+             [mac :as mac]]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
             [drafter.util :as util])
-  (:import [org.apache.commons.codec DecoderException]))
+  (:import org.apache.commons.codec.DecoderException))
 
 (defn try-parse-timeout
   "Attempts to parse a string into a timeout value. Returns an

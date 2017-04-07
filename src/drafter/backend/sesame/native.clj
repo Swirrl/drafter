@@ -1,6 +1,5 @@
 (ns drafter.backend.sesame.native
-  (:require [drafter.backend.repository]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [grafter.rdf.repository :as repo]))
 
 (defn- get-repo-at [repo-path indexes]

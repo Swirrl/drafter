@@ -2,10 +2,10 @@
   "Library of functions for syntactically rewriting queries using Jena ARQ.  Of
   particular interest are sse-zipper and apply-rewriter."
   (:require [clojure.zip :as z])
-  (:import [org.apache.jena.query QueryFactory Query Syntax]
-           [org.apache.jena.sparql.sse SSE Item]
-           [org.apache.jena.sparql.algebra Op OpAsQuery Algebra]
-           [org.apache.jena.graph NodeFactory]))
+  (:import org.apache.jena.graph.NodeFactory
+           [org.apache.jena.query Query QueryFactory Syntax]
+           [org.apache.jena.sparql.algebra Algebra Op OpAsQuery]
+           [org.apache.jena.sparql.sse Item SSE]))
 
 (defn get-query-type [query]
   (cond

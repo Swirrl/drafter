@@ -1,24 +1,20 @@
 (ns drafter.rdf.rewriting.result-rewriting-test
-  (:require
-   [drafter.test-common :refer [test-triples *test-backend* wrap-db-setup wrap-clean-test-db]]
-   [clojure.set :as set]
-   [drafter.util :refer [map-values]]
-   [drafter.rdf.draft-management :refer [create-managed-graph create-draft-graph! append-data-batch!]]
-   [drafter.backend.protocols :refer [prepare-query]]
-   [grafter.rdf.templater :refer [graph triplify]]
-   [grafter.rdf :refer [statements]]
-   [grafter.rdf.repository :refer [repo prepare-update] :as repo]
-   [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-   [clojure.test :refer :all]
-   [schema.test :refer [validate-schemas]])
-
-  (:import
-           [org.openrdf.model.impl URIImpl]
-           [org.openrdf.query QueryLanguage]
-           [org.openrdf.query.parser QueryParserUtil]
-           [org.openrdf.query.algebra.evaluation.function Function]
-           [org.openrdf.query.algebra Var StatementPattern Extension ExtensionElem FunctionCall]
-           [org.openrdf.query.algebra.helpers QueryModelTreePrinter VarNameCollector StatementPatternCollector QueryModelVisitorBase]))
+  (:require [clojure
+             [set :as set]
+             [test :refer :all]]
+            [drafter
+             [test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-db-setup]]
+             [util :refer [map-values]]]
+            [drafter.backend.protocols :refer [prepare-query]]
+            [drafter.rdf.draft-management
+             :refer
+             [append-data-batch! create-draft-graph!]]
+            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
+            [grafter.rdf
+             [repository :as repo]
+             [templater :refer [triplify]]]
+            [schema.test :refer [validate-schemas]])
+  (:import org.openrdf.model.impl.URIImpl))
 
 (use-fixtures :each validate-schemas)
 

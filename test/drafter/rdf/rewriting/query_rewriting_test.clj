@@ -1,14 +1,11 @@
 (ns drafter.rdf.rewriting.query-rewriting-test
-  (:require [drafter.rdf.rewriting.query-rewriting :refer :all]
-            [drafter.rdf.rewriting.arq :refer :all]
-            [clojure.test :refer :all]
-            [clojure.string :refer [trim]]
-            [schema.test :refer [validate-schemas]])
-
-  (:import [org.apache.jena.query Query]
-           [org.apache.jena.sparql.sse Item ItemList]
-           [org.apache.jena.sparql.algebra Op]
-           [org.apache.jena.graph NodeFactory]))
+  (:require [clojure
+             [string :refer [trim]]
+             [test :refer :all]]
+            [drafter.rdf.rewriting
+             [arq :refer :all]
+             [query-rewriting :refer :all]]
+            [schema.test :refer [validate-schemas]]))
 
 (use-fixtures :each validate-schemas)
 

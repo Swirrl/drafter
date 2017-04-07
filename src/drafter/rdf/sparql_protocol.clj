@@ -1,16 +1,17 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.tools.logging :as log]
-            [drafter.responses :refer [not-acceptable-response]]
-            [drafter.backend.protocols :refer [prepare-query]]
-            [drafter.rdf.sesame :refer [get-query-type create-query-executor create-signalling-query-handler]]
-            [drafter.middleware :refer [allowed-methods-handler sparql-negotiation-handler sparql-timeout-handler sparql-prepare-query-handler require-params]]
-            [drafter.channels :refer :all]
             [compojure.core :refer [make-route]]
-            [drafter.timeouts :as timeouts])
+            [drafter
+             [channels :refer :all]
+             [middleware :refer [allowed-methods-handler require-params sparql-negotiation-handler sparql-prepare-query-handler sparql-timeout-handler]]
+             [timeouts :as timeouts]]
+            [drafter.rdf.sesame
+             :refer
+             [create-signalling-query-handler get-query-type]])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
-           [org.openrdf.query QueryInterruptedException]
-           [org.openrdf.query.resultio QueryResultIO]
-           [java.util.concurrent TimeUnit]))
+           java.util.concurrent.TimeUnit
+           org.openrdf.query.QueryInterruptedException
+           org.openrdf.query.resultio.QueryResultIO))
 
 (defn- execute-boolean-query [pquery result-format response-content-type]
   (let [os (ByteArrayOutputStream. 1024)

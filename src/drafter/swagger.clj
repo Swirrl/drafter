@@ -1,10 +1,11 @@
 (ns drafter.swagger
   (:require [clj-yaml.core :as yaml]
-            [scjsv.core :as jsonsch]
-            [clojure.string :as string]
+            [clojure
+             [string :as string]
+             [walk :as walk]]
             [clojure.java.io :as io]
-            [clojure.walk :as walk]
-            [clout.core :as clout]))
+            [clout.core :as clout]
+            [scjsv.core :as jsonsch]))
 
 (defn- load-spec-file []
   (-> "public/swagger/drafter.yml"
