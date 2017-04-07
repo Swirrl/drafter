@@ -2,7 +2,7 @@
   (:require [drafter.backend.protocols :as backend :refer [->sesame-repo]]
             [drafter.rdf
              [draft-management :as mgmt]
-             [sesame :refer [apply-restriction prepare-query prepare-restricted-update]]]
+             [sesame :refer [apply-restriction prepare-query]]]
             [drafter.rdf.rewriting
              [query-rewriting :refer [rewrite-sparql-string]]
              [result-rewriting :refer [rewrite-query-results]]]
@@ -51,10 +51,6 @@
   (prepare-query [this query-string]
     (let [pquery (prepare-query inner query-string)]
       (apply-restriction pquery restriction)))
-
-  backend/SparqlUpdateExecutor
-  (prepare-update [this update-query]
-    (prepare-restricted-update (->sesame-repo this) update-query restriction))
 
   backend/ToRepository
   (->sesame-repo [_] (->sesame-repo inner)))

@@ -73,26 +73,6 @@
     (.setDataset pquery dataset)
     pquery))
 
-(defmulti exec-sesame-prepared-update (fn [repo prepare-fn] (class repo)))
-(defmethod exec-sesame-prepared-update SPARQLRepository [repo prepare-fn]
-  ;;default sesame implementation executes UPDATE queries in a
-  ;;transaction which the remote SPARQL client does not like
-  (with-open [conn (repo/->connection repo)]
-    (let [pquery (prepare-fn conn)]
-      (repo/evaluate pquery))))
-
-(defmethod exec-sesame-prepared-update Repository [repo prepare-fn]
-  (with-open [conn (repo/->connection repo)]
-    (repo/with-transaction conn
-      (let [pquery (prepare-fn conn)]
-        (repo/evaluate pquery)))))
-
-(defn prepare-restricted-update [repo update-query restrictions]
-  (repo/prepare-update repo update-query (restricted-dataset restrictions)))
-
-(defn prepare-update [repo update-query]
-  (prepare-restricted-update repo update-query nil))
-
 (defn- exec-ask-query [writer pquery]
   (let [result (.evaluate pquery)]
        (doto writer
