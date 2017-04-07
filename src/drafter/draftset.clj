@@ -2,7 +2,8 @@
   "In memory clojure representations of Draftset objects and functions
   to operate on them."
   (:require [drafter.util :as util]
-            [schema.core :as s])
+            [schema.core :as s]
+            [drafter.rdf.drafter-ontology :as ont])
   (:import java.net.URI
            [java.util Date UUID]))
 
@@ -16,7 +17,7 @@
 
 (defrecord DraftsetId [id]
   DraftsetRef
-  (->draftset-uri [this] (->DraftsetURI (drafter.rdf.drafter-ontology/draftset-uri id)))
+  (->draftset-uri [this] (->DraftsetURI (ont/draftset-uri id)))
   (->draftset-id [this] this)
 
   Object
@@ -26,7 +27,7 @@
   DraftsetRef
   (->draftset-uri [this] this)
   (->draftset-id [{:keys [uri]}]
-    (let [base-uri (URI. (drafter.rdf.drafter-ontology/draftset-uri ""))
+    (let [base-uri (URI. (ont/draftset-uri ""))
           relative (.relativize base-uri (URI. uri))]
       (->DraftsetId (str relative)))))
 

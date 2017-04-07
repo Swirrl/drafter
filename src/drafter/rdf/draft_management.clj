@@ -247,15 +247,6 @@
    "   <" draft-graph-uri "> ?p ?o . "
    "}"))
 
-(defn delete-draft-graph-state! [db draft-graph-uri]
-  (log/info "Deleting state for draft " draft-graph-uri)
-  (let [query-str (delete-draft-state-query draft-graph-uri)]
-    (update! db query-str)
-
-    ;; if the graph-uri is a draft graph uri, remove the mention of
-    ;; this draft uri, but leave the live graph as a managed graph.
-    (log/info (str "Deleted draft graph from state "draft-graph-uri))))
-
 (defn delete-draft-graph-and-remove-from-state-query [draft-graph-uri]
   (let [drop-query (format "DROP SILENT GRAPH <%s>" draft-graph-uri)
         delete-from-state-query (delete-draft-state-query draft-graph-uri)]
@@ -500,11 +491,3 @@ WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
     (with-open [conn (->repo-connection backend)]
       (repo/with-transaction conn
         (add conn graph-uri triple-batch)))))
-
-(defn- sparql-uri-list [uris]
-  (string/join " " (map #(str "<" % ">") uris)))
-
-(defn ->sparql-values-binding [e]
-  (if (coll? e)
-    (str "(" (string/join " " e) ")")
-    e))

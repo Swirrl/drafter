@@ -89,24 +89,6 @@
     (handler request)
     (is (= true @invoked-inner))))
 
-(deftest require-user-role-test
-  (testing "User is in role"
-    (let [invoked-inner (atom false)
-          inner-handler (notifying-handler invoked-inner)
-          handler (require-user-role :publisher inner-handler)
-          request {:uri "/test" :request-method :get :identity test-publisher}
-          response (handler request)]
-      (is @invoked-inner)))
-
-  (testing "User not in role"
-    (let [invoked-inner (atom false)
-          inner-handler (notifying-handler invoked-inner)
-          handler (require-user-role :publisher inner-handler)
-          request {:uri "/test" :request-method :get :identity test-editor}
-          response (handler request)]
-      (tc/assert-is-forbidden-response response)
-      (is (= false @invoked-inner)))))
-
 (deftest require-params-test
   (testing "Request with params"
     (let [invoked-inner (atom false)
