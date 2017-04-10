@@ -10,9 +10,8 @@
              [middleware :as middleware]
              [util :refer [set-var-root!]]
              [write-scheduler :refer [global-writes-lock start-writer! stop-writer!]]]
-            [drafter.backend
-             [configuration :refer [get-backend]]
-             [protocols :refer [stop-backend]]]
+            [drafter.backend.protocols :refer [stop-backend]]
+            [drafter.backend.sesame.remote :refer [get-backend]]
             [drafter.common.json-encoders :as enc]
             [drafter.routes
              [draftsets-api :refer [draftset-api-routes]]

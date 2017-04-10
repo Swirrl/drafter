@@ -4,16 +4,14 @@
              [draftset :refer [->draftset-uri]]
              [user :as user]
              [write-scheduler :refer [global-writes-lock queue-job! start-writer! stop-writer!]]]
-            [drafter.backend
-             [configuration :refer [get-backend]]
-             [protocols :refer [stop-backend]]]
+            [drafter.backend.protocols :refer [stop-backend]]
+            [drafter.backend.sesame.remote :refer [get-backend]]
             [drafter.rdf
              [draft-management :refer [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
              [sparql :as sparql]]
             [environ.core :refer [env]]
             [grafter.rdf
              [protocols :refer [add]]
-             [repository :as repo]
              [templater :refer [triplify]]]
             [grafter.rdf.repository.registry :as reg]
             [ring.middleware.params :refer [wrap-params]]
@@ -40,8 +38,6 @@
 (use-fixtures :each validate-schemas)
 
 (def ^:dynamic *test-backend*)
-
-(def test-db-path "drafter-test-db")
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri
@@ -82,7 +78,7 @@
 (declare ^:dynamic *test-writer*)
 
 (defn wrap-db-setup [test-fn]
-  (let [backend (get-backend (assoc env :drafter-repo-path "test-drafter-db"))
+  (let [backend (get-backend env)
         configured-factories (reg/registered-parser-factories)]
     (binding [*test-backend* backend
               *test-writer* (start-writer!)]
@@ -103,9 +99,6 @@
             "DROP ALL ;")
    (setup-state-fn *test-backend*)
    (test-fn)))
-
-(defn make-store []
-  (repo/repo))
 
 (defn make-backend []
   (get-backend env))
