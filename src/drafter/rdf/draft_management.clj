@@ -12,6 +12,7 @@
              [repository :as repo]
              [templater :refer [add-properties graph]]]
             [grafter.vocabularies.rdf :refer :all]
+            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [schema.core :as s]
             [swirrl-server.errors :refer [ex-swirrl]]
             [grafter.url :as url])
@@ -223,12 +224,12 @@
   ;; if the graph-uri is a draft graph uri,
   ;; remove the mention of this draft uri, but leave the live graph as a managed graph.
   (str
-   "WITH <http://publishmydata.com/graphs/drafter/drafts>"
+   "WITH <" drafter-state-graph ">"
    "DELETE {"
-   "   ?live drafter:hasDraft <" draft-graph-uri "> ."
+   "   ?live <" drafter:hasDraft "> <" draft-graph-uri "> ."
    "   <" draft-graph-uri "> ?p ?o ."
    "} WHERE {"
-   "   ?live a drafter:ManagedGraph ;"
+   "   ?live a <" drafter:ManagedGraph "> ;"
    "         <" drafter:hasDraft "> <" draft-graph-uri "> ."
    "   <" draft-graph-uri "> ?p ?o . "
    "}"))
@@ -240,15 +241,15 @@
 
 (defn- delete-dependent-private-managed-graph-query [draft-graph-uri]
   (str
-   "WITH <http://publishmydata.com/graphs/drafter/drafts>"
+   "WITH <" drafter-state-graph ">"
    "DELETE {"
    "   ?lg ?lp ?lo ."
    "} WHERE {"
-   "   ?lg a drafter:ManagedGraph ."
-   "   ?lg drafter:isPublic false ."
+   "   ?lg a <" drafter:ManagedGraph "> ."
+   "   ?lg <" drafter:isPublic "> false ."
    "   ?lg ?lp ?lo ."
    "   MINUS {"
-   "      ?lg drafter:hasDraft ?odg ."
+   "      ?lg <" drafter:hasDraft "> ?odg ."
    "      FILTER (?odg != <" draft-graph-uri ">)"
    "   }"
    "}"))
@@ -281,10 +282,9 @@
 (defn delete-live-graph-from-state-query [live-graph-uri]
   (str
    "DELETE WHERE {"
-   "GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
-   "<" live-graph-uri "> a drafter:ManagedGraph ;"
-   "   ?p ?o ."
-   "}"
+   (with-state-graph
+     "<" live-graph-uri "> a <" drafter:ManagedGraph "> ;"
+     "                     ?p ?o")
    "}"))
 
 (defn copy-graph-query
@@ -380,47 +380,38 @@
 
 (defn- update-live-graph-timestamps-query [draft-graph-uri now-ts]
   (let [issued-at (xsd-datetime now-ts)]
-    (str "# First remove the modified timestamp from the live graph
+    (str
+      "# First remove the modified timestamp from the live graph\n"
+      "WITH <" drafter-state-graph "> DELETE {"
+      "  ?live <" dcterms:modified "> ?modified ."
+      "} WHERE {"
+      "  VALUES ?draft { <" draft-graph-uri "> }"
+      "  ?live a <" drafter:ManagedGraph "> ;"
+      "        <" drafter:hasDraft "> ?draft ;"
+      "        <" dcterms:modified "> ?modified ."
+      "  ?draft a <" drafter:DraftGraph "> ."
+      "};\n"
 
-WITH <http://publishmydata.com/graphs/drafter/drafts> DELETE {
-  ?live dcterms:modified ?modified .
-} WHERE {
+      "# Then set the modified timestamp on the live graph to be that of the draft graph\n"
+      "WITH <" drafter-state-graph "> INSERT {"
+      "  ?live <" dcterms:modified "> ?modified ."
+      "} WHERE {"
+      "  VALUES ?draft { <" draft-graph-uri "> }"
+      "  ?live a <" drafter:ManagedGraph "> ;"
+      "        <" drafter:hasDraft "> ?draft ."
+      "  ?draft a <" drafter:DraftGraph "> ;"
+      "         <" dcterms:modified "> ?modified ."
+      "};\n"
 
-  VALUES ?draft { <" draft-graph-uri "> }
-
-  ?live a drafter:ManagedGraph ;
-     drafter:hasDraft ?draft ;
-     dcterms:modified ?modified .
-
-  ?draft a drafter:DraftGraph .
-}
-
-; # Then set the modified timestamp on the live graph to be that of the draft graph
-WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
-  ?live dcterms:modified ?modified .
-} WHERE {
-
-  VALUES ?draft { <" draft-graph-uri "> }
-
-  ?live a drafter:ManagedGraph ;
-        drafter:hasDraft ?draft .
-
-  ?draft a drafter:DraftGraph ;
-         dcterms:modified ?modified .
-}
-
-
-; # And finally set a dcterms:issued timestamp if it doesn't have one already.
-WITH <http://publishmydata.com/graphs/drafter/drafts> INSERT {
-  ?live dcterms:issued " issued-at " .
-} WHERE {
-  VALUES ?draft { <" draft-graph-uri "> }
-
-  ?live a drafter:ManagedGraph ;
-        drafter:hasDraft ?draft .
-
-  FILTER NOT EXISTS { ?live dcterms:issued ?existing . }
-}")))
+      "# And finally set a dcterms:issued timestamp if it doesn't have one already\n"
+      "WITH <" drafter-state-graph "> INSERT {"
+      "  ?live <" dcterms:issued "> " issued-at " ."
+      "} WHERE {"
+      "  VALUES ?draft { <" draft-graph-uri "> }"
+      "  ?live a <" drafter:ManagedGraph "> ;"
+      "        <" drafter:hasDraft "> ?draft ."
+      "  FILTER NOT EXISTS { ?live <" dcterms:issued "> ?existing . }"
+      "}")))
 
 (defn- move-graph
   "Move's how TBL intended.  Issues a SPARQL MOVE query.
