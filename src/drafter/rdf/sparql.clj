@@ -12,14 +12,6 @@ PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX qb: <http://purl.org/linked-data/cube#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX drafter: <" drafter ">"))
 
-(defn- mapply [f & args]
-  (apply f (apply concat (butlast args) (last args))))
-
-(defn query [repo query-str & {:as opts}]
-  (let [q (str prefixes query-str)]
-    (log/info "Running query:" q)
-    (mapply repo/query repo q opts)))
-
 (defn query-eager-seq
   "Executes a SPARQL query which returns a sequence of results and
   ensures it is eagerly consumed before being returned. The underlying
@@ -28,7 +20,7 @@ PREFIX qb: <http://purl.org/linked-data/cube#> PREFIX skos: <http://www.w3.org/2
   necessary."
   [repo query-string]
   (with-open [conn (repo/->connection repo)]
-    (doall (query conn query-string))))
+    (doall (repo/query conn query-string))))
 
 (defn update! [repo update-string]
   (let [update-string (str prefixes update-string)]

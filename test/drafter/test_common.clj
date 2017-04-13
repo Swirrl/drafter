@@ -20,7 +20,8 @@
              [core :as s]
              [test :refer [validate-schemas]]]
             [swirrl-server.async.jobs :refer [create-job]]
-            [grafter.url :as url])
+            [grafter.url :as url]
+            [grafter.rdf.repository :as repo])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -166,12 +167,10 @@
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
-  (sparql/query *test-backend* (str "ASK WHERE {"
-
+  (repo/query *test-backend* (str "ASK WHERE {"
                         (-> (apply str (interpose " " graphpatterns))
                             (.replace " >" ">")
                             (.replace "< " "<"))
-
                         "}")))
 
 (def default-timeout 5000)

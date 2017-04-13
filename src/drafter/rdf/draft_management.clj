@@ -5,7 +5,7 @@
             [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
             [drafter.rdf
              [drafter-ontology :refer :all]
-             [sparql :refer [query update!]]]
+             [sparql :refer [update!]]]
             [drafter.util :as util]
             [grafter.rdf :refer [add]]
             [grafter.rdf
@@ -60,18 +60,18 @@
   (let [qry (str "ASK WHERE {"
                  "  SELECT (COUNT(?draft) AS ?numberOfRefs)   WHERE {"
                  "    {"
-                 "      <" live-graph-uri "> a drafter:ManagedGraph ;"
-                 "                 drafter:hasDraft ?draft ."
+                 "      <" live-graph-uri "> a <" drafter:ManagedGraph "> ;"
+                 "                           <" drafter:hasDraft "> ?draft ."
                  "    }"
                  "  }"
                  "  HAVING (?numberOfRefs > 1)"
                  "}")]
-    (query db qry)))
+    (repo/query db qry)))
 
 (defn graph-exists?
   "Checks that a graph exists"
   [db graph-uri]
-  (query db
+  (repo/query db
          (str "ASK WHERE {"
               "  SELECT ?s ?p ?o WHERE {"
               "    GRAPH <" graph-uri "> { ?s ?p ?o }"
@@ -274,7 +274,7 @@
                  "?live a <" drafter:ManagedGraph "> ;"
                  "      <" drafter:hasDraft "> <" draft-graph-uri "> . ")
                "} LIMIT 1")]
-    (-> (doall (query db q))
+    (-> (doall (repo/query db q))
         first
         (:live))))
 

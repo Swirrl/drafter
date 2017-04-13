@@ -62,12 +62,12 @@
 (defn- draftset-exists-query [draftset-ref]
   (str "ASK WHERE {"
        (with-state-graph
-         "<" (ds/->draftset-uri draftset-ref) "> a drafter:DraftSet . ")
+         "<" (ds/->draftset-uri draftset-ref) "> a <" drafter:DraftSet "> .")
        "}"))
 
 (defn draftset-exists? [db draftset-ref]
   (let [q (draftset-exists-query draftset-ref)]
-    (sparql/query db q)))
+    (repo/query db q)))
 
 (defn- delete-draftset-statements-query [draftset-ref]
   (let [ds-uri (str (ds/->draftset-uri draftset-ref))]

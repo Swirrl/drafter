@@ -8,6 +8,7 @@
              [drafter-ontology :refer :all]
              [draftset-management :refer [create-draftset!]]
              [sparql :as sparql]]
+            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
             [drafter.draftset :refer [->DraftsetId]]
             [grafter.rdf :refer [add]]
@@ -16,7 +17,6 @@
              [templater :refer [triplify]]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
-            [drafter.util :as util]
             [grafter.url :as url])
   (:import [java.util Date UUID]
            [java.net URI]))
@@ -171,10 +171,10 @@
       (is (= true (is-graph-managed? *test-backend* test-graph-uri))
           "Live graph reference shouldn't have been deleted from state graph")
 
-      (is (ask? "GRAPH <" drafter-state-graph "> {
-                   <http://example.org/my-graph> dcterms:modified ?modified ;
-                                                 dcterms:issued ?published .
-                }")
+      (is (ask? "GRAPH <" drafter-state-graph "> {"
+                "  <http://example.org/my-graph> <" dcterms:modified "> ?modified ;"
+                "                                <" dcterms:issued "> ?published ."
+                "}")
           "Live graph should have a modified and issued time stamp"))))
 
 (deftest migrate-graphs-to-live!-remove-live-aswell-test
@@ -323,7 +323,7 @@
 (deftest upsert-single-object-insert-test
   (let [db (repo/repo)]
     (upsert-single-object! db "http://foo/" "http://bar/" "baz")
-    (is (sparql/query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
+    (is (repo/query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
 (deftest upsert-single-object-update-test
   (let [db (repo/repo)
@@ -331,7 +331,7 @@
         predicate (URI. "http://example.com/predicate")]
     (add db (triplify [subject [predicate "initial"]]))
     (upsert-single-object! db subject predicate "updated")
-    (is (sparql/query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
+    (is (repo/query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
                        "<" subject "> <" predicate "> \"updated\""
                        "} }")))))
 
@@ -423,7 +423,7 @@
 
     (set-modifed-at-on-draft-graph! *test-backend* draft-graph-uri (Date.))
 
-    (is (sparql/query *test-backend*
+    (is (repo/query *test-backend*
                (str
                 "ASK {"
                 "<" draft-graph-uri "> <" drafter:modifiedAt "> ?modified . "
