@@ -4,7 +4,7 @@
              [draftset :refer [->draftset-uri]]
              [user :as user]
              [write-scheduler :refer [global-writes-lock queue-job! start-writer! stop-writer!]]]
-            [drafter.backend.protocols :refer [stop-backend]]
+            [drafter.backend.protocols :refer [stop-backend ->repo-connection]]
             [drafter.backend.sesame.remote :refer [get-backend]]
             [drafter.rdf
              [draft-management :refer [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]

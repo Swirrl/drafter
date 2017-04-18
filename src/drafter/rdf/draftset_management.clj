@@ -594,11 +594,7 @@
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."
   [conn graph-uri triple-batch]
-  ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
-  ;;so only create one if there is data in the batch
   (when-not (empty? triple-batch)
-    ;;WARNING: This assumes the backend is a sesame backend which is
-    ;;true for all current backends.
     (add conn graph-uri triple-batch)))
 
 (defn- append-draftset-quads*

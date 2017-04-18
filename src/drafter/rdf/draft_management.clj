@@ -327,7 +327,7 @@
                   "  ?live a <" drafter:ManagedGraph "> ;"
                   "        <" drafter:hasDraft "> ?draft .")
                 "}")
-          results (->> (doall (grafter.rdf.repository/query db q)))]
+          results (->> (doall (repo/query db q)))]
 
       (let [live-graphs (map :live results)]
         (when (has-duplicates? live-graphs)
@@ -456,14 +456,3 @@
   (let [live-graphs (if union-with-live? (live-graphs db) #{})]
     (calculate-graph-restriction live-graphs (keys graph-mapping) (vals graph-mapping))))
 
-(defn append-data-batch!
-  "Appends a sequence of triples to the given draft graph."
-  [backend graph-uri triple-batch]
-  ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
-  ;;so only create one if there is data in the batch
-  (if-not (empty? triple-batch)
-    ;;WARNING: This assumes the backend is a sesame backend which is
-    ;;true for all current backends.
-    (with-open [conn (->repo-connection backend)]
-      (repo/with-transaction conn
-        (add conn graph-uri triple-batch)))))

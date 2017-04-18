@@ -1,324 +1,220 @@
 (ns drafter.rdf.draft-management-test
   (:require [clojure.test :refer :all]
             [drafter
-             [test-common :as test :refer [*test-backend* ask? import-data-to-draft! make-graph-live! wrap-clean-test-db wrap-db-setup]]
+             [test-common :refer [*test-backend* ask? import-data-to-draft! make-graph-live! wrap-clean-test-db wrap-db-setup]]
              [user-test :refer [test-editor]]]
+            [drafter.test-generators :as gen]
             [drafter.rdf
              [draft-management :refer :all]
              [drafter-ontology :refer :all]
-             [draftset-management :refer [create-draftset!]]
-             [sparql :as sparql]]
+             [draftset-management :refer [create-draftset!]]]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
             [drafter.draftset :refer [->DraftsetId]]
-            [grafter.rdf :refer [add]]
+            [grafter.rdf :refer [add statements]]
             [grafter.rdf
              [repository :as repo]
              [templater :refer [triplify]]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
-            [grafter.url :as url])
+            [selmer.parser :refer [render render-file]]
+            [drafter.util :as util]
+            [clojure.set :as set])
   (:import [java.util Date UUID]
            [java.net URI]))
 
 (use-fixtures :each validate-schemas)
 
-(defn clone-data-from-live-to-draft-query [draft-graph-uri]
-  (str
-   "INSERT {"
-   "  GRAPH <" draft-graph-uri "> {"
-   "    ?s ?p ?o ."
-   "  }"
-   "} WHERE { "
-   (with-state-graph
-     "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
-     "      <" drafter:hasDraft "> <" draft-graph-uri "> .")
-   "  GRAPH ?live {"
-   "    ?s ?p ?o ."
-   "  }"
-   "}"))
-
-(defn clone-data-from-live-to-draft!
-  "Copy all of the data found in the drafts live graph into the
-  specified draft."
-
-  [repo draft-graph-uri]
-  (sparql/update! repo (clone-data-from-live-to-draft-query draft-graph-uri)))
-
-(defn clone-and-append-data! [db draft-graph-uri triples]
-  (clone-data-from-live-to-draft! db draft-graph-uri)
-  (append-data-batch! db draft-graph-uri triples))
-
-(def test-triples (triplify [(URI. "http://test.com/data/one")
-                             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
-                             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]]
-
-                            [(URI. "http://test.com/data/two")
-                             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
-                             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]]))
-
-(def test-triples-2 (triplify [(URI. "http://test2.com/data/one")
-                               [(URI. "http://test2.com/hasProperty") (URI. "http://test2.com/data/1")]
-                               [(URI. "http://test2.com/hasProperty") (URI. "http://test2.com/data/2")]]
-
-                              [(URI. "http://test2.com/data/two")
-                               [(URI. "http://test2.com/hasProperty") (URI. "http://test2.com/data/1")]
-                               [(URI. "http://test2.com/hasProperty") (URI. "http://test2.com/data/2")]]))
+(defn- print-statement [s]
+  (println (util/map-values str s)))
 
 (def test-graph-uri (URI. "http://example.org/my-graph"))
 
-(deftest create-managed-graph-test
-  (testing "Creates managed graph"
-    (is (create-managed-graph (URI. "http://example.org/my-graph"))))
+(defn- assert-statements-exist [repo expected & {:keys [debug]}]
+  (let [missing (set/difference (set expected) (set (statements repo)))]
+    (when (and debug (not (empty? missing)))
+      (println "Missing statements:")
+      (doseq [q missing]
+        (print-statement q))
 
-  (deftest create-managed-graph!-test
-    (testing "create-managed-graph!"
-      (testing "stores the details of the managed graph"
-        (create-managed-graph! *test-backend* test-graph-uri)
-        (is (is-graph-managed? *test-backend* test-graph-uri))))))
+      (println)
+
+      (println "Repository statements:")
+      (doseq [q (statements repo)]
+        (print-statement q)))
+
+    (is (empty? missing))))
+
+(deftest is-graph-managed?-test
+  (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false
+                                                                     :drafts ::gen/gen}}})]
+    (is (is-graph-managed? r test-graph-uri))))
+
+(deftest create-managed-graph!-test
+  (let [r (repo/repo)
+        expected (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public false :drafts {} :triples []}}
+                                           :draftsets {}})]
+    (create-managed-graph! r test-graph-uri)
+    (assert-statements-exist r expected)))
 
 (deftest is-graph-live?-test
   (testing "Non-existent graph"
-    (is (= false (is-graph-live? *test-backend* (URI. "http://missing")))))
+    (let [r (repo/repo)]
+      (is (= false (is-graph-live? r (URI. "http://missing"))))))
 
   (testing "Non-live graph"
-    (let [graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))]
-      (is (= false (is-graph-live? *test-backend* graph-uri)))))
+    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})]
+      (is (= false (is-graph-live? repo test-graph-uri)))))
 
   (testing "Live graph"
-    (let [graph-uri (make-graph-live! *test-backend* (URI. "http://live"))]
-      (is (is-graph-live? *test-backend* graph-uri)))))
+    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true}}})]
+      (is (is-graph-live? repo test-graph-uri)))))
 
 (deftest create-draft-graph!-test
-  (testing "create-draft-graph!"
-
-    (create-managed-graph! *test-backend* test-graph-uri)
-
-    (testing "returns the draft-graph-uri, stores data about it and associates it with the live graph"
-      (let [new-graph-uri (create-draft-graph! *test-backend* test-graph-uri)]
-        (is (.startsWith (str new-graph-uri) (str staging-base)))
-        (is (ask? "<" test-graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                                       "<" drafter:hasDraft "> <" new-graph-uri "> .")))))
-
   (testing "within draft set"
-    (create-managed-graph! *test-backend* test-graph-uri)
     (let [draftset-id (UUID/randomUUID)
-          ds-uri (url/append-path-segments draftset-uri draftset-id)
-          draft-graph-uri (create-draft-graph! *test-backend* test-graph-uri (->DraftsetId draftset-id))]
-      (is (ask? "<" draft-graph-uri "> <" drafter:inDraftSet "> <" ds-uri ">")))))
-
-(defn create-managed-graph-with-draft! [test-graph-uri]
-  (create-managed-graph! *test-backend* test-graph-uri)
-  (create-draft-graph! *test-backend* test-graph-uri))
-
-(deftest append-data-batch!-test
-  (testing "append-data-batch!"
-    (testing "on an empty live graph"
-      (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
-
-        (append-data-batch! *test-backend* draft-graph-uri test-triples)
-
-        (is (ask? "GRAPH <" draft-graph-uri "> {
-                 <http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .
-               }"))))
-
-    (testing "with live graph with existing data, copies data into draft"
-      (let [live-uri (make-graph-live! *test-backend*
-                                       (URI. "http://clones/original/data")
-                                       (triplify [(URI. "http://starting/data") [(URI. "http://starting/data") (URI. "http://starting/data")]]))
-            draft-graph-uri (create-managed-graph-with-draft! live-uri)]
-
-        (clone-and-append-data! *test-backend* draft-graph-uri test-triples)
-
-        (is (ask? "GRAPH <" draft-graph-uri "> {
-                 <http://starting/data> <http://starting/data> <http://starting/data> .
-                 <http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> .
-               }"))))))
+          ds-uri (draftset-id->uri draftset-id)
+          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false
+                                                                       :drafts {}}}})]
+      (let [draft-graph-uri (create-draft-graph! r test-graph-uri (->DraftsetId draftset-id))]
+        (mgmt/draft-exists? r draft-graph-uri)
+        (is (= true (repo/query r (str
+                                    "ASK WHERE {"
+                                    "  GRAPH <" drafter-state-graph "> {"
+                                    "    <" draft-graph-uri "> <" drafter:inDraftSet "> <" ds-uri "> ."
+                                    "  }"
+                                    "}"))))))))
 
 (deftest lookup-live-graph-test
   (testing "lookup-live-graph"
-    (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
-      (is (= test-graph-uri (lookup-live-graph *test-backend* draft-graph-uri))))))
+    (let [draft-graph-uri (URI. "http://draft")
+          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true :drafts {draft-graph-uri ::gen/gen}}}})
+          found-graph-uri (lookup-live-graph r draft-graph-uri)]
+      (is (= test-graph-uri found-graph-uri)))))
 
 (deftest set-isPublic!-test
   (testing "set-isPublic!"
-    (create-managed-graph-with-draft! test-graph-uri)
-    (is (ask? "<" test-graph-uri "> <" drafter:isPublic "> " false " .")
-        "Graphs are initialsed as non-public")
-    (set-isPublic! *test-backend* test-graph-uri true)
-    (is (ask? "<" test-graph-uri "> <" drafter:isPublic "> " true " .")
-        "should set the boolean value")))
+    (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})
+          expected (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public true
+                                                                              :triples []
+                                                                              :drafts {}}}
+                                             :draftsets {}})]
+      (set-isPublic! r test-graph-uri true)
+      (assert-statements-exist r expected))))
 
 (deftest migrate-graphs-to-live!-test
   (testing "migrate-graphs-to-live! data is migrated"
-    (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
-          expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
-      (append-data-batch! *test-backend* draft-graph-uri test-triples)
-      (migrate-graphs-to-live! *test-backend* [draft-graph-uri])
-      (is (not (ask? "GRAPH <" draft-graph-uri "> {"
-                     expected-triple-pattern
-                     "}"))
+    (let [draft-graph-uri (URI. "http://draft1")
+          ss (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public false
+                                                                        :drafts {draft-graph-uri {:triples 5}}
+                                                                        :triples []}}})
+          expected-live-statements (map #(assoc % :c test-graph-uri) (filter #(= draft-graph-uri (:c %)) ss))
+          db (doto (repo/repo) (add ss))]
+      (migrate-graphs-to-live! db [draft-graph-uri])
+      (is (not (repo/query db (str "ASK WHERE { GRAPH <" draft-graph-uri "> { ?s ?p ?o } }")))
           "Draft graph contents no longer exist.")
 
-      (is (ask? "GRAPH <" test-graph-uri "> {"
-                expected-triple-pattern
-                "}")
-          "Live graph contains the migrated triples")
+      (assert-statements-exist db expected-live-statements :debug true)
 
-      (is (= false (mgmt/draft-exists? *test-backend* draft-graph-uri))
+      (is (= false (mgmt/draft-exists? db draft-graph-uri))
           "Draft graph should be removed from the state graph")
 
-      (is (= true (is-graph-managed? *test-backend* test-graph-uri))
+      (is (= true (is-graph-managed? db test-graph-uri))
           "Live graph reference shouldn't have been deleted from state graph")
 
-      (is (ask? "GRAPH <" drafter-state-graph "> {"
-                "  <http://example.org/my-graph> <" dcterms:modified "> ?modified ;"
-                "                                <" dcterms:issued "> ?published ."
-                "}")
+      (is (repo/query db (str "ASK WHERE { GRAPH <" drafter-state-graph "> {"
+                              "  <http://example.org/my-graph> <" dcterms:modified "> ?modified ;"
+                              "                                <" dcterms:issued "> ?published ."
+                              "  }"
+                              "}"))
           "Live graph should have a modified and issued time stamp"))))
 
-(deftest migrate-graphs-to-live!-remove-live-aswell-test
+(deftest migrate-graphs-to-live!-remove-live-as-well-test
   (testing "migrate-graphs-to-live! DELETION: Deleted draft removes live graph from state graph"
     (let [test-graph-to-delete-uri (URI. "http://example.org/my-other-graph1")
           graph-to-keep-uri (URI. "http://example.org/keep-me-a1")
-          graph-to-keep-uri2 (URI. "http://example.org/keep-me-a2")
-          draft-graph-to-del-uri (create-managed-graph-with-draft!
-                                  test-graph-to-delete-uri)
-          draft-graph-to-keep-uri (create-managed-graph-with-draft! graph-to-keep-uri)
-          draft-graph-to-keep-uri2 (create-managed-graph-with-draft! graph-to-keep-uri2)]
+          draft-graph-to-del-uri (URI. "http://draft1")
+          draft-graph-to-keep-uri (URI. "http://draft2")
+          r (gen/generate-repository {:managed-graphs {test-graph-to-delete-uri {:is-public true
+                                                                                 :triples 6
+                                                                                 :drafts {draft-graph-to-del-uri {:triples []}}}
+                                                       graph-to-keep-uri {:is-public true
+                                                                          :triples 5
+                                                                          :drafts {draft-graph-to-keep-uri ::gen/gen}}}})]
 
-      (append-data-batch! *test-backend* draft-graph-to-keep-uri test-triples)
-      (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
-      (append-data-batch! *test-backend* draft-graph-to-del-uri test-triples)
+      (migrate-graphs-to-live! r [draft-graph-to-del-uri])
+      ;;live graph should be deleted
+      (is (not (is-graph-managed? r test-graph-to-delete-uri)))
 
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri])
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
+      ;;draft graph should be deleted
+      (is (not (mgmt/draft-exists? r draft-graph-to-del-uri)))
 
-      ;; Draft for deletion has had data published. Now lets create a delete and publish
-      (let [draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)]
-        ;; We are migrating an empty graph, so this is deleting.
-        (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
-        (let [managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
-              keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri)]
-          (is (not managed-found?)
-              "Live graph should no longer be referenced in state graph")
+      ;;unrelated draft graph should still exist
+      (is (mgmt/draft-exists? r draft-graph-to-keep-uri))
 
-          (is (= false (mgmt/draft-exists? *test-backend* draft-graph-to-del-uri))
-              "Draft graph should be removed from the state graph")
-          (testing "Unrelated draft and live graphs should be not be removed from the state graph"
-            (is keep-managed-found?)
-            (is (mgmt/draft-exists? *test-backend* draft-graph-to-keep-uri2))))))))
+      ;;unrelated live graph should still exist
+      (is (is-graph-managed? r graph-to-keep-uri)))))
 
 (deftest migrate-graphs-to-live!-dont-remove-state-when-other-drafts-test
   (testing "migrate-graphs-to-live! DELETION: Doesn't delete from state graph when there's multiple drafts"
-    (let [test-graph-to-delete-uri (URI. "http://example.org/my-other-graph2")
-          draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)
-          _ (create-managed-graph-with-draft! test-graph-to-delete-uri)
-          graph-to-keep-uri2 (URI. "http://example.org/keep-me-b2")
-          graph-to-keep-uri3 (URI. "http://example.org/keep-me-b3")
-          draft-graph-to-keep-uri2 (create-managed-graph-with-draft! graph-to-keep-uri2)
-          draft-graph-to-keep-uri3 (create-managed-graph-with-draft! graph-to-keep-uri3)]
+    (let [deleting-live-uri (URI. "http://example.org/my-other-graph2")
+          deleting-draft-1-uri (URI. "http://draft1")
+          deleting-draft-2-uri (URI. "http://draft2")
+          other-live-uri (URI. "http://example.org/keep-me-b2")
+          other-live-draft-uri (URI. "http://draft3")
+          r (gen/generate-repository {:managed-graphs {deleting-live-uri {:is-public true
+                                                                                 :triples ::gen/gen
+                                                                                 :drafts {deleting-draft-1-uri {:triples []}
+                                                                                          deleting-draft-2-uri ::gen/gen}}
+                                                       other-live-uri {:is-public true
+                                                                           :triples ::gen/gen
+                                                                           :drafts {other-live-draft-uri ::gen/gen}}}})]
 
-      (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
-      (append-data-batch! *test-backend* draft-graph-to-keep-uri3 test-triples)
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri2])
-      (is (graph-exists? *test-backend* graph-to-keep-uri2))
+      ;;migrate empty draft graph to live - this should delete the live graph data
+      (migrate-graphs-to-live! r [deleting-draft-1-uri])
 
-      ;; We are migrating an empty graph, so this is deleting.
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
-      (let [draft-managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
-            keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri2)]
-        (is draft-managed-found?
-            "Live graph shouldn't be deleted from state graph if referenced by other drafts")
+      ;;live graph should be empty
+      (is (= true (graph-empty? r deleting-live-uri)))
 
-        (is (= false (mgmt/draft-exists? *test-backend* draft-graph-to-del-uri))
-            "Draft graph should be removed from the state graph")
+      ;;live graph should still be managed
+      (is (is-graph-managed? r deleting-live-uri))
 
-        (testing "Unrelated live & draft graphs should be not be removed from the state graph"
-          (is keep-managed-found?)
-          (is (mgmt/draft-exists? *test-backend* draft-graph-to-keep-uri3)))))))
+      ;;migrated draft should be deleted
+      (is (= false (mgmt/draft-exists? r deleting-draft-1-uri)))
 
-(deftest graph-restricted-queries-test
-  (testing "query"
-    (testing "supports graph restriction"
-      (add *test-backend* "http://example.org/graph/1"
-              test-triples)
+      ;;other draft for live graph should still exist
+      (is (= true (mgmt/draft-exists? r deleting-draft-2-uri)))
 
-      (add *test-backend* "http://example.org/graph/2"
-              test-triples-2)
+      ;;other live graph should still exist
+      (is (= true (is-graph-managed? r other-live-uri)))
 
-      (is (repo/query *test-backend*
-                 (str "ASK WHERE {
-                         GRAPH <http://example.org/graph/2> {
-                           ?s ?p ?o .
-                         }
-                      }") :named-graphs ["http://example.org/graph/2"])
-          "Can query triples in named graph 2")
-
-      (is (repo/query *test-backend*
-                 (str "ASK WHERE {
-                         GRAPH <http://example.org/graph/1> {
-                           <http://test.com/data/one>  ?p1 ?o1 .
-                         }
-                         GRAPH <http://example.org/graph/2> {
-                           <http://test2.com/data/one> ?p2 ?o2 .
-                         }
-                      }") :named-graphs ["http://example.org/graph/1" "http://example.org/graph/2"])
-          "Can specify many named graphs as a query restriction.")
-
-      (is (= false (repo/query *test-backend*
-                          (str "ASK WHERE {
-                                  GRAPH <http://example.org/graph/2> {
-                                    ?s ?p ?o .
-                                  }
-                                }")
-                          :named-graphs ["http://example.org/graph/1"]))
-          "Can't query triples in named graph 2")
-
-      (is (= false (repo/query *test-backend*
-                          (str "ASK WHERE {
-                           ?s ?p ?o .
-                      }") :default-graph []))
-          "Can't query triples in union graph")
-
-      (is (repo/query *test-backend*
-                 (str "ASK WHERE {
-                           ?s ?p ?o .
-                      }") :default-graph ["http://example.org/graph/1"])
-          "Can query triples in union graph")
-
-      (is (repo/query *test-backend*
-                 (str "ASK WHERE {
-                           <http://test.com/data/one>  ?p1 ?o1 .
-                           <http://test2.com/data/one> ?p2 ?o2 .
-                      }") :default-graph ["http://example.org/graph/1" "http://example.org/graph/2"])
-          "Can set many graphs as union graph"))))
+      ;;draft for other live graph should still exist
+      (is (= true (mgmt/draft-exists? r other-live-draft-uri))))))
 
 (deftest draft-graphs-test
   (let [live-1 (URI. "http://real/graph/1")
         live-2 (URI. "http://real/graph/2")
-        draft-1 (create-managed-graph-with-draft! live-1)
-        draft-2 (create-managed-graph-with-draft! live-2)]
+        draft-1 (URI. "http://draft1")
+        draft-2 (URI. "http://draft2")
+        r (gen/generate-repository {:managed-graphs {live-1 {:is-public false :drafts {draft-1 ::gen/gen}}
+                                                     live-2 {:is-public false :drafts {draft-2 ::gen/gen}}}})]
 
        (testing "draft-graphs returns all draft graphs"
-         (is (= #{draft-1 draft-2} (mgmt/draft-graphs *test-backend*))))
+         (is (= #{draft-1 draft-2} (mgmt/draft-graphs r))))
 
        (testing "live-graphs returns all live graphs"
-         (is (= #{live-1 live-2}
-                (live-graphs *test-backend* :online false))))))
+         (is (= #{live-1 live-2} (live-graphs r :online false))))))
 
 (deftest build-draft-map-test
-  (let [db (repo/repo)]
-    (testing "graph-map associates live graphs with their drafts"
-      (create-managed-graph! db (URI. "http://frogs.com/"))
-      (create-managed-graph! db (URI. "http://dogs.com/"))
-      (let [frogs-draft (create-draft-graph! db (URI. "http://frogs.com/"))
-            dogs-draft (create-draft-graph! db (URI. "http://dogs.com/"))
-            gm (graph-map db #{frogs-draft dogs-draft})]
-
-        (is (= {(URI. "http://frogs.com/") frogs-draft
-                (URI. "http://dogs.com/")  dogs-draft}
-               gm))))))
+  (let [live-1 (URI. "http://live1")
+        live-2 (URI. "http://live2")
+        draft-1 (URI. "http://draft1")
+        draft-2 (URI. "http://draft2")
+        db (gen/generate-repository {:managed-graphs {live-1 {:drafts {draft-1 ::gen/gen}}
+                                                      live-2 {:drafts {draft-2 ::gen/gen}}}
+                                     :draftsets {}})
+        gm (graph-map db #{draft-1 draft-2})]
+    (is (= {live-1 draft-1 live-2 draft-2} gm))))
 
 (deftest upsert-single-object-insert-test
   (let [db (repo/repo)]
@@ -340,52 +236,61 @@
     (let [draft-graph-uri (URI. "http://draft")
           live-graph-uri (URI. "http://live")
           ds-uri (URI. "http://draftset")
+          initial-statements (gen/generate-statements {:managed-graphs {live-graph-uri {:is-public false
+                                                                                        :drafts {draft-graph-uri {:draftset-uri ds-uri}}}}})
+          r (doto (repo/repo) (add initial-statements))
           initial-mapping {live-graph-uri draft-graph-uri}
-          {found-draft-uri :draft-graph-uri graph-map :graph-map} (ensure-draft-exists-for *test-backend* live-graph-uri initial-mapping ds-uri)]
+          {found-draft-uri :draft-graph-uri graph-map :graph-map} (ensure-draft-exists-for r live-graph-uri initial-mapping ds-uri)]
+      (is (= (set initial-statements) (set (statements r))))
       (is (= draft-graph-uri found-draft-uri))
       (is (= initial-mapping graph-map))))
 
   (testing "Live graph exists without draft"
-    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
+    (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false
+                                                                       :drafts {}}}})
           ds-uri (URI. "http://draftset")
-          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
-      (is (= {live-graph-uri draft-graph-uri} graph-map))
-      (is (is-graph-managed? *test-backend*  live-graph-uri))
-      (is (mgmt/draft-exists? *test-backend* draft-graph-uri))))
+          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for r test-graph-uri {} ds-uri)]
+      (mgmt/draft-exists? r draft-graph-uri)
+      (is (= {test-graph-uri draft-graph-uri} graph-map))))
 
   (testing "Live graph does not exist"
-    (let [live-graph-uri (URI. "http://live")
-          ds-uri (URI. "http://draftset")
-          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
-      (is (= {live-graph-uri draft-graph-uri} graph-map))
-      (is (is-graph-managed? *test-backend* live-graph-uri))
-      (is (mgmt/draft-exists? *test-backend* draft-graph-uri)))))
+    (let [ds-uri (URI. "http://draftset")
+          r (repo/repo)
+          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for r test-graph-uri {} ds-uri)]
+      (is-graph-managed? r test-graph-uri)
+      (mgmt/draft-exists? r draft-graph-uri)
+      (is (= {test-graph-uri draft-graph-uri} graph-map)))))
 
 (deftest delete-draft-graph!-test
-  (testing "With only draft for managed graph"
-    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
-          draft-graph-uri (create-draft-graph! *test-backend* live-graph-uri)]
-      (append-data-batch! *test-backend* draft-graph-uri test-triples)
-      (delete-draft-graph! *test-backend* draft-graph-uri)
+  (testing "only draft for non-live graph"
+    (let [draft-graph-uri (URI. "http://draft-graph")
+          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false
+                                                                       :drafts {draft-graph-uri ::gen/gen}}}})]
+      (delete-draft-graph! r draft-graph-uri)
 
-      (testing "should delete graph data"
-        (is (= false (ask? "GRAPH <" draft-graph-uri "> { ?s ?p ?o }"))))
+      ;;draft and live graph should be deleted
+      (is (= false (is-graph-managed? r test-graph-uri)))
+      (is (= false (mgmt/draft-exists? r draft-graph-uri)))))
 
-      (testing "should delete graph from state"
-        (is (= false (ask? (with-state-graph "<" draft-graph-uri "> ?p ?o")))))
-
-      (testing "should delete managed graph"
-        (is (= false (is-graph-managed? *test-backend* live-graph-uri))))))
+  (testing "only draft for live graph"
+    (let [draft-graph-uri (URI. "http://draft-graph")
+          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true
+                                                                       :drafts {draft-graph-uri ::gen/gen}}}})]
+      (delete-draft-graph! r draft-graph-uri)
+      (is (= true (is-graph-managed? r test-graph-uri)))
+      (is (= false (mgmt/draft-exists? r draft-graph-uri)))))
 
   (testing "Draft for managed graph with other graphs"
     (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
-          draft-graph-1 (create-draft-graph! *test-backend* live-graph-uri)
-          draft-graph-2 (create-draft-graph! *test-backend* live-graph-uri)]
+          draft-graph-1 (URI. "http://draft1")
+          draft-graph-2 (URI. "http://draft2")
+          r (gen/generate-repository {:managed-graphs {live-graph-uri {:drafts {draft-graph-1 ::gen/gen
+                                                                                draft-graph-2 ::gen/gen}}}})]
 
-      (delete-draft-graph! *test-backend* draft-graph-2)
+      (delete-draft-graph! r draft-graph-2)
 
-      (is (= true (mgmt/draft-exists? *test-backend* draft-graph-1)))
-      (is (= true (is-graph-managed? *test-backend* live-graph-uri))))))
+      (is (= true (mgmt/draft-exists? r draft-graph-1)))
+      (is (= true (is-graph-managed? r live-graph-uri))))))
 
 ;; This test attempts to capture the rationale behind the calculation of graph
 ;; restrictions.
@@ -417,36 +322,25 @@
           "Restriction should be the set of drafts (as live graph queries will be rewritten to their draft graphs)"))))
 
 (deftest set-timestamp-test
-  (let [draftset (create-draftset! *test-backend* test-editor)
-        triples (test/test-triples (URI. "http://test-subject"))
-        draft-graph-uri (import-data-to-draft! *test-backend* (URI. "http://foo/graph") triples draftset)]
+  (let [draft-graph-uri (URI. "http://draft-graph")
+        modified-date (Date.)
+        r (gen/generate-repository {:managed-graphs {test-graph-uri {:drafts {draft-graph-uri ::gen/gen}}}})]
+    (set-modifed-at-on-draft-graph! r draft-graph-uri modified-date)
 
-    (set-modifed-at-on-draft-graph! *test-backend* draft-graph-uri (Date.))
-
-    (is (repo/query *test-backend*
+    (is (repo/query r
                (str
                 "ASK {"
                 "<" draft-graph-uri "> <" drafter:modifiedAt "> ?modified . "
                 "}")))))
 
-(defn test-quads [g]
-  (map #(assoc % :c g)
-       (test/test-triples (URI. "http://test-subject"))))
-
 (deftest copy-graph-test
-  (let [repo (repo/repo)]
-    (add repo (test-quads (URI. "http://test-graph/1")))
-
-    (copy-graph repo "http://test-graph/1" "http://test-graph/2")
-
-    (let [source-graph (set (repo/query repo "SELECT * WHERE { GRAPH <http://test-graph/1> { ?s ?p ?o }}"))
-          dest-graph   (set (repo/query repo "SELECT * WHERE { GRAPH <http://test-graph/2> { ?s ?p ?o }}"))]
-
-      (is (not (empty? dest-graph))
-          "Should not be empty (and have the data we loaded)")
-      (is (= source-graph
-             dest-graph)
-          "Should be a copy of the source graph"))))
+  (let [source-graph-uri (URI. "http://test-graph/1")
+        dest-graph-uri (URI. "http://test-graph/2")
+        initial-statements (gen/generate-statements {:managed-graphs {source-graph-uri {:triples 10}}})
+        expected-dest-graph-statements (map #(assoc % :c dest-graph-uri) (filter #(= source-graph-uri (:c %)) initial-statements))
+        repo (doto (repo/repo) (add initial-statements))]
+    (copy-graph repo source-graph-uri dest-graph-uri)
+    (assert-statements-exist repo expected-dest-graph-statements :debug true)))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each wrap-clean-test-db)

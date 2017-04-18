@@ -1,6 +1,5 @@
 (ns drafter.routes.dump
   (:require [compojure.core :refer [GET routes context]]
-            [drafter.rdf.draft-management :refer [drafter-state-graph]]
             [drafter.rdf.drafter-ontology :refer [drafter]]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
