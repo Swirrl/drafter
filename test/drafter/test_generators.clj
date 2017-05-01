@@ -2,148 +2,131 @@
   (:require [drafter.rdf.drafter-ontology :refer :all]
             [grafter.vocabularies.rdf :refer [rdf:a]]
             [drafter.rdf.draft-management :refer [drafter-state-graph create-draft-graph]]
+            [drafter.rdf.draftset-management :refer [create-draftset-statements]]
+            [drafter.rdf.draft-management :refer [to-quads]]
             [grafter.rdf :refer [add]]
             [grafter.rdf.templater :refer [graph]]
             [grafter.rdf.protocols :as proto]
-            [grafter.rdf.repository :as repo])
-  (:import [java.util UUID Random Date]
+            [grafter.rdf.repository :as repo]
+            [clojure.test.check.generators :as gen]
+            [drafter.util :as util]
+            [drafter.user-test :refer [test-editor test-publisher test-manager]]
+            [drafter.user :as user])
+  (:import [java.util UUID Date]
            [java.net URI]))
 
-(defn- gen-draftset-uri [rand]
-  (draftset-id->uri (str (UUID/randomUUID))))
+(defn- make-prefixed-uri-gen [uri-prefix]
+  (gen/fmap #(URI. (str uri-prefix %)) gen/uuid))
 
-(defn- gen-draft-graph-uri [rand]
-  (URI. (str "http://publishmydata.com/graphs/drafter/draft/" (UUID/randomUUID))))
+(def draftset-uri-gen (gen/fmap (comp draftset-id->uri str) gen/uuid))
+(def draft-graph-uri-gen (gen/fmap #(URI. (str "http://publishmydata.com/graphs/drafter/draft/" %)) gen/uuid))
+(def managed-graph-uri-gen (gen/fmap #(URI. (str "http://live/" %)) gen/uuid))
+(def subject-gen (gen/fmap #(URI. (str "http://subject/" %)) gen/uuid))
+(def predicate-gen (gen/fmap #(URI. (str "http://predicate/" %)) gen/uuid))
+(def object-uri-gen (make-prefixed-uri-gen "http://object/"))
+(def object-gen (gen/one-of [object-uri-gen gen/string-alphanumeric gen/boolean]))
+(def triple-gen (gen/fmap (fn [[s p o]] (proto/->Quad s p o nil)) (gen/tuple subject-gen predicate-gen object-gen)))
+(def user-gen (gen/elements [test-editor test-publisher test-manager]))
 
-(defn- gen-managed-graph-uri [rand]
-  (URI. (str "http://live/" (UUID/randomUUID))))
+(defn make-triples-gen [v]
+  (cond (number? v) (gen/vector triple-gen v)
+        (= ::gen v) (gen/vector triple-gen 0 5)
+        :else (gen/return v)))
 
-(defn- gen-subject [rand]
-  (URI. (str "http://subject/" (UUID/randomUUID))))
+(def date-gen (gen/let [y (gen/choose 100 120)
+                        m (gen/choose 0 11)
+                        d (gen/choose 1 28)]
+                       (Date. y m d)))
 
-(defn- gen-predicate [rand]
-  (URI. (str "http://predicate/" (UUID/randomUUID))))
+(defn make-draft-graph-gen
+  ([] (make-draft-graph-gen ::gen))
+  ([spec] (make-draft-graph-gen spec nil))
+  ([{:keys [draftset-uri triples created] :as spec} ds-uri-gen]
+   (if (= ::gen spec)
+     (make-draft-graph-gen {:triples ::gen} ds-uri-gen)
+     (let [ds-uri-gen (if (nil? draftset-uri) (or ds-uri-gen draftset-uri-gen) (gen/return draftset-uri))
+           created-gen (if (nil? created) date-gen (gen/return created))]
+       (gen/hash-map :draftset-uri ds-uri-gen
+                     :triples (make-triples-gen triples)
+                     :created created-gen)))))
 
-(defn- gen-object [rand]
-  (case (.nextInt rand 3)
-    0 (URI. (str "http://object/" (UUID/randomUUID)))
-    1 (str "object-" (UUID/randomUUID))
-    (.nextBoolean rand)))
+(defn- gen-pairs->map-gen
+  "Converts a sequence of [key-gen value-gen] pairs into a generator for maps. Each generator pair
+   will be used to construct a key-value pair in the generated map"
+  [gen-pairs]
+  (gen/fmap #(into {} %) (apply gen/tuple gen-pairs)))
 
-(defn- gen-triple [rand]
-  (proto/->Quad (gen-subject rand) (gen-predicate rand) (gen-object rand) nil))
+(defn- make-drafts-gen
+  ([v] make-drafts-gen v nil)
+  ([v ds-uri-gen]
+   (cond
+     (number? v) (gen/map draft-graph-uri-gen (make-draft-graph-gen ::gen ds-uri-gen) {:num-elements v})
+     (= ::gen v) (gen/map draft-graph-uri-gen (make-draft-graph-gen ::gen ds-uri-gen) {:max-elements 5})
+     (map? v) (let [gen-pairs (map (fn [[k v]] (gen/tuple (gen/return k) (make-draft-graph-gen v ds-uri-gen))) v)]
+                (gen-pairs->map-gen gen-pairs))
+     (nil? v) (gen/return {})
+     :else (throw (RuntimeException. "Expected ::gen, map, nil or number of drafts in drafts spec")))))
 
-(defn- gen-n-triples [n rand]
-  (vec (repeatedly n #(gen-triple rand))))
+(defn- make-managed-graph-gen
+  ([spec] (make-managed-graph-gen spec nil))
+  ([spec ds-uri-gen]
+   (cond
+     (= ::gen spec) (make-managed-graph-gen {:triples ::gen :drafts ::gen} ds-uri-gen)
+     (map? spec) (let [{:keys [is-public triples drafts]} spec
+                       is-public-gen (if (nil? is-public) gen/boolean (gen/return is-public))]
+                   (gen/hash-map :is-public is-public-gen
+                                 :triples (make-triples-gen triples)
+                                 :drafts (make-drafts-gen drafts ds-uri-gen)))
+     :else (throw (RuntimeException. "Expected ::gen or map for managed graph spec")))))
 
-(defn- gen-triples [rand]
-  (gen-n-triples (.nextInt rand 5) rand))
+(defn- make-managed-graphs-gen
+  ([spec] (make-managed-graphs-gen spec nil))
+  ([spec ds-uri-gen]
+   (cond
+     (number? spec) (gen/map managed-graph-uri-gen (make-managed-graph-gen ::gen ds-uri-gen) {:num-elements spec})
+     (= ::gen spec) (gen/map managed-graph-uri-gen (make-managed-graph-gen ::gen ds-uri-gen) {:max-elements 5})
+     (map? spec) (let [gen-pairs (map (fn [[k v]] (gen/tuple (gen/return k) (make-managed-graph-gen v ds-uri-gen))) spec)]
+                   (gen-pairs->map-gen gen-pairs))
+     :else (throw (RuntimeException. "Expected ::gen number or map for managed graphs spec")))))
 
-(defn- gen-draft-graph-draftset-uri [managed-graph-uri draft-graph-uri {:keys [draftsets] :as state} rand]
-  (let [draftset-uris (keys draftsets)]
-    (if (>= (count draftset-uris) 5)
-      (assoc-in state [:managed-graphs managed-graph-uri :drafts draft-graph-uri :draftset-uri] (nth draftset-uris (.nextInt rand 5)))
-      (let [ds-uri (gen-draftset-uri rand)]
-        (-> state
-            (assoc-in [:managed-graphs managed-graph-uri :drafts draft-graph-uri :draftset-uri] ds-uri)
-            (update :draftsets #(assoc % ds-uri {:draft-graphs [draft-graph-uri]})))))))
+(defn- make-draftset-gen [{:keys [created-by created-at title description id :as spec]}]
+  (let [id-gen (if (some? id) (gen/return id) gen/uuid)
+        uri-gen (gen/fmap draftset-id->uri id-gen)
+        created-by-gen (if (some? created-by) (gen/return created-by) user-gen)
+        created-at-gen (if (some? created-at) (gen/return created-at) date-gen)]
+    (gen/hash-map :id id-gen
+                  :uri uri-gen
+                  :title (gen/return title)
+                  :description (gen/return description)
+                  :created-at created-at-gen
+                  :created-by created-by-gen)))
 
-(defn- ensure-draftset-draft-graph [draftset-uri draft-graph-uri state]
-  (let [path [:draftsets draftset-uri :draft-graphs]]
-    (if-let [ds-draft-graphs (get-in state path)]
-      (if (#{draft-graph-uri} ds-draft-graphs)
-        state
-        (update-in state path conj draft-graph-uri))
-      (assoc-in state path [draft-graph-uri]))))
+(defn- make-draftsets-gen [spec]
+  (cond (number? spec) (gen/vector (make-draftset-gen {}) spec)
+        (= ::gen spec) (gen/vector (make-draftset-gen {}) 1 5)
+        (coll? spec) (apply gen/tuple (map make-draftset-gen spec))
+        (nil? spec) (make-draftsets-gen 1)))
 
-(defn- gen-draft-graph-triples [managed-graph-uri draft-graph-uri state rand]
-  (let [{:keys [triples] :as ds-state} (get-in state [:managed-graphs managed-graph-uri :drafts draft-graph-uri])]
-    (cond
-      (number? triples)
-      (assoc-in state [:managed-graphs managed-graph-uri :drafts draft-graph-uri :triples] (gen-n-triples triples rand))
+(comment {:managed-graphs {"http://woo" {:is-public false
+                                         :triples []
+                                         :drafts {"http://draft1" {:draftset-uri "http://draftset1"}
+                                                  "http://draft2" {:draftset-uri "http://draft2"
+                                                                   :triples []
+                                                                   :created (Date.)}}}}
+          :draftsets [{:uri "http://draftset1"
+                       :created-by test-editor
+                       :title "Title"
+                       :description "description"
+                       :id (UUID/randomUUID)
+                       :created-at (Date.)}]})
 
-      (contains? ds-state :triples)
-      state
+(defn- draftset-statements [{:keys [uri created-by created-at title description]}]
+  (let [user-uri (user/user->uri created-by)
+        template (create-draftset-statements user-uri title description uri created-at)]
+    (to-quads template)))
 
-      (or (nil? triples) (= ::gen triples))
-      (assoc-in state [:managed-graphs managed-graph-uri :drafts draft-graph-uri :triples] (gen-triples rand)))))
-
-(defn- gen-managed-draft-graph [managed-graph-uri draft-graph-uri state rand]
-  (let [draft-state (get-in state [:managed-graphs managed-graph-uri :drafts draft-graph-uri])]
-    (cond
-      (= ::gen draft-state)
-      (gen-managed-draft-graph managed-graph-uri draft-graph-uri (update-in state [:managed-graphs managed-graph-uri :drafts] dissoc draft-graph-uri) rand)
-
-      (nil? draft-state)
-      (let [ds-state (gen-draft-graph-draftset-uri managed-graph-uri draft-graph-uri state rand)]
-        (gen-draft-graph-triples managed-graph-uri draft-graph-uri ds-state rand))
-
-      (map? draft-state)
-      (let [with-ds (if (contains? draft-state :draftset-uri)
-                      (ensure-draftset-draft-graph (:draftset-uri draft-state) draft-graph-uri state)
-                      (gen-draft-graph-draftset-uri managed-graph-uri draft-graph-uri state rand))]
-        (gen-draft-graph-triples managed-graph-uri draft-graph-uri with-ds rand)))))
-
-(defn- gen-num-draft-graphs [managed-graph-uri n state rand]
-  (reduce (fn [s _] (gen-managed-draft-graph managed-graph-uri (gen-draftset-uri rand) s rand)) state (range n)))
-
-(defn- gen-managed-graph-draft-graphs [managed-graph-uri state rand]
-  (let [drafts (get-in state [:managed-graphs managed-graph-uri :drafts])]
-    (cond
-      (number? drafts)
-      (gen-num-draft-graphs managed-graph-uri drafts (update-in state [:managed-graphs managed-graph-uri] #(dissoc % :drafts)) rand)
-
-      (or (nil? drafts) (= drafts ::gen))
-      (gen-num-draft-graphs managed-graph-uri (.nextInt rand 5) (update-in state [:managed-graphs managed-graph-uri] #(dissoc % :drafts)) rand)
-
-      (map? drafts)
-      (reduce (fn [s dg] (gen-managed-draft-graph managed-graph-uri dg s rand)) state (keys drafts)))))
-
-(defn- gen-boolean [rand]
-  (.nextBoolean rand))
-
-(defn- gen-managed-graph [managed-graph-uri state rand]
-  (let [path [:managed-graphs managed-graph-uri]
-        {:keys [triples] :as graph-state} (get-in state path)
-        is-public (get graph-state :is-public (gen-boolean rand))
-        triples (cond
-                  (number? triples) (gen-n-triples triples rand)
-                  (or (nil? triples) (= ::gen triples)) (gen-triples rand)
-                  :else triples)
-        tmp (assoc-in state path {:is-public is-public
-                                  :triples   triples
-                                  :drafts    (get-in state (conj path :drafts))})]
-    (gen-managed-graph-draft-graphs managed-graph-uri tmp rand)))
-
-(defn- gen-managed-graphs [state rand]
-  (let [graphs-state (:managed-graphs state)]
-    (cond
-      (number? graphs-state)
-      (let [mg-uris (repeatedly graphs-state #(gen-managed-graph-uri rand))]
-        (reduce (fn [s mg] (gen-managed-graph mg s rand)) (dissoc state :managed-graphs) mg-uris))
-
-      (or (nil? graphs-state) (= ::gen graphs-state))
-      (gen-managed-graphs (assoc state :managed-graphs (inc (.nextInt rand 5))) rand)
-
-      (map? graphs-state)
-      (reduce (fn [s mg] (gen-managed-graph mg s rand)) state (keys graphs-state)))))
-
-(defn- gen-draftsets [state rand]
-  (let [ds-state (:draftsets state)]
-    (cond
-      (number? ds-state)
-      (let [ds-uris (repeatedly ds-state #(gen-draftset-uri rand))
-            ds-map (into {} (map (fn [uri] [uri {:draft-graphs []}]) ds-uris))]
-        (assoc state :draftsets ds-map))
-
-      (or (nil? ds-state) (= ::gen ds-state))
-      (gen-draftsets (assoc state :draftsets (.nextInt rand 4)) rand)
-
-      :else state)))
-
-(defn- draftset-statements [draftsets]
-  ;;TODO: include owner, creator and metadata in draftsets
-  (map #(proto/->Quad % rdf:a drafter:DraftSet drafter-state-graph) (keys draftsets)))
+(defn- draftsets-statements [draftsets]
+  (mapcat draftset-statements draftsets))
 
 (defn- draft-graph-statements [managed-graph-uri draft-graph-uri {:keys [draftset-uri triples created]}]
   ;;TODO: add modified time to draft graph spec?
@@ -160,27 +143,30 @@
         draft-quads (mapcat (fn [[dg dg-spec]] (draft-graph-statements graph-uri dg dg-spec)) drafts)]
     (concat state-quads graph-quads draft-quads)))
 
-(defn generate [spec]
-  (let [r (Random.)]
-    (gen-managed-graphs (gen-draftsets spec r) r)))
+(defn- managed-graphs-statements [graphs]
+  (mapcat (fn [[uri def]] (managed-graph-statements uri def)) graphs))
+
+(defn make-spec-gen [spec]
+  (let [draftsets-gen (make-draftsets-gen (:draftsets spec))
+        draftsets (gen/generate draftsets-gen)
+        draftset-uris (map :uri draftsets)
+        ds-uri-gen (if (seq draftset-uris) (gen/elements draftset-uris) draftset-uri-gen)]
+    (gen/hash-map :draftsets (gen/return draftsets)
+                  :managed-graphs (make-managed-graphs-gen (:managed-graphs spec) ds-uri-gen))))
 
 (defn ->statements [spec]
-  (let [ds-statements (draftset-statements (:draftsets spec))
-        mg-statements (mapcat (fn [[uri mg-spec]] (managed-graph-statements uri mg-spec)) (:managed-graphs spec))]
+  (let [spec-gen (make-spec-gen spec)
+        {:keys [draftsets managed-graphs]} (gen/generate spec-gen)
+        ds-statements (draftsets-statements draftsets)
+        mg-statements (managed-graphs-statements managed-graphs)]
     (concat ds-statements mg-statements)))
 
 (defn generate-statements [spec]
-  (->statements (generate spec)))
+  (->statements spec))
+
+(defn generate-in [repository spec]
+  (add repository (generate-statements spec))
+  repository)
 
 (defn generate-repository [spec]
-  (let [r (repo/repo)]
-    (add r (generate-statements spec))
-    r))
-
-(comment {:managed-graphs {"http://woo" {:is-public false
-                                         :triples []
-                                         :drafts {"http://draft1" {:draftset-uri "http://draftset1"}
-                                                  "http://draft2" {:draftset-uri "http://draft2"
-                                                                   :triples []
-                                                                   :created (Date.)}}}}
-          :draftsets {"http://draftset1" {:draft-graphs ["http://draft2"]}}})
+  (generate-in (repo/repo) spec))

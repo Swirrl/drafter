@@ -29,7 +29,7 @@
            [org.openrdf.query GraphQuery TupleQueryResultHandler]
            org.openrdf.queryrender.RenderUtils))
 
-(defn- create-draftset-statements [user-uri title description draftset-uri created-date]
+(defn create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
             [rdf:a drafter:DraftSet]
             [drafter:createdAt created-date]

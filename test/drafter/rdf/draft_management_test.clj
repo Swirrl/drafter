@@ -63,11 +63,11 @@
       (is (= false (is-graph-live? r (URI. "http://missing"))))))
 
   (testing "Non-live graph"
-    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})]
+    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false :drafts ::gen/gen}}})]
       (is (= false (is-graph-live? repo test-graph-uri)))))
 
   (testing "Live graph"
-    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true}}})]
+    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true :drafts ::gen/gen}}})]
       (is (is-graph-live? repo test-graph-uri)))))
 
 (deftest create-draft-graph!-test
@@ -94,7 +94,7 @@
 
 (deftest set-isPublic!-test
   (testing "set-isPublic!"
-    (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})
+    (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false :drafts {}}}})
           expected (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public true
                                                                               :triples []
                                                                               :drafts {}}}

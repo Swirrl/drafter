@@ -12,15 +12,16 @@
              [drafter-ontology :refer :all]
              [draftset-management :refer :all]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
+            [drafter.test-generators :as gen]
             [grafter.rdf :refer [context statements triple=]]
             [grafter.rdf
              [protocols :refer [->Quad ->Triple]]
              [repository :refer [query]]]
             [grafter.vocabularies.rdf :refer :all]
-            [drafter.util :as util]
-            [grafter.url :as url])
+            [drafter.util :as util])
   (:import org.openrdf.rio.RDFFormat
-           (java.net URI)))
+           (java.net URI)
+           (java.util UUID)))
 
 (defn- has-uri-object? [s p uri-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
@@ -65,7 +66,8 @@
 
 (deftest draftset-exists-test
   (testing "Existing draftset"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
+    (let [draftset-id (->DraftsetId (str (UUID/randomUUID)))]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}] :managed-graphs ::gen/gen})
       (is (draftset-exists? *test-backend* draftset-id))))
 
   (testing "Non-existent draftset"
