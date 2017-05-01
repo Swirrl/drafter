@@ -1,6 +1,6 @@
 (ns drafter.test-generators
   (:require [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.vocabularies.rdf :refer [rdf:a]]
+            [grafter.vocabularies.rdf :refer [rdf:a rdfs:label rdfs:comment]]
             [drafter.rdf.draft-management :refer [drafter-state-graph create-draft-graph]]
             [drafter.rdf.draftset-management :refer [create-draftset-statements]]
             [drafter.rdf.draft-management :refer [to-quads]]
@@ -87,13 +87,15 @@
      (= ::gen spec) (gen/map managed-graph-uri-gen (make-managed-graph-gen ::gen ds-uri-gen) {:max-elements 5})
      (map? spec) (let [gen-pairs (map (fn [[k v]] (gen/tuple (gen/return k) (make-managed-graph-gen v ds-uri-gen))) spec)]
                    (gen-pairs->map-gen gen-pairs))
-     :else (throw (RuntimeException. "Expected ::gen number or map for managed graphs spec")))))
+     (nil? spec) (make-managed-graphs-gen {} ds-uri-gen)
+     :else (throw (RuntimeException. "Expected ::gen, nil, number or map for managed graphs spec")))))
 
-(defn- make-draftset-gen [{:keys [created-by created-at title description id :as spec]}]
+(defn- make-draftset-gen [{:keys [created-by owned-by created-at title description id :as spec]}]
   (let [id-gen (if (some? id) (gen/return id) gen/uuid)
         uri-gen (gen/fmap draftset-id->uri id-gen)
         created-by-gen (if (some? created-by) (gen/return created-by) user-gen)
-        created-at-gen (if (some? created-at) (gen/return created-at) date-gen)]
+        created-at-gen (if (some? created-at) (gen/return created-at) date-gen)
+        owned-by-gen (if (some? owned-by) (gen/return owned-by))]
     (gen/hash-map :id id-gen
                   :uri uri-gen
                   :title (gen/return title)
@@ -115,14 +117,25 @@
                                                                    :created (Date.)}}}}
           :draftsets [{:uri "http://draftset1"
                        :created-by test-editor
+                       :owned-by test-publisher
+                       :submission {:role :publisher :user test-manager}
                        :title "Title"
                        :description "description"
                        :id (UUID/randomUUID)
-                       :created-at (Date.)}]})
+                       :created-at (Date.)
+                       :modified-at (Date.)}]})
 
-(defn- draftset-statements [{:keys [uri created-by created-at title description]}]
+(defn- draftset-statements [{:keys [uri created-by owned-by created-at modified-at title description]}]
   (let [user-uri (user/user->uri created-by)
-        template (create-draftset-statements user-uri title description uri created-at)]
+        owned-by (or owned-by created-by)                   ;;TODO: handle submissions
+        template [uri
+                  [rdf:a drafter:DraftSet]
+                  [drafter:createdAt created-at]
+                  [drafter:modifiedAt (or modified-at created-at)]
+                  [drafter:createdBy user-uri]
+                  [drafter:hasOwner (user/user->uri owned-by)]]
+        template (util/conj-if (some? title) template [rdfs:label title])
+        template (util/conj-if (some? description) template [rdfs:comment description])]
     (to-quads template)))
 
 (defn- draftsets-statements [draftsets]

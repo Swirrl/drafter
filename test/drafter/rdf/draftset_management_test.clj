@@ -67,7 +67,7 @@
 (deftest draftset-exists-test
   (testing "Existing draftset"
     (let [draftset-id (->DraftsetId (str (UUID/randomUUID)))]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}] :managed-graphs ::gen/gen})
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]})
       (is (draftset-exists? *test-backend* draftset-id))))
 
   (testing "Non-existent draftset"
@@ -75,9 +75,10 @@
 
 (deftest get-draftset-owner-test
   (testing "With owner"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)
-          owner (get-draftset-owner *test-backend* draftset-id)]
-      (is (= (user/username test-editor) owner))))
+    (let [draftset-id "test"]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :owned-by test-editor}]})
+      (let [owner (get-draftset-owner *test-backend* (->DraftsetId draftset-id))]
+        (is (= (user/username test-editor) owner)))))
 
   (testing "With no owner"
     (let [draftset-id (create-draftset! *test-backend* test-editor)]
