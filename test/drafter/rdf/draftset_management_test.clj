@@ -133,24 +133,38 @@
       (delete-draftset-statements! *test-backend* (->DraftsetId draftset-id))
       (is (= false (draftset-statements-exist? *test-backend* draftset-id))))))
 
-(defn- import-data-to-draftset! [db draftset-id quads]
-  (let [graph-quads (group-by context quads)]
-    (doall (map (fn [[live qs]] (import-data-to-draft! db live qs draftset-id)) graph-quads))))
-
 (deftest delete-draftset!-test
-  (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
-        quads (statements "test/resources/test-draftset.trig")
-        draft-graphs (import-data-to-draftset! *test-backend* draftset-id quads)]
+  (let [draftset-id (str (UUID/randomUUID))
+        ns (range 1 10)
+        draftset-uris (mapv #(URI. (str "http://draft" %)) (range 1 3))
+        live-graphs (map #(URI. (str "http://live" %)) ns)
+        draft-graphs (map #(URI. (str "http://draft" %)) ns)
+        mg-spec (into {} (map (fn [mg dg] [mg {:drafts {dg ::gen/gen}}]) live-graphs draft-graphs))
+        spec {:draftsets [{:id draftset-id :owned-by test-editor}]
+              :managed-graphs mg-spec}]
+    (gen/generate-in *test-backend* spec)
 
-    (doseq [dg draft-graphs]
+    (doseq [dg draftset-uris]
       (is (= true (mgmth/draft-exists? *test-backend* dg))))
 
-    (delete-draftset! *test-backend* draftset-id)
+    (delete-draftset! *test-backend* (->DraftsetId draftset-id))
 
-    (is (= false (draftset-exists? *test-backend* draftset-id)))
+    (is (= false (draftset-exists? *test-backend* (->DraftsetId draftset-id))))
 
-    (doseq [dg draft-graphs]
+    (doseq [dg draftset-uris]
       (is (= false (mgmth/draft-exists? *test-backend* dg))))))
+
+(deftest get-draftest-graph-mapping-test
+  (let [ns (range 1 10)
+        live-graphs (map #(URI. (str "http://live" %)) ns)
+        draft-graphs (map #(URI. (str "http://draft" %)) ns)
+        draftset-id (str (UUID/randomUUID))
+        mg-spec (into {} (map (fn [mg dg] [mg {:drafts {dg ::gen}}]) live-graphs draft-graphs))
+        spec {:managed-graphs mg-spec
+              :draftsets [{:id draftset-id :created-by test-editor}]}]
+    (gen/generate-in *test-backend* spec)
+    (let [mapping (get-draftset-graph-mapping *test-backend* (->DraftsetId draftset-id))]
+      (is (= (zipmap live-graphs draft-graphs) mapping)))))
 
 (deftest delete-draftest-graph!-test
   (testing "Delete non-existent live graph"
