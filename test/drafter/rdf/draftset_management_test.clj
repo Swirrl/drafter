@@ -89,17 +89,22 @@
 
 (deftest is-draftset-owner?-test
   (testing "Is owner"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (is (= true (is-draftset-owner? *test-backend* draftset-id test-editor)))))
+    (let [draftset-id (str (UUID/randomUUID))
+          spec {:draftsets [{:id draftset-id :created-by test-editor :owned-by test-editor}]}]
+      (gen/generate-in *test-backend* spec)
+      (is (= true (is-draftset-owner? *test-backend* (->DraftsetId draftset-id) test-editor)))))
 
   (testing "Has no owner"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
-      (is (= false (is-draftset-owner? *test-backend* draftset-id test-editor)))))
+    (let [draftset-id (str (UUID/randomUUID))
+          spec {:draftsets [{:id draftset-id :created-by test-editor :submission ::gen/gen}]}]
+      (gen/generate-in *test-backend* spec)
+      (is (= false (is-draftset-owner? *test-backend* (->DraftsetId draftset-id) test-editor)))))
 
   (testing "Has different owner"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (is (= false (is-draftset-owner? *test-backend* draftset-id test-publisher))))))
+    (let [draftset-id (str (UUID/randomUUID))
+          spec {:draftsets [{:id draftset-id :created-by test-publisher :owned-by test-editor}]}]
+      (gen/generate-in *test-backend* spec)
+      (is (= false (is-draftset-owner? *test-backend* (->DraftsetId draftset-id) test-publisher))))))
 
 (deftest delete-draftset-statements!-test
   (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
