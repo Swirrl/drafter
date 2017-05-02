@@ -18,7 +18,8 @@
              [protocols :refer [->Quad ->Triple]]
              [repository :refer [query]]]
             [grafter.vocabularies.rdf :refer :all]
-            [drafter.util :as util])
+            [drafter.util :as util]
+            [grafter.rdf.repository :as repo])
   (:import org.openrdf.rio.RDFFormat
            (java.net URI)
            (java.util UUID)))
@@ -106,10 +107,31 @@
       (gen/generate-in *test-backend* spec)
       (is (= false (is-draftset-owner? *test-backend* (->DraftsetId draftset-id) test-publisher))))))
 
+(defn- draftset-statements-exist? [db draftset-id]
+  (let [draftset-uri (draftset-id->uri draftset-id)
+        q (str "ASK WHERE {"
+               (with-state-graph "{ <" draftset-uri "> ?p ?o . }"
+                                 "UNION {"
+                                 "  <" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
+                                 "  ?submission ?sp ?so ."
+                                 "}")
+               "}")]
+    (repo/query db q)))
+
 (deftest delete-draftset-statements!-test
-  (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-    (delete-draftset-statements! *test-backend* draftset-id)
-    (is (= false (ask? (str "<" (draftset-id->uri draftset-id) ">") "?p" "?o")))))
+  (testing "With owner"
+    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+          spec {:draftsets [{:id draftset-id :created-by test-editor :title "Test draftset" :owned-by test-editor}]}]
+      (gen/generate-in *test-backend* spec)
+      (delete-draftset-statements! *test-backend* (->DraftsetId draftset-id))
+      (is (= false (draftset-statements-exist? *test-backend* draftset-id)))))
+
+  (testing "With submission"
+    (let [draftset-id (str (UUID/randomUUID))
+          spec {:draftsets [{:id draftset-id :created-by test-editor :title "Test draftset" :description "DESCRIPTION" :submission ::gen/gen}]}]
+      (gen/generate-in *test-backend* spec)
+      (delete-draftset-statements! *test-backend* (->DraftsetId draftset-id))
+      (is (= false (draftset-statements-exist? *test-backend* draftset-id))))))
 
 (defn- import-data-to-draftset! [db draftset-id quads]
   (let [graph-quads (group-by context quads)]
