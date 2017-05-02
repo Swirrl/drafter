@@ -1,7 +1,7 @@
 (ns drafter.rdf.draft-management-test
   (:require [clojure.test :refer :all]
             [drafter
-             [test-common :refer [*test-backend* ask? import-data-to-draft! make-graph-live! wrap-clean-test-db wrap-db-setup]]
+             [test-common :refer [*test-backend* make-graph-live! wrap-clean-test-db wrap-db-setup]]
              [user-test :refer [test-editor]]]
             [drafter.test-generators :as gen]
             [drafter.rdf
