@@ -168,17 +168,19 @@
 
 (deftest delete-draftest-graph!-test
   (testing "Delete non-existent live graph"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+    (let [draftset-id (str (UUID/randomUUID))
           graph-to-delete (URI. "http://missing")]
-      (delete-draftset-graph! *test-backend* draftset-id graph-to-delete)
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]})
+      (delete-draftset-graph! *test-backend* (->DraftsetId draftset-id) graph-to-delete)
 
       (is (= false (mgmt/is-graph-managed? *test-backend* graph-to-delete)))
-      (is (empty? (get-draftset-graph-mapping *test-backend* draftset-id)))))
+      (is (empty? (get-draftset-graph-mapping *test-backend* (->DraftsetId draftset-id))))))
 
   (testing "Delete live graph not already in draftset"
     (let [live-graph (URI. "http://live")
           draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (make-graph-live! *test-backend* live-graph)
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :title "Test draftset"}]
+                                       :managed-graphs {live-graph {:is-public true :drafts {}}}})
       (delete-draftset-graph! *test-backend* draftset-id live-graph)
 
       (is (mgmt/is-graph-managed? *test-backend* live-graph))
@@ -190,16 +192,21 @@
 
   (testing "Graph already in draftset"
     (let [live-graph (URI. "http://live")
-          draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (make-graph-live! *test-backend* live-graph)
+          draft-graph (URI. "http://draft")
+          draftset-id (str (UUID/randomUUID))
+          spec {:draftsets [{:id draftset-id}]
+                :managed-graphs {live-graph {:is-public true
+                                             :drafts {draft-graph {:draftset-uri (draftset-id->uri draftset-id)
+                                                                   :triples 10}}}}}]
+      (gen/generate-in *test-backend* spec)
 
-      (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples (URI. "http://subject")) draftset-id)]
-        (is (mgmth/draft-exists? *test-backend* draft-graph))
+      (is (mgmth/draft-exists? *test-backend* draft-graph))
 
-        (delete-draftset-graph! *test-backend* draftset-id live-graph)
+      (delete-draftset-graph! *test-backend* (->DraftsetId draftset-id) live-graph)
 
-        (is (mgmth/draft-exists? *test-backend* draft-graph))
-        (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph))))))))
+      (is (mgmth/draft-exists? *test-backend* draft-graph))
+
+      (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph)))))))
 
 (defn- draftset-has-claim-role? [draftset-id role]
   (let [q (str
