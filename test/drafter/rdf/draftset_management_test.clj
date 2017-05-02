@@ -81,9 +81,10 @@
         (is (= (user/username test-editor) owner)))))
 
   (testing "With no owner"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
-      (let [owner (get-draftset-owner *test-backend* draftset-id)]
+    (let [draftset-id (str (UUID/randomUUID))
+          spec {:draftsets [{:id draftset-id :created-by test-editor :submission ::gen/gen}]}]
+      (gen/generate-in *test-backend* spec)
+      (let [owner (get-draftset-owner *test-backend* (->DraftsetId draftset-id))]
         (is (nil? owner))))))
 
 (deftest is-draftset-owner?-test

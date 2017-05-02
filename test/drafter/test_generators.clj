@@ -90,18 +90,38 @@
      (nil? spec) (make-managed-graphs-gen {} ds-uri-gen)
      :else (throw (RuntimeException. "Expected ::gen, nil, number or map for managed graphs spec")))))
 
-(defn- make-draftset-gen [{:keys [created-by owned-by created-at title description id :as spec]}]
+(def role-gen (gen/elements user/roles))
+
+(defn- make-submission-gen [spec]
+  (cond (= ::gen spec) (gen/one-of [(gen/hash-map :user user-gen)
+                                    (gen/hash-map :role role-gen)])
+        (map? spec) (let [{:keys [user role]} spec]
+                      (cond
+                        (and (some? user) (some? role))
+                        (throw (RuntimeException. "Only one of user or role can be specified for draftset submission"))
+
+                        ;;TODO: allow ::gen for user or role?
+                        (some? user) (gen/return {:user user})
+                        (some? role) (gen/return {:role role})
+
+                        :else (throw (RuntimeException. "user or role required for draftset submission"))))
+        :else (throw (RuntimeException. "Expected ::gen or map for draftset submission spec"))))
+
+(defn- make-draftset-gen [{:keys [created-by owned-by submission created-at title description id] :as spec}]
   (let [id-gen (if (some? id) (gen/return id) gen/uuid)
         uri-gen (gen/fmap draftset-id->uri id-gen)
         created-by-gen (if (some? created-by) (gen/return created-by) user-gen)
         created-at-gen (if (some? created-at) (gen/return created-at) date-gen)
-        owned-by-gen (if (some? owned-by) (gen/return owned-by))]
+        owned-by-gen (gen/return owned-by)
+        submission-gen (if (some? submission) (make-submission-gen submission) (gen/return nil))]
     (gen/hash-map :id id-gen
                   :uri uri-gen
                   :title (gen/return title)
                   :description (gen/return description)
                   :created-at created-at-gen
-                  :created-by created-by-gen)))
+                  :created-by created-by-gen
+                  :owned-by owned-by-gen
+                  :submission submission-gen)))
 
 (defn- make-draftsets-gen [spec]
   (cond (number? spec) (gen/vector (make-draftset-gen {}) spec)
@@ -125,18 +145,35 @@
                        :created-at (Date.)
                        :modified-at (Date.)}]})
 
-(defn- draftset-statements [{:keys [uri created-by owned-by created-at modified-at title description]}]
+(defn- submission-statements [submission-uri {:keys [role user]}]
+  (let [po (if (some? role)
+             [drafter:claimRole (name role)]
+             [drafter:claimUser (user/user->uri user)])
+        template [submission-uri
+                  [rdf:a drafter:Submission]
+                  po]]
+    (to-quads template)))
+
+(defn- draftset-statements [{:keys [uri created-by owned-by created-at submission modified-at title description]}]
   (let [user-uri (user/user->uri created-by)
-        owned-by (or owned-by created-by)                   ;;TODO: handle submissions
         template [uri
                   [rdf:a drafter:DraftSet]
                   [drafter:createdAt created-at]
                   [drafter:modifiedAt (or modified-at created-at)]
-                  [drafter:createdBy user-uri]
-                  [drafter:hasOwner (user/user->uri owned-by)]]
+                  [drafter:createdBy user-uri]]
         template (util/conj-if (some? title) template [rdfs:label title])
         template (util/conj-if (some? description) template [rdfs:comment description])]
-    (to-quads template)))
+    (if (some? submission)
+      (let [submission-uri (submission-id->uri (UUID/randomUUID))
+            submission-quads (submission-statements submission-uri submission)
+            template (conj template
+                           [drafter:hasSubmission submission-uri]
+                           [drafter:submittedBy user-uri]   ;TODO: allow submitting user to be specified
+                           )]
+        (concat (to-quads template) submission-quads))
+      (let [owned-by (or owned-by created-by)
+            template (conj template [drafter:hasOwner (user/user->uri owned-by)])]
+        (to-quads template)))))
 
 (defn- draftsets-statements [draftsets]
   (mapcat draftset-statements draftsets))
@@ -167,15 +204,12 @@
     (gen/hash-map :draftsets (gen/return draftsets)
                   :managed-graphs (make-managed-graphs-gen (:managed-graphs spec) ds-uri-gen))))
 
-(defn ->statements [spec]
+(defn generate-statements [spec]
   (let [spec-gen (make-spec-gen spec)
         {:keys [draftsets managed-graphs]} (gen/generate spec-gen)
         ds-statements (draftsets-statements draftsets)
         mg-statements (managed-graphs-statements managed-graphs)]
     (concat ds-statements mg-statements)))
-
-(defn generate-statements [spec]
-  (->statements spec))
 
 (defn generate-in [repository spec]
   (add repository (generate-statements spec))
