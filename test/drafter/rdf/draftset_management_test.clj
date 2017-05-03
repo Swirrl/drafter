@@ -219,16 +219,20 @@
 
 (deftest submit-draftset-to-role-test!
   (testing "Existing owner"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)
           draftset-uri (->draftset-uri draftset-id)]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :owned-by test-editor}]})
+      (submit-draftset-to-role! *test-backend* (->DraftsetId draftset-id) test-editor :publisher)
 
       (is (draftset-has-claim-role? draftset-id :publisher))
       (is (= false (has-any-object? draftset-uri drafter:hasOwner)))))
 
   (testing "Submitted by other user"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)
           draftset-uri (->draftset-uri draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :owned-by test-editor :created-by test-editor}]})
       (submit-draftset-to-role! *test-backend* draftset-id test-publisher :manager)
 
       (is (is-draftset-owner? *test-backend* draftset-id test-editor))
