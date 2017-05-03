@@ -19,7 +19,8 @@
              [repository :refer [query]]]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.util :as util]
-            [grafter.rdf.repository :as repo])
+            [grafter.rdf.repository :as repo]
+            [grafter.url :as url])
   (:import org.openrdf.rio.RDFFormat
            (java.net URI)
            (java.util UUID)))
@@ -67,7 +68,7 @@
 
 (deftest draftset-exists-test
   (testing "Existing draftset"
-    (let [draftset-id (->DraftsetId (str (UUID/randomUUID)))]
+    (let [draftset-id (gen/generate-draftset-id)]
       (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]})
       (is (draftset-exists? *test-backend* draftset-id))))
 
@@ -76,39 +77,39 @@
 
 (deftest get-draftset-owner-test
   (testing "With owner"
-    (let [draftset-id "test"]
+    (let [draftset-id (gen/generate-draftset-id)]
       (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :owned-by test-editor}]})
-      (let [owner (get-draftset-owner *test-backend* (->DraftsetId draftset-id))]
+      (let [owner (get-draftset-owner *test-backend* draftset-id)]
         (is (= (user/username test-editor) owner)))))
 
   (testing "With no owner"
-    (let [draftset-id (str (UUID/randomUUID))
+    (let [draftset-id (gen/generate-draftset-id)
           spec {:draftsets [{:id draftset-id :created-by test-editor :submission ::gen/gen}]}]
       (gen/generate-in *test-backend* spec)
-      (let [owner (get-draftset-owner *test-backend* (->DraftsetId draftset-id))]
+      (let [owner (get-draftset-owner *test-backend* draftset-id)]
         (is (nil? owner))))))
 
 (deftest is-draftset-owner?-test
   (testing "Is owner"
-    (let [draftset-id (str (UUID/randomUUID))
+    (let [draftset-id (gen/generate-draftset-id)
           spec {:draftsets [{:id draftset-id :created-by test-editor :owned-by test-editor}]}]
       (gen/generate-in *test-backend* spec)
-      (is (= true (is-draftset-owner? *test-backend* (->DraftsetId draftset-id) test-editor)))))
+      (is (= true (is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "Has no owner"
-    (let [draftset-id (str (UUID/randomUUID))
+    (let [draftset-id (gen/generate-draftset-id)
           spec {:draftsets [{:id draftset-id :created-by test-editor :submission ::gen/gen}]}]
       (gen/generate-in *test-backend* spec)
-      (is (= false (is-draftset-owner? *test-backend* (->DraftsetId draftset-id) test-editor)))))
+      (is (= false (is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "Has different owner"
-    (let [draftset-id (str (UUID/randomUUID))
+    (let [draftset-id (gen/generate-draftset-id)
           spec {:draftsets [{:id draftset-id :created-by test-publisher :owned-by test-editor}]}]
       (gen/generate-in *test-backend* spec)
-      (is (= false (is-draftset-owner? *test-backend* (->DraftsetId draftset-id) test-publisher))))))
+      (is (= false (is-draftset-owner? *test-backend* draftset-id test-publisher))))))
 
 (defn- draftset-statements-exist? [db draftset-id]
-  (let [draftset-uri (draftset-id->uri draftset-id)
+  (let [draftset-uri (url/->java-uri draftset-id)
         q (str "ASK WHERE {"
                (with-state-graph "{ <" draftset-uri "> ?p ?o . }"
                                  "UNION {"
@@ -120,21 +121,21 @@
 
 (deftest delete-draftset-statements!-test
   (testing "With owner"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
+    (let [draftset-id (gen/generate-draftset-id)
           spec {:draftsets [{:id draftset-id :created-by test-editor :title "Test draftset" :owned-by test-editor}]}]
       (gen/generate-in *test-backend* spec)
-      (delete-draftset-statements! *test-backend* (->DraftsetId draftset-id))
+      (delete-draftset-statements! *test-backend* draftset-id)
       (is (= false (draftset-statements-exist? *test-backend* draftset-id)))))
 
   (testing "With submission"
-    (let [draftset-id (str (UUID/randomUUID))
+    (let [draftset-id (gen/generate-draftset-id)
           spec {:draftsets [{:id draftset-id :created-by test-editor :title "Test draftset" :description "DESCRIPTION" :submission ::gen/gen}]}]
       (gen/generate-in *test-backend* spec)
-      (delete-draftset-statements! *test-backend* (->DraftsetId draftset-id))
+      (delete-draftset-statements! *test-backend* draftset-id)
       (is (= false (draftset-statements-exist? *test-backend* draftset-id))))))
 
 (deftest delete-draftset!-test
-  (let [draftset-id (str (UUID/randomUUID))
+  (let [draftset-id (gen/generate-draftset-id)
         ns (range 1 10)
         draftset-uris (mapv #(URI. (str "http://draft" %)) (range 1 3))
         live-graphs (map #(URI. (str "http://live" %)) ns)
@@ -147,9 +148,9 @@
     (doseq [dg draftset-uris]
       (is (= true (mgmth/draft-exists? *test-backend* dg))))
 
-    (delete-draftset! *test-backend* (->DraftsetId draftset-id))
+    (delete-draftset! *test-backend* draftset-id)
 
-    (is (= false (draftset-exists? *test-backend* (->DraftsetId draftset-id))))
+    (is (= false (draftset-exists? *test-backend* draftset-id)))
 
     (doseq [dg draftset-uris]
       (is (= false (mgmth/draft-exists? *test-backend* dg))))))
@@ -158,27 +159,27 @@
   (let [ns (range 1 10)
         live-graphs (map #(URI. (str "http://live" %)) ns)
         draft-graphs (map #(URI. (str "http://draft" %)) ns)
-        draftset-id (str (UUID/randomUUID))
+        draftset-id (gen/generate-draftset-id)
         mg-spec (into {} (map (fn [mg dg] [mg {:drafts {dg ::gen}}]) live-graphs draft-graphs))
         spec {:managed-graphs mg-spec
               :draftsets [{:id draftset-id :created-by test-editor}]}]
     (gen/generate-in *test-backend* spec)
-    (let [mapping (get-draftset-graph-mapping *test-backend* (->DraftsetId draftset-id))]
+    (let [mapping (get-draftset-graph-mapping *test-backend* draftset-id)]
       (is (= (zipmap live-graphs draft-graphs) mapping)))))
 
 (deftest delete-draftest-graph!-test
   (testing "Delete non-existent live graph"
-    (let [draftset-id (str (UUID/randomUUID))
+    (let [draftset-id (gen/generate-draftset-id)
           graph-to-delete (URI. "http://missing")]
       (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]})
-      (delete-draftset-graph! *test-backend* (->DraftsetId draftset-id) graph-to-delete)
+      (delete-draftset-graph! *test-backend* draftset-id graph-to-delete)
 
       (is (= false (mgmt/is-graph-managed? *test-backend* graph-to-delete)))
-      (is (empty? (get-draftset-graph-mapping *test-backend* (->DraftsetId draftset-id))))))
+      (is (empty? (get-draftset-graph-mapping *test-backend* draftset-id)))))
 
   (testing "Delete live graph not already in draftset"
     (let [live-graph (URI. "http://live")
-          draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
+          draftset-id (gen/generate-draftset-id)]
       (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :title "Test draftset"}]
                                        :managed-graphs {live-graph {:is-public true :drafts {}}}})
       (delete-draftset-graph! *test-backend* draftset-id live-graph)
@@ -193,16 +194,16 @@
   (testing "Graph already in draftset"
     (let [live-graph (URI. "http://live")
           draft-graph (URI. "http://draft")
-          draftset-id (str (UUID/randomUUID))
+          draftset-id (gen/generate-draftset-id)
           spec {:draftsets [{:id draftset-id}]
                 :managed-graphs {live-graph {:is-public true
-                                             :drafts {draft-graph {:draftset-uri (draftset-id->uri draftset-id)
+                                             :drafts {draft-graph {:draftset-uri (url/->java-uri draftset-id)
                                                                    :triples 10}}}}}]
       (gen/generate-in *test-backend* spec)
 
       (is (mgmth/draft-exists? *test-backend* draft-graph))
 
-      (delete-draftset-graph! *test-backend* (->DraftsetId draftset-id) live-graph)
+      (delete-draftset-graph! *test-backend* draftset-id live-graph)
 
       (is (mgmth/draft-exists? *test-backend* draft-graph))
 
@@ -219,24 +220,20 @@
 
 (deftest submit-draftset-to-role-test!
   (testing "Existing owner"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)
-          draftset-uri (->draftset-uri draftset-id)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :owned-by test-editor}]})
-      (submit-draftset-to-role! *test-backend* (->DraftsetId draftset-id) test-editor :publisher)
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :owned-by test-editor}]})
+      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
 
       (is (draftset-has-claim-role? draftset-id :publisher))
-      (is (= false (has-any-object? draftset-uri drafter:hasOwner)))))
+      (is (= false (has-any-object? (url/->java-uri draftset-id) drafter:hasOwner)))))
 
   (testing "Submitted by other user"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)
-          draftset-uri (->draftset-uri draftset-id)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :owned-by test-editor :created-by test-editor}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :owned-by test-editor :created-by test-editor}]})
       (submit-draftset-to-role! *test-backend* draftset-id test-publisher :manager)
 
       (is (is-draftset-owner? *test-backend* draftset-id test-editor))
-      (is (= false (has-any-object? draftset-uri drafter:hasSubmission))))))
+      (is (= false (has-any-object? (url/->java-uri draftset-id) drafter:hasSubmission))))))
 
 (defn- draftset-has-claim-user? [draftset-id user]
   (let [q (str
@@ -254,9 +251,8 @@
 
 (deftest submit-draftset-to-user!-test
   (testing "When owned"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :owned-by test-editor :created-by test-editor}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :owned-by test-editor :created-by test-editor}]})
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
 
       (is (= nil (get-draftset-owner *test-backend* draftset-id)))
@@ -264,17 +260,15 @@
       (is (draftset-has-claim-user? draftset-id test-publisher))))
 
   (testing "Submitted to self"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :owned-by test-editor}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :owned-by test-editor}]})
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-editor)
 
       (is-draftset-owner? *test-backend* draftset-id test-editor)))
 
   (testing "When not owned"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :owned-by test-editor}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :owned-by test-editor}]})
       (submit-draftset-to-user! *test-backend* draftset-id test-manager test-publisher)
 
       (is (is-draftset-owner? *test-backend* draftset-id test-editor))
@@ -283,9 +277,8 @@
       (is (= false (has-uri-object? (->draftset-uri draftset-id) drafter:submittedBy (user/user->uri test-manager))))))
 
   (testing "When submitted"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :submission {:role :publisher}}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :submission {:role :publisher}}]})
 
       ;;should do nothing since test-editor is not the owner
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-manager)
@@ -305,20 +298,17 @@
 
 (deftest claim-draftset-test!
   (testing "No owner when user in role"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+    (let [draftset-id (gen/generate-draftset-id)]
       (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :submission {:role :publisher}}]})
 
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-publisher))
-        (is (= false (has-any-object? (->draftset-uri draftset-id) drafter:hasSubmission))))))
+        (is (= false (has-any-object? (url/->java-uri draftset-id) drafter:hasSubmission))))))
 
   (testing "No owner when submitted to user"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:user test-publisher}}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :submission {:user test-publisher}}]})
 
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :ok result))
@@ -326,9 +316,8 @@
         (is (= false (draftset-has-submission? draftset-id))))))
 
   (testing "No owner when submitted to different user"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:user test-publisher}}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :submission {:user test-publisher}}]})
 
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-manager)]
         (is (= :user result))
@@ -336,52 +325,46 @@
         (is (draftset-has-submission? draftset-id)))))
 
   (testing "Reclaimed by submitter after submit to role"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:role :publisher}}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :submission {:role :publisher}}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor))
         (is (= false (draftset-has-submission? draftset-id))))))
 
   (testing "Reclaimed by submitter after submit to user"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:user test-publisher}}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :submission {:user test-publisher}}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor))
         (is (= false (draftset-has-submission? draftset-id))))))
 
   (testing "No owner when user is submitter not in role"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:role :publisher}}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :submission {:role :publisher}}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor))
-        (is (= false (has-any-object? (->draftset-uri draftset-id) drafter:hasSubmission))))))
+        (is (= false (has-any-object? (url/->java-uri draftset-id) drafter:hasSubmission))))))
 
   (testing "Claimed by current owner"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :owned-by test-editor}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :owned-by test-editor}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "User not in claim role"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:role :manager}}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :submission {:role :manager}}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :role result))
         (is (nil? (get-draftset-owner *test-backend* draftset-id))))))
 
   (testing "Draftset owned by other user"
-    (let [draftset-id-str (str (UUID/randomUUID))
-          draftset-id (->DraftsetId draftset-id-str)]
-      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :owned-by test-editor}]})
+    (let [draftset-id (gen/generate-draftset-id)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :created-by test-editor :owned-by test-editor}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :owned result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor)))))
@@ -393,8 +376,7 @@
 (deftest revert-changes-from-graph-only-in-draftset
   (let [live-graph (URI. "http://live")
         draft-graph (URI. "http://draft")
-        draftset-id-str (str (UUID/randomUUID))
-        draftset-id (->DraftsetId draftset-id-str)]
+        draftset-id (gen/generate-draftset-id)]
     (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
                                      :managed-graphs {live-graph {:is-public false
                                                                   :triples []
@@ -406,8 +388,7 @@
 
 (deftest revert-changes-from-graph-which-exists-in-live
   (let [live-graph-uri (URI. "http://live")
-        draftset-id-str (str (UUID/randomUUID))
-        draftset-id (->DraftsetId draftset-id-str)
+        draftset-id (gen/generate-draftset-id)
         draft-graph-uri (URI. "http://draft")]
     (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
                                      :managed-graphs {live-graph-uri {:is-public true
@@ -420,28 +401,27 @@
 
 (deftest revert-change-from-graph-which-exists-independently-in-other-draftset
   (let [live-graph-uri (URI. "http://live")
-        ds1-id (str (UUID/randomUUID))
-        ds2-id (str (UUID/randomUUID))
+        ds1-id (gen/generate-draftset-id)
+        ds2-id (gen/generate-draftset-id)
         draft1-uri (URI. "http://draft1")
         draft2-uri (URI. "http://draft2")]
     (gen/generate-in *test-backend* {:draftsets [{:id ds1-id}
                                                  {:id ds2-id}]
                                      :managed-graphs {live-graph-uri {:is-public true
                                                                       :triples ::gen/gen
-                                                                      :drafts {draft1-uri {:draftset-uri (draftset-id->uri ds1-id)
+                                                                      :drafts {draft1-uri {:draftset-uri (url/->java-uri ds1-id)
                                                                                            :triples ::gen/gen}
-                                                                               draft2-uri {:draftset-uri (draftset-id->uri ds2-id)
+                                                                               draft2-uri {:draftset-uri (url/->java-uri ds2-id)
                                                                                            :triples ::gen/gen}}}}})
-    (let [result (revert-graph-changes! *test-backend* (->DraftsetId ds2-id) live-graph-uri)]
+    (let [result (revert-graph-changes! *test-backend* ds2-id live-graph-uri)]
       (is (= :reverted result))
       (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
       (is (= false (mgmth/draft-exists? *test-backend* draft2-uri)))
       (is (mgmth/draft-exists? *test-backend* draft1-uri)))))
 
 (deftest revert-non-existent-change-in-draftset
-  (let [draftset-id-str (str (UUID/randomUUID))
-        draftset-id (->DraftsetId draftset-id-str)]
-    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str}]
+  (let [draftset-id (gen/generate-draftset-id)]
+    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
                                      :managed-graphs {}})
     (let [result (revert-graph-changes! *test-backend* draftset-id (URI. "http://missing"))]
       (is (= :not-found result)))))
@@ -459,11 +439,10 @@
     (map (fn [{:keys [s p o]}] (->Triple s p o)) results)))
 
 (deftest copy-live-graph-into-draftset-test
-  (let [draftset-id-str (str (UUID/randomUUID))
-        draftset-id (->DraftsetId draftset-id-str)
+  (let [draftset-id (gen/generate-draftset-id)
         live-triples (gen/generate-triples 1 10)
         live-graph-uri (URI. "http://live")]
-    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str}]
+    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
                                      :managed-graphs {live-graph-uri {:is-public true
                                                                       :triples live-triples}}})
 
@@ -477,12 +456,11 @@
         (is (= (set live-triples) (set draft-triples)))))))
 
 (deftest copy-live-graph-into-existing-draft-graph-in-draftset-test
-  (let [draftset-id-str (str (UUID/randomUUID))
-        draftset-id (->DraftsetId draftset-id-str)
+  (let [draftset-id (gen/generate-draftset-id)
         live-triples (gen/generate-triples 1 10)
         live-graph-uri (URI. "http://live")
         draft-graph-uri (URI. "http://draft")]
-    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str}]
+    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
                                      :managed-graphs {live-graph-uri {:is-public true
                                                                       :triples live-triples
                                                                       :drafts {draft-graph-uri {:triples 8}}}}})

@@ -4,6 +4,8 @@
             [drafter.rdf.draft-management :refer [drafter-state-graph create-draft-graph]]
             [drafter.rdf.draftset-management :refer [create-draftset-statements]]
             [drafter.rdf.draft-management :refer [to-quads]]
+            [drafter.draftset :refer [->DraftsetId ->draftset-uri]]
+            [grafter.url :as url]
             [grafter.rdf :refer [add]]
             [grafter.rdf.templater :refer [graph]]
             [grafter.rdf.protocols :as proto]
@@ -20,6 +22,7 @@
 
 (def draftset-uri-gen (gen/fmap (comp draftset-id->uri str) gen/uuid))
 (def draft-graph-uri-gen (gen/fmap #(URI. (str "http://publishmydata.com/graphs/drafter/draft/" %)) gen/uuid))
+(def draftset-id-gen (gen/fmap ->DraftsetId gen/uuid))
 (def managed-graph-uri-gen (gen/fmap #(URI. (str "http://live/" %)) gen/uuid))
 (def subject-gen (gen/fmap #(URI. (str "http://subject/" %)) gen/uuid))
 (def predicate-gen (gen/fmap #(URI. (str "http://predicate/" %)) gen/uuid))
@@ -37,6 +40,9 @@
   ([] (gen/generate (gen/vector triple-gen)))
   ([n] (generate-triples n n))
   ([min max] (gen/generate (gen/vector triple-gen min max))))
+
+(defn generate-draftset-id []
+  (gen/generate draftset-id-gen))
 
 (def date-gen (gen/let [y (gen/choose 100 120)
                         m (gen/choose 0 11)
@@ -113,8 +119,8 @@
         :else (throw (RuntimeException. "Expected ::gen or map for draftset submission spec"))))
 
 (defn- make-draftset-gen [{:keys [created-by owned-by submission created-at title description id] :as spec}]
-  (let [id-gen (if (some? id) (gen/return id) gen/uuid)
-        uri-gen (gen/fmap draftset-id->uri id-gen)
+  (let [id-gen (if (some? id) (gen/return id) draftset-id-gen)
+        uri-gen (gen/fmap url/->java-uri id-gen)
         created-by-gen (if (some? created-by) (gen/return created-by) user-gen)
         created-at-gen (if (some? created-at) (gen/return created-at) date-gen)
         owned-by-gen (gen/return owned-by)
