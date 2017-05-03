@@ -117,15 +117,6 @@
      (add db draft-graph triples)
      draft-graph)))
 
-(defn make-graph-live!
-  ([db live-graph-uri]
-     (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1"))))
-
-  ([db live-graph-uri data]
-     (let [draft-graph-uri (import-data-to-draft! db live-graph-uri data)]
-       (migrate-graphs-to-live! db [draft-graph-uri]))
-     live-graph-uri))
-
 (defn during-exclusive-write-f [f]
   (let [p (promise)
         latch (CountDownLatch. 1)

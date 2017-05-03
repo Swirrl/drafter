@@ -3,7 +3,7 @@
             [clojure.test :refer :all]
             [drafter
              [draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
-             [test-common :refer [*test-backend* ask? import-data-to-draft! make-graph-live! select-all-in-graph test-triples wrap-clean-test-db wrap-db-setup]]
+             [test-common :refer [*test-backend* ask? select-all-in-graph test-triples wrap-clean-test-db wrap-db-setup]]
              [user :as user]
              [user-test :refer [test-editor test-manager test-publisher]]
              [write-scheduler :as scheduler]]
@@ -392,76 +392,108 @@
 
 (deftest revert-changes-from-graph-only-in-draftset
   (let [live-graph (URI. "http://live")
-        draftset-id (create-draftset! *test-backend* test-editor)]
-    (mgmt/create-managed-graph! *test-backend* live-graph)
-    (let [draft-graph (mgmt/create-draft-graph! *test-backend* live-graph draftset-id)
-          result (revert-graph-changes! *test-backend* draftset-id live-graph)]
+        draft-graph (URI. "http://draft")
+        draftset-id-str (str (UUID/randomUUID))
+        draftset-id (->DraftsetId draftset-id-str)]
+    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
+                                     :managed-graphs {live-graph {:is-public false
+                                                                  :triples []
+                                                                  :drafts {draft-graph {:triples 10}}}}})
+    (let [result (revert-graph-changes! *test-backend* draftset-id live-graph)]
       (is (= :reverted result))
       (is (= false (mgmth/draft-exists? *test-backend* draft-graph)))
       (is (= false (mgmt/is-graph-managed? *test-backend* live-graph))))))
 
 (deftest revert-changes-from-graph-which-exists-in-live
-  (let [live-graph-uri (make-graph-live! *test-backend* (URI. "http://live"))
-        draftset-id (create-draftset! *test-backend* test-editor)
-        draft-graph-uri (delete-draftset-graph! *test-backend* draftset-id live-graph-uri)]
+  (let [live-graph-uri (URI. "http://live")
+        draftset-id-str (str (UUID/randomUUID))
+        draftset-id (->DraftsetId draftset-id-str)
+        draft-graph-uri (URI. "http://draft")]
+    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
+                                     :managed-graphs {live-graph-uri {:is-public true
+                                                                      :triples 5
+                                                                      :drafts {draft-graph-uri {:triples 6}}}}})
     (let [result (revert-graph-changes! *test-backend* draftset-id live-graph-uri)]
       (is (= :reverted result))
       (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
       (is (= false (mgmth/draft-exists? *test-backend* draft-graph-uri))))))
 
 (deftest revert-change-from-graph-which-exists-independently-in-other-draftset
-  (let [live-graph-uri (mgmt/create-managed-graph! *test-backend* (URI. "http://live"))
-        ds1-id (create-draftset! *test-backend* test-editor)
-        ds2-id (create-draftset! *test-backend* test-publisher)
-        draft-graph1-uri (mgmt/create-draft-graph! *test-backend* live-graph-uri ds1-id)
-        draft-graph2-uri (mgmt/create-draft-graph! *test-backend* live-graph-uri ds2-id)]
-
-    (let [result (revert-graph-changes! *test-backend* ds2-id live-graph-uri)]
+  (let [live-graph-uri (URI. "http://live")
+        ds1-id (str (UUID/randomUUID))
+        ds2-id (str (UUID/randomUUID))
+        draft1-uri (URI. "http://draft1")
+        draft2-uri (URI. "http://draft2")]
+    (gen/generate-in *test-backend* {:draftsets [{:id ds1-id}
+                                                 {:id ds2-id}]
+                                     :managed-graphs {live-graph-uri {:is-public true
+                                                                      :triples ::gen/gen
+                                                                      :drafts {draft1-uri {:draftset-uri (draftset-id->uri ds1-id)
+                                                                                           :triples ::gen/gen}
+                                                                               draft2-uri {:draftset-uri (draftset-id->uri ds2-id)
+                                                                                           :triples ::gen/gen}}}}})
+    (let [result (revert-graph-changes! *test-backend* (->DraftsetId ds2-id) live-graph-uri)]
       (is (= :reverted result))
       (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
-      (is (= false (mgmth/draft-exists? *test-backend* draft-graph2-uri)))
-      (is (mgmth/draft-exists? *test-backend* draft-graph1-uri)))))
+      (is (= false (mgmth/draft-exists? *test-backend* draft2-uri)))
+      (is (mgmth/draft-exists? *test-backend* draft1-uri)))))
 
 (deftest revert-non-existent-change-in-draftset
-  (let [draftset-id (create-draftset! *test-backend* test-editor)
-        result (revert-graph-changes! *test-backend* draftset-id (URI. "http://missing"))]
-    (is (= :not-found result))))
+  (let [draftset-id-str (str (UUID/randomUUID))
+        draftset-id (->DraftsetId draftset-id-str)]
+    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str}]
+                                     :managed-graphs {}})
+    (let [result (revert-graph-changes! *test-backend* draftset-id (URI. "http://missing"))]
+      (is (= :not-found result)))))
 
 (deftest revert-changes-in-non-existent-draftset
-  (let [live-graph (make-graph-live! *test-backend* (URI. "http://live"))
-        result (revert-graph-changes! *test-backend* (->DraftsetId "missing") live-graph)]
-    (is (= :not-found result))))
+  (let [live-graph (URI. "http://live")]
+    (gen/generate-in *test-backend* {:draftsets []
+                                     :managed-graphs {live-graph {:is-public true
+                                                                  :drafts {}}}})
+    (let [result (revert-graph-changes! *test-backend* (->DraftsetId "missing") live-graph)]
+      (is (= :not-found result)))))
 
 (defn- get-graph-triples [graph-uri]
   (let [results (query *test-backend* (select-all-in-graph graph-uri))]
     (map (fn [{:keys [s p o]}] (->Triple s p o)) results)))
 
 (deftest copy-live-graph-into-draftset-test
-  (let [draftset-id (create-draftset! *test-backend* test-editor)
+  (let [draftset-id-str (str (UUID/randomUUID))
+        draftset-id (->DraftsetId draftset-id-str)
         live-triples (test-triples (URI. "http://test-subject"))
-        live-graph-uri (make-graph-live! *test-backend* (URI. "http://live") live-triples)
-        {:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
-    (scheduler/queue-job! copy-job)
+        live-graph-uri (URI. "http://live")]
+    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str}]
+                                     :managed-graphs {live-graph-uri {:is-public true
+                                                                      :triples live-triples}}})
 
-    @value-p
+    (let [{:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
+      (scheduler/queue-job! copy-job)
 
-    (let [draft-graph (find-draftset-draft-graph *test-backend* draftset-id live-graph-uri)
-          draft-triples (get-graph-triples draft-graph)]
-      (is (= (set live-triples) (set draft-triples))))))
+      @value-p
+
+      (let [draft-graph (find-draftset-draft-graph *test-backend* draftset-id live-graph-uri)
+            draft-triples (get-graph-triples draft-graph)]
+        (is (= (set live-triples) (set draft-triples)))))))
 
 (deftest copy-live-graph-into-existing-draft-graph-in-draftset-test
-  (let [draftset-id (create-draftset! *test-backend* test-editor)
+  (let [draftset-id-str (str (UUID/randomUUID))
+        draftset-id (->DraftsetId draftset-id-str)
         live-triples (test-triples (URI. "http://test-subject"))
-        live-graph-uri (make-graph-live! *test-backend* (URI. "http://live") live-triples)
-        initial-draft-triples (test-triples (URI. "http://temp-subject"))
-        draft-graph-uri (import-data-to-draft! *test-backend* live-graph-uri initial-draft-triples draftset-id)
-        {:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
+        live-graph-uri (URI. "http://live")
+        draft-graph-uri (URI. "http://draft")]
+    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str}]
+                                     :managed-graphs {live-graph-uri {:is-public true
+                                                                      :triples live-triples
+                                                                      :drafts {draft-graph-uri {:triples 8}}}}})
 
-    (scheduler/queue-job! copy-job)
-    @value-p
+    (let [{:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
 
-    (let [draft-triples (get-graph-triples draft-graph-uri)]
-      (is (= (set live-triples) (set draft-triples))))))
+      (scheduler/queue-job! copy-job)
+      @value-p
+
+      (let [draft-triples (get-graph-triples draft-graph-uri)]
+        (is (= (set live-triples) (set draft-triples)))))))
 
 (deftest quad-batch->graph-triples-test
   (testing "Empty batch"
