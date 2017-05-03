@@ -254,7 +254,9 @@
 
 (deftest submit-draftset-to-user!-test
   (testing "When owned"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :owned-by test-editor :created-by test-editor}]})
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
 
       (is (= nil (get-draftset-owner *test-backend* draftset-id)))
@@ -262,26 +264,30 @@
       (is (draftset-has-claim-user? draftset-id test-publisher))))
 
   (testing "Submitted to self"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)
-          draftset-uri (str (->draftset-uri draftset-id))]
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :owned-by test-editor}]})
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-editor)
 
       (is-draftset-owner? *test-backend* draftset-id test-editor)))
 
   (testing "When not owned"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)
-          draftset-uri (str (->draftset-uri draftset-id))]
-
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :owned-by test-editor}]})
       (submit-draftset-to-user! *test-backend* draftset-id test-manager test-publisher)
 
       (is (is-draftset-owner? *test-backend* draftset-id test-editor))
       (is (= false (draftset-has-claim-user? draftset-id test-publisher)))
       (is (= false (is-draftset-submitter? *test-backend* draftset-id test-manager)))
-      (is (= false (has-uri-object? draftset-uri drafter:submittedBy (user/user->uri test-manager))))))
+      (is (= false (has-uri-object? (->draftset-uri draftset-id) drafter:submittedBy (user/user->uri test-manager))))))
 
   (testing "When submitted"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :submission {:role :publisher}}]})
+
+      ;;should do nothing since test-editor is not the owner
       (submit-draftset-to-user! *test-backend* draftset-id test-editor test-manager)
 
       (is (= nil (get-draftset-owner *test-backend* draftset-id)))
@@ -299,19 +305,20 @@
 
 (deftest claim-draftset-test!
   (testing "No owner when user in role"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")
-          draftset-uri (->draftset-uri draftset-id)]
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
       (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :submission {:role :publisher}}]})
 
-      (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)
-            ds-info (get-draftset-info *test-backend* draftset-id)]
+      (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-publisher))
-        (is (= false (has-any-object? draftset-uri drafter:hasSubmission))))))
+        (is (= false (has-any-object? (->draftset-uri draftset-id) drafter:hasSubmission))))))
 
   (testing "No owner when submitted to user"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:user test-publisher}}]})
 
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :ok result))
@@ -319,8 +326,9 @@
         (is (= false (draftset-has-submission? draftset-id))))))
 
   (testing "No owner when submitted to different user"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:user test-publisher}}]})
 
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-manager)]
         (is (= :user result))
@@ -328,51 +336,52 @@
         (is (draftset-has-submission? draftset-id)))))
 
   (testing "Reclaimed by submitter after submit to role"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:role :publisher}}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor))
         (is (= false (draftset-has-submission? draftset-id))))))
 
   (testing "Reclaimed by submitter after submit to user"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:user test-publisher}}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor))
         (is (= false (draftset-has-submission? draftset-id))))))
 
   (testing "No owner when user is submitter not in role"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:role :publisher}}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor))
         (is (= false (has-any-object? (->draftset-uri draftset-id) drafter:hasSubmission))))))
 
-  (testing "Owned by other user after submitted by user"
-    (let [draftset-id (create-draftset! *test-backend* test-editor "Test draftset")]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
-      (claim-draftset! *test-backend* draftset-id test-publisher)
-      (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
-        (is (= :owned result)))))
-
   (testing "Claimed by current owner"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)
-          [result _] (claim-draftset! *test-backend* draftset-id test-editor)]
-      (is (= :ok result))
-      (is (is-draftset-owner? *test-backend* draftset-id test-editor))))
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :owned-by test-editor}]})
+      (let [[result _] (claim-draftset! *test-backend* draftset-id test-editor)]
+        (is (= :ok result))
+        (is (is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "User not in claim role"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)]
-      (submit-draftset-to-role! *test-backend* draftset-id test-editor :manager)
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :submission {:role :manager}}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :role result))
         (is (nil? (get-draftset-owner *test-backend* draftset-id))))))
 
   (testing "Draftset owned by other user"
-    (let [draftset-id (create-draftset! *test-backend* test-editor)]
+    (let [draftset-id-str (str (UUID/randomUUID))
+          draftset-id (->DraftsetId draftset-id-str)]
+      (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str :created-by test-editor :owned-by test-editor}]})
       (let [[result _] (claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :owned result))
         (is (is-draftset-owner? *test-backend* draftset-id test-editor)))))
