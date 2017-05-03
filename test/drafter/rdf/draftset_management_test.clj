@@ -3,7 +3,7 @@
             [clojure.test :refer :all]
             [drafter
              [draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
-             [test-common :refer [*test-backend* ask? select-all-in-graph test-triples wrap-clean-test-db wrap-db-setup]]
+             [test-common :refer [*test-backend* ask? select-all-in-graph wrap-clean-test-db wrap-db-setup]]
              [user :as user]
              [user-test :refer [test-editor test-manager test-publisher]]
              [write-scheduler :as scheduler]]
@@ -461,7 +461,7 @@
 (deftest copy-live-graph-into-draftset-test
   (let [draftset-id-str (str (UUID/randomUUID))
         draftset-id (->DraftsetId draftset-id-str)
-        live-triples (test-triples (URI. "http://test-subject"))
+        live-triples (gen/generate-triples 1 10)
         live-graph-uri (URI. "http://live")]
     (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str}]
                                      :managed-graphs {live-graph-uri {:is-public true
@@ -479,7 +479,7 @@
 (deftest copy-live-graph-into-existing-draft-graph-in-draftset-test
   (let [draftset-id-str (str (UUID/randomUUID))
         draftset-id (->DraftsetId draftset-id-str)
-        live-triples (test-triples (URI. "http://test-subject"))
+        live-triples (gen/generate-triples 1 10)
         live-graph-uri (URI. "http://live")
         draft-graph-uri (URI. "http://draft")]
     (gen/generate-in *test-backend* {:draftsets [{:id draftset-id-str}]
