@@ -105,18 +105,6 @@
 (defn make-backend []
   (get-backend env))
 
-(defn import-data-to-draft!
-  "Imports the data from the triples into a draft graph associated
-  with the specified graph.  Returns the draft graph uri."
-  ([db graph triples] (import-data-to-draft! db graph triples nil))
-  ([db graph triples draftset-ref]
-
-   (create-managed-graph! db graph)
-   (let [draftset-uri (and draftset-ref (url/->java-uri draftset-ref))
-         draft-graph (create-draft-graph! db graph draftset-uri)]
-     (add db draft-graph triples)
-     draft-graph)))
-
 (defn during-exclusive-write-f [f]
   (let [p (promise)
         latch (CountDownLatch. 1)

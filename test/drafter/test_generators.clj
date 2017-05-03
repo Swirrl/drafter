@@ -33,6 +33,11 @@
         (= ::gen v) (gen/vector triple-gen 0 5)
         :else (gen/return v)))
 
+(defn generate-triples
+  ([] (gen/generate (gen/vector triple-gen)))
+  ([n] (generate-triples n n))
+  ([min max] (gen/generate (gen/vector triple-gen min max))))
+
 (def date-gen (gen/let [y (gen/choose 100 120)
                         m (gen/choose 0 11)
                         d (gen/choose 1 28)]

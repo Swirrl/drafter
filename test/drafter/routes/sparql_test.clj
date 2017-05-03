@@ -1,29 +1,16 @@
 (ns drafter.routes.sparql-test
   (:require [clojure-csv.core :as csv]
             [clojure.test :refer :all]
-            [clojure.tools.logging :as log]
             [drafter
-             [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft! select-all-in-graph stream->string test-triples with-identity wrap-clean-test-db wrap-db-setup]]
-             [timeouts :as timeouts]
-             [user-test :refer [test-editor test-system]]]
+             [test-common :refer [*test-backend* select-all-in-graph stream->string wrap-clean-test-db wrap-db-setup]]
+             [timeouts :as timeouts]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.routes.sparql :refer :all]
+            [drafter.test-generators :as gen]
             [schema.test :refer [validate-schemas]])
-  (:import (java.net URI)))
+  (:import [java.net URI]))
 
 (use-fixtures :each validate-schemas)
-
-(defn add-test-data!
-  "Set the state of the database so that we have three managed graphs,
-  one of which is made public the other two are still private (draft)."
-  [db]
-  (let [draft-made-live-and-deleted (import-data-to-draft! db (URI. "http://test.com/made-live-and-deleted-1") (test-triples (URI. "http://test.com/subject-1")))
-        draft-2 (import-data-to-draft! db (URI. "http://test.com/graph-2") (test-triples (URI. "http://test.com/subject-2")))
-        draft-3 (import-data-to-draft! db (URI. "http://test.com/graph-3") (test-triples (URI. "http://test.com/subject-3")))]
-    (migrate-graphs-to-live! db [draft-made-live-and-deleted])
-    [draft-made-live-and-deleted draft-2 draft-3]))
-
-(def graph-1-result [(URI. "http://test.com/subject-1") (URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")])
 
 (def default-sparql-query {:request-method :get
                            :uri "/sparql/live"
@@ -31,55 +18,57 @@
                            :headers {"accept" "text/csv"}})
 
 (defn- build-query
-  ([endpoint-path query] (build-query endpoint-path query))
-  ([endpoint-path query graphs]
-   (let [query-request (-> default-sparql-query
-                           (assoc-in [:params :query] query)
-                           (assoc :uri endpoint-path))]
-
-     (reduce (fn [req graph]
-               (log/spy (update-in req [:params :graph] (fn [old new]
-                                                          (cond
-                                                            (nil? old) new
-                                                            (instance? String old) [old new]
-                                                            :else (conj old new))) graph)))
-             query-request graphs))))
+  [endpoint-path query]
+  (-> default-sparql-query
+      (assoc-in [:params :query] query)
+      (assoc :uri endpoint-path)))
 
 (defn live-query [qstr]
-  (build-query "/sparql/live" qstr nil))
+  (let [endpoint (live-sparql-routes "/sparql/live" *test-backend* timeouts/calculate-default-request-timeout)
+        request (build-query "/sparql/live" qstr)]
+    (endpoint request)))
 
 (defn csv-> [{:keys [body]}]
   "Parse a response into a CSV"
   (-> body stream->string csv/parse-csv))
 
-(deftest live-sparql-routes-test
-  (let [[draft-graph-1 draft-graph-2] (add-test-data! *test-backend*)
-        endpoint (live-sparql-routes "/sparql/live" *test-backend* timeouts/calculate-default-request-timeout)
-        {:keys [status headers body]
-         :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
-        csv-result (csv-> result)]
+(deftest can-query-live-graphs-test
+  (let [live-graph-uri (URI. "http://live")
+        live-triples (gen/generate-triples 1 10)
+        expected-rows (map #(map str %) (map (juxt :s :p :o) live-triples))]
+    (gen/generate-in *test-backend* {:managed-graphs {live-graph-uri {:is-public true
+                                                                      :triples live-triples
+                                                                      :drafts ::gen/gen}}})
+    (let [{:keys [headers] :as response} (live-query (select-all-in-graph live-graph-uri))
+          csv-result (csv-> response)]
+      (is (= "text/csv" (headers "Content-Type"))
+          "Returns content-type")
 
-    (is (= "text/csv" (headers "Content-Type"))
-        "Returns content-type")
+      (is (= ["s" "p" "o"] (first csv-result)) "Returns CSV")
 
-    (is (= ["s" "p" "o"] (first csv-result))
-        "Returns CSV")
+      (is (= (set expected-rows) (set (rest csv-result)))))))
 
-    (is (= graph-1-result (map #(URI. %) (second csv-result)))
-        "Named (live) graph is publicly queryable")
+(deftest cannot-query-draft-graphs-through-live-endpoint-test
+  (let [live-graph-uri (URI. "http://live")
+        draft-graph-uri (URI. "http://draft")]
+    (gen/generate-in *test-backend* {:draftsets 1
+                                     :managed-graphs {live-graph-uri {:is-public true
+                                                                      :triples ::gen/gen
+                                                                      :drafts {draft-graph-uri {:triples 10}}}}})
 
-    (testing "Draft graphs are not exposed"
-      (let [csv-result (csv-> (endpoint
-                               (live-query (select-all-in-graph draft-graph-2))))]
-        (is (empty? (second csv-result)))))
+    (let [{:keys [headers] :as response} (live-query (select-all-in-graph draft-graph-uri))
+          csv-result (csv-> response)]
+      (is (empty? (rest csv-result))))))
 
-    (testing "Offline public graphs are not exposed"
-      (set-isPublic! *test-backend* "http://test.com/made-live-and-deleted-1" false)
-      (let [csv-result (csv-> (endpoint
-                               (live-query
-                                (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
+(deftest cannot-query-non-public-graphs-through-live-endpoint-test
+  (let [managed-graph-uri (URI. "http://non-public")]
+    (gen/generate-in *test-backend* {:managed-graphs {managed-graph-uri {:is-public false
+                                                                         :triples 10}}})
 
-        (is (not= graph-1-result (second csv-result)))))))
+    (let [response (live-query (select-all-in-graph managed-graph-uri))
+          csv-result (csv-> response)]
+      (is (= ["s" "p" "o"] (first csv-result)))
+      (is (empty? (rest csv-result))))))
 
 (use-fixtures :once wrap-db-setup)
 (use-fixtures :each (partial wrap-clean-test-db))
