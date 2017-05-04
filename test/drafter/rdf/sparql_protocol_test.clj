@@ -3,59 +3,60 @@
             [clojure.test :refer :all]
             [drafter.rdf.sparql-protocol :refer :all]
             [drafter.test-common :refer :all]
+            [drafter.test-generators :as gen]
             [grafter.rdf :as rdf]
             [grafter.rdf
              [formats :refer [rdf-ntriples]]
              [protocols :as pr]]
             [schema.test :refer [validate-schemas]])
-  (:import [java.util.concurrent CountDownLatch TimeUnit]
-           [java.net URI]))
+  (:import [java.util.concurrent CountDownLatch TimeUnit]))
 
 (use-fixtures :each validate-schemas)
 
-(defn add-triple-to-db [db]
-  (pr/add db (URI. "http://foo.com/my-graph") (test-triples (URI. "http://test.com/data/one"))))
+(defn- triples->row-set [triples]
+  (set (map #(mapv str %) (map (juxt :s :p :o) triples))))
 
 (deftest sparql-end-point-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
-    (testing "Standard SPARQL query with no dataset restrictions"
-      (let [{:keys [status headers body]
-             :as result} (end-point {:request-method :get
-                                     :uri "/live/sparql"
-                                     :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
-                                     :headers {"accept" "text/csv"}})]
+  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)
+        triples (gen/generate-triples 5 10)
+        expected-rows (triples->row-set triples)]
+    (pr/add *test-backend* triples)
+    (let [{:keys [status headers body]
+           :as result} (end-point {:request-method :get
+                                   :uri "/live/sparql"
+                                   :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
+                                   :headers {"accept" "text/csv"}})
+          csv-result (csv/parse-csv (stream->string body))]
 
-        (is (= 200 status))
-        (is (= "text/csv" (headers "Content-Type")))
+      (is (= 200 status))
+      (is (= "text/csv" (headers "Content-Type")))
 
-        (let [csv-result (csv/parse-csv (stream->string body))]
-          (is (= ["s" "p" "o"] (first csv-result)))
-          (is (= ["http://test.com/data/one" "http://test.com/hasProperty" "http://test.com/data/1"]
-                 (second csv-result))))))))
-
-(defn get-spo-set [triples]
-  (set (map (fn [{:keys [s p o]}] [s p o]) triples)))
+      (is (= ["s" "p" "o"] (first csv-result)))
+      (is (= expected-rows (set (rest csv-result)))))))
 
 (deftest sparql-end-point-graph-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
-    (testing "Standard SPARQL query with multiple accepted MIME types and qualities"
+  (testing "Standard SPARQL query with multiple accepted MIME types and qualities"
+    (let [end-point (sparql-end-point "/live/sparql" *test-backend*)
+          triples (gen/generate-triples 5 10)]
+
+      (pr/add *test-backend* triples)
+
       (let [{:keys [status headers body]
-             :as result} (end-point {:request-method :get
-                                     :uri "/live/sparql"
-                                     :params {:query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
-                                     :headers {"accept" "text/csv;q=0.7,text/unknown,application/n-triples;q=0.9"}})]
+             :as   result} (end-point {:request-method :get
+                                       :uri            "/live/sparql"
+                                       :params         {:query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
+                                       :headers        {"accept" "text/csv;q=0.7,text/unknown,application/n-triples;q=0.9"}})]
 
         (is (= 200 status))
         (is (= "application/n-triples" (headers "Content-Type")))
 
-        (let [triple-reader (java.io.InputStreamReader. body)
-              triples (get-spo-set (rdf/statements triple-reader :format rdf-ntriples))
-              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
-
-          (is (= expected-triples triples)))))))
+        (let [result-statements (set (rdf/statements body :format rdf-ntriples))]
+          (is (= (set triples) result-statements)))))))
 
 (deftest sparql-end-point-tuple-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
+  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)
+        triples (gen/generate-triples 1 10)]
+    (pr/add *test-backend* triples)
     (testing "Tuple SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]} (end-point {:request-method :get
                                                       :uri "/live/sparql"
@@ -66,26 +67,26 @@
         (is (= "text/csv" (headers "Content-Type")))
 
         (let [csv-result (csv/parse-csv (stream->string body))
-              triples (set (map (fn [row] (map #(URI. %) row)) (drop 1 csv-result)))
-              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
+              expected-rows (triples->row-set triples)]
           (is (= ["s" "p" "o"] (first csv-result)))
-          (is (= expected-triples triples)))))))
+          (is (= expected-rows (set (rest csv-result)))))))))
 
 (deftest sparql-end-point-boolean-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
-    (testing "Boolean SPARQL query with multiple accepted MIME types and qualities"
-      (let [{:keys [status headers body]
-             :as result} (end-point {:request-method :get
-                                     :uri "/live/sparql"
-                                     :params {:query "ASK WHERE { ?s ?p ?o }"}
-                                     :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,*/*;q=0.8"
-                                               "Accept-Charset" "utf-8"}})]
+  (testing "Boolean SPARQL query with multiple accepted MIME types and qualities"
+    (pr/add *test-backend* (gen/generate-triples 1 10))
+    (let [endpoint (sparql-end-point "/live/sparql" *test-backend*)
+          {:keys [status headers body]
+           :as result} (endpoint {:request-method :get
+                                  :uri "/live/sparql"
+                                  :params {:query "ASK WHERE { ?s ?p ?o }"}
+                                  :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,*/*;q=0.8"
+                                            "Accept-Charset" "utf-8"}})]
 
-        (is (= 200 status))
-        (is (= "text/plain; charset=utf-8" (headers "Content-Type")))
+      (is (= 200 status))
+      (is (= "text/plain; charset=utf-8" (headers "Content-Type")))
 
-        (let [body-str (stream->string body)]
-          (is (= "true" body-str)))))))
+      (let [body-str (stream->string body)]
+        (is (= "true" body-str))))))
 
 (deftest sparql-endpoint-sets-content-type-text-plain-if-html-requested
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
@@ -99,7 +100,7 @@
         (is (= 200 status))
         (is (= "text/plain; charset=utf-8" (headers "Content-Type")))))))
 
-(deftest sparlq-endpoint-invalid-query
+(deftest sparql-endpoint-invalid-query
   (testing "SPARQL endpoint returns client error if SPARQL query invalid"
     (let [endpoint (sparql-end-point "/live/sparql" *test-backend*)
           request {:request-method :get
@@ -139,5 +140,4 @@
 
 (use-fixtures :once wrap-db-setup)
 
-(use-fixtures :each (partial wrap-clean-test-db
-                             add-triple-to-db))
+(use-fixtures :each wrap-clean-test-db)
