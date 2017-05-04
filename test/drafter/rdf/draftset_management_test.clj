@@ -22,8 +22,7 @@
             [grafter.rdf.repository :as repo]
             [grafter.url :as url])
   (:import org.openrdf.rio.RDFFormat
-           (java.net URI)
-           (java.util UUID)))
+           [java.net URI]))
 
 (defn- has-uri-object? [s p uri-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
@@ -137,22 +136,22 @@
 (deftest delete-draftset!-test
   (let [draftset-id (gen/generate-draftset-id)
         ns (range 1 10)
-        draftset-uris (mapv #(URI. (str "http://draft" %)) (range 1 3))
         live-graphs (map #(URI. (str "http://live" %)) ns)
         draft-graphs (map #(URI. (str "http://draft" %)) ns)
-        mg-spec (into {} (map (fn [mg dg] [mg {:drafts {dg ::gen/gen}}]) live-graphs draft-graphs))
-        spec {:draftsets [{:id draftset-id :owned-by test-editor}]
+        mg-spec (into {} (map (fn [mg] [mg ::gen/gen]) live-graphs))
+        dg-spec (into {} (map (fn [mg dg] {mg {:uri dg}}) live-graphs draft-graphs))
+        spec {:draftsets [{:id draftset-id :owned-by test-editor :drafts dg-spec}]
               :managed-graphs mg-spec}]
     (gen/generate-in *test-backend* spec)
 
-    (doseq [dg draftset-uris]
+    (doseq [dg draft-graphs]
       (is (= true (mgmth/draft-exists? *test-backend* dg))))
 
     (delete-draftset! *test-backend* draftset-id)
 
     (is (= false (draftset-exists? *test-backend* draftset-id)))
 
-    (doseq [dg draftset-uris]
+    (doseq [dg draft-graphs]
       (is (= false (mgmth/draft-exists? *test-backend* dg))))))
 
 (deftest get-draftest-graph-mapping-test
@@ -160,9 +159,10 @@
         live-graphs (map #(URI. (str "http://live" %)) ns)
         draft-graphs (map #(URI. (str "http://draft" %)) ns)
         draftset-id (gen/generate-draftset-id)
-        mg-spec (into {} (map (fn [mg dg] [mg {:drafts {dg ::gen}}]) live-graphs draft-graphs))
+        mg-spec (into {} (map (fn [mg] [mg ::gen/gen]) live-graphs))
+        dg-spec (into {} (map (fn [mg dg] [mg {:uri dg :triples ::gen/gen}]) live-graphs draft-graphs))
         spec {:managed-graphs mg-spec
-              :draftsets [{:id draftset-id :created-by test-editor}]}]
+              :draftsets [{:id draftset-id :created-by test-editor :drafts dg-spec}]}]
     (gen/generate-in *test-backend* spec)
     (let [mapping (get-draftset-graph-mapping *test-backend* draftset-id)]
       (is (= (zipmap live-graphs draft-graphs) mapping)))))
@@ -181,7 +181,7 @@
     (let [live-graph (URI. "http://live")
           draftset-id (gen/generate-draftset-id)]
       (gen/generate-in *test-backend* {:draftsets [{:id draftset-id :title "Test draftset"}]
-                                       :managed-graphs {live-graph {:is-public true :drafts {}}}})
+                                       :managed-graphs {live-graph {:is-public true}}})
       (delete-draftset-graph! *test-backend* draftset-id live-graph)
 
       (is (mgmt/is-graph-managed? *test-backend* live-graph))
@@ -195,10 +195,9 @@
     (let [live-graph (URI. "http://live")
           draft-graph (URI. "http://draft")
           draftset-id (gen/generate-draftset-id)
-          spec {:draftsets [{:id draftset-id}]
-                :managed-graphs {live-graph {:is-public true
-                                             :drafts {draft-graph {:draftset-uri (url/->java-uri draftset-id)
-                                                                   :triples 10}}}}}]
+          spec {:managed-graphs {live-graph {:is-public true}}
+                :draftsets [{:id draftset-id :drafts {live-graph {:uri draft-graph
+                                                                  :triples 10}}}]}]
       (gen/generate-in *test-backend* spec)
 
       (is (mgmth/draft-exists? *test-backend* draft-graph))
@@ -377,10 +376,10 @@
   (let [live-graph (URI. "http://live")
         draft-graph (URI. "http://draft")
         draftset-id (gen/generate-draftset-id)]
-    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
-                                     :managed-graphs {live-graph {:is-public false
-                                                                  :triples []
-                                                                  :drafts {draft-graph {:triples 10}}}}})
+    (gen/generate-in *test-backend* {:managed-graphs {live-graph {:is-public false
+                                                                  :triples []}}
+                                     :draftsets [{:id draftset-id :drafts {live-graph {:uri draft-graph
+                                                                                       :triples 10}}}]})
     (let [result (revert-graph-changes! *test-backend* draftset-id live-graph)]
       (is (= :reverted result))
       (is (= false (mgmth/draft-exists? *test-backend* draft-graph)))
@@ -390,10 +389,10 @@
   (let [live-graph-uri (URI. "http://live")
         draftset-id (gen/generate-draftset-id)
         draft-graph-uri (URI. "http://draft")]
-    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
-                                     :managed-graphs {live-graph-uri {:is-public true
-                                                                      :triples 5
-                                                                      :drafts {draft-graph-uri {:triples 6}}}}})
+    (gen/generate-in *test-backend* {:managed-graphs {live-graph-uri {:is-public true
+                                                                      :triples 5}}
+                                     :draftsets [{:id draftset-id :drafts {live-graph-uri {:uri draft-graph-uri
+                                                                                           :triples 6}}}]})
     (let [result (revert-graph-changes! *test-backend* draftset-id live-graph-uri)]
       (is (= :reverted result))
       (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
@@ -405,14 +404,11 @@
         ds2-id (gen/generate-draftset-id)
         draft1-uri (URI. "http://draft1")
         draft2-uri (URI. "http://draft2")]
-    (gen/generate-in *test-backend* {:draftsets [{:id ds1-id}
-                                                 {:id ds2-id}]
-                                     :managed-graphs {live-graph-uri {:is-public true
-                                                                      :triples ::gen/gen
-                                                                      :drafts {draft1-uri {:draftset-uri (url/->java-uri ds1-id)
-                                                                                           :triples ::gen/gen}
-                                                                               draft2-uri {:draftset-uri (url/->java-uri ds2-id)
-                                                                                           :triples ::gen/gen}}}}})
+    (gen/generate-in *test-backend* {:managed-graphs {live-graph-uri {:is-public true :triples ::gen/gen}}
+                                     :draftsets [{:id ds1-id :drafts {live-graph-uri {:uri draft1-uri
+                                                                                      :triples ::gen/gen}}}
+                                                 {:id ds2-id :drafts {live-graph-uri {:uri draft2-uri
+                                                                                      :triples ::gen/gen}}}]})
     (let [result (revert-graph-changes! *test-backend* ds2-id live-graph-uri)]
       (is (= :reverted result))
       (is (mgmt/is-graph-managed? *test-backend* live-graph-uri))
@@ -429,8 +425,7 @@
 (deftest revert-changes-in-non-existent-draftset
   (let [live-graph (URI. "http://live")]
     (gen/generate-in *test-backend* {:draftsets []
-                                     :managed-graphs {live-graph {:is-public true
-                                                                  :drafts {}}}})
+                                     :managed-graphs {live-graph {:is-public true}}})
     (let [result (revert-graph-changes! *test-backend* (->DraftsetId "missing") live-graph)]
       (is (= :not-found result)))))
 
@@ -460,10 +455,10 @@
         live-triples (gen/generate-triples 1 10)
         live-graph-uri (URI. "http://live")
         draft-graph-uri (URI. "http://draft")]
-    (gen/generate-in *test-backend* {:draftsets [{:id draftset-id}]
-                                     :managed-graphs {live-graph-uri {:is-public true
-                                                                      :triples live-triples
-                                                                      :drafts {draft-graph-uri {:triples 8}}}}})
+    (gen/generate-in *test-backend* {:managed-graphs {live-graph-uri {:is-public true
+                                                                      :triples live-triples}}
+                                     :draftsets [{:id draftset-id :drafts {live-graph-uri {:uri draft-graph-uri
+                                                                                           :triples 8}}}]})
 
     (let [{:keys [value-p] :as copy-job} (copy-live-graph-into-draftset-job *test-backend* draftset-id live-graph-uri)]
 

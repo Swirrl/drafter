@@ -46,14 +46,13 @@
     (is (empty? missing))))
 
 (deftest is-graph-managed?-test
-  (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false
-                                                                     :drafts ::gen/gen}}})]
+  (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})]
     (is (is-graph-managed? r test-graph-uri))))
 
 (deftest create-managed-graph!-test
   (let [r (repo/repo)
-        expected (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public false :drafts {} :triples []}}
-                                           :draftsets {}})]
+        expected (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public false :triples []}}
+                                           :draftsets []})]
     (create-managed-graph! r test-graph-uri)
     (assert-statements-exist r expected)))
 
@@ -63,19 +62,18 @@
       (is (= false (is-graph-live? r (URI. "http://missing"))))))
 
   (testing "Non-live graph"
-    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false :drafts ::gen/gen}}})]
+    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})]
       (is (= false (is-graph-live? repo test-graph-uri)))))
 
   (testing "Live graph"
-    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true :drafts ::gen/gen}}})]
+    (let [repo (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true}}})]
       (is (is-graph-live? repo test-graph-uri)))))
 
 (deftest create-draft-graph!-test
   (testing "within draft set"
     (let [draftset-id (UUID/randomUUID)
           ds-uri (draftset-id->uri draftset-id)
-          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false
-                                                                       :drafts {}}}})]
+          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})]
       (let [draft-graph-uri (create-draft-graph! r test-graph-uri (->DraftsetId draftset-id))]
         (mgmt/draft-exists? r draft-graph-uri)
         (is (= true (repo/query r (str
@@ -88,26 +86,26 @@
 (deftest lookup-live-graph-test
   (testing "lookup-live-graph"
     (let [draft-graph-uri (URI. "http://draft")
-          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true :drafts {draft-graph-uri ::gen/gen}}}})
+          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true}}
+                                      :draftsets [{:drafts {test-graph-uri {:uri draft-graph-uri :triples ::gen/gen}}}]})
           found-graph-uri (lookup-live-graph r draft-graph-uri)]
       (is (= test-graph-uri found-graph-uri)))))
 
 (deftest set-isPublic!-test
   (testing "set-isPublic!"
-    (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false :drafts {}}}})
+    (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})
           expected (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public true
-                                                                              :triples []
-                                                                              :drafts {}}}
-                                             :draftsets {}})]
+                                                                              :triples []}}
+                                             :draftsets []})]
       (set-isPublic! r test-graph-uri true)
       (assert-statements-exist r expected))))
 
 (deftest migrate-graphs-to-live!-test
   (testing "migrate-graphs-to-live! data is migrated"
     (let [draft-graph-uri (URI. "http://draft1")
-          ss (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public false
-                                                                        :drafts {draft-graph-uri {:triples 5}}
-                                                                        :triples []}}})
+          ss (gen/generate-statements {:managed-graphs {test-graph-uri {:is-public false :triples []}}
+                                       :draftsets [{:drafts {test-graph-uri {:uri draft-graph-uri
+                                                                             :triples 5}}}]})
           expected-live-statements (map #(assoc % :c test-graph-uri) (filter #(= draft-graph-uri (:c %)) ss))
           db (doto (repo/repo) (add ss))]
       (migrate-graphs-to-live! db [draft-graph-uri])
@@ -136,11 +134,13 @@
           draft-graph-to-del-uri (URI. "http://draft1")
           draft-graph-to-keep-uri (URI. "http://draft2")
           r (gen/generate-repository {:managed-graphs {test-graph-to-delete-uri {:is-public true
-                                                                                 :triples 6
-                                                                                 :drafts {draft-graph-to-del-uri {:triples []}}}
+                                                                                 :triples 6}
                                                        graph-to-keep-uri {:is-public true
-                                                                          :triples 5
-                                                                          :drafts {draft-graph-to-keep-uri ::gen/gen}}}})]
+                                                                          :triples 5}}
+                                      :draftsets [{:drafts {test-graph-to-delete-uri {:uri draft-graph-to-del-uri
+                                                                                      :triples []}
+                                                            graph-to-keep-uri {:uri draft-graph-to-keep-uri
+                                                                               :triples ::gen/gen}}}]})]
 
       (migrate-graphs-to-live! r [draft-graph-to-del-uri])
       ;;live graph should be deleted
@@ -163,12 +163,14 @@
           other-live-uri (URI. "http://example.org/keep-me-b2")
           other-live-draft-uri (URI. "http://draft3")
           r (gen/generate-repository {:managed-graphs {deleting-live-uri {:is-public true
-                                                                                 :triples ::gen/gen
-                                                                                 :drafts {deleting-draft-1-uri {:triples []}
-                                                                                          deleting-draft-2-uri ::gen/gen}}
+                                                                          :triples ::gen/gen}
                                                        other-live-uri {:is-public true
-                                                                           :triples ::gen/gen
-                                                                           :drafts {other-live-draft-uri ::gen/gen}}}})]
+                                                                       :triples ::gen/gen}}
+                                      :draftsets [{:drafts {deleting-live-uri {:uri deleting-draft-1-uri
+                                                                               :triples []}
+                                                            other-live-uri {:uri other-live-draft-uri
+                                                                            :triples ::gen/gen}}}
+                                                  {:drafts {deleting-live-uri {:uri deleting-draft-2-uri}}}]})]
 
       ;;migrate empty draft graph to live - this should delete the live graph data
       (migrate-graphs-to-live! r [deleting-draft-1-uri])
@@ -196,8 +198,10 @@
         live-2 (URI. "http://real/graph/2")
         draft-1 (URI. "http://draft1")
         draft-2 (URI. "http://draft2")
-        r (gen/generate-repository {:managed-graphs {live-1 {:is-public false :drafts {draft-1 ::gen/gen}}
-                                                     live-2 {:is-public false :drafts {draft-2 ::gen/gen}}}})]
+        r (gen/generate-repository {:managed-graphs {live-1 {:is-public false}
+                                                     live-2 {:is-public false}}
+                                    :draftsets [{:drafts {live-1 {:uri draft-1 :triples ::gen/gen}
+                                                          live-2 {:uri draft-2 :triples ::gen/gen}}}]})]
 
        (testing "draft-graphs returns all draft graphs"
          (is (= #{draft-1 draft-2} (mgmt/draft-graphs r))))
@@ -210,9 +214,10 @@
         live-2 (URI. "http://live2")
         draft-1 (URI. "http://draft1")
         draft-2 (URI. "http://draft2")
-        db (gen/generate-repository {:managed-graphs {live-1 {:drafts {draft-1 ::gen/gen}}
-                                                      live-2 {:drafts {draft-2 ::gen/gen}}}
-                                     :draftsets {}})
+        db (gen/generate-repository {:managed-graphs {live-1 ::gen/gen
+                                                      live-2 ::gen/gen}
+                                     :draftsets [{:drafts {live-1 {:uri draft-1 :triples ::gen/gen}
+                                                           live-2 {:uri draft-2 :triples ::gen/gen}}}]})
         gm (graph-map db #{draft-1 draft-2})]
     (is (= {live-1 draft-1 live-2 draft-2} gm))))
 
@@ -236,8 +241,9 @@
     (let [draft-graph-uri (URI. "http://draft")
           live-graph-uri (URI. "http://live")
           ds-uri (URI. "http://draftset")
-          initial-statements (gen/generate-statements {:managed-graphs {live-graph-uri {:is-public false
-                                                                                        :drafts {draft-graph-uri {:draftset-uri ds-uri}}}}})
+          initial-statements (gen/generate-statements {:managed-graphs {live-graph-uri {:is-public false}}
+                                                       :draftsets [{:uri ds-uri
+                                                                    :drafts {live-graph-uri {:uri draft-graph-uri}}}]})
           r (doto (repo/repo) (add initial-statements))
           initial-mapping {live-graph-uri draft-graph-uri}
           {found-draft-uri :draft-graph-uri graph-map :graph-map} (ensure-draft-exists-for r live-graph-uri initial-mapping ds-uri)]
@@ -246,8 +252,7 @@
       (is (= initial-mapping graph-map))))
 
   (testing "Live graph exists without draft"
-    (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false
-                                                                       :drafts {}}}})
+    (let [r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}})
           ds-uri (URI. "http://draftset")
           {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for r test-graph-uri {} ds-uri)]
       (mgmt/draft-exists? r draft-graph-uri)
@@ -264,8 +269,8 @@
 (deftest delete-draft-graph!-test
   (testing "only draft for non-live graph"
     (let [draft-graph-uri (URI. "http://draft-graph")
-          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false
-                                                                       :drafts {draft-graph-uri ::gen/gen}}}})]
+          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public false}}
+                                      :draftsets [{:drafts {test-graph-uri {:uri draft-graph-uri}}}]})]
       (delete-draft-graph! r draft-graph-uri)
 
       ;;draft and live graph should be deleted
@@ -274,18 +279,22 @@
 
   (testing "only draft for live graph"
     (let [draft-graph-uri (URI. "http://draft-graph")
-          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true
-                                                                       :drafts {draft-graph-uri ::gen/gen}}}})]
+          r (gen/generate-repository {:managed-graphs {test-graph-uri {:is-public true}}
+                                      :draftsets [{:drafts {test-graph-uri {:uri draft-graph-uri
+                                                                            :triples ::gen/gen}}}]})]
       (delete-draft-graph! r draft-graph-uri)
       (is (= true (is-graph-managed? r test-graph-uri)))
       (is (= false (mgmt/draft-exists? r draft-graph-uri)))))
 
   (testing "Draft for managed graph with other graphs"
-    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
+    (let [live-graph-uri (URI. "http://live")
           draft-graph-1 (URI. "http://draft1")
           draft-graph-2 (URI. "http://draft2")
-          r (gen/generate-repository {:managed-graphs {live-graph-uri {:drafts {draft-graph-1 ::gen/gen
-                                                                                draft-graph-2 ::gen/gen}}}})]
+          r (gen/generate-repository {:managed-graphs {live-graph-uri ::gen/gen}
+                                      :draftsets [{:drafts {live-graph-uri {:uri draft-graph-1
+                                                                            :triples ::gen/gen}}}
+                                                  {:drafts {live-graph-uri {:uri draft-graph-2
+                                                                            :triples ::gen/gen}}}]})]
 
       (delete-draft-graph! r draft-graph-2)
 
@@ -324,7 +333,9 @@
 (deftest set-timestamp-test
   (let [draft-graph-uri (URI. "http://draft-graph")
         modified-date (Date.)
-        r (gen/generate-repository {:managed-graphs {test-graph-uri {:drafts {draft-graph-uri ::gen/gen}}}})]
+        r (gen/generate-repository {:managed-graphs {test-graph-uri ::gen/gen}
+                                    :draftsets [{:drafts {test-graph-uri {:uri draft-graph-uri
+                                                                          :triples ::gen/gen}}}]})]
     (set-modifed-at-on-draft-graph! r draft-graph-uri modified-date)
 
     (is (repo/query r

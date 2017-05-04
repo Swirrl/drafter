@@ -51,14 +51,13 @@
 
 (defn make-draft-graph-gen
   ([] (make-draft-graph-gen ::gen))
-  ([spec] (make-draft-graph-gen spec nil))
-  ([{:keys [draftset-uri triples created] :as spec} ds-uri-gen]
+  ([{:keys [uri triples created] :as spec}]
    (if (= ::gen spec)
-     (make-draft-graph-gen {:triples ::gen} ds-uri-gen)
-     (let [ds-uri-gen (if (nil? draftset-uri) (or ds-uri-gen draftset-uri-gen) (gen/return draftset-uri))
+     (make-draft-graph-gen {:triples ::gen})
+     (let [uri-gen (if (some? uri) (gen/return uri) draft-graph-uri-gen)
            created-gen (if (nil? created) date-gen (gen/return created))]
-       (gen/hash-map :draftset-uri ds-uri-gen
-                     :triples (make-triples-gen triples)
+       (gen/hash-map :triples (make-triples-gen triples)
+                     :uri uri-gen
                      :created created-gen)))))
 
 (defn- gen-pairs->map-gen
@@ -68,38 +67,35 @@
   (gen/fmap #(into {} %) (apply gen/tuple gen-pairs)))
 
 (defn- make-drafts-gen
-  ([v] make-drafts-gen v nil)
-  ([v ds-uri-gen]
+  ([spec] (make-drafts-gen spec managed-graph-uri-gen))
+  ([v mg-uri-gen]
    (cond
-     (number? v) (gen/map draft-graph-uri-gen (make-draft-graph-gen ::gen ds-uri-gen) {:num-elements v})
-     (= ::gen v) (gen/map draft-graph-uri-gen (make-draft-graph-gen ::gen ds-uri-gen) {:max-elements 5})
-     (map? v) (let [gen-pairs (map (fn [[k v]] (gen/tuple (gen/return k) (make-draft-graph-gen v ds-uri-gen))) v)]
+     (number? v) (gen/map mg-uri-gen (make-draft-graph-gen ::gen) {:num-elements v})
+     (= ::gen v) (gen/map mg-uri-gen (make-draft-graph-gen ::gen) {:max-elements 5})
+     (map? v) (let [gen-pairs (map (fn [[k v]] (gen/tuple (gen/return k) (make-draft-graph-gen v))) v)]
                 (gen-pairs->map-gen gen-pairs))
      (nil? v) (gen/return {})
      :else (throw (RuntimeException. "Expected ::gen, map, nil or number of drafts in drafts spec")))))
 
 (defn- make-managed-graph-gen
-  ([spec] (make-managed-graph-gen spec nil))
-  ([spec ds-uri-gen]
-   (cond
-     (= ::gen spec) (make-managed-graph-gen {:triples ::gen :drafts ::gen} ds-uri-gen)
-     (map? spec) (let [{:keys [is-public triples drafts]} spec
-                       is-public-gen (if (nil? is-public) gen/boolean (gen/return is-public))]
-                   (gen/hash-map :is-public is-public-gen
-                                 :triples (make-triples-gen triples)
-                                 :drafts (make-drafts-gen drafts ds-uri-gen)))
-     :else (throw (RuntimeException. "Expected ::gen or map for managed graph spec")))))
+  [spec]
+  (cond
+    (= ::gen spec) (make-managed-graph-gen {:triples ::gen})
+    (map? spec) (let [{:keys [is-public triples]} spec
+                      is-public-gen (if (nil? is-public) gen/boolean (gen/return is-public))]
+                  (gen/hash-map :is-public is-public-gen
+                                :triples (make-triples-gen triples)))
+    :else (throw (RuntimeException. "Expected ::gen or map for managed graph spec"))))
 
 (defn- make-managed-graphs-gen
-  ([spec] (make-managed-graphs-gen spec nil))
-  ([spec ds-uri-gen]
-   (cond
-     (number? spec) (gen/map managed-graph-uri-gen (make-managed-graph-gen ::gen ds-uri-gen) {:num-elements spec})
-     (= ::gen spec) (gen/map managed-graph-uri-gen (make-managed-graph-gen ::gen ds-uri-gen) {:max-elements 5})
-     (map? spec) (let [gen-pairs (map (fn [[k v]] (gen/tuple (gen/return k) (make-managed-graph-gen v ds-uri-gen))) spec)]
-                   (gen-pairs->map-gen gen-pairs))
-     (nil? spec) (make-managed-graphs-gen {} ds-uri-gen)
-     :else (throw (RuntimeException. "Expected ::gen, nil, number or map for managed graphs spec")))))
+  [spec]
+  (cond
+    (number? spec) (gen/map managed-graph-uri-gen (make-managed-graph-gen ::gen) {:num-elements spec})
+    (= ::gen spec) (gen/map managed-graph-uri-gen (make-managed-graph-gen ::gen) {:max-elements 5})
+    (map? spec) (let [gen-pairs (map (fn [[k v]] (gen/tuple (gen/return k) (make-managed-graph-gen v))) spec)]
+                  (gen-pairs->map-gen gen-pairs))
+    (nil? spec) (make-managed-graphs-gen {})
+    :else (throw (RuntimeException. "Expected ::gen, nil, number or map for managed graphs spec"))))
 
 (def role-gen (gen/elements user/roles))
 
@@ -118,34 +114,38 @@
                         :else (throw (RuntimeException. "user or role required for draftset submission"))))
         :else (throw (RuntimeException. "Expected ::gen or map for draftset submission spec"))))
 
-(defn- make-draftset-gen [{:keys [created-by owned-by submission created-at title description id] :as spec}]
-  (let [id-gen (if (some? id) (gen/return id) draftset-id-gen)
-        uri-gen (gen/fmap url/->java-uri id-gen)
-        created-by-gen (if (some? created-by) (gen/return created-by) user-gen)
-        created-at-gen (if (some? created-at) (gen/return created-at) date-gen)
-        owned-by-gen (gen/return owned-by)
-        submission-gen (if (some? submission) (make-submission-gen submission) (gen/return nil))]
-    (gen/hash-map :id id-gen
-                  :uri uri-gen
-                  :title (gen/return title)
-                  :description (gen/return description)
-                  :created-at created-at-gen
-                  :created-by created-by-gen
-                  :owned-by owned-by-gen
-                  :submission submission-gen)))
+(defn- make-draftset-gen
+  ([spec] (make-draftset-gen spec managed-graph-uri-gen))
+  ([{:keys [created-by owned-by submission created-at title description id drafts] :as spec} mg-uri-gen]
+   (let [id-gen (if (some? id) (gen/return id) draftset-id-gen)
+         uri-gen (gen/fmap url/->java-uri id-gen)
+         created-by-gen (if (some? created-by) (gen/return created-by) user-gen)
+         created-at-gen (if (some? created-at) (gen/return created-at) date-gen)
+         owned-by-gen (cond (some? owned-by) (gen/return owned-by)
+                            (some? submission) (gen/return nil)
+                            :else user-gen)
+         submission-gen (if (some? submission) (make-submission-gen submission) (gen/return nil))
+         drafts-gen (make-drafts-gen drafts mg-uri-gen)]
+     (gen/hash-map :id id-gen
+                   :uri uri-gen
+                   :title (gen/return title)
+                   :description (gen/return description)
+                   :created-at created-at-gen
+                   :created-by created-by-gen
+                   :owned-by owned-by-gen
+                   :submission submission-gen
+                   :drafts drafts-gen))))
 
-(defn- make-draftsets-gen [spec]
-  (cond (number? spec) (gen/vector (make-draftset-gen {}) spec)
-        (= ::gen spec) (gen/vector (make-draftset-gen {}) 1 5)
-        (coll? spec) (apply gen/tuple (map make-draftset-gen spec))
-        (nil? spec) (make-draftsets-gen 1)))
+(defn- make-draftsets-gen
+  ([spec] (make-draftsets-gen spec managed-graph-uri-gen))
+  ([spec mg-uri-gen]
+   (cond (number? spec) (gen/vector (make-draftset-gen {} mg-uri-gen) spec)
+         (= ::gen spec) (gen/vector (make-draftset-gen {} mg-uri-gen) 1 5)
+         (coll? spec) (apply gen/tuple (map #(make-draftset-gen % mg-uri-gen) spec))
+         (nil? spec) (gen/return []))))
 
 (comment {:managed-graphs {"http://woo" {:is-public false
-                                         :triples []
-                                         :drafts {"http://draft1" {:draftset-uri "http://draftset1"}
-                                                  "http://draft2" {:draftset-uri "http://draft2"
-                                                                   :triples []
-                                                                   :created (Date.)}}}}
+                                         :triples []}}
           :draftsets [{:uri "http://draftset1"
                        :created-by test-editor
                        :owned-by test-publisher
@@ -154,7 +154,12 @@
                        :description "description"
                        :id (UUID/randomUUID)
                        :created-at (Date.)
-                       :modified-at (Date.)}]})
+                       :modified-at (Date.)
+                       :drafts {"http://live1" {:uri "http://draft1"
+                                                :triples []
+                                                :created (Date.)}
+                                "http://live2" {:uri "http://draft2"
+                                                :triples ::gen}}}]})
 
 (defn- submission-statements [submission-uri {:keys [role user]}]
   (let [po (if (some? role)
@@ -165,8 +170,16 @@
                   po]]
     (to-quads template)))
 
-(defn- draftset-statements [{:keys [uri created-by owned-by created-at submission modified-at title description]}]
+(defn- draft-graph-statements [managed-graph-uri draftset-uri {:keys [uri triples created]}]
+  ;;TODO: add modified time to draft graph spec?
+  (let [created-at (or created (Date.))
+        state-quads (apply graph drafter-state-graph (create-draft-graph managed-graph-uri uri created-at draftset-uri))
+        graph-quads (map #(assoc % :c uri) triples)]
+    (concat state-quads graph-quads)))
+
+(defn- draftset-statements [{:keys [uri created-by owned-by created-at submission modified-at title description drafts]}]
   (let [user-uri (user/user->uri created-by)
+        draft-graph-quads (mapcat (fn [[mg dg-spec]] (draft-graph-statements mg uri dg-spec)) drafts)
         template [uri
                   [rdf:a drafter:DraftSet]
                   [drafter:createdAt created-at]
@@ -181,39 +194,32 @@
                            [drafter:hasSubmission submission-uri]
                            [drafter:submittedBy user-uri]   ;TODO: allow submitting user to be specified
                            )]
-        (concat (to-quads template) submission-quads))
+        (concat (to-quads template) submission-quads draft-graph-quads))
       (let [owned-by (or owned-by created-by)
             template (conj template [drafter:hasOwner (user/user->uri owned-by)])]
-        (to-quads template)))))
+        (concat (to-quads template) draft-graph-quads)))))
 
 (defn- draftsets-statements [draftsets]
   (mapcat draftset-statements draftsets))
 
-(defn- draft-graph-statements [managed-graph-uri draft-graph-uri {:keys [draftset-uri triples created]}]
-  ;;TODO: add modified time to draft graph spec?
-  (let [created-at (or created (Date.))
-        state-quads (apply graph drafter-state-graph (create-draft-graph managed-graph-uri draft-graph-uri created-at draftset-uri))
-        graph-quads (map #(assoc % :c draft-graph-uri) triples)]
-    (concat state-quads graph-quads)))
-
-(defn- managed-graph-statements [graph-uri {:keys [is-public triples drafts]}]
+(defn- managed-graph-statements [graph-uri {:keys [is-public triples]}]
   (let [state-quads (graph drafter-state-graph [graph-uri
                                                 [rdf:a drafter:ManagedGraph]
                                                 [drafter:isPublic is-public]])
-        graph-quads (map #(assoc % :c graph-uri) triples)
-        draft-quads (mapcat (fn [[dg dg-spec]] (draft-graph-statements graph-uri dg dg-spec)) drafts)]
-    (concat state-quads graph-quads draft-quads)))
+        graph-quads (map #(assoc % :c graph-uri) triples)]
+    (concat state-quads graph-quads)))
 
 (defn- managed-graphs-statements [graphs]
   (mapcat (fn [[uri def]] (managed-graph-statements uri def)) graphs))
 
 (defn make-spec-gen [spec]
-  (let [draftsets-gen (make-draftsets-gen (:draftsets spec))
-        draftsets (gen/generate draftsets-gen)
-        draftset-uris (map :uri draftsets)
-        ds-uri-gen (if (seq draftset-uris) (gen/elements draftset-uris) draftset-uri-gen)]
+  (let [managed-graphs-gen (make-managed-graphs-gen (:managed-graphs spec))
+        managed-graphs (gen/generate managed-graphs-gen)
+        managed-graph-uris-gen (if (empty? managed-graphs) managed-graph-uri-gen (gen/elements (keys managed-graphs)))
+        draftsets-gen (make-draftsets-gen (:draftsets spec) managed-graph-uris-gen)
+        draftsets (gen/generate draftsets-gen)]
     (gen/hash-map :draftsets (gen/return draftsets)
-                  :managed-graphs (make-managed-graphs-gen (:managed-graphs spec) ds-uri-gen))))
+                  :managed-graphs (make-managed-graphs-gen (:managed-graphs spec)))))
 
 (defn generate-statements [spec]
   (let [spec-gen (make-spec-gen spec)
