@@ -36,7 +36,7 @@
         (add-user repo (user-decl->user decl)))
       repo)))
 
-(defn get-repository [env-map]
+(defn get-repository [config]
   (log/info "Creating memory repository")
   (try
     (create-repository-from-file "test-users.edn")

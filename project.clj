@@ -35,6 +35,8 @@
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
 
+                 [aero "1.1.2"]
+
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
                  ;; and the scjsv json schema validator.
@@ -45,7 +47,6 @@
                  [com.novemberain/monger "3.0.2"]
                  [com.sun.mail/javax.mail "1.5.5"]
                  [com.taoensso/tower "2.0.2"]
-                 [environ "1.0.0"]
                  [grafter "0.7.5"]
                  [grafter/url "0.2.1"]
                  [grafter/vocabularies "0.1.3"]
@@ -88,7 +89,6 @@
                  :timeout 180000}
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
-            [lein-environ "1.0.0"]
             [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
 
   :ring {:handler drafter.handler/app

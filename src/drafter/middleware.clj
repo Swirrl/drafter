@@ -1,33 +1,28 @@
 (ns drafter.middleware
-  (:require [buddy.auth :as auth]
-            [buddy.auth
-             [middleware :refer [wrap-authentication wrap-authorization]]
-             [protocols :as authproto]]
-            [buddy.auth.backends
-             [httpbasic :refer [http-basic-backend]]
-             [token :refer [jws-backend]]]
-            [clj-logging-config.log4j :as l4j]
-            [clojure
-             [set :as set]
-             [string :as string]]
-            [clojure.java.io :as io]
+  (:require [clj-logging-config.log4j :as l4j]
             [clojure.tools.logging :as log]
-            [drafter
-             [requests :as drafter-request]
-             [responses :as response]
-             [user :as user]
-             [util :as util]]
-            [drafter.backend.protocols :refer [prepare-query]]
-            [drafter.rdf
-             [content-negotiation :as conneg]
-             [sesame :as ses]]
+            [clojure.string :as string]
+            [clojure.set :as set]
+            [clojure.java.io :as io]
+            [drafter.util :as util]
+            [drafter.responses :as response]
+            [drafter.user :as user]
             [drafter.user.repository :as user-repo]
+            [drafter.rdf.sesame :refer [read-statements] :as ses]
             [grafter.rdf.io :refer [mimetype->rdf-format]]
+            [buddy.auth :as auth]
+            [buddy.auth.protocols :as authproto]
+            [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
+            [buddy.auth.backends.token :refer [jws-backend]]
+            [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
+            [ring.util.request :as request]
+            [drafter.requests :as drafter-request]
             [pantomime.media :refer [media-type-named]]
-            [ring.util.request :as request])
-  (:import clojure.lang.ExceptionInfo
-           java.io.File
-           org.apache.jena.query.QueryParseException))
+            [drafter.rdf.content-negotiation :as conneg]
+            [drafter.backend.protocols :refer [prepare-query]])
+  (:import [java.io File]
+           [org.apache.jena.query QueryParseException]
+           [clojure.lang ExceptionInfo]))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (if-let [user (user-repo/find-user-by-username user-repo username)]
@@ -69,17 +64,17 @@
           (inner-handler request)))
       (auth/throw-unauthorized {:message "Authentication required"}))))
 
-(defn- get-configured-token-auth-backend [env-map]
-  (if-let [signing-key (:drafter-jws-signing-key env-map)]
+(defn- get-configured-token-auth-backend [config]
+  (if-let [signing-key (:jws-signing-key config)]
     (jws-auth-backend signing-key)
     (do
       (log/warn "No JWS Token signing key configured - token authentication will not be available")
-      (log/warn "To configure JWS Token authentication, set the DRAFTER_JWS_SIGNING_KEY environment variable")
+      (log/warn "To configure JWS Token authentication, specify the jws-signing-key configuration setting")
       nil)))
 
-(defn- get-configured-auth-backends [user-repo env-map]
+(defn- get-configured-auth-backends [user-repo config]
   (let [basic-backend (basic-auth-backend user-repo)
-        jws-backend (get-configured-token-auth-backend env-map)]
+        jws-backend (get-configured-token-auth-backend config)]
     (remove nil? [basic-backend jws-backend])))
 
 (defn- wrap-authenticated [auth-backends inner-handler]
@@ -88,8 +83,8 @@
                           (response/unauthorised-basic-response "Drafter"))]
     (wrap-authorization auth-handler unauthorised-fn)))
 
-(defn make-authenticated-wrapper [user-repo env-map]
-  (let [auth-backends (get-configured-auth-backends user-repo env-map)]
+(defn make-authenticated-wrapper [user-repo config]
+  (let [auth-backends (get-configured-auth-backends user-repo config)]
     (fn [inner-handler]
       (wrap-authenticated auth-backends inner-handler))))
 

@@ -8,7 +8,7 @@ Be sure to see the [Getting Started Guide](https://github.com/Swirrl/drafter/blo
 
 ## Configuring Drafter
 
-Drafter uses [environ](https://github.com/weavejester/environ) for its configuration. This means it uses environment variables (and/or java properties) to pass configuration
+Drafter uses [aero](https://github.com/juxt/aero) for its configuration. This means it uses environment variables (and/or java properties) to pass configuration
 variables from the environment.
 
 The defaults should work for most cases, but for further details on the options drafter supports you should see the [Configuring Drafter](https://github.com/Swirrl/drafter/blob/master/doc/configuring-drafter.org) page.

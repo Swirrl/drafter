@@ -1,13 +1,12 @@
 (ns drafter.repl
+  (:require [drafter.handler :as service]
+            [clojure.string :as s]
+            [ring.middleware.file-info :refer :all]
+            [ring.middleware.resource :refer :all]
+            [ring.server.standalone :refer [serve]]
+            [drafter.configuration :refer [get-configuration]])
   (:gen-class)
-  (:require [clojure.string :as s]
-            [drafter.handler :as service]
-            [environ.core :refer [env]]
-            [ring.middleware
-             [file-info :refer :all]
-             [resource :refer :all]]
-            [ring.server.standalone :refer [serve]])
-  (:import java.lang.management.ManagementFactory))
+  (:import (java.lang.management ManagementFactory)))
 
 (defonce server (atom nil))
 
@@ -31,17 +30,19 @@
 
 (defn start-server
   "Used for starting the server in development mode from REPL"
-  [port]
-  (do
+  [port-or-config]
+  (let [{:keys [port is-dev]} (if (number? port-or-config)
+                                {:port port-or-config :is-dev true}
+                                port-or-config)]
     (reset! server
             (serve (get-handler)
                    {:port          port
                     :init          service/init
                     :auto-reload?  true
-                    :stacktraces?  (:dev env) ;; remove fancy error page in all
-                                              ;; but the dev env (Jetty will
-                                              ;; still display HTML though)
-                    :open-browser? (:dev env)
+                    :stacktraces?  is-dev               ;; remove fancy error page in all
+                    ;; but the dev env (Jetty will
+                    ;; still display HTML though)
+                    :open-browser? is-dev
                     :destroy       service/destroy
                     :join?         false}))
     (println (str "Started with PID: " (get-pid)))
@@ -53,12 +54,6 @@
   (.stop @server)
   (reset! server nil))
 
-(defn ->int [i]
-  (when i
-    (if (integer? i)
-      i
-      (Integer/parseInt i))))
-
 (defn -main []
-  (start-server (or (->int (:drafter-http-port env))
-                    3001)))
+  (let [config (get-configuration)]
+    (start-server config)))
