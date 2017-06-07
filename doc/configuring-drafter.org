@@ -5,69 +5,40 @@ environment variables (and/or java properties) to pass configuration
 variables from the environment. The file config-settings.edn defines all configuration settings,
 along with their types, default values and the locations they are loaded from.
 
-** Backends
+** Stardog
 
-Drafter supports multiple backends for storing RDF data.
-
-#+BEGIN_EXAMPLE
-DRAFTER_BACKEND               (default drafter.backend.sesame.remote)
-#+END_EXAMPLE
-
-| Namespace                     | Description                                                      |
-|-------------------------------+------------------------------------------------------------------|
-| drafter.backend.sesame.native | Sesame Native Store Backend                                      |
-| drafter.backend.sesame.remote | Stardog optimised queries via the Sesame SparqlRepository client |
-
-Different backends have their own configuration options. There are also common
-configuration settings which apply across all backends:
-
-#+BEGIN_EXAMPLE
-DRAFTER_HTTP_PORT:            (default 3001)
-DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
-#+END_EXAMPLE
-
-*** drafter.backend.sesame.native
-
-The Sesame native backend stores the data in a Sesame native repository backed by files on a local disk. The location
-of the data directory and the indexes to create can be configured:
-
-#+BEGIN_EXAMPLE
-DRAFTER_INDEXES
-DEFAULT_REPO_PATH
-#+END_EXAMPLE
-
-*** drafter.backend.sesame.remote
-
-The Sesame stardog backend accesses a remote Stardog instance through a Sesame SPARQL repository. The location of the
-query and update endpoints for the Stardog database to use must be configured.
+Drafter uses stardog for storing RDF data and accesses a remote Stardog instance through a Sesame SPARQL
+repository. The location of the query and update endpoints for the Stardog database to use must be configured.
 
 #+BEGIN_EXAMPLE
 SPARQL_QUERY_ENDPOINT         REQUIRED http://$STARDOG_PORT_5820_TCP_ADDR:5820/${DATABASE_NAME:-pmd-data}/query
 SPARQL_UPDATE_ENDPOINT        REQUIRED http://$STARDOG_PORT_5820_TCP_ADDR:5820/${DATABASE_NAME:-pmd-data}/update
 #+END_EXAMPLE
 
+** Common configuration
+
+*** Drafter port
+The port drafter listens on can be configured with `DRAFTER_HTTP_PORT`. The default is port 3001.
+
+#+BEGIN_EXAMPLE
+DRAFTER_HTTP_PORT:            (default 3001)
+#+END_EXAMPLE
+
+*** Batch size
+Due to the limitations of the sesame SPARQL repository, large append or delete jobs must split the incoming data into batches
+to be applied sequentially to the stardog database. The size of these batches can be configured - note that out-of-memory
+errors can occur if the value is set too high.
+
 ** Examples
 
 Some examples of supplying these properties are provided below:
 
-As environment variables via lein run:
-
-#+BEGIN_SRC shell :exports code
-$ env DRAFTER_HTTP_PORT=3040 DRAFTER_REPO_PATH=/var/drafter-db lein run
-#+END_SRC
-
-As java properties via a built application jar:
-
-#+BEGIN_SRC shell :exports code
-$ java -Ddrafter.http.port=3050 -Ddrafter.repo.path=./drafter-database -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
-#+END_SRC
-
 As environment variables via a built application jar:
 
-#+BEGIN_SRC shell :exports code
-$ env DRAFTER_HTTP_PORT=3050 DRAFTER_REPO_PATH=./drafter-database java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
-#+END_SRC
+env DRAFTER_HTTP_PORT=3050 SPARQL_QUERY_ENDPOINT=http://localhost:5820/drafter-db/sparql/query SPARQL_UPDATE_ENDPOINT=http://localhost:5820/drafter-db/sparql/update java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 
+#+BEGIN_EXAMPLE
+DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
 ** Configuring Timeouts
 
 SPARQL queries may require a long time to be evaluated, so to maintain the

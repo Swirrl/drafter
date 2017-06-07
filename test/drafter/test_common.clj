@@ -6,7 +6,7 @@
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
             [drafter.user :as user]
-            [drafter.backend.configuration :refer [get-backend]]
+            [drafter.backend.sesame.remote :refer [get-backend]]
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
                                                   create-draft-graph!]]
@@ -36,8 +36,6 @@
 (use-fixtures :each validate-schemas)
 
 (def ^:dynamic *test-backend*)
-
-(def test-db-path "test-drafter-db")
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri
@@ -79,7 +77,7 @@
 
 (defn wrap-db-setup [test-fn]
   (let [config (get-configuration)
-        backend (get-backend (assoc config :repo-path test-db-path))
+        backend (get-backend config)
         configured-factories (reg/registered-parser-factories)]
     (binding [*test-backend* backend
               *test-writer* (start-writer!)]

@@ -6,7 +6,7 @@
             [drafter.middleware :as middleware]
             [swirrl-server.middleware.log-request :refer [log-request]]
             [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.backend.configuration :refer [get-backend]]
+            [drafter.backend.sesame.remote :refer [get-backend]]
             [drafter.util :refer [set-var-root! conj-if]]
             [drafter.common.json-encoders :as enc]
             [drafter.routes.draftsets-api :refer [draftset-api-routes]]
@@ -80,7 +80,7 @@
     (set-var-root! #'app (app-handler
                           ;; add your application routes here
                           (-> []
-                              (add-route (pages-routes backend))
+                              (add-route (pages-routes))
                               (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout-fn))
                               (add-route (get-live-sparql-query-route backend config))
                               (add-route (context "/v1/status" []

@@ -73,39 +73,6 @@
     (.setDataset pquery dataset)
     pquery))
 
-(defmulti exec-sesame-prepared-update (fn [repo prepare-fn] (class repo)))
-(defmethod exec-sesame-prepared-update SPARQLRepository [repo prepare-fn]
-  ;;default sesame implementation executes UPDATE queries in a
-  ;;transaction which the remote SPARQL client does not like
-  (with-open [conn (repo/->connection repo)]
-    (let [pquery (prepare-fn conn)]
-      (repo/evaluate pquery))))
-
-(defmethod exec-sesame-prepared-update Repository [repo prepare-fn]
-  (with-open [conn (repo/->connection repo)]
-    (repo/with-transaction conn
-      (let [pquery (prepare-fn conn)]
-        (repo/evaluate pquery)))))
-
-(defn prepare-restricted-update [repo update-query restrictions]
-  (repo/prepare-update repo update-query (restricted-dataset restrictions)))
-
-(defn prepare-update [repo update-query]
-  (prepare-restricted-update repo update-query nil))
-
-(defn- exec-ask-query [writer pquery]
-  (let [result (.evaluate pquery)]
-       (doto writer
-         (.handleBoolean result))))
-
-(defn- exec-tuple-query [writer pquery]
-  (log/debug "pquery (default) is " pquery " writer is " writer)
-  (.evaluate pquery writer))
-
-(defn- exec-graph-query [writer pquery]
-  (log/debug "pquery is " pquery " writer is " writer)
-  (.evaluate pquery writer))
-
 (defn create-tuple-query-writer [os result-format]
   (QueryResultIO/createWriter result-format os))
 
@@ -145,17 +112,3 @@
     :construct (signalling-rdf-handler send-channel (create-construct-query-writer output-stream result-format))
     (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query.")))
 
-(defn create-query-executor [result-format pquery]
-  (case (get-query-type pquery)
-    :select (fn [os]
-              (let [w (QueryResultIO/createWriter result-format os)]
-                (exec-tuple-query w pquery)))
-
-    :ask (fn [os]
-           (let [w (QueryResultIO/createWriter result-format os)]
-             (exec-ask-query w pquery)))
-
-    :construct (fn [os]
-                 (let [w (Rio/createWriter result-format os)]
-                   (exec-graph-query w pquery)))
-    (throw (IllegalArgumentException. (str "Invalid query type")))))

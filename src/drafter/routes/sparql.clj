@@ -1,6 +1,5 @@
 (ns drafter.routes.sparql
   (:require [compojure.core :refer [make-route]]
-            [drafter.middleware :refer [require-user-role]]
             [drafter.rdf
              [endpoints :refer [live-endpoint]]
              [sparql-protocol :refer [sparql-end-point sparql-protocol-handler]]]))

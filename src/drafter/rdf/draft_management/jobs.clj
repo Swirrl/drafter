@@ -1,6 +1,5 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
-            [drafter.rdf.sparql :as sparql]
             [drafter.write-scheduler :refer [queue-job!]]
             [swirrl-server.async.jobs
              :refer
@@ -55,61 +54,3 @@
                (fn [~job]
                  (with-job-exception-handling ~job
                    ~@forms))))
-
-(defn copy-graph-batch-query
-  "Query to copy a range of data in a source graph into a destination
-  graph."
-  [source-graph dest-graph offset limit]
-  (str "INSERT {
-          GRAPH <" dest-graph "> {
-            ?s ?p ?o
-          }
-        } WHERE {
-          SELECT ?s ?p ?o WHERE {
-            GRAPH <" source-graph "> {
-              ?s ?p ?o
-            }
-          } LIMIT " limit " OFFSET " offset "
-       }"))
-
-(defn copy-graph-batch!
-  "Copies the data segmented by offset and limit in the source graph
-  into the given destination graph."
-  [repo source-graph dest-graph offset limit]
-  (let [query (copy-graph-batch-query source-graph dest-graph offset limit)]
-    (sparql/update! repo query)))
-
-(defn calculate-offsets [count batch-size]
-  "Given a total number of items and a batch size, returns a sequence
-  of [offset limit] pairs for segmenting the source collection into
-  batches.
-
-  The limit will always be set to batch-size."
-  (take (/ count batch-size)
-        (iterate (fn [[offset batch-size]]
-                   [(+ offset batch-size) batch-size])
-                 [0 batch-size])))
-
-(defn graph-count-query [graph]
-  (str "SELECT (COUNT(*) as ?c) WHERE {
-          GRAPH <" graph "> { ?s ?p ?o }
-        }"))
-
-;; TODO remove this
-(defn get-graph-clone-batches
-  ([repo graph-uri] (get-graph-clone-batches repo graph-uri batched-write-size))
-  ([repo graph-uri batch-size]
-   (let [m (first (sparql/query-eager-seq repo (graph-count-query graph-uri)))
-         graph-count (Integer/parseInt (.stringValue (get m "c")))]
-     (calculate-offsets graph-count batch-size))))
-
-;; TODO remove this
-(defn copy-from-live-graph [repo live-graph-uri dest-graph-uri batches job]
-  (with-job-exception-handling job
-    (if-let [[offset limit] (first batches)]
-      (let [next-fn (fn [job]
-                      (copy-from-live-graph repo live-graph-uri dest-graph-uri (rest batches) job))]
-        (copy-graph-batch! repo live-graph-uri dest-graph-uri offset limit)
-        (log/info "There are" (count batches) "remaining batches")
-        (queue-job! (create-child-job job next-fn)))
-      (job-succeeded! job))))

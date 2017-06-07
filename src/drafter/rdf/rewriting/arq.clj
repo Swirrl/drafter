@@ -7,13 +7,6 @@
            [org.apache.jena.sparql.algebra Algebra Op OpAsQuery]
            [org.apache.jena.sparql.sse Item SSE]))
 
-(defn get-query-type [query]
-  (cond
-    (.isSelectType query) :select
-    (.isConstructType query) :construct
-    (.isAskType query) :ask
-    (.isDescribeType query) :describe))
-
 (defprotocol ToArqQuery
   (sparql-string->arq-query [this]
     "Converts this into an ARC AST"))
