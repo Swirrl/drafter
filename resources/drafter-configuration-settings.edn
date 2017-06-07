@@ -2,7 +2,6 @@
  :draftset-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
  :port #long #or [#port #env DRAFTER_HTTP_PORT 3001]
  :is-dev #boolean #or [#env DEV false]
- :backend-ns #or [#env DRAFTER_BACKEND "drafter.backend.sesame.remote"]
  :user-repo-ns #or [#env DRAFTER_USER_REPO_NS "drafter.user.memory-repository"]
  :log-config-file #or [#env LOG_CONFIG_FILE "log-config.edn"]
  :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY
@@ -11,14 +10,6 @@
  ;;sesame remote backend config settings
  :sparql-query-endpoint #env SPARQL_QUERY_ENDPOINT
  :sparql-update-endpoint #env SPARQL_UPDATE_ENDPOINT
-
- ;;native backend config settings
- :sesame-store #or [#env SESAME_STORE "native-store"]
-
- ;; http://sw.deri.org/2005/02/dexa/yars.pdf - see table on p5 for full coverage of indexes.
- ;; (but we have to specify 4 char strings, so in some cases last chars don't matter
- :indexes #or [#env DRAFTER_INDEXES "spoc,pocs,ocsp,cspo,cpos,oscp"]
- :repo-path #or [#env DRAFTER_REPO_PATH "drafter-db"]
 
  ;;mongo user repository
  :mongo-host #env DRAFTER_MONGO_HOST
