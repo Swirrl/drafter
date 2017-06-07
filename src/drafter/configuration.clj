@@ -56,6 +56,6 @@
         (throw (RuntimeException. (str "Configuration invalid: " msg)))))))
 
 (defn get-configuration []
-  (let [config (aero/read-config (io/resource "drafter-configuration-settings.edn"))]
+  (let [config (aero/read-config (io/resource "drafter-config.edn"))]
     (validate-configuration! config)
     config))
