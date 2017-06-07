@@ -10,9 +10,5 @@
   (prepare-query [this sparql-string]
     (ses/prepare-query this sparql-string))
 
-  SparqlUpdateExecutor
-  (prepare-update [r update-query]
-    (ses/prepare-update r update-query))
-
   ToRepository
   (->sesame-repo [r] r))

@@ -93,16 +93,6 @@
     (fn [inner-handler]
       (wrap-authenticated auth-backends inner-handler))))
 
-(defn require-user-role
-  "Wraps a handler with one that only permits the request to continue
-  if the associated user is in the required role. If not, a 403
-  Forbidden response is returned."
-  [required-role inner-handler]
-  (fn [{:keys [identity] :as request}]
-    (if (user/has-role? identity required-role)
-      (inner-handler request)
-      (response/forbidden-response "User is not authorised to access this resource"))))
-
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]
     (if-let [missing-keys (seq (set/difference required-keys (set (keys params))))]

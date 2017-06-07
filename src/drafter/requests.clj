@@ -10,7 +10,3 @@
   [request]
   (get-in request [:params :query]))
 
-(defn get-user
-  "Gets the user associated with the request if one exists"
-  [request]
-  (:identity request))

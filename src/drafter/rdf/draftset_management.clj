@@ -738,15 +738,6 @@
         now (java.util.Date.)]
     (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
 
-(defn- stringified-draftset-backend-graph-mapping
-  "Gets a map of type {String String} containing the live->draft graph
-  mapping of a RewritingSesameSparqlExecutor. WARNING: This is coupled
-  to the implementation of RewritingSesameSparqlExecutor since it
-  relies on the name of the graph mapping field."
-  [ds-backend]
-  (let [graph-mapping (:live->draft ds-backend)]
-    (util/map-all #(.stringValue %) graph-mapping)))
-
 (defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format]
   (jobs/make-job :background-write [job]
                  (let [backend (get-draftset-executor {:backend backend :draftset-ref draftset-ref :union-with-live? false})

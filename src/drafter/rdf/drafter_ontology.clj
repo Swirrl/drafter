@@ -4,8 +4,6 @@
 
 (def drafter (prefixer "http://publishmydata.com/def/drafter/"))
 
-(def draft-uri (prefixer "http://publishmydata.com/graphs/drafter/draft/"))
-
 (def draftset-uri (prefixer "http://publishmydata.com/def/drafter/draftset/"))
 (def submission-uri (prefixer "http://publishmydata.com/def/drafter/submission/"))
 

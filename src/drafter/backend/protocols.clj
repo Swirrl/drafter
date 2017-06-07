@@ -1,12 +1,8 @@
 (ns drafter.backend.protocols
-  (:require [grafter.rdf.repository :as repo])
-  (:import org.openrdf.repository.Repository))
+  (:require [grafter.rdf.repository :as repo]))
 
 (defprotocol SparqlExecutor
   (prepare-query [this sparql-string]))
-
-(defprotocol SparqlUpdateExecutor
-  (prepare-update [this update-query]))
 
 (defprotocol ToRepository
   (->sesame-repo [this]

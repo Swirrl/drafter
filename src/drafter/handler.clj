@@ -10,9 +10,8 @@
              [middleware :as middleware]
              [util :refer [set-var-root!]]
              [write-scheduler :refer [global-writes-lock start-writer! stop-writer!]]]
-            [drafter.backend
-             [configuration :refer [get-backend]]
-             [protocols :refer [stop-backend]]]
+            [drafter.backend.protocols :refer [stop-backend]]
+            [drafter.backend.sesame.remote :refer [get-backend]]
             [drafter.common.json-encoders :as enc]
             [drafter.routes
              [draftsets-api :refer [draftset-api-routes]]
@@ -87,7 +86,7 @@
     (set-var-root! #'app (app-handler
                           ;; add your application routes here
                           (-> []
-                              (add-route (pages-routes backend))
+                              (add-route (pages-routes))
                               (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout-fn))
                               (add-route (get-live-sparql-query-route backend sparql-timeouts-config))
                               ;;(add-routes (get-sparql-routes backend authenticated-fn sparql-timeouts-config))

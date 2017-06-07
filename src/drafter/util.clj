@@ -37,18 +37,6 @@
   [f m]
   (into {} (for [[k v] m] [(f k) (f v)])))
 
-(defn construct-dynamic
-  "Dynamically creates an instance of a class using the given sequence
-  of constructor arguments."
-  [klass args]
-  (clojure.lang.Reflector/invokeConstructor klass (into-array Object args)))
-
-(defn construct-dynamic*
-  "Dyamically creates an instance of a class with the given
-  constructor arguments."
-  [klass & args]
-  (construct-dynamic klass args))
-
 (defn get-causes [ex]
   "Returns a flattened vector containing the root exception and all
   inner cause exceptions."
@@ -99,17 +87,6 @@
 
 (defn string->sesame-uri [s]
   (URIImpl. s))
-
-(defn seq->iterator
-  "Creates a java Iterator for a sequence."
-  [s]
-  (let [state (atom s)]
-    (reify java.util.Iterator
-      (hasNext [this] (boolean (seq @state)))
-      (next [this]
-        (let [value (first @state)]
-          (swap! state rest)
-          value)))))
 
 ;; Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
 (defn intersection-with
