@@ -21,16 +21,9 @@
   :dependencies [[buddy/buddy-auth "0.9.0"]
                  [buddy/buddy-core "0.9.0"]
                  [org.clojure/clojure "1.8.0"]
-                 [org.openrdf.sesame/sesame-queryrender "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
-                 [org.openrdf.sesame/sesame-runtime "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-queryrender "2.8.11"]
+                 [org.openrdf.sesame/sesame-runtime "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
-
-                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
-                 ;; see here for the source code that built this release:
-                 ;;
-                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
-
-                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
