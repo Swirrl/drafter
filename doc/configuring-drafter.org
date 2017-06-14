@@ -58,15 +58,39 @@ By default, endpoints have a query timeout of 30 seconds.
 
 ** Users Database
 
-For the mongo database user backend you can set the environment variables:
+The type of user repository to use is configured by specifying the namespace containing the repository
+definition.
 
-`DRAFTER_USER_DB_NAME=pmd-app2_development`
+*** Mongo
+
+A repository which looks up users in a mongo db instance is defined in the `drafter.user.mongo` namespace:
+
 `DRAFTER_USER_REPO_NS=drafter.user.mongo`
 
-For an in memory database of users specified in a
-`test-users.edn` file you can set:
+The name of the database containing the user collection must be specified:
+
+`DRAFTER_USER_DB_NAME=pmd2_development`
+
+The name of the user collection within the database can also be specified:
+
+`DRAFTER_MONGO_USER_COLLECTION=publish_my_data_users`
+
+If not specified the default collection name of 'users' will be used.
+
+The location of the mongo database can also be specified as a host/port pair:
+`DRAFTER_MONGO_HOST=mongoserver`
+`DRAFTER_MONGO_PORT=8080`
+
+if either the host or port is specified, both are required. If neither is specified the host will default to
+`localhost` and the port to 27017 (the default mongo port).
+
+*** In-memory
+
+To use the in-memory user repository set the namespace to `drafter.user.memory-repository`:
 
 `DRAFTER_USER_REPO_NS=drafter.user.memory-repository`
+
+The memory repository loads its users from a `test-users.edn` file in the working directory so this must exist.
 
 ** User Token Signing Key
 

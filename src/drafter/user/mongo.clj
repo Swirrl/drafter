@@ -65,12 +65,17 @@
     user-db-name
     (throw (missing-config-key-exception "User database name required" :mongo-db-name))))
 
+(defn- get-user-collection-name [config]
+  ;;NOTE: user collection has default if not explicitly configured so should always exist
+  (:mongo-user-collection config))
+
 (defn get-repository [config]
   (let [host-config (get-host-config config)
         db-name (get-user-db-name config)
+        collection-name (get-user-collection-name config)
         conn (if (nil? host-config) (mg/connect) (mg/connect host-config))
         db (mg/get-db conn db-name)]
-    (->MongoUserRepository conn db "publish_my_data_users")))
+    (->MongoUserRepository conn db collection-name)))
 
 (defn- user->mongo-user [user]
   (let [[email role digest] ((juxt user/username user/role user/password-digest) user)
