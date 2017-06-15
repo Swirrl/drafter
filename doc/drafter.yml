@@ -613,7 +613,7 @@ paths:
         Query the live data via the SPARQL query langauge and protocol.
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
       consumes:
-        - application/sparql-query
+        - application/x-www-form-urlencoded
       produces:
         - application/n-triples
         - application/rdf+xml
