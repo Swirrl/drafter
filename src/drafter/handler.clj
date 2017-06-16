@@ -19,6 +19,7 @@
                                              stop-writer!]]
             [drafter.configuration :refer [get-configuration]]
             [drafter.env :as denv]
+            [drafter.rdf.writers :as writers]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware
@@ -117,6 +118,7 @@
 
 (defn initialise-services! [config]
   (enc/register-custom-encoders!)
+  (writers/register-custom-rdf-writers!)
 
   (jobs/init-job-settings! config)
   (initialise-write-service!)
