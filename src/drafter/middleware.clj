@@ -138,7 +138,7 @@
                 :else
                 (response/unprocessable-entity-response (str "Expected SPARQL query in " location))))]
       (case request-method
-        :get (handle (:query query-params) "'query' query string parameter")
+        :get (handle (get query-params "query") "'query' query string parameter")
         :post (case (request/content-type request)
                 "application/x-www-form-urlencoded" (handle (get form-params "query") "'query' form parameter")
                 "application/sparql-query" (handle body "body")

@@ -209,7 +209,7 @@
   (let [handler (sparql-query-parser-handler identity)
         query-string "SELECT * WHERE { ?s ?p ?o }"]
     (testing "Valid GET request"
-      (let [req {:request-method :get :query-params {:query query-string}}
+      (let [req {:request-method :get :query-params {"query" query-string}}
             inner-req (handler req)]
         (is (= query-string (get-in inner-req [:sparql :query-string])))))
 
@@ -219,7 +219,7 @@
 
     (testing "Invalid GET request with multiple 'query' query parameters"
       (let [req {:request-method :get
-                 :query-params {:query [query-string "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]}}
+                 :query-params {"query" [query-string "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]}}
             resp (handler req)]
         (tc/assert-is-unprocessable-response resp)))
 
