@@ -37,7 +37,6 @@ As environment variables via a built application jar:
 
 env DRAFTER_HTTP_PORT=3050 SPARQL_QUERY_ENDPOINT=http://localhost:5820/drafter-db/sparql/query SPARQL_UPDATE_ENDPOINT=http://localhost:5820/drafter-db/sparql/update java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
 
-#+BEGIN_EXAMPLE
 DRAFTER_BATCHED_WRITE_SIZE:   (default 10000)
 ** Configuring Timeouts
 
