@@ -1,34 +1,32 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
-            [drafter
-             [draftset :refer [->draftset-uri]]
-             [user :as user]
-             [write-scheduler :refer [global-writes-lock queue-job! start-writer! stop-writer!]]]
-            [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.backend.sesame.remote :refer [get-backend]]
-            [drafter.rdf
-             [draft-management :refer [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
-             [sparql :as sparql]]
-            [environ.core :refer [env]]
-            [grafter.rdf
-             [protocols :refer [add]]
-             [templater :refer [triplify]]]
+            [grafter.rdf.protocols :refer [add]]
+            [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf.repository.registry :as reg]
+            [grafter.rdf.repository :as repo]
+            [grafter.url :as url]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
-            [schema
-             [core :as s]
-             [test :refer [validate-schemas]]]
+            [drafter.user :as user]
+            [drafter.backend.sesame.remote :refer [get-backend]]
+            [drafter.backend.protocols :refer [stop-backend]]
+            [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
+                                                  create-draft-graph!]]
+            [drafter.rdf.sparql :refer [update!] :as sparql]
+            [drafter.configuration :refer [get-configuration]]
+            [drafter.draftset :refer [->draftset-uri]]
+            [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
+                                             global-writes-lock]]
             [swirrl-server.async.jobs :refer [create-job]]
-            [grafter.url :as url]
-            [grafter.rdf.repository :as repo])
-  (:import drafter.rdf.DrafterSPARQLRepository
-           [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
-           java.lang.AutoCloseable
-           [java.net InetSocketAddress ServerSocket SocketException URI]
-           java.nio.charset.Charset
-           [java.util ArrayList Scanner UUID]
+            [schema.test :refer [validate-schemas]]
+            [schema.core :as s])
+  (:import [java.util Scanner UUID ArrayList]
            [java.util.concurrent CountDownLatch TimeUnit]
+           [java.io ByteArrayOutputStream ByteArrayInputStream OutputStream PrintWriter]
+           [java.nio.charset Charset]
+           [java.net URI InetSocketAddress SocketException ServerSocket]
+           [java.lang AutoCloseable]
+           [drafter.rdf DrafterSPARQLRepository]
            [org.apache.http.entity ContentLengthStrategy ContentType StringEntity]
            org.apache.http.impl.entity.StrictContentLengthStrategy
            [org.apache.http.impl.io ChunkedOutputStream ContentLengthOutputStream DefaultHttpRequestParser DefaultHttpResponseWriter HttpTransportMetricsImpl IdentityOutputStream SessionInputBufferImpl SessionOutputBufferImpl]
@@ -80,7 +78,8 @@
 (declare ^:dynamic *test-writer*)
 
 (defn wrap-db-setup [test-fn]
-  (let [backend (get-backend env)
+  (let [config (get-configuration)
+        backend (get-backend config)
         configured-factories (reg/registered-parser-factories)]
     (binding [*test-backend* backend
               *test-writer* (start-writer!)]
@@ -101,9 +100,6 @@
             "DROP ALL ;")
    (setup-state-fn *test-backend*)
    (test-fn)))
-
-(defn make-backend []
-  (get-backend env))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated

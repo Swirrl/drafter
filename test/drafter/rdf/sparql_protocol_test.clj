@@ -22,7 +22,7 @@
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
                                      :uri "/live/sparql"
-                                     :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
+                                     :query-params {"query" "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
                                      :headers {"accept" "text/csv"}})]
 
         (is (= 200 status))
@@ -40,10 +40,10 @@
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "Standard SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
-             :as result} (end-point {:request-method :get
-                                     :uri "/live/sparql"
-                                     :params {:query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
-                                     :headers {"accept" "text/csv;q=0.7,text/unknown,application/n-triples;q=0.9"}})]
+             :as result} (end-point {:request-method           :get
+                                                 :uri          "/live/sparql"
+                                                 :query-params {"query" "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
+                                                 :headers      {"accept" "text/csv;q=0.7,text/unknown,application/n-triples;q=0.9"}})]
 
         (is (= 200 status))
         (is (= "application/n-triples" (headers "Content-Type")))
@@ -57,10 +57,11 @@
 (deftest sparql-end-point-tuple-query-accept-test
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "Tuple SPARQL query with multiple accepted MIME types and qualities"
-      (let [{:keys [status headers body]} (end-point {:request-method :get
-                                                      :uri "/live/sparql"
-                                                      :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
-                                                      :headers {"accept" "text/csv,application/sparql-results+json;q=0.9,*/*;q=0.8"}})]
+      (let [{:keys [status headers body]
+             :as result} (end-point {:request-method :get
+                                     :uri "/live/sparql"
+                                     :query-params {"query" "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
+                                     :headers {"accept" "text/csv,application/sparql-results+json;q=0.9,*/*;q=0.8"}})]
 
         (is (= 200 status))
         (is (= "text/csv" (headers "Content-Type")))
@@ -75,12 +76,11 @@
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
     (testing "Boolean SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
-             :as result} (end-point {:request-method :get
-                                     :uri "/live/sparql"
-                                     :params {:query "ASK WHERE { ?s ?p ?o }"}
-                                     :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,*/*;q=0.8"
-                                               "Accept-Charset" "utf-8"}})]
-
+             :as resp} (end-point {:request-method :get
+                                   :uri "/live/sparql"
+                                   :query-params {"query" "ASK WHERE { ?s ?p ?o }"}
+                                   :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,*/*;q=0.8"
+                                             "Accept-Charset" "utf-8"}})]
         (is (= 200 status))
         (is (= "text/plain; charset=utf-8" (headers "Content-Type")))
 
@@ -93,18 +93,18 @@
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
                                      :uri "/live/sparql"
-                                     :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                                     :query-params {"query" "SELECT * WHERE { ?s ?p ?o }"}
                                      :headers {"accept" "text/html"}})]
 
         (is (= 200 status))
         (is (= "text/plain; charset=utf-8" (headers "Content-Type")))))))
 
-(deftest sparlq-endpoint-invalid-query
+(deftest sparql-endpoint-invalid-query
   (testing "SPARQL endpoint returns client error if SPARQL query invalid"
     (let [endpoint (sparql-end-point "/live/sparql" *test-backend*)
           request {:request-method :get
                    :uri "/live/sparql"
-                   :params {:query "NOT A VALID SPARQL QUERY"}
+                   :query-params {"query" "NOT A VALID SPARQL QUERY"}
                    :headers {"accept" "text/plain"}}
           {:keys [status]} (endpoint request)]
       (is (= 400 status)))))
@@ -118,7 +118,7 @@
         endpoint (sparql-end-point "/live/sparql" repo)
         test-request {:uri "/live/sparql"
                       :request-method :get
-                      :params {:query "SELECT * WHERE { ?s ?p ?o }"}
+                      :query-params {"query" "SELECT * WHERE { ?s ?p ?o }"}
                       :headers {"accept" "application/sparql-results+json"}}]
     (with-open [server (latched-http-server test-port connection-latch release-latch (get-spo-http-response))]
       (let [blocked-connections (doall (map (fn [i] (future (endpoint test-request))) (range 1 (inc max-connections))))]

@@ -1,7 +1,6 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
             [drafter.write-scheduler :refer [queue-job!]]
-            [environ.core :refer [env]]
             [swirrl-server.async.jobs
              :refer
              [create-child-job create-job job-failed! job-succeeded!]]))
@@ -30,7 +29,13 @@
 ;; |               100 |       123 |              4058 |              4454 |              4714 |           5100 | 9m 9s      |           22347 |
 ;; |               200 |        62 |              5570 |              6730 |              8811 |          10781 | 7m 18s     |           28011 |
 
-(def batched-write-size (Integer/parseInt (get env :drafter-batched-write-size "75000")))
+(def batched-write-size 75000)
+
+(defn init-job-settings!
+  "Initialised job settings from the given configuration map."
+  [config]
+  (when-let [configured-batch-size (:batched-write-size config)]
+    (alter-var-root #'batched-write-size (constantly configured-batch-size))))
 
 (defmacro with-job-exception-handling [job & forms]
   `(try

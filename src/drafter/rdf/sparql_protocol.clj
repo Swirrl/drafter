@@ -3,7 +3,7 @@
             [compojure.core :refer [make-route]]
             [drafter
              [channels :refer :all]
-             [middleware :refer [allowed-methods-handler require-params sparql-negotiation-handler sparql-prepare-query-handler sparql-timeout-handler]]
+             [middleware :refer [allowed-methods-handler sparql-negotiation-handler sparql-prepare-query-handler sparql-timeout-handler sparql-query-parser-handler]]
              [timeouts :as timeouts]]
             [drafter.rdf.sesame
              :refer
@@ -79,8 +79,7 @@
        (sparql-timeout-handler query-timeout-fn)
        (sparql-negotiation-handler)
        (prepare-handler)
-       (require-params #{:query})
-       (allowed-methods-handler #{:get :post})))
+       (sparql-query-parser-handler)))
 
 (defn sparql-protocol-handler [executor query-timeout-fn]
   (build-sparql-protocol-handler #(sparql-prepare-query-handler executor %) sparql-execution-handler query-timeout-fn))

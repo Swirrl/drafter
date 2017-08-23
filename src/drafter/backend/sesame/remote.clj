@@ -9,17 +9,10 @@
            org.openrdf.rio.nquads.NQuadsParserFactory
            org.openrdf.rio.ntriples.NTriplesParserFactory))
 
-(defn get-required-environment-variable [var-key env-map]
-  (if-let [ev (var-key env-map)]
+(defn get-required-configuration-setting [var-key config]
+  (if-let [ev (var-key config)]
     ev
-    (let [var-name (str/upper-case (str/replace (name var-key) \- \_))
-          message (str "Missing required key "
-                       var-key
-                       " in environment map. Ensure you export an environment variable "
-                       var-name
-                       " or define "
-                       var-key
-                       " in the relevant profile in profiles.clj")]
+    (let [message (str "Missing required configuration key " var-key)]
       (do
         (log/error message)
         (throw (RuntimeException. message))))))
@@ -52,9 +45,9 @@
 (def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory})
 (def ask-formats-whitelist #{SPARQLBooleanJSONParserFactory BooleanTextParserFactory SPARQLBooleanXMLParserFactory})
 
-(defn get-backend [env-map]
+(defn get-backend [config]
   "Creates a new SPARQL repository with the query and update endpoints
-  configured in the given environment map."
+  configured in the given configuration map."
 
   ;; This call here obliterates the sesame defaults for registered
   ;; parsers.  Forcing content negotiation to work only with the
@@ -63,6 +56,6 @@
                                    :construct construct-formats-whitelist
                                    :ask ask-formats-whitelist})
 
-  (let [query-endpoint (get-required-environment-variable :sparql-query-endpoint env-map)
-        update-endpoint (get-required-environment-variable :sparql-update-endpoint env-map)]
+  (let [query-endpoint (get-required-configuration-setting :sparql-query-endpoint config)
+        update-endpoint (get-required-configuration-setting :sparql-update-endpoint config)]
     (create-sparql-repository query-endpoint update-endpoint)))

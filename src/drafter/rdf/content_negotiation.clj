@@ -1,65 +1,8 @@
 (ns drafter.rdf.content-negotiation
-  (:require [ring.middleware.accept :refer [wrap-accept]])
-  (:import [java.io OutputStream Writer]
-           java.nio.charset.Charset
-           org.openrdf.query.impl.MapBindingSet
-           [org.openrdf.query.resultio BooleanQueryResultFormat TupleQueryResultFormat]
-           org.openrdf.query.resultio.text.csv.SPARQLResultsCSVWriter
-           org.openrdf.query.resultio.text.tsv.SPARQLResultsTSVWriter
-           [org.openrdf.rio RDFFormat RDFWriter RDFWriterFactory RDFWriterRegistry]))
-
-(def ^:private ascii (Charset/forName "US-ASCII"))
-(def csv-rdf-format (RDFFormat. "CSV" "text/csv" ascii "csv" false true))
-(def tsv-rdf-format (RDFFormat. "TSV" "text/tab-separated-values" nil "tsv" false true))
-
-(defn- query-result-writer->rdf-writer [rdf-format result-writer]
-  (reify RDFWriter
-    (getRDFFormat [this] rdf-format)
-    (getWriterConfig [this] (.getWriterConfig result-writer))
-    (setWriterConfig [this config] (.setWriterConfig result-writer config))
-    (getSupportedSettings [this] (.getSupportedSettings result-writer))
-    (startRDF [this]
-      (.startQueryResult result-writer '("s" "p" "o")))
-    (endRDF [this]
-      (.endQueryResult result-writer))
-    (handleNamespace [this prefix uri]
-      ;; No op
-      )
-    (handleStatement [this statement]
-      (let [s (.getSubject statement)
-            p (.getPredicate statement)
-            o (.getObject statement)
-            bs (doto (MapBindingSet.)
-                 (.addBinding "s" s)
-                 (.addBinding "p" p)
-                 (.addBinding "o" o))]
-        (.handleSolution result-writer bs)))
-    (handleComment [this comment]
-      ;; No op
-      )))
-
-(defn- create-rdf-writer-factory [rdf-format writer-fn]
-  (reify RDFWriterFactory
-    (getRDFFormat [this] rdf-format)
-    (^RDFWriter getWriter [this ^OutputStream os]
-      (query-result-writer->rdf-writer rdf-format (writer-fn os)))
-    (^RDFWriter getWriter [this ^Writer w]
-      (throw (RuntimeException. "Not supported - use OutputStream overload")))))
-
-(defn- get-rdf-writer-registry []
-  (RDFWriterRegistry/getInstance))
-
-(defn- register-rdf-writer-factory [writer-factory]
-  (.add (get-rdf-writer-registry) writer-factory))
-
-(defn- create-csv-result-writer [output-stream]
-  (SPARQLResultsCSVWriter. output-stream))
-
-(defn- create-tsv-result-writer [output-stream]
-  (SPARQLResultsTSVWriter. output-stream))
-
-(register-rdf-writer-factory (create-rdf-writer-factory csv-rdf-format create-csv-result-writer))
-(register-rdf-writer-factory (create-rdf-writer-factory tsv-rdf-format create-tsv-result-writer))
+  (:require [ring.middleware.accept :refer [wrap-accept]]
+            [drafter.rdf.formats :refer [csv-rdf-format tsv-rdf-format]])
+  (:import [org.openrdf.query.resultio BooleanQueryResultFormat TupleQueryResultFormat]
+           [org.openrdf.rio RDFFormat]))
 
 (defn- format-preferences->mime-spec [format-prefs]
   (into {} (mapcat (fn [[f q]] (map (fn [m] [m [f q]]) (.getMIMETypes f))) format-prefs)))

@@ -15,7 +15,8 @@
              [repository :as repo]]
             [ring.util.response :refer [response]])
   (:import clojure.lang.ExceptionInfo
-           java.io.File))
+           java.io.File
+           (java.io ByteArrayInputStream)))
 
 (defn- add-auth-header [m username password]
   (let [credentials (str->base64 (str username ":" password))]
@@ -204,15 +205,87 @@
           result (handler {:uri "/test" :request-method :post :body body-stream})]
       (is (= body-text result)))))
 
+(deftest sparql-query-parser-handler-test
+  (let [handler (sparql-query-parser-handler identity)
+        query-string "SELECT * WHERE { ?s ?p ?o }"]
+    (testing "Valid GET request"
+      (let [req {:request-method :get :query-params {"query" query-string}}
+            inner-req (handler req)]
+        (is (= query-string (get-in inner-req [:sparql :query-string])))))
+
+    (testing "Invalid GET request with missing query parameter"
+      (let [resp (handler {:request-method :get :query-params {}})]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Invalid GET request with multiple 'query' query parameters"
+      (let [req {:request-method :get
+                 :query-params {"query" [query-string "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]}}
+            resp (handler req)]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Valid form POST request"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/x-www-form-urlencoded"}
+                 :form-params {"query" query-string}}
+            inner-req (handler req)]
+        (is (= query-string (get-in inner-req [:sparql :query-string])))))
+
+    (testing "Invalid form POST request with missing query form parameter"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/x-www-form-urlencoded"}
+                 :form-params {}}
+            resp (handler req)]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Invalid form POST request with multiple query form parameters"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/x-www-form-urlencoded"}
+                 :form-params {"query" [query-string "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]}}
+            resp (handler req)]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Valid body POST request"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/sparql-query"}
+                 :body query-string}
+            inner-req (handler req)]
+        (is (= query-string (get-in inner-req [:sparql :query-string])))))
+
+    (testing "Invalid body POST request missing body"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/sparql-query"}
+                 :body nil}
+            resp (handler req)]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Invalid body POST request non-string body"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/sparql-query"}
+                 :body (ByteArrayInputStream. (byte-array [1 2 3]))}
+            resp (handler req)]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "POST request with invalid content type"
+      (let [req {:request-method :post
+                 :headers {"content-type" "text/plain"}
+                 :params {:query query-string}}
+            inner-req (handler req)]
+        (is (= query-string (get-in inner-req [:sparql :query-string])))))
+
+    (testing "Invalid request method"
+      (let [req {:request-method :put :body query-string}
+            resp (handler req)]
+        (tc/assert-is-method-not-allowed-response resp)))))
+
 (deftest sparql-prepare-query-handler-test
   (let [r (repo/repo)
         handler (sparql-prepare-query-handler r identity)]
     (testing "Valid query"
-      (let [req (handler {:params {:query "SELECT * WHERE { ?s ?p ?o }"}})]
+      (let [req (handler {:sparql {:query-string "SELECT * WHERE { ?s ?p ?o }"}})]
         (is (some? (get-in req [:sparql :prepared-query])))))
 
     (testing "Malformed SPARQL query"
-      (let [response (handler {:params {:query "NOT A SPARQL QUERY"}})]
+      (let [response (handler {:sparql {:query-string "NOT A SPARQL QUERY"}})]
         (tc/assert-is-bad-request-response response)))))
 
 (defn- prepare-query-str [query-str]

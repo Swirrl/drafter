@@ -1,24 +1,26 @@
 (ns drafter.handler
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [compojure
-             [core :refer [context defroutes]]
-             [route :as route]]
-            [drafter
-             [env :as denv]
-             [configuration :as conf]
-             [middleware :as middleware]
-             [util :refer [set-var-root!]]
-             [write-scheduler :refer [global-writes-lock start-writer! stop-writer!]]]
+            [compojure.core :refer [defroutes context]]
+            [compojure.route :as route]
+            [drafter.middleware :as middleware]
+            [swirrl-server.middleware.log-request :refer [log-request]]
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.backend.sesame.remote :refer [get-backend]]
+            [drafter.util :refer [set-var-root! conj-if]]
             [drafter.common.json-encoders :as enc]
-            [drafter.routes
-             [draftsets-api :refer [draftset-api-routes]]
-             [pages :refer [pages-routes]]
-             [sparql :refer [live-sparql-routes]]
-             [status :refer [status-routes]]]
-            [environ.core :refer [env]]
+            [drafter.routes.draftsets-api :refer [draftset-api-routes]]
+            [drafter.routes.status :refer [status-routes]]
+            [drafter.routes.pages :refer [pages-routes]]
+            [drafter.routes.sparql :refer [live-sparql-routes]]
+            [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.write-scheduler :refer [start-writer!
+                                             global-writes-lock
+                                             stop-writer!]]
+            [drafter.configuration :refer [get-configuration]]
+            [drafter.env :as denv]
+            [drafter.rdf.writers :as writers]
+            [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware
              [defaults :refer [api-defaults]]
@@ -61,35 +63,27 @@
       (str "/" (name version) suffix)
       suffix)))
 
-(defn- get-sparql-endpoint-timeout-config []
-  (conf/get-timeout-config env #{:live :draftset}))
-
 (def ^:private v1-prefix :v1)
 
-(defn- get-endpoint-query-timeout-fn [endpoint-timeouts]
-  (let [signing-key (:drafter-jws-signing-key env)]
-    (when (nil? signing-key)
-      (log/warn "DRAFTER_JWS_SIGNING_KEY not configured - any PMD query timeouts will be ignored"))
-    (timeouts/calculate-request-query-timeout endpoint-timeouts signing-key)))
+(defn- get-endpoint-query-timeout-fn [endpoint-timeout {:keys [jws-signing-key] :as config}]
+  (when (nil? jws-signing-key)
+    (log/warn "jws-signing-key not configured - any PMD query timeouts will be ignored"))
+  (timeouts/calculate-request-query-timeout endpoint-timeout jws-signing-key))
 
-(defn- get-live-sparql-query-route [backend timeouts-config]
-  (let [live-timeouts (conf/get-endpoint-timeout :live :query timeouts-config)
-        timeout-fn (get-endpoint-query-timeout-fn live-timeouts)
+(defn- get-live-sparql-query-route [backend {:keys [live-query-timeout] :as config}]
+  (let [timeout-fn (get-endpoint-query-timeout-fn live-query-timeout config)
         mount-point (endpoint-query-path :live v1-prefix)]
     (live-sparql-routes mount-point backend timeout-fn)))
 
-(defn initialise-app! [backend]
-  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo env)
-        sparql-timeouts-config (get-sparql-endpoint-timeout-config)
-        draftset-sparql-query-timeout (conf/get-endpoint-timeout :draftset :query sparql-timeouts-config)
-        draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-sparql-query-timeout)]
+(defn initialise-app! [backend {:keys [draftset-query-timeout] :as config}]
+  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo config)
+        draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-query-timeout config)]
     (set-var-root! #'app (app-handler
                           ;; add your application routes here
                           (-> []
                               (add-route (pages-routes))
                               (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout-fn))
-                              (add-route (get-live-sparql-query-route backend sparql-timeouts-config))
-                              ;;(add-routes (get-sparql-routes backend authenticated-fn sparql-timeouts-config))
+                              (add-route (get-live-sparql-query-route backend config))
                               (add-route (context "/v1/status" []
                                                   (status-routes global-writes-lock finished-jobs restart-id)))
 
@@ -115,20 +109,22 @@
 (defn- init-backend!
   "Creates the backend for the current configuration and sets the
   backend var."
-  []
-  (set-var-root! #'backend (get-backend env)))
+  [config]
+  (set-var-root! #'backend (get-backend config)))
 
-(defn- init-user-repo! []
-  (let [repo (drafter.user.repository/get-configured-repository env)]
+(defn- init-user-repo! [config]
+  (let [repo (drafter.user.repository/get-configured-repository config)]
     (set-var-root! #'user-repo repo)))
 
-(defn initialise-services! []
+(defn initialise-services! [config]
   (enc/register-custom-encoders!)
+  (writers/register-custom-rdf-writers!)
 
+  (jobs/init-job-settings! config)
   (initialise-write-service!)
-  (init-backend!)
-  (init-user-repo!)
-  (initialise-app! backend))
+  (init-backend! config)
+  (init-user-repo! config)
+  (initialise-app! backend config))
 
 (defn- load-logging-configuration [config-file]
   (-> config-file slurp read-string))
@@ -148,15 +144,17 @@
   app server such as Tomcat put any initialization code here"
   []
 
-  (configure-logging! (io/file (get env :log-config-file "log-config.edn")))
+  (let [{:keys [log-config-file is-dev] :as config} (get-configuration)]
 
-  (when (env :dev)
-    (parser/cache-off!))
+    (configure-logging! (io/file log-config-file))
 
-  (log/info "Initialising repository")
-  (initialise-services!)
+    (when is-dev
+      (parser/cache-off!))
 
-  (log/info "drafter started successfully"))
+    (log/info "Initialising repository")
+    (initialise-services! config)
+
+    (log/info "drafter started successfully")))
 
 (defn destroy
   "destroy will be called when your application

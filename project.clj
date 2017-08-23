@@ -1,4 +1,4 @@
-(defproject drafter "2.1.2-SNAPSHOT"
+(defproject drafter "2.1.4-SNAPSHOT"
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
@@ -21,19 +21,14 @@
   :dependencies [[buddy/buddy-auth "0.9.0"]
                  [buddy/buddy-core "0.9.0"]
                  [org.clojure/clojure "1.8.0"]
-                 [org.openrdf.sesame/sesame-queryrender "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
-                 [org.openrdf.sesame/sesame-runtime "2.8.11" :exclusions [org.openrdf.sesame/sesame-http-client]]
+                 [org.openrdf.sesame/sesame-queryrender "2.8.11"]
+                 [org.openrdf.sesame/sesame-runtime "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
-
-                 ;; STOMP over sesames version of their http client lib with a release that patches SES-2368
-                 ;; see here for the source code that built this release:
-                 ;;
-                 ;; https://github.com/RickMoynihan/sesame/tree/connection-pool-timeout
-
-                 [swirrl/sesame-http-client "2.8.9-with-connection-pool-and-url-fix"]
 
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
+
+                 [aero "1.1.2"]
 
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
@@ -45,7 +40,6 @@
                  [com.novemberain/monger "3.0.2"]
                  [com.sun.mail/javax.mail "1.5.5"]
                  [com.taoensso/tower "2.0.2"]
-                 [environ "1.0.0"]
                  [grafter "0.8.8"]
                  [grafter/url "0.2.1"]
                  ;[grafter/vocabularies "0.1.3"]
@@ -88,7 +82,6 @@
                  :timeout 180000}
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
-            [lein-environ "1.0.0"]
             [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
 
   :ring {:handler drafter.handler/app
