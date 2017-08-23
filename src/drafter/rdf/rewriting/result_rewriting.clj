@@ -106,13 +106,21 @@
       (setMaxExecutionTime [this max]
         (.setMaxExecutionTime inner-query max)))))
 
+(defn- ->sesame-graph-mapping
+  "Rewriting executors store the keys and values in their live -> draft
+  graph mapping as java.net.URIs while query rewriting requires them to
+  be sesame URI instances. This function maps the mapping from java to sesame
+  URIs."
+  [uri-mapping]
+  (util/map-all util/uri->sesame-uri uri-mapping))
+
 (defn rewrite-query-results [inner-query live->draft]
   (cond
    (instance? GraphQuery inner-query)
-   (rewrite-graph-query-results inner-query live->draft)
+   (rewrite-graph-query-results inner-query (->sesame-graph-mapping live->draft))
 
    (instance? TupleQuery inner-query)
-   (rewrite-tuple-query-results inner-query live->draft)
+   (rewrite-tuple-query-results inner-query (->sesame-graph-mapping live->draft))
 
    (instance? BooleanQuery inner-query)
    inner-query))

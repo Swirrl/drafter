@@ -3,6 +3,8 @@
             [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf.repository.registry :as reg]
+            [grafter.rdf.repository :as repo]
+            [grafter.url :as url]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
             [drafter.user :as user]
@@ -10,7 +12,7 @@
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
                                                   create-draft-graph!]]
-            [drafter.rdf.sparql :refer [query update!] :as sparql]
+            [drafter.rdf.sparql :refer [update!] :as sparql]
             [drafter.configuration :refer [get-configuration]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
@@ -39,8 +41,8 @@
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri
-             ["http://test.com/hasProperty" "http://test.com/data/1"]
-             ["http://test.com/hasProperty" "http://test.com/data/2"]]))
+             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
+             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]]))
 
 (defn select-all-in-graph [graph-uri]
   (str "SELECT * WHERE {"
@@ -106,19 +108,19 @@
   ([db graph triples draftset-ref]
 
    (create-managed-graph! db graph)
-   (let [draftset-uri (and draftset-ref (str (->draftset-uri draftset-ref)))
-         draft-graph (create-draft-graph! db graph {} draftset-uri)]
+   (let [draftset-uri (and draftset-ref (url/->java-uri draftset-ref))
+         draft-graph (create-draft-graph! db graph draftset-uri)]
      (add db draft-graph triples)
      draft-graph)))
 
 (defn make-graph-live!
-  ([db live-guri]
-     (make-graph-live! db live-guri (test-triples "http://test.com/subject-1")))
+  ([db live-graph-uri]
+     (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1"))))
 
-  ([db live-guri data]
-     (let [draft-guri (import-data-to-draft! db live-guri data)]
-       (migrate-graphs-to-live! db [draft-guri]))
-     live-guri))
+  ([db live-graph-uri data]
+     (let [draft-graph-uri (import-data-to-draft! db live-graph-uri data)]
+       (migrate-graphs-to-live! db [draft-graph-uri]))
+     live-graph-uri))
 
 (defn during-exclusive-write-f [f]
   (let [p (promise)
@@ -161,12 +163,10 @@
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
-  (sparql/query *test-backend* (str "ASK WHERE {"
-
+  (repo/query *test-backend* (str "ASK WHERE {"
                         (-> (apply str (interpose " " graphpatterns))
                             (.replace " >" ">")
                             (.replace "< " "<"))
-
                         "}")))
 
 (def default-timeout 5000)

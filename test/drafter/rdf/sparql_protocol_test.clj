@@ -8,12 +8,13 @@
              [formats :refer [rdf-ntriples]]
              [protocols :as pr]]
             [schema.test :refer [validate-schemas]])
-  (:import [java.util.concurrent CountDownLatch TimeUnit]))
+  (:import [java.util.concurrent CountDownLatch TimeUnit]
+           [java.net URI]))
 
 (use-fixtures :each validate-schemas)
 
 (defn add-triple-to-db [db]
-  (pr/add db "http://foo.com/my-graph" (test-triples "http://test.com/data/one")))
+  (pr/add db (URI. "http://foo.com/my-graph") (test-triples (URI. "http://test.com/data/one"))))
 
 (deftest sparql-end-point-test
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
@@ -49,7 +50,7 @@
 
         (let [triple-reader (java.io.InputStreamReader. body)
               triples (get-spo-set (rdf/statements triple-reader :format rdf-ntriples))
-              expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
+              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
 
           (is (= expected-triples triples)))))))
 
@@ -66,8 +67,8 @@
         (is (= "text/csv" (headers "Content-Type")))
 
         (let [csv-result (csv/parse-csv (stream->string body))
-              triples (set (drop 1 csv-result))
-              expected-triples (get-spo-set (test-triples "http://test.com/data/one"))]
+              triples (set (map (fn [row] (map #(URI. %) row)) (drop 1 csv-result)))
+              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
           (is (= ["s" "p" "o"] (first csv-result)))
           (is (= expected-triples triples)))))))
 

@@ -19,14 +19,13 @@ permissions."
   "Gets a user's URI from their username."
   [username]
   {:pre [(util/validate-email-address username)]}
-  (str "mailto:" username))
+  (URI. "mailto" username nil))
 
 (def user->uri (comp username->uri username))
 (defn uri->username
   "Gets a user's username from their URI."
   [user-uri]
-  (let [uri (URI. user-uri)]
-    (.getSchemeSpecificPart uri)))
+  (.getSchemeSpecificPart user-uri))
 
 (defn is-known-role? [r]
   (util/seq-contains? roles r))

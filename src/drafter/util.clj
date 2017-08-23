@@ -85,8 +85,10 @@
          batches (mapcat vals grouped-batches)]
      (mapcat #(partition-all output-batch-size %) batches))))
 
-(defn string->sesame-uri [s]
-  (URIImpl. s))
+(defn uri->sesame-uri
+  "Converts a java.net.URI into a sesame URI"
+  [uri]
+  (URIImpl. (str uri)))
 
 ;; Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
 (defn intersection-with

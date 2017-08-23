@@ -65,8 +65,9 @@
    :post [(or (instance? Dataset %)
               (nil? %))]}
   (when-let [graph-restrictions (get-restrictions graph-restrictions)]
-    (repo/make-restricted-dataset :default-graph graph-restrictions
-                                  :named-graphs graph-restrictions)))
+    (let [stringified-restriction (map str graph-restrictions)]
+      (repo/make-restricted-dataset :default-graph stringified-restriction
+                                    :named-graphs stringified-restriction))))
 
 (defn apply-restriction [pquery restriction]
   (let [dataset (restricted-dataset restriction)]

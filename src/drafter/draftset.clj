@@ -3,7 +3,8 @@
   to operate on them."
   (:require [drafter.util :as util]
             [schema.core :as s]
-            [drafter.rdf.drafter-ontology :as ont])
+            [drafter.rdf.drafter-ontology :as ont]
+            [grafter.url :as url])
   (:import java.net.URI
            [java.util Date UUID]))
 
@@ -12,13 +13,19 @@
   (->draftset-id [this]))
 
 (defrecord DraftsetURI [uri]
+  url/IURIable
+  (->java-uri [this] uri)
+
   Object
-  (toString [this] uri))
+  (toString [this] (str uri)))
 
 (defrecord DraftsetId [id]
   DraftsetRef
-  (->draftset-uri [this] (->DraftsetURI (ont/draftset-uri id)))
+  (->draftset-uri [this] (->DraftsetURI (ont/draftset-id->uri id)))
   (->draftset-id [this] this)
+
+  url/IURIable
+  (->java-uri [this] (ont/draftset-id->uri id))
 
   Object
   (toString [this] id))
@@ -27,8 +34,7 @@
   DraftsetRef
   (->draftset-uri [this] this)
   (->draftset-id [{:keys [uri]}]
-    (let [base-uri (URI. (ont/draftset-uri ""))
-          relative (.relativize base-uri (URI. uri))]
+    (let [relative (.relativize ont/draftset-uri uri)]
       (->DraftsetId (str relative)))))
 
 (def ^:private email-schema (s/pred util/validate-email-address))

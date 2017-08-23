@@ -5,8 +5,7 @@
              [draftset :as ds]
              [middleware :refer [negotiate-quads-content-type-handler negotiate-triples-content-type-handler optional-enum-param require-params require-rdf-content-type sparql-constant-prepared-query-handler sparql-timeout-handler temp-file-body]]
              [responses :refer [conflict-detected-response forbidden-response run-sync-job! submit-async-job! unprocessable-entity-response]]
-             [user :as user]
-             [util :as util]]
+             [user :as user]]
             [drafter.rdf
              [draft-management :as mgmt]
              [draftset-management :as dsmgmt]
@@ -20,27 +19,19 @@
                                        unsupported-media-type-response method-not-allowed-response
                                        forbidden-response submit-async-job! run-sync-job!
                                        conflict-detected-response]]
-            [drafter.requests :as request]
             [swirrl-server.responses :as response]
             [swirrl-server.async.jobs :refer [job-succeeded!]]
             [drafter.rdf.draftset-management :as dsmgmt]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
-            [drafter.rdf.content-negotiation :as conneg]
             [drafter.backend.protocols :refer :all]
-            [drafter.backend.endpoints :as endpoints]
-            [drafter.util :as util]
             [drafter.user :as user]
 
             [drafter.user.repository :as user-repo]
             [ring.util.response :refer [not-found redirect-after-post response]]
             [swirrl-server.async.jobs :as ajobs]
-            [swirrl-server.responses :as response]))
-
-
-(defn- get-draftset-executor [backend draftset-ref union-with-live?]
-  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
-    (endpoints/->RewritingSesameSparqlExecutor backend (util/map-all util/string->sesame-uri graph-mapping) union-with-live?)))
+            [swirrl-server.responses :as response])
+  (:import (java.net URI)))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
@@ -56,11 +47,34 @@
       (inner-handler request)
       (forbidden-response "Operation only permitted by draftset owner"))))
 
+(defn- try-parse-uri [s]
+  (try
+    (URI. s)
+    (catch Exception ex
+      ex)))
+
+(defn- parse-graph-param-handler [required? inner-handler]
+  (fn [request]
+    (let [graph (get-in request [:params :graph])]
+      (cond
+        (some? graph)
+        (let [uri-or-ex (try-parse-uri graph)]
+          (if (instance? URI uri-or-ex)
+            (inner-handler (assoc-in request [:params :graph] uri-or-ex))
+            (unprocessable-entity-response "Valid URI required for graph parameter")))
+
+        required?
+        (unprocessable-entity-response "Graph parameter required")
+
+        :else
+        (inner-handler request)))))
+
 (defn- require-graph-for-triples-rdf-format [inner-handler]
-  (fn [{{:keys [graph rdf-format]} :params :as request}]
-    (if (util/implies (is-triples-format? rdf-format) (some? graph))
-      (inner-handler request)
-      (unprocessable-entity-response "Graph parameter required for triples RDF format"))))
+  (fn [{{:keys [rdf-format]} :params :as request}]
+    (if (is-triples-format? rdf-format)
+      (let [h (parse-graph-param-handler true inner-handler)]
+        (h request))
+      (inner-handler request))))
 
 (defn- required-live-graph-param-handler [backend inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
@@ -108,7 +122,7 @@
                             (handler-fn req)))))
 
 (defn draftset-api-routes [backend user-repo authenticated query-timeout-fn]
-  (letfn [(required-live-graph-param [h] (required-live-graph-param-handler backend h))
+  (letfn [(required-live-graph-param [h] (parse-graph-param-handler true (required-live-graph-param-handler backend h)))
           (as-draftset-owner [h]
             (authenticated
              (existing-draftset-handler
@@ -175,7 +189,7 @@
                     (as-draftset-owner
                       (parse-union-with-live-handler
                        (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
-                          (let [executor (get-draftset-executor backend draftset-id union-with-live)
+                          (let [executor (dsmgmt/get-draftset-executor {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
                                 is-triples-query? (contains? params :graph)
                                 conneg (if is-triples-query?
                                          negotiate-triples-content-type-handler
@@ -206,25 +220,28 @@
                     (as-draftset-owner
                       (parse-query-param-flag-handler
                         :silent
-                        (fn [{{:keys [draftset-id graph silent]} :params :as request}]
-                          (if (mgmt/is-graph-managed? backend graph)
-                            (run-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
-                                         #(draftset-sync-write-response % backend draftset-id))
-                            (if silent
-                              (response (dsmgmt/get-draftset-info backend draftset-id))
-                              (unprocessable-entity-response (str "Graph not found"))))))))
+                        (parse-graph-param-handler
+                          true
+                          (fn [{{:keys [draftset-id graph silent]} :params :as request}]
+                            (if (mgmt/is-graph-managed? backend graph)
+                              (run-sync #(dsmgmt/delete-draftset-graph! backend draftset-id graph)
+                                        #(draftset-sync-write-response % backend draftset-id))
+                              (if silent
+                                (response (dsmgmt/get-draftset-info backend draftset-id))
+                                (unprocessable-entity-response (str "Graph not found")))))))))
 
         (make-route :delete "/draftset/:id/changes"
                     (as-draftset-owner
-                      (require-params #{:graph}
-                                      (fn [{{:keys [draftset-id graph]} :params}]
-                                        (run-sync #(dsmgmt/revert-graph-changes! backend draftset-id graph)
-                                                     (fn [result]
-                                                       (if (failed-job-result? result)
-                                                         (response/api-response 500 result)
-                                                         (if (= :reverted (:details result))
-                                                           (response (dsmgmt/get-draftset-info backend draftset-id))
-                                                           (not-found "")))))))))
+                      (parse-graph-param-handler
+                        true
+                        (fn [{{:keys [draftset-id graph]} :params}]
+                          (run-sync #(dsmgmt/revert-graph-changes! backend draftset-id graph)
+                                    (fn [result]
+                                      (if (failed-job-result? result)
+                                        (response/api-response 500 result)
+                                        (if (= :reverted (:details result))
+                                          (response (dsmgmt/get-draftset-info backend draftset-id))
+                                          (not-found "")))))))))
         (make-route :put "/draftset/:id/data"
                     (as-draftset-owner
                      (require-rdf-content-type
@@ -249,7 +266,7 @@
                     (as-draftset-owner
                       (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-                          (let [executor (get-draftset-executor backend draftset-id union-with-live)
+                          (let [executor (dsmgmt/get-draftset-executor {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
                                 handler (sparql-protocol-handler executor query-timeout-fn)]
                             (handler request))))))
 
