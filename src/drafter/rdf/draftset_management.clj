@@ -17,13 +17,15 @@
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-statement]]
             [grafter.rdf :refer [add context]]
             [grafter.rdf
-             [io :refer [IStatement->sesame-statement]]
+             [io :refer [IStatement->sesame-statement rdf-serializer]]
              [protocols :refer [map->Quad map->Triple]]
-             [repository :as repo]]
+             [repository :as repo]
+             [formats :as formats]]
             [grafter.vocabularies.rdf :refer :all]
             [swirrl-server.async.jobs :as ajobs]
             [grafter.url :as url])
   (:import [java.util Date UUID]
+           [java.io StringWriter]
            org.openrdf.model.impl.ContextStatementImpl
            org.openrdf.model.Resource
            [org.openrdf.query GraphQuery TupleQueryResultHandler]
@@ -582,12 +584,20 @@
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
-  quads into triples. Expects each quad in the sequence to have the
-  same target graph."
+  quads into triples. Batch must be non-empty and each contained quad
+  should have the same graph. If the quads have a nil context an
+  exception is thrown as drafts for the default graph are not
+  currently supported."
   [quads]
-  (if-let [graph-uri (context (first quads))]
-    {:graph-uri graph-uri :triples (map map->Triple quads)}
-    (throw (IllegalArgumentException. "Quad batch must contain at least one item"))))
+  {:pre [(not (empty? quads))]}
+  (let [graph-uri (context (first quads))]
+    (if (some? graph-uri)
+      {:graph-uri graph-uri :triples (map map->Triple quads)}
+      (let [sw (StringWriter.)
+            msg (format "All statements must have an explicit target graph")]
+        (add (rdf-serializer sw :format formats/rdf-nquads) (take 5 quads))
+        (throw (IllegalArgumentException.
+                (str "All statements must have an explicit target graph. The following statements have no graph:\n" sw)))))))
 
 (declare append-draftset-quads)
 
@@ -609,7 +619,6 @@
         (do
           (append-data-batch! backend draft-graph-uri triples)
           (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
-
 
           (let [next-job (ajobs/create-child-job
                           job
