@@ -43,7 +43,7 @@
   (testing "all elements included in output"
     (let [p (prop/for-all [v (gen/vector gen/int)]
                           (let [batches (batch-partition-by v even? 5)]
-                            (= (group-by identity v) (group-by identity (flatten batches)))))]
+                            (= (frequencies v) (frequencies (flatten batches)))))]
       (assert-check (tc/quick-check 100 p))))
 
   (testing "all batches non-empty"
