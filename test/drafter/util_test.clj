@@ -1,7 +1,11 @@
 (ns drafter.util-test
   (:require [clojure.math.combinatorics :refer [permutations]]
             [clojure.test :refer :all]
-            [drafter.util :refer :all]))
+            [drafter.util :refer :all]
+            [clojure.test.check :as tc]
+            [clojure.test.check.generators :as gen]
+            [clojure.test.check.properties :as prop]
+            [clojure.test.check.clojure-test :refer [defspec assert-check]]))
 
 (deftest get-causes-test
   (testing "Returns all causes"
@@ -34,7 +38,33 @@
     [:a :b :a :b :a] identity 2 10 [[:a :a] [:a] [:b :b]]
 
     ;;grouped batches where input length > take-batch-size
-    [:a :b :a :b :a :b] identity 2 4 [[:a :a] [:b :b] [:a] [:b]]))
+    [:a :b :a :b :a :b] identity 2 4 [[:a :a] [:b :b] [:a] [:b]])
+
+  (testing "all elements included in output"
+    (let [p (prop/for-all [v (gen/vector gen/int)]
+                          (let [batches (batch-partition-by v even? 5)]
+                            (= (frequencies v) (frequencies (flatten batches)))))]
+      (assert-check (tc/quick-check 100 p))))
+
+  (testing "all batches non-empty"
+    (let [p (prop/for-all [v (gen/vector gen/int)]
+                          (let [batches (batch-partition-by v even? 5)]
+                            (every? #(not (empty? %)) batches)))]
+      (assert-check (tc/quick-check 100 p))))
+  
+  (testing "all batches no larger than output batch size"
+    (let [p (prop/for-all [v (gen/vector gen/int)]
+                          (let [output-batch-size 3
+                                batches (batch-partition-by v even? output-batch-size)]
+                            (every? #(<= (count %) output-batch-size) batches)))]
+      (assert-check (tc/quick-check 100 p))))
+
+  (testing "all batch values same for partition fn"
+    (let [p (prop/for-all [v (gen/vector gen/int)]
+                          (let [f even?
+                                batches (batch-partition-by v f 5)]
+                            (every? #(= 1 (count (group-by f %))) batches)))]
+      (assert-check (tc/quick-check 100 p)))))
 
 (deftest intersection-with-test
   (are [m1 m2 f expected] (= expected (intersection-with m1 m2 f))

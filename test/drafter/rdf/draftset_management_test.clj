@@ -20,7 +20,7 @@
             [drafter.util :as util]
             [grafter.url :as url])
   (:import org.openrdf.rio.RDFFormat
-           (java.net URI)))
+           [java.net URI]))
 
 (defn- has-uri-object? [s p uri-o]
   (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
@@ -399,8 +399,10 @@
       (is (= (set live-triples) (set draft-triples))))))
 
 (deftest quad-batch->graph-triples-test
-  (testing "Empty batch"
-    (is (thrown? IllegalArgumentException (quad-batch->graph-triples []))))
+  (testing "Batch quads have nil graph"
+    (let [quads [(->Quad (URI. "http://s1") (URI. "http://p1") "o1" nil)
+                 (->Quad (URI. "http://s2") (URI. "http://p2") "o2" nil)]]
+      (is (thrown? IllegalArgumentException (quad-batch->graph-triples quads)))))
 
   (testing "Non-empty batch"
     (let [guri "http://graph"
