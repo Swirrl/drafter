@@ -128,6 +128,7 @@
    }
 
   :jvm-opts ["-Djava.awt.headless=true"
+             "-XX:-OmitStackTraceInFastThrow"
              ;; Use this property to control number
              ;; of connections in the SPARQLRepository connection pool:
              ;;
