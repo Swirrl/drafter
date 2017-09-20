@@ -18,5 +18,5 @@
 (defn update! [repo update-string]
   (log/info "Running update: " update-string)
   (datadog/measure!
-   "drafter.sparql.update.time"
+   "drafter.sparql.update.time" {}
    (pr/update! repo update-string)))

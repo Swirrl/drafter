@@ -56,7 +56,7 @@
        ~@forms
        (finally
          (let [end-time# (System/currentTimeMillis)]
-           (datadog/histogram! "drafter.writes-locked" (- end-time# start-time#)))
+           (datadog/histogram! "drafter.writes_locked" (- end-time# start-time#)))
          (log/info "Releasing lock for" ~operation-type)
          (.unlock global-writes-lock)))))
 
@@ -76,7 +76,7 @@
               job)]
     (log/info "Queueing job: " job (meta job))
     (let [changed (.add writes-queue job)]
-      (datadog/increment! "drafter.jobs-queued" 1)
+      (datadog/increment! "drafter.jobs_queued" 1)
       changed)))
 
 ;;await-sync-job! :: Job -> ApiResponse
@@ -113,7 +113,7 @@
                   priority :priority
                   job-id :id
                   promis :value-p :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS )]
-        (datadog/increment! "drafter.jobs-queued" -1)
+        (datadog/increment! "drafter.jobs_queued" -1)
         (l4j/with-logging-context (assoc
                                    (meta job)
                                    :jobId (str "job-" (.substring (str job-id) 0 8)))

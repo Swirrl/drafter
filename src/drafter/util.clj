@@ -6,6 +6,14 @@
            [javax.mail.internet AddressException InternetAddress]
            org.openrdf.model.impl.URIImpl))
 
+(defn statsd-name
+  "Takes any number of strings or keywords and formats them into a
+  datadog/statsd style string, i.e. it joins the parts with .'s and
+  replaces -'s with _'s"
+  [& s]
+  (-> (str/join "." (map name s) )
+      (str/replace #"-" "_")))
+
 (defmacro log-time-taken
   "Macro that logs the time spent doing something at :info level,
   captures the form execued in the log output."

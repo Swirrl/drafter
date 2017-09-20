@@ -1,6 +1,8 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
+            [clojure.string :as str]
+            [drafter.util :as util]
             [drafter.write-scheduler :refer [queue-job!]]
             [swirrl-server.async.jobs :as ajobs]))
 
@@ -32,7 +34,7 @@
 
 (defn- record-job-stats! [job suffix]
   "Log a job completion to datadog"
-  (datadog/increment! (str "drafter.job." (name (:priority job)) "." (name suffix)) 1))
+  (datadog/increment! (util/statsd-name "drafter.job." (:priority job) suffix) 1))
 
 (defn job-failed!
   "Wrap swirrl-server.async.jobs/job-failed! with a datadog counter."
@@ -74,6 +76,6 @@
 (defmacro make-job [write-priority [job :as args] & forms]
   `(ajobs/create-job ~write-priority
                (fn [~job]
-                 (datadog/measure! (str "drafter.job." (name ~write-priority) ".time")
+                 (datadog/measure! (util/statsd-name "drafter.job" ~write-priority "time") {}
                   (with-job-exception-handling ~job
                     ~@forms)))))

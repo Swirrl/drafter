@@ -18,7 +18,7 @@
   (let [os (ByteArrayOutputStream. 1024)
         writer (QueryResultIO/createWriter result-format os)]
     (with-open [_ os]
-      (datadog/measure! "drafter.sparql.query.time"
+      (datadog/measure! "drafter.sparql.query.time" {}
          (let [result (.evaluate pquery)]
            (.handleBoolean writer result))))
     {:status 200
