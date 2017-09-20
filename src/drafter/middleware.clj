@@ -1,5 +1,6 @@
 (ns drafter.middleware
   (:require [clj-logging-config.log4j :as l4j]
+            [cognician.dogstatsd :as datadog]
             [clojure.tools.logging :as log]
             [clojure.string :as string]
             [clojure.set :as set]
@@ -60,9 +61,12 @@
     (if (auth/authenticated? request)
       (let [email (:email (:identity request))]
         (l4j/with-logging-context {:user email} ;; wrap a logging context over the request so we can trace the user
+          (datadog/increment! "drafter.requests.authorised" 1)
           (log/info "got user" email)
           (inner-handler request)))
-      (auth/throw-unauthorized {:message "Authentication required"}))))
+      (do
+        (datadog/increment! "drafter.requests.unauthorised" 1)
+        (auth/throw-unauthorized {:message "Authentication required"})))))
 
 (defn- get-configured-token-auth-backend [config]
   (if-let [signing-key (:jws-signing-key config)]
@@ -264,6 +268,11 @@
   [inner-handler]
   (negotiate-sparql-results-content-type-with conneg/negotiate-rdf-triples-format "RDF triples format required" inner-handler))
 
+(defn wrap-total-requests-counter [handler]
+  (fn [req]
+    (datadog/increment! "drafter.requests.total" 1)
+    (handler req)))
+
 (defn sparql-timeout-handler
   "Returns a handler which configures the timeout for the prepared SPARQL query associated with the request.
    The timeout is calculated based on the optional timeout and max-query-timeout parameters on the request
@@ -276,3 +285,4 @@
         (let [query-timeout timeout-or-ex]
           (.setMaxExecutionTime pquery query-timeout)
           (inner-handler (assoc-in request [:sparql :timeout] query-timeout)))))))
+

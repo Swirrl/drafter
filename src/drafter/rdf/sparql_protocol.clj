@@ -1,5 +1,6 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.tools.logging :as log]
+            [cognician.dogstatsd :as datadog]
             [compojure.core :refer [make-route]]
             [drafter
              [channels :refer :all]
@@ -17,8 +18,9 @@
   (let [os (ByteArrayOutputStream. 1024)
         writer (QueryResultIO/createWriter result-format os)]
     (with-open [_ os]
-      (let [result (.evaluate pquery)]
-        (.handleBoolean writer result)))
+      (datadog/measure! "drafter.sparql.query.time"
+         (let [result (.evaluate pquery)]
+           (.handleBoolean writer result))))
     {:status 200
      :headers {"Content-Type" response-content-type}
      :body (String. (.toByteArray os))}))
@@ -32,12 +34,15 @@
         ;;start query execution in its own thread
         ;;once results have been recieved
         query-f (future
-                  (try
-                    (.evaluate pquery result-handler)
-                    (catch Exception ex
-                      (send ex))
-                    (finally
-                      (.close os))))]
+                  (let [start-time (System/currentTimeMillis)]
+                    (try
+                      (.evaluate pquery result-handler)
+                      (catch Exception ex
+                        (send ex))
+                      (finally
+                        (.close os)
+                        (let [end-time (System/currentTimeMillis)]
+                          (datadog/histogram! "drafter.sparql.query.time" (- end-time start-time)))))))]
     ;;wait for signal from query execution thread that the response has been received and begun streaming
     ;;results
     ;;NOTE: This could block for as long as the query execution timeout period

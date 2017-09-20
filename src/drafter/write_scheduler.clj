@@ -11,6 +11,7 @@
 
   Jobs can be added to the write queue using the queue-job! function."
   (:require [clj-logging-config.log4j :as l4j]
+            [cognician.dogstatsd :as datadog]
             [clojure.tools.logging :as log]
             [drafter.util :refer [log-time-taken]]
             [swirrl-server.async.jobs :refer [job-failed!]]
@@ -47,13 +48,15 @@
   released.  After the forms have executed the lock is guaranteed to
   be released."
   [operation-type & forms]
-  `(do
+  `(let [start-time# (System/currentTimeMillis)]
      (log/debug "Locking for" ~operation-type)
      (.lock global-writes-lock)
      (try
        (log/info "Acquired lock for " ~operation-type)
        ~@forms
        (finally
+         (let [end-time# (System/currentTimeMillis)]
+           (datadog/histogram! "drafter.writes-locked" (- end-time# start-time#)))
          (log/info "Releasing lock for" ~operation-type)
          (.unlock global-writes-lock)))))
 
@@ -72,7 +75,9 @@
                               :route req-route})
               job)]
     (log/info "Queueing job: " job (meta job))
-    (.add writes-queue job)))
+    (let [changed (.add writes-queue job)]
+      (datadog/increment! "drafter.jobs-queued" 1)
+      changed)))
 
 ;;await-sync-job! :: Job -> ApiResponse
 (defn exec-sync-job!
@@ -108,6 +113,7 @@
                   priority :priority
                   job-id :id
                   promis :value-p :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS )]
+        (datadog/increment! "drafter.jobs-queued" -1)
         (l4j/with-logging-context (assoc
                                    (meta job)
                                    :jobId (str "job-" (.substring (str job-id) 0 8)))
@@ -123,7 +129,7 @@
                 (with-lock :publish-write
                   (task-f! job))
                 (task-f! job)))
-
+            
             (catch Exception ex
               (log/warn ex "A task raised an error.  Delivering error to promise")
               ;; TODO improve error returned

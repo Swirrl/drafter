@@ -1,5 +1,6 @@
 (ns drafter.rdf.sparql
   (:require [clojure.tools.logging :as log]
+            [cognician.dogstatsd :as datadog]
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf.protocols :as pr]
             [grafter.rdf.repository :as repo]))
@@ -16,4 +17,6 @@
 
 (defn update! [repo update-string]
   (log/info "Running update: " update-string)
-  (pr/update! repo update-string))
+  (datadog/measure!
+   "drafter.sparql.update.time"
+   (pr/update! repo update-string)))

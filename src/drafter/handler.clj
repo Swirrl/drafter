@@ -1,5 +1,6 @@
 (ns drafter.handler
   (:require [clojure.java.io :as io]
+            [cognician.dogstatsd :as datadog]
             [clojure.tools.logging :as log]
             [compojure.core :refer [defroutes context]]
             [compojure.route :as route]
@@ -47,8 +48,8 @@
 (def user-repo)
 (def app)
 
-(def ^{:doc "A future to control the single write thread that performs database writes."}
-  writer-service)
+(def writer-service
+  "A future to control the single write thread that performs database writes.")
 
 (defroutes app-routes
   (route/resources "/")
@@ -95,6 +96,7 @@
                           :middleware [#(wrap-resource % "swagger-ui")
                                        wrap-verbs
                                        wrap-encode-errors
+                                       middleware/wrap-total-requests-counter
                                        log-request]
                           ;; add access rules here
                           :access-rules []
@@ -144,7 +146,7 @@
   app server such as Tomcat put any initialization code here"
   []
 
-  (let [{:keys [log-config-file is-dev] :as config} (get-configuration)]
+  (let [{:keys [log-config-file is-dev datadog-statsd-address] :as config} (get-configuration)]
 
     (configure-logging! (io/file log-config-file))
 
@@ -154,6 +156,7 @@
     (log/info "Initialising repository")
     (initialise-services! config)
 
+    (datadog/configure! datadog-statsd-address {:service :drafter})
     (log/info "drafter started successfully")))
 
 (defn destroy

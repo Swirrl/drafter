@@ -322,7 +322,7 @@
   (jobs/make-job
     :background-write [job]
     (do (delete-draftset! backend draftset-ref)
-        (ajobs/job-succeeded! job))))
+        (jobs/job-succeeded! job))))
 
 (defn delete-draftset-graph! [db draftset-ref graph-uri]
   (when (mgmt/is-graph-managed? db graph-uri)
@@ -561,7 +561,7 @@
   (jobs/make-job :background-write [job]
                  (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph)]
                    (lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
-                   (ajobs/job-succeeded! job))))
+                   (jobs/job-succeeded! job))))
 
 (defn- publish-draftset-graphs! [backend draftset-ref]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
@@ -578,9 +578,9 @@
                  (try
                    (publish-draftset-graphs! backend draftset-ref)
                    (delete-draftset-statements! backend draftset-ref)
-                   (ajobs/job-succeeded! job)
+                   (jobs/job-succeeded! job)
                    (catch Exception ex
-                     (ajobs/job-failed! job ex)))))
+                     (jobs/job-failed! job ex)))))
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
@@ -627,7 +627,7 @@
         ;;NOTE: do this immediately instead of scheduling a
         ;;continuation since we haven't done any real work yet
         (append-draftset-quads backend draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-    (ajobs/job-succeeded! job)))
+    (jobs/job-succeeded! job)))
 
 (defn- copy-graph-for-append*
   [state draftset-ref backend live->draft quad-batches job]
@@ -688,7 +688,7 @@
           ;;which does not exist in live
           (recur backend (rest quad-batches) draftset-ref live->draft state job)))
       (let [draftset-info (get-draftset-info backend draftset-ref)]
-        (ajobs/job-succeeded! job {:draftset draftset-info})))
+        (jobs/job-succeeded! job {:draftset draftset-info})))
 
     :copy-graph
     (let [{:keys [live-graph]} state
