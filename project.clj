@@ -25,6 +25,8 @@
                  [org.openrdf.sesame/sesame-runtime "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
 
+                 [cognician/dogstatsd-clj "0.1.1"]
+                 
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
 
@@ -126,6 +128,7 @@
    }
 
   :jvm-opts ["-Djava.awt.headless=true"
+             "-XX:-OmitStackTraceInFastThrow"
              ;; Use this property to control number
              ;; of connections in the SPARQLRepository connection pool:
              ;;

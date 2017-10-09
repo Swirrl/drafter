@@ -16,4 +16,5 @@
  :mongo-port #port #env DRAFTER_MONGO_PORT
  :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]
  :mongo-db-name #env DRAFTER_USER_DB_NAME
+ :datadog-statsd-address #or [#env DATADOG_STATSD_ADDRESS nil]
  }

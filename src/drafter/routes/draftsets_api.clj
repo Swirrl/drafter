@@ -1,5 +1,6 @@
 (ns drafter.routes.draftsets-api
   (:require [clj-logging-config.log4j :as l4j]
+            [cognician.dogstatsd :as datadog]
             [compojure.core :as compojure :refer [context routes]]
             [drafter
              [draftset :as ds]

@@ -1,9 +1,10 @@
 (ns drafter.rdf.draft-management.jobs
   (:require [clojure.tools.logging :as log]
+            [cognician.dogstatsd :as datadog]
+            [clojure.string :as str]
+            [drafter.util :as util]
             [drafter.write-scheduler :refer [queue-job!]]
-            [swirrl-server.async.jobs
-             :refer
-             [create-child-job create-job job-failed! job-succeeded!]]))
+            [swirrl-server.async.jobs :as ajobs]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:
@@ -31,6 +32,29 @@
 
 (def batched-write-size 75000)
 
+(defn- record-job-stats! [job suffix]
+  "Log a job completion to datadog"
+  (datadog/increment! (util/statsd-name "drafter.job." (:priority job) suffix) 1))
+
+(defn job-failed!
+  "Wrap swirrl-server.async.jobs/job-failed! with a datadog counter."
+  ([job ex]
+   (record-job-stats! job :failed)
+   (ajobs/job-failed! job ex))
+  
+  ([job ex details]
+   (record-job-stats! job :failed)
+   (ajobs/job-failed! job ex details)))
+
+(defn job-succeeded!
+  "Wrap swirrl-server.async.jobs/job-succeeded! with a datadog counter."
+  ([job]
+   (record-job-stats! job :succeeded)
+   (ajobs/job-succeeded! job))
+  ([job details]
+   (record-job-stats! job :succeeded)
+   (ajobs/job-succeeded! job details)))
+
 (defn init-job-settings!
   "Initialised job settings from the given configuration map."
   [config]
@@ -42,7 +66,7 @@
      ~@forms
      (catch Throwable ext#
        (log/warn ext# "Error whilst executing job")
-       (job-failed! ~job ext#))))
+       (ajobs/job-failed! ~job ext#))))
 
 (defn failed-job-result?
   "Indicates whether the given result object is a failed job result."
@@ -50,7 +74,8 @@
   (= :error type))
 
 (defmacro make-job [write-priority [job :as args] & forms]
-  `(create-job ~write-priority
+  `(ajobs/create-job ~write-priority
                (fn [~job]
-                 (with-job-exception-handling ~job
-                   ~@forms))))
+                 (datadog/measure! (util/statsd-name "drafter.job" ~write-priority "time") {}
+                  (with-job-exception-handling ~job
+                    ~@forms)))))
