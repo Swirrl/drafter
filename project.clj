@@ -20,7 +20,7 @@
 
   :dependencies [[buddy/buddy-auth "0.9.0"]
                  [buddy/buddy-core "0.9.0"]
-                 [org.clojure/clojure "1.8.0"]
+                 [org.clojure/clojure "1.9.0-beta2"]
                  [org.openrdf.sesame/sesame-queryrender "2.8.11"]
                  [org.openrdf.sesame/sesame-runtime "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
@@ -58,7 +58,6 @@
                  [org.apache.jena/jena-base "3.1.1" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-core "3.1.1" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-iri "3.1.1" :exclusions [org.slf4j/slf4j-api]]
-                 [org.clojure/clojure "1.8.0"]
                  [org.mindrot/jbcrypt "0.3m"]
                  [org.openrdf.sesame/sesame-queryrender "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
