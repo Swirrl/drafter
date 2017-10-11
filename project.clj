@@ -54,12 +54,13 @@
 
 
                  ;; Use JENA for our query rewriting
-                 [org.apache.jena/jena-arq "3.1.1" :exclusions [org.slf4j/slf4j-api
+                 [org.apache.jena/jena-arq "3.4.0" :exclusions [org.slf4j/slf4j-api
                                                                 org.slf4j/jcl-over-slf4j
                                                                 org.apache.httpcomponents/httpclient]]
-                 [org.apache.jena/jena-base "3.1.1" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-core "3.1.1" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-iri "3.1.1" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-base "3.4.0" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-core "3.4.0" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-iri "3.4.0" :exclusions [org.slf4j/slf4j-api]]
+                 
                  [org.mindrot/jbcrypt "0.3m"]
                  [org.openrdf.sesame/sesame-queryrender "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
