@@ -30,7 +30,7 @@
                  [cognician/dogstatsd-clj "0.1.1"]
                  
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
-                 [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
+                 [metosin/scjsv "0.4.0"] ;; for validating our Swagger/JSON schemas
 
                  [aero "1.1.2"]
 
@@ -49,10 +49,9 @@
                  ;[grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
+
                  [metosin/ring-swagger-ui "2.2.10"]
-                 [metosin/scjsv "0.3.0"] ;; for validating our Swagger/JSON schemas
-
-
+                 
                  ;; Use JENA for our query rewriting
                  [org.apache.jena/jena-arq "3.4.0" :exclusions [org.slf4j/slf4j-api
                                                                 org.slf4j/jcl-over-slf4j
