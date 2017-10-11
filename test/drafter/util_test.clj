@@ -7,6 +7,12 @@
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec assert-check]]))
 
+(deftest base64-codec-test
+  (let [p (prop/for-all [s gen/string]
+                        (= (base64->str (str->base64 s))
+                           s))]
+    (assert-check (tc/quick-check 100 p))))
+
 (deftest get-causes-test
   (testing "Returns all causes"
     (let [innermost (RuntimeException. "!!!")

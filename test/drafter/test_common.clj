@@ -1,5 +1,6 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
+            [drafter.util :as util]
             [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf.repository.registry :as reg]
@@ -65,7 +66,7 @@
   "Sets the given test user as the user on a request"
   [user request]
   (let [unencoded-auth (str (user/username user) ":" "password")
-        encoded-auth (buddy.core.codecs/str->base64 unencoded-auth)]
+        encoded-auth (util/str->base64 unencoded-auth)]
     (-> request
         (assoc :identity user)
         (assoc-in [:headers "Authorization"] (str "Basic " encoded-auth)))))
