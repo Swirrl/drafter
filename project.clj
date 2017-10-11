@@ -66,7 +66,7 @@
                  [org.openrdf.sesame/sesame-queryrender "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
                  [org.openrdf.sesame/sesame-runtime "2.8.11"]
-                 [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
+                 [org.slf4j/slf4j-log4j12 "1.7.25" :exclusions [log4j org.slf4j/slf4j-api]]
                  [prismatic/schema "1.1.7"]
 
                  [ring-middleware-format "0.7.2"]
