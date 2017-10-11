@@ -40,6 +40,9 @@
                  ;;
                  ;; NOTE: When we upgrade sesame to RDF4j we can possibly
                  ;; drop this override.
+                 ;;
+                 ;; Without this you get errors like:
+                 ;; java.lang.NoClassDefFoundError: com/fasterxml/jackson/core/FormatFeature, compiling:(cheshire/factory.clj:54:7)
                  [com.fasterxml.jackson.core/jackson-core "2.6.7"]
                  
                  [com.novemberain/monger "3.1.0"]
