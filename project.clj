@@ -41,8 +41,10 @@
                  ;; NOTE: When we upgrade sesame to RDF4j we can possibly
                  ;; drop this override.
                  [com.fasterxml.jackson.core/jackson-core "2.6.7"]
+                 
                  [com.novemberain/monger "3.1.0"]
-                 [com.sun.mail/javax.mail "1.5.5"]
+
+                 [com.sun.mail/javax.mail "1.6.0"]
                  ;;[com.taoensso/tower "2.0.2"]
                  [grafter "0.9.0"]
                  [grafter/url "0.2.5"]
