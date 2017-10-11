@@ -18,8 +18,8 @@
   :classifiers {:prod :prod
                 :dev :dev}
 
-  :dependencies [[buddy/buddy-auth "0.9.0"]
-                 [buddy/buddy-core "0.9.0"]
+  :dependencies [[buddy/buddy-auth "2.1.0"]
+                 [buddy/buddy-core "1.4.0"]
                  [org.clojure/clojure "1.9.0-beta2"]
                  [org.openrdf.sesame/sesame-queryrender "2.8.11"]
                  [org.openrdf.sesame/sesame-runtime "2.8.11"]

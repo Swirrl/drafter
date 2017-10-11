@@ -1,6 +1,6 @@
 (ns drafter.middleware-test
   (:require [buddy.auth :as auth]
-            [buddy.core.codecs :refer [str->base64]]
+            [drafter.util :as util]
             [clojure.java.io :as io]
             [clojure.test :refer :all]
             [drafter
@@ -19,7 +19,7 @@
            (java.io ByteArrayInputStream)))
 
 (defn- add-auth-header [m username password]
-  (let [credentials (str->base64 (str username ":" password))]
+  (let [credentials (util/str->base64 (str username ":" password))]
     (assoc m "Authorization" (str "Basic " credentials))))
 
 (defn- create-authorised-request [username password]

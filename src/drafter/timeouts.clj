@@ -3,6 +3,7 @@
              [bytes :as bytes]
              [codecs :as codecs]
              [mac :as mac]]
+            [drafter.util :as util]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
             [drafter.util :as util])
@@ -43,13 +44,13 @@
         mac-bytes (string->mac-bytes timeout-str mac-signing-key)
         mac-hex (codecs/bytes->hex mac-bytes)
         msg (str timeout-str "--" mac-hex)]
-    (codecs/str->base64 msg)))
+    (util/str->base64 msg)))
 
 (defn try-parse-privileged-query-timeout [timeout-param mac-signing-key]
   {:pre [(or (nil? timeout-param) (string? timeout-param))]
    :post [(or (nil? %) (number? %) (keyword? %))]}
   (when timeout-param
-    (let [decoded (codecs/base64->str timeout-param)
+    (let [decoded (util/base64->str timeout-param)
           [timeout-str mac-hex] (string/split decoded #"--")]
       (if (and (some? timeout-str) (some? mac-hex))
         (let [timeout-bytes (.getBytes timeout-str util/utf8)
@@ -111,7 +112,7 @@
     (if-let [privileged-timeout-str (get-in request [:params :max-query-timeout])]
       (let [privileged-timeout (try-parse-privileged-query-timeout privileged-timeout-str mac-signing-key)]
         (if (keyword? privileged-timeout)
-          (let [decoded (codecs/base64->str privileged-timeout-str)]
+          (let [decoded (util/base64->str privileged-timeout-str)]
             (log-invalid-timeout-param decoded privileged-timeout)
             (IllegalArgumentException. "Invalid parameter max-query-timeout"))
           privileged-timeout))
