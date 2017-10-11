@@ -120,8 +120,8 @@
                 :source-paths ["env/dev/clj"]
                 :resource-paths ["env/dev/resources"]
 
-                :dependencies [[clojure-csv/clojure-csv "2.0.1"]
-                               [org.clojure/data.json "0.2.5"]
+                :dependencies [[clojure-csv/clojure-csv "2.0.2"]
+                               [org.clojure/data.json "0.2.6"]
                                [ring-mock "0.1.5"]
                                [ring/ring-devel "1.6.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
                                [org.clojure/test.check "0.9.0"]]
