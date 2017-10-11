@@ -65,8 +65,8 @@
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
                  [org.openrdf.sesame/sesame-runtime "2.8.11"]
                  [org.slf4j/slf4j-log4j12 "1.7.9" :exclusions [log4j org.slf4j/slf4j-api]]
-                 [prismatic/schema "1.0.4"]
                  [ring "1.4.0" :exclusions [org.clojure/java.classpath]]
+                 [prismatic/schema "1.1.7"]
                  [ring-middleware-accept "2.0.3"]
                  [ring-server "0.4.0"]
                  [ring/ring-core "1.4.0"]
@@ -118,7 +118,6 @@
 
                 :dependencies [[clojure-csv/clojure-csv "2.0.1"]
                                [org.clojure/data.json "0.2.5"]
-                               [prismatic/schema "1.0.4"]
                                [ring-mock "0.1.5"]
                                [ring/ring-devel "1.3.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
                                [org.clojure/test.check "0.9.0"]]
