@@ -4,16 +4,16 @@
   :license {:name "Proprietary & Commercially Licensed Only"
             :url "http://swirrl.com/"}
 
-  :repositories [["snapshots" {:url "s3p://swirrl-jars/snapshots/"
-                               :sign-releases false
-                               :username :env
-                               :passphrase :env
-                               :releases false}]
-                 ["releases" {:url "s3p://swirrl-jars/releases/"
-                              :sign-releases true
-                              :username :env
-                              :passphrase :env
-                              :snapshots false}]]
+  ;; :repositories [["snapshots" {:url "s3p://swirrl-jars/snapshots/"
+  ;;                              :sign-releases false
+  ;;                              :username :env
+  ;;                              :passphrase :env
+  ;;                              :releases false}]
+  ;;                ["releases" {:url "s3p://swirrl-jars/releases/"
+  ;;                             :sign-releases true
+  ;;                             :username :env
+  ;;                             :passphrase :env
+  ;;                             :snapshots false}]]
 
   :classifiers {:prod :prod
                 :dev :dev}
@@ -21,6 +21,8 @@
   :dependencies [[buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-core "1.4.0"]
                  [org.clojure/clojure "1.9.0-beta2"]
+                 [org.clojure/math.combinatorics "0.1.4"]
+                 
                  [org.openrdf.sesame/sesame-queryrender "2.8.11"]
                  [org.openrdf.sesame/sesame-runtime "2.8.11"]
                  [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
@@ -42,8 +44,8 @@
                  [com.novemberain/monger "3.1.0"]
                  [com.sun.mail/javax.mail "1.5.5"]
                  [com.taoensso/tower "2.0.2"]
-                 [grafter "0.8.8"]
-                 [grafter/url "0.2.1"]
+                 [grafter "0.9.0"]
+                 [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
