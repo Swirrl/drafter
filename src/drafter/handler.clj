@@ -27,7 +27,6 @@
              [defaults :refer [api-defaults]]
              [resource :refer [wrap-resource]]
              [verbs :refer [wrap-verbs]]]
-            [selmer.parser :as parser]
             [swirrl-server.async.jobs :refer [finished-jobs restart-id]]
             [swirrl-server.errors :refer [wrap-encode-errors]]
             [swirrl-server.middleware.log-request :refer [log-request]]))
@@ -149,9 +148,6 @@
   (let [{:keys [log-config-file is-dev datadog-statsd-address] :as config} (get-configuration)]
 
     (configure-logging! (io/file log-config-file))
-
-    (when is-dev
-      (parser/cache-off!))
 
     (log/info "Initialising repository")
     (initialise-services! config)

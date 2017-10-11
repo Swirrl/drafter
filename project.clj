@@ -74,7 +74,7 @@
                  [ring-middleware-accept "2.0.3"]
                  [ring-server "0.5.0"]
                  [ring/ring-core "1.6.2"]
-                 [selmer "0.6.9"]
+                 ;;[selmer "0.6.9"]
                  [swirrl/lib-swirrl-server "0.6.3" :exclusions [clout org.clojure/java.classpath]]
                  [wrap-verbs "0.1.1"]]
 
