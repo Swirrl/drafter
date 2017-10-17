@@ -1,7 +1,8 @@
 (ns drafter.backend.sesame.remote
   (:require [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [grafter.rdf.repository.registry :as reg])
+            [grafter.rdf.repository.registry :as reg]
+            [integrant.core :as ig])
   (:import drafter.rdf.DrafterSPARQLRepository
            [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
            [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
@@ -59,3 +60,6 @@
   (let [query-endpoint (get-required-configuration-setting :sparql-query-endpoint config)
         update-endpoint (get-required-configuration-setting :sparql-update-endpoint config)]
     (create-sparql-repository query-endpoint update-endpoint)))
+
+(defmethod ig/init-key :drafter.backend.sesame/remote [k opts]
+  (get-backend opts))

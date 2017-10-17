@@ -15,6 +15,7 @@
             [clojure.tools.logging :as log]
             [drafter.util :refer [log-time-taken]]
             [swirrl-server.async.jobs :refer [job-failed!]]
+            [integrant.core :as ig]
             [swirrl-server.errors :refer [ex-swirrl]])
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
            java.util.concurrent.atomic.AtomicBoolean
@@ -147,3 +148,10 @@
 (defn stop-writer! [{:keys [should-continue thread]}]
   (.set should-continue false)
   (.join thread))
+
+
+(defmethod ig/init-key :drafter/write-scheduler [_ opts]
+  (start-writer!))
+
+(defmethod ig/halt-key! :drafter/write-scheduler [_ writer]
+  (stop-writer! writer))
