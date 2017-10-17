@@ -60,6 +60,7 @@ public class DrafterSPARQLRepository extends SPARQLRepository {
         this.setSesameClient(null);
     }
 
+    // Fix for: https://github.com/eclipse/rdf4j/issues/367
     private synchronized HttpClient newHttpClient() {
         //the 'system' HTTP client uses the http.maxConnections
         //system property to define the size of its connection pool (5 is the default
