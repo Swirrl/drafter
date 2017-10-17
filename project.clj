@@ -27,7 +27,10 @@
 
   :dependencies [[buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-core "1.4.0"]
+
                  [org.clojure/clojure "1.9.0-beta2"]
+                 [org.clojure/spec.alpha "0.1.134"]
+                 
                  [org.clojure/math.combinatorics "0.1.4"]
                  
                  [cognician/dogstatsd-clj "0.1.2"]
@@ -37,6 +40,8 @@
 
                  [aero "1.1.2"]
 
+                 [integrant "0.6.1"]
+                 
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
                  ;; and the scjsv json schema validator.
