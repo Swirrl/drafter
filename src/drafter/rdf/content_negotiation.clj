@@ -1,8 +1,8 @@
 (ns drafter.rdf.content-negotiation
   (:require [ring.middleware.accept :refer [wrap-accept]]
             [drafter.rdf.formats :refer [csv-rdf-format tsv-rdf-format]])
-  (:import [org.openrdf.query.resultio BooleanQueryResultFormat TupleQueryResultFormat]
-           [org.openrdf.rio RDFFormat]))
+  (:import [org.eclipse.rdf4j.query.resultio BooleanQueryResultFormat TupleQueryResultFormat]
+           [org.eclipse.rdf4j.rio RDFFormat]))
 
 (defn- format-preferences->mime-spec [format-prefs]
   (into {} (mapcat (fn [[f q]] (map (fn [m] [m [f q]]) (.getMIMETypes f))) format-prefs)))

@@ -26,10 +26,10 @@
             [grafter.url :as url])
   (:import [java.util Date UUID]
            [java.io StringWriter]
-           org.openrdf.model.impl.ContextStatementImpl
-           org.openrdf.model.Resource
-           [org.openrdf.query GraphQuery TupleQueryResultHandler]
-           org.openrdf.queryrender.RenderUtils))
+           org.eclipse.rdf4j.model.impl.ContextStatementImpl
+           org.eclipse.rdf4j.model.Resource
+           [org.eclipse.rdf4j.query GraphQuery TupleQueryResultHandler]
+           org.eclipse.rdf4j.queryrender.RenderUtils))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri

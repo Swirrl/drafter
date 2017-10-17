@@ -29,8 +29,8 @@
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            java.util.Date
-           org.openrdf.query.QueryResultHandler
-           org.openrdf.query.resultio.sparqljson.SPARQLResultsJSONParser
+           org.eclipse.rdf4j.query.QueryResultHandler
+           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser
            (java.net URI)))
 
 (def ^:private ^:dynamic *route*)

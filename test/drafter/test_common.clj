@@ -33,8 +33,8 @@
            [org.apache.http.impl.io ChunkedOutputStream ContentLengthOutputStream DefaultHttpRequestParser DefaultHttpResponseWriter HttpTransportMetricsImpl IdentityOutputStream SessionInputBufferImpl SessionOutputBufferImpl]
            org.apache.http.message.BasicHttpResponse
            org.apache.http.ProtocolVersion
-           org.openrdf.query.resultio.sparqljson.SPARQLResultsJSONWriter
-           org.openrdf.rio.trig.TriGParserFactory))
+           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
+           org.eclipse.rdf4j.rio.trig.TriGParserFactory))
 
 (use-fixtures :each validate-schemas)
 

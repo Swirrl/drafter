@@ -1,10 +1,10 @@
 (ns drafter.rdf.writers
   (:require [drafter.rdf.formats :refer [csv-rdf-format tsv-rdf-format]])
   (:import [java.io OutputStream Writer]
-           [org.openrdf.query.impl MapBindingSet]
-           [org.openrdf.query.resultio.text.csv SPARQLResultsCSVWriter]
-           [org.openrdf.query.resultio.text.tsv SPARQLResultsTSVWriter]
-           [org.openrdf.rio RDFWriter RDFWriterFactory RDFWriterRegistry]))
+           [org.eclipse.rdf4j.query.impl MapBindingSet]
+           [org.eclipse.rdf4j.query.resultio.text.csv SPARQLResultsCSVWriter]
+           [org.eclipse.rdf4j.query.resultio.text.tsv SPARQLResultsTSVWriter]
+           [org.eclipse.rdf4j.rio RDFWriter RDFWriterFactory RDFWriterRegistry]))
 
 (defn- query-result-writer->rdf-writer [rdf-format result-writer]
   (reify RDFWriter

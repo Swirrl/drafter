@@ -13,7 +13,7 @@ overly-specific in your interpretation of the error."
              [errors :refer [encode-error]]
              [responses :as r]]))
 
-(defmethod encode-error org.openrdf.query.QueryEvaluationException [ex]
+(defmethod encode-error org.eclipse.rdf4j.query.QueryEvaluationException [ex]
   ;; This exception should also be caught in specific routes concerned with
   ;; SPARQL endpoints, here we use this to unpack our ConnectionPoolTimeoutException.
 

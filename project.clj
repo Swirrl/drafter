@@ -23,10 +23,6 @@
                  [org.clojure/clojure "1.9.0-beta2"]
                  [org.clojure/math.combinatorics "0.1.4"]
                  
-                 [org.openrdf.sesame/sesame-queryrender "2.8.11"]
-                 [org.openrdf.sesame/sesame-runtime "2.8.11"]
-                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
-
                  [cognician/dogstatsd-clj "0.1.2"]
                  
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
@@ -49,7 +45,7 @@
 
                  [com.sun.mail/javax.mail "1.6.0"]
                  ;;[com.taoensso/tower "2.0.2"]
-                 [grafter "0.9.0"]
+                 [grafter "0.10.0-SNAPSHOT"]
                  [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
@@ -66,9 +62,7 @@
                  [org.apache.jena/jena-iri "3.4.0" :exclusions [org.slf4j/slf4j-api]]
                  
                  [org.mindrot/jbcrypt "0.4"]
-                 [org.openrdf.sesame/sesame-queryrender "2.8.11"]
-                 [org.openrdf.sesame/sesame-queryresultio-sparqlxml "2.8.11"]
-                 [org.openrdf.sesame/sesame-runtime "2.8.11"]
+
                  [org.slf4j/slf4j-log4j12 "1.7.25" :exclusions [log4j org.slf4j/slf4j-api]]
                  [prismatic/schema "1.1.7"]
 

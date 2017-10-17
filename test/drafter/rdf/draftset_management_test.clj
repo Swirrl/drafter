@@ -19,7 +19,7 @@
             [grafter.vocabularies.rdf :refer :all]
             [drafter.util :as util]
             [grafter.url :as url])
-  (:import org.openrdf.rio.RDFFormat
+  (:import org.eclipse.rdf4j.rio.RDFFormat
            [java.net URI]))
 
 (defn- has-uri-object? [s p uri-o]

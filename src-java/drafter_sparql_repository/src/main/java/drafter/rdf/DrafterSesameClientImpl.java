@@ -2,8 +2,8 @@ package drafter.rdf;
 
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.openrdf.http.client.SesameClientImpl;
-import org.openrdf.http.client.SparqlSession;
+import org.eclipse.rdf4j.http.client.SesameClientImpl;
+import org.eclipse.rdf4j.http.client.SparqlSession;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

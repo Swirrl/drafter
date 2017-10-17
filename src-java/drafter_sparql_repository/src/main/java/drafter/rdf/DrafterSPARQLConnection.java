@@ -1,10 +1,10 @@
 package drafter.rdf;
 
-import org.openrdf.query.*;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.sparql.SPARQLConnection;
-import org.openrdf.repository.sparql.SPARQLRepository;
-import org.openrdf.http.client.SparqlSession;
+import org.eclipse.rdf4j.query.*;
+import org.eclipse.rdf4j.repository.RepositoryException;
+import org.eclipse.rdf4j.repository.sparql.SPARQLConnection;
+import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
+import org.eclipse.rdf4j.http.client.SparqlSession;
 
 public class DrafterSPARQLConnection extends SPARQLConnection {
 

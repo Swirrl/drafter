@@ -2,11 +2,11 @@ package drafter.rdf;
 
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.openrdf.http.client.SesameClient;
-import org.openrdf.model.vocabulary.SESAME;
-import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.sparql.SPARQLRepository;
+import org.eclipse.rdf4j.http.client.SesameClient;
+import org.eclipse.rdf4j.model.vocabulary.SESAME;
+import org.eclipse.rdf4j.repository.RepositoryConnection;
+import org.eclipse.rdf4j.repository.RepositoryException;
+import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
 
 public class DrafterSPARQLRepository extends SPARQLRepository {
 

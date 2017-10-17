@@ -5,7 +5,7 @@
   (:import drafter.rdf.DrafterSparqlSession
            java.io.ByteArrayOutputStream
            [java.util.concurrent CountDownLatch ExecutionException TimeUnit]
-           org.openrdf.query.QueryInterruptedException))
+           org.eclipse.rdf4j.query.QueryInterruptedException))
 
 (defn query-timeout-handler
   "Handler which always returns a query timeout response in the format used by Stardog"
