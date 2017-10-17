@@ -14,6 +14,7 @@ import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
 import org.eclipse.rdf4j.OpenRDFException;
+import org.eclipse.rdf4j.http.client.SPARQLProtocolSession;
 import org.eclipse.rdf4j.http.client.SparqlSession;
 import org.eclipse.rdf4j.http.protocol.UnauthorizedException;
 import org.eclipse.rdf4j.http.protocol.error.ErrorInfo;
@@ -30,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
-public class DrafterSparqlSession extends SparqlSession {
+public class DrafterSparqlSession extends SPARQLProtocolSession /*SparqlSession*/ {
     /**
      * The longest URL length accepted by stardog. SPARQL queries which result in a URL longer than this length
      * should be sent as POST requests instead.
@@ -79,7 +80,7 @@ public class DrafterSparqlSession extends SparqlSession {
     }
 
     private HttpClientContext getHttpContext() {
-        return readField(SparqlSession.class, this, "httpContext");
+        return readField(SPARQLProtocolSession.class, this, "httpContext");
     }
 
     /**

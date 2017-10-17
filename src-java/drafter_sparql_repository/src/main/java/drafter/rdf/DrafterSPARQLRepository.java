@@ -2,15 +2,15 @@ package drafter.rdf;
 
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.eclipse.rdf4j.http.client.HttpClientSessionManager;
 import org.eclipse.rdf4j.http.client.SesameClient;
-import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
 
 public class DrafterSPARQLRepository extends SPARQLRepository {
 
-    private SesameClient sesameClient;
+    private HttpClientSessionManager httpClientManager;
     private Integer maxConcurrentHttpConnections;
 
     public DrafterSPARQLRepository(String queryEndpoint) { super(queryEndpoint); }
@@ -18,25 +18,40 @@ public class DrafterSPARQLRepository extends SPARQLRepository {
         super(queryEndpoint, updateEndpoint);
     }
 
-    @Override public RepositoryConnection getConnection() throws RepositoryException {
-        if(!this.isInitialized()) {
-            throw new RepositoryException("SPARQLRepository not initialized.");
-        } else {
-            return new DrafterSPARQLConnection(this, createHTTPClient());
-        }
+     @Override public RepositoryConnection getConnection() throws RepositoryException {
+         if(!this.isInitialized()) {
+             throw new RepositoryException("SPARQLRepository not initialized.");
+         } else {
+             return new DrafterSPARQLConnection(this, createHTTPClient());
+         }
+     }
+
+     public synchronized HttpClientSessionManager getHttpClientSessionManager() {
+         if (this.httpClientManager == null) {
+             HttpClient httpClient = newHttpClient();
+             this.httpClientManager = new DrafterSesameClientImpl(httpClient);
+         }
+         return this.httpClientManager;
+     }
+
+//     @Override public synchronized SesameClient getSesameClient() {
+//         if (this.httpClientManager == null) {
+//             HttpClient httpClient = newHttpClient();
+//             this.httpClientManager = new DrafterSesameClientImpl(httpClient);
+//         }
+//         return this.httpClientManager;
+//     }
+
+
+    @Override public synchronized void setHttpClientSessionManager(HttpClientSessionManager httpMan) {
+        this.httpClientManager = httpMan;
     }
 
-    @Override public synchronized SesameClient getSesameClient() {
-        if (this.sesameClient == null) {
-            HttpClient httpClient = newHttpClient();
-            this.sesameClient = new DrafterSesameClientImpl(httpClient);
-        }
-        return this.sesameClient;
-    }
 
-    @Override public synchronized void setSesameClient(SesameClient client) {
-        this.sesameClient = client;
-    }
+//
+//    @Override public synchronized void setSesameClient(SesameClient client) {
+//        this.httpClientManager = client;
+//    }
 
     /**
      * Gets the maximum number of concurrent TCP connections created per route
