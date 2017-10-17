@@ -10,7 +10,7 @@
             [drafter.user :as user]
             [drafter.user.repository :as user-repo]
             [drafter.rdf.sesame :refer [read-statements] :as ses]
-            [grafter.rdf.io :refer [mimetype->rdf-format]]
+            [grafter.rdf.formats :refer [mimetype->rdf-format]]
             [buddy.auth :as auth]
             [buddy.auth.protocols :as authproto]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]

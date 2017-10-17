@@ -5,7 +5,8 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
-            [grafter.rdf.io :refer [rdf-serializer default-prefixes]]
+            [grafter.rdf.io :refer [default-prefixes]]
+            [grafter.rdf4j.io :refer [rdf-writer]]
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]
             [grafter.url :as url]))
@@ -20,7 +21,7 @@
   the RAW database as a Trig String for debugging.  Don't use on large
   databases as it will be loaded into memory."
   [db ostream]
-  (add (rdf-serializer ostream :format rdf-trig :prefixes drafter-prefixes)
+  (add (rdf-writer ostream :format rdf-trig :prefixes drafter-prefixes)
        (statements db)))
 
 (defn build-dump-route [backend]
