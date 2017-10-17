@@ -3,7 +3,9 @@
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
             [drafter
-             [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft! select-all-in-graph stream->string test-triples with-identity wrap-clean-test-db wrap-db-setup]]
+             [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft!
+                                  select-all-in-graph stream->string test-triples with-identity
+                                  wrap-clean-test-db wrap-db-setup]]
              [timeouts :as timeouts]
              [user-test :refer [test-editor test-system]]]
             [drafter.rdf.draft-management :refer :all]

@@ -13,7 +13,9 @@
              [sesame :refer [is-quads-format? is-triples-format?]]
              [sparql-protocol :refer [sparql-execution-handler sparql-protocol-handler]]]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
-            )
+
+            [grafter.rdf.protocols :as pr]
+            [grafter.rdf.repository :as repo])
   (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes]]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [not-acceptable-response unprocessable-entity-response

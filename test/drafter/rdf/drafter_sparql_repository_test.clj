@@ -1,7 +1,8 @@
 (ns drafter.rdf.drafter-sparql-repository-test
   (:require [clojure.test :refer :all]
             [drafter.test-common :as tc]
-            [grafter.rdf.repository :as repo])
+            [grafter.rdf.repository :as repo]
+            [drafter.rdf.sparql :as sparql])
   (:import drafter.rdf.DrafterSparqlSession
            java.io.ByteArrayOutputStream
            [java.util.concurrent CountDownLatch ExecutionException TimeUnit]
@@ -20,7 +21,7 @@
   (testing "Raises QueryInterruptedException on timeout response"
     (let [repo (tc/get-latched-http-server-repo test-port)]
       (tc/with-server test-port query-timeout-handler
-                   (is (thrown? QueryInterruptedException (repo/query repo "SELECT * WHERE { ?s ?p ?o }"))))))
+                   (is (thrown? QueryInterruptedException (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }"))))))
 
   (testing "sends timeout header when maxExecutionTime set"
     (let [query-params (atom nil)
@@ -35,15 +36,17 @@
     (let [query-params (atom nil)
           repo (tc/get-latched-http-server-repo test-port)]
       (tc/with-server test-port (tc/extract-query-params-handler query-params tc/ok-spo-query-response)
-                   (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
+                   (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }")
                    (is (= false (contains? @query-params "timeout")))))))
+
+(def stardog-max-url-length 4083)
 
 (deftest query-method-test
   (testing "short query should be GET request"
     (let [method (atom nil)
           repo (tc/get-latched-http-server-repo test-port)]
       (tc/with-server test-port (tc/extract-method-handler method tc/ok-spo-query-response)
-                   (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
+                   (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }")
                    (is (= :get @method)))))
 
   (testing "long query should be POST request"
@@ -53,13 +56,13 @@
           method (atom nil)
           repo (tc/get-latched-http-server-repo test-port)]
       (loop [s bindings]
-        (when (< (.length sb) DrafterSparqlSession/STARDOG_MAXIMUM_URL_LENGTH)
+        (when (< (.length sb) stardog-max-url-length)
           (.append sb (first s))
           (.append sb " ")
           (recur (rest bindings))))
       (.append sb "} ?u ?p ?o }")
       (tc/with-server test-port (tc/extract-method-handler method tc/ok-spo-query-response)
-                   (repo/query repo (str sb))
+                   (sparql/eager-query repo (str sb))
                    (is (= :post @method))))))
 
 (defn- http-response->string [response]
@@ -69,7 +72,7 @@
 
 (defn- make-blocking-connection [repo idx]
   (future
-    (repo/query repo "SELECT * WHERE { ?s ?p ?o }")
+    (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }")
     (keyword (str "future-" idx))))
 
 (deftest connection-timeout
@@ -85,14 +88,16 @@
             (do
               ;;server has accepted max number of connections so next query attempt should see a connection timeout
               (let [rf (future
-                         (repo/query repo "SELECT * WHERE { ?s ?p ?o }"))]
+                         (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }"))]
                 ;;should be rejected almost immediately
                 (try
                   (.get rf 5000 TimeUnit/MILLISECONDS)
                   (catch ExecutionException ex
                     (is (instance? QueryInterruptedException (.getCause ex))))
+                  (catch java.util.concurrent.TimeoutException tex
+                    (is (not tex) "Expected query to be rejected due to timeout"))
                   (catch Throwable ex
-                    (is false "Expected query to be rejected due to timeout"))))
+                    (is (not ex) "Unexpected exception"))))
 
               ;;release previous connections and wait for them to complete
               (.countDown release-latch)

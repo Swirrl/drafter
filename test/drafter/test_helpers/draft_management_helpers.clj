@@ -17,7 +17,7 @@
                  "  }")
                  "  LIMIT 1"
                  "}")]
-    (repo/query db qry)))
+    (sparql/eager-query db qry)))
 
 (defn draft-graphs
   "Get all the draft graph URIs"
@@ -26,5 +26,5 @@
                        (with-state-graph
                          "?live <" drafter:hasDraft "> ?draft .")
                        "}")
-        results (repo/query db query-str)]
+        results (sparql/eager-query db query-str)]
     (into #{} (map :draft results))))

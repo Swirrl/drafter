@@ -11,6 +11,8 @@
              [user :as user]
              [user-test :refer [test-editor test-manager test-password test-publisher]]
              [util :as util]]
+            [drafter.rdf
+             [sparql :as sparql]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.drafter-ontology
              :refer
@@ -563,7 +565,7 @@
                                       ;; test - so we can get away with a bit of
                                       ;; a sloppy query.
                                       (-> *test-backend*
-                                          (repo/query
+                                          (sparql/eager-query
                                            (str "SELECT ?modified {"
                                                 "   ?draftgraph a <" drafter:DraftGraph "> ;"
                                                 "                 <" drafter:modifiedAt ">   ?modified ."

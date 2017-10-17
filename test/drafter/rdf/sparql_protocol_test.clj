@@ -2,6 +2,7 @@
   (:require [clojure-csv.core :as csv]
             [clojure.test :refer :all]
             [drafter.rdf.sparql-protocol :refer :all]
+            [drafter.rdf.sparql :as sparql]
             [drafter.test-common :refer :all]
             [grafter.rdf :as rdf]
             [grafter.rdf
@@ -14,7 +15,7 @@
 (use-fixtures :each validate-schemas)
 
 (defn add-triple-to-db [db]
-  (pr/add db (URI. "http://foo.com/my-graph") (test-triples (URI. "http://test.com/data/one"))))
+  (sparql/add db (URI. "http://foo.com/my-graph") (test-triples (URI. "http://test.com/data/one"))))
 
 (deftest sparql-end-point-test
   (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]

@@ -1,7 +1,6 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
             [drafter.util :as util]
-            [grafter.rdf.protocols :refer [add]]
             [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf.repository.registry :as reg]
             [grafter.rdf.repository :as repo]
@@ -111,7 +110,7 @@
    (create-managed-graph! db graph)
    (let [draftset-uri (and draftset-ref (url/->java-uri draftset-ref))
          draft-graph (create-draft-graph! db graph draftset-uri)]
-     (add db draft-graph triples)
+     (sparql/add db draft-graph triples)
      draft-graph)))
 
 (defn make-graph-live!
@@ -164,7 +163,7 @@
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
-  (repo/query *test-backend* (str "ASK WHERE {"
+  (sparql/eager-query *test-backend* (str "ASK WHERE {"
                         (-> (apply str (interpose " " graphpatterns))
                             (.replace " >" ">")
                             (.replace "< " "<"))
