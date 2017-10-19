@@ -7,7 +7,8 @@
             [monger
              [collection :as mc]
              [core :as mg]]
-            [schema.core :as s])
+            [schema.core :as s]
+            [integrant.core :as ig])
   (:import java.io.Closeable
            org.bson.types.ObjectId))
 
@@ -96,3 +97,7 @@
   [repo user]
   (let [mongo-user (user->mongo-user user)]
     (insert-document repo mongo-user)))
+
+
+(defmethod ig/init-key :drafter.user/mongo [k opts]
+  (get-repository opts))

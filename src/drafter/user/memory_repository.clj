@@ -1,5 +1,6 @@
 (ns drafter.user.memory-repository
   (:require [clojure.edn :as edn]
+            [integrant.core :as ig]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [drafter.user :refer [create-user get-digest username]]
@@ -45,3 +46,6 @@
         (println msg)
         (log/fatal msg))
       (throw e))))
+
+(defmethod ig/init-key :drafter.user/memory-repository [k opts]
+  (get-repository opts))
