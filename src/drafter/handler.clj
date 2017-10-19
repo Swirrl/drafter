@@ -1,5 +1,6 @@
 (ns drafter.handler
   (:require [clojure.java.io :as io]
+            [integrant.core :as ig]
             [cognician.dogstatsd :as datadog]
             [clojure.tools.logging :as log]
             [compojure.core :refer [defroutes context]]
@@ -103,6 +104,9 @@
                           ;; available formats:
                           ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                           :formats [:json-kw :edn]))))
+
+(defmethod ig/init-key :drafter.handler/handler [k {:keys [drafter.backend.sesame/remote
+                                                           ]}])
 
 (defn initialise-write-service! []
   (set-var-root! #'writer-service  (start-writer!)))
