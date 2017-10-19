@@ -14,7 +14,7 @@
              [repository :as repo]
              [templater :refer [triplify]]]
             [schema.test :refer [validate-schemas]])
-  (:import org.openrdf.model.impl.URIImpl
+  (:import org.eclipse.rdf4j.model.impl.URIImpl
            [java.net URI]))
 
 (use-fixtures :each validate-schemas)

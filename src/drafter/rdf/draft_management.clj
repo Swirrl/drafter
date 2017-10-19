@@ -1,13 +1,15 @@
 (ns drafter.rdf.draft-management
   (:require [clojure
-             [set :as set]]
+             [set :as set]
+             [string :as str]]
             [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
+            [drafter.rdf.sparql :as sparql]
             [drafter.rdf
              [drafter-ontology :refer :all]
              [sparql :refer [update!]]]
             [drafter.util :as util]
-            [grafter.rdf :refer [add]]
+            [grafter.rdf :as rdf]
             [grafter.rdf
              [repository :as repo]
              [templater :refer [add-properties graph]]]
@@ -40,14 +42,14 @@
                  " }")))
 
 (defn is-graph-managed? [db graph-uri]
-  (repo/query db
+  (sparql/eager-query db
          (str "ASK WHERE {"
               (with-state-graph
                 "<" graph-uri "> a <" drafter:ManagedGraph "> ."
                 "}"))))
 
 (defn is-graph-live? [db graph-uri]
-  (repo/query db
+  (sparql/eager-query db
          (str "ASK WHERE {"
               (with-state-graph
                 "   <" graph-uri "> a <" drafter:ManagedGraph "> ."
@@ -67,12 +69,12 @@
                  "  }"
                  "  HAVING (?numberOfRefs > 1)"
                  "}")]
-    (repo/query db qry)))
+    (sparql/eager-query db qry)))
 
 (defn graph-exists?
   "Checks that a graph exists"
   [db graph-uri]
-  (repo/query db
+  (sparql/eager-query db
          (str "ASK WHERE {"
               "  SELECT ?s ?p ?o WHERE {"
               "    GRAPH <" graph-uri "> { ?s ?p ?o }"
@@ -97,7 +99,7 @@
   ;; the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
   (if (not (is-graph-managed? db graph-uri))
     (let [managed-graph-quads (to-quads (create-managed-graph graph-uri))]
-      (add db managed-graph-quads)))
+      (sparql/add db managed-graph-quads)))
   graph-uri)
 
 (defn create-draft-graph
@@ -131,7 +133,7 @@
          draftset-uri (some-> draftset-ref (url/->java-uri))
          triple-templates (create-draft-graph live-graph-uri draft-graph-uri now draftset-uri)
          quads (apply to-quads triple-templates)]
-     (add db quads)
+     (sparql/add db quads)
 
      draft-graph-uri)))
 
@@ -275,7 +277,7 @@
                  "?live a <" drafter:ManagedGraph "> ;"
                  "      <" drafter:hasDraft "> <" draft-graph-uri "> . ")
                "} LIMIT 1")]
-    (-> (doall (repo/query db q))
+    (-> (sparql/eager-query db q)
         first
         (:live))))
 
@@ -320,14 +322,14 @@
   [db draft-set]
   (if (empty? draft-set)
     {}
-    (let [drafts (clojure.string/join " " (map #(str "<" % ">") draft-set))
+    (let [drafts (str/join " " (map #(str "<" % ">") draft-set))
           q (str "SELECT ?live ?draft WHERE {"
                 (with-state-graph
                   "  VALUES ?draft {" drafts "}"
                   "  ?live a <" drafter:ManagedGraph "> ;"
                   "        <" drafter:hasDraft "> ?draft .")
                 "}")
-          results (->> (doall (grafter.rdf.repository/query db q)))]
+          results (sparql/eager-query db q)]
 
       (let [live-graphs (map :live results)]
         (when (has-duplicates? live-graphs)
@@ -346,7 +348,7 @@
                  "?live a <" drafter:ManagedGraph "> ;"
                  "      <" drafter:isPublic "> " online " .")
                "}")
-        results (repo/query db q)]
+        results (sparql/eager-query db q)]
     (into #{} (map :live results))))
 
 (defn graph-non-empty-query [graph-uri]
@@ -360,7 +362,7 @@
 (defn graph-non-empty?
   "Returns true if the graph contains any statements."
   [repo graph-uri]
-  (repo/query repo (graph-non-empty-query graph-uri)))
+  (sparql/eager-query repo (graph-non-empty-query graph-uri)))
 
 (defn graph-empty?
   "Returns true if there are no statements in the associated graph."
@@ -466,4 +468,4 @@
     ;;true for all current backends.
     (with-open [conn (->repo-connection backend)]
       (repo/with-transaction conn
-        (add conn graph-uri triple-batch)))))
+        (sparql/add conn graph-uri triple-batch)))))

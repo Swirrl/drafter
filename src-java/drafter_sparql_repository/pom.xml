@@ -40,9 +40,9 @@
                 NOTE: this version of sesame should be kept in sync with the version in the parent
                 leiningen project.clj.
             -->
-            <groupId>org.openrdf.sesame</groupId>
-            <artifactId>sesame-runtime</artifactId>
-            <version>2.8.11</version>
+            <groupId>org.eclipse.rdf4j</groupId>
+            <artifactId>rdf4j-runtime</artifactId>
+            <version>2.2.2</version>
             <!--<exclusions>-->
                 <!--<exclusion>-->
                     <!--<groupId>org.openrdf.sesame</groupId>-->

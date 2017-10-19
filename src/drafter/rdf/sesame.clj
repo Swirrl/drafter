@@ -5,11 +5,11 @@
             [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
             [grafter.rdf :refer [statements]]
             [grafter.rdf.repository :as repo])
-  (:import [org.openrdf.query BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler Update]
-           org.openrdf.query.resultio.QueryResultIO
-           org.openrdf.repository.Repository
-           org.openrdf.repository.sparql.SPARQLRepository
-           [org.openrdf.rio RDFHandler Rio]))
+  (:import [org.eclipse.rdf4j.query BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler Update]
+           org.eclipse.rdf4j.query.resultio.QueryResultIO
+           org.eclipse.rdf4j.repository.Repository
+           org.eclipse.rdf4j.repository.sparql.SPARQLRepository
+           [org.eclipse.rdf4j.rio RDFHandler Rio]))
 
 (defn is-quads-format? [rdf-format]
   (.supportsContexts rdf-format))

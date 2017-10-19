@@ -5,10 +5,10 @@
             [clojure.tools.logging :as log]
             [drafter.util :as util]
             [grafter.rdf.protocols :refer [map->Quad]])
-  (:import [org.openrdf.model.impl ContextStatementImpl StatementImpl]
-           [org.openrdf.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler]
-           [org.openrdf.query.impl BindingImpl MapBindingSet]
-           org.openrdf.rio.RDFHandler))
+  (:import [org.eclipse.rdf4j.model.impl ContextStatementImpl StatementImpl]
+           [org.eclipse.rdf4j.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler]
+           [org.eclipse.rdf4j.query.impl BindingImpl MapBindingSet]
+           org.eclipse.rdf4j.rio.RDFHandler))
 
 (defn- rewrite-binding
   "Rewrites the value of a Binding if it appears in the given graph map"

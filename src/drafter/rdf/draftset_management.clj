@@ -15,7 +15,7 @@
              [sparql :as sparql]]
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-statement]]
-            [grafter.rdf :refer [add context]]
+            [grafter.rdf :refer [context] :as rdf]
             [grafter.rdf
              [io :refer [IStatement->sesame-statement rdf-serializer]]
              [protocols :refer [map->Quad map->Triple]]
@@ -26,10 +26,10 @@
             [grafter.url :as url])
   (:import [java.util Date UUID]
            [java.io StringWriter]
-           org.openrdf.model.impl.ContextStatementImpl
-           org.openrdf.model.Resource
-           [org.openrdf.query GraphQuery TupleQueryResultHandler]
-           org.openrdf.queryrender.RenderUtils))
+           org.eclipse.rdf4j.model.impl.ContextStatementImpl
+           org.eclipse.rdf4j.model.Resource
+           [org.eclipse.rdf4j.query GraphQuery TupleQueryResultHandler]
+           org.eclipse.rdf4j.queryrender.RenderUtils))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -49,11 +49,12 @@
   ([db creator title] (create-draftset! db creator title nil))
   ([db creator title description] (create-draftset! db creator title description (UUID/randomUUID) (Date.)))
   ([db creator title description draftset-id created-date]
-   (let [user-uri (user/user->uri creator)
-         template (create-draftset-statements user-uri title description (url/append-path-segments draftset-uri draftset-id) created-date)
-         quads (to-quads template)]
-     (add db quads)
-     (ds/->DraftsetId (str draftset-id)))))
+   (with-open [dbcon (repo/->connection db)]
+     (let [user-uri (user/user->uri creator)
+           template (create-draftset-statements user-uri title description (url/append-path-segments draftset-uri draftset-id) created-date)
+           quads (to-quads template)]
+       (rdf/add dbcon quads)
+       (ds/->DraftsetId (str draftset-id))))))
 
 (defn- graph-exists-query [graph-uri]
   (str
@@ -69,7 +70,7 @@
 
 (defn draftset-exists? [db draftset-ref]
   (let [q (draftset-exists-query draftset-ref)]
-    (repo/query db q)))
+    (sparql/eager-query db q)))
 
 (defn- delete-draftset-statements-query [draftset-ref]
   (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
@@ -111,7 +112,7 @@
 
 (defn get-draftset-owner [backend draftset-ref]
   (let [q (get-draftset-owner-query draftset-ref)
-        result (first (sparql/query-eager-seq backend q))]
+        result (first (sparql/eager-query backend q))]
     (when-let [owner-uri (:owner result)]
       (user/uri->username owner-uri))))
 
@@ -135,7 +136,7 @@
   {:live-graph-uri lg
    :draft-graph-uri dg
    :public public
-   :draft-graph-exists (repo/query repo (graph-exists-query dg))})
+   :draft-graph-exists (sparql/eager-query repo (graph-exists-query dg))})
 
 (defn- union-clauses [clauses]
   (string/join " UNION " clauses))
@@ -195,7 +196,7 @@
 (defn get-draftset-graph-states [repo draftset-ref]
   (let [q (get-draftset-graph-mapping-query draftset-ref)]
     (->> q
-         (sparql/query-eager-seq repo)
+         (sparql/eager-query repo)
          (map #(graph-mapping-result->graph-state repo %)))))
 
 (defn get-draftset-graph-mapping [repo draftset-ref]
@@ -280,11 +281,11 @@
 
 (defn- get-all-draftsets-properties-by [repo clauses]
   (let [properties-query (get-draftsets-matching-properties-query clauses)]
-    (sparql/query-eager-seq repo properties-query)))
+    (sparql/eager-query repo properties-query)))
 
 (defn- get-all-draftsets-mappings-by [repo clauses]
   (let [mappings-query (get-draftsets-matching-graph-mappings-query clauses)]
-    (sparql/query-eager-seq repo mappings-query)))
+    (sparql/eager-query repo mappings-query)))
 
 (defn- get-all-draftsets-by [repo clauses]
   (let [properties (get-all-draftsets-properties-by repo clauses)
@@ -522,7 +523,7 @@
   contain a draft for the graph."
   [backend draftset-ref live-graph]
   (let [q (find-draftset-draft-graph-query draftset-ref live-graph)
-        [result] (sparql/query-eager-seq backend q)]
+        [result] (sparql/eager-query backend q)]
     (:dg result)))
 
 (defn revert-graph-changes!
@@ -595,7 +596,7 @@
       {:graph-uri graph-uri :triples (map map->Triple quads)}
       (let [sw (StringWriter.)
             msg (format "All statements must have an explicit target graph")]
-        (add (rdf-serializer sw :format formats/rdf-nquads) (take 5 quads))
+        (rdf/add (rdf-serializer sw :format formats/rdf-nquads) (take 5 quads))
         (throw (IllegalArgumentException.
                 (str "All statements must have an explicit target graph. The following statements have no graph:\n" sw)))))))
 
@@ -609,7 +610,7 @@
   (when-not (empty? triple-batch)
     ;;WARNING: This assumes the backend is a sesame backend which is
     ;;true for all current backends.
-    (add conn graph-uri triple-batch)))
+    (sparql/add conn graph-uri triple-batch)))
 
 (defn- append-draftset-quads*
   [quad-batches live->draft backend job-started-at job draftset-ref state]

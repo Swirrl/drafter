@@ -1,5 +1,5 @@
 (ns drafter.rdf.formats
-  (:import [org.openrdf.rio RDFFormat]
+  (:import [org.eclipse.rdf4j.rio RDFFormat]
            [java.nio.charset Charset]))
 
 (def ^:private ascii (Charset/forName "US-ASCII"))

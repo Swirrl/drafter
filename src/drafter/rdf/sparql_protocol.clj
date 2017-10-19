@@ -11,8 +11,8 @@
              [create-signalling-query-handler get-query-type]])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            java.util.concurrent.TimeUnit
-           org.openrdf.query.QueryInterruptedException
-           org.openrdf.query.resultio.QueryResultIO))
+           org.eclipse.rdf4j.query.QueryInterruptedException
+           org.eclipse.rdf4j.query.resultio.QueryResultIO))
 
 (defn- execute-boolean-query [pquery result-format response-content-type]
   (let [os (ByteArrayOutputStream. 1024)

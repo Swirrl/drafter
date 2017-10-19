@@ -10,7 +10,7 @@
              [protocols :as proto]
              [repository :as repo]]
             [schema.core :as s])
-  (:import org.openrdf.model.URI))
+  (:import org.eclipse.rdf4j.model.URI))
 
 (require 'drafter.backend.repository)
 

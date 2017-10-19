@@ -13,15 +13,16 @@ import org.apache.http.params.CoreConnectionPNames;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
-import org.openrdf.OpenRDFException;
-import org.openrdf.http.client.SparqlSession;
-import org.openrdf.http.protocol.UnauthorizedException;
-import org.openrdf.http.protocol.error.ErrorInfo;
-import org.openrdf.http.protocol.error.ErrorType;
-import org.openrdf.query.*;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.rio.RDFParseException;
-import org.openrdf.rio.UnsupportedRDFormatException;
+import org.eclipse.rdf4j.OpenRDFException;
+import org.eclipse.rdf4j.http.client.SPARQLProtocolSession;
+import org.eclipse.rdf4j.http.client.SparqlSession;
+import org.eclipse.rdf4j.http.protocol.UnauthorizedException;
+import org.eclipse.rdf4j.http.protocol.error.ErrorInfo;
+import org.eclipse.rdf4j.http.protocol.error.ErrorType;
+import org.eclipse.rdf4j.query.*;
+import org.eclipse.rdf4j.repository.RepositoryException;
+import org.eclipse.rdf4j.rio.RDFParseException;
+import org.eclipse.rdf4j.rio.UnsupportedRDFormatException;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -30,12 +31,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
-public class DrafterSparqlSession extends SparqlSession {
+public class DrafterSparqlSession extends SPARQLProtocolSession /*SparqlSession*/ {
     /**
      * The longest URL length accepted by stardog. SPARQL queries which result in a URL longer than this length
      * should be sent as POST requests instead.
      */
-    public static final int STARDOG_MAXIMUM_URL_LENGTH = 4083;
+    //public static final int STARDOG_MAXIMUM_URL_LENGTH = 4083;
 
     public DrafterSparqlSession(String queryEndpointUrl, String updateEndpointUrl, HttpClient client, ExecutorService executor) {
         super(client, executor);
@@ -79,7 +80,7 @@ public class DrafterSparqlSession extends SparqlSession {
     }
 
     private HttpClientContext getHttpContext() {
-        return readField(SparqlSession.class, this, "httpContext");
+        return readField(SPARQLProtocolSession.class, this, "httpContext");
     }
 
     /**
@@ -144,9 +145,9 @@ public class DrafterSparqlSession extends SparqlSession {
      * @param query The SPARQL query
      * @return Whether to use a POST request to submit the query
      */
-    @Override protected boolean shouldUsePost(String query) {
-        return query.length() > STARDOG_MAXIMUM_URL_LENGTH;
-    }
+    // @Override protected boolean shouldUsePost(String query) {
+    //     return query.length() > STARDOG_MAXIMUM_URL_LENGTH;
+    // }
 
     @SuppressWarnings("deprecation")
     @Override protected HttpResponse execute(HttpUriRequest method) throws IOException, OpenRDFException {

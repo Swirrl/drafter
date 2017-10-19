@@ -8,28 +8,28 @@
              [user-test :refer [test-editor test-manager test-publisher]]
              [write-scheduler :as scheduler]]
             [drafter.rdf
+             [sparql :as sparql]
              [draft-management :as mgmt :refer [with-state-graph]]
              [drafter-ontology :refer :all]
              [draftset-management :refer :all]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
             [grafter.rdf :refer [context statements triple=]]
             [grafter.rdf
-             [protocols :refer [->Quad ->Triple]]
-             [repository :refer [query]]]
+             [protocols :refer [->Quad ->Triple]]]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.util :as util]
             [grafter.url :as url])
-  (:import org.openrdf.rio.RDFFormat
+  (:import org.eclipse.rdf4j.rio.RDFFormat
            [java.net URI]))
 
 (defn- has-uri-object? [s p uri-o]
-  (query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
+  (sparql/eager-query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
 
 (defn- has-string-object? [s p str-o]
-  (query *test-backend* (str "ASK WHERE { <" s "> <" p "> \"" str-o "\" }")))
+  (sparql/eager-query *test-backend* (str "ASK WHERE { <" s "> <" p "> \"" str-o "\" }")))
 
 (defn- has-any-object? [s p]
-  (query *test-backend* (str "ASK WHERE { <" s "> <" p "> ?o }")))
+  (sparql/eager-query *test-backend* (str "ASK WHERE { <" s "> <" p "> ?o }")))
 
 (defn- assert-user-is-creator-and-owner [user draftset-id]
   (is (has-uri-object? (->draftset-uri draftset-id) drafter:createdBy (user/user->uri user)))
@@ -163,7 +163,7 @@
              "<" (->draftset-uri draftset-id) "> <" drafter:hasSubmission "> ?submission ."
              "?submission <" drafter:claimRole "> \"" (name role) "\" .")
            "}")]
-    (query *test-backend* q)))
+    (sparql/eager-query *test-backend* q)))
 
 (deftest submit-draftset-to-role-test!
   (testing "Existing owner"
@@ -189,7 +189,7 @@
              "<" (->draftset-uri draftset-id) "> <" drafter:hasSubmission "> ?submission ."
              "?submission <" drafter:claimUser "> <" (user/user->uri user) "> .")
            "}")]
-    (query *test-backend* q)))
+    (sparql/eager-query *test-backend* q)))
 
 (defn is-draftset-submitter? [backend draftset-ref user]
   (if-let [{:keys [submitted-by]} (get-draftset-info backend draftset-ref)]
@@ -239,7 +239,7 @@
                  "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
                  "<" draftset-uri "> <" drafter:hasSubmission "> ?submission")
                "}")]
-    (query *test-backend* q)))
+    (sparql/eager-query *test-backend* q)))
 
 (deftest claim-draftset-test!
   (testing "No owner when user in role"
@@ -368,7 +368,7 @@
     (is (= :not-found result))))
 
 (defn- get-graph-triples [graph-uri]
-  (let [results (query *test-backend* (select-all-in-graph graph-uri))]
+  (let [results (sparql/eager-query *test-backend* (select-all-in-graph graph-uri))]
     (map (fn [{:keys [s p o]}] (->Triple s p o)) results)))
 
 (deftest copy-live-graph-into-draftset-test
@@ -425,7 +425,7 @@
                             "} LIMIT 2")]
 
     (let [res (-> *test-backend*
-                  (query modified-query))]
+                  (sparql/eager-query modified-query))]
 
       (assert (= 1 (count res)) "There were multiple modifiedAt timestamps, we expect just one.")
 

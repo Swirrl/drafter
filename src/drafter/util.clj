@@ -6,7 +6,7 @@
             [buddy.core.codecs :as codecs])
   (:import java.nio.charset.Charset
            [javax.mail.internet AddressException InternetAddress]
-           org.openrdf.model.impl.URIImpl))
+           org.eclipse.rdf4j.model.impl.URIImpl))
 
 (defn str->base64 [s]
   (codecs/bytes->str (base64/encode s)))

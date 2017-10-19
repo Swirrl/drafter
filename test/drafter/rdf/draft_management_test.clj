@@ -11,7 +11,6 @@
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
             [drafter.draftset :refer [->DraftsetId]]
-            [grafter.rdf :refer [add]]
             [grafter.rdf
              [repository :as repo]
              [templater :refer [triplify]]]
@@ -241,21 +240,21 @@
 (deftest graph-restricted-queries-test
   (testing "query"
     (testing "supports graph restriction"
-      (add *test-backend* "http://example.org/graph/1"
+      (sparql/add *test-backend* "http://example.org/graph/1"
               test-triples)
 
-      (add *test-backend* "http://example.org/graph/2"
+      (sparql/add *test-backend* "http://example.org/graph/2"
               test-triples-2)
 
-      (is (repo/query *test-backend*
+      (is (sparql/eager-query *test-backend*
                  (str "ASK WHERE {
                          GRAPH <http://example.org/graph/2> {
                            ?s ?p ?o .
                          }
-                      }") :named-graphs ["http://example.org/graph/2"])
+                      }") {:named-graphs ["http://example.org/graph/2"]})
           "Can query triples in named graph 2")
 
-      (is (repo/query *test-backend*
+      (is (sparql/eager-query *test-backend*
                  (str "ASK WHERE {
                          GRAPH <http://example.org/graph/1> {
                            <http://test.com/data/one>  ?p1 ?o1 .
@@ -263,35 +262,35 @@
                          GRAPH <http://example.org/graph/2> {
                            <http://test2.com/data/one> ?p2 ?o2 .
                          }
-                      }") :named-graphs ["http://example.org/graph/1" "http://example.org/graph/2"])
+                      }") {:named-graphs ["http://example.org/graph/1" "http://example.org/graph/2"]})
           "Can specify many named graphs as a query restriction.")
 
-      (is (= false (repo/query *test-backend*
+      (is (= false (sparql/eager-query *test-backend*
                           (str "ASK WHERE {
                                   GRAPH <http://example.org/graph/2> {
                                     ?s ?p ?o .
                                   }
                                 }")
-                          :named-graphs ["http://example.org/graph/1"]))
+                          {:named-graphs ["http://example.org/graph/1"]}))
           "Can't query triples in named graph 2")
 
-      (is (= false (repo/query *test-backend*
+      (is (= false (sparql/eager-query *test-backend*
                           (str "ASK WHERE {
                            ?s ?p ?o .
-                      }") :default-graph []))
+                      }") {:default-graph []}))
           "Can't query triples in union graph")
 
-      (is (repo/query *test-backend*
+      (is (sparql/eager-query *test-backend*
                  (str "ASK WHERE {
                            ?s ?p ?o .
-                      }") :default-graph ["http://example.org/graph/1"])
+                      }") {:default-graph ["http://example.org/graph/1"]})
           "Can query triples in union graph")
 
-      (is (repo/query *test-backend*
+      (is (sparql/eager-query *test-backend*
                  (str "ASK WHERE {
                            <http://test.com/data/one>  ?p1 ?o1 .
                            <http://test2.com/data/one> ?p2 ?o2 .
-                      }") :default-graph ["http://example.org/graph/1" "http://example.org/graph/2"])
+                      }") {:default-graph ["http://example.org/graph/1" "http://example.org/graph/2"]})
           "Can set many graphs as union graph"))))
 
 (deftest draft-graphs-test
@@ -323,15 +322,15 @@
 (deftest upsert-single-object-insert-test
   (let [db (repo/repo)]
     (upsert-single-object! db "http://foo/" "http://bar/" "baz")
-    (is (repo/query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
+    (is (sparql/eager-query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
 (deftest upsert-single-object-update-test
   (let [db (repo/repo)
         subject (URI. "http://example.com/subject")
         predicate (URI. "http://example.com/predicate")]
-    (add db (triplify [subject [predicate "initial"]]))
+    (sparql/add db (triplify [subject [predicate "initial"]]))
     (upsert-single-object! db subject predicate "updated")
-    (is (repo/query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
+    (is (sparql/eager-query db (str "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
                        "<" subject "> <" predicate "> \"updated\""
                        "} }")))))
 
@@ -423,7 +422,7 @@
 
     (set-modifed-at-on-draft-graph! *test-backend* draft-graph-uri (Date.))
 
-    (is (repo/query *test-backend*
+    (is (sparql/eager-query *test-backend*
                (str
                 "ASK {"
                 "<" draft-graph-uri "> <" drafter:modifiedAt "> ?modified . "
@@ -435,12 +434,12 @@
 
 (deftest copy-graph-test
   (let [repo (repo/repo)]
-    (add repo (test-quads (URI. "http://test-graph/1")))
+    (sparql/add repo (test-quads (URI. "http://test-graph/1")))
 
     (copy-graph repo "http://test-graph/1" "http://test-graph/2")
 
-    (let [source-graph (set (repo/query repo "SELECT * WHERE { GRAPH <http://test-graph/1> { ?s ?p ?o }}"))
-          dest-graph   (set (repo/query repo "SELECT * WHERE { GRAPH <http://test-graph/2> { ?s ?p ?o }}"))]
+    (let [source-graph (set (sparql/eager-query repo "SELECT * WHERE { GRAPH <http://test-graph/1> { ?s ?p ?o }}"))
+          dest-graph   (set (sparql/eager-query repo "SELECT * WHERE { GRAPH <http://test-graph/2> { ?s ?p ?o }}"))]
 
       (is (not (empty? dest-graph))
           "Should not be empty (and have the data we loaded)")

@@ -3,11 +3,11 @@
             [clojure.tools.logging :as log]
             [grafter.rdf.repository.registry :as reg])
   (:import drafter.rdf.DrafterSPARQLRepository
-           [org.openrdf.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
-           [org.openrdf.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
-           org.openrdf.query.resultio.text.BooleanTextParserFactory
-           org.openrdf.rio.nquads.NQuadsParserFactory
-           org.openrdf.rio.ntriples.NTriplesParserFactory))
+           [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
+           [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
+           org.eclipse.rdf4j.query.resultio.text.BooleanTextParserFactory
+           org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
+           org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory))
 
 (defn get-required-configuration-setting [var-key config]
   (if-let [ev (var-key config)]
