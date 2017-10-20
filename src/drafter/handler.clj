@@ -24,6 +24,8 @@
             [drafter.rdf.writers :as writers]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [noir.util.middleware :refer [app-handler]]
+            [ring.middleware.file-info :refer [wrap-file-info]]
+            [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware
              [defaults :refer [api-defaults]]
              [resource :refer [wrap-resource]]
@@ -45,8 +47,6 @@
 
 ;; Set these values later when we start the server
 (def backend)
-(def user-repo)
-(def app)
 
 (def writer-service
   "A future to control the single write thread that performs database writes.")
@@ -66,75 +66,103 @@
 
 (def ^:private v1-prefix :v1)
 
-(defn- get-endpoint-query-timeout-fn [endpoint-timeout {:keys [jws-signing-key] :as config}]
+(defn- get-endpoint-query-timeout-fn [{:keys [endpoint-timeout jws-signing-key] :as config}]
   (when (nil? jws-signing-key)
     (log/warn "jws-signing-key not configured - any PMD query timeouts will be ignored"))
   (timeouts/calculate-request-query-timeout endpoint-timeout jws-signing-key))
 
-(defn- get-live-sparql-query-route [backend {:keys [live-query-timeout] :as config}]
-  (let [timeout-fn (get-endpoint-query-timeout-fn live-query-timeout config)
-        mount-point (endpoint-query-path :live v1-prefix)]
-    (live-sparql-routes mount-point backend timeout-fn)))
+(defmethod ig/init-key :drafter.handler/live-endpoint-timeout-fn [_ opts]
+  (get-endpoint-query-timeout-fn opts))
 
-(defn initialise-app! [backend {:keys [draftset-query-timeout] :as config}]
+(defmethod ig/init-key :drafter.handler/draftset-query-timeout-fn [_ opts]
+  (get-endpoint-query-timeout-fn opts))
+
+
+(defn- get-live-sparql-query-route [backend {:keys [live-query-timeout endpoint-timeout-fn] :as config}]
+  (let [mount-point (endpoint-query-path :live v1-prefix)]
+    (live-sparql-routes mount-point backend endpoint-timeout-fn)))
+
+(defmethod ig/init-key :drafter.handler/live-sparql-query-route [_ {:keys [repo] :as opts}]
+  (get-live-sparql-query-route repo opts))
+
+(defn- wrap-handler [handler]
+  (-> handler
+      ;; Makes static assets in $PROJECT_DIR/resources/public/ available.
+      (wrap-resource "public")
+
+      ;; Content-Type, Content-Length, and Last Modified headers for files in body
+      wrap-file-info))
+
+(defn- build-handler
+  [{backend :repo
+    authenticated-fn :authentication-handler
+    draftset-sparql-query-timeout-fn :query-timeout-fn
+    live-sparql-route :live-sparql-query-route
+    draftset-api-routes :draftset-api-routes
+    :as config}]
+  (wrap-handler (app-handler 
+                 ;; add your application routes here
+                 (-> []
+                     (add-route (pages-routes))
+                     (add-route draftset-api-routes)
+                     (add-route live-sparql-route)
+                     (add-route (context "/v1/status" []
+                                         (status-routes global-writes-lock finished-jobs restart-id)))
+
+                     (add-routes (denv/env-specific-routes backend))
+                     (add-route app-routes))
+
+                 :ring-defaults (assoc-in api-defaults [:params :multipart] true)
+                 ;; add custom middleware here
+                 :middleware [#(wrap-resource % "swagger-ui")
+                              wrap-verbs
+                              wrap-encode-errors
+                              middleware/wrap-total-requests-counter
+                              log-request
+                              ;;wrap-file-info       ;; Content-Type, Content-Length, and Last Modified headers for files in body
+                              ]
+                 ;; add access rules here
+                 :access-rules []
+                 ;; serialize/deserialize the following data formats
+                 ;; available formats:
+                 ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
+                 :formats [:json-kw :edn])))
+
+#_(defn initialise-app! [backend {:keys [draftset-query-timeout] :as config}]
+
   (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo config)
         draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-query-timeout config)]
-    (set-var-root! #'app (app-handler
-                          ;; add your application routes here
-                          (-> []
-                              (add-route (pages-routes))
-                              (add-route (draftset-api-routes backend user-repo authenticated-fn draftset-sparql-query-timeout-fn))
-                              (add-route (get-live-sparql-query-route backend config))
-                              (add-route (context "/v1/status" []
-                                                  (status-routes global-writes-lock finished-jobs restart-id)))
 
-                              (add-routes (denv/env-specific-routes backend))
-                              (add-route app-routes))
+    (set-var-root! #'app (build-handler backend authenticated-fn draftset-sparql-query-timeout-fn config))))
 
-                          :ring-defaults (assoc-in api-defaults [:params :multipart] true)
-                          ;; add custom middleware here
-                          :middleware [#(wrap-resource % "swagger-ui")
-                                       wrap-verbs
-                                       wrap-encode-errors
-                                       middleware/wrap-total-requests-counter
-                                       log-request]
-                          ;; add access rules here
-                          :access-rules []
-                          ;; serialize/deserialize the following data formats
-                          ;; available formats:
-                          ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
-                          :formats [:json-kw :edn]))))
+(defmethod ig/init-key :drafter.handler/app [k opts]
+  (build-handler opts))
 
-(defmethod ig/init-key :drafter.handler/handler [k {:keys [drafter.backend.sesame/remote
-                                                           ]}])
 
-(defn initialise-write-service! []
+
+#_(defn initialise-write-service! []
   (set-var-root! #'writer-service  (start-writer!)))
 
-(defn- init-backend!
+#_(defn- init-backend!
   "Creates the backend for the current configuration and sets the
   backend var."
   [config]
   (set-var-root! #'backend (get-backend config)))
-
-(defn- init-user-repo! [config]
-  (let [repo (drafter.user.repository/get-configured-repository config)]
-    (set-var-root! #'user-repo repo)))
 
 (defn initialise-services! [config]
   (enc/register-custom-encoders!)
   (writers/register-custom-rdf-writers!)
 
   (jobs/init-job-settings! config)
-  (initialise-write-service!)
-  (init-backend! config)
-  (init-user-repo! config)
-  (initialise-app! backend config))
+  #_(initialise-write-service!)
+  #_(init-backend! config)
+  #_(init-user-repo! config)
+  #_(initialise-app! backend config))
 
 (defn- load-logging-configuration [config-file]
   (-> config-file slurp read-string))
 
-(defn configure-logging! [config-file]
+#_(defn configure-logging! [config-file]
   (binding [*ns* (find-ns 'drafter.handler)]
     (let [default-config (load-logging-configuration (io/resource "log-config.edn"))
           config-file (when (.exists config-file)
@@ -143,6 +171,21 @@
       (let [chosen-config (or config-file default-config)]
         (eval chosen-config)
         (log/debug "Loaded logging config" chosen-config)))))
+
+(defn configure-logging! [config-file]
+  (binding [*ns* (find-ns 'drafter.handler)]
+    (let [default-config (load-logging-configuration (io/resource "log-config.edn"))
+          config-file (when config-file
+                        (load-logging-configuration config-file))]
+
+      (let [chosen-config (or config-file default-config)]
+        (eval chosen-config)
+        (log/debug "Loaded logging config" chosen-config))))
+  :side-effecting!)
+
+(defmethod ig/init-key :drafter.handler/logging [_ opts]
+  (println "Starting logging")
+  (configure-logging! (:config opts)))
 
 (defn init
   "init will be called once when app is deployed as a servlet on an
@@ -165,6 +208,4 @@
   []
   (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
   (stop-backend backend)
-  (.close user-repo)
-  (stop-writer! writer-service)
   (log/info "drafter has shut down."))

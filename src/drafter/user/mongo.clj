@@ -100,4 +100,8 @@
 
 
 (defmethod ig/init-key :drafter.user/mongo [k opts]
-  (get-repository opts))
+  ;; merge the config options onto the record for convenience
+  (merge (get-repository opts) opts))
+
+(defmethod ig/halt-key! :drafter.user/mongo [_ mongo]
+  (.close mongo))

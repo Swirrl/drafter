@@ -38,6 +38,7 @@
   ReentrantLock javadocs for details."
   true)
 
+;; TODO integrantify
 (def global-writes-lock (ReentrantLock. fairness))
 
 (defonce ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))

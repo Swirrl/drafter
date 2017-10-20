@@ -20,7 +20,8 @@
             [drafter.requests :as drafter-request]
             [pantomime.media :refer [media-type-named]]
             [drafter.rdf.content-negotiation :as conneg]
-            [drafter.backend.protocols :refer [prepare-query]])
+            [drafter.backend.protocols :refer [prepare-query]]
+            [integrant.core :as ig])
   (:import [java.io File]
            [org.apache.jena.query QueryParseException]
            [clojure.lang ExceptionInfo]))
@@ -29,9 +30,8 @@
   (if-let [user (user-repo/find-user-by-username user-repo username)]
     (user/try-authenticate user password)))
 
-(defn- basic-auth-backend [user-repo]
-  (let [realm "Drafter"
-        conf {:realm realm
+(defn- basic-auth-backend [{:as user-repo :keys [realm]}]
+  (let [conf {:realm (or realm "Drafter")
               :authfn #(authenticate-user user-repo %1 %2)
               :unauthorized-handler (fn [req err]
                                       (response/unauthorised-basic-response realm))}]
@@ -81,16 +81,19 @@
         jws-backend (get-configured-token-auth-backend config)]
     (remove nil? [basic-backend jws-backend])))
 
-(defn- wrap-authenticated [auth-backends inner-handler]
+(defn- wrap-authenticated [auth-backends inner-handler realm]
   (let [auth-handler (apply wrap-authentication (require-authenticated inner-handler) auth-backends)
         unauthorised-fn (fn [req err]
-                          (response/unauthorised-basic-response "Drafter"))]
+                          (response/unauthorised-basic-response (or realm "Drafter")))]
     (wrap-authorization auth-handler unauthorised-fn)))
 
-(defn make-authenticated-wrapper [user-repo config]
+(defn make-authenticated-wrapper [{:keys [realm] :as user-repo} config]
   (let [auth-backends (get-configured-auth-backends user-repo config)]
     (fn [inner-handler]
-      (wrap-authenticated auth-backends inner-handler))))
+      (wrap-authenticated auth-backends inner-handler realm))))
+
+(defmethod ig/init-key :drafter.middleware/authentication-handler [_ {:keys [user-repo] :as config}]
+  (make-authenticated-wrapper user-repo config))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]
