@@ -10,10 +10,7 @@
 (defrecord MemoryUserRepository [users]
   UserRepository
   (find-user-by-username [this username] (get @users username))
-  (get-all-users [this] (vals @users))
-
-  Closeable
-  (close [this]))
+  (get-all-users [this] (vals @users)))
 
 (defn create-repository [users]
   (let [user-map (reduce (fn [m user] (assoc m (username user) user)) {} users)]
@@ -49,3 +46,4 @@
 
 (defmethod ig/init-key :drafter.user/memory-repository [k opts]
   (get-repository opts))
+

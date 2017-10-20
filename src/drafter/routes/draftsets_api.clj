@@ -15,7 +15,8 @@
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
 
             [grafter.rdf.protocols :as pr]
-            [grafter.rdf.repository :as repo])
+            [grafter.rdf.repository :as repo]
+            [integrant.core :as ig])
   (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes]]
             [ring.util.response :refer [redirect-after-post not-found response]]
             [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
@@ -124,7 +125,7 @@
                              :route route}
                             (handler-fn req)))))
 
-(defn draftset-api-routes [backend user-repo authenticated query-timeout-fn]
+#dbg (defn draftset-api-routes [backend user-repo authenticated draftset-query-timeout-fn]
   (letfn [(required-live-graph-param [h] (parse-graph-param-handler true (required-live-graph-param-handler backend h)))
           (as-draftset-owner [h]
             (authenticated
@@ -201,7 +202,7 @@
                                          (dsmgmt/all-graph-triples-query executor graph)
                                          (dsmgmt/all-quads-query executor))
                                 handler (->> sparql-execution-handler
-                                             (sparql-timeout-handler query-timeout-fn)
+                                             (sparql-timeout-handler draftset-query-timeout-fn)
                                              (conneg)
                                              (sparql-constant-prepared-query-handler pquery))]
                             (handler request))))))
@@ -270,7 +271,7 @@
                       (parse-union-with-live-handler
                         (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
                           (let [executor (dsmgmt/get-draftset-executor {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
-                                handler (sparql-protocol-handler executor query-timeout-fn)]
+                                handler (sparql-protocol-handler executor draftset-query-timeout-fn)]
                             (handler request))))))
 
         (make-route :post "/draftset/:id/publish"
@@ -340,3 +341,9 @@
                                                    (conflict-detected-response "Failed to claim draftset"))))))
                               (forbidden-response "User not in role for draftset claim"))
                             (not-found "Draftset not found")))))))))))
+
+(defmethod ig/init-key :drafter.routes/draftset-api [_ {backend :repo
+                                                        user-db :user-repo
+                                                        authenticated :authentication-handler
+                                                        draftset-query-timeout-fn :draftset-query-timeout-fn}]
+  (draftset-api-routes backend user-db authenticated draftset-query-timeout-fn))

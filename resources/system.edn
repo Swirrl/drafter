@@ -1,8 +1,8 @@
 {
 
-;;  :log-config-file #or [#env LOG_CONFIG_FILE "log-config.edn"]
+ ;;  :log-config-file #or [#env LOG_CONFIG_FILE "log-config.edn"]
 
-;;  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
+ ;;  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
  
  
  :drafter/write-scheduler {:port #long #or [#port #env DRAFTER_HTTP_PORT 3001]
@@ -10,19 +10,44 @@
 
  ;;:drafter.services/datadog {}
  
- ;;:drafter.handler/logging {:config #include "log-config.edn"}
+ :drafter.handler/logging {:config "log-config.edn"}
 
- :drafter.handler/handler {:jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
+ :drafter.middleware/authentication-handler {:user-repo #ig/ref :drafter.user/mongo
+                                             :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
 
+ :drafter.handler/live-endpoint-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
+                                            :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
+
+ :drafter.handler/draftset-query-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
+                                             :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
+ 
+ :drafter.handler/live-sparql-query-route {:repo #ig/ref :drafter.backend.sesame/remote
+                                           :endpoint-timeout-fn #ig/ref :drafter.handler/live-endpoint-timeout-fn
+                                           :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+
+
+ :drafter.routes/draftset-api {:repo #ig/ref :drafter.backend.sesame/remote
+                               :user-repo #ig/ref :drafter.user/mongo
+                               :authentication-handler #ig/ref :drafter.middleware/authentication-handler
+
+                               :draftset-query-timeout-fn #ig/ref :drafter.handler/draftset-query-timeout-fn
+                               :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+ 
+ :drafter.handler/app {:authentication-handler #ig/ref :drafter.middleware/authentication-handler
+                       :repo #ig/ref :drafter.backend.sesame/remote
+                       :live-sparql-query-route #ig/ref :drafter.handler/live-sparql-query-route
+                       :draftset-api-routes #ig/ref :drafter.routes/draftset-api
+                       }
+ 
  :drafter.main/datadog {:statsd-address #or [#env DATADOG_STATSD_ADDRESS nil]
                         :tags {:service :drafter}}
  
- :drafter.main/server {:handler #ref [:drafter.main/handler]}
+ :drafter.server/http {:handler #ig/ref :drafter.handler/app
+                       :stacktraces? false
+                       :port #long #or [#port #env DRAFTER_HTTP_PORT 3001]}
  
  ;; Also use aero readers
  :drafter.backend.sesame/remote {:batched-write-size #or [#env "batched-write-size" 75000] ;; TODO  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
-                                 :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
-                                 :draftset-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
                                  :sparql-query-endpoint #env SPARQL_QUERY_ENDPOINT
                                  :sparql-update-endpoint #env SPARQL_UPDATE_ENDPOINT }
 
@@ -30,6 +55,9 @@
                       :mongo-port #port #env DRAFTER_MONGO_PORT
                       :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]
                       :mongo-db-name #env DRAFTER_USER_DB_NAME
+
+                      ;; TODO DEV only!
+                      :realm #join ["Drafter: " #env DRAFTER_USER_DB_NAME] 
                       }
  
  ;; :drafter.user/memory-repository {:users [{:username "editor@swirrl.com" :password "password" :role :editor}
