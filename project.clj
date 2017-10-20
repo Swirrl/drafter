@@ -88,7 +88,7 @@
   :pedantic :abort
 
   :repl-options {:init-ns drafter.repl
-                 :init (-main)
+                 ;;:init (-main)
                  :timeout 180000}
 
   :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
@@ -109,7 +109,7 @@
 
    :uberjar [:prod
              {:aot :all
-              :main drafter.repl}]
+              :main drafter.server}]
 
    :prod {:uberjar-name "drafter.jar"
           :source-paths ["env/prod/clj"]
