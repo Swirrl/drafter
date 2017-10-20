@@ -1,6 +1,9 @@
 (ns drafter.main
   (:require [integrant.core :as ig]
             [aero.core :as aero]
+            [drafter.common.json-encoders :as enc]
+            [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.rdf.writers :as writers]
             [clojure.java.io :as io]
             [cognician.dogstatsd :as datadog]))
 
@@ -15,11 +18,18 @@
   (datadog/configure! statsd-address {:tags tags})
   :side-effecting!)
 
+(defn initialisation-side-effects! [config]
+  (enc/register-custom-encoders!)
+  (writers/register-custom-rdf-writers!)
+  ;; TODO tidy up this into a proper component
+  (jobs/init-job-settings! config))
+
 (defn- load-system
   [system-config-path]
   (let [config (-> system-config-path
                    io/file
                    aero/read-config)]
+    (initialisation-side-effects! config)
     (ig/load-namespaces config)
     (ig/init config)))
 

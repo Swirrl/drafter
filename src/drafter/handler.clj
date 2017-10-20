@@ -10,18 +10,15 @@
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.backend.sesame.remote :refer [get-backend]]
             [drafter.util :refer [set-var-root! conj-if]]
-            [drafter.common.json-encoders :as enc]
             [drafter.routes.draftsets-api :refer [draftset-api-routes]]
             [drafter.routes.status :refer [status-routes]]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.sparql :refer [live-sparql-routes]]
-            [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
             [drafter.configuration :refer [get-configuration]]
             [drafter.env :as denv]
-            [drafter.rdf.writers :as writers]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.file-info :refer [wrap-file-info]]
@@ -128,49 +125,12 @@
                  ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                  :formats [:json-kw :edn])))
 
-#_(defn initialise-app! [backend {:keys [draftset-query-timeout] :as config}]
-
-  (let [authenticated-fn (middleware/make-authenticated-wrapper user-repo config)
-        draftset-sparql-query-timeout-fn (get-endpoint-query-timeout-fn draftset-query-timeout config)]
-
-    (set-var-root! #'app (build-handler backend authenticated-fn draftset-sparql-query-timeout-fn config))))
 
 (defmethod ig/init-key :drafter.handler/app [k opts]
   (build-handler opts))
 
-
-
-#_(defn initialise-write-service! []
-  (set-var-root! #'writer-service  (start-writer!)))
-
-#_(defn- init-backend!
-  "Creates the backend for the current configuration and sets the
-  backend var."
-  [config]
-  (set-var-root! #'backend (get-backend config)))
-
-(defn initialise-services! [config]
-  (enc/register-custom-encoders!)
-  (writers/register-custom-rdf-writers!)
-
-  (jobs/init-job-settings! config)
-  #_(initialise-write-service!)
-  #_(init-backend! config)
-  #_(init-user-repo! config)
-  #_(initialise-app! backend config))
-
 (defn- load-logging-configuration [config-file]
   (-> config-file slurp read-string))
-
-#_(defn configure-logging! [config-file]
-  (binding [*ns* (find-ns 'drafter.handler)]
-    (let [default-config (load-logging-configuration (io/resource "log-config.edn"))
-          config-file (when (.exists config-file)
-                        (load-logging-configuration config-file))]
-
-      (let [chosen-config (or config-file default-config)]
-        (eval chosen-config)
-        (log/debug "Loaded logging config" chosen-config)))))
 
 (defn configure-logging! [config-file]
   (binding [*ns* (find-ns 'drafter.handler)]
