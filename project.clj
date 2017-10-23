@@ -88,16 +88,15 @@
   :pedantic :abort
 
   :repl-options {:init-ns drafter.repl
-                 ;;:init (-main)
                  :timeout 180000}
 
-  :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
-            [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
+  ;; :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
+  ;;           [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
 
-  :ring {:handler drafter.handler/app
-         :init    drafter.handler/init
-         :destroy drafter.handler/destroy
-         :open-browser? false }
+  ;; :ring {:handler drafter.handler/app
+  ;;        :init    drafter.handler/init
+  ;;        :destroy drafter.handler/destroy
+  ;;        :open-browser? false }
 
   ;;:target-path "target/%s" ;; ensure profiles don't pollute each other with
   ;; compiled classes etc...
@@ -109,17 +108,19 @@
 
    :uberjar [:prod
              {:aot :all
-              :main drafter.server}]
+              :main drafter.main}]
 
    :prod {:uberjar-name "drafter.jar"
           :source-paths ["env/prod/clj"]
           :resource-paths ["env/prod/resources"]}
 
-   :dev [:dev-common :dev-overrides]
+   :dev [:dev-common]
 
    :dev-common {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                           [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
+                :main drafter.main
+                
                 :source-paths ["env/dev/clj"]
                 :resource-paths ["env/dev/resources"]
 
