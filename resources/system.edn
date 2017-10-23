@@ -10,7 +10,7 @@
 
  ;;:drafter.services/datadog {}
  
- :drafter.handler/logging {:config "log-config.edn"}
+ :drafter/logging {:config "log-config.edn"}
 
  :drafter.middleware/authentication-handler {:user-repo #ig/ref :drafter.user/mongo
                                              :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
