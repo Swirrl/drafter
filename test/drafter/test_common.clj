@@ -78,7 +78,7 @@
 (declare ^:dynamic *test-writer*)
 
 (defn wrap-db-setup [test-fn]
-  (let [config (get-configuration)
+  (let [config (get-configuration) ;; TODO fix up to not use this get-configuration
         backend (get-backend config)
         configured-factories (reg/registered-parser-factories)]
     (binding [*test-backend* backend
