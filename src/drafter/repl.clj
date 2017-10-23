@@ -6,7 +6,17 @@
   (in-ns 'drafter.main))
 
 
-(println "Run (dev)")
+(do (println)
+    (println "   ___           _____         ")
+    (println "  / _ \\_______ _/ _/ /____ ____")
+    (println " / // / __/ _ `/ _/ __/ -_) __/")
+    (println "/____/_/  \\_,_/_/ \\__/\\__/_/   ")
+    (println)
+    (println "Welcome to the Drafter REPL!")
+    (println)
+    (println)
+    (println "Run: (dev)"))
+
 
 
 
