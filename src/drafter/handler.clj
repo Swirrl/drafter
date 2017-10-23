@@ -17,7 +17,7 @@
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
-            [drafter.configuration :refer [get-configuration]]
+            [drafter.timeouts :as timeouts]
             [drafter.env :as denv]
             [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
             [noir.util.middleware :refer [app-handler]]
@@ -31,22 +31,8 @@
             [swirrl-server.errors :refer [wrap-encode-errors]]
             [swirrl-server.middleware.log-request :refer [log-request]]))
 
-;; Note that though the classes and requires below aren't used in this
-;; namespace they are needed by the log-config file which is loaded
-;; from here.
-(import '[org.apache.log4j ConsoleAppender DailyRollingFileAppender RollingFileAppender EnhancedPatternLayout PatternLayout SimpleLayout]
-        '[org.apache.log4j.helpers DateLayout]
-        '[java.util UUID])
-
-(require '[clj-logging-config.log4j :refer [set-loggers!]]
-         '[drafter.timeouts :as timeouts]
-         'drafter.errors)
-
 ;; Set these values later when we start the server
-(def backend)
-
-(def writer-service
-  "A future to control the single write thread that performs database writes.")
+;;(def backend)
 
 (defroutes app-routes
   (route/resources "/")
@@ -129,40 +115,8 @@
 (defmethod ig/init-key :drafter.handler/app [k opts]
   (build-handler opts))
 
-(defn- load-logging-configuration [config-file]
-  (-> config-file slurp read-string))
-
-(defn configure-logging! [config-file]
-  (binding [*ns* (find-ns 'drafter.handler)]
-    (let [default-config (load-logging-configuration (io/resource "log-config.edn"))
-          config-file (when config-file
-                        (load-logging-configuration config-file))]
-
-      (let [chosen-config (or config-file default-config)]
-        (eval chosen-config)
-        (log/debug "Loaded logging config" chosen-config))))
-  :side-effecting!)
-
-(defmethod ig/init-key :drafter.handler/logging [_ opts]
-  (println "Starting logging")
-  (configure-logging! (:config opts)))
-
-(defn init
-  "init will be called once when app is deployed as a servlet on an
-  app server such as Tomcat put any initialization code here"
-  []
-
-  (let [{:keys [log-config-file is-dev datadog-statsd-address] :as config} (get-configuration)]
-
-    (configure-logging! (io/file log-config-file))
-
-    (log/info "Initialising repository")
-    (initialise-services! config)
-
-    (datadog/configure! datadog-statsd-address {:service :drafter})
-    (log/info "drafter started successfully")))
-
-(defn destroy
+;; TODO remove/replace
+#_(defn destroy
   "destroy will be called when your application
    shuts down, put any clean up code here"
   []
