@@ -125,7 +125,7 @@
                              :route route}
                             (handler-fn req)))))
 
-#dbg (defn draftset-api-routes [backend user-repo authenticated draftset-query-timeout-fn]
+(defn draftset-api-routes [backend user-repo authenticated draftset-query-timeout-fn]
   (letfn [(required-live-graph-param [h] (parse-graph-param-handler true (required-live-graph-param-handler backend h)))
           (as-draftset-owner [h]
             (authenticated

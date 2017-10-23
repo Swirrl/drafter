@@ -1,7 +1,6 @@
 (ns drafter.server
   (:require [clojure.string :as s]
             [ring.server.standalone :refer [serve]]
-            [drafter.configuration :refer [get-configuration]]
             [integrant.core :as ig])
   (:gen-class)
   (:import (java.lang.management ManagementFactory)))
@@ -30,6 +29,3 @@
 (defmethod ig/halt-key! :drafter.server/http [k server]
   (.stop server))
 
-#_(defn -main []
-  (let [config (get-configuration)]
-    (start-server config)))
