@@ -41,20 +41,34 @@
     (initialisation-side-effects! config)
     (ig/init config (keys (apply dissoc config pre-init-keys)))))
 
-(defn start-system! [system-config]
-  (println "Starting Drafter")
-  (let [cfg (load-system system-config)]
-    (alter-var-root #'system (constantly cfg))))
+(defn start-system!
+  "Starts drafter with the supplied system.edn file (assumed to be in
+  integrant & aero format).
+
+  If no argument is given it will start drafter using the default
+  system.edn resource."
+  
+  ([] (start-system! (io/resource "system.edn")))
+  ([system-config]
+   (println "Starting Drafter")
+   (let [cfg (load-system system-config)]
+     (alter-var-root #'system (constantly cfg)))))
 
 (defn stop-system! []
   (log/info "Stopping Drafter")
   (when system
     (ig/halt! system)))
 
-(defn add-shutdown-hook! []
+(defn add-shutdown-hook!
+  "Register a shutdown hook with the JVM.  This is not guaranteed to
+  be called in all circumstances, but should be called upon receipt of
+  a SIGTERM (a normal Unix kill command).  It gives us an opportunity
+  to try and shut things down gracefully."
+  []
   (.addShutdownHook (Runtime/getRuntime) (Thread. stop-system!)))
 
-;; TODO
-(defn -main [args]
+(defn -main [& args]
   (add-shutdown-hook!)
-  (start-system! "system.edn"))
+  (if-let [config-file (first args)]
+    (start-system! config-file)
+    (start-system!)))
