@@ -1,5 +1,6 @@
 (ns drafter.backend.sesame.remote
   (:require [clojure.string :as str]
+            [drafter.backend.protocols :as drpr]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository.registry :as reg]
             [integrant.core :as ig])
@@ -62,4 +63,10 @@
     (create-sparql-repository query-endpoint update-endpoint)))
 
 (defmethod ig/init-key :drafter.backend.sesame/remote [k opts]
+  (log/info "Initialising Backend")
   (get-backend opts))
+
+
+(defmethod ig/halt-key! :drafter.backend.sesame/remote [k backend]
+  (log/info "Halting Backend")
+  (drpr/stop-backend backend))
