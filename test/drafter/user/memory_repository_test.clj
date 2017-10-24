@@ -4,28 +4,28 @@
              [user :refer [create-user get-digest roles username]]
              [user-test :refer [test-editor]]]
             [drafter.user
-             [memory-repository :refer :all]
-             [repository :refer [find-user-by-username get-all-users]]]))
+             [memory-repository :refer :all]]
+            [drafter.user :as user]))
 
 (deftest find-existing-user-test
-  (let [repo (create-repository* test-editor)
-        u (find-user-by-username repo (username test-editor))]
+  (let [repo (init-repository* test-editor)
+        u (user/find-user-by-username repo (username test-editor))]
     (is (= test-editor u))))
 
 (deftest find-non-existent-user-test
-  (let [repo (create-repository*)
-        u (find-user-by-username repo "missing@example.com")]
+  (let [repo (init-repository*)
+        u (user/find-user-by-username repo "missing@example.com")]
     (is (nil? u))))
 
 (deftest get-all-users-test
   (let [email-f #(str (name %) "@example.com")
         users (map #(create-user (email-f %) % (get-digest "password")) roles)
-        repo (create-repository users)
-        found-users (get-all-users repo)]
+        repo (init-repository users)
+        found-users (user/get-all-users repo)]
     (is (= (set users) (set found-users)))))
 
 (deftest add-user-test
-  (let [repo (create-repository*)]
+  (let [repo (init-repository*)]
     (add-user repo test-editor)
-    (let [found (find-user-by-username repo (username test-editor))]
+    (let [found (user/find-user-by-username repo (username test-editor))]
       (is (= test-editor found)))))

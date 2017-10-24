@@ -29,9 +29,6 @@
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
             [drafter.backend.protocols :refer :all]
-            [drafter.user :as user]
-
-            [drafter.user.repository :as user-repo]
             [ring.util.response :refer [not-found redirect-after-post response]]
             [swirrl-server.async.jobs :as ajobs]
             [swirrl-server.responses :as response])
@@ -139,7 +136,7 @@
         (make-route :get "/users"
                     (authenticated
                      (fn [r]
-                       (let [users (user-repo/get-all-users user-repo)
+                       (let [users (user/get-all-users user-repo)
                              summaries (map user/get-summary users)]
                          (response summaries)))))
 
@@ -295,7 +292,7 @@
                           (unprocessable-entity-response "Only one of user and role parameters permitted")
 
                           (some? user)
-                          (if-let [target-user (user-repo/find-user-by-username user-repo user)]
+                          (if-let [target-user (user/find-user-by-username user-repo user)]
                             (run-sync #(dsmgmt/submit-draftset-to-user! backend draftset-id owner target-user)
                                          #(draftset-sync-write-response % backend draftset-id))
                             (unprocessable-entity-response (str "User: " user " not found")))

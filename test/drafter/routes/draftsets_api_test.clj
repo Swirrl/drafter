@@ -19,8 +19,7 @@
              [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.routes.draftsets-api :refer :all]
             [drafter.user
-             [memory-repository :as memrepo]
-             [repository :as user-repo]]
+             [memory-repository :as memrepo]]
             [grafter.rdf :refer [add context statements]]
             [grafter.rdf
              [formats :as formats]
@@ -1471,7 +1470,7 @@
   (with-identity user {:uri "/v1/users" :request-method :get}))
 
 (deftest get-users
-  (let [users (user-repo/get-all-users *user-repo*)
+  (let [users (user/get-all-users *user-repo*)
         expected-summaries (map user/get-summary users)
         {:keys [body] :as response} (route (get-users-request test-editor))]
     (assert-is-ok-response response)
@@ -1518,7 +1517,7 @@
         (is (= :deleted (get-in changes [live-graph :status])))))))
 
 (defn- setup-route [test-function]
-  (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
+  (let [users (memrepo/init-repository* test-editor test-publisher test-manager)
         authenticated-fn (middleware/make-authenticated-wrapper users {})
         swagger-spec (swagger/load-spec-and-resolve-refs)
         api-handler (draftset-api-routes *test-backend* users authenticated-fn timeouts/calculate-default-request-timeout)]
