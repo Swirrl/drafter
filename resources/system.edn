@@ -11,7 +11,7 @@
  
  :drafter/logging {:config "log-config.edn"}
 
- :drafter.middleware/authentication-handler {:user-repo #ig/ref :drafter.user/mongo
+ :drafter.middleware/authentication-handler {:user-repo #ig/ref :drafter.user/repo
                                              :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
 
  :drafter.handler/live-endpoint-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
@@ -20,13 +20,13 @@
  :drafter.handler/draftset-query-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
                                              :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
  
- :drafter.handler/live-sparql-query-route {:repo #ig/ref :drafter.backend.sesame/remote
-                                           :endpoint-timeout-fn #ig/ref :drafter.handler/live-endpoint-timeout-fn
-                                           :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+ :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.sesame/remote
+                                                 :endpoint-timeout-fn #ig/ref :drafter.handler/live-endpoint-timeout-fn
+                                                 :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
 
 
  :drafter.routes/draftset-api {:repo #ig/ref :drafter.backend.sesame/remote
-                               :user-repo #ig/ref :drafter.user/mongo
+                               :user-repo #ig/ref :drafter.user/repo
                                :authentication-handler #ig/ref :drafter.middleware/authentication-handler
 
                                :draftset-query-timeout-fn #ig/ref :drafter.handler/draftset-query-timeout-fn
@@ -34,7 +34,7 @@
  
  :drafter.handler/app {:authentication-handler #ig/ref :drafter.middleware/authentication-handler
                        :repo #ig/ref :drafter.backend.sesame/remote
-                       :live-sparql-query-route #ig/ref :drafter.handler/live-sparql-query-route
+                       :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
                        :draftset-api-routes #ig/ref :drafter.routes/draftset-api
                        }
  

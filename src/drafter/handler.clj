@@ -8,12 +8,9 @@
             [drafter.middleware :as middleware]
             [swirrl-server.middleware.log-request :refer [log-request]]
             [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.backend.sesame.remote :refer [get-backend]]
             [drafter.util :refer [set-var-root! conj-if]]
-            [drafter.routes.draftsets-api :refer [draftset-api-routes]]
-            [drafter.routes.status :refer [status-routes]]
-            [drafter.routes.pages :refer [pages-routes]]
-            [drafter.routes.sparql :refer [live-sparql-routes]]
+            [drafter.routes.status :refer [status-routes]] ;; TODO componentise
+            [drafter.routes.pages :refer [pages-routes]]   ;; TODO componentise
             [drafter.write-scheduler :refer [start-writer!
                                              global-writes-lock
                                              stop-writer!]]
@@ -31,23 +28,12 @@
             [swirrl-server.errors :refer [wrap-encode-errors]]
             [swirrl-server.middleware.log-request :refer [log-request]]))
 
-;; Set these values later when we start the server
-;;(def backend)
-
 (defroutes app-routes
   (route/resources "/")
   (route/not-found "Not Found"))
 
 (def add-route conj)
 (def add-routes into)
-
-(defn- endpoint-query-path [route-name version]
-  (let [suffix (str "/sparql/" (name route-name))]
-    (if (some? version)
-      (str "/" (name version) suffix)
-      suffix)))
-
-(def ^:private v1-prefix :v1)
 
 (defn- get-endpoint-query-timeout-fn [{:keys [endpoint-timeout jws-signing-key] :as config}]
   (when (nil? jws-signing-key)
@@ -59,14 +45,6 @@
 
 (defmethod ig/init-key :drafter.handler/draftset-query-timeout-fn [_ opts]
   (get-endpoint-query-timeout-fn opts))
-
-
-(defn- get-live-sparql-query-route [backend {:keys [live-query-timeout endpoint-timeout-fn] :as config}]
-  (let [mount-point (endpoint-query-path :live v1-prefix)]
-    (live-sparql-routes mount-point backend endpoint-timeout-fn)))
-
-(defmethod ig/init-key :drafter.handler/live-sparql-query-route [_ {:keys [repo] :as opts}]
-  (get-live-sparql-query-route repo opts))
 
 (defn- wrap-handler [handler]
   (-> handler
