@@ -12,12 +12,13 @@
       (first)
       (read-string)))
 
-(defmethod ig/init-key :drafter.server/http [_ {:keys [port handler stacktraces?]}]
+(defmethod ig/init-key :drafter.server/http [_ {:keys [open-browser? port handler stacktraces?]}]
   (let [server (serve handler
                       {:port          port
                        :init #(do (println (str "Started with PID: " (get-pid)))
                                   (println (str "You can view the site at http://localhost:" port)))
                        :auto-reload?  false
+                       :open-browser? (or open-browser? false)
                        :stacktraces?  stacktraces? ;; remove fancy error page in all
                        
                        ;; but the dev env (Jetty will
