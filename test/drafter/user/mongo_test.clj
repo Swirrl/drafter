@@ -13,7 +13,7 @@
         test-user (user/create-user email :publisher "dsklfsjde")]
     (um/insert-user *user-repo* test-user)
 
-    (let [found-user (find-user-by-username *user-repo* email)]
+    (let [found-user (user/find-user-by-username *user-repo* email)]
       (is (= test-user found-user)))))
 
 (deftest get-all-users-test
@@ -24,11 +24,11 @@
     (doseq [u expected-users]
       (um/insert-user *user-repo* u))
 
-    (let [actual-users (get-all-users *user-repo*)]
+    (let [actual-users (user/get-all-users *user-repo*)]
       (is (= (set expected-users) (set actual-users))))))
 
 (deftest find-non-existent-user-test
-  (is (nil? (find-user-by-username *user-repo* "missing@example.com"))))
+  (is (nil? (user/find-user-by-username *user-repo* "missing@example.com"))))
 
 (deftest find-malformed-user-record-test
   ;;user record is invalid - role number is out of range and
@@ -39,7 +39,7 @@
                      :role_number 18}]
     (um/insert-document *user-repo* user-record)
 
-    (is (thrown? RuntimeException (find-user-by-username *user-repo* email)))))
+    (is (thrown? RuntimeException (user/find-user-by-username *user-repo* email)))))
 
 (defn- with-clean-mongo-db [test-function]
   (let [conn (mg/connect)

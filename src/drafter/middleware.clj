@@ -8,7 +8,6 @@
             [drafter.util :as util]
             [drafter.responses :as response]
             [drafter.user :as user]
-            [drafter.user.repository :as user-repo]
             [drafter.rdf.sesame :refer [read-statements] :as ses]
             [grafter.rdf.formats :refer [mimetype->rdf-format]]
             [buddy.auth :as auth]
@@ -27,7 +26,8 @@
            [clojure.lang ExceptionInfo]))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
-  (if-let [user (user-repo/find-user-by-username user-repo username)]
+  (log/info "auth user" username password)
+  (if-let [user (user/find-user-by-username user-repo username)]
     (user/try-authenticate user password)))
 
 (defn- basic-auth-backend [{:as user-repo :keys [realm]}]

@@ -38,7 +38,7 @@
         password "dslkfjsejw"
         password-digest (user/get-digest password)
         user (user/create-user username :publisher password-digest)
-        repo (memory-repo/create-repository* user)
+        repo (memory-repo/init-repository* user)
         handler (basic-authentication repo identity)
         request (create-authorised-request username password)
         {:keys [identity] :as response} (handler request)]
@@ -48,28 +48,28 @@
 (deftest invalid-password-should-not-authenticate-test
   (let [username "test@example.com"
         user (user/create-user username :editor (user/get-digest "password"))
-        repo (memory-repo/create-repository* user)
+        repo (memory-repo/init-repository* user)
         handler (basic-authentication repo identity)
         request (create-authorised-request username "invalidpassword")
         response (handler request)]
     (is (= false (auth/authenticated? response)))))
 
 (deftest non-existent-user-should-not-authenticate-test
-  (let [repo (memory-repo/create-repository*)
+  (let [repo (memory-repo/init-repository*)
         handler (basic-authentication repo identity)
         request (create-authorised-request "missing@example.com" (user/get-digest "sdkfiwe"))
         response (handler request)]
     (is (= false (auth/authenticated? response)))))
 
 (deftest request-without-credentials-should-not-authenticate
-  (let [repo (memory-repo/create-repository*)
+  (let [repo (memory-repo/init-repository*)
         handler (basic-authentication repo identity)
         response (handler {:uri "/test" :request-method :get})]
     (is (= false (auth/authenticated? response)))))
 
 (deftest handler-should-return-not-authenticated-response-if-inner-handler-throws-unauthorised
   (let [inner-handler (fn [req] (auth/throw-unauthorized {:message "Auth required"}))
-        handler (basic-authentication (memory-repo/create-repository*) inner-handler)
+        handler (basic-authentication (memory-repo/init-repository*) inner-handler)
         response (handler {:uri "/test" :request-method :get})]
     (assert-is-unauthorised-basic-response response)))
 

@@ -3,14 +3,14 @@
              [set :as set]
              [string :as string]]
             [drafter.user :as user]
-            [drafter.user.repository :refer :all]
             [monger
              [collection :as mc]
              [core :as mg]]
             [schema.core :as s]
             [integrant.core :as ig])
   (:import java.io.Closeable
-           org.bson.types.ObjectId))
+           org.bson.types.ObjectId
+           org.mindrot.jbcrypt.BCrypt))
 
 (def ^:private role-mappings
   {10 :editor
@@ -29,7 +29,7 @@
   (user/create-user email (role-mappings role_number) encrypted_password))
 
 (defrecord MongoUserRepository [conn db user-collection]
-  UserRepository
+  user/UserRepository
   (find-user-by-username [this username]
     (if-let [mongo-user (mc/find-one-as-map db user-collection {:email username})]
       (mongo-user->user mongo-user)))
@@ -98,6 +98,7 @@
   (let [mongo-user (user->mongo-user user)]
     (insert-document repo mongo-user)))
 
+(derive :drafter.user/mongo :drafter.user/repo)
 
 (defmethod ig/init-key :drafter.user/mongo [k opts]
   ;; merge the config options onto the record for convenience
