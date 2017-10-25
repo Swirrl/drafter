@@ -13,7 +13,6 @@
           '[java.util UUID])
 
   (require '[clj-logging-config.log4j :refer [set-loggers!]]
-           '[drafter.timeouts :as timeouts]
            'drafter.errors))
 
 
