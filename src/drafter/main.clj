@@ -6,7 +6,8 @@
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.writers :as writers]
             [clojure.java.io :as io]
-            [cognician.dogstatsd :as datadog])
+            [cognician.dogstatsd :as datadog]
+            [clojure.edn :as edn])
   (:gen-class))
 
 (require 'drafter.configuration)
@@ -20,44 +21,65 @@
   (println "Initialising datadog")
   (datadog/configure! statsd-address {:tags tags}))
 
-(def pre-init-keys [:drafter/logging :drafter.main/datadog])
+(def pre-initialised-keys #{:drafter/logging :drafter.main/datadog})
 
 (defn initialisation-side-effects! [config]
   ;;(println "Initialisation Effects")
   (ig/load-namespaces config)
-  (ig/init config pre-init-keys)
+  (ig/init config pre-initialised-keys)
 
   ;; TODO consider moving these calls into more specific components
   (enc/register-custom-encoders!)
   (writers/register-custom-rdf-writers!)
   (jobs/init-job-settings! config))
 
-(defn- load-system
-  [system-config-path]
-  (let [config (-> system-config-path
-                   io/file
-                   aero/read-config)]
+(defn read-system [system-config]
+  (if (map? system-config)
+    system-config
+    (-> system-config
+        aero/read-config)))
 
-    (initialisation-side-effects! config)
-    (ig/init config (keys (apply dissoc config pre-init-keys)))))
+(defn- load-system
+  "Initialises the given system map."
+  [system-config sys-keys]
+
+  (initialisation-side-effects! system-config)
+  
+  (let [start-keys (->> (or sys-keys (keys system-config))
+                        (remove pre-initialised-keys))]
+    (ig/init system-config start-keys)))
 
 (defn start-system!
   "Starts drafter with the supplied system.edn file (assumed to be in
   integrant & aero format).
 
   If no argument is given it will start drafter using the default
-  system.edn resource."
+  system.edn resource.
+
+  If a single arg is given it will load the given resource, file or if
+  it's a map use its value as the system and start it.
+
+  If two args are given the second argument is expected to be a set of
+  keys to start from within the given system."
   
   ([] (start-system! (io/resource "system.edn")))
-  ([system-config]
+  ([sys] (start-system! sys nil))
+  ([system-config start-keys]
    (println "Starting Drafter")
-   (let [cfg (load-system system-config)]
-     (alter-var-root #'system (constantly cfg)))))
+   (let [system (read-system system-config)
+         initialised-sys (load-system system start-keys)]
+     (alter-var-root #'system (constantly initialised-sys)))))
 
 (defn stop-system! []
   (log/info "Stopping Drafter")
   (when system
     (ig/halt! system)))
+
+(defn restart-system!
+  "Note this doesn't do a refresh yet."
+  []
+  (stop-system!)
+  (start-system!))
 
 (defn add-shutdown-hook!
   "Register a shutdown hook with the JVM.  This is not guaranteed to
