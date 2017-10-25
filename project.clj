@@ -1,4 +1,4 @@
-(defproject drafter "2.1.7-SNAPSHOT"
+(defproject drafter "2.1.8-SNAPSHOT"
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
@@ -45,7 +45,7 @@
 
                  [com.sun.mail/javax.mail "1.6.0"]
                  ;;[com.taoensso/tower "2.0.2"]
-                 [grafter "0.10.0"]
+                 [grafter "0.10.1"]
                  [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
