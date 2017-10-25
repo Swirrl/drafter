@@ -97,9 +97,6 @@
   :resource-paths ["resources"]
   :pedantic :abort
 
-  :repl-options {:init-ns drafter.repl
-                 :timeout 180000}
-
   ;; :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
   ;;           [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
 
@@ -129,15 +126,17 @@
    :dev-common {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                           [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
-                :main drafter.main
+                :repl-options {:init-ns user
+                               :timeout 180000}
                 
                 :source-paths ["env/dev/clj"]
-                :resource-paths ["env/dev/resources"]
+                :resource-paths ["env/dev/resources" "test/resources"]
 
                 :dependencies [[clojure-csv/clojure-csv "2.0.2"]
                                [org.clojure/data.json "0.2.6"]
                                [ring-mock "0.1.5"]
                                [ring/ring-devel "1.6.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
+                               [eftest "0.3.2"] ;; repl test runner support
                                [org.clojure/test.check "0.9.0"]]
 
                 ;;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
