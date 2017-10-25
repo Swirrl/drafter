@@ -11,7 +11,8 @@
 (defn stop-backend [backend]
   (repo/shutdown (->sesame-repo backend)))
 
-(defn ->repo-connection [backend]
+(defn ->repo-connection
   "Opens a connection to the underlying Sesame repository for the
   given backend."
+  [backend]
   (repo/->connection (->sesame-repo backend)))

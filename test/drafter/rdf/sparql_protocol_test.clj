@@ -139,7 +139,7 @@
               (.get f 100 TimeUnit/MILLISECONDS)))
           (throw (RuntimeException. "Server failed to accept connections within timeout")))))))
 
-(use-fixtures :once (tc/wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.sesame/remote :drafter/write-scheduler]))
+(use-fixtures :once (tc/wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.rdf4j/remote :drafter/write-scheduler]))
 
 (use-fixtures :each (partial tc/wrap-clean-test-db
                              add-triple-to-db))

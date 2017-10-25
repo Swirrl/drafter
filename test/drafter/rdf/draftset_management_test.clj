@@ -447,5 +447,5 @@
                (.getTime ts-3))
               "Modified time is updated after delete"))))))
 
-(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.sesame/remote :drafter/write-scheduler]))
+(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.rdf4j/remote :drafter/write-scheduler]))
 (use-fixtures :each wrap-clean-test-db)

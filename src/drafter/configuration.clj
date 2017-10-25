@@ -4,7 +4,8 @@
             [drafter.timeouts :as timeouts]
             [aero.core :as aero]
             [drafter.util :as util]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io])
+  (:import java.net.URI))
 
 ;;Reads a timeout setting from the configuration. Timeout configurations
 ;;are optional. Returns an exception if the timeout string is invalid.
@@ -25,6 +26,15 @@
           (IllegalArgumentException. "Port must be in range (0 65536]")))
       (catch Exception ex
         ex))))
+
+
+(defmethod aero/reader 'uri
+  [opts tag value]
+  (URI. value))
+
+(defmethod aero/reader 'url ;; alias url too even though we create java.net.URIs with it
+  [opts tag value]
+  (URI. value))
 
 ;;Reads an optional configuration setting representing a natural number.
 ;;The value to read can be either a number or a string representation of a
