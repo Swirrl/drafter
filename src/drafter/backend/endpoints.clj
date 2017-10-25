@@ -10,9 +10,16 @@
              [protocols :as proto]
              [repository :as repo]]
             [schema.core :as s])
-  (:import org.eclipse.rdf4j.model.URI))
+  (:import org.eclipse.rdf4j.model.URI
+           org.eclipse.rdf4j.repository.Repository))
 
-(require 'drafter.backend.repository)
+(extend-type Repository
+  backend/SparqlExecutor
+  (backend/prepare-query [this sparql-string]
+    (prepare-query this sparql-string))
+
+  backend/ToRepository
+  (->sesame-repo [r] r))
 
 (def ^:private itriple-readable-delegate
   {:to-statements (fn [this options]
