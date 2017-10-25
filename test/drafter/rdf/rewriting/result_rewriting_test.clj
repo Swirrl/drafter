@@ -3,7 +3,7 @@
              [set :as set]
              [test :refer :all]]
             [drafter
-             [test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-db-setup]]
+             [test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-system-setup]]
              [util :refer [map-values]]]
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.draft-management
@@ -13,7 +13,8 @@
             [grafter.rdf
              [repository :as repo]
              [templater :refer [triplify]]]
-            [schema.test :refer [validate-schemas]])
+            [schema.test :refer [validate-schemas]]
+            [clojure.java.io :as io])
   (:import org.eclipse.rdf4j.model.impl.URIImpl
            [java.net URI]))
 
@@ -188,5 +189,5 @@
 
         (is (some #{live-triple} (map (juxt :s :p :o) results)))))))
 
-(use-fixtures :once wrap-db-setup)
+(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.sesame/remote :drafter/write-scheduler]))
 (use-fixtures :each wrap-clean-test-db)

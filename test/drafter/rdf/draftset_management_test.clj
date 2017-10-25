@@ -3,7 +3,7 @@
             [clojure.test :refer :all]
             [drafter
              [draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
-             [test-common :refer [*test-backend* ask? import-data-to-draft! make-graph-live! select-all-in-graph test-triples wrap-clean-test-db wrap-db-setup]]
+             [test-common :refer [*test-backend* ask? import-data-to-draft! make-graph-live! select-all-in-graph test-triples wrap-clean-test-db wrap-system-setup]]
              [user :as user]
              [user-test :refer [test-editor test-manager test-publisher]]
              [write-scheduler :as scheduler]]
@@ -447,5 +447,5 @@
                (.getTime ts-3))
               "Modified time is updated after delete"))))))
 
-(use-fixtures :once wrap-db-setup)
+(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.sesame/remote :drafter/write-scheduler]))
 (use-fixtures :each wrap-clean-test-db)

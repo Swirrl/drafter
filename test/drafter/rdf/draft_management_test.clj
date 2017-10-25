@@ -1,7 +1,7 @@
 (ns drafter.rdf.draft-management-test
   (:require [clojure.test :refer :all]
             [drafter
-             [test-common :as test :refer [*test-backend* ask? import-data-to-draft! make-graph-live! wrap-clean-test-db wrap-db-setup]]
+             [test-common :as test :refer [*test-backend* ask? import-data-to-draft! make-graph-live! wrap-clean-test-db wrap-system-setup]]
              [user-test :refer [test-editor]]]
             [drafter.rdf
              [draft-management :refer :all]
@@ -16,7 +16,8 @@
              [templater :refer [triplify]]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
-            [grafter.url :as url])
+            [grafter.url :as url]
+            [clojure.java.io :as io])
   (:import [java.util Date UUID]
            [java.net URI]))
 
@@ -447,5 +448,5 @@
              dest-graph)
           "Should be a copy of the source graph"))))
 
-(use-fixtures :once wrap-db-setup)
+(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.sesame/remote :drafter/write-scheduler]))
 (use-fixtures :each wrap-clean-test-db)
