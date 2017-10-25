@@ -84,5 +84,5 @@
 
         (is (not= graph-1-result (second csv-result)))))))
 
-(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.sesame/remote :drafter/write-scheduler]))
+(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.rdf4j/remote :drafter/write-scheduler]))
 (use-fixtures :each (partial wrap-clean-test-db))

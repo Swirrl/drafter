@@ -1,34 +1,36 @@
 (ns drafter.test-common
-  (:require [clojure.test :refer :all]
-            [drafter.util :as util]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
+            [drafter.backend.protocols :refer [stop-backend]]
+            [drafter.backend.rdf4j.remote :refer [get-backend]]
+            [drafter.configuration :refer [get-configuration]]
+            [drafter.draftset :refer [->draftset-uri]]
             [drafter.main :as main]
-            [grafter.rdf.templater :refer [triplify]]
-            [grafter.rdf.repository.registry :as reg]
+            [drafter.rdf.draft-management
+             :refer
+             [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
+            [drafter.rdf.sparql :as sparql]
+            [drafter.user :as user]
+            [drafter.util :as util]
+            [drafter.write-scheduler
+             :refer
+             [global-writes-lock queue-job! start-writer! stop-writer!]]
             [grafter.rdf.repository :as repo]
+            [grafter.rdf.repository.registry :as reg]
+            [grafter.rdf.templater :refer [triplify]]
             [grafter.url :as url]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
-            [drafter.user :as user]
-            [drafter.backend.sesame.remote :refer [get-backend]]
-            [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
-                                                  create-draft-graph!]]
-            [drafter.rdf.sparql :as sparql]
-            [drafter.configuration :refer [get-configuration]]
-            [drafter.draftset :refer [->draftset-uri]]
-            [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
-                                             global-writes-lock]]
-            [swirrl-server.async.jobs :refer [create-job]]
-            [schema.test :refer [validate-schemas]]
             [schema.core :as s]
-            [clojure.java.io :as io])
-  (:import [java.util Scanner UUID ArrayList]
+            [schema.test :refer [validate-schemas]]
+            [swirrl-server.async.jobs :refer [create-job]])
+  (:import drafter.rdf.DrafterSPARQLRepository
+           [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
+           java.lang.AutoCloseable
+           [java.net InetSocketAddress ServerSocket SocketException URI]
+           java.nio.charset.Charset
+           [java.util ArrayList Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
-           [java.io ByteArrayOutputStream ByteArrayInputStream OutputStream PrintWriter]
-           [java.nio.charset Charset]
-           [java.net URI InetSocketAddress SocketException ServerSocket]
-           [java.lang AutoCloseable]
-           [drafter.rdf DrafterSPARQLRepository]
            [org.apache.http.entity ContentLengthStrategy ContentType StringEntity]
            org.apache.http.impl.entity.StrictContentLengthStrategy
            [org.apache.http.impl.io ChunkedOutputStream ContentLengthOutputStream DefaultHttpRequestParser DefaultHttpResponseWriter HttpTransportMetricsImpl IdentityOutputStream SessionInputBufferImpl SessionOutputBufferImpl]
@@ -98,7 +100,7 @@
 (defn wrap-system-setup [system start-keys]
   (fn [test-fn]
     (let [started-system (main/start-system! system start-keys)
-          backend (:drafter.backend.sesame/remote started-system)
+          backend (:drafter.backend.rdf4j/remote started-system)
           writer (:drafter/write-scheduler started-system)
           configured-factories (reg/registered-parser-factories)]
       (binding [*test-backend* backend

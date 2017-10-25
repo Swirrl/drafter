@@ -51,7 +51,8 @@
                  [com.sun.mail/javax.mail "1.6.0"]
                  ;;[com.taoensso/tower "2.0.2"]
 
-                 [grafter "0.10.1"]
+                 [grafter "0.10.2-SNAPSHOT"] ;; might not be necessary.
+                 
                  [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]

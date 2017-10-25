@@ -1,9 +1,12 @@
-(ns drafter.backend.sesame.remote
+(ns drafter.backend.rdf4j.remote
+  "Thin wrapper over a DrafterSparqlRepository as a configurable
+  integrant component."
   (:require [clojure.string :as str]
             [drafter.backend.protocols :as drpr]
             [clojure.tools.logging :as log]
             [grafter.rdf.repository.registry :as reg]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [clojure.spec.alpha :as s])
   (:import drafter.rdf.DrafterSPARQLRepository
            [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
            [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
@@ -11,22 +14,20 @@
            org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
            org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory))
 
-(defn get-required-configuration-setting [var-key config]
-  (if-let [ev (var-key config)]
-    ev
-    (let [message (str "Missing required configuration key " var-key)]
-      (do
-        (log/error message)
-        (throw (RuntimeException. message))))))
-
-(defn create-sparql-repository [query-endpoint update-endpoint]
+(defn create-sparql-repository
   "Creates a new SPARQL repository with the given query and update
   endpoints."
+  [query-endpoint update-endpoint]
   (let [repo (DrafterSPARQLRepository. query-endpoint update-endpoint)]
     (.initialize repo)
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     repo))
 
+
+;; TODO:
+;;
+;; We should turn these whitelist sets into proper configuration.
+;;
 ;; Set some whitelists that ensure we're much more strict around what
 ;; formats we negotiate with stardog.  If you want to run drafter
 ;; against another (non stardog) store we should configure these to be
@@ -47,10 +48,11 @@
 (def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory})
 (def ask-formats-whitelist #{SPARQLBooleanJSONParserFactory BooleanTextParserFactory SPARQLBooleanXMLParserFactory})
 
-(defn get-backend [config]
+(defn get-backend
   "Creates a new SPARQL repository with the query and update endpoints
   configured in the given configuration map."
-
+  [{:keys [sparql-query-endpoint sparql-update-endpoint]}]
+  
   ;; This call here obliterates the sesame defaults for registered
   ;; parsers.  Forcing content negotiation to work only with the
   ;; parsers we explicitly whitelist above.
@@ -58,15 +60,20 @@
                                    :construct construct-formats-whitelist
                                    :ask ask-formats-whitelist})
 
-  (let [query-endpoint (get-required-configuration-setting :sparql-query-endpoint config)
-        update-endpoint (get-required-configuration-setting :sparql-update-endpoint config)]
-    (create-sparql-repository query-endpoint update-endpoint)))
+  (create-sparql-repository (str sparql-query-endpoint) (str sparql-update-endpoint)))
 
-(defmethod ig/init-key :drafter.backend.sesame/remote [k opts]
+
+(s/def ::sparql-query-endpoint uri?)
+(s/def ::sparql-update-endpoint uri?)
+
+(defmethod ig/pre-init-spec :drafter.backend.rdf4j/remote [_]
+  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint]))
+
+(defmethod ig/init-key :drafter.backend.rdf4j/remote [k opts]
   (log/info "Initialising Backend")
   (get-backend opts))
 
 
-(defmethod ig/halt-key! :drafter.backend.sesame/remote [k backend]
+(defmethod ig/halt-key! :drafter.backend.rdf4j/remote [k backend]
   (log/info "Halting Backend")
   (drpr/stop-backend backend))

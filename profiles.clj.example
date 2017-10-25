@@ -1,4 +1,2 @@
 {:dev-overrides {:env {:sparql-query-endpoint "http://localhost:5820/drafter/query"
-                       :drafter-backend
-                       "drafter.backend.sesame.remote" ;; or drafter.backend.sesame.native
                        :sparql-update-endpoint "http://localhost:5820/drafter/update"}}}
