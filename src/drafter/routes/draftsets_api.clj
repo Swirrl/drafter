@@ -339,7 +339,7 @@
                               (forbidden-response "User not in role for draftset claim"))
                             (not-found "Draftset not found")))))))))))
 
-(defmethod ig/init-key :drafter.routes/draftset-api [_ {backend :repo
+(defmethod ig/init-key :drafter.routes/draftsets-api [_ {backend :repo
                                                         user-db :user-repo
                                                         authenticated :authentication-handler
                                                         draftset-query-timeout-fn :draftset-query-timeout-fn}]

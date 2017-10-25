@@ -25,17 +25,17 @@
                                                  :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
 
 
- :drafter.routes/draftset-api {:repo #ig/ref :drafter.backend.sesame/remote
-                               :user-repo #ig/ref :drafter.user/repo
-                               :authentication-handler #ig/ref :drafter.middleware/authentication-handler
+ :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend.sesame/remote
+                                :user-repo #ig/ref :drafter.user/repo
+                                :authentication-handler #ig/ref :drafter.middleware/authentication-handler
 
-                               :draftset-query-timeout-fn #ig/ref :drafter.handler/draftset-query-timeout-fn
-                               :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+                                :draftset-query-timeout-fn #ig/ref :drafter.handler/draftset-query-timeout-fn
+                                :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
  
  :drafter.handler/app {:authentication-handler #ig/ref :drafter.middleware/authentication-handler
                        :repo #ig/ref :drafter.backend.sesame/remote
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
-                       :draftset-api-routes #ig/ref :drafter.routes/draftset-api
+                       :draftset-api-routes #ig/ref :drafter.routes/draftsets-api
                        }
  
  :drafter.main/datadog {:statsd-address #or [#env DATADOG_STATSD_ADDRESS nil]
