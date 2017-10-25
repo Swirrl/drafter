@@ -5,12 +5,13 @@
             [drafter
              [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft!
                                   select-all-in-graph stream->string test-triples with-identity
-                                  wrap-clean-test-db wrap-db-setup]]
+                                  wrap-clean-test-db wrap-system-setup]]
              [timeouts :as timeouts]
              [user-test :refer [test-editor test-system]]]
             [drafter.rdf.draft-management :refer :all]
             [drafter.routes.sparql :refer :all]
-            [schema.test :refer [validate-schemas]])
+            [schema.test :refer [validate-schemas]]
+            [clojure.java.io :as io])
   (:import (java.net URI)))
 
 (use-fixtures :each validate-schemas)
@@ -83,5 +84,5 @@
 
         (is (not= graph-1-result (second csv-result)))))))
 
-(use-fixtures :once wrap-db-setup)
+(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.sesame/remote :drafter/write-scheduler]))
 (use-fixtures :each (partial wrap-clean-test-db))

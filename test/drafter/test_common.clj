@@ -1,6 +1,7 @@
 (ns drafter.test-common
   (:require [clojure.test :refer :all]
             [drafter.util :as util]
+            [drafter.main :as main]
             [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf.repository.registry :as reg]
             [grafter.rdf.repository :as repo]
@@ -12,14 +13,15 @@
             [drafter.backend.protocols :refer [stop-backend]]
             [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
                                                   create-draft-graph!]]
-            [drafter.rdf.sparql :refer [update!] :as sparql]
+            [drafter.rdf.sparql :as sparql]
             [drafter.configuration :refer [get-configuration]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
                                              global-writes-lock]]
             [swirrl-server.async.jobs :refer [create-job]]
             [schema.test :refer [validate-schemas]]
-            [schema.core :as s])
+            [schema.core :as s]
+            [clojure.java.io :as io])
   (:import [java.util Scanner UUID ArrayList]
            [java.util.concurrent CountDownLatch TimeUnit]
            [java.io ByteArrayOutputStream ByteArrayInputStream OutputStream PrintWriter]
@@ -77,7 +79,7 @@
 
 (declare ^:dynamic *test-writer*)
 
-(defn wrap-db-setup [test-fn]
+#_(defn wrap-db-setup [test-fn]
   (let [config (get-configuration) ;; TODO fix up to not use this get-configuration
         backend (get-backend config)
         configured-factories (reg/registered-parser-factories)]
@@ -92,6 +94,24 @@
             (stop-backend backend)
             (stop-writer! *test-writer*)
             (reg/register-parser-factories! configured-factories)))))))
+
+(defn wrap-system-setup [system start-keys]
+  (fn [test-fn]
+    (let [started-system (main/start-system! system start-keys)
+          backend (:drafter.backend.sesame/remote started-system)
+          writer (:drafter/write-scheduler started-system)
+          configured-factories (reg/registered-parser-factories)]
+      (binding [*test-backend* backend
+                *test-writer* writer]
+        (do
+          ;; Some tests need to load and parse trig file data
+          (reg/register-parser-factory! :construct TriGParserFactory)
+          (try
+            (test-fn)
+            (finally
+              (stop-backend backend)
+              (stop-writer! *test-writer*)
+              (reg/register-parser-factories! configured-factories))))))))
 
 (defn wrap-clean-test-db
   ([test-fn] (wrap-clean-test-db identity test-fn))
