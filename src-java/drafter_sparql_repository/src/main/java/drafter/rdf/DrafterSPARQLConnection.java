@@ -10,8 +10,13 @@ import org.eclipse.rdf4j.http.client.SPARQLProtocolSession;
 
 public class DrafterSPARQLConnection extends SPARQLConnection {
 
+
+    public DrafterSPARQLConnection(SPARQLRepository repository, SPARQLProtocolSession sparqlSession, boolean quadMode) {
+        super(repository, sparqlSession, quadMode);
+    }
+    
     public DrafterSPARQLConnection(SPARQLRepository repository, SPARQLProtocolSession sparqlSession) {
-        super(repository, sparqlSession);
+        super(repository, sparqlSession, false);
     }
 
     @Override public BooleanQuery prepareBooleanQuery(QueryLanguage ql, String query, String base) throws RepositoryException, MalformedQueryException {
