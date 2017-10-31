@@ -38,9 +38,10 @@
       Update :update
       nil))
 
-(defn validate-query [query-str]
+(defn validate-query
   "Validates a query by parsing it using ARQ. If the query is invalid
   a QueryParseException is thrown."
+  [query-str]
   (sparql-string->arq-query query-str)
   query-str)
 
