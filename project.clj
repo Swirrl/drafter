@@ -34,6 +34,8 @@
                  [org.clojure/math.combinatorics "0.1.4"]
                  
                  [cognician/dogstatsd-clj "0.1.2"]
+
+                 [commons-codec "1.11"]
                  
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.4.0"] ;; for validating our Swagger/JSON schemas
@@ -57,7 +59,9 @@
 
                  [com.sun.mail/javax.mail "1.6.0"]
                  ;;[com.taoensso/tower "2.0.2"]
-                 [grafter "0.10.2-SNAPSHOT"] ;; might not be necessary.
+
+                 [grafter "0.10.2-SNAPSHOT"]
+
                  [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
