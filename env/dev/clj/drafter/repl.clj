@@ -1,6 +1,7 @@
 (ns drafter.repl
   (:require [drafter.main :refer [start-system! stop-system!]]
-            [eftest.runner :as eftest]))
+            [eftest.runner :as eftest]
+            [clojure.java.io :as io]))
 
 (defn run-tests []
   (eftest/run-tests (eftest/find-tests "test") {:multithread? false}))
