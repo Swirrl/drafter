@@ -1,12 +1,18 @@
 (ns drafter.stasher
   (:require [clojure.core.cache :as cache]
             [clojure.java.io :as io]
-            [grafter.rdf.repository :as repo]
+            [grafter.rdf4j.repository :as repo]
             [grafter.rdf :as rdf]
             [grafter.rdf4j.io :as gio]
             [grafter.rdf.protocols :as pr]
             [me.raynes.fs :as fs]
-            [grafter.rdf.formats :as fmt])
+            [grafter.rdf.formats :as fmt]
+            [drafter.stasher.filecache :as fc]
+            [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as g]
+            [clojure.test :as t]
+            [drafter.test-common :as tc]
+            [integrant.core :as ig])
   (:import org.eclipse.rdf4j.repository.event.RepositoryConnectionListener
            java.net.URI
            (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository DrafterSparqlSession)
@@ -15,9 +21,12 @@
            (org.eclipse.rdf4j.repository.event.base NotifyingRepositoryWrapper NotifyingRepositoryConnectionWrapper)
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate)
            (org.eclipse.rdf4j.rio RDFHandler)
+           (org.eclipse.rdf4j.query.impl BackgroundGraphResult)
            java.io.File
            (java.security DigestOutputStream DigestInputStream MessageDigest)
            org.apache.commons.codec.binary.Hex))
+
+(t/use-fixtures :once (tc/wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.rdf4j/remote :drafter/write-scheduler]))
 
 (defn stashing->boolean-query
   "Construct a boolean query that checks the stash before evaluating"
@@ -29,68 +38,41 @@
 
 (def dataset nil) ;; TODO
 
-(defn md5-sum [cache-key]
-  (let [cache-key-str (pr-str cache-key)
-        md (MessageDigest/getInstance "MD5")]
-    (Hex/encodeHexString (.digest md (.getBytes cache-key-str)))))
-
-(defn cache-key->file-path [cache-key fmt-extension]
-  (let [hex-str (md5-sum cache-key)
-        sub-dirs (->> hex-str
-                      (partition 2)
-                      (take 2)
-                      (mapv (partial apply str)))]
-    (apply io/file (conj sub-dirs (str hex-str "." (name fmt-extension))))))
-
-(defn- move-tmpfile-to-cache [cache cache-key temp-file]
-  (let [cache-key-fname (cache-key->file-path cache-key)
-        new-path (io/file (:dir cache) cache-key-fname)]
-    (io/make-parents cache-key-fname)
-    (fs/rename temp-file new-path)))
-
-(defn stash-rdf-handler
-  ""
-  [cache cache-key inner-rdf-handler]
-  (let [rdf-format (:backend-rdf-format cache :brf)
-        temp-file (.createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir cache) "tmp"))
-        make-stream (fmt/select-output-coercer rdf-format)
-        stream (make-stream :buffer 8192)
-        cache-file-writer (gio/rdf-writer stream :format rdf-format)]
-
-    (reify RDFHandler
-      (startRDF [this]
-        (.startRDF cache-file-writer)
-        (.startRDF inner-rdf-handler))
-      (endRDF [this]
-        (.endRDF cache-file-writer)
-        (.endRDF inner-rdf-handler)
-        (.close stream)
-        (move-tmpfile-to-cache cache temp-file))
-      (handleStatement [this statement]
-        (.handleStatement cache-file-writer statement)
-        (.handleStatement inner-rdf-handler statement))
-      (handleComment [this comment]
-        (.handleComment cache-file-writer comment)
-        (.handleComment inner-rdf-handler comment))
-      (handleNamespace [this prefix-str uri-str]
-        (.handleNamespace cache-file-writer prefix-str uri-str)
-        (.handleNamespace inner-rdf-handler prefix-str uri-str)))))
-
-
 (defn stashing->construct-query
   "Construct a tuple query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str]
-  (proxy [SPARQLGraphQuery] [httpclient query-str base-uri-str]
-    (evaluate
-      ([]
-       ;; TODO will need to support these also...
-       (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
-                        (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this)))
-      ([rdf-handler]
-       (if (cache/has? cache query-str)
-         (cache/lookup cache query-str)
-         (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
-                          (.getIncludeInferred this) (.getMaxExecutionTime this) rdf-handler (.getBindingsArray this)))))))
+  (let [cache (fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
+    (proxy [SPARQLGraphQuery] [httpclient query-str base-uri-str]
+      (evaluate
+        ;; sync results
+        ([]
+         (if (cache/has? cache query-str) ;; TODO build composite keys
+           (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
+                 cached-file-parser (-> cache
+                                        fc/backend-rdf-format
+                                        fmt/->rdf-format
+                                        fmt/format->parser)
+                 charset nil ;; as we're using binary file format for cache ;; TODO move this into file-cache object / config
+                 bg-graph-result (BackgroundGraphResult. cached-file-parser cached-file-stream charset base-uri-str)]
+
+             ;; execute parse thread on a thread pool.
+             (.submit clojure.lang.Agent/soloExecutor bg-graph-result) 
+             bg-graph-result)
+
+           
+           ;; else send query (and stream it to file)
+
+           ;; TODO return background-result-parser, wrapped in my tee'ing handler that writes to cache
+           (let []
+             (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
+                              (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this)))))
+
+        ;; async results
+        ([rdf-handler]
+         (if (cache/has? cache query-str) ;; TODO build composite keys
+           (cache/lookup cache query-str)
+           (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
+                            (.getIncludeInferred this) (.getMaxExecutionTime this) rdf-handler (.getBindingsArray this))))))))
 
 (defn stasher-update-query
   "Construct a stasher update query to expire cache etc"
@@ -110,53 +92,27 @@
     #_(prepareBooleanQuery [_ query-str base-uri-str])
     ))
 
-
 (defn stasher-repo
-  ([query-endpoint update-endpoint]
-   (stasher-repo query-endpoint update-endpoint (file-cache-factory todo-replace-me-with-init-base-cache)))
-  ([query-endpoint update-endpoint cache]
-   (stasher-repo query-endpoint update-endpoint (file-cache-factory todo-replace-me-with-init-base-cache) {}))
-  ([query-endpoint update-endpoint cache opts]
-   (let [deltas (boolean (:report-deltas opts true))]
-     (repo/notifying-repo (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
-                            (getConnection []
-                              (stasher-connection this (.createHTTPClient this) cache opts))) deltas))))
+  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache] :as opts}]
+  (let [query-endpoint (str sparql-query-endpoint)
+        update-endpoint (str sparql-update-endpoint)
+        cache (or cache (fc/file-cache-factory {}))
+        deltas (boolean (or report-deltas true))]
+    (repo/notifying-repo (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
+                           (getConnection []
+                             (stasher-connection this (.createHTTPClient this) cache opts))) deltas)))
 
+(defmethod ig/init-key :drafter.stasher/repo [_ opts]
+  (stasher-repo opts))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Specs
 
+(s/def ::sparql-query-endpoint uri?)
+(s/def ::sparql-update-endpoint uri?)
 
-
-(let [at (atom [])
-      listener (reify RepositoryConnectionListener ;; todo can extract for in memory change detection
-                 (add [this conn sub pred obj graphs]
-                   #_(println "adding")
-                   (swap! at conj [:add sub pred obj graphs]))
-                 (begin [this conn]
-                   #_(println "begin")
-                   (swap! at conj [:begin]))
-                 (close [this conn]
-                   #_(println "close")
-                   (swap! at conj [:close]))
-                 (commit [this conn]
-                   #_(println "commit")
-                   (swap! at conj [:commit]))
-                 (execute [this conn ql updt-str base-uri operation]
-                   #_(println "execute")
-                   (swap! at conj [:execute ql updt-str base-uri operation])))
-      
-      repo (doto (stasher-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
-             (.addRepositoryConnectionListener listener))]
-
-  (with-open [conn (repo/->connection repo)]
-    (rdf/add conn [(pr/->Quad (URI. "http://foo") (URI. "http://foo") (URI. "http://foo") (URI. "http://foo"))])
-    (println (doall (repo/query conn "construct { ?s ?p ?o } where { ?s ?p ?o } limit 10")))
-
-    (pr/update! conn "drop all"))
-  
-  @at)
-
-
-
+(defmethod ig/pre-init-spec :drafter.stasher/repo [_]
+  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint]))
 
 
 
@@ -174,7 +130,7 @@
             rdf-handler)
            ([^RDFHandler rdf-handler-b ^RDFHandler rdf-handler-a]
             (reify RDFHandler
-              (startRDF [this]
+              #_(startRDF [this]
                 (.startRDF rdf-handler-a)
                 (.startRDF rdf-handler-b))
               (endRDF [this]
@@ -191,13 +147,6 @@
                 (.handleNamespace rdf-handler-b prefix-str uri-str))))
            ([rdf-handler-b rdf-handler-a & rdf-handlers]
             (reduce comp-rdf-handler (list* rdf-handler-b rdf-handler-a rdf-handlers)))))
-
-
-
-
-
-
-
 
 
 ;; We need to delegate the whole interface just to override the one

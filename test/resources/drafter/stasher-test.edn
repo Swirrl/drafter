@@ -1,0 +1,8 @@
+{
+ :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/filecache
+                        :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
+                        :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT }
+
+ :drafter.stasher/filecache {:persist-on-shutdown? false ;; delete cache on shutdown (for tests)
+                             }
+ }

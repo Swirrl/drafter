@@ -28,7 +28,7 @@
   :dependencies [[buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-core "1.4.0"]
 
-                 [org.clojure/clojure "1.9.0-beta2"]
+                 [org.clojure/clojure "1.9.0-beta4"]
                  [org.clojure/spec.alpha "0.1.134"]
                  
                  [org.clojure/math.combinatorics "0.1.4"]
@@ -60,7 +60,7 @@
                  [com.sun.mail/javax.mail "1.6.0"]
                  ;;[com.taoensso/tower "2.0.2"]
 
-                 [grafter "0.10.2-SNAPSHOT"]
+                 [grafter "0.11.0-alpha1-SNAPSHOT"]
 
                  [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]

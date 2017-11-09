@@ -23,7 +23,8 @@
             [ring.server.standalone :as ring-server]
             [schema.core :as s]
             [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.jobs :refer [create-job]])
+            [swirrl-server.async.jobs :refer [create-job]]
+            [integrant.core :as ig])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -97,13 +98,18 @@
             (stop-writer! *test-writer*)
             (reg/register-parser-factories! configured-factories)))))))
 
-(defn wrap-system-setup [system start-keys]
+(declare ^:dynamic *test-system*)
+
+(defn wrap-system-setup
+  "Start an integrant test system"
+  [system start-keys]
   (fn [test-fn]
     (let [started-system (main/start-system! system start-keys)
           backend (:drafter.backend.rdf4j/remote started-system)
           writer (:drafter/write-scheduler started-system)
           configured-factories (reg/registered-parser-factories)]
-      (binding [*test-backend* backend
+      (binding [*test-system* started-system
+                *test-backend* backend
                 *test-writer* writer]
         (do
           ;; Some tests need to load and parse trig file data
@@ -111,8 +117,10 @@
           (try
             (test-fn)
             (finally
-              (stop-backend backend)
-              (stop-writer! *test-writer*)
+              (ig/halt! started-system)
+              ;; TODO change to halt system
+              ;;(stop-backend backend)
+              ;;(stop-writer! *test-writer*)
               (reg/register-parser-factories! configured-factories))))))))
 
 (defn wrap-clean-test-db
