@@ -47,8 +47,8 @@
  
  ;; Also use aero readers
  :drafter.backend.rdf4j/remote {:batched-write-size #or [#env "batched-write-size" 75000] ;; TODO  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
-                                 :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
-                                 :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT }
+                                :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
+                                :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT }
 
  :drafter.user/mongo {:mongo-host #env DRAFTER_MONGO_HOST
                       :mongo-port #port #env DRAFTER_MONGO_PORT

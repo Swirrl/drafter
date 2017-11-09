@@ -21,3 +21,4 @@ drafter.iml
 /profiles.clj
 /test-drafter-db/
 /test-users.edn
+sparql-cache
