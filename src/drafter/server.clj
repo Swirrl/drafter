@@ -28,5 +28,5 @@
     server))
 
 (defmethod ig/halt-key! :drafter.server/http [k server]
-  (.stop server))
+  (when server (.stop server)))
 
