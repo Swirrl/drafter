@@ -5,8 +5,7 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
             [grafter.rdf.formats :refer [rdf-trig]]
-            [grafter.rdf.io :refer [default-prefixes]]
-            [grafter.rdf4j.io :refer [rdf-writer]]
+            [grafter.rdf4j.io :refer [default-prefixes rdf-writer]]
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]
             [grafter.url :as url]))

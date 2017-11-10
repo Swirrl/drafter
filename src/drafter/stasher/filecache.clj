@@ -12,8 +12,13 @@
             [grafter.rdf4j.formats :as fmt]
             [integrant.core :as ig]
             [clojure.spec.alpha :as s]
-            [me.raynes.fs :as fs])
+            [me.raynes.fs :as fs]
+            [clojure.tools.logging :as log])
   (:import (java.security DigestOutputStream DigestInputStream MessageDigest)
+           (org.eclipse.rdf4j.query QueryLanguage GraphQueryResult TupleQueryResult)
+           (org.eclipse.rdf4j.query.impl BackgroundGraphResult)
+           (org.eclipse.rdf4j.rio RDFWriter)
+           java.io.File
            org.apache.commons.codec.binary.Hex
            org.eclipse.rdf4j.rio.RDFHandler))
 
@@ -32,7 +37,9 @@
   disk.  This function takes a cache-key (map) and converts it into an
   MD5 sum."
   [cache-key]
-  (let [cache-key-str (pr-str (sort cache-key))
+  (let [cache-key-str (pr-str (if (coll? cache-key)
+                                (sort cache-key)
+                                cache-key))
         md (MessageDigest/getInstance "MD5")]
     (Hex/encodeHexString (.digest md (.getBytes cache-key-str)))))
 
@@ -117,19 +124,49 @@
   (s/and (s/keys :opt-un [::base-cache ::dir ::persist-on-shutdown? ::charset ::backend-rdf-format])))
 
 (defn file-cache-factory [opts]
-  (let [{:keys [dir base-cache] :as opts} {:base-cache (or (:base-cache opts) {})
-                                           :dir (or (:dir opts) default-cache-dir)}]
+  (let [{:keys [dir base-cache] :as opts} (merge opts {:base-cache (or (:base-cache opts) {})
+                                                       :dir (or (:dir opts) default-cache-dir)})]
     (fs/mkdir dir)
     (FileCache. base-cache opts)))
 
 (defmethod ig/init-key :drafter.stasher/filecache [_ opts]
   (file-cache-factory opts))
 
-(defmethod ig/halt-key! :drafter.stasher/filecache [_ cache]
+(defmethod ig/halt-key! :drafter.stasher/filecache [k cache]
   (when-not (:persist-on-shutdown? (.opts cache) true)
+    (log/info "Clearing" k)
     (fs/delete-dir (:dir (.opts cache)))))
 
-(defn stash-rdf-handler
+(defn stashing-graph-query-result [cache cache-key ^BackgroundGraphResult bg-graph-result]
+  (println "stashing")
+  (let [rdf-format (backend-rdf-format cache)
+        temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir cache) "tmp"))
+        make-stream (fmt/select-output-coercer rdf-format)
+        stream (make-stream temp-file :buffer 8192)]
+
+    (let [prefixes (.getNamespaces bg-graph-result)
+          cache-file-writer ^RDFWriter (gio/rdf-writer stream :format rdf-format :prefixes prefixes)]
+      
+      (.startRDF cache-file-writer)
+
+      (reify GraphQueryResult
+        (getNamespaces [this]
+          prefixes)
+        (close [this]
+          (println "close")
+          (.endRDF cache-file-writer)
+          (move-file-to-cache! cache cache-key temp-file)
+          (.close bg-graph-result))
+        (hasNext [this]
+          (.hasNext bg-graph-result))
+        (next [this]
+          (let [quad (.next bg-graph-result)]
+            (.handleStatement cache-file-writer quad)
+            quad))
+        (remove [this]
+          (.remove bg-graph-result))))))
+
+#_(defn stash-rdf-handler
   ""
   [cache cache-key inner-rdf-handler]
   (let [rdf-format (backend-rdf-format cache)
