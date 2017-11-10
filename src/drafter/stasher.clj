@@ -12,12 +12,13 @@
             [clojure.spec.gen.alpha :as g]
             [clojure.test :as t]
             [drafter.test-common :as tc]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [clojure.tools.logging :as log])
   (:import org.eclipse.rdf4j.repository.event.RepositoryConnectionListener
            java.net.URI
            (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository DrafterSparqlSession)
            (org.eclipse.rdf4j.repository Repository RepositoryConnection)
-           (org.eclipse.rdf4j.query QueryLanguage)
+           (org.eclipse.rdf4j.query QueryLanguage GraphQueryResult TupleQueryResult)
            (org.eclipse.rdf4j.repository.event.base NotifyingRepositoryWrapper NotifyingRepositoryConnectionWrapper)
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate)
            (org.eclipse.rdf4j.rio RDFHandler)
@@ -47,25 +48,29 @@
         ;; sync results
         ([]
          (if (cache/has? cache query-str) ;; TODO build composite keys
-           (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
-                 cached-file-parser (-> cache
-                                        fc/backend-rdf-format
-                                        fmt/->rdf-format
-                                        fmt/format->parser)
-                 charset nil ;; as we're using binary file format for cache ;; TODO move this into file-cache object / config
-                 bg-graph-result (BackgroundGraphResult. cached-file-parser cached-file-stream charset base-uri-str)]
+           (do
+             (println "cache hit")
+             (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
+                   cached-file-parser (-> cache
+                                          fc/backend-rdf-format
+                                          fmt/->rdf-format
+                                          fmt/format->parser)
+                   charset nil ;; as we're using binary file format for cache ;; TODO move this into file-cache object / config
+                   bg-graph-result (BackgroundGraphResult. cached-file-parser cached-file-stream charset base-uri-str)]
 
-             ;; execute parse thread on a thread pool.
-             (.submit clojure.lang.Agent/soloExecutor bg-graph-result) 
-             bg-graph-result)
+               ;; execute parse thread on a thread pool.
+               (.submit clojure.lang.Agent/soloExecutor bg-graph-result) 
+               bg-graph-result))
 
            
            ;; else send query (and stream it to file)
 
            ;; TODO return background-result-parser, wrapped in my tee'ing handler that writes to cache
-           (let []
-             (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this)))))
+           (do
+             (println "cache miss")
+             (let [bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
+                                                     (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this))]
+                (fc/stashing-graph-query-result cache query-str bg-graph-result)))))
 
         ;; async results
         ([rdf-handler]

@@ -81,23 +81,6 @@
     (throw (RuntimeException. (str "Lock not released after " period-ms "ms")))))
 
 (declare ^:dynamic *test-writer*)
-
-#_(defn wrap-db-setup [test-fn]
-  (let [config (get-configuration) ;; TODO fix up to not use this get-configuration
-        backend (get-backend config)
-        configured-factories (reg/registered-parser-factories)]
-    (binding [*test-backend* backend
-              *test-writer* (start-writer!)]
-      (do
-        ; Some tests need to load and parse trig file data
-        (reg/register-parser-factory! :construct TriGParserFactory)
-        (try
-          (test-fn)
-          (finally
-            (stop-backend backend)
-            (stop-writer! *test-writer*)
-            (reg/register-parser-factories! configured-factories)))))))
-
 (declare ^:dynamic *test-system*)
 
 (defn wrap-system-setup
