@@ -49,7 +49,7 @@
         ([]
          (if (cache/has? cache query-str) ;; TODO build composite keys
            (do
-             (println "cache hit")
+             ;; cache hit!
              (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
                    cached-file-parser (-> cache
                                           fc/backend-rdf-format
@@ -63,21 +63,32 @@
                bg-graph-result))
 
            
-           ;; else send query (and stream it to file)
-
-           ;; TODO return background-result-parser, wrapped in my tee'ing handler that writes to cache
-           (do
-             (println "cache miss")
-             (let [bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
-                                                     (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this))]
-                (fc/stashing-graph-query-result cache query-str bg-graph-result)))))
+           ;; else send query (and simultaneously stream it to file that gets put in the cache)
+           (let [bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
+                                                  (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this))]
+             (fc/stashing-graph-query-result cache query-str bg-graph-result))))
 
         ;; async results
         ([rdf-handler]
          (if (cache/has? cache query-str) ;; TODO build composite keys
-           (cache/lookup cache query-str)
-           (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
-                            (.getIncludeInferred this) (.getMaxExecutionTime this) rdf-handler (.getBindingsArray this))))))))
+           (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
+                 cached-file-parser (-> cache
+                                        fc/backend-rdf-format
+                                        fmt/->rdf-format
+                                        fmt/format->parser)
+                 ;; as we're using binary file format for
+                 ;; cache TODO move this into file-cache
+                 ;; object / config
+                 charset nil]
+
+             (doto cached-file-parser
+               (.setRDFHandler rdf-handler)
+               (.parse cached-file-stream base-uri-str)))
+           
+           ;; else
+           (let [stashing-rdf-handler (fc/stashing-rdf-handler cache query-str rdf-handler)]
+             (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
+                              (.getIncludeInferred this) (.getMaxExecutionTime this) stashing-rdf-handler (.getBindingsArray this)))))))))
 
 (defn stasher-update-query
   "Construct a stasher update query to expire cache etc"
@@ -118,8 +129,6 @@
 
 (defmethod ig/pre-init-spec :drafter.stasher/repo [_]
   (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint]))
-
-
 
 
 
