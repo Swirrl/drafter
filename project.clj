@@ -28,7 +28,7 @@
   :dependencies [[buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-core "1.4.0"]
 
-                 [org.clojure/clojure "1.9.0-beta4"]
+                 [org.clojure/clojure "1.9.0-RC1"]
                  [org.clojure/spec.alpha "0.1.134"]
                  
                  [org.clojure/math.combinatorics "0.1.4"]
