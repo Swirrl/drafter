@@ -5,9 +5,8 @@
             [drafter.rdf.sparql :as sparql]
             [drafter.test-common :as tc]
             [grafter.rdf :as rdf]
-            [grafter.rdf
-             [formats :refer [rdf-ntriples]]
-             [protocols :as pr]]
+            [grafter.rdf4j.formats :as fmt]
+            [grafter.rdf.protocols :as pr]
             [schema.test :refer [validate-schemas]]
             [clojure.java.io :as io])
   (:import [java.util.concurrent CountDownLatch TimeUnit]
@@ -51,7 +50,7 @@
         (is (= "application/n-triples" (headers "Content-Type")))
 
         (let [triple-reader (java.io.InputStreamReader. body)
-              triples (get-spo-set (rdf/statements triple-reader :format rdf-ntriples))
+              triples (get-spo-set (rdf/statements triple-reader :format :nt))
               expected-triples (get-spo-set (tc/test-triples (URI. "http://test.com/data/one")))]
 
           (is (= expected-triples triples)))))))

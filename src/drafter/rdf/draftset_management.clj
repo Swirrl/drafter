@@ -16,11 +16,12 @@
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-statement]]
             [grafter.rdf :refer [context] :as rdf]
-            [grafter.rdf
-             [io :refer [IStatement->sesame-statement rdf-serializer]]
-             [protocols :refer [map->Quad map->Triple]]
+            [grafter.rdf4j
+             [io :refer [quad->backend-quad rdf-writer]]
              [repository :as repo]
              [formats :as formats]]
+            [grafter.rdf [protocols :refer [map->Quad map->Triple]]
+]
             [grafter.vocabularies.rdf :refer :all]
             [swirrl-server.async.jobs :as ajobs]
             [grafter.url :as url])
@@ -596,7 +597,7 @@
       {:graph-uri graph-uri :triples (map map->Triple quads)}
       (let [sw (StringWriter.)
             msg (format "All statements must have an explicit target graph")]
-        (rdf/add (rdf-serializer sw :format formats/rdf-nquads) (take 5 quads))
+        (rdf/add (rdf-writer sw :format :nq) (take 5 quads))
         (throw (IllegalArgumentException.
                 (str "All statements must have an explicit target graph. The following statements have no graph:\n" sw)))))))
 
@@ -675,7 +676,7 @@
               (with-open [conn (repo/->connection (->sesame-repo backend))]
                 (mgmt/set-modifed-at-on-draft-graph! conn draft-graph-uri job-started-at)
                 (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
-                      sesame-statements (map IStatement->sesame-statement rewritten-statements)
+                      sesame-statements (map quad->backend-quad rewritten-statements)
                       graph-array (into-array Resource (map util/uri->sesame-uri (vals live->draft)))]
                   (.remove conn sesame-statements graph-array)))
               (let [next-job (ajobs/create-child-job

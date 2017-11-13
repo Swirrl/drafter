@@ -6,7 +6,7 @@
             [grafter.rdf4j.io :as gio]
             [grafter.rdf.protocols :as pr]
             [me.raynes.fs :as fs]
-            [grafter.rdf.formats :as fmt]
+            [grafter.rdf4j.formats :as fmt]
             [drafter.stasher.filecache :as fc]
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as g]

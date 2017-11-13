@@ -10,13 +10,14 @@
              [user-test :refer [test-editor test-publisher]]]
             [drafter.rdf.sesame :as ses]
             [drafter.user.memory-repository :as memory-repo]
-            [grafter.rdf
+            [grafter.rdf4j
              [formats :as formats]
              [repository :as repo]]
             [ring.util.response :refer [response]])
   (:import clojure.lang.ExceptionInfo
            java.io.File
-           (java.io ByteArrayInputStream)))
+           (java.io ByteArrayInputStream)
+           org.eclipse.rdf4j.rio.RDFFormat))
 
 (defn- add-auth-header [m username password]
   (let [credentials (util/str->base64 (str username ":" password))]
@@ -170,11 +171,11 @@
   (testing "With valid RDF content type"
     (let [handler (fn [req] (:params req))
           wrapped-handler (require-rdf-content-type handler)
-          content-type (.getDefaultMIMEType formats/rdf-nquads)
+          content-type (.getDefaultMIMEType (formats/->rdf-format :nq))
           request {:uri "/test" :headers {"content-type" content-type}}
           {:keys [rdf-format rdf-content-type]} (wrapped-handler request)]
       (is (= content-type rdf-content-type))
-      (is (= formats/rdf-nquads rdf-format))))
+      (is (= RDFFormat/NQUADS rdf-format))))
 
   (testing "With unknown RDF content type"
     (let [handler (require-rdf-content-type ok-handler)
@@ -278,7 +279,7 @@
         (tc/assert-is-method-not-allowed-response resp)))))
 
 (deftest sparql-prepare-query-handler-test
-  (let [r (repo/repo)
+  (let [r (repo/sail-repo)
         handler (sparql-prepare-query-handler r identity)]
     (testing "Valid query"
       (let [req (handler {:sparql {:query-string "SELECT * WHERE { ?s ?p ?o }"}})]
@@ -289,7 +290,7 @@
         (tc/assert-is-bad-request-response response)))))
 
 (defn- prepare-query-str [query-str]
-  (ses/prepare-query (repo/repo) query-str))
+  (ses/prepare-query (repo/sail-repo) query-str))
 
 (deftest sparql-negotiation-handler-test
   (testing "Valid request"
@@ -330,7 +331,7 @@
 
 (deftest negotiate-sparql-results-content-type-with-test
   (testing "Negotiation succeeds"
-    (let [format formats/rdf-ntriples
+    (let [format RDFFormat/NTRIPLES
           response-content-type "text/plain"
           handler (negotiate-sparql-results-content-type-with (constantly [format response-content-type]) ":(" identity)
           request {:headers {"accept" "text/plain"}}

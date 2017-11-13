@@ -4,7 +4,7 @@
   (:require [clojure.string :as str]
             [drafter.backend.protocols :as drpr]
             [clojure.tools.logging :as log]
-            [grafter.rdf.repository.registry :as reg]
+            [grafter.rdf4j.repository.registry :as reg]
             [integrant.core :as ig]
             [clojure.spec.alpha :as s])
   (:import drafter.rdf.DrafterSPARQLRepository

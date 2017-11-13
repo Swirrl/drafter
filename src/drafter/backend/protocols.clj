@@ -1,5 +1,5 @@
 (ns drafter.backend.protocols
-  (:require [grafter.rdf.repository :as repo])
+  (:require [grafter.rdf4j.repository :as repo])
   (:import java.net.URI))
 
 (defprotocol SparqlExecutor

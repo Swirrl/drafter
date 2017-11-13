@@ -10,8 +10,9 @@
              [sparql :refer [update!]]]
             [drafter.util :as util]
             [grafter.rdf :as rdf]
+            [grafter.rdf4j
+             [repository :as repo]]
             [grafter.rdf
-             [repository :as repo]
              [templater :refer [add-properties graph]]]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]

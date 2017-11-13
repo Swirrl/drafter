@@ -15,7 +15,7 @@
             [drafter.rdf.draft-management.jobs :refer [failed-job-result? make-job]]
 
             [grafter.rdf.protocols :as pr]
-            [grafter.rdf.repository :as repo]
+            [grafter.rdf4j.repository :as repo]
             [integrant.core :as ig])
   (:require [compojure.core :refer [ANY GET POST PUT DELETE context routes]]
             [ring.util.response :refer [redirect-after-post not-found response]]
