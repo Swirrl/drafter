@@ -15,8 +15,8 @@
             [drafter.write-scheduler
              :refer
              [global-writes-lock queue-job! start-writer! stop-writer!]]
-            [grafter.rdf.repository :as repo]
-            [grafter.rdf.repository.registry :as reg]
+            [grafter.rdf4j.repository :as repo]
+            [grafter.rdf4j.repository.registry :as reg]
             [grafter.rdf.templater :refer [triplify]]
             [grafter.url :as url]
             [ring.middleware.params :refer [wrap-params]]
@@ -100,6 +100,8 @@
           (try
             (test-fn)
             (finally
+              (when *test-backend* (sparql/update! *test-backend* "DROP ALL ;"))
+              (when (:drafter.stasher/repo *test-system*) (sparql/update! (:drafter.stasher/repo *test-system*) "DROP ALL ;"))
               (ig/halt! started-system)
               ;; TODO change to halt system
               ;;(stop-backend backend)

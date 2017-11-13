@@ -10,8 +10,8 @@
              :refer
              [append-data-batch! create-draft-graph!]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
+            [grafter.rdf4j.repository :as repo]
             [grafter.rdf
-             [repository :as repo]
              [templater :refer [triplify]]]
             [schema.test :refer [validate-schemas]]
             [clojure.java.io :as io])

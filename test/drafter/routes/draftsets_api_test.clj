@@ -21,11 +21,12 @@
             [drafter.user
              [memory-repository :as memrepo]]
             [grafter.rdf :refer [add context statements]]
+            [grafter.rdf4j
+             [io :refer [rdf-writer]]
+             [formats :as formats]]
             [grafter.rdf
-             [formats :as formats]
-             [io :refer [rdf-serializer]]
-             [protocols :refer [->Quad ->Triple map->Triple]]
-             [repository :as repo]]
+             [protocols :refer [->Quad ->Triple map->Triple]]]
+            [grafter.rdf4j.repository :as repo]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
@@ -48,7 +49,7 @@
 
 (defn- statements->input-stream [statements format]
   (let [bos (ByteArrayOutputStream.)
-        serialiser (rdf-serializer bos :format format)]
+        serialiser (rdf-writer bos :format format)]
     (add serialiser statements)
     (ByteArrayInputStream. (.toByteArray bos))))
 
@@ -77,15 +78,15 @@
 
 (defn- statements->append-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)]
-    (append-to-draftset-request user draftset-location input-stream (.getDefaultMIMEType format))))
+    (append-to-draftset-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
 
 (defn- append-quads-to-draftset-through-api [user draftset-location quads]
-  (let [request (statements->append-request user draftset-location quads formats/rdf-nquads)
+  (let [request (statements->append-request user draftset-location quads :nq)
         response (route request)]
     (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
 
 (defn- statements->append-triples-request [user draftset-location triples graph]
-  (-> (statements->append-request user draftset-location triples formats/rdf-ntriples)
+  (-> (statements->append-request user draftset-location triples :nt)
       (assoc-in [:params :graph] (str graph))))
 
 (defn- append-triples-to-draftset-through-api [user draftset-location triples graph]
@@ -150,16 +151,16 @@
      :params {:union-with-live union-with-live?-str}}))
 
 (defn- get-draftset-quads-request [draftset-location user format union-with-live?-str]
-  (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType format) union-with-live?-str))
+  (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType (formats/->rdf-format format)) union-with-live?-str))
 
 (defn- get-draftset-quads-through-api
   ([draftset-location user]
    (get-draftset-quads-through-api draftset-location user "false"))
   ([draftset-location user union-with-live?]
-   (let [data-request (get-draftset-quads-request draftset-location user formats/rdf-nquads union-with-live?)
+   (let [data-request (get-draftset-quads-request draftset-location user :nq union-with-live?)
          data-response (route data-request)]
      (tc/assert-is-ok-response data-response)
-     (concrete-statements (:body data-response) formats/rdf-nquads))))
+     (concrete-statements (:body data-response) :nq))))
 
 (defn- get-draftset-graph-triples-through-api [draftset-location user graph union-with-live?-str]
   (let [data-request {:uri            (str draftset-location "/data")
@@ -169,7 +170,7 @@
         data-request (tc/with-identity user data-request)
         {:keys [body] :as data-response} (route data-request)]
     (tc/assert-is-ok-response data-response)
-    (concrete-statements body formats/rdf-ntriples)))
+    (concrete-statements body :nt)))
 
 (defn- create-publish-request [draftset-location user]
   (tc/with-identity user {:uri (str draftset-location "/publish") :request-method :post}))
@@ -220,10 +221,10 @@
 
 (defn- create-delete-statements-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)]
-    (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType format))))
+    (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
 
 (defn- create-delete-triples-request [user draftset-location statements graph]
-  (assoc-in (create-delete-statements-request user draftset-location statements formats/rdf-ntriples)
+  (assoc-in (create-delete-statements-request user draftset-location statements :nt)
             [:params :graph] (str graph)))
 
 (defn- delete-triples-through-api [user draftset-location triples graph]
@@ -232,12 +233,12 @@
       await-delete-statements-response))
 
 (defn- delete-quads-through-api [user draftset-location quads]
-  (let [delete-request (create-delete-statements-request user draftset-location quads formats/rdf-nquads)
+  (let [delete-request (create-delete-statements-request user draftset-location quads :nq)
         delete-response (route delete-request)]
     (await-delete-statements-response delete-response)))
 
 (defn- delete-draftset-triples-through-api [user draftset-location triples graph]
-  (let [delete-request (create-delete-statements-request user draftset-location triples formats/rdf-ntriples)
+  (let [delete-request (create-delete-statements-request user draftset-location triples :nt)
         delete-request (assoc-in delete-request [:params :graph] (str graph))
         delete-response (route delete-request)]
     (await-delete-statements-response delete-response)))
@@ -620,7 +621,7 @@
 (deftest append-quads-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
         quads (statements "test/resources/test-draftset.trig")
-        append-request (statements->append-request test-publisher draftset-location quads formats/rdf-nquads)
+        append-request (statements->append-request test-publisher draftset-location quads :nq)
         append-response (route append-request)]
     (tc/assert-is-forbidden-response append-response)))
 
@@ -685,7 +686,7 @@
 (deftest delete-quads-with-malformed-body
   (let [draftset-location (create-draftset-through-api test-editor)
         body (tc/string->input-stream "NOT NQUADS")
-        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType formats/rdf-nquads))
+        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :nq)))
         delete-response (route delete-request)
         job-result (tc/await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))
@@ -750,15 +751,15 @@
         draftset-quads (statements "test/resources/test-draftset.trig")]
     (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
 
-    (with-open [input-stream (statements->input-stream (take 2 draftset-quads) formats/rdf-ntriples)]
-      (let [delete-request (create-delete-quads-request test-editor draftset-location input-stream (.getDefaultMIMEType formats/rdf-ntriples))
+    (with-open [input-stream (statements->input-stream (take 2 draftset-quads) :nt)]
+      (let [delete-request (create-delete-quads-request test-editor draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format :nt)))
             delete-response (route delete-request)]
         (tc/assert-is-unprocessable-response delete-response)))))
 
 (deftest delete-triples-with-malformed-body
   (let [draftset-location (create-draftset-through-api test-editor)
         body (tc/string->input-stream "NOT TURTLE")
-        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType formats/rdf-turtle))
+        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :ttl)))
         delete-request (assoc-in delete-request [:params :graph] "http://test-graph")
         delete-response (route delete-request)
         job-result (tc/await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
@@ -1005,7 +1006,7 @@
     (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
           query-request (create-query-request test-editor draftset-location query "application/n-triples")
           query-response (route query-request)
-          response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format grafter.rdf.formats/rdf-ntriples)) )
+          response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format :nt)) )
           expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
       (tc/assert-is-ok-response query-response)
 
@@ -1172,7 +1173,7 @@
 
 (deftest get-draftset-data-for-unowned-draftset
   (let [draftset-location (create-draftset-through-api test-editor)
-        get-data-request (get-draftset-quads-request draftset-location test-publisher formats/rdf-nquads "false")
+        get-data-request (get-draftset-quads-request draftset-location test-publisher :nq "false")
         response (route get-data-request)]
     (tc/assert-is-forbidden-response response)))
 

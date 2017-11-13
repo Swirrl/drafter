@@ -11,9 +11,8 @@
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
             [drafter.draftset :refer [->DraftsetId]]
-            [grafter.rdf
-             [repository :as repo]
-             [templater :refer [triplify]]]
+            [grafter.rdf4j.repository :as repo]
+            [grafter.rdf.templater :refer [triplify]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
             [grafter.url :as url]
@@ -308,7 +307,7 @@
                 (live-graphs *test-backend* :online false))))))
 
 (deftest build-draft-map-test
-  (let [db (repo/repo)]
+  (let [db (repo/sail-repo)]
     (testing "graph-map associates live graphs with their drafts"
       (create-managed-graph! db (URI. "http://frogs.com/"))
       (create-managed-graph! db (URI. "http://dogs.com/"))
@@ -321,12 +320,12 @@
                gm))))))
 
 (deftest upsert-single-object-insert-test
-  (let [db (repo/repo)]
+  (let [db (repo/sail-repo)]
     (upsert-single-object! db "http://foo/" "http://bar/" "baz")
     (is (sparql/eager-query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
 (deftest upsert-single-object-update-test
-  (let [db (repo/repo)
+  (let [db (repo/sail-repo)
         subject (URI. "http://example.com/subject")
         predicate (URI. "http://example.com/predicate")]
     (sparql/add db (triplify [subject [predicate "initial"]]))
@@ -434,7 +433,7 @@
        (test/test-triples (URI. "http://test-subject"))))
 
 (deftest copy-graph-test
-  (let [repo (repo/repo)]
+  (let [repo (repo/sail-repo)]
     (sparql/add repo (test-quads (URI. "http://test-graph/1")))
 
     (copy-graph repo "http://test-graph/1" "http://test-graph/2")

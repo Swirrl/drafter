@@ -14,8 +14,7 @@
              [draftset-management :refer :all]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
             [grafter.rdf :refer [context statements triple=]]
-            [grafter.rdf
-             [protocols :refer [->Quad ->Triple]]]
+            [grafter.rdf.protocols :refer [->Quad ->Triple]]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.util :as util]
             [grafter.url :as url])

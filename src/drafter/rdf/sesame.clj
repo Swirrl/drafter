@@ -4,7 +4,7 @@
             [drafter.rdf.draft-management.jobs :as jobs]
             [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
             [grafter.rdf :refer [statements]]
-            [grafter.rdf.repository :as repo])
+            [grafter.rdf4j.repository :as repo])
   (:import [org.eclipse.rdf4j.query BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler Update]
            org.eclipse.rdf4j.query.resultio.QueryResultIO
            org.eclipse.rdf4j.repository.Repository

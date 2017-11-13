@@ -6,9 +6,9 @@
             [drafter.rdf.rewriting
              [query-rewriting :refer [rewrite-sparql-string]]
              [result-rewriting :refer [rewrite-query-results]]]
+            [grafter.rdf4j.repository :as repo]
             [grafter.rdf
-             [protocols :as proto]
-             [repository :as repo]]
+             [protocols :as proto]]
             [schema.core :as s])
   (:import org.eclipse.rdf4j.model.URI
            org.eclipse.rdf4j.repository.Repository))
