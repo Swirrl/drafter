@@ -10,8 +10,6 @@
             [drafter.stasher.filecache :as fc]
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as g]
-            [clojure.test :as t]
-            [drafter.test-common :as tc]
             [integrant.core :as ig]
             [clojure.tools.logging :as log])
   (:import org.eclipse.rdf4j.repository.event.RepositoryConnectionListener
@@ -27,7 +25,6 @@
            (java.security DigestOutputStream DigestInputStream MessageDigest)
            org.apache.commons.codec.binary.Hex))
 
-(t/use-fixtures :once (tc/wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.rdf4j/remote :drafter/write-scheduler]))
 
 (defn stashing->boolean-query
   "Construct a boolean query that checks the stash before evaluating"
