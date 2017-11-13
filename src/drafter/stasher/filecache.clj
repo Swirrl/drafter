@@ -138,7 +138,6 @@
     (fs/delete-dir (:dir (.opts cache)))))
 
 (defn stashing-graph-query-result [cache cache-key ^BackgroundGraphResult bg-graph-result]
-  (println "stashing")
   (let [rdf-format (backend-rdf-format cache)
         temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir cache) "tmp"))
         make-stream (fmt/select-output-coercer rdf-format)
@@ -166,13 +165,13 @@
         (remove [this]
           (.remove bg-graph-result))))))
 
-#_(defn stash-rdf-handler
+(defn stashing-rdf-handler
   ""
   [cache cache-key inner-rdf-handler]
   (let [rdf-format (backend-rdf-format cache)
-        temp-file (.createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir cache) "tmp"))
+        temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir cache) "tmp"))
         make-stream (fmt/select-output-coercer rdf-format)
-        stream (make-stream :buffer 8192)
+        stream (make-stream temp-file :buffer 8192)
         cache-file-writer (gio/rdf-writer stream :format rdf-format)]
 
     (reify RDFHandler
@@ -183,7 +182,7 @@
         (.endRDF cache-file-writer)
         (.endRDF inner-rdf-handler)
         (.close stream)
-        (move-file-to-cache! cache temp-file))
+        (move-file-to-cache! cache cache-key temp-file))
       (handleStatement [this statement]
         (.handleStatement cache-file-writer statement)
         (.handleStatement inner-rdf-handler statement))
