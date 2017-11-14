@@ -1,4 +1,4 @@
-(ns drafter.rdf.draft-management.jobs
+(ns drafter.rdf.draftset-management.job-util
   (:require [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
             [clojure.string :as str]
@@ -32,8 +32,9 @@
 
 (def batched-write-size 75000)
 
-(defn- record-job-stats! [job suffix]
+(defn- record-job-stats!
   "Log a job completion to datadog"
+  [job suffix]
   (datadog/increment! (util/statsd-name "drafter.job." (:priority job) suffix) 1))
 
 (defn job-failed!

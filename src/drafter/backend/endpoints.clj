@@ -1,16 +1,13 @@
 (ns drafter.backend.endpoints
   (:require [drafter.backend.protocols :as backend :refer [->sesame-repo]]
-            [drafter.rdf
-             [draft-management :as mgmt]
-             [sesame :refer [apply-restriction prepare-query]]]
-            [drafter.rdf.rewriting
-             [query-rewriting :refer [rewrite-sparql-string]]
-             [result-rewriting :refer [rewrite-query-results]]]
+            [drafter.rdf.draft-management :as mgmt]
+            [drafter.rdf.draftset-management.operations :as dsmgmt]
+            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
+            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results]]
+            [drafter.rdf.sesame :refer [apply-restriction prepare-query]]
+            [grafter.rdf.protocols :as proto]
             [grafter.rdf4j.repository :as repo]
-            [grafter.rdf
-             [protocols :as proto]]
-            [schema.core :as s]
-            [drafter.rdf.draft-management :as mgmt])
+            [schema.core :as s])
   (:import org.eclipse.rdf4j.model.URI
            org.eclipse.rdf4j.repository.Repository))
 
@@ -96,3 +93,9 @@
   "Creates a backend restricted to the live graphs."
   [backend]
   (create-restricted backend (partial mgmt/live-graphs backend)))
+
+(defn draftset-endpoint
+  "Build a SPARQL queryable repo representing the draftset"
+  [{:keys [backend draftset-ref union-with-live?]}]
+  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
+    (->RewritingSesameSparqlExecutor backend graph-mapping union-with-live?)))

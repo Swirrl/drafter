@@ -1,7 +1,7 @@
 (ns drafter.rdf.sesame
   (:require [clojure.tools.logging :as log]
             [drafter.backend.protocols :refer [->sesame-repo]]
-            [drafter.rdf.draft-management.jobs :as jobs]
+            [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
             [grafter.rdf :refer [statements]]
             [grafter.rdf4j.repository :as repo])

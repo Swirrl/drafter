@@ -1,39 +1,35 @@
 (ns drafter.routes.draftsets-api-test
-  (:require [clojure
-             [set :as set]
-             [test :refer :all]]
-            [clojure.java.io :as io]
-            [drafter
-             [middleware :as middleware]
-             [swagger :as swagger]
-             [test-common :as tc]
-             [timeouts :as timeouts]
-             [user :as user]
-             [user-test :refer [test-editor test-manager test-password test-publisher]]
-             [util :as util]]
-            [drafter.rdf
-             [sparql :as sparql]]
-            [drafter.rdf.draft-management.jobs :as jobs]
+  (:require [clojure.java.io :as io]
+            [clojure.set :as set]
+            [clojure.test :refer :all]
+            [drafter.middleware :as middleware]
             [drafter.rdf.drafter-ontology
              :refer
              [drafter:DraftGraph drafter:modifiedAt]]
+            [drafter.rdf.draftset-management.job-util :as jobs]
+            [drafter.rdf.sparql :as sparql]
             [drafter.routes.draftsets-api :refer :all]
-            [drafter.user
-             [memory-repository :as memrepo]]
+            [drafter.swagger :as swagger]
+            [drafter.test-common :as tc]
+            [drafter.timeouts :as timeouts]
+            [drafter.user :as user]
+            [drafter.user-test
+             :refer
+             [test-editor test-manager test-password test-publisher]]
+            [drafter.user.memory-repository :as memrepo]
+            [drafter.util :as util]
             [grafter.rdf :refer [add context statements]]
-            [grafter.rdf4j
-             [io :refer [rdf-writer]]
-             [formats :as formats]]
-            [grafter.rdf
-             [protocols :refer [->Quad ->Triple map->Triple]]]
+            [grafter.rdf.protocols :refer [->Quad ->Triple map->Triple]]
+            [grafter.rdf4j.formats :as formats]
+            [grafter.rdf4j.io :refer [rdf-writer]]
             [grafter.rdf4j.repository :as repo]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
+           java.net.URI
            java.util.Date
            org.eclipse.rdf4j.query.QueryResultHandler
-           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser
-           (java.net URI)))
+           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
 
 (def ^:private ^:dynamic *route*)
 (def ^:private ^:dynamic *user-repo*)

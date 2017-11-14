@@ -1,12 +1,11 @@
 (ns drafter.responses
   (:require [clojure.string :refer [upper-case]]
             [clojure.tools.logging :as log]
-            [drafter.rdf.draft-management.jobs :refer [failed-job-result?]]
+            [drafter.rdf.draftset-management.job-util :refer [failed-job-result?]]
             [drafter.write-scheduler :refer [exec-sync-job! queue-job!]]
-            [swirrl-server
-             [errors :refer [encode-error]]
-             [responses :as r]]
-            [swirrl-server.async.status-routes :refer [submitted-job-response]]))
+            [swirrl-server.async.status-routes :refer [submitted-job-response]]
+            [swirrl-server.errors :refer [encode-error]]
+            [swirrl-server.responses :as r]))
 
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
