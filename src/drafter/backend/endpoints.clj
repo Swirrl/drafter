@@ -9,7 +9,8 @@
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf
              [protocols :as proto]]
-            [schema.core :as s])
+            [schema.core :as s]
+            [drafter.rdf.draft-management :as mgmt])
   (:import org.eclipse.rdf4j.model.URI
            org.eclipse.rdf4j.repository.Repository))
 
@@ -90,3 +91,8 @@
   proto/ISPARQLable isparqlable-delegate
   proto/ISPARQLUpdateable isparql-updateable-delegate
   repo/ToConnection to-connection-delegate)
+
+(defn live-endpoint
+  "Creates a backend restricted to the live graphs."
+  [backend]
+  (create-restricted backend (partial mgmt/live-graphs backend)))
