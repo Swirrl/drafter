@@ -60,7 +60,7 @@
         (let [response (resp/submit-async-job! (const-job :background-write :done))]
           (is (= 202 (:status response))
               "Job returns 202 (Accepted)")
-          (is (= (string? (get-in response [:body :finished-job])))
+          (is (string? (get-in response [:body :finished-job]))
               "Job executes and returns its value")))
 
       (testing "when global-writes-lock is locked"
@@ -85,7 +85,7 @@
       (let [response (resp/submit-async-job! (const-job :publish-write :done))]
         (is (= 202 (:status response))
             "Job returns 202 (Accepted)")
-        (is (= (string? (get-in response [:body :finished-job])))
+        (is (string? (get-in response [:body :finished-job]))
             "Job executes and returns its value")))
 
     (testing "when global-writes-lock is locked"
