@@ -6,6 +6,8 @@
  :drafter.stasher/filecache {:persist-on-shutdown? false ;; delete cache on shutdown (for tests)
                              }
 
- ;;:drafter/logging {:config "log-config.edn"}
+ :drafter/logging {:config "./test/resources/log-config.edn"}
 
+ 
+ 
  }
