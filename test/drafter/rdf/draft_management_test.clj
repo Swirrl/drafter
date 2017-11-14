@@ -1,24 +1,31 @@
 (ns drafter.rdf.draft-management-test
-  (:require [clojure.test :refer :all]
-            [drafter
-             [test-common :as test :refer [*test-backend* ask? import-data-to-draft! make-graph-live! wrap-clean-test-db wrap-system-setup]]
-             [user-test :refer [test-editor]]]
-            [drafter.rdf
-             [draft-management :refer :all]
-             [drafter-ontology :refer :all]
-             [draftset-management :refer [create-draftset!]]
-             [sparql :as sparql]]
-            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
-            [drafter.test-helpers.draft-management-helpers :as mgmt]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
             [drafter.draftset :refer [->DraftsetId]]
-            [grafter.rdf4j.repository :as repo]
+            [drafter.rdf.draft-management :refer :all]
+            [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.rdf.draftset-management.operations :refer [create-draftset!]]
+            [drafter.rdf.sparql :as sparql]
+            [drafter.test-common
+             :as
+             test
+             :refer
+             [*test-backend*
+              ask?
+              import-data-to-draft!
+              make-graph-live!
+              wrap-clean-test-db
+              wrap-system-setup]]
+            [drafter.test-helpers.draft-management-helpers :as mgmt]
+            [drafter.user-test :refer [test-editor]]
             [grafter.rdf.templater :refer [triplify]]
-            [grafter.vocabularies.rdf :refer :all]
-            [schema.test :refer [validate-schemas]]
+            [grafter.rdf4j.repository :as repo]
             [grafter.url :as url]
-            [clojure.java.io :as io])
-  (:import [java.util Date UUID]
-           [java.net URI]))
+            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
+            [grafter.vocabularies.rdf :refer :all]
+            [schema.test :refer [validate-schemas]])
+  (:import java.net.URI
+           [java.util Date UUID]))
 
 (use-fixtures :each validate-schemas)
 

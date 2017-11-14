@@ -1,14 +1,14 @@
 (ns drafter.main
-  (:require [integrant.core :as ig]
-            [aero.core :as aero]
-            [clojure.tools.logging :as log]
-            [drafter.common.json-encoders :as enc]
-            [drafter.rdf.draft-management.jobs :as jobs]
-            [drafter.rdf.writers :as writers]
+  (:gen-class)
+  (:require [aero.core :as aero]
+            [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
-            [clojure.edn :as edn])
-  (:gen-class))
+            [drafter.common.json-encoders :as enc]
+            [drafter.rdf.draftset-management.job-util :as jobs]
+            [drafter.rdf.writers :as writers]
+            [integrant.core :as ig]))
 
 (require 'drafter.configuration)
 
