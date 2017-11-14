@@ -152,21 +152,37 @@
         (getNamespaces [this]
           prefixes)
         (close [this]
-          (println "close")
-          (.endRDF cache-file-writer)
-          (move-file-to-cache! cache cache-key temp-file)
-          (.close bg-graph-result))
+          (try
+            (.endRDF cache-file-writer)
+            (move-file-to-cache! cache cache-key temp-file)
+            (.close bg-graph-result)
+            (catch Throwable ex
+              (.delete temp-file)
+              (throw ex))))
         (hasNext [this]
-          (.hasNext bg-graph-result))
+          (try
+            (.hasNext bg-graph-result)
+            (catch Throwable ex
+              (.delete temp-file)
+              (throw ex))))
         (next [this]
-          (let [quad (.next bg-graph-result)]
-            (.handleStatement cache-file-writer quad)
-            quad))
+          (try
+            (let [quad (.next bg-graph-result)]
+              (.handleStatement cache-file-writer quad)
+              quad)
+            (catch Throwable ex
+              (.delete temp-file)
+              (throw ex))))
         (remove [this]
-          (.remove bg-graph-result))))))
+          (try 
+            (.remove bg-graph-result)
+            (catch Throwable ex
+              (.delete temp-file)
+              (throw ex))))))))
 
 (defn stashing-rdf-handler
-  ""
+  "Wrap an RDFHandler with one that will write the stream of RDF into
+  a temp file and move the file into the cache when it's finished."
   [cache cache-key inner-rdf-handler]
   (let [rdf-format (backend-rdf-format cache)
         temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir cache) "tmp"))
@@ -176,19 +192,39 @@
 
     (reify RDFHandler
       (startRDF [this]
-        (.startRDF cache-file-writer)
-        (.startRDF inner-rdf-handler))
+        (try
+          (.startRDF cache-file-writer)
+          (.startRDF inner-rdf-handler)
+          (catch Throwable ex
+            (.delete temp-file)
+            (throw ex))))
       (endRDF [this]
-        (.endRDF cache-file-writer)
-        (.endRDF inner-rdf-handler)
-        (.close stream)
-        (move-file-to-cache! cache cache-key temp-file))
+        (try 
+          (.endRDF cache-file-writer)
+          (.endRDF inner-rdf-handler)
+          (.close stream)
+          (move-file-to-cache! cache cache-key temp-file)
+          (catch Throwable ex
+            (.delete temp-file)
+            (throw ex))))
       (handleStatement [this statement]
-        (.handleStatement cache-file-writer statement)
-        (.handleStatement inner-rdf-handler statement))
+        (try
+          (.handleStatement cache-file-writer statement)
+          (.handleStatement inner-rdf-handler statement)
+          (catch Throwable ex
+            (.delete temp-file)
+            (throw ex))))
       (handleComment [this comment]
-        (.handleComment cache-file-writer comment)
-        (.handleComment inner-rdf-handler comment))
+        (try
+          (.handleComment cache-file-writer comment)
+          (.handleComment inner-rdf-handler comment)
+          (catch Throwable ex
+            (.delete temp-file)
+            (throw ex))))
       (handleNamespace [this prefix-str uri-str]
-        (.handleNamespace cache-file-writer prefix-str uri-str)
-        (.handleNamespace inner-rdf-handler prefix-str uri-str)))))
+        (try 
+          (.handleNamespace cache-file-writer prefix-str uri-str)
+          (.handleNamespace inner-rdf-handler prefix-str uri-str)
+          (catch Throwable ex
+            (.delete temp-file)
+            (throw ex)))))))
