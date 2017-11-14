@@ -36,6 +36,25 @@
 
 (def dataset nil) ;; TODO
 
+(defn- construct-sync-cache-hit [cache query-str base-uri-str httpclient this]
+  ;; cache hit!
+  (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
+        cached-file-parser (-> cache
+                               fc/backend-rdf-format
+                               fmt/->rdf-format
+                               fmt/format->parser)
+        charset nil ;; as we're using binary file format for cache ;; TODO move this into file-cache object / config
+        bg-graph-result (BackgroundGraphResult. cached-file-parser cached-file-stream charset base-uri-str)]
+
+    ;; execute parse thread on a thread pool.
+    (.submit clojure.lang.Agent/soloExecutor bg-graph-result) 
+    bg-graph-result))
+
+(defn construct-sync-cache-miss [httpclient query-str base-uri-str this cache]
+  (let [bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
+                                         (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this))]
+    (fc/stashing-graph-query-result cache query-str bg-graph-result)))
+
 (defn stashing->construct-query
   "Construct a tuple query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str]
@@ -45,25 +64,10 @@
         ;; sync results
         ([]
          (if (cache/has? cache query-str) ;; TODO build composite keys
-           (do
-             ;; cache hit!
-             (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
-                   cached-file-parser (-> cache
-                                          fc/backend-rdf-format
-                                          fmt/->rdf-format
-                                          fmt/format->parser)
-                   charset nil ;; as we're using binary file format for cache ;; TODO move this into file-cache object / config
-                   bg-graph-result (BackgroundGraphResult. cached-file-parser cached-file-stream charset base-uri-str)]
-
-               ;; execute parse thread on a thread pool.
-               (.submit clojure.lang.Agent/soloExecutor bg-graph-result) 
-               bg-graph-result))
-
+           (construct-sync-cache-hit cache query-str base-uri-str httpclient this)
            
            ;; else send query (and simultaneously stream it to file that gets put in the cache)
-           (let [bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
-                                                  (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this))]
-             (fc/stashing-graph-query-result cache query-str bg-graph-result))))
+           (construct-sync-cache-miss httpclient query-str base-uri-str this cache)))
 
         ;; async results
         ([rdf-handler]
