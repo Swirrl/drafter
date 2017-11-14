@@ -123,12 +123,13 @@
                             (handler-fn req)))))
 
 (defn draftset-api-routes [backend user-repo authenticated draftset-query-timeout-fn]
-  (letfn [(required-live-graph-param [h] (parse-graph-param-handler true (required-live-graph-param-handler backend h)))
-          (as-draftset-owner [h]
+  (letfn [(required-live-graph-param [handler]
+            (parse-graph-param-handler true (required-live-graph-param-handler backend handler)))
+          (as-draftset-owner [handler]
             (authenticated
              (existing-draftset-handler
               backend
-              (restrict-to-draftset-owner backend h))))]
+              (restrict-to-draftset-owner backend handler))))]
     (let [version "/v1"]
       (context
        version []
