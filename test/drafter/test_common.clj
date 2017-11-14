@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
             [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.backend.rdf4j.remote :refer [get-backend]]
+            [drafter.backend.rdf4j-repo :refer [get-backend]]
             [drafter.configuration :refer [get-configuration]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.main :as main]
@@ -15,16 +15,16 @@
             [drafter.write-scheduler
              :refer
              [global-writes-lock queue-job! start-writer! stop-writer!]]
+            [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf4j.repository.registry :as reg]
-            [grafter.rdf.templater :refer [triplify]]
             [grafter.url :as url]
+            [integrant.core :as ig]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
             [schema.core :as s]
             [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.jobs :refer [create-job]]
-            [integrant.core :as ig])
+            [swirrl-server.async.jobs :refer [create-job]])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -88,7 +88,7 @@
   [system start-keys]
   (fn [test-fn]
     (let [started-system (main/start-system! system start-keys)
-          backend (:drafter.backend.rdf4j/remote started-system)
+          backend (:drafter.backend/rdf4j-repo started-system)
           writer (:drafter/write-scheduler started-system)
           configured-factories (reg/registered-parser-factories)]
       (binding [*test-system* started-system

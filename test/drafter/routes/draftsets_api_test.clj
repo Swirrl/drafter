@@ -1527,7 +1527,7 @@
               *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
       (test-function))))
 
-(use-fixtures :once (tc/wrap-system-setup (io/resource "test-system.edn") [:drafter.backend.rdf4j/remote :drafter/write-scheduler]))
+(use-fixtures :once (tc/wrap-system-setup (io/resource "test-system.edn") [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
 (use-fixtures :each setup-route)
 (use-fixtures :each (fn [tf]
                       (tc/wrap-clean-test-db #(setup-route tf))))
