@@ -1,4 +1,4 @@
-(ns drafter.backend.rdf4j.remote
+(ns drafter.backend.rdf4j-repo
   "Thin wrapper over a DrafterSparqlRepository as a configurable
   integrant component."
   (:require [clojure.string :as str]
@@ -66,14 +66,14 @@
 (s/def ::sparql-query-endpoint uri?)
 (s/def ::sparql-update-endpoint uri?)
 
-(defmethod ig/pre-init-spec :drafter.backend.rdf4j/remote [_]
+(defmethod ig/pre-init-spec :drafter.backend/rdf4j-repo [_]
   (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint]))
 
-(defmethod ig/init-key :drafter.backend.rdf4j/remote [k opts]
+(defmethod ig/init-key :drafter.backend/rdf4j-repo [k opts]
   (log/info "Initialising Backend")
   (get-backend opts))
 
 
-(defmethod ig/halt-key! :drafter.backend.rdf4j/remote [k backend]
+(defmethod ig/halt-key! :drafter.backend/rdf4j-repo [k backend]
   (log/info "Halting Backend")
   (drpr/stop-backend backend))
