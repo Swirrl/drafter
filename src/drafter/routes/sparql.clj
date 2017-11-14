@@ -1,8 +1,8 @@
 (ns drafter.routes.sparql
   (:require [compojure.core :refer [make-route]]
             [drafter.rdf
-             [endpoints :refer [live-endpoint]]
              [sparql-protocol :refer [sparql-end-point sparql-protocol-handler]]]
+            [drafter.backend.endpoints :refer [live-endpoint]]
             [integrant.core :as ig]))
 
 (def ^:private v1-prefix :v1)
