@@ -17,6 +17,9 @@
 (defmethod aero/reader 'ig/ref [_ _ value]
   (ig/ref value))
 
+(defmethod aero/reader 'resource [_ _ value]
+  (io/resource value))
+
 (defmethod ig/init-key :drafter.main/datadog [k {:keys [statsd-address tags]}]
   (println "Initialising datadog")
   (datadog/configure! statsd-address {:tags tags}))

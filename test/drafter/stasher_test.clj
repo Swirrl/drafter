@@ -2,7 +2,7 @@
   (:require [drafter.stasher :as sut]
             [grafter.rdf4j.io :as gio]
             [clojure.test :as t]
-            [drafter.test-common :as tc]
+            [drafter.test-common :as tc :refer [with-system]]
             [clojure.java.io :as io]
             [grafter.rdf :as rdf]
             [drafter.stasher.filecache :as fc]
@@ -13,7 +13,7 @@
   (:import [java.net URI]
            org.eclipse.rdf4j.rio.RDFHandler))
 
-(t/use-fixtures :each (tc/wrap-system-setup (io/resource "drafter/stasher-test/system.edn") [:drafter.stasher/repo]))
+(t/use-fixtures :each (tc/wrap-system-setup "drafter/stasher-test/system.edn" [:drafter.stasher/repo]))
 
 
 (def test-triples [(rdf/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
@@ -152,6 +152,14 @@
                 (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
                   (t/is (= (set (rdf/statements (io/resource fixture-file) :format :ttl))
                            (set cached-file-statements))))))))))))
+
+(t/deftest build-drafter-cache-key-test
+  (with-system [system "drafter/stasher-test/drafter-state-1.edn"]
+    (t/is (seq (rdf/statements (repo/->connection (:drafter.stasher/repo system)))))))
+
+
+
+
 
 
 
