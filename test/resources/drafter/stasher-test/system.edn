@@ -8,6 +8,4 @@
 
  :drafter/logging {:config "./test/resources/log-config.edn"}
 
- 
- 
  }
