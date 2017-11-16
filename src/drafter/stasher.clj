@@ -26,6 +26,10 @@
            org.apache.commons.codec.binary.Hex))
 
 
+
+(defn build-composite-cache-key [repo cache query-str context]
+  )
+
 (defn stashing->boolean-query
   "Construct a boolean query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str])
@@ -34,26 +38,54 @@
   "Construct a tuple query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str])
 
-(def dataset nil) ;; TODO
-
-(defn- construct-sync-cache-hit [cache query-str base-uri-str httpclient this]
-  ;; cache hit!
+(defn fetch-cache-parser-and-stream
+  "Given a cache and a cache key/query lookup the cached item and
+  return a stream and parser on it."
+  [cache query-str]
   (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
         cached-file-parser (-> cache
                                fc/backend-rdf-format
                                fmt/->rdf-format
-                               fmt/format->parser)
-        charset nil ;; as we're using binary file format for cache ;; TODO move this into file-cache object / config
-        bg-graph-result (BackgroundGraphResult. cached-file-parser cached-file-stream charset base-uri-str)]
+                               fmt/format->parser)]
+
+    {:cache-stream cached-file-stream
+     :cache-parser cached-file-parser
+     :charset nil ;; as we're using binary file format for cache ;; TODO move this into file-cache object / config
+     }))
+
+(defn- construct-sync-cache-hit
+  "Return a BackgroundGraphResult and trigger a thread to iterate over
+  the result stream.  BackgroundGraphResult will then marshal the
+  events through an iterator-like blocking interface.
+
+  NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
+  will already be on results where the dataset restriction was set."
+  [query-str base-uri-str cache]
+  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache query-str)       
+        bg-graph-result (BackgroundGraphResult. cache-parser cache-stream charset base-uri-str)]
 
     ;; execute parse thread on a thread pool.
     (.submit clojure.lang.Agent/soloExecutor bg-graph-result) 
     bg-graph-result))
 
-(defn construct-sync-cache-miss [httpclient query-str base-uri-str this cache]
-  (let [bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
-                                         (.getIncludeInferred this) (.getMaxExecutionTime this) (.getBindingsArray this))]
+(defn construct-sync-cache-miss [httpclient query-str base-uri-str cache graph-query]
+  (let [dataset (.getDataset graph-query)
+        bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                         query-str base-uri-str dataset
+                                         (.getIncludeInferred graph-query) (.getMaxExecutionTime graph-query)
+                                         (.getBindingsArray graph-query))]
+
+    ;; Finally wrap the RDF4j handler we get back in a stashing
+    ;; handler that will move the streamed results into the stasher
+    ;; cache when it's finished.
     (fc/stashing-graph-query-result cache query-str bg-graph-result)))
+
+(defn- construct-async-cache-hit
+  [query-str rdf-handler base-uri-str cache]
+  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache query-str)]
+             (doto cache-parser
+               (.setRDFHandler rdf-handler)
+               (.parse cache-stream base-uri-str))))
 
 (defn stashing->construct-query
   "Construct a tuple query that checks the stash before evaluating"
@@ -64,32 +96,23 @@
         ;; sync results
         ([]
          (if (cache/has? cache query-str) ;; TODO build composite keys
-           (construct-sync-cache-hit cache query-str base-uri-str httpclient this)
+           (construct-sync-cache-hit query-str base-uri-str cache)
            
            ;; else send query (and simultaneously stream it to file that gets put in the cache)
-           (construct-sync-cache-miss httpclient query-str base-uri-str this cache)))
+           (construct-sync-cache-miss httpclient query-str base-uri-str cache this)))
 
         ;; async results
         ([rdf-handler]
          (if (cache/has? cache query-str) ;; TODO build composite keys
-           (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
-                 cached-file-parser (-> cache
-                                        fc/backend-rdf-format
-                                        fmt/->rdf-format
-                                        fmt/format->parser)
-                 ;; as we're using binary file format for
-                 ;; cache TODO move this into file-cache
-                 ;; object / config
-                 charset nil]
-
-             (doto cached-file-parser
-               (.setRDFHandler rdf-handler)
-               (.parse cached-file-stream base-uri-str)))
+           (construct-async-cache-hit query-str rdf-handler base-uri-str cache)
            
            ;; else
-           (let [stashing-rdf-handler (fc/stashing-rdf-handler cache query-str rdf-handler)]
-             (.sendGraphQuery httpclient QueryLanguage/SPARQL query-str base-uri-str dataset ;; TODO handle dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this) stashing-rdf-handler (.getBindingsArray this)))))))))
+           (let [stashing-rdf-handler (fc/stashing-rdf-handler cache query-str rdf-handler)
+                 dataset (.getDataset this)]
+             (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                              query-str base-uri-str dataset
+                              (.getIncludeInferred this) (.getMaxExecutionTime this)
+                              stashing-rdf-handler (.getBindingsArray this)))))))))
 
 (defn stasher-update-query
   "Construct a stasher update query to expire cache etc"
@@ -114,7 +137,12 @@
   (let [query-endpoint (str sparql-query-endpoint)
         update-endpoint (str sparql-update-endpoint)
         cache (or cache (fc/file-cache-factory {}))
-        deltas (boolean (or report-deltas true))]
+        deltas (boolean (or report-deltas true))
+
+        ;; construct a second hidden raw-repo for performing uncached
+        ;; queries on, e.g. draftset modified times.
+        raw-repo (DrafterSPARQLRepository. query-endpoint update-endpoint)]
+
     (repo/notifying-repo (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
                            (getConnection []
                              (stasher-connection this (.createHTTPClient this) cache opts))) deltas)))
