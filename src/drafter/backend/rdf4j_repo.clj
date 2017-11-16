@@ -20,6 +20,7 @@
   [query-endpoint update-endpoint]
   (let [repo (DrafterSPARQLRepository. query-endpoint update-endpoint)]
     (.initialize repo)
+    (.enableQuadMode repo true)
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     repo))
 
