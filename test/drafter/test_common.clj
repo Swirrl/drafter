@@ -24,7 +24,8 @@
             [ring.server.standalone :as ring-server]
             [schema.core :as s]
             [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.jobs :refer [create-job]])
+            [swirrl-server.async.jobs :refer [create-job]]
+            [grafter.rdf :as rdf])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -83,12 +84,35 @@
 (declare ^:dynamic *test-writer*)
 (declare ^:dynamic *test-system*)
 
-(defn wrap-system-setup
-  "Start an integrant test system"
+(defmacro with-system
+  "Convenience macro to build a drafter system and shut it down
+  outside of with-system's lexical scope."
+  ([binding-form form]
+   `(with-system nil ~binding-form ~form))
+
+  ([start-keys [binding-form system-cfg] form]
+   `(let [~binding-form (main/start-system! (io/resource ~system-cfg) ~start-keys)
+          configured-factories# (reg/registered-parser-factories)]
+      (do
+        ;; Some tests need to load and parse trig file data drafter specific gunk..  can remove when we generalise
+        (reg/register-parser-factory! :construct TriGParserFactory)
+        (try
+          ~form
+          (finally
+            (ig/halt! *test-system*)
+
+            ;; drafter specific gunk... can remove when we generalise
+            (reg/register-parser-factories! configured-factories#)))))))
+
+
+(defn ^{:deprecated "Use with-system instead."} wrap-system-setup
+  "Start an integrant test system.  Uses dynamic bindings to support
+  old test suite style.  For new code please try the with-system maro
+  instead."
   [system start-keys]
   (fn [test-fn]
-    (let [started-system (main/start-system! system start-keys)
-          backend (:drafter.backend/rdf4j-repo started-system)
+    (let [started-system (main/start-system! (io/resource system) start-keys)
+          backend (:drafter.backend.rdf4j/remote started-system)
           writer (:drafter/write-scheduler started-system)
           configured-factories (reg/registered-parser-factories)]
       (binding [*test-system* started-system
