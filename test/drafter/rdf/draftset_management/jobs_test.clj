@@ -16,7 +16,6 @@
               make-graph-live!
               select-all-in-graph
               test-triples
-              wrap-clean-test-db
               wrap-system-setup]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
             [drafter.user :as user]
@@ -30,8 +29,8 @@
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
 
-(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
-(use-fixtures :each wrap-clean-test-db)
+(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
+;(use-fixtures :each wrap-clean-test-db)
 
 (defn apply-job! [{fun :function :as job}]
   (fun job))

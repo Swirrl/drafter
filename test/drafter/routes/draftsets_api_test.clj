@@ -31,8 +31,8 @@
            org.eclipse.rdf4j.query.QueryResultHandler
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
 
-(def ^:private ^:dynamic *route*)
-(def ^:private ^:dynamic *user-repo*)
+(def ^:private ^:dynamic *route* nil)
+(def ^:private ^:dynamic *user-repo* nil)
 
 (defn is-client-error-response?
   "Whether the given ring response map represents a client error."
@@ -1523,7 +1523,9 @@
               *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
       (test-function))))
 
-(use-fixtures :once (tc/wrap-system-setup (io/resource "test-system.edn") [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
-(use-fixtures :each setup-route)
-(use-fixtures :each (fn [tf]
-                      (tc/wrap-clean-test-db #(setup-route tf))))
+(use-fixtures :each (compose-fixtures (tc/wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler])
+                                      setup-route))
+;;(use-fixtures :each setup-route)
+
+;; (use-fixtures :each (fn [tf]
+;;                       (tc/wrap-clean-test-db #(setup-route tf))))

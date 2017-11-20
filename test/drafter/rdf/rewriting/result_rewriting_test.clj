@@ -3,7 +3,7 @@
              [set :as set]
              [test :refer :all]]
             [drafter
-             [test-common :refer [*test-backend* test-triples wrap-clean-test-db wrap-system-setup]]
+             [test-common :refer [*test-backend* test-triples wrap-system-setup]]
              [util :refer [map-values]]]
             [drafter.backend.protocols :refer [prepare-query]]
             [drafter.rdf.draft-management
@@ -189,5 +189,5 @@
 
         (is (some #{live-triple} (map (juxt :s :p :o) results)))))))
 
-(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
-(use-fixtures :each wrap-clean-test-db)
+(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
+;(use-fixtures :each wrap-clean-test-db)
