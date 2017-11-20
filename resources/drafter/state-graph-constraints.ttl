@@ -1,0 +1,54 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+################################################################################
+#
+# This file contains some stardog ICV constraints for the Drafter state graph.
+#
+# ICV's can be expressed via rdfs/owl axioms, but need to be added to
+# the database with stardog-admin icv add <this-file.ttl>.
+#
+# Optionally they can be enforced with guard mode on the database.
+#
+# See stardog docs: http://www.stardog.com/docs/#_validating_constraints
+#
+################################################################################
+
+
+drafter:inDraftSet
+    rdfs:domain drafter:DraftGraph ;
+    rdfs:range drafter:DraftSet .
+
+drafter:hasDraft
+    rdfs:domain drafter:ManagedGraph ;
+    rdfs:range drafter:DraftGraph .
+
+# You can only have one isPublic (prevent setting isPublic to both true and false)
+drafter:isPublic
+    a owl:FunctionalProperty ;
+    rdfs:domain drafter:ManagedGraph ;
+    rdfs:range xsd:boolean .
+
+drafter:hasOwner
+    rdfs:domain drafter:DraftSet .
+
+dcterms:modified
+    rdfs:range xsd:dateTime .
+
+dcterms:created
+    rdfs:range xsd:dateTime .
+
+
+# Draft graphs must be in only one DraftSet
+drafter:DraftGraph rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty drafter:inDraftSet ;
+        owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ;
+        owl:onClass drafter:DraftSet
+ ] .
+
