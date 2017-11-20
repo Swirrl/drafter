@@ -43,7 +43,9 @@
 
 (use-fixtures :each validate-schemas)
 
-(def ^:dynamic *test-backend*)
+(def ^:dynamic *test-backend* nil)
+(def ^:dynamic *test-writer* nil)
+(def ^:dynamic *test-system* nil)
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri
@@ -81,9 +83,6 @@
     (.unlock lock)
     (throw (RuntimeException. (str "Lock not released after " period-ms "ms")))))
 
-(declare ^:dynamic *test-writer*)
-(declare ^:dynamic *test-system*)
-
 (defmacro with-system
   "Convenience macro to build a drafter system and shut it down
   outside of with-system's lexical scope."
@@ -91,19 +90,31 @@
    `(with-system nil ~binding-form ~form))
 
   ([start-keys [binding-form system-cfg] form]
-   `(let [~binding-form (main/start-system! (io/resource ~system-cfg) ~start-keys)
+   `(let [system# (main/start-system! (io/resource ~system-cfg) ~start-keys)
+          ~binding-form system#
+          ;; drafter specific gunk that we can ultimately remove
           configured-factories# (reg/registered-parser-factories)]
-      (do
-        ;; Some tests need to load and parse trig file data drafter specific gunk..  can remove when we generalise
-        (reg/register-parser-factory! :construct TriGParserFactory)
-        (try
-          ~form
-          (finally
-            (ig/halt! *test-system*)
+      ;; Some tests need to load and parse trig file data drafter specific gunk..  can remove when we generalise
+      (reg/register-parser-factory! :construct TriGParserFactory)
+      (try
+        ~form
+        (finally
+          (ig/halt! system#)
 
-            ;; drafter specific gunk... can remove when we generalise
-            (reg/register-parser-factories! configured-factories#)))))))
+          ;; drafter specific gunk... can remove when we generalise
+          (reg/register-parser-factories! configured-factories#))))))
 
+(defmacro deftest-system
+  ([name binding-form & forms]
+   `(deftest ~name
+      (with-system ~binding-form
+        (do ~@forms)))))
+
+(defmacro deftest-system-with-keys
+  ([name start-keys binding-form forms]
+   `(deftest ~name
+      (with-system ~start-keys ~binding-form
+        (do ~@forms)))))
 
 (defn ^{:deprecated "Use with-system instead."} wrap-system-setup
   "Start an integrant test system.  Uses dynamic bindings to support
@@ -112,7 +123,7 @@
   [system start-keys]
   (fn [test-fn]
     (let [started-system (main/start-system! (io/resource system) start-keys)
-          backend (:drafter.backend.rdf4j/remote started-system)
+          backend (:drafter.backend/rdf4j-repo started-system)
           writer (:drafter/write-scheduler started-system)
           configured-factories (reg/registered-parser-factories)]
       (binding [*test-system* started-system
@@ -131,14 +142,6 @@
               ;;(stop-backend backend)
               ;;(stop-writer! *test-writer*)
               (reg/register-parser-factories! configured-factories))))))))
-
-(defn wrap-clean-test-db
-  ([test-fn] (wrap-clean-test-db identity test-fn))
-  ([setup-state-fn test-fn]
-   (sparql/update! *test-backend*
-            "DROP ALL ;")
-   (setup-state-fn *test-backend*)
-   (test-fn)))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated

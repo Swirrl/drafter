@@ -5,7 +5,7 @@
             [drafter
              [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft!
                                   select-all-in-graph stream->string test-triples with-identity
-                                  wrap-clean-test-db wrap-system-setup]]
+                                  wrap-system-setup]]
              [timeouts :as timeouts]
              [user-test :refer [test-editor test-system]]]
             [drafter.rdf.draft-management :refer :all]
@@ -84,5 +84,5 @@
 
         (is (not= graph-1-result (second csv-result)))))))
 
-(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
-(use-fixtures :each (partial wrap-clean-test-db))
+(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
+;(use-fixtures :each (partial wrap-clean-test-db))

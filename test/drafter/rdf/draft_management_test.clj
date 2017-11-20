@@ -14,7 +14,6 @@
               ask?
               import-data-to-draft!
               make-graph-live!
-              wrap-clean-test-db
               wrap-system-setup]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
             [drafter.user-test :refer [test-editor]]
@@ -454,5 +453,5 @@
              dest-graph)
           "Should be a copy of the source graph"))))
 
-(use-fixtures :once (wrap-system-setup (io/resource "test-system.edn") [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
-(use-fixtures :each wrap-clean-test-db)
+(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
+;(use-fixtures :each wrap-clean-test-db)

@@ -12,10 +12,17 @@
   (:import [java.util.concurrent CountDownLatch TimeUnit]
            [java.net URI]))
 
-(use-fixtures :each validate-schemas)
-
 (defn add-triple-to-db [db]
   (sparql/add db (URI. "http://foo.com/my-graph") (tc/test-triples (URI. "http://test.com/data/one"))))
+
+(def add-triple-fixture (fn [test]
+                          (add-triple-to-db tc/*test-backend*)
+                          (test)))
+
+(use-fixtures :each (join-fixtures (reverse [validate-schemas
+                                             add-triple-fixture
+                                             (tc/wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler])])))
+
 
 (deftest sparql-end-point-test
   (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
@@ -137,8 +144,3 @@
             (doseq [f blocked-connections]
               (.get f 100 TimeUnit/MILLISECONDS)))
           (throw (RuntimeException. "Server failed to accept connections within timeout")))))))
-
-(use-fixtures :once (tc/wrap-system-setup (io/resource "test-system.edn") [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
-
-(use-fixtures :each (partial tc/wrap-clean-test-db
-                             add-triple-to-db))

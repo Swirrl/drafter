@@ -21,7 +21,7 @@
   (io/resource value))
 
 (defmethod ig/init-key :drafter.main/datadog [k {:keys [statsd-address tags]}]
-  (println "Initialising datadog")
+  (log/info "Initialising datadog")
   (datadog/configure! statsd-address {:tags tags}))
 
 (def pre-initialised-keys #{:drafter/logging :drafter.main/datadog})
@@ -68,7 +68,6 @@
   ([] (start-system! (io/resource "system.edn")))
   ([sys] (start-system! sys nil))
   ([system-config start-keys]
-   (println "Starting Drafter")
    (let [system (read-system system-config)
          initialised-sys (load-system system start-keys)]
      (alter-var-root #'system (constantly initialised-sys)))))
@@ -93,6 +92,7 @@
   (.addShutdownHook (Runtime/getRuntime) (Thread. stop-system!)))
 
 (defn -main [& args]
+  (println "Starting Drafter")
   (add-shutdown-hook!)
   (if-let [config-file (first args)]
     (start-system! config-file)
