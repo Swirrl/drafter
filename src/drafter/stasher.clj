@@ -33,8 +33,9 @@
   "Convert a Dataset object into a clojure value with consistent print
   order, so it's suitable for hashing."
   [dataset]
-  {:default-graphs (sort (map str (.getDefaultGraphs dataset)))
-   :named-graphs (sort (map str (.getNamedGraphs dataset)))})
+  (when dataset
+    {:default-graphs (sort (map str (.getDefaultGraphs dataset)))
+     :named-graphs (sort (map str (.getNamedGraphs dataset)))}))
 
 
 (defn fetch-modified-state [repo {:keys [default-graphs named-graphs]}]
@@ -43,13 +44,12 @@
     (with-open [conn (repo/->connection repo)]
       (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn))))))
 
-(defn build-composite-cache-key [repo cache query-str dataset context]
+(defn build-composite-cache-key [cache query-str dataset {repo :raw-repo :as context}]
   (let [dataset (dataset->edn dataset)
-        modified-state (fetch-modified-state dataset)]
-    ;; we intentionally use a vector not a map for consistent hashing
-    [:dataset dataset
+        modified-state (fetch-modified-state repo dataset)]
+    {:dataset dataset
      :query query-str
-     :modified-times modified-state ]))
+     :modified-times modified-state} ))
 
 (defn stashing->boolean-query
   "Construct a boolean query that checks the stash before evaluating"
@@ -62,8 +62,8 @@
 (defn fetch-cache-parser-and-stream
   "Given a cache and a cache key/query lookup the cached item and
   return a stream and parser on it."
-  [cache query-str]
-  (let [cached-file-stream (io/input-stream (cache/lookup cache query-str))
+  [cache cache-key]
+  (let [cached-file-stream (io/input-stream (cache/lookup cache cache-key))
         cached-file-parser (-> cache
                                fc/backend-rdf-format
                                fmt/->rdf-format
@@ -81,8 +81,8 @@
 
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
-  [query-str base-uri-str cache]
-  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache query-str)       
+  [cache-key base-uri-str cache]
+  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)       
         bg-graph-result (BackgroundGraphResult. cache-parser cache-stream charset base-uri-str)]
 
     ;; execute parse thread on a thread pool.
@@ -110,17 +110,19 @@
 
 (defn stashing->construct-query
   "Construct a tuple query that checks the stash before evaluating"
-  [httpclient cache query-str base-uri-str]
+  [httpclient cache query-str base-uri-str {:keys [cache-key-generator] :as opts}]
   (let [cache (fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
     (proxy [SPARQLGraphQuery] [httpclient query-str base-uri-str]
       (evaluate
         ;; sync results
         ([]
-         (if (cache/has? cache query-str) ;; TODO build composite keys
-           (construct-sync-cache-hit query-str base-uri-str cache)
-           
-           ;; else send query (and simultaneously stream it to file that gets put in the cache)
-           (construct-sync-cache-miss httpclient query-str base-uri-str cache this)))
+         (let [dataset (.getDataset this)
+               cache-key (cache-key-generator cache query-str dataset opts)]
+           (if (cache/has? cache cache-key) ;; TODO build composite keys
+             (construct-sync-cache-hit cache-key base-uri-str cache)
+             
+             ;; else send query (and simultaneously stream it to file that gets put in the cache)
+             (construct-sync-cache-miss httpclient query-str base-uri-str cache this))))
 
         ;; async results
         ([rdf-handler]
@@ -148,12 +150,17 @@
     
     #_(prepareTupleQuery [_ query-str base-uri-str])
     (prepareGraphQuery [_ query-str base-uri-str]
-      (stashing->construct-query httpclient cache query-str base-uri-str))
+      (stashing->construct-query httpclient cache query-str base-uri-str opts))
     
     #_(prepareBooleanQuery [_ query-str base-uri-str])
     ))
 
 (defn stasher-repo
+  "Builds a stasher RDF repository, that implements the standard RDF4j
+  repository interface but caches query results to disk and
+  transparently returns cached results if they're in the cache.
+  
+  "
   [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache] :as opts}]
   (let [query-endpoint (str sparql-query-endpoint)
         update-endpoint (str sparql-update-endpoint)
@@ -162,11 +169,16 @@
 
         ;; construct a second hidden raw-repo for performing uncached
         ;; queries on, e.g. draftset modified times.
-        raw-repo (DrafterSPARQLRepository. query-endpoint update-endpoint)]
+        raw-repo (doto (DrafterSPARQLRepository. query-endpoint update-endpoint)
+                   (.initialize))
+        updated-opts (assoc opts
+                            :raw-repo raw-repo
+                            :cache-key-generator (or (:cache-key-generator opts)
+                                                     build-composite-cache-key))]
 
     (repo/notifying-repo (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
                            (getConnection []
-                             (stasher-connection this (.createHTTPClient this) cache opts))) deltas)))
+                             (stasher-connection this (.createHTTPClient this) cache updated-opts))) deltas)))
 
 (defmethod ig/init-key :drafter.stasher/repo [_ opts]
   (stasher-repo opts))

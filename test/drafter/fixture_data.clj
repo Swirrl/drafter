@@ -1,4 +1,4 @@
-(ns drafter.fixture-data
+ (ns drafter.fixture-data
   (:require [clojure.test :as t]
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf :as rdf]
@@ -9,10 +9,10 @@
   (:import org.eclipse.rdf4j.repository.Repository))
 
 
-(defn load-fixture! [{:keys [repo fixtures] :as opts}]
+(defn load-fixture! [{:keys [repo fixtures format] :as opts}]
   (with-open [conn (repo/->connection repo)]
     (doseq [res-path fixtures]
-      (rdf/add conn (rdf/statements res-path))))
+      (rdf/add conn (rdf/statements res-path :format format))))
   repo)
 
 (s/def ::resource #(instance? java.net.URL %)) ;; io/resource creates urls.
