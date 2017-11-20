@@ -6,8 +6,9 @@
  :drafter.stasher/filecache {}
  
  :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/filecache
-                        :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
-                        :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT }
+                        :sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query" ;#env SPARQL_QUERY_ENDPOINT
+                        :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update" ;#env SPARQL_UPDATE_ENDPOINT
+                        }
 
 
  ;; instantiate/remove test fixture
