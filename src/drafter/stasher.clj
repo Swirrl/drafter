@@ -11,7 +11,8 @@
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as g]
             [integrant.core :as ig]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [grafter.rdf4j.sparql :as sparql])
   (:import org.eclipse.rdf4j.repository.event.RepositoryConnectionListener
            java.net.URI
            (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository DrafterSparqlSession)
@@ -20,15 +21,35 @@
            (org.eclipse.rdf4j.repository.event.base NotifyingRepositoryWrapper NotifyingRepositoryConnectionWrapper)
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate)
            (org.eclipse.rdf4j.rio RDFHandler)
+           (org.eclipse.rdf4j.model.impl URIImpl)
+           (org.eclipse.rdf4j.query.impl SimpleDataset)
            (org.eclipse.rdf4j.query.impl BackgroundGraphResult)
            java.io.File
            (java.security DigestOutputStream DigestInputStream MessageDigest)
            org.apache.commons.codec.binary.Hex))
 
 
+(defn dataset->edn
+  "Convert a Dataset object into a clojure value with consistent print
+  order, so it's suitable for hashing."
+  [dataset]
+  {:default-graphs (sort (map str (.getDefaultGraphs dataset)))
+   :named-graphs (sort (map str (.getNamedGraphs dataset)))})
 
-(defn build-composite-cache-key [repo cache query-str context]
-  )
+
+(defn fetch-modified-state [repo {:keys [default-graphs named-graphs]}]
+  (let [values {:graph (set (concat default-graphs
+                                    named-graphs))}]
+    (with-open [conn (repo/->connection repo)]
+      (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn))))))
+
+(defn build-composite-cache-key [repo cache query-str dataset context]
+  (let [dataset (dataset->edn dataset)
+        modified-state (fetch-modified-state dataset)]
+    ;; we intentionally use a vector not a map for consistent hashing
+    [:dataset dataset
+     :query query-str
+     :modified-times modified-state ]))
 
 (defn stashing->boolean-query
   "Construct a boolean query that checks the stash before evaluating"

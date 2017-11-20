@@ -2,7 +2,7 @@
   (:require [drafter.stasher :as sut]
             [grafter.rdf4j.io :as gio]
             [clojure.test :as t]
-            [drafter.test-common :as tc :refer [with-system]]
+            [drafter.test-common :as tc :refer [with-system deftest-system]]
             [clojure.java.io :as io]
             [grafter.rdf :as rdf]
             [drafter.stasher.filecache :as fc]
@@ -11,7 +11,9 @@
             [grafter.rdf.protocols :as pr]
             [grafter.url :as url])
   (:import [java.net URI]
-           org.eclipse.rdf4j.rio.RDFHandler))
+           org.eclipse.rdf4j.rio.RDFHandler
+           (org.eclipse.rdf4j.model.impl URIImpl)
+           (org.eclipse.rdf4j.query.impl SimpleDataset)))
 
 (t/use-fixtures :each (tc/wrap-system-setup "drafter/stasher-test/system.edn" [:drafter.stasher/repo]))
 
@@ -153,14 +155,74 @@
                   (t/is (= (set (rdf/statements (io/resource fixture-file) :format :ttl))
                            (set cached-file-statements))))))))))))
 
-(t/deftest build-drafter-cache-key-test
-  (with-system [system "drafter/stasher-test/drafter-state-1.edn"]
-    (t/is (seq (rdf/statements (repo/->connection (:drafter.stasher/repo system)))))))
+(t/deftest dataset->edn-test
+  (let [ds-1 (doto (SimpleDataset.)
+               (.addNamedGraph (URIImpl. "http://foo"))
+               (.addNamedGraph (URIImpl. "http://bar"))
+               (.addDefaultGraph (URIImpl. "http://foo"))
+               (.addDefaultGraph (URIImpl. "http://bar")))
+        ds-2 (doto (SimpleDataset.)
+               (.addNamedGraph (URIImpl. "http://bar"))
+               (.addDefaultGraph (URIImpl. "http://bar"))
+               (.addNamedGraph (URIImpl. "http://foo"))
+               (.addDefaultGraph (URIImpl. "http://foo")))]
+
+    (t/testing "dataset->edn prints same value irrespective of assembly order"
+      (t/is (= (pr-str (sut/dataset->edn ds-1))
+               (pr-str (sut/dataset->edn ds-2)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; clojure definitions corresponding to idenfitiers/states in drafter-state-1.trig
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def live-graph-1 (URI. "http://live-and-ds1-and-ds2"))
+(def live-graph-only (URI. "http://live-only"))
+
+(def liveset #{live-graph-1 live-graph-only})
+
+(def liveset-most-recently-modified {:livemod #inst "2017-02-02T02:02:02.000-00:00"})
+
+(def ds-1-dg-1 (URI. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
+(def ds-1-dg-2 (URI. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
+
+(def ds-1 "draftset-1 is made of dg-1 dg-2" #{ds-1-dg-1 ds-1-dg-2})
+
+(def ds-1-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
+  {:draftmod #inst "2017-04-04T04:04:04.000-00:00"})
 
 
+(def ds-2-dg-1 (URI. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
 
+(def ds-2 #{ds-2-dg-1})
 
+(def ds-2-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
+  {:draftmod #inst "2017-05-05T05:05:05.000-00:00"})
 
+(deftest-system fetch-modified-state-test
+  [{:keys [drafter.stasher/repo]}  "drafter/stasher-test/drafter-state-1.edn"]  
+
+  (t/testing "Fetching draftset modified times"
+    (t/is (= ds-1-most-recently-modified
+             (sut/fetch-modified-state repo {:named-graphs ds-1 :default-graphs ds-1})))
+
+    (t/is (= ds-2-most-recently-modified
+             (sut/fetch-modified-state repo {:named-graphs ds-2 :default-graphs ds-2}))))
+
+  (t/testing "Fetching live graph modified times"
+    (t/is (= liveset-most-recently-modified
+             (sut/fetch-modified-state repo {:named-graphs liveset :default-graphs liveset}))))
+
+    (t/testing "Fetching draftsets with union-with-live set"
+    ;; Union with live is at this low level equivalent to merging the
+    ;; set of live graphs in to :named-graphs and :default-graphs.
+    (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)]
+      (t/is (= (merge liveset-most-recently-modified
+                      ds-1-most-recently-modified)
+               (sut/fetch-modified-state repo {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}))))))
+
+(deftest-system build-drafter-cache-key-test
+  [{:keys [drafter.stasher/repo]}  "drafter/stasher-test/drafter-state-1.edn"]
+  (t/is (seq (rdf/statements (repo/->connection repo)))))
 
 
 (comment
