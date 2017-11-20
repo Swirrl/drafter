@@ -9,7 +9,8 @@
             [clojure.core.cache :as cache]
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf.protocols :as pr]
-            [grafter.url :as url])
+            [grafter.url :as url]
+            [integrant.core :as ig])
   (:import [java.net URI]
            org.eclipse.rdf4j.rio.RDFHandler
            (org.eclipse.rdf4j.model.impl URIImpl)
@@ -33,13 +34,17 @@
 
 (def basic-construct-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . }")
 
-(t/deftest stasher-repo-test-return-cache-hit
-  (let [repo (:drafter.stasher/repo tc/*test-system*)
-        cache (:drafter.stasher/filecache tc/*test-system*)]
+(defmethod ig/init-key ::stub-cache-key-generator [_ opts]
+  (fn [cache query-str dataset {repo :raw-repo :as context}]
+    ;; Just use query-str as cache key for stasher-repo-test-return-cache-hit
+    query-str))
 
-    (t/testing "Querying a cached value returns the cached RDF"
-
-      (add-rdf-file-to-cache! cache basic-construct-query) ;; sneak a file in to the cache via the backdoor
+(deftest-system stasher-repo-return-cache-hit-test
+  [{:keys [drafter.stasher/repo :drafter.stasher/filecache]}  "drafter/stasher-test/stasher-repo-return-cache-hit-test.edn"]
+  (t/testing "Querying a cached value returns the cached RDF"
+    ;; sneak a file in to the cache via the backdoor - mutable file system muuhahahaha!!
+    (let [cache-key basic-construct-query]
+      (add-rdf-file-to-cache! filecache basic-construct-query)
 
       (t/is (= test-triples
                (repo/query (repo/->connection repo) basic-construct-query))))))
