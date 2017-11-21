@@ -1,4 +1,4 @@
- (ns drafter.fixture-data
+(ns drafter.fixture-data
   (:require [clojure.test :as t]
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf :as rdf]
@@ -13,7 +13,7 @@
   (with-open [conn (repo/->connection repo)]
     (doseq [res-path fixtures]
       (rdf/add conn (rdf/statements res-path :format format))))
-  repo)
+  (assoc opts :repo repo))
 
 (s/def ::resource #(instance? java.net.URL %)) ;; io/resource creates urls.
 
@@ -27,6 +27,6 @@
 (defmethod ig/init-key ::loader [_ opts]
   (load-fixture! opts))
 
-(defmethod ig/halt-key! ::loader [_ repo]
+(defmethod ig/halt-key! ::loader [_ {:keys [repo]}]
   (with-open [conn (repo/->connection repo)]
     (pr/update! conn "DROP ALL ;")))

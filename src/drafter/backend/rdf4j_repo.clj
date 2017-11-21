@@ -3,6 +3,7 @@
   integrant component."
   (:require [clojure.string :as str]
             [drafter.backend.protocols :as drpr]
+            [drafter.rdf.sesame :refer [apply-restriction prepare-query]]
             [clojure.tools.logging :as log]
             [grafter.rdf4j.repository.registry :as reg]
             [integrant.core :as ig]
@@ -12,7 +13,17 @@
            [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
            org.eclipse.rdf4j.query.resultio.text.BooleanTextParserFactory
            org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
-           org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory))
+           org.eclipse.rdf4j.rio.trig.TriGParserFactory
+           org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory
+           org.eclipse.rdf4j.repository.Repository))
+
+(extend-type Repository
+  drpr/SparqlExecutor
+  (drpr/prepare-query [this sparql-string]
+    (prepare-query this sparql-string))
+
+  drpr/ToRepository
+  (drpr/->sesame-repo [r] r))
 
 (defn create-sparql-repository
   "Creates a new SPARQL repository with the given query and update
@@ -45,7 +56,7 @@
 ;; smaller list should mean less bugs in production as we can choose
 ;; the most reliable formats and avoid those with known issues.
 ;;
-(def construct-formats-whitelist #{NTriplesParserFactory NQuadsParserFactory})
+(def construct-formats-whitelist #{NTriplesParserFactory NQuadsParserFactory TriGParserFactory})
 (def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory})
 (def ask-formats-whitelist #{SPARQLBooleanJSONParserFactory BooleanTextParserFactory SPARQLBooleanXMLParserFactory})
 

@@ -5,8 +5,8 @@
  :drafter.stasher-test/stub-cache-key-generator {}
  
  :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/filecache
-                        :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
-                        :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT
+                        :sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
+                        :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"
                         ;; This is needed for this test to override
                         ;; the default generator with something more
                         ;; simple/predictable.

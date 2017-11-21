@@ -16,7 +16,7 @@
            (org.eclipse.rdf4j.model.impl URIImpl)
            (org.eclipse.rdf4j.query.impl SimpleDataset)))
 
-(t/use-fixtures :each (tc/wrap-system-setup "drafter/stasher-test/system.edn" [:drafter.stasher/repo]))
+#_(t/use-fixtures :each (tc/wrap-system-setup "drafter/stasher-test/system.edn" [:drafter.stasher/repo]))
 
 
 (def test-triples [(rdf/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
@@ -40,52 +40,46 @@
     query-str))
 
 (deftest-system stasher-repo-return-cache-hit-test
-  [{:keys [drafter.stasher/repo :drafter.stasher/filecache]}  "drafter/stasher-test/stasher-repo-return-cache-hit-test.edn"]
+  [{:keys [drafter.stasher/repo drafter.stasher/filecache]}  "drafter/stasher-test/stasher-repo-return-cache-hit-test.edn"]
   (t/testing "Querying a cached value returns the cached RDF"
     ;; sneak a file in to the cache via the backdoor - mutable file system muuhahahaha!!
     (let [cache-key basic-construct-query]
       (add-rdf-file-to-cache! filecache basic-construct-query)
-
+      
       (t/is (= test-triples
                (repo/query (repo/->connection repo) basic-construct-query))))))
 
-(def fixture-file "drafter/stasher-test/fixture-data.ttl")
+(deftest-system stasher-repo-cache-and-serve-test
+  [{repo :drafter.stasher/repo
+    cache :drafter.stasher/filecache
+    raw-repo :drafter.backend/rdf4j-repo
+    {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
 
-(defn load-fixture! [repo fixture-resource]
-  (with-open [conn (repo/->connection repo)]
-    (rdf/add conn (rdf/statements (io/resource fixture-resource) :format :ttl))))
+  (t/testing "A cache miss returns the results and stores them in the cache"
+    (with-open [conn (repo/->connection repo)]
+      (let [uncached-results (repo/query conn basic-construct-query)
+            cached-results (repo/query conn basic-construct-query)
+            fixture-data (rdf/statements (first fixtures) :format :ttl)]
 
-(t/deftest stasher-repo-test-cache-and-serve
-  (t/testing "Pull interface to query results"
-    (let [repo (:drafter.stasher/repo tc/*test-system*) 
-          cache (:drafter.stasher/filecache tc/*test-system*)]
+        (t/testing "The cached, uncached and fixture data are all the same"
+          (t/is (= (set uncached-results)
+                   (set cached-results)
+                   (set fixture-data))))
 
-      (load-fixture! repo fixture-file)
-                 
-      (t/testing "A cache miss returns the results and stores them in the cache"
-        (with-open [conn (repo/->connection repo)]
-          (let [uncached-results (repo/query conn basic-construct-query)
-                cached-results (repo/query conn basic-construct-query)
-                fixture-data (rdf/statements (io/resource fixture-file) :format :ttl)]
+        (t/testing "Results for query are stored on disk"
+          ;; evidence that we didn't just run another uncached query
+          (let [cache-key (sut/generate-drafter-cache-key cache basic-construct-query nil {:raw-repo raw-repo})
+                cached-file (fc/cache-key->cache-path cache cache-key)
+                cached-file-statements (-> cached-file
+                                           io/input-stream
+                                           (rdf/statements :format (fc/backend-rdf-format cache)))]
 
-            (t/testing "The cached, uncached and fixture data are all the same"
-              (t/is (= (set uncached-results)
-                       (set cached-results)
-                       (set fixture-data))))
+            (t/testing "Prove the side-effect of creating the file in the cache happened"
+              (t/is (.exists cached-file)))
 
-            (t/testing "Results for query are stored on disk"
-              ;; evidence that we didn't just run another uncached query
-              (let [cached-file (fc/cache-key->cache-path cache basic-construct-query)
-                    cached-file-statements (-> cached-file
-                                               io/input-stream
-                                               (rdf/statements :format (fc/backend-rdf-format cache)))]
-
-                (t/testing "Prove the side-effect of creating the file in the cache happened"
-                  (t/is (.exists cached-file)))
-
-                (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
-                  (t/is (= (set cached-file-statements)
-                           (set fixture-data))))))))))))
+            (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
+              (t/is (= (set cached-file-statements)
+                       (set fixture-data))))))))))
 
 (defn recording-rdf-handler
   "Convenience function that returns a 2-tuple rdf-handler that will
@@ -109,56 +103,54 @@
 
     [recorded-events rdf-handler]))
 
-
-(t/deftest stasher-repo-test-cache-and-serve-push
+(deftest-system stasher-repo-test-cache-and-serve-push
+  [{repo :drafter.stasher/repo
+    cache :drafter.stasher/filecache
+    raw-repo :drafter.backend/rdf4j-repo
+    {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
   (t/testing "Push interface (RDFHandler) to query results"
-    (let [repo (:drafter.stasher/repo tc/*test-system*) 
-          cache (:drafter.stasher/filecache tc/*test-system*)]
+    (t/testing "A cache miss returns the results and stores them in the cache"
+      (with-open [conn (repo/->connection repo)]
+        (let [preped-query (.prepareGraphQuery conn basic-construct-query)
+              [uncached-recorded-events uncached-rdf-event-handler] (recording-rdf-handler)
+              [cached-recorded-events cached-rdf-event-handler] (recording-rdf-handler)]
 
-      (load-fixture! repo fixture-file)
-      
-      (t/testing "A cache miss returns the results and stores them in the cache"
-        (with-open [conn (repo/->connection repo)]
-          (let [preped-query (.prepareGraphQuery conn basic-construct-query)
-                [uncached-recorded-events uncached-rdf-event-handler] (recording-rdf-handler)
-                [cached-recorded-events cached-rdf-event-handler] (recording-rdf-handler)]
+          (.evaluate preped-query uncached-rdf-event-handler) ;; run uncached query 
+          (.evaluate preped-query cached-rdf-event-handler)   ;; run again (the cached query)
 
-            (.evaluate preped-query uncached-rdf-event-handler) ;; run uncached query 
-            (.evaluate preped-query cached-rdf-event-handler)   ;; run again (the cached query)
+          (t/is (= true
+                   (:started @uncached-recorded-events)
+                   (:started @cached-recorded-events))
+                "startRDF called")
 
-            (t/is (= true
-                     (:started @uncached-recorded-events)
-                     (:started @cached-recorded-events))
-                  "startRDF called")
+          (t/is (= true
+                   (:ended @uncached-recorded-events)
+                   (:ended @cached-recorded-events))
+                "endRDF called")
 
-            (t/is (= true
-                     (:ended @uncached-recorded-events)
-                     (:ended @cached-recorded-events))
-                  "endRDF called")
+          (t/testing "The cached, uncached queries return the same data"
+            (t/is (= (set (:statements @uncached-recorded-events))
+                     (set (:statements @cached-recorded-events)))))
+          
+          (t/testing "Results for query are stored on disk"
+            ;; evidence that we didn't just run another uncached query
 
-            (t/testing "The cached, uncached queries return the same data"
-              (t/is (= (set (:statements @uncached-recorded-events))
-                       (set (:statements @cached-recorded-events)))))
-            
-            (t/testing "Results for query are stored on disk"
-              ;; evidence that we didn't just run another uncached query
+            (let [cached-file (fc/cache-key->cache-path cache basic-construct-query)
+                  cached-file-statements (-> cached-file
+                                             io/input-stream
+                                             (rdf/statements :format (fc/backend-rdf-format cache)))]
 
-              (let [cached-file (fc/cache-key->cache-path cache basic-construct-query)
-                    cached-file-statements (-> cached-file
-                                               io/input-stream
-                                               (rdf/statements :format (fc/backend-rdf-format cache)))]
-
-                (t/testing "Prove the side-effect of creating the file in the cache happened"
-                  (t/is (.exists cached-file)))
-                
-                (t/testing "The cached, uncached and fixture data are all the same"
-                  (t/is (= (set (:statements @uncached-recorded-events))
-                           (set (:statements @cached-recorded-events))
-                           (set cached-file-statements))))
-                
-                (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
-                  (t/is (= (set (rdf/statements (io/resource fixture-file) :format :ttl))
-                           (set cached-file-statements))))))))))))
+              (t/testing "Prove the side-effect of creating the file in the cache happened"
+                (t/is (.exists cached-file)))
+              
+              (t/testing "The cached, uncached and fixture data are all the same"
+                (t/is (= (set (:statements @uncached-recorded-events))
+                         (set (:statements @cached-recorded-events))
+                         (set cached-file-statements))))
+              
+              (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
+                (t/is (= (set (rdf/statements (first fixtures) :format :ttl))
+                         (set cached-file-statements)))))))))))
 
 (t/deftest dataset->edn-test
   (let [ds-1 (doto (SimpleDataset.)
@@ -227,6 +219,7 @@
 
 (deftest-system build-drafter-cache-key-test
   [{:keys [drafter.stasher/repo]}  "drafter/stasher-test/drafter-state-1.edn"]
+  ;; TODO
   (t/is (seq (rdf/statements (repo/->connection repo)))))
 
 
