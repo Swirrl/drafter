@@ -44,11 +44,12 @@
     (with-open [conn (repo/->connection repo)]
       (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn))))))
 
-(defn build-composite-cache-key [cache query-str dataset {repo :raw-repo :as context}]
+(defn generate-drafter-cache-key [cache query-str dataset {repo :raw-repo :as context}]
   (let [dataset (dataset->edn dataset)
         modified-state (fetch-modified-state repo dataset)]
+
     {:dataset dataset
-     :query query-str
+     :query-str query-str
      :modified-times modified-state} ))
 
 (defn stashing->boolean-query
@@ -89,7 +90,7 @@
     (.submit clojure.lang.Agent/soloExecutor bg-graph-result) 
     bg-graph-result))
 
-(defn construct-sync-cache-miss [httpclient query-str base-uri-str cache graph-query]
+(defn construct-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache graph-query]
   (let [dataset (.getDataset graph-query)
         bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL
                                          query-str base-uri-str dataset
@@ -99,7 +100,7 @@
     ;; Finally wrap the RDF4j handler we get back in a stashing
     ;; handler that will move the streamed results into the stasher
     ;; cache when it's finished.
-    (fc/stashing-graph-query-result cache query-str bg-graph-result)))
+    (fc/stashing-graph-query-result cache cache-key bg-graph-result)))
 
 (defn- construct-async-cache-hit
   [query-str rdf-handler base-uri-str cache]
@@ -122,7 +123,7 @@
              (construct-sync-cache-hit cache-key base-uri-str cache)
              
              ;; else send query (and simultaneously stream it to file that gets put in the cache)
-             (construct-sync-cache-miss httpclient query-str base-uri-str cache this))))
+             (construct-sync-cache-miss httpclient cache-key base-uri-str cache this))))
 
         ;; async results
         ([rdf-handler]
@@ -174,7 +175,7 @@
         updated-opts (assoc opts
                             :raw-repo raw-repo
                             :cache-key-generator (or (:cache-key-generator opts)
-                                                     build-composite-cache-key))]
+                                                     generate-drafter-cache-key))]
 
     (repo/notifying-repo (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
                            (getConnection []

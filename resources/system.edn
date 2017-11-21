@@ -51,6 +51,7 @@
                               :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
                               :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT }
 
+
  :drafter.user/mongo {:mongo-host #env DRAFTER_MONGO_HOST
                       :mongo-port #port #env DRAFTER_MONGO_PORT
                       :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]

@@ -11,14 +11,6 @@
   (:import org.eclipse.rdf4j.model.URI
            org.eclipse.rdf4j.repository.Repository))
 
-(extend-type Repository
-  backend/SparqlExecutor
-  (backend/prepare-query [this sparql-string]
-    (prepare-query this sparql-string))
-
-  backend/ToRepository
-  (->sesame-repo [r] r))
-
 (def ^:private itriple-readable-delegate
   {:to-statements (fn [this options]
                     (proto/to-statements (->sesame-repo this) options))})
