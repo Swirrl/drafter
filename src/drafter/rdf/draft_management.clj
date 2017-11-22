@@ -340,10 +340,11 @@
         (zipmap live-graphs
                 (map :draft results))))))
 
-(defn live-graphs [db & {:keys [online] :or {online true}}]
+(defn live-graphs
   "Get all live graph names.  Takes an optional boolean keyword
   argument of :online to allow querying for all online/offline live
   graphs."
+  [db & {:keys [online] :or {online true}}]
   (let [q (str "SELECT ?live WHERE {"
                (with-state-graph
                  "?live a <" drafter:ManagedGraph "> ;"
