@@ -23,7 +23,7 @@
                                        conflict-detected-response]]
             
             [swirrl-server.async.jobs :refer [job-succeeded!]]
-            [drafter.backend.endpoints :as ep]
+            [drafter.backend.draftset :as ep]
             [drafter.rdf.draftset-management.operations :as dsops]
             [drafter.rdf.draftset-management.jobs :as dsjobs]
             [drafter.backend.protocols :refer :all]
