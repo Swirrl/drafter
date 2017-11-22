@@ -37,8 +37,8 @@
      :named-graphs (sort (map str (.getNamedGraphs dataset)))}))
 
 (defn fetch-modified-state [repo dataset]
-  (let [values {:graph (set (concat (.getDefaultGraphs dataset)
-                                    (.getNamedGraphs dataset)))}]
+  (let [values {:graph (set (when dataset (concat (.getDefaultGraphs dataset)
+                                                  (.getNamedGraphs dataset))))}]
     (with-open [conn (repo/->connection repo)]
       (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn))))))
 
