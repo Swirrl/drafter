@@ -1,7 +1,7 @@
 (ns drafter.rdf.draftset-management.jobs
   (:require [clojure.string :as string]
             [drafter.backend.protocols :refer :all]
-            [drafter.backend.endpoints :as ep]
+            [drafter.backend.draftset :as ep]
             [drafter.rdf.draftset-management.operations :as ops]
             [drafter.draftset :as ds]
             [drafter.rdf.draft-management :as mgmt :refer [to-quads with-state-graph]]

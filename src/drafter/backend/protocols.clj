@@ -1,5 +1,6 @@
 (ns drafter.backend.protocols
-  (:require [grafter.rdf4j.repository :as repo])
+  (:require [grafter.rdf4j.repository :as repo]
+            [grafter.rdf.protocols :as proto])
   (:import java.net.URI))
 
 (defprotocol SparqlExecutor
@@ -17,6 +18,44 @@
   given backend."
   [backend]
   (repo/->connection (->sesame-repo backend)))
+
+
+(def itriple-readable-delegate
+  {:to-statements (fn [this options]
+                    (proto/to-statements (->sesame-repo this) options))})
+
+(def isparqlable-delegate
+  {:query-dataset (fn [this sparql-string model]
+                    (proto/query-dataset (->sesame-repo this) sparql-string model))})
+
+(def isparql-updateable-delegate
+  {:update! (fn [this sparql-string]
+              (proto/update! (->sesame-repo this) sparql-string))})
+
+(def to-connection-delegate
+  {:->connection (fn [this]
+                   (repo/->connection (->sesame-repo this)))})
+
+(defn- add-delegate
+  ([this triples] (proto/add (->sesame-repo this) triples))
+  ([this graph triples] (proto/add (->sesame-repo this) graph triples))
+  ([this graph format triple-stream] (proto/add (->sesame-repo this) graph format triple-stream))
+  ([this graph base-uri format triple-stream] (proto/add (->sesame-repo this) graph base-uri format triple-stream)))
+
+(defn- add-statement-delegate
+  ([this statement] (proto/add-statement (->sesame-repo this) statement))
+  ([this graph statement] (proto/add-statement (->sesame-repo this) graph statement)))
+
+(def itriple-writeable-delegate
+  {:add add-delegate
+   :add-statement add-statement-delegate})
+
+
+
+
+
+
+
 
 
 (comment
