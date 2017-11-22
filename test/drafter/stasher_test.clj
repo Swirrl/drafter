@@ -54,7 +54,7 @@
 
   (t/testing "A cache miss returns the results and stores them in the cache"
     (with-open [conn (repo/->connection repo)]
-      (let [uncached-results (repo/query conn basic-construct-query)
+      (let [uncached-results (repo/query conn basic-construct-query) ;; first query should be uncached
             cached-results (repo/query conn basic-construct-query)
             fixture-data (rdf/statements (first fixtures) :format :ttl)]
 
