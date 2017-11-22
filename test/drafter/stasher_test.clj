@@ -16,9 +16,6 @@
            (org.eclipse.rdf4j.model.impl URIImpl)
            (org.eclipse.rdf4j.query.impl SimpleDataset)))
 
-#_(t/use-fixtures :each (tc/wrap-system-setup "drafter/stasher-test/system.edn" [:drafter.stasher/repo]))
-
-
 (def test-triples [(rdf/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
 
 (defn- add-rdf-file-to-cache!
@@ -172,15 +169,13 @@
 ;; clojure definitions corresponding to idenfitiers/states in drafter-state-1.trig
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def live-graph-1 (URI. "http://live-and-ds1-and-ds2"))
-(def live-graph-only (URI. "http://live-only"))
-
-(def liveset #{live-graph-1 live-graph-only})
+(def live-graph-1 (URIImpl. "http://live-and-ds1-and-ds2"))
+(def live-graph-only (URIImpl. "http://live-only"))
 
 (def liveset-most-recently-modified {:livemod #inst "2017-02-02T02:02:02.000-00:00"})
 
-(def ds-1-dg-1 (URI. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
-(def ds-1-dg-2 (URI. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
+(def ds-1-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
+(def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
 
 (def ds-1 "draftset-1 is made of dg-1 dg-2" #{ds-1-dg-1 ds-1-dg-2})
 
@@ -188,39 +183,65 @@
   {:draftmod #inst "2017-04-04T04:04:04.000-00:00"})
 
 
-(def ds-2-dg-1 (URI. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
+(def ds-2-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
 
 (def ds-2 #{ds-2-dg-1})
 
 (def ds-2-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
   {:draftmod #inst "2017-05-05T05:05:05.000-00:00"})
 
+(defn edn->dataset [{:keys [default-graphs named-graphs]}]
+  (reduce (fn [dataset graph]
+            (doto dataset
+              (.addDefaultGraph (if (instance? org.eclipse.rdf4j.model.URI graph)
+                                  graph
+                                  (URIImpl. graph)))
+              (.addNamedGraph (if (instance? org.eclipse.rdf4j.model.URI graph)
+                                  graph
+                                  (URIImpl. graph)))))
+          (SimpleDataset.)
+          (concat default-graphs named-graphs)))
+
 (deftest-system fetch-modified-state-test
   [{:keys [drafter.stasher/repo]}  "drafter/stasher-test/drafter-state-1.edn"]  
 
   (t/testing "Fetching draftset modified times"
     (t/is (= ds-1-most-recently-modified
-             (sut/fetch-modified-state repo {:named-graphs ds-1 :default-graphs ds-1})))
+             (sut/fetch-modified-state repo (edn->dataset {:named-graphs ds-1 :default-graphs ds-1}))))
 
     (t/is (= ds-2-most-recently-modified
-             (sut/fetch-modified-state repo {:named-graphs ds-2 :default-graphs ds-2}))))
+             (sut/fetch-modified-state repo (edn->dataset {:named-graphs ds-2 :default-graphs ds-2})))))
 
   (t/testing "Fetching live graph modified times"
     (t/is (= liveset-most-recently-modified
-             (sut/fetch-modified-state repo {:named-graphs liveset :default-graphs liveset}))))
+             (sut/fetch-modified-state repo (edn->dataset {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]})))))
 
     (t/testing "Fetching draftsets with union-with-live set"
     ;; Union with live is at this low level equivalent to merging the
     ;; set of live graphs in to :named-graphs and :default-graphs.
-    (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)]
-      (t/is (= (merge liveset-most-recently-modified
-                      ds-1-most-recently-modified)
-               (sut/fetch-modified-state repo {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}))))))
+      (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
+            dataset (edn->dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live})]
+        (t/is (= (merge liveset-most-recently-modified
+                        ds-1-most-recently-modified)
+                 (sut/fetch-modified-state repo dataset))))))
 
-(deftest-system build-drafter-cache-key-test
-  [{:keys [drafter.stasher/repo]}  "drafter/stasher-test/drafter-state-1.edn"]
-  ;; TODO
-  (t/is (seq (rdf/statements (repo/->connection repo)))))
+(deftest-system generate-drafter-cache-key-test
+  [{:keys [drafter.stasher/repo
+           drafter.stasher/filecache]} "drafter/stasher-test/drafter-state-1.edn"]
+
+  (let [dataset (edn->dataset {:named-graphs [live-graph-1 live-graph-only]
+                               :default-graphs [live-graph-1 live-graph-only]})
+        result (sut/generate-drafter-cache-key filecache basic-construct-query dataset {:raw-repo repo})]
+    
+    (let [{:keys [dataset query-str modified-times]} result]
+      (t/is (= 
+             {:default-graphs ["http://live-and-ds1-and-ds2" "http://live-only"],
+              :named-graphs ["http://live-and-ds1-and-ds2" "http://live-only"]}
+             dataset))
+      (t/is (= basic-construct-query
+               query-str))
+      (t/is (= modified-times
+               {:livemod #inst "2017-02-02T02:02:02.000-00:00"})))))
 
 
 (comment

@@ -28,7 +28,6 @@
            (java.security DigestOutputStream DigestInputStream MessageDigest)
            org.apache.commons.codec.binary.Hex))
 
-
 (defn dataset->edn
   "Convert a Dataset object into a clojure value with consistent print
   order, so it's suitable for hashing."
@@ -37,20 +36,19 @@
     {:default-graphs (sort (map str (.getDefaultGraphs dataset)))
      :named-graphs (sort (map str (.getNamedGraphs dataset)))}))
 
-
-(defn fetch-modified-state [repo {:keys [default-graphs named-graphs]}]
-  (let [values {:graph (set (concat default-graphs
-                                    named-graphs))}]
+(defn fetch-modified-state [repo dataset]
+  (let [values {:graph (set (concat (.getDefaultGraphs dataset)
+                                    (.getNamedGraphs dataset)))}]
     (with-open [conn (repo/->connection repo)]
       (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn))))))
 
-(defn generate-drafter-cache-key [cache query-str dataset {repo :raw-repo :as context}]
-  (let [dataset (dataset->edn dataset)
-        modified-state (fetch-modified-state repo dataset)]
+(defn generate-drafter-cache-key [_cache query-str dataset {raw-repo :raw-repo :as context}]
+  (let [modified-state (fetch-modified-state raw-repo dataset)
+        dataset-value (dataset->edn dataset)]
 
-    {:dataset dataset
+    {:dataset dataset-value
      :query-str query-str
-     :modified-times modified-state} ))
+     :modified-times modified-state}))
 
 (defn stashing->boolean-query
   "Construct a boolean query that checks the stash before evaluating"
