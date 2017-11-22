@@ -1,22 +1,19 @@
 (ns drafter.middleware-test
   (:require [buddy.auth :as auth]
-            [drafter.util :as util]
             [clojure.java.io :as io]
             [clojure.test :refer :all]
-            [drafter
-             [middleware :refer :all]
-             [test-common :as tc]
-             [user :as user]
-             [user-test :refer [test-editor test-publisher]]]
-            [drafter.rdf.sesame :as ses]
+            [drafter.backend.common :as bcom]
+            [drafter.middleware :refer :all]
+            [drafter.test-common :as tc]
+            [drafter.user :as user]
+            [drafter.user-test :refer [test-editor test-publisher]]
             [drafter.user.memory-repository :as memory-repo]
-            [grafter.rdf4j
-             [formats :as formats]
-             [repository :as repo]]
+            [drafter.util :as util]
+            [grafter.rdf4j.formats :as formats]
+            [grafter.rdf4j.repository :as repo]
             [ring.util.response :refer [response]])
   (:import clojure.lang.ExceptionInfo
-           java.io.File
-           (java.io ByteArrayInputStream)
+           [java.io ByteArrayInputStream File]
            org.eclipse.rdf4j.rio.RDFFormat))
 
 (defn- add-auth-header [m username password]
@@ -290,7 +287,7 @@
         (tc/assert-is-bad-request-response response)))))
 
 (defn- prepare-query-str [query-str]
-  (ses/prepare-query (repo/sail-repo) query-str))
+  (bcom/prep-and-validate-query (repo/sail-repo) query-str))
 
 (deftest sparql-negotiation-handler-test
   (testing "Valid request"

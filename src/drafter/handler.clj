@@ -1,29 +1,25 @@
 (ns drafter.handler
   (:require [clojure.java.io :as io]
-            [integrant.core :as ig]
-            [cognician.dogstatsd :as datadog]
             [clojure.tools.logging :as log]
-            [compojure.core :refer [defroutes context]]
+            [cognician.dogstatsd :as datadog]
+            [compojure.core :refer [context defroutes]]
             [compojure.route :as route]
-            [drafter.middleware :as middleware]
-            [swirrl-server.middleware.log-request :refer [log-request]]
-            [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.util :refer [set-var-root! conj-if]]
-            [drafter.routes.status :refer [status-routes]] ;; TODO componentise
-            [drafter.routes.pages :refer [pages-routes]]   ;; TODO componentise
-            [drafter.write-scheduler :refer [start-writer!
-                                             global-writes-lock
-                                             stop-writer!]]
-            [drafter.timeouts :as timeouts]
+            [drafter.backend.common :refer [stop-backend]]
             [drafter.env :as denv]
-            [swirrl-server.async.jobs :refer [restart-id finished-jobs]]
+            [drafter.middleware :as middleware]
+            [drafter.routes.pages :refer [pages-routes]]
+            [drafter.routes.status :refer [status-routes]]
+            [drafter.timeouts :as timeouts]
+            [drafter.util :refer [conj-if set-var-root!]]
+            [drafter.write-scheduler
+             :refer
+             [global-writes-lock start-writer! stop-writer!]]
+            [integrant.core :as ig]
             [noir.util.middleware :refer [app-handler]]
+            [ring.middleware.defaults :refer [api-defaults]]
             [ring.middleware.file-info :refer [wrap-file-info]]
             [ring.middleware.resource :refer [wrap-resource]]
-            [ring.middleware
-             [defaults :refer [api-defaults]]
-             [resource :refer [wrap-resource]]
-             [verbs :refer [wrap-verbs]]]
+            [ring.middleware.verbs :refer [wrap-verbs]]
             [swirrl-server.async.jobs :refer [finished-jobs restart-id]]
             [swirrl-server.errors :refer [wrap-encode-errors]]
             [swirrl-server.middleware.log-request :refer [log-request]]))

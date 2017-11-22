@@ -1,7 +1,7 @@
 (ns drafter.test-common
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
-            [drafter.backend.protocols :refer [stop-backend]]
+            [drafter.backend.common :refer [stop-backend]]
             [drafter.backend.rdf4j-repo :refer [get-backend]]
             [drafter.configuration :refer [get-configuration]]
             [drafter.draftset :refer [->draftset-uri]]
@@ -15,6 +15,7 @@
             [drafter.write-scheduler
              :refer
              [global-writes-lock queue-job! start-writer! stop-writer!]]
+            [grafter.rdf :as rdf]
             [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf4j.repository.registry :as reg]
@@ -24,8 +25,7 @@
             [ring.server.standalone :as ring-server]
             [schema.core :as s]
             [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.jobs :refer [create-job]]
-            [grafter.rdf :as rdf])
+            [swirrl-server.async.jobs :refer [create-job]])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable

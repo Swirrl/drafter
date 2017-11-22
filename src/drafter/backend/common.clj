@@ -1,7 +1,9 @@
-(ns drafter.backend.protocols
-  (:require [grafter.rdf4j.repository :as repo]
-            [grafter.rdf.protocols :as proto])
-  (:import java.net.URI))
+(ns drafter.backend.common
+  (:require [grafter.rdf.protocols :as proto]
+            [grafter.rdf4j.repository :as repo]
+            [drafter.rdf.rewriting.arq :as arq])
+  (:import java.net.URI
+           org.eclipse.rdf4j.query.Dataset))
 
 (defprotocol SparqlExecutor
   (prepare-query [this sparql-string]))
@@ -50,9 +52,51 @@
   {:add add-delegate
    :add-statement add-statement-delegate})
 
+(defn- get-restrictions [graph-restrictions]
+  (cond
+   (coll? graph-restrictions) graph-restrictions
+   (fn? graph-restrictions) (graph-restrictions)
+   :else nil))
+
+(defn restricted-dataset
+  "Returns a restricted dataset or nil when given either a 0-arg
+  function or a collection of graph uris."
+  [graph-restrictions]
+  {:pre [(or (nil? graph-restrictions)
+             (coll? graph-restrictions)
+             (fn? graph-restrictions))]
+   :post [(or (instance? Dataset %)
+              (nil? %))]}
+  (when-let [graph-restrictions (get-restrictions graph-restrictions)]
+    (let [stringified-restriction (map str graph-restrictions)]
+      (repo/make-restricted-dataset :default-graph stringified-restriction
+                                    :named-graphs stringified-restriction))))
+
+(defn apply-restriction [pquery restriction]
+  (let [dataset (restricted-dataset restriction)]
+    (.setDataset pquery dataset)
+    pquery))
 
 
 
+
+(defn validate-query
+  "Validates a query by parsing it using ARQ. If the query is invalid
+  a QueryParseException is thrown."
+  [query-str]
+  (arq/sparql-string->arq-query query-str)
+  query-str)
+
+
+;; TODO: Not sure we need to do this anymore.  I think this (with the
+;; ARQ validation) is a legacy from having local/remote
+;; implementations and wanting to enforce consistency in error
+;; messages by raising syntax error exceptions from drafter directly
+;; rather than the remote/local db.
+(defn prep-and-validate-query [backend sparql-string]
+    (let [repo (->sesame-repo backend)
+          validated-query-string (validate-query sparql-string)]
+      (repo/prepare-query repo validated-query-string)))
 
 
 

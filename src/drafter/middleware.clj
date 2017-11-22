@@ -1,29 +1,29 @@
 (ns drafter.middleware
-  (:require [clj-logging-config.log4j :as l4j]
-            [cognician.dogstatsd :as datadog]
-            [clojure.tools.logging :as log]
-            [clojure.string :as string]
-            [clojure.set :as set]
-            [clojure.java.io :as io]
-            [drafter.util :as util]
-            [drafter.responses :as response]
-            [drafter.user :as user]
-            [drafter.rdf.sesame :refer [read-statements] :as ses]
-            [grafter.rdf4j.formats :refer [mimetype->rdf-format]]
-            [buddy.auth :as auth]
-            [buddy.auth.protocols :as authproto]
+  (:require [buddy.auth :as auth]
             [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
             [buddy.auth.backends.token :refer [jws-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
-            [ring.util.request :as request]
-            [drafter.requests :as drafter-request]
-            [pantomime.media :refer [media-type-named]]
+            [buddy.auth.protocols :as authproto]
+            [clj-logging-config.log4j :as l4j]
+            [clojure.java.io :as io]
+            [clojure.set :as set]
+            [clojure.string :as string]
+            [clojure.tools.logging :as log]
+            [cognician.dogstatsd :as datadog]
+            [drafter.backend.common :refer [prepare-query] :as bcom]
             [drafter.rdf.content-negotiation :as conneg]
-            [drafter.backend.protocols :refer [prepare-query]]
-            [integrant.core :as ig])
-  (:import [java.io File]
-           [org.apache.jena.query QueryParseException]
-           [clojure.lang ExceptionInfo]))
+            [drafter.rdf.sesame :as ses :refer [read-statements]]
+            [drafter.requests :as drafter-request]
+            [drafter.responses :as response]
+            [drafter.user :as user]
+            [drafter.util :as util]
+            [grafter.rdf4j.formats :refer [mimetype->rdf-format]]
+            [integrant.core :as ig]
+            [pantomime.media :refer [media-type-named]]
+            [ring.util.request :as request])
+  (:import clojure.lang.ExceptionInfo
+           java.io.File
+           org.apache.jena.query.QueryParseException))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (log/info "auth user" username password)
@@ -215,7 +215,7 @@
   [executor inner-handler]
   (fn [request]
     (try
-      (let [validated-query-str (ses/validate-query (get-in request [:sparql :query-string]))
+      (let [validated-query-str (bcom/validate-query (get-in request [:sparql :query-string]))
             pquery (prepare-query executor validated-query-str)]
         (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
       (catch QueryParseException ex

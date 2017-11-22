@@ -1,15 +1,18 @@
 (ns drafter.backend.draftset
-  (:require [drafter.backend.protocols :as bprot :refer [->sesame-repo]]
+  (:require [drafter.backend.common
+             :as
+             bprot
+             :refer
+             [->sesame-repo apply-restriction]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draftset-management.operations :as dsmgmt]
+            [drafter.rdf.rewriting.arq :as arq]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results]]
-            [drafter.rdf.sesame :refer [apply-restriction prepare-query]]
             [grafter.rdf.protocols :as proto]
             [grafter.rdf4j.repository :as repo]
             [schema.core :as s])
-  (:import org.eclipse.rdf4j.model.URI
-           org.eclipse.rdf4j.repository.Repository))
+  (:import org.eclipse.rdf4j.model.URI))
 
 (s/defrecord RewritingSesameSparqlExecutor [inner :- (s/protocol bprot/SparqlExecutor)
                                             live->draft :- {URI URI}
@@ -18,8 +21,8 @@
   (prepare-query [this sparql-string]
     (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
           graph-restriction (mgmt/graph-mapping->graph-restriction inner live->draft union-with-live?)
-          pquery (prepare-query inner rewritten-query-string)
-          pquery (apply-restriction pquery graph-restriction)]
+          pquery (bprot/prep-and-validate-query inner rewritten-query-string)
+          pquery (bprot/apply-restriction pquery graph-restriction)]
       (rewrite-query-results pquery live->draft)))
 
   bprot/ToRepository
