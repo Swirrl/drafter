@@ -58,8 +58,6 @@
   proto/ISPARQLUpdateable isparql-updateable-delegate
   repo/ToConnection to-connection-delegate)
 
-(def create-restricted ->RestrictedExecutor)
-
 (s/defrecord RewritingSesameSparqlExecutor [inner :- (s/protocol backend/SparqlExecutor)
                                             live->draft :- {URI URI}
                                             union-with-live? :- Boolean]
@@ -84,7 +82,7 @@
 (defn live-endpoint
   "Creates a backend restricted to the live graphs."
   [backend]
-  (create-restricted backend (partial mgmt/live-graphs backend)))
+  (->RestrictedExecutor backend (partial mgmt/live-graphs backend)))
 
 (defn draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"
