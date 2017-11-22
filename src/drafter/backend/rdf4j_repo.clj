@@ -1,26 +1,26 @@
 (ns drafter.backend.rdf4j-repo
   "Thin wrapper over a DrafterSparqlRepository as a configurable
   integrant component."
-  (:require [clojure.string :as str]
-            [drafter.backend.protocols :as drpr]
-            [drafter.rdf.sesame :refer [apply-restriction prepare-query]]
+  (:require [clojure.spec.alpha :as s]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [drafter.backend.common :as drpr]
+            [drafter.backend.draftset :as ds]
             [grafter.rdf4j.repository.registry :as reg]
-            [integrant.core :as ig]
-            [clojure.spec.alpha :as s])
+            [integrant.core :as ig])
   (:import drafter.rdf.DrafterSPARQLRepository
            [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
            [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
            org.eclipse.rdf4j.query.resultio.text.BooleanTextParserFactory
+           org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
-           org.eclipse.rdf4j.rio.trig.TriGParserFactory
            org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory
-           org.eclipse.rdf4j.repository.Repository))
+           org.eclipse.rdf4j.rio.trig.TriGParserFactory))
 
 (extend-type Repository
   drpr/SparqlExecutor
   (drpr/prepare-query [this sparql-string]
-    (prepare-query this sparql-string))
+    (drpr/prep-and-validate-query this sparql-string))
 
   drpr/ToRepository
   (drpr/->sesame-repo [r] r))

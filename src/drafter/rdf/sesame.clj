@@ -1,6 +1,6 @@
 (ns drafter.rdf.sesame
   (:require [clojure.tools.logging :as log]
-            [drafter.backend.protocols :refer [->sesame-repo]]
+            [drafter.backend.common :refer [->sesame-repo]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
             [grafter.rdf :refer [statements]]
@@ -38,42 +38,11 @@
       Update :update
       nil))
 
-(defn validate-query
-  "Validates a query by parsing it using ARQ. If the query is invalid
-  a QueryParseException is thrown."
-  [query-str]
-  (sparql-string->arq-query query-str)
-  query-str)
 
-(defn prepare-query [backend sparql-string]
-    (let [repo (->sesame-repo backend)
-          validated-query-string (validate-query sparql-string)]
-      (repo/prepare-query repo validated-query-string)))
 
-(defn- get-restrictions [graph-restrictions]
-  (cond
-   (coll? graph-restrictions) graph-restrictions
-   (fn? graph-restrictions) (graph-restrictions)
-   :else nil))
 
-(defn restricted-dataset
-  "Returns a restricted dataset or nil when given either a 0-arg
-  function or a collection of graph uris."
-  [graph-restrictions]
-  {:pre [(or (nil? graph-restrictions)
-             (coll? graph-restrictions)
-             (fn? graph-restrictions))]
-   :post [(or (instance? Dataset %)
-              (nil? %))]}
-  (when-let [graph-restrictions (get-restrictions graph-restrictions)]
-    (let [stringified-restriction (map str graph-restrictions)]
-      (repo/make-restricted-dataset :default-graph stringified-restriction
-                                    :named-graphs stringified-restriction))))
 
-(defn apply-restriction [pquery restriction]
-  (let [dataset (restricted-dataset restriction)]
-    (.setDataset pquery dataset)
-    pquery))
+
 
 (defn create-tuple-query-writer [os result-format]
   (QueryResultIO/createWriter result-format os))

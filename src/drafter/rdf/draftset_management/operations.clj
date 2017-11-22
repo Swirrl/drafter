@@ -1,8 +1,12 @@
 (ns drafter.rdf.draftset-management.operations
   (:require [clojure.string :as string]
-            [drafter.backend.protocols :refer :all]
+            [drafter.backend.common :refer :all]
             [drafter.draftset :as ds]
-            [drafter.rdf.draft-management :as mgmt :refer [to-quads with-state-graph]]
+            [drafter.rdf.draft-management
+             :as
+             mgmt
+             :refer
+             [to-quads with-state-graph]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-statement]]

@@ -26,7 +26,7 @@
             [drafter.backend.draftset :as ep]
             [drafter.rdf.draftset-management.operations :as dsops]
             [drafter.rdf.draftset-management.jobs :as dsjobs]
-            [drafter.backend.protocols :refer :all]
+            [drafter.backend.common :refer :all]
             [swirrl-server.async.jobs :as ajobs]
             [swirrl-server.responses :as response])
   (:import (java.net URI)))

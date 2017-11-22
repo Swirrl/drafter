@@ -1,22 +1,21 @@
 (ns drafter.rdf.rewriting.result-rewriting-test
-  (:require [clojure
-             [set :as set]
-             [test :refer :all]]
-            [drafter
-             [test-common :refer [*test-backend* test-triples wrap-system-setup]]
-             [util :refer [map-values]]]
-            [drafter.backend.protocols :refer [prepare-query]]
+  (:require [clojure.java.io :as io]
+            [clojure.set :as set]
+            [clojure.test :refer :all]
+            [drafter.backend.common :refer [prepare-query]]
             [drafter.rdf.draft-management
              :refer
              [append-data-batch! create-draft-graph!]]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
+            [drafter.test-common
+             :refer
+             [*test-backend* test-triples wrap-system-setup]]
+            [drafter.util :refer [map-values]]
+            [grafter.rdf.templater :refer [triplify]]
             [grafter.rdf4j.repository :as repo]
-            [grafter.rdf
-             [templater :refer [triplify]]]
-            [schema.test :refer [validate-schemas]]
-            [clojure.java.io :as io])
-  (:import org.eclipse.rdf4j.model.impl.URIImpl
-           [java.net URI]))
+            [schema.test :refer [validate-schemas]])
+  (:import java.net.URI
+           org.eclipse.rdf4j.model.impl.URIImpl))
 
 (use-fixtures :each validate-schemas)
 

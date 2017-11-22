@@ -1,26 +1,21 @@
 (ns drafter.rdf.draft-management
-  (:require [clojure
-             [set :as set]
-             [string :as str]]
+  (:require [clojure.set :as set]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [drafter.backend.protocols :refer [->repo-connection ->sesame-repo]]
-            [drafter.rdf.sparql :as sparql]
-            [drafter.rdf
-             [drafter-ontology :refer :all]
-             [sparql :refer [update!]]]
+            [drafter.backend.common :refer [->repo-connection ->sesame-repo]]
+            [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.rdf.sparql :as sparql :refer [update!]]
             [drafter.util :as util]
             [grafter.rdf :as rdf]
-            [grafter.rdf4j
-             [repository :as repo]]
-            [grafter.rdf
-             [templater :refer [add-properties graph]]]
-            [grafter.vocabularies.rdf :refer :all]
+            [grafter.rdf.templater :refer [add-properties graph]]
+            [grafter.rdf4j.repository :as repo]
+            [grafter.url :as url]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
+            [grafter.vocabularies.rdf :refer :all]
             [schema.core :as s]
-            [swirrl-server.errors :refer [ex-swirrl]]
-            [grafter.url :as url])
-  (:import [java.util Date UUID]
-           (java.net URI)))
+            [swirrl-server.errors :refer [ex-swirrl]])
+  (:import java.net.URI
+           [java.util Date UUID]))
 
 (def drafter-state-graph (URI. "http://publishmydata.com/graphs/drafter/drafts"))
 
