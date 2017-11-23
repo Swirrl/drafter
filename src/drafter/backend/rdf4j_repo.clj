@@ -2,6 +2,7 @@
   "Thin wrapper over a DrafterSparqlRepository as a configurable
   integrant component."
   (:require [clojure.spec.alpha :as s]
+            [drafter.backend :as backend]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [drafter.backend.common :as drpr]
@@ -75,11 +76,8 @@
   (create-sparql-repository (str sparql-query-endpoint) (str sparql-update-endpoint)))
 
 
-(s/def ::sparql-query-endpoint uri?)
-(s/def ::sparql-update-endpoint uri?)
-
 (defmethod ig/pre-init-spec :drafter.backend/rdf4j-repo [_]
-  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint]))
+  (s/keys :req-un [::backend/sparql-query-endpoint ::backend/sparql-update-endpoint]))
 
 (defmethod ig/init-key :drafter.backend/rdf4j-repo [k opts]
   (log/info "Initialising Backend")
