@@ -46,6 +46,22 @@
       (t/is (= test-triples
                (repo/query (repo/->connection repo) basic-construct-query))))))
 
+(defn assert-cached-results 
+  [cache raw-repo query dataset expected-data]
+  ;; evidence that we didn't just run another uncached query
+  (let [cache-key (sut/generate-drafter-cache-key cache query dataset {:raw-repo raw-repo})
+        cached-file (fc/cache-key->cache-path cache cache-key)
+        cached-file-statements (-> cached-file
+                                   io/input-stream
+                                   (rdf/statements :format (fc/backend-rdf-format cache)))]
+
+    (t/testing "Prove the side-effect of creating the file in the cache happened"
+      (t/is (.exists cached-file)))
+
+    (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
+      (t/is (= (set cached-file-statements)
+               (set expected-data))))))
+
 (deftest-system stasher-repo-cache-and-serve-test
   [{repo :drafter.stasher/repo
     cache :drafter.stasher/filecache
@@ -64,19 +80,8 @@
                    (set fixture-data))))
 
         (t/testing "Results for query are stored on disk"
-          ;; evidence that we didn't just run another uncached query
-          (let [cache-key (sut/generate-drafter-cache-key cache basic-construct-query nil {:raw-repo raw-repo})
-                cached-file (fc/cache-key->cache-path cache cache-key)
-                cached-file-statements (-> cached-file
-                                           io/input-stream
-                                           (rdf/statements :format (fc/backend-rdf-format cache)))]
-
-            (t/testing "Prove the side-effect of creating the file in the cache happened"
-              (t/is (.exists cached-file)))
-
-            (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
-              (t/is (= (set cached-file-statements)
-                       (set fixture-data))))))))))
+          ;; Check that the expected fixture data was stored in the cache on disk
+          (assert-cached-results cache raw-repo basic-construct-query nil fixture-data))))))
 
 (defn recording-rdf-handler
   "Convenience function that returns a 2-tuple rdf-handler that will

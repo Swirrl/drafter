@@ -78,8 +78,6 @@
     pquery))
 
 
-
-
 (defn validate-query
   "Validates a query by parsing it using ARQ. If the query is invalid
   a QueryParseException is thrown."
@@ -88,17 +86,14 @@
   query-str)
 
 
-;; TODO: Not sure we need to do this anymore.  I think this (with the
-;; ARQ validation) is a legacy from having local/remote
-;; implementations and wanting to enforce consistency in error
-;; messages by raising syntax error exceptions from drafter directly
-;; rather than the remote/local db.
 (defn prep-and-validate-query [backend sparql-string]
-    (let [repo (->sesame-repo backend)
-          validated-query-string (validate-query sparql-string)]
-      (repo/prepare-query repo validated-query-string)))
-
-
+  (let [repo (->sesame-repo backend)
+        ;; Technically calls to live endpoint don't need to be
+        ;; validated with JENA/ARQ but as draftsets do their rewriting
+        ;; through ARQ this helps ensure consistency between
+        ;; implementations.
+        validated-query-string (validate-query sparql-string)]
+    (repo/prepare-query repo validated-query-string)))
 
 
 

@@ -1,0 +1,21 @@
+{
+ :drafter.common/config {:sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
+                         :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
+
+ :drafter.stasher/filecache {}
+
+ :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/filecache}
+                               ^:ref [:drafter.common/config]]
+ 
+ :drafter.backend/rdf4j-repo ^:ref [:drafter.common/config]
+ 
+ :drafter.backend.live/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+                                 :stasher-repo #ig/ref :drafter.stasher/repo
+                                 }
+
+ ;; instantiate/remove test fixture
+ :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo
+                               :fixtures [#resource "drafter/stasher-test/drafter-state-1.trig"]}
+
+ 
+ }
