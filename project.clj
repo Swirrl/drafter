@@ -101,14 +101,6 @@
   :resource-paths ["resources"]
   :pedantic :abort
 
-  ;; :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
-  ;;           [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
-
-  ;; :ring {:handler drafter.handler/app
-  ;;        :init    drafter.handler/init
-  ;;        :destroy drafter.handler/destroy
-  ;;        :open-browser? false }
-
   ;;:target-path "target/%s" ;; ensure profiles don't pollute each other with
   ;; compiled classes etc...
 
