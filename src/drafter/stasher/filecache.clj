@@ -24,7 +24,7 @@
 
 (def todo-replace-me-with-init-base-cache {}) ;; TODO replace me
 
-(def default-cache-dir "sparql-cache")
+(def default-cache-dir "stasher-cache")
 
 (def default-cache-rdf-format :brf)
 
