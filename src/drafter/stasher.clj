@@ -117,7 +117,7 @@
         ([]
          (let [dataset (.getDataset this)
                cache-key (cache-key-generator cache query-str dataset opts)]
-           (if (cache/has? cache cache-key) ;; TODO build composite keys
+           (if (cache/has? cache cache-key)
              (construct-sync-cache-hit cache-key base-uri-str cache)
              
              ;; else send query (and simultaneously stream it to file that gets put in the cache)
@@ -125,16 +125,18 @@
 
         ;; async results
         ([rdf-handler]
-         (if (cache/has? cache query-str) ;; TODO build composite keys
-           (construct-async-cache-hit query-str rdf-handler base-uri-str cache)
-           
-           ;; else
-           (let [stashing-rdf-handler (fc/stashing-rdf-handler cache query-str rdf-handler)
-                 dataset (.getDataset this)]
-             (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                              query-str base-uri-str dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this)
-                              stashing-rdf-handler (.getBindingsArray this)))))))))
+         (let [dataset (.getDataset this)
+               cache-key (cache-key-generator cache query-str dataset opts)]
+           (if (cache/has? cache cache-key)
+             (construct-async-cache-hit cache-key rdf-handler base-uri-str cache)
+             
+             ;; else
+             (let [stashing-rdf-handler (fc/stashing-rdf-handler cache cache-key rdf-handler)
+                   dataset (.getDataset this)]
+               (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                query-str base-uri-str dataset
+                                (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                stashing-rdf-handler (.getBindingsArray this))))))))))
 
 (defn stasher-update-query
   "Construct a stasher update query to expire cache etc"
