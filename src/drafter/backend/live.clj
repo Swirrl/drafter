@@ -5,8 +5,7 @@
             [drafter.rdf.draft-management :as mgmt]
             [grafter.rdf.protocols :as proto]
             [grafter.rdf4j.repository :as repo]
-            [integrant.core :as ig])
-  (:import org.eclipse.rdf4j.repository.Repository))
+            [integrant.core :as ig]))
 
 (defrecord RestrictedExecutor [inner restriction]
   bprot/SparqlExecutor
@@ -33,11 +32,8 @@
   ;; the stategraph.
   (->RestrictedExecutor stasher-repo (partial mgmt/live-graphs uncached-repo)))
 
-(s/def ::uncached-repo #(instance? Repository %))
-(s/def ::stasher-repo #(instance? Repository %))
-
 (defmethod ig/pre-init-spec ::endpoint [_]
-  (s/keys :req-un [::uncached-repo ::stasher-repo]))
+  (s/keys :req-un [::backend/uncached-repo ::backend/stasher-repo]))
 
 (defmethod ig/init-key ::endpoint [_ opts]
   (live-endpoint-with-stasher opts))

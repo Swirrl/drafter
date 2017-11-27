@@ -159,9 +159,7 @@
 (defn stasher-repo
   "Builds a stasher RDF repository, that implements the standard RDF4j
   repository interface but caches query results to disk and
-  transparently returns cached results if they're in the cache.
-  
-  "
+  transparently returns cached results if they're in the cache."
   [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache] :as opts}]
   (let [query-endpoint (str sparql-query-endpoint)
         update-endpoint (str sparql-update-endpoint)
