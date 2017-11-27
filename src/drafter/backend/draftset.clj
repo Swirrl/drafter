@@ -1,22 +1,20 @@
 (ns drafter.backend.draftset
-  (:require [drafter.backend.common
-             :as
-             bprot
-             :refer
-             [->sesame-repo apply-restriction]]
+  (:require [clojure.spec.alpha :as sp]
+            [drafter.backend :as backend]
+            [drafter.backend.common :as bprot :refer [->sesame-repo]]
             [drafter.rdf.draft-management :as mgmt]
             [drafter.rdf.draftset-management.operations :as dsmgmt]
-            [drafter.rdf.rewriting.arq :as arq]
             [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
             [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results]]
             [grafter.rdf.protocols :as proto]
             [grafter.rdf4j.repository :as repo]
-            [schema.core :as s])
+            [integrant.core :as ig]
+            [schema.core :as sc])
   (:import org.eclipse.rdf4j.model.URI))
 
-(s/defrecord RewritingSesameSparqlExecutor [inner :- (s/protocol bprot/SparqlExecutor)
-                                            live->draft :- {URI URI}
-                                            union-with-live? :- Boolean]
+(sc/defrecord RewritingSesameSparqlExecutor [inner :- (s/protocol bprot/SparqlExecutor)
+                                             live->draft :- {URI URI}
+                                             union-with-live? :- Boolean]
   bprot/SparqlExecutor
   (prepare-query [this sparql-string]
     (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
@@ -35,8 +33,23 @@
   proto/ISPARQLUpdateable bprot/isparql-updateable-delegate
   repo/ToConnection bprot/to-connection-delegate)
 
+;; TODO REMOVE THIS function
 (defn draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"
   [{:keys [backend draftset-ref union-with-live?]}]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
     (->RewritingSesameSparqlExecutor backend graph-mapping union-with-live?)))
+
+
+
+(defn build-draftset-endpoint
+  "Build a SPARQL queryable repo representing the draftset"
+  [{:keys [backend/uncached-repo backend/stasher-repo]} draftset-ref union-with-live?]
+  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping uncached-repo draftset-ref)]
+    (->RewritingSesameSparqlExecutor stasher-repo graph-mapping union-with-live?)))
+
+(defmethod ig/pre-init-spec ::endpoint [_]
+  (sp/keys :req-un [::backend/uncached-repo ::backend/stasher-repo]))
+
+(defmethod ig/init-key ::endpoint [_ opts]
+  opts)

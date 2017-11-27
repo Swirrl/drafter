@@ -23,6 +23,7 @@
                                        conflict-detected-response]]
             
             [swirrl-server.async.jobs :refer [job-succeeded!]]
+            [drafter.backend :as backend]
             [drafter.backend.draftset :as ep]
             [drafter.rdf.draftset-management.operations :as dsops]
             [drafter.rdf.draftset-management.jobs :as dsjobs]
@@ -74,7 +75,7 @@
         (h request))
       (inner-handler request))))
 
-(defn- required-live-graph-param-handler [backend inner-handler]
+(defn- required-live-graph-param-handler [{backend ::backend/uncached-repo} inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
     (if (mgmt/is-graph-live? backend graph)
       (inner-handler request)
@@ -338,7 +339,7 @@
                           (ring/not-found "Draftset not found")))))))))))
 
 (defmethod ig/init-key :drafter.routes/draftsets-api [_ {backend :repo
-                                                        user-db :user-repo
-                                                        authenticated :authentication-handler
-                                                        draftset-query-timeout-fn :draftset-query-timeout-fn}]
+                                                         user-db :user-repo
+                                                         authenticated :authentication-handler
+                                                         draftset-query-timeout-fn :draftset-query-timeout-fn}]
   (draftset-api-routes backend user-db authenticated draftset-query-timeout-fn))

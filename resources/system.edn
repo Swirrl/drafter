@@ -17,14 +17,16 @@
 
  ;;;; A repo specifically for the live query endpoint
  :drafter.backend.live/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
-                                 :stasher-repo #ig/ref :drafter.stasher/repo
-                                 }
+                                 :stasher-repo #ig/ref :drafter.stasher/repo}
  
  :drafter.backend/rdf4j-repo #merge [{:batched-write-size #or [#env "batched-write-size" 75000]
                                       ;; TODO  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
                                       }
                                      ^:ref [:drafter.common/config]]
 
+ :drafter.backend.draftset/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+                                     :cached-repo #ig/ref :drafter.stasher/repo}
+ 
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Web Middleware
@@ -48,7 +50,7 @@
                                                  :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
 
 
- :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
+ :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend.draftset/endpoint
                                 :user-repo #ig/ref :drafter.user/repo
                                 :authentication-handler #ig/ref :drafter.middleware/authentication-handler
 
@@ -72,19 +74,6 @@
  
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ;; User Database config
- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-
- :drafter.user/mongo {:mongo-host #env DRAFTER_MONGO_HOST
-                      :mongo-port #port #env DRAFTER_MONGO_PORT
-                      :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]
-                      :mongo-db-name #env DRAFTER_USER_DB_NAME
-
-                      ;; TODO DEV only!
-                      :realm #join ["Drafter: " #env DRAFTER_USER_DB_NAME] 
-                      }
-
- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Misc
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  
@@ -102,12 +91,26 @@
  :drafter/logging {:config "log-config.edn"}
 
  
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; User Database config
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+
+ ;; :drafter.user/mongo {:mongo-host #env DRAFTER_MONGO_HOST
+ ;;                      :mongo-port #port #env DRAFTER_MONGO_PORT
+ ;;                      :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]
+ ;;                      :mongo-db-name #env DRAFTER_USER_DB_NAME
+
+ ;;                      ;; TODO DEV only!
+ ;;                      :realm #join ["Drafter: " #env DRAFTER_USER_DB_NAME] 
+ ;;                      }
+
+ 
  
  ;;;; Uncomment below for an in memory repo
  
- ;; :drafter.user/memory-repository {:users [{:username "editor@swirrl.com" :password "password" :role :editor}
- ;;                                          {:username "publisher@swirrl.com" :password "password" :role :publisher}
- ;;                                          {:username "manager@swirrl.com" :password "password" :role :manager}
- ;;                                          {:username "system@swirrl.com" :password "password" :role :system}]
- ;;                                      :realm "Drafter Memory Repo"}
+ :drafter.user/memory-repository {:users [{:username "editor@swirrl.com" :password "password" :role :editor}
+                                          {:username "publisher@swirrl.com" :password "password" :role :publisher}
+                                          {:username "manager@swirrl.com" :password "password" :role :manager}
+                                          {:username "system@swirrl.com" :password "password" :role :system}]
+                                      :realm "Drafter Memory Repo"}
  }
