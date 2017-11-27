@@ -106,7 +106,8 @@
                              [rdf:a drafter:DraftGraph]
                              [drafter:createdAt time]
                              [drafter:modifiedAt time]]
-        draft-graph-triples (util/conj-if (some? draftset-uri) draft-graph-triples [drafter:inDraftSet draftset-uri])]
+        draft-graph-triples (util/conj-if (some? draftset-uri)
+                                          draft-graph-triples [drafter:inDraftSet draftset-uri])]
     [live-graph-triples draft-graph-triples]))
 
 (defn create-draft-graph!
