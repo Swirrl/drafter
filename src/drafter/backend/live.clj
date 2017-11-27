@@ -2,7 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [drafter.backend :as backend]
             [drafter.backend.common :as bprot :refer [->sesame-repo]]
-            [drafter.rdf.draft-management :as mgmt]
+            [drafter.backend.draftset.draft-management :as mgmt]
             [grafter.rdf.protocols :as proto]
             [grafter.rdf4j.repository :as repo]
             [integrant.core :as ig]))

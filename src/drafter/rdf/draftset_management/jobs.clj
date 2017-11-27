@@ -2,16 +2,16 @@
   (:require [clojure.string :as string]
             [drafter.backend.common :refer :all]
             [drafter.backend.draftset :as ep]
-            [drafter.draftset :as ds]
-            [drafter.rdf.draft-management
+            [drafter.backend.draftset.draft-management
              :as
              mgmt
              :refer
              [to-quads with-state-graph]]
+            [drafter.backend.draftset.operations :as ops]
+            [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
+            [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.rdf.draftset-management.operations :as ops]
-            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-statement]]
             [drafter.rdf.sesame :refer [read-statements]]
             [drafter.rdf.sparql :as sparql]
             [drafter.user :as user]

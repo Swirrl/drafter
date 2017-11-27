@@ -2,13 +2,13 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
             [drafter.backend.common :refer [stop-backend]]
+            [drafter.backend.draftset.draft-management
+             :refer
+             [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
             [drafter.backend.rdf4j-repo :refer [get-backend]]
             [drafter.configuration :refer [get-configuration]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.main :as main]
-            [drafter.rdf.draft-management
-             :refer
-             [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
             [drafter.rdf.sparql :as sparql]
             [drafter.user :as user]
             [drafter.util :as util]

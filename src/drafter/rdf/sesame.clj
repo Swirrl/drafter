@@ -1,8 +1,8 @@
 (ns drafter.rdf.sesame
   (:require [clojure.tools.logging :as log]
             [drafter.backend.common :refer [->sesame-repo]]
+            [drafter.backend.draftset.arq :refer [sparql-string->arq-query]]
             [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
             [grafter.rdf :refer [statements]]
             [grafter.rdf4j.repository :as repo])
   (:import [org.eclipse.rdf4j.query BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler Update]

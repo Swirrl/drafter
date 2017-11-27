@@ -1,12 +1,12 @@
-(ns drafter.rdf.rewriting.result-rewriting-test
+(ns drafter.backend.draftset.rewrite-result-test
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.test :refer :all]
             [drafter.backend.common :refer [prepare-query]]
-            [drafter.rdf.draft-management
+            [drafter.backend.draftset.draft-management
              :refer
              [append-data-batch! create-draft-graph!]]
-            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
+            [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
             [drafter.test-common
              :refer
              [*test-backend* test-triples wrap-system-setup]]

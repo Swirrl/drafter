@@ -1,7 +1,7 @@
 (ns drafter.backend.common
-  (:require [grafter.rdf.protocols :as proto]
-            [grafter.rdf4j.repository :as repo]
-            [drafter.rdf.rewriting.arq :as arq])
+  (:require [drafter.backend.draftset.arq :as arq]
+            [grafter.rdf.protocols :as proto]
+            [grafter.rdf4j.repository :as repo])
   (:import java.net.URI
            org.eclipse.rdf4j.query.Dataset))
 

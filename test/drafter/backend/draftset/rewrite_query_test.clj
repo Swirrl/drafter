@@ -1,10 +1,8 @@
-(ns drafter.rdf.rewriting.query-rewriting-test
-  (:require [clojure
-             [string :refer [trim]]
-             [test :refer :all]]
-            [drafter.rdf.rewriting
-             [arq :refer :all]
-             [query-rewriting :refer :all]]
+(ns drafter.backend.draftset.rewrite-query-test
+  (:require [clojure.string :refer [trim]]
+            [clojure.test :refer :all]
+            [drafter.backend.draftset.arq :refer :all]
+            [drafter.backend.draftset.rewrite-query :refer :all]
             [schema.test :refer [validate-schemas]]))
 
 (use-fixtures :each validate-schemas)

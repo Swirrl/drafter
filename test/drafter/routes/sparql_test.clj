@@ -1,18 +1,24 @@
 (ns drafter.routes.sparql-test
   (:require [clojure-csv.core :as csv]
+            [clojure.java.io :as io]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
-            [drafter
-             [test-common :refer [*test-backend* assert-is-forbidden-response import-data-to-draft!
-                                  select-all-in-graph stream->string test-triples with-identity
-                                  wrap-system-setup]]
-             [timeouts :as timeouts]
-             [user-test :refer [test-editor test-system]]]
-            [drafter.rdf.draft-management :refer :all]
+            [drafter.backend.draftset.draft-management :refer :all]
             [drafter.routes.sparql :refer :all]
-            [schema.test :refer [validate-schemas]]
-            [clojure.java.io :as io])
-  (:import (java.net URI)))
+            [drafter.test-common
+             :refer
+             [*test-backend*
+              assert-is-forbidden-response
+              import-data-to-draft!
+              select-all-in-graph
+              stream->string
+              test-triples
+              with-identity
+              wrap-system-setup]]
+            [drafter.timeouts :as timeouts]
+            [drafter.user-test :refer [test-editor test-system]]
+            [schema.test :refer [validate-schemas]])
+  (:import java.net.URI))
 
 (use-fixtures :each validate-schemas)
 
