@@ -1,4 +1,4 @@
-(ns drafter.rdf.rewriting.arq
+(ns drafter.backend.draftset.arq
   "Library of functions for syntactically rewriting queries using Jena ARQ.  Of
   particular interest are sse-zipper and apply-rewriter."
   (:require [clojure.zip :as z])

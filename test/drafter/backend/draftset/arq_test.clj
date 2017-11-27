@@ -1,8 +1,8 @@
-(ns drafter.rdf.rewriting.arq-test
+(ns drafter.backend.draftset.arq-test
   "Testing round tripping through Jena ARC"
   (:require [clojure.java.io :as io]
             [clojure.test :as t]
-            [drafter.rdf.rewriting.arq :as sut]))
+            [drafter.backend.draftset.arq :as sut]))
 
 (defn load-query [res-path]
   (slurp (io/resource res-path)))

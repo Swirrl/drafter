@@ -1,4 +1,4 @@
-(ns drafter.rdf.rewriting.result-rewriting
+(ns drafter.backend.draftset.rewrite-result
   "The other side of query rewriting; result rewriting.  Result rewriting
   rewrites results and solutions."
   (:require [clojure.set :as set]

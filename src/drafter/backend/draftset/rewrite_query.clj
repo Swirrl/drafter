@@ -1,8 +1,8 @@
-(ns drafter.rdf.rewriting.query-rewriting
+(ns drafter.backend.draftset.rewrite-query
   "Functions related to syntactically rewriting drafter queries."
   (:require [clojure.tools.logging :as log]
             [clojure.zip :as z]
-            [drafter.rdf.rewriting.arq :refer [apply-rewriter]])
+            [drafter.backend.draftset.arq :refer [apply-rewriter]])
   (:import org.apache.jena.graph.NodeFactory
            org.apache.jena.sparql.sse.Item))
 

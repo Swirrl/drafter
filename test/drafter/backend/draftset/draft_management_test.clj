@@ -1,10 +1,10 @@
-(ns drafter.rdf.draft-management-test
+(ns drafter.backend.draftset.draft-management-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
+            [drafter.backend.draftset.draft-management :refer :all]
+            [drafter.backend.draftset.operations :refer [create-draftset!]]
             [drafter.draftset :refer [->DraftsetId]]
-            [drafter.rdf.draft-management :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.draftset-management.operations :refer [create-draftset!]]
             [drafter.rdf.sparql :as sparql]
             [drafter.test-common
              :as

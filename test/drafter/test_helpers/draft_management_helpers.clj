@@ -1,8 +1,11 @@
 (ns drafter.test-helpers.draft-management-helpers
-  (:require [drafter.rdf
-             [draft-management :as mgmt :refer [with-state-graph]]
-             [sparql :as sparql]]
+  (:require [drafter.backend.draftset.draft-management
+             :as
+             mgmt
+             :refer
+             [with-state-graph]]
             [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.rdf.sparql :as sparql]
             [grafter.rdf4j.repository :as repo]))
 
 (defn draft-exists?

@@ -2,35 +2,39 @@
   (:require [clj-logging-config.log4j :as l4j]
             [cognician.dogstatsd :as datadog]
             [compojure.core :as compojure :refer [context routes]]
-            [drafter
-             [draftset :as ds]
-             [middleware :refer [negotiate-quads-content-type-handler negotiate-triples-content-type-handler optional-enum-param require-params require-rdf-content-type sparql-constant-prepared-query-handler sparql-timeout-handler temp-file-body]]
-             [responses :refer [conflict-detected-response forbidden-response run-sync-job! submit-async-job! unprocessable-entity-response]]
-             [user :as user]]
-            [drafter.rdf
-             [draft-management :as mgmt]
-             [sesame :refer [is-quads-format? is-triples-format?]]
-             [sparql-protocol :refer [sparql-execution-handler sparql-protocol-handler]]]
-            [drafter.rdf.draftset-management.job-util :as jobutil :refer [failed-job-result? make-job]]
-
+            [drafter.backend.draftset.draft-management :as mgmt]
+            [drafter.draftset :as ds]
+            [drafter.middleware
+             :refer
+             [negotiate-quads-content-type-handler
+              negotiate-triples-content-type-handler
+              optional-enum-param
+              require-params
+              require-rdf-content-type
+              sparql-constant-prepared-query-handler
+              sparql-timeout-handler
+              temp-file-body]]
+            [drafter.rdf.draftset-management.job-util
+             :as
+             jobutil
+             :refer
+             [failed-job-result? make-job]]
+            [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
+            [drafter.rdf.sparql-protocol
+             :refer
+             [sparql-execution-handler sparql-protocol-handler]]
+            [drafter.responses
+             :refer
+             [conflict-detected-response
+              forbidden-response
+              run-sync-job!
+              submit-async-job!
+              unprocessable-entity-response]]
+            [drafter.user :as user]
             [grafter.rdf.protocols :as pr]
             [grafter.rdf4j.repository :as repo]
             [integrant.core :as ig])
-  (:require [ring.util.response :refer [not-found response] :as ring]
-            [drafter.responses :refer [not-acceptable-response unprocessable-entity-response
-                                       unsupported-media-type-response method-not-allowed-response
-                                       forbidden-response submit-async-job! run-sync-job!
-                                       conflict-detected-response]]
-            
-            [swirrl-server.async.jobs :refer [job-succeeded!]]
-            [drafter.backend :as backend]
-            [drafter.backend.draftset :as ep]
-            [drafter.rdf.draftset-management.operations :as dsops]
-            [drafter.rdf.draftset-management.jobs :as dsjobs]
-            [drafter.backend.common :refer :all]
-            [swirrl-server.async.jobs :as ajobs]
-            [swirrl-server.responses :as response])
-  (:import (java.net URI)))
+  (:import java.net.URI))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]

@@ -2,17 +2,17 @@
   (:require [clojure.spec.alpha :as sp]
             [drafter.backend :as backend]
             [drafter.backend.common :as bprot :refer [->sesame-repo]]
-            [drafter.rdf.draft-management :as mgmt]
-            [drafter.rdf.draftset-management.operations :as dsmgmt]
-            [drafter.rdf.rewriting.query-rewriting :refer [rewrite-sparql-string]]
-            [drafter.rdf.rewriting.result-rewriting :refer [rewrite-query-results]]
+            [drafter.backend.draftset.draft-management :as mgmt]
+            [drafter.backend.draftset.operations :as dsmgmt]
+            [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
+            [drafter.backend.draftset.rewrite-result :refer [rewrite-query-results]]
             [grafter.rdf.protocols :as proto]
             [grafter.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [schema.core :as sc])
   (:import org.eclipse.rdf4j.model.URI))
 
-(sc/defrecord RewritingSesameSparqlExecutor [inner :- (s/protocol bprot/SparqlExecutor)
+(sc/defrecord RewritingSesameSparqlExecutor [inner :- (sc/protocol bprot/SparqlExecutor)
                                              live->draft :- {URI URI}
                                              union-with-live? :- Boolean]
   bprot/SparqlExecutor

@@ -1,31 +1,6 @@
 (ns drafter.rdf.draftset-management.jobs-test
-  (:require [drafter.rdf.draftset-management.jobs :as sut]
-            [clojure.test :as t])
-  (:require [drafter.rdf.draftset-management.operations :as dsops]
-            [clojure.test :refer :all]
-            [clojure.java.io :as io]
-            [drafter.draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
-            [drafter.rdf.draft-management :as mgmt :refer [with-state-graph]]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.sparql :as sparql]
-            [drafter.test-common
-             :refer
-             [*test-backend*
-              ask?
-              import-data-to-draft!
-              make-graph-live!
-              select-all-in-graph
-              test-triples
-              wrap-system-setup]]
-            [drafter.test-helpers.draft-management-helpers :as mgmth]
-            [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-manager test-publisher]]
-            [drafter.util :as util]
-            [drafter.write-scheduler :as scheduler]
-            [grafter.rdf :refer [context statements triple=]]
-            [grafter.rdf.protocols :refer [->Quad ->Triple]]
-            [grafter.url :as url]
-            [grafter.vocabularies.rdf :refer :all])
+  (:require [clojure.test :as t]
+            [drafter.rdf.draftset-management.jobs :as sut])
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
 

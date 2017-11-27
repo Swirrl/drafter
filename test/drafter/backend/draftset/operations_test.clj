@@ -1,9 +1,13 @@
-(ns drafter.rdf.draftset-management.operations-test
-  (:require [drafter.rdf.draftset-management.operations :as sut]
+(ns drafter.backend.draftset.operations-test
+  (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
-            [clojure.java.io :as io]
+            [drafter.backend.draftset.draft-management
+             :as
+             mgmt
+             :refer
+             [with-state-graph]]
+            [drafter.backend.draftset.operations :as sut]
             [drafter.draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
-            [drafter.rdf.draft-management :as mgmt :refer [with-state-graph]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql]
             [drafter.test-common
