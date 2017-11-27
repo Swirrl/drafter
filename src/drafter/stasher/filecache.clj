@@ -143,7 +143,7 @@
         make-stream (fmt/select-output-coercer rdf-format)
         stream (make-stream temp-file :buffer 8192)]
 
-    (let [prefixes (.getNamespaces bg-graph-result)
+    (let [prefixes (.getNamespaces bg-graph-result) ;; take prefixes from supplied result
           cache-file-writer ^RDFWriter (gio/rdf-writer stream :format rdf-format :prefixes prefixes)]
       
       (.startRDF cache-file-writer)
@@ -188,7 +188,11 @@
         temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir cache) "tmp"))
         make-stream (fmt/select-output-coercer rdf-format)
         stream (make-stream temp-file :buffer 8192)
-        cache-file-writer (gio/rdf-writer stream :format rdf-format)]
+
+        ;; explicitly set prefixes to nil as gio/rdf-writer will write
+        ;; the grafter default-prefixes otherwise.  By setting to nil,
+        ;; use what comes from the stream instead.
+        cache-file-writer (gio/rdf-writer stream :format rdf-format :prefixes nil)]
 
     (reify RDFHandler
       (startRDF [this]
