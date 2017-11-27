@@ -2,13 +2,12 @@
   (:require [compojure.core :refer [make-route]]
             [drafter.rdf
              [sparql-protocol :refer [sparql-end-point sparql-protocol-handler]]]
-            [drafter.backend.live :refer [live-endpoint]]
             [integrant.core :as ig]))
 
 (def ^:private v1-prefix :v1)
 
-(defn live-sparql-routes [mount-point executor query-timeout-fn]
-  (sparql-end-point mount-point (live-endpoint executor) query-timeout-fn))
+(defn live-sparql-routes [mount-point endpoint query-timeout-fn]
+  (sparql-end-point mount-point endpoint query-timeout-fn))
 
 (defn- endpoint-query-path [route-name version]
   (let [suffix (str "/sparql/" (name route-name))]
