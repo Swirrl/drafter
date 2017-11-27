@@ -25,11 +25,6 @@
   proto/ISPARQLUpdateable bprot/isparql-updateable-delegate
   repo/ToConnection bprot/to-connection-delegate)
 
-(defn live-endpoint
-  "Creates a backend restricted to the live graphs."
-  [backend]
-  (->RestrictedExecutor backend (partial mgmt/live-graphs backend)))
-
 (defn live-endpoint-with-stasher
   "Creates a backend restricted to the live graphs."
   [{:keys [uncached-repo stasher-repo]}]
