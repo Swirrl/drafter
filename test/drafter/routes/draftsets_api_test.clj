@@ -13,16 +13,13 @@
             [drafter.test-common :as tc]
             [drafter.timeouts :as timeouts]
             [drafter.user :as user]
-            [drafter.user-test
-             :refer
-             [test-editor test-manager test-password test-publisher]]
+            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [drafter.user.memory-repository :as memrepo]
             [drafter.util :as util]
             [grafter.rdf :refer [add context statements]]
             [grafter.rdf.protocols :refer [->Quad ->Triple map->Triple]]
             [grafter.rdf4j.formats :as formats]
             [grafter.rdf4j.io :refer [rdf-writer]]
-            [grafter.rdf4j.repository :as repo]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
@@ -33,6 +30,19 @@
 
 (def ^:private ^:dynamic *route* nil)
 (def ^:private ^:dynamic *user-repo* nil)
+
+(defn- setup-route [test-function]
+  (let [users (:drafter.user/memory-repository tc/*test-system*)
+        swagger-spec (swagger/load-spec-and-resolve-refs)
+        api-handler (:drafter.routes/draftsets-api tc/*test-system*)]
+
+    (binding [*user-repo* users
+              *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
+      (test-function))))
+
+(use-fixtures :each (join-fixtures [(tc/wrap-system-setup "test-system.edn" [:drafter.user/repo :drafter.routes/draftsets-api :drafter.backend/rdf4j-repo :drafter/write-scheduler])
+                                    setup-route]))
+
 
 (defn is-client-error-response?
   "Whether the given ring response map represents a client error."
@@ -427,7 +437,8 @@
     (tc/assert-is-forbidden-response get-response)))
 
 (defn- get-claimable-draftsets-through-api [user]
-  (let [request (tc/with-identity user {:uri "/v1/draftsets" :request-method :get :params {:include :claimable}})]
+  (let [request (tc/with-identity user
+                  {:uri "/v1/draftsets" :request-method :get :params {:include :claimable}})]
     (ok-response->typed-body [Draftset] (route request))))
 
 (deftest get-claimable-draftsets-test
@@ -1514,18 +1525,6 @@
       (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
         (is (= :deleted (get-in changes [live-graph :status])))))))
 
-(defn- setup-route [test-function]
-  (let [users (memrepo/init-repository* test-editor test-publisher test-manager)
-        authenticated-fn (middleware/make-authenticated-wrapper users {})
-        swagger-spec (swagger/load-spec-and-resolve-refs)
-        api-handler (draftset-api-routes tc/*test-backend* users authenticated-fn timeouts/calculate-default-request-timeout)]
-    (binding [*user-repo* users
-              *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
-      (test-function))))
 
-(use-fixtures :each (compose-fixtures (tc/wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler])
-                                      setup-route))
-;;(use-fixtures :each setup-route)
 
-;; (use-fixtures :each (fn [tf]
-;;                       (tc/wrap-clean-test-db #(setup-route tf))))
+

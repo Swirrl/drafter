@@ -1,7 +1,8 @@
 {
- :drafter.middleware/authentication-handler {:user-repo #ig/ref :drafter.user/repo
-                                             :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
-
+ :drafter.middleware/wrap-auth {:drafter.user/repo #ig/ref :drafter.user/repo
+                                :jws-signing-key "foo"}
+ 
+ 
  :drafter.handler/live-endpoint-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
                                             :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
 
@@ -13,14 +14,18 @@
                                                  :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
 
 
- :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
-                                :user-repo #ig/ref :drafter.user/repo
-                                :authentication-handler #ig/ref :drafter.middleware/authentication-handler
-                                
-                               :draftset-query-timeout-fn #ig/ref :drafter.handler/draftset-query-timeout-fn
-                               :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+ :drafter.routes.draftsets-api/get-draftsets-handler {:repo #ig/ref :drafter.backend/rdf4j-repo
+                                                      :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
  
- :drafter.handler/app {:authentication-handler #ig/ref :drafter.middleware/authentication-handler
+ :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
+                                :drafter.user/repo #ig/ref :drafter.user/repo
+                                :wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
+
+                                :draftset-query-timeout-fn #ig/ref :drafter.handler/draftset-query-timeout-fn
+                                :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+ 
+ :drafter.handler/app {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                        :repo #ig/ref :drafter.backend/rdf4j-repo
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
                        :draftset-api-routes #ig/ref :drafter.routes/draftsets-api

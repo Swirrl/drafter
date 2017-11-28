@@ -31,7 +31,8 @@
             [integrant.core :as ig]
             [ring.util.response :as ring]
             [swirrl-server.async.jobs :as ajobs]
-            [swirrl-server.responses :as response])
+            [swirrl-server.responses :as response]
+            [clojure.spec.alpha :as s])
   (:import java.net.URI))
 
 (defn- existing-draftset-handler [backend inner-handler]
@@ -122,7 +123,27 @@
                              :route route}
                             (handler-fn req)))))
 
-(defn draftset-api-routes [backend user-repo authenticated draftset-query-timeout-fn]
+(defn- get-draftsets-handler
+  ":get /draftsets"
+  [{wrap-authenticated :wrap-auth backend :repo}]
+  (wrap-authenticated
+   (optional-enum-param
+    :include #{:all :owned :claimable} :all
+    (fn [{user :identity {:keys [include]} :params :as request}]
+      (case include
+        :all (ring/response (dsops/get-all-draftsets-info backend user))
+        :claimable (ring/response (dsops/get-draftsets-claimable-by backend user))
+        :owned (ring/response (dsops/get-draftsets-owned-by backend user)))))))
+
+(defmethod ig/init-key ::get-draftsets-handler [_ opts]
+  (get-draftsets-handler opts))
+
+(defn draftset-api-routes [{backend :repo
+                            user-repo ::user/repo
+                            authenticated :wrap-auth
+                            draftset-query-timeout-fn :draftset-query-timeout-fn
+                            get-draftsets-handler :get-draftsets-handler}]
+  
   (letfn [(required-live-graph-param [handler]
             (parse-graph-param-handler true (required-live-graph-param-handler backend handler)))
           (as-draftset-owner [handler]
@@ -141,15 +162,7 @@
                              summaries (map user/get-summary users)]
                          (ring/response summaries)))))
 
-        (make-route :get "/draftsets"
-                    (authenticated
-                     (optional-enum-param
-                      :include #{:all :owned :claimable} :all
-                      (fn [{user :identity {:keys [include]} :params :as request}]
-                        (case include
-                          :all (ring/response (dsops/get-all-draftsets-info backend user))
-                          :claimable (ring/response (dsops/get-draftsets-claimable-by backend user))
-                          :owned (ring/response (dsops/get-draftsets-owned-by backend user)))))))
+        (make-route :get "/draftsets" get-draftsets-handler)
 
         ;; create a new draftset
         (make-route :post "/draftsets"
@@ -160,8 +173,8 @@
                                    (if (jobutil/failed-job-result? result)
                                      (response/api-response 500 result)
                                      (ring/redirect-after-post (str version
-                                                               "/draftset/"
-                                                               (get-in result [:details :id])))))))))
+                                                                    "/draftset/"
+                                                                    (get-in result [:details :id])))))))))
 
         (make-route :get "/draftset/:id"
                     (authenticated
@@ -340,8 +353,16 @@
                             (forbidden-response "User not in role for draftset claim"))
                           (ring/not-found "Draftset not found")))))))))))
 
-(defmethod ig/init-key :drafter.routes/draftsets-api [_ {backend :repo
-                                                         user-db :user-repo
-                                                         authenticated :authentication-handler
-                                                         draftset-query-timeout-fn :draftset-query-timeout-fn}]
-  (draftset-api-routes backend user-db authenticated draftset-query-timeout-fn))
+
+(s/def ::draftset-query-timeout-fn fn?)
+(s/def ::wrap-auth fn?)
+
+(defmethod ig/pre-init-spec :drafter.routes/draftsets-api [_]
+  (s/keys :req-un [::wrap-auth ::draftset-query-timeout-fn]
+          :req [::user/repo]
+          ;; TODO :req-un [::repo]
+          ))
+
+(defmethod ig/init-key :drafter.routes/draftsets-api [_ opts]
+  (draftset-api-routes opts))
+ 

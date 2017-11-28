@@ -52,7 +52,6 @@
 
 (defn- build-handler
   [{backend :repo
-    authenticated-fn :authentication-handler
     draftset-sparql-query-timeout-fn :query-timeout-fn
     live-sparql-route :live-sparql-query-route
     draftset-api-routes :draftset-api-routes

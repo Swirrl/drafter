@@ -20,7 +20,8 @@
             [grafter.rdf4j.formats :refer [mimetype->rdf-format]]
             [integrant.core :as ig]
             [pantomime.media :refer [media-type-named]]
-            [ring.util.request :as request])
+            [ring.util.request :as request]
+            [clojure.spec.alpha :as s])
   (:import clojure.lang.ExceptionInfo
            java.io.File
            org.apache.jena.query.QueryParseException))
@@ -92,8 +93,11 @@
     (fn [inner-handler]
       (wrap-authenticated auth-backends inner-handler realm))))
 
-(defmethod ig/init-key :drafter.middleware/authentication-handler [_ {:keys [user-repo] :as config}]
-  (make-authenticated-wrapper user-repo config))
+(defmethod ig/pre-init-spec :drafter.middleware/wrap-auth [_]
+  (s/keys :req [::user/repo]))
+
+(defmethod ig/init-key :drafter.middleware/wrap-auth [_ {:keys [::user/repo] :as config}]
+  (make-authenticated-wrapper repo config))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]
