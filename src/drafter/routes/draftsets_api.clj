@@ -1,24 +1,21 @@
 (ns drafter.routes.draftsets-api
   (:require [clj-logging-config.log4j :as l4j]
-            [cognician.dogstatsd :as datadog]
             [compojure.core :as compojure :refer [context routes]]
+            [drafter.backend.draftset :as ep]
             [drafter.backend.draftset.draft-management :as mgmt]
+            [drafter.backend.draftset.operations :as dsops]
             [drafter.draftset :as ds]
             [drafter.middleware
              :refer
              [negotiate-quads-content-type-handler
               negotiate-triples-content-type-handler
               optional-enum-param
-              require-params
               require-rdf-content-type
               sparql-constant-prepared-query-handler
               sparql-timeout-handler
               temp-file-body]]
-            [drafter.rdf.draftset-management.job-util
-             :as
-             jobutil
-             :refer
-             [failed-job-result? make-job]]
+            [drafter.rdf.draftset-management.job-util :as jobutil :refer [make-job]]
+            [drafter.rdf.draftset-management.jobs :as dsjobs]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
             [drafter.rdf.sparql-protocol
              :refer
@@ -31,10 +28,10 @@
               submit-async-job!
               unprocessable-entity-response]]
             [drafter.user :as user]
-            [grafter.rdf.protocols :as pr]
-            [grafter.rdf4j.repository :as repo]
             [integrant.core :as ig]
-            [drafter.backend.draftset.operations :as dsops])
+            [ring.util.response :as ring]
+            [swirrl-server.async.jobs :as ajobs]
+            [swirrl-server.responses :as response])
   (:import java.net.URI))
 
 (defn- existing-draftset-handler [backend inner-handler]
@@ -80,7 +77,7 @@
         (h request))
       (inner-handler request))))
 
-(defn- required-live-graph-param-handler [{backend ::backend/uncached-repo} inner-handler]
+(defn- required-live-graph-param-handler [backend inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
     (if (mgmt/is-graph-live? backend graph)
       (inner-handler request)
@@ -173,7 +170,7 @@
                       (fn [{{:keys [draftset-id]} :params user :identity :as request}]
                         (if-let [info (dsops/get-draftset-info backend draftset-id)]
                           (if (user/can-view? user info)
-                            (response info)
+                            (ring/response info)
                             (forbidden-response "Draftset not in accessible state"))
                           (ring/not-found ""))))))
 
@@ -188,7 +185,7 @@
                       backend
                       (fn [{{:keys [draftset-id]} :params user :identity}]
                         (let [permitted (dsops/find-permitted-draftset-operations backend draftset-id user)]
-                          (response permitted))))))
+                          (ring/response permitted))))))
 
         (make-route :get "/draftset/:id/data"
                     (as-draftset-owner
@@ -232,7 +229,7 @@
                            (run-sync #(dsops/delete-draftset-graph! backend draftset-id graph)
                                      #(draftset-sync-write-response % backend draftset-id))
                            (if silent
-                             (response (dsops/get-draftset-info backend draftset-id))
+                             (ring/response (dsops/get-draftset-info backend draftset-id))
                              (unprocessable-entity-response (str "Graph not found")))))))))
 
         (make-route :delete "/draftset/:id/changes"
