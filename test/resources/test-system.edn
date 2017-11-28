@@ -1,11 +1,15 @@
-{
+#merge [#include "repo.edn"
+        #include "user-repo.edn"
+        #include "log-system.edn"
+        #include "web.edn"]
+
+#_{
 
  ;;  :log-config-file #or [#env LOG_CONFIG_FILE "log-config.edn"]
 
  ;;  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
  
- :drafter/write-scheduler {:port #long #or [#port #env DRAFTER_HTTP_PORT 3003]}
-
+ 
  ;;:drafter.services/datadog {}
  
  :drafter/logging {:config "./test/resources/log-config.edn"}
@@ -37,19 +41,30 @@
                        :draftset-api-routes #ig/ref :drafter.routes/draftsets-api
                        }
  
- :drafter.main/datadog {:statsd-address #or [#env DATADOG_STATSD_ADDRESS nil]
-                        :tags {:service :drafter}}
+
  
  :drafter.server/http {:handler #ig/ref :drafter.handler/app
                        :open-browser? false
                        :stacktraces? false
                        :port #long #or [#port #env DRAFTER_HTTP_PORT 3003]}
+
+ :drafter.common/config {:sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
+                         :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT}
+ 
+ :drafter.stasher/filecache {}
+
+ :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/filecache}
+                               ^:ref [:drafter.common/config]]
  
  ;; Also use aero readers
  :drafter.backend/rdf4j-repo {:batched-write-size #or [#env "batched-write-size" 75000] ;; TODO  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
                               :sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
                               :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
 
+ :drafter.backend.draftset/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+                                     :cached-repo #ig/ref :drafter.stasher/repo}
+ 
+ 
  :drafter.user/mongo {:mongo-host #env DRAFTER_MONGO_HOST
                       :mongo-port #port #env DRAFTER_MONGO_PORT
                       :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]
