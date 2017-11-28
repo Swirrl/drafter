@@ -1,5 +1,6 @@
 (ns drafter.user
-  (:require [drafter.util :as util]
+  (:require [clojure.spec.alpha :as s]
+            [drafter.util :as util]
             [integrant.core :as ig])
   (:import java.net.URI
            org.mindrot.jbcrypt.BCrypt))
@@ -149,3 +150,5 @@ permissions."
    #{:claim}
 
    :else #{}))
+
+(s/def ::repo (partial satisfies? UserRepository))

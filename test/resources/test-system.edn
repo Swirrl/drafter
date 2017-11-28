@@ -28,7 +28,7 @@
                                                  :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
 
 
- :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
+   :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
                                :user-repo #ig/ref :drafter.user/repo
                                :authentication-handler #ig/ref :drafter.middleware/authentication-handler
 
