@@ -24,8 +24,9 @@
                                       }
                                      ^:ref [:drafter.common/config]]
 
- :drafter.backend.draftset/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
-                                     :stasher-repo #ig/ref :drafter.stasher/repo}
+ ;; TODO construct drafter instance instead
+ ;; :drafter.backend.draftset/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+ ;;                                     :stasher-repo #ig/ref :drafter.stasher/repo}
  
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -50,7 +51,7 @@
                                                  :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
 
 
- :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend.draftset/endpoint
+ :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
                                 :user-repo #ig/ref :drafter.user/repo
                                 :authentication-handler #ig/ref :drafter.middleware/authentication-handler
 
