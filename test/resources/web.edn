@@ -1,0 +1,35 @@
+{
+ :drafter.middleware/authentication-handler {:user-repo #ig/ref :drafter.user/repo
+                                             :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
+
+ :drafter.handler/live-endpoint-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
+                                            :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
+
+ :drafter.handler/draftset-query-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
+                                             :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
+ 
+ :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.draftset/endpoint
+                                                 :endpoint-timeout-fn #ig/ref :drafter.handler/live-endpoint-timeout-fn
+                                                 :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+
+
+ :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
+                                :user-repo #ig/ref :drafter.user/repo
+                                :authentication-handler #ig/ref :drafter.middleware/authentication-handler
+                                
+                               :draftset-query-timeout-fn #ig/ref :drafter.handler/draftset-query-timeout-fn
+                               :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+ 
+ :drafter.handler/app {:authentication-handler #ig/ref :drafter.middleware/authentication-handler
+                       :repo #ig/ref :drafter.backend/rdf4j-repo
+                       :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
+                       :draftset-api-routes #ig/ref :drafter.routes/draftsets-api
+                       }
+ 
+
+ 
+ :drafter.server/http {:handler #ig/ref :drafter.handler/app
+                       :open-browser? false
+                       :stacktraces? false
+                       :port #long #or [#port #env DRAFTER_HTTP_PORT 3003]}
+ }

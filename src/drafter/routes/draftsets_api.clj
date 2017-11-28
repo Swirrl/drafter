@@ -33,7 +33,8 @@
             [drafter.user :as user]
             [grafter.rdf.protocols :as pr]
             [grafter.rdf4j.repository :as repo]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [drafter.backend.draftset.operations :as dsops])
   (:import java.net.URI))
 
 (defn- existing-draftset-handler [backend inner-handler]
