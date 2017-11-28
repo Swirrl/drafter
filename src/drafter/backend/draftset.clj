@@ -44,7 +44,7 @@
 
 (defn build-draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"
-  [{:keys [backend/uncached-repo backend/stasher-repo]} draftset-ref union-with-live?]
+  [{:keys [uncached-repo stasher-repo]} draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping uncached-repo draftset-ref)]
     (->RewritingSesameSparqlExecutor stasher-repo graph-mapping union-with-live?)))
 
