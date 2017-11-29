@@ -137,7 +137,8 @@
           (t/testing "Results for query are stored on disk"
             ;; evidence that we didn't just run another uncached query
 
-            (let [cached-file (fc/cache-key->cache-path cache basic-construct-query)
+            (let [cache-key (sut/generate-drafter-cache-key cache basic-construct-query nil {:raw-repo raw-repo})
+                  cached-file (fc/cache-key->cache-path cache cache-key)
                   cached-file-statements (-> cached-file
                                              io/input-stream
                                              (rdf/statements :format (fc/backend-rdf-format cache)))]
