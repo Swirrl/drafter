@@ -1,0 +1,41 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+	<http://test.com/made-live-and-deleted-1> a drafter:ManagedGraph ;
+		dcterms:modified "2017-11-29T09:58:36.715Z"^^xsd:dateTime ;
+		drafter:isPublic true ;
+		dcterms:issued "2017-11-29T09:58:36.969Z"^^xsd:dateTime .
+	
+	<http://test.com/graph-2> a drafter:ManagedGraph ;
+		drafter:isPublic false ;
+		drafter:hasDraft draft:dg-1 .
+	
+	<http://test.com/graph-3> a drafter:ManagedGraph ;
+		drafter:isPublic false ;
+		drafter:hasDraft draft:dg-2 .
+	
+	draft:dg-1 a drafter:DraftGraph ;
+		dcterms:modified "2017-11-29T09:58:36.833Z"^^xsd:dateTime ;
+		dcterms:created "2017-11-29T09:58:36.833Z"^^xsd:dateTime .
+	
+	draft:dg-2 a drafter:DraftGraph ;
+		dcterms:modified "2017-11-29T09:58:36.913Z"^^xsd:dateTime ;
+		dcterms:created "2017-11-29T09:58:36.913Z"^^xsd:dateTime .
+}
+
+<http://test.com/made-live-and-deleted-1> {
+	<http://test.com/subject-1> <http://test.com/hasProperty> <http://test.com/data/1> , <http://test.com/data/2> .
+}
+
+draft:dg-1 {
+	<http://test.com/subject-2> <http://test.com/hasProperty> <http://test.com/data/1> , <http://test.com/data/2> .
+}
+
+draft:dg-2 {
+	<http://test.com/subject-3> <http://test.com/hasProperty> <http://test.com/data/1> , <http://test.com/data/2> .
+}

@@ -4,6 +4,7 @@
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
             [drafter.backend.draftset.draft-management :refer :all]
+            [drafter.rdf.drafter-ontology :refer :all]
             [drafter.routes.sparql :refer :all]
             [drafter.test-common
              :refer
@@ -14,23 +15,17 @@
               stream->string
               test-triples
               with-identity
-              wrap-system-setup]]
+              wrap-system-setup
+              deftest-system]]
             [drafter.timeouts :as timeouts]
             [drafter.user-test :refer [test-editor test-system]]
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI))
 
-(use-fixtures :each validate-schemas)
+(use-fixtures :each (join-fixtures [validate-schemas]))
 
-(defn add-test-data!
-  "Set the state of the database so that we have three managed graphs,
-  one of which is made public the other two are still private (draft)."
-  [db]
-  (let [draft-made-live-and-deleted (import-data-to-draft! db (URI. "http://test.com/made-live-and-deleted-1") (test-triples (URI. "http://test.com/subject-1")))
-        draft-2 (import-data-to-draft! db (URI. "http://test.com/graph-2") (test-triples (URI. "http://test.com/subject-2")))
-        draft-3 (import-data-to-draft! db (URI. "http://test.com/graph-3") (test-triples (URI. "http://test.com/subject-3")))]
-    (migrate-graphs-to-live! db [draft-made-live-and-deleted])
-    [draft-made-live-and-deleted draft-2 draft-3]))
+(def draft-graph-1 (draft:graph "dg-1"))
+(def draft-graph-2 (draft:graph "dg-2"))
 
 (def graph-1-result [(URI. "http://test.com/subject-1") (URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")])
 
@@ -55,16 +50,16 @@
              query-request graphs))))
 
 (defn live-query [qstr]
-  (build-query "/sparql/live" qstr nil))
+  (build-query "/v1/sparql/live" qstr nil))
 
 (defn csv-> [{:keys [body]}]
   "Parse a response into a CSV"
   (-> body stream->string csv/parse-csv))
 
-(deftest live-sparql-routes-test
-  (let [[draft-graph-1 draft-graph-2] (add-test-data! *test-backend*)
-        endpoint (live-sparql-routes "/sparql/live" *test-backend* timeouts/calculate-default-request-timeout)
-        {:keys [status headers body]
+(deftest-system live-sparql-routes-test
+  [{endpoint :drafter.routes.sparql/live-sparql-query-route
+    :keys [drafter.stasher/repo] :as system} "drafter/routes/sparql-test/system.edn"]
+  (let [{:keys [status headers body]
          :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
         csv-result (csv-> result)]
 
@@ -83,12 +78,11 @@
         (is (empty? (second csv-result)))))
 
     (testing "Offline public graphs are not exposed"
-      (set-isPublic! *test-backend* "http://test.com/made-live-and-deleted-1" false)
+      (set-isPublic! repo "http://test.com/made-live-and-deleted-1" false)
       (let [csv-result (csv-> (endpoint
                                (live-query
                                 (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
-
         (is (not= graph-1-result (second csv-result)))))))
 
-(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
-;(use-fixtures :each (partial wrap-clean-test-db))
+
+
