@@ -8,7 +8,9 @@
              [timeouts :as timeouts]]
             [drafter.rdf.sesame
              :refer
-             [create-signalling-query-handler get-query-type]])
+             [create-signalling-query-handler get-query-type]]
+            [integrant.core :as ig]
+            [clojure.spec.alpha :as s])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            java.util.concurrent.TimeUnit
            org.eclipse.rdf4j.query.QueryInterruptedException
@@ -86,14 +88,24 @@
        (prepare-handler)
        (sparql-query-parser-handler)))
 
-(defn sparql-protocol-handler [executor query-timeout-fn]
-  (build-sparql-protocol-handler #(sparql-prepare-query-handler executor %) sparql-execution-handler query-timeout-fn))
+(def default-query-timeout-fn (fn [request] timeouts/default-query-timeout))
+
+(s/def ::timeout-fn fn?)
+
+(defn sparql-protocol-handler
+  "Builds a SPARQL endpoint from a SPARQL executor/repo and a
+  timeout-fn.  The handler is not mounted to a specific route/path."
+  [{:keys [repo timeout-fn]}]
+  (build-sparql-protocol-handler #(sparql-prepare-query-handler repo %) sparql-execution-handler timeout-fn))
+
+(defmethod ig/init-key ::handler [_ opts]
+  (sparql-protocol-handler opts))
 
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path, a SPARQL executor and
   an optional restriction function which returns a list of graph uris
   to restrict both the union and named-graph queries too."
 
-  ([mount-path executor] (sparql-end-point mount-path executor (fn [request] timeouts/default-query-timeout)))
+  ([mount-path executor] (sparql-end-point mount-path executor default-query-timeout-fn))
   ([mount-path executor query-timeout-fn]
-   (make-route nil mount-path (sparql-protocol-handler executor query-timeout-fn))))
+   (make-route nil mount-path (sparql-protocol-handler {:repo executor :timeout-fn query-timeout-fn}))))

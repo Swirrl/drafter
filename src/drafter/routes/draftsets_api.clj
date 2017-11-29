@@ -19,7 +19,8 @@
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
             [drafter.rdf.sparql-protocol
              :refer
-             [sparql-execution-handler sparql-protocol-handler]]
+             [sparql-execution-handler sparql-protocol-handler]
+             :as sp]
             [drafter.responses
              :refer
              [conflict-detected-response
@@ -141,7 +142,7 @@
 (defn draftset-api-routes [{backend :repo
                             user-repo ::user/repo
                             authenticated :wrap-auth
-                            draftset-query-timeout-fn :draftset-query-timeout-fn
+                            draftset-query-timeout-fn :timeout-fn
                             get-draftsets-handler :get-draftsets-handler}]
   
   (letfn [(required-live-graph-param [handler]
@@ -282,7 +283,7 @@
                      (parse-union-with-live-handler
                       (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
                         (let [executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
-                              handler (sparql-protocol-handler executor draftset-query-timeout-fn)]
+                              handler (sparql-protocol-handler {:repo executor :timeout-fn draftset-query-timeout-fn})]
                           (handler request))))))
 
         (make-route :post "/draftset/:id/publish"
@@ -354,11 +355,10 @@
                           (ring/not-found "Draftset not found")))))))))))
 
 
-(s/def ::draftset-query-timeout-fn fn?)
 (s/def ::wrap-auth fn?)
 
 (defmethod ig/pre-init-spec :drafter.routes/draftsets-api [_]
-  (s/keys :req-un [::wrap-auth ::draftset-query-timeout-fn]
+  (s/keys :req-un [::wrap-auth ::sp/timeout-fn]
           :req [::user/repo]
           ;; TODO :req-un [::repo]
           ))

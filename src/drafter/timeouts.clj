@@ -6,7 +6,8 @@
             [drafter.util :as util]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
-            [drafter.util :as util])
+            [drafter.util :as util]
+            [integrant.core :as ig])
   (:import org.apache.commons.codec.DecoderException))
 
 (defn try-parse-timeout
@@ -128,3 +129,8 @@
     (if (nil? mac-signing-key)
       unprivileged-timeout-fn
       (calculate-privileged-timeout mac-signing-key unprivileged-timeout-fn))))
+
+(defmethod ig/init-key ::timeout-query [_ {:keys [endpoint-timeout jws-signing-key] :as config}]
+  (when (nil? jws-signing-key)
+    (log/warn "jws-signing-key not configured - any PMD query timeouts will be ignored"))
+  (calculate-request-query-timeout endpoint-timeout jws-signing-key))
