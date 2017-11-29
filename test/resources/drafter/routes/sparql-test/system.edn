@@ -1,0 +1,11 @@
+#merge [#include "../../../repo.edn"
+        {:drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.live/endpoint
+                                                         :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/test-timeout]}
+
+         [:drafter.timeouts/timeout-query :drafter/test-timeout] {:endpoint-timeout 30
+                                                                  :jws-signing-key "foo"}
+
+         :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo
+                                       :fixtures [#resource "drafter/routes/sparql-test/start-state.trig"]}
+         }
+        ]

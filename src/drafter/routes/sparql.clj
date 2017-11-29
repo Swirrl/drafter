@@ -6,6 +6,13 @@
             [clojure.spec.alpha :as s]
             [drafter.timeouts :as timeouts]))
 
+;; TODO: Remove this namespace as all it really adds to
+;; sparql-protocol is some route-matching code to /v1/sparql/:name
+;; which should really just be moved into config.
+;;
+;; When we do this we should move the tests also (would suggest into
+;; sparql-protocol-test if they're not dupes.)
+
 (def ^:private v1-prefix :v1)
 
 (defn live-sparql-routes [mount-point endpoint query-timeout-fn]

@@ -3,6 +3,8 @@
             [grafter.vocabularies.dcterms :refer :all])
   (:import [java.net URI]))
 
+(def pmd-graphs (URI. "http://publishmydata.com/graphs/"))
+
 (def drafter (URI. "http://publishmydata.com/def/drafter/"))
 (def draftset-uri (URI. "http://publishmydata.com/def/drafter/draftset/"))
 
@@ -43,3 +45,8 @@
 (def drafter:claimUser (url/append-path-segments drafter "claimUser"))
 
 (def drafter:submittedBy (url/append-path-segments drafter "submittedBy"))
+
+(def drafter:draft (url/append-path-segments drafter ))
+
+(defn draft:graph [graph-id]
+  (url/append-path-segments pmd-graphs "drafter" "draft" graph-id))
