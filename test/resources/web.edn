@@ -1,17 +1,15 @@
 {
  :drafter.middleware/wrap-auth {:drafter.user/repo #ig/ref :drafter.user/repo
                                 :jws-signing-key "foo"}
- 
- 
- :drafter.handler/live-endpoint-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
-                                            :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
 
- :drafter.handler/draftset-query-timeout-fn {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
-                                             :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
+ [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout 30
+                                                          :jws-signing-key "foo"}
+
+ [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout 30
+                                                              :jws-signing-key "foo"}
  
  :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.draftset/endpoint
-                                                 :endpoint-timeout-fn #ig/ref :drafter.handler/live-endpoint-timeout-fn
-                                                 :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+                                                 :endpoint-timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
 
  :drafter.routes.draftsets-api/get-draftsets-handler {:repo #ig/ref :drafter.backend/rdf4j-repo
@@ -21,9 +19,7 @@
                                 :drafter.user/repo #ig/ref :drafter.user/repo
                                 :wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                 :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
-
-                                :draftset-query-timeout-fn #ig/ref :drafter.handler/draftset-query-timeout-fn
-                                :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+                                :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
  
  :drafter.handler/app {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                        :repo #ig/ref :drafter.backend/rdf4j-repo

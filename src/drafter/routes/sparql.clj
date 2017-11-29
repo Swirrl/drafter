@@ -1,8 +1,10 @@
 (ns drafter.routes.sparql
   (:require [compojure.core :refer [make-route]]
             [drafter.rdf
-             [sparql-protocol :refer [sparql-end-point sparql-protocol-handler]]]
-            [integrant.core :as ig]))
+             [sparql-protocol :refer [sparql-end-point] :as sp]]
+            [integrant.core :as ig]
+            [clojure.spec.alpha :as s]
+            [drafter.timeouts :as timeouts]))
 
 (def ^:private v1-prefix :v1)
 
@@ -15,9 +17,12 @@
       (str "/" (name version) suffix)
       suffix)))
 
-(defn- get-live-sparql-query-route [backend {:keys [live-query-timeout endpoint-timeout-fn] :as config}]
+(defn- get-live-sparql-query-route [backend {:keys [timeout-fn] :as config}]
   (let [mount-point (endpoint-query-path :live v1-prefix)]
-    (live-sparql-routes mount-point backend endpoint-timeout-fn)))
+    (live-sparql-routes mount-point backend (or timeout-fn sp/default-query-timeout-fn))))
+
+(defmethod ig/pre-init-spec ::live-sparql-query-route [_]
+  (s/keys :opt-un [::sp/timeout-fn]))
 
 (defmethod ig/init-key ::live-sparql-query-route [_ {:keys [repo] :as opts}]
   (get-live-sparql-query-route repo opts))

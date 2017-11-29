@@ -31,17 +31,6 @@
 (def add-route conj)
 (def add-routes into)
 
-(defn- get-endpoint-query-timeout-fn [{:keys [endpoint-timeout jws-signing-key] :as config}]
-  (when (nil? jws-signing-key)
-    (log/warn "jws-signing-key not configured - any PMD query timeouts will be ignored"))
-  (timeouts/calculate-request-query-timeout endpoint-timeout jws-signing-key))
-
-(defmethod ig/init-key :drafter.handler/live-endpoint-timeout-fn [_ opts]
-  (get-endpoint-query-timeout-fn opts))
-
-(defmethod ig/init-key :drafter.handler/draftset-query-timeout-fn [_ opts]
-  (get-endpoint-query-timeout-fn opts))
-
 (defn- wrap-handler [handler]
   (-> handler
       ;; Makes static assets in $PROJECT_DIR/resources/public/ available.
