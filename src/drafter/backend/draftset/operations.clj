@@ -203,12 +203,6 @@
         mapping-pairs (map (juxt :live-graph-uri :draft-graph-uri) graph-states)]
     (into {} mapping-pairs)))
 
-#_(defn get-draftset-executor
-  "Build a SPARQL queryable repo representing the draftset"
-  [{:keys [backend draftset-ref union-with-live?]}]
-  (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
-    (->RewritingSesameSparqlExecutor backend graph-mapping union-with-live?)))
-
 (defn- user-is-owner-clause [user]
   (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
 
