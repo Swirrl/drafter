@@ -111,10 +111,10 @@
         (do ~@forms)))))
 
 (defmacro deftest-system-with-keys
-  ([name start-keys binding-form forms]
-   `(deftest ~name
-      (with-system ~start-keys ~binding-form
-        (do ~@forms)))))
+  [name start-keys binding-form & forms]
+  `(deftest ~name
+     (with-system ~start-keys ~binding-form
+       (do ~@forms))))
 
 (defn ^{:deprecated "Use with-system instead."} wrap-system-setup
   "Start an integrant test system.  Uses dynamic bindings to support
