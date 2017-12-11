@@ -8,9 +8,19 @@
   (:import java.net.URI))
 
 
-
 (deftest-system-with-keys drafter-backend-test [:drafter/backend :drafter.fixture-data/loader]
   [{:keys [:drafter/backend] :as sys} "drafter/backend-test.edn"]
+
+  (t/testing "unrestricted repository"
+    (let [conn (repo/->connection backend)]
+      (t/is (-> conn
+                (repo/query "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { ?s ?p ?o } }"))
+            "We can see the state graph")
+
+      (t/is (-> conn
+                (repo/query "ASK { GRAPH <http://live-only> { ?s ?p ?o } }"))
+            "We can see live graphs")))
+  
   (t/testing "endpoint-repo"
     (t/testing "getting just the live/public data"
       (let [live-endpoint (sut/endpoint-repo backend ::sut/live {})
@@ -19,7 +29,7 @@
                                                     "SELECT ?g WHERE { GRAPH ?g { ?s ?p ?o }}")))]
         (t/is (= state/expected-live-graphs
                  visible-graphs))))
-
+    
     
     (t/testing "getting draftset repo"
       (let [ds1-endpoint (sut/endpoint-repo backend state/ds-1 {:union-with-live true})] 

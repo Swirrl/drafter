@@ -52,13 +52,35 @@
  :drafter.routes.draftsets-api/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
                                                       :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
+ :drafter.routes.draftsets-api/get-draftset-handler {:drafter/backend #ig/ref :drafter/backend
+                                                     :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
+
+ :drafter.routes.draftsets-api/create-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
+                                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
+ :drafter.routes.draftsets-api/wrap-as-draftset-owner {:drafter/backend #ig/ref :drafter/backend
+                                                       :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
+ :drafter.routes.draftsets-api/delete-draftset-handler {:drafter/backend #ig/ref :drafter/backend
+                                                        :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/draftset-options-handler{:drafter/backend #ig/ref :drafter/backend
+                                                        :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
  
  
  :drafter.routes/draftsets-api {;;:repo #ig/ref :drafter.backend/rdf4j-repo
                                 :backend #ig/ref :drafter/backend
                                 :drafter.user/repo #ig/ref :drafter.user/repo
                                 :wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner
+
                                 :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
+                                :create-draftsets-handler #ig/ref :drafter.routes.draftsets-api/create-draftsets-handler
+                                :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
+                                :delete-draftset-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-handler
+                                :draftset-options-handler #ig/ref :drafter.routes.draftsets-api/draftset-options-handler
+                                
                                 :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]
                                 :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
  
