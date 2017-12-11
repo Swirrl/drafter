@@ -13,14 +13,15 @@
 
 (def construct-graph-query "CONSTRUCT { ?g ?g ?g } WHERE { GRAPH ?g { ?s ?p ?o }}")
 
-(deftest-system endpoint-test-querying
+(deftest-system endpoint-test-prepare-query
   [{:keys [drafter.backend.live/endpoint
-           drafter.stasher/filecache]} "drafter/backend/live-test.edn"]
+           drafter.stasher/filecache]
+    uncached-repo :drafter.backend/rdf4j-repo} "drafter/backend/live-test.edn"]
 
   (t/testing ":drafter.backend.live/endpoint is both cached and restricted"
     (t/testing "Restricted Endpoint restricts queries to live graphs only"
-      (let [preped-query (bcom/prepare-query endpoint construct-graph-query)
-
+      (let [preped-query (repo/prepare-query (repo/->connection endpoint) construct-graph-query)
+            
             ;; As this test uses a construct :s is indeed :g
             visible-graphs (set (map :s (repo/evaluate preped-query)))]
         (t/is (= #{live-graph-1 live-graph-only}
@@ -30,10 +31,23 @@
           (let [expected-triples #{(->Triple live-graph-1 live-graph-1 live-graph-1)
                                    (->Triple live-graph-only live-graph-only live-graph-only)}]
             (stasher-test/assert-cached-results filecache
-                                                endpoint
+                                                uncached-repo
                                                 construct-graph-query
                                                 (.getDataset preped-query)
                                                 expected-triples)))))))
+
+(deftest-system endpoint-test-query
+  [{:keys [drafter.backend.live/endpoint]} "drafter/backend/live-test.edn"]
+
+  (t/testing ":drafter.backend.live/endpoint"
+    (t/testing "query-dataset interface restricts queries to live graphs only"
+      (let [results (repo/query (repo/->connection endpoint) construct-graph-query)
+            ;; As this test uses a construct :s is indeed :g
+            visible-graphs (set (map :s results))]
+        (t/is (= #{live-graph-1 live-graph-only}
+                 visible-graphs))))))
+
+
 
 (def all-live-triples #{(->Triple (URI. "http://a") (URI. "http://a") (URI. "http://a"))
                         (->Triple (URI. "http://live-only") (URI. "http://live-only") (URI. "http://live-only"))})

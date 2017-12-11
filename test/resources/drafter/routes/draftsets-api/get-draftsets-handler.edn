@@ -1,0 +1,9 @@
+#merge [#include "../../../backend.edn"
+        #include "../../../repo.edn"
+        #include "../../../user-repo.edn"
+        #include "../../../log-system.edn"
+        #include "../../../web.edn"
+        {:drafter.routes.draftsets-api/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
+                                                              :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+         :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo
+                                       :fixtures [#resource "drafter/routes/draftsets-api/get-draftsets-handler.trig"]}}]

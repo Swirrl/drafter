@@ -14,20 +14,23 @@
            org.eclipse.rdf4j.model.Resource))
 
 (defn- build-restricted-connection [{:keys [inner restriction]}]
-  (let [conn (repo/->connection inner)]
+  (let [stasher-conn (repo/->connection inner)]
     (reify
       repo/IPrepareQuery
-      (repo/prepare-query* [this sparql-string restriction]
-        (repo/prepare-query* conn sparql-string restriction))
+      (repo/prepare-query* [this sparql-string _]
+        (let [pquery (-> (bprot/prep-and-validate-query stasher-conn sparql-string)
+                         (bprot/apply-restriction restriction))]
+          pquery))
+      
       ;; Currently restricted connections only support querying...
       proto/ISPARQLable
       (proto/query-dataset [this sparql-string dataset]
-        (let [pquery (bprot/prep-and-validate-query conn sparql-string)]
-          (bprot/apply-restriction pquery restriction)
+        (let [pquery (repo/prepare-query* this sparql-string dataset)]
           (repo/evaluate pquery)))
+      
       Closeable
       (close [this]
-        (.close conn))
+        (.close stasher-conn))
 
       ;; For completeness... a to-statements implementation that
       ;; enforces the graph restriction.
@@ -37,12 +40,13 @@
                   (when (.hasNext i)
                     (let [v (.next i)]
                       (lazy-seq (cons (rio/backend-quad->grafter-quad v) (next-item i))))))]
-          (let [iter (.getStatements conn nil nil nil infer (into-array Resource (map #(URIImpl. (str %)) (restriction))))]
+          (let [iter (.getStatements stasher-conn nil nil nil infer (into-array Resource (map #(URIImpl. (str %)) (restriction))))]
             (f iter)))))))
 
 (defrecord RestrictedExecutor [inner restriction]
-  bprot/SparqlExecutor
-  (prepare-query [this query-string]
+  ;; TODO Think we should get rid of this...
+  #_bprot/SparqlExecutor
+  #_(prepare-query [this query-string]
     (let [pquery (bprot/prep-and-validate-query inner query-string)]
       (bprot/apply-restriction pquery restriction)))
 

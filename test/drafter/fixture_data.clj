@@ -27,6 +27,6 @@
 (defmethod ig/init-key ::loader [_ opts]
   (load-fixture! opts))
 
-(defmethod ig/halt-key! ::loader [_ {:keys [repo]}]
+(defmethod ig/halt-key! ::loader [_ {:keys [repo] :as sys}]
   (with-open [conn (repo/->connection repo)]
     (pr/update! conn "DROP ALL ;")))

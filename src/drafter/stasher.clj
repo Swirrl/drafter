@@ -46,9 +46,11 @@
   (let [modified-state (fetch-modified-state raw-repo dataset)
         dataset-value (dataset->edn dataset)]
 
-    {:dataset dataset-value
-     :query-str query-str
-     :modified-times modified-state}))
+    (let [k {:dataset dataset-value
+             :query-str query-str
+             :modified-times modified-state}]
+      (println "cache key " k)
+      k)))
 
 (defn stashing->boolean-query
   "Construct a boolean query that checks the stash before evaluating"
