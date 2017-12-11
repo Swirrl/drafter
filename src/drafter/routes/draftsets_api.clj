@@ -222,200 +222,287 @@
 (defmethod ig/init-key ::draftset-options-handler [_ opts]
   (draftset-options-handler opts))
 
+(defn draftset-get-data [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend
+                          draftset-query-timeout-fn :timeout-fn}]
+  (wrap-as-draftset-owner
+   (parse-union-with-live-handler
+    (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
+      (let [executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
+            is-triples-query? (contains? params :graph)
+            conneg (if is-triples-query?
+                     negotiate-triples-content-type-handler
+                     negotiate-quads-content-type-handler)
+            pquery (if is-triples-query?
+                     (dsops/all-graph-triples-query executor graph)
+                     (dsops/all-quads-query executor))
+            handler (->> sparql-execution-handler
+                         (sp/sparql-timeout-handler draftset-query-timeout-fn)
+                         (conneg)
+                         (sp/sparql-constant-prepared-query-handler pquery))]
+        (handler request))))))
+
+(defmethod ig/pre-init-spec ::draftset-get-data [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner ::sp/timeout-fn]))
+
+(defmethod ig/init-key ::draftset-get-data [_ opts]
+  (draftset-get-data opts))
+
+(defn delete-draftset-data-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
+  (wrap-as-draftset-owner
+   (require-rdf-content-type
+    (require-graph-for-triples-rdf-format
+     (temp-file-body
+      (fn [{{draftset-id :draftset-id
+            graph :graph
+            rdf-format :rdf-format} :params body :body :as request}]
+        (let [delete-job (if (is-quads-format? rdf-format)
+                           (dsjobs/delete-quads-from-draftset-job backend draftset-id body rdf-format)
+                           (dsjobs/delete-triples-from-draftset-job backend draftset-id graph body rdf-format))]
+          (submit-async-job! delete-job))))))))
+
+(defmethod ig/pre-init-spec ::delete-draftset-data-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner]))
+
+(defmethod ig/init-key ::delete-draftset-data-handler [_ opts]
+  (delete-draftset-data-handler opts))
+
+(defn delete-draftset-graph-handler [{backend :drafter/backend wrap-as-draftset-owner :wrap-as-draftset-owner}]
+  (wrap-as-draftset-owner
+   (parse-query-param-flag-handler
+    :silent
+    (parse-graph-param-handler
+     true
+     (fn [{{:keys [draftset-id graph silent]} :params :as request}]
+       (if (mgmt/is-graph-managed? backend graph)
+         (run-sync #(dsops/delete-draftset-graph! backend draftset-id graph)
+                   #(draftset-sync-write-response % backend draftset-id))
+         (if silent
+           (ring/response (dsops/get-draftset-info backend draftset-id))
+           (unprocessable-entity-response (str "Graph not found")))))))))
+
+(defmethod ig/pre-init-spec ::delete-draftset-graph-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner]))
+
+(defmethod ig/init-key ::delete-draftset-graph-handler [_ opts]
+  (delete-draftset-graph-handler opts))
+
+(defn delete-draftset-changes-handler [{backend :drafter/backend wrap-as-draftset-owner :wrap-as-draftset-owner}]
+  (wrap-as-draftset-owner
+   (parse-graph-param-handler
+    true
+    (fn [{{:keys [draftset-id graph]} :params}]
+      (run-sync #(dsops/revert-graph-changes! backend draftset-id graph)
+                (fn [result]
+                  (if (jobutil/failed-job-result? result)
+                    (response/api-response 500 result)
+                    (if (= :reverted (:details result))
+                      (ring/response (dsops/get-draftset-info backend draftset-id))
+                      (ring/not-found "")))))))))
+
+(defmethod ig/pre-init-spec ::delete-draftset-changes-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner]))
+
+(defmethod ig/init-key ::delete-draftset-changes-handler [_ opts]
+  (delete-draftset-changes-handler opts))
+
+(defn put-draftset-data-handler [{backend :drafter/backend wrap-as-draftset-owner :wrap-as-draftset-owner}]
+  (wrap-as-draftset-owner
+   (require-rdf-content-type
+    (require-graph-for-triples-rdf-format
+     (temp-file-body
+      (fn [{{draftset-id :draftset-id
+            rdf-format :rdf-format
+            graph :graph} :params body :body :as request}]
+        (if (is-quads-format? rdf-format)
+          (let [append-job (dsjobs/append-data-to-draftset-job backend draftset-id body rdf-format)]
+            (submit-async-job! append-job))
+          (let [append-job (dsjobs/append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
+            (submit-async-job! append-job)))))))))
+
+(defmethod ig/pre-init-spec ::put-draftset-data-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner]))
+
+(defmethod ig/init-key ::put-draftset-data-handler [_ opts]
+  (put-draftset-data-handler opts))
+
+(defn put-draftset-graph-handler [{backend :drafter/backend
+                                   :keys [wrap-as-draftset-owner]}]
+  (letfn [(required-live-graph-param [handler]
+            (parse-graph-param-handler true (required-live-graph-param-handler backend handler)))]
+    
+    (wrap-as-draftset-owner
+     (required-live-graph-param
+      (fn [{{:keys [draftset-id graph]} :params}]
+        (submit-async-job! (dsjobs/copy-live-graph-into-draftset-job backend draftset-id graph)))))))
+
+(defmethod ig/pre-init-spec ::put-draftset-graph-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner]))
+
+(defmethod ig/init-key ::put-draftset-graph-handler [_ opts]
+  (put-draftset-graph-handler opts))
+
+(defn draftset-query-handler [{backend :drafter/backend
+                               :keys [wrap-as-draftset-owner timeout-fn]}]
+  (wrap-as-draftset-owner
+   (parse-union-with-live-handler
+    (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
+      (let [;;executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
+
+            executor (backend/endpoint-repo backend draftset-id {:union-with-live? union-with-live})
+            handler (sparql-protocol-handler {:repo executor :timeout-fn timeout-fn})]
+        (handler request))))))
+
+(defmethod ig/pre-init-spec ::draftset-query-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner ::sp/timeout-fn]))
+
+(defmethod ig/init-key ::draftset-query-handler [_ opts]
+  (draftset-query-handler opts))
+
 (defn draftset-api-routes [{backend :drafter/backend
                             user-repo ::user/repo
                             authenticated :wrap-auth
                             draftset-query-timeout-fn :timeout-fn
-                            get-draftsets-handler :get-draftsets-handler
-                            get-draftset-handler :get-draftset-handler
-                            create-draftsets-handler :create-draftsets-handler
-                            wrap-as-draftset-owner :wrap-as-draftset-owner
-                            delete-draftset-handler :delete-draftset-handler}]
+                            :keys [get-draftsets-handler
+                                   get-draftset-handler 
+                                   create-draftsets-handler
+                                   wrap-as-draftset-owner 
+                                   delete-draftset-handler
+                                   draftset-get-data-handler 
+                                   delete-draftset-data-handler
+                                   delete-draftset-graph-handler
+                                   delete-draftset-changes-handler
+                                   put-draftset-data-handler
+                                   put-draftset-graph-handler
+                                   draftset-query-handler]}]
   
-  (letfn [(required-live-graph-param [handler]
-            (parse-graph-param-handler true (required-live-graph-param-handler backend handler)))]
+  (let [version "/v1"]
+    (context
+     version []
+     (routes
+      (make-route :get "/users"
+                  (authenticated
+                   (fn [r]
+                     (let [users (user/get-all-users user-repo)
+                           summaries (map user/get-summary users)]
+                       (ring/response summaries)))))
 
-    (let [version "/v1"]
-      (context
-       version []
-       (routes
-        (make-route :get "/users"
-                    (authenticated
-                     (fn [r]
-                       (let [users (user/get-all-users user-repo)
-                             summaries (map user/get-summary users)]
-                         (ring/response summaries)))))
+      (make-route :get "/draftsets" get-draftsets-handler)
 
-        (make-route :get "/draftsets" get-draftsets-handler)
+      ;; create a new draftset
+      (make-route :post "/draftsets" create-draftsets-handler)
 
-        ;; create a new draftset
-        (make-route :post "/draftsets" create-draftsets-handler)
+      (make-route :get "/draftset/:id" get-draftset-handler)
 
-        (make-route :get "/draftset/:id" get-draftset-handler)
+      (make-route :delete "/draftset/:id" delete-draftset-handler)
 
-        (make-route :delete "/draftset/:id" delete-draftset-handler)
+      (make-route :options "/draftset/:id" draftset-options-handler)
 
-        (make-route :options "/draftset/:id" draftset-options-handler)
+      (make-route :get "/draftset/:id/data" draftset-get-data-handler)
 
-        (make-route :get "/draftset/:id/data"
-                    (wrap-as-draftset-owner
-                     (parse-union-with-live-handler
-                      (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
-                        (let [executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
-                              is-triples-query? (contains? params :graph)
-                              conneg (if is-triples-query?
-                                       negotiate-triples-content-type-handler
-                                       negotiate-quads-content-type-handler)
-                              pquery (if is-triples-query?
-                                       (dsops/all-graph-triples-query executor graph)
-                                       (dsops/all-quads-query executor))
-                              handler (->> sparql-execution-handler
-                                           (sparql-timeout-handler draftset-query-timeout-fn)
-                                           (conneg)
-                                           (sparql-constant-prepared-query-handler pquery))]
-                          (handler request))))))
+      (make-route :delete "/draftset/:id/data" delete-draftset-data-handler)
 
-        (make-route :delete "/draftset/:id/data"
-                    (wrap-as-draftset-owner
-                     (require-rdf-content-type
-                      (require-graph-for-triples-rdf-format
-                       (temp-file-body
-                        (fn [{{draftset-id :draftset-id
-                              graph :graph
-                              rdf-format :rdf-format} :params body :body :as request}]
-                          (let [delete-job (if (is-quads-format? rdf-format)
-                                             (dsjobs/delete-quads-from-draftset-job backend draftset-id body rdf-format)
-                                             (dsjobs/delete-triples-from-draftset-job backend draftset-id graph body rdf-format))]
-                            (submit-async-job! delete-job))))))))
+      (make-route :delete "/draftset/:id/graph" delete-draftset-graph-handler)
 
-        (make-route :delete "/draftset/:id/graph"
-                    (wrap-as-draftset-owner
-                     (parse-query-param-flag-handler
-                      :silent
-                      (parse-graph-param-handler
-                       true
-                       (fn [{{:keys [draftset-id graph silent]} :params :as request}]
-                         (if (mgmt/is-graph-managed? backend graph)
-                           (run-sync #(dsops/delete-draftset-graph! backend draftset-id graph)
+      (make-route :delete "/draftset/:id/changes" delete-draftset-changes-handler)
+
+      (make-route :put "/draftset/:id/data" put-draftset-data-handler)
+      
+      (make-route :put "/draftset/:id/graph" put-draftset-graph-handler)
+
+      (make-route nil "/draftset/:id/query" draftset-query-handler)
+
+      (make-route :post "/draftset/:id/publish"
+                  (wrap-as-draftset-owner
+                   (fn [{{:keys [draftset-id]} :params user :identity}]
+                     (if (user/has-role? user :publisher)
+                       (submit-async-job! (dsjobs/publish-draftset-job backend draftset-id))
+                       (forbidden-response "You require the publisher role to perform this action")))))
+
+      (make-route :put "/draftset/:id"
+                  (wrap-as-draftset-owner
+                   (fn [{{:keys [draftset-id] :as params} :params}]
+                     (run-sync #(dsops/set-draftset-metadata! backend draftset-id params)
+                               #(draftset-sync-write-response % backend draftset-id)))))
+
+      (make-route :post "/draftset/:id/submit-to"
+                  (wrap-as-draftset-owner
+                   (fn [{{:keys [user role draftset-id]} :params owner :identity}]
+                     (cond
+                       (and (some? user) (some? role))
+                       (unprocessable-entity-response "Only one of user and role parameters permitted")
+
+                       (some? user)
+                       (if-let [target-user (user/find-user-by-username user-repo user)]
+                         (run-sync #(dsops/submit-draftset-to-user! backend draftset-id owner target-user)
+                                   #(draftset-sync-write-response % backend draftset-id))
+                         (unprocessable-entity-response (str "User: " user " not found")))
+
+                       (some? role)
+                       (let [role-kw (keyword role)]
+                         (if (user/is-known-role? role-kw)
+                           (run-sync #(dsops/submit-draftset-to-role! backend draftset-id owner role-kw)
                                      #(draftset-sync-write-response % backend draftset-id))
-                           (if silent
-                             (ring/response (dsops/get-draftset-info backend draftset-id))
-                             (unprocessable-entity-response (str "Graph not found")))))))))
+                           (unprocessable-entity-response (str "Invalid role: " role))))
 
-        (make-route :delete "/draftset/:id/changes"
-                    (wrap-as-draftset-owner
-                     (parse-graph-param-handler
-                      true
-                      (fn [{{:keys [draftset-id graph]} :params}]
-                        (run-sync #(dsops/revert-graph-changes! backend draftset-id graph)
-                                  (fn [result]
-                                    (if (jobutil/failed-job-result? result)
-                                      (response/api-response 500 result)
-                                      (if (= :reverted (:details result))
-                                        (ring/response (dsops/get-draftset-info backend draftset-id))
-                                        (ring/not-found "")))))))))
+                       :else
+                       (unprocessable-entity-response (str "user or role parameter required"))))))
 
-        (make-route :put "/draftset/:id/data"
-                    (wrap-as-draftset-owner
-                     (require-rdf-content-type
-                      (require-graph-for-triples-rdf-format
-                       (temp-file-body
-                        (fn [{{draftset-id :draftset-id
-                              rdf-format :rdf-format
-                              graph :graph} :params body :body :as request}]
-                          (if (is-quads-format? rdf-format)
-                            (let [append-job (dsjobs/append-data-to-draftset-job backend draftset-id body rdf-format)]
-                              (submit-async-job! append-job))
-                            (let [append-job (dsjobs/append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
-                              (submit-async-job! append-job)))))))))
+      (make-route :put "/draftset/:id/claim"
+                  (authenticated
+                   (existing-draftset-handler
+                    backend
+                    (fn [{{:keys [draftset-id]} :params user :identity}]
+                      (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
+                        (if (user/can-claim? user ds-info)
+                          (let [[result ds-info] (dsops/claim-draftset! backend draftset-id user)]
+                            (if (= :ok result)
+                              (ring/response ds-info)
+                              (conflict-detected-response "Failed to claim draftset")))
+                          (forbidden-response "User not in role for draftset claim"))
+                        (ring/not-found "Draftset not found"))))))
 
-        (make-route :put "/draftset/:id/graph"
-                    (wrap-as-draftset-owner
-                     (required-live-graph-param
-                      (fn [{{:keys [draftset-id graph]} :params}]
-                        (submit-async-job! (dsjobs/copy-live-graph-into-draftset-job backend draftset-id graph))))))
-
-        (make-route nil "/draftset/:id/query"
-                    (wrap-as-draftset-owner
-                     (parse-union-with-live-handler
-                      (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-                        (let [executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
-                              handler (sparql-protocol-handler {:repo executor :timeout-fn draftset-query-timeout-fn})]
-                          (handler request))))))
-
-        (make-route :post "/draftset/:id/publish"
-                    (wrap-as-draftset-owner
-                     (fn [{{:keys [draftset-id]} :params user :identity}]
-                       (if (user/has-role? user :publisher)
-                         (submit-async-job! (dsjobs/publish-draftset-job backend draftset-id))
-                         (forbidden-response "You require the publisher role to perform this action")))))
-
-        (make-route :put "/draftset/:id"
-                    (wrap-as-draftset-owner
-                     (fn [{{:keys [draftset-id] :as params} :params}]
-                       (run-sync #(dsops/set-draftset-metadata! backend draftset-id params)
-                                 #(draftset-sync-write-response % backend draftset-id)))))
-
-        (make-route :post "/draftset/:id/submit-to"
-                    (wrap-as-draftset-owner
-                     (fn [{{:keys [user role draftset-id]} :params owner :identity}]
-                       (cond
-                         (and (some? user) (some? role))
-                         (unprocessable-entity-response "Only one of user and role parameters permitted")
-
-                         (some? user)
-                         (if-let [target-user (user/find-user-by-username user-repo user)]
-                           (run-sync #(dsops/submit-draftset-to-user! backend draftset-id owner target-user)
-                                     #(draftset-sync-write-response % backend draftset-id))
-                           (unprocessable-entity-response (str "User: " user " not found")))
-
-                         (some? role)
-                         (let [role-kw (keyword role)]
-                           (if (user/is-known-role? role-kw)
-                             (run-sync #(dsops/submit-draftset-to-role! backend draftset-id owner role-kw)
-                                       #(draftset-sync-write-response % backend draftset-id))
-                             (unprocessable-entity-response (str "Invalid role: " role))))
-
-                         :else
-                         (unprocessable-entity-response (str "user or role parameter required"))))))
-
-        (make-route :put "/draftset/:id/claim"
-                    (authenticated
-                     (existing-draftset-handler
-                      backend
-                      (fn [{{:keys [draftset-id]} :params user :identity}]
-                        (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
-                          (if (user/can-claim? user ds-info)
-                            (let [[result ds-info] (dsops/claim-draftset! backend draftset-id user)]
-                              (if (= :ok result)
-                                (ring/response ds-info)
-                                (conflict-detected-response "Failed to claim draftset")))
-                            (forbidden-response "User not in role for draftset claim"))
-                          (ring/not-found "Draftset not found"))))))
-
-        (make-route :put "/draftset/:id/claim"
-                    (authenticated
-                     (existing-draftset-handler
-                      backend
-                      (fn [{{:keys [draftset-id]} :params user :identity}]
-                        (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
-                          (if (user/can-claim? user ds-info)
-                            (run-sync #(dsops/claim-draftset! backend draftset-id user)
-                                      (fn [result]
-                                        (if (jobutil/failed-job-result? result)
-                                          (response/api-response 500 result)
-                                          (let [[claim-outcome ds-info] (:details result)]
-                                            (if (= :ok claim-outcome)
-                                              (ring/response ds-info)
-                                              (conflict-detected-response "Failed to claim draftset"))))))
-                            (forbidden-response "User not in role for draftset claim"))
-                          (ring/not-found "Draftset not found")))))))))))
+      (make-route :put "/draftset/:id/claim"
+                  (authenticated
+                   (existing-draftset-handler
+                    backend
+                    (fn [{{:keys [draftset-id]} :params user :identity}]
+                      (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
+                        (if (user/can-claim? user ds-info)
+                          (run-sync #(dsops/claim-draftset! backend draftset-id user)
+                                    (fn [result]
+                                      (if (jobutil/failed-job-result? result)
+                                        (response/api-response 500 result)
+                                        (let [[claim-outcome ds-info] (:details result)]
+                                          (if (= :ok claim-outcome)
+                                            (ring/response ds-info)
+                                            (conflict-detected-response "Failed to claim draftset"))))))
+                          (forbidden-response "User not in role for draftset claim"))
+                        (ring/not-found "Draftset not found"))))))))))
 
 
 (s/def ::wrap-auth fn?)
 
 (defmethod ig/pre-init-spec :drafter.routes/draftsets-api [_]
-  (s/keys :req-un [::wrap-auth ::sp/timeout-fn :drafter/backend ::create-draftsets-handler ::get-draftsets-handler ::get-draftset-handler ::delete-draftset-handler]
+  (s/keys :req-un [::wrap-auth ::sp/timeout-fn :drafter/backend
+                   ::get-draftsets-handler
+                   ::create-draftsets-handler
+                   ::get-draftset-handler
+                   ::delete-draftset-handler
+                   ::draftset-options-handler
+                   ::draftset-get-data-handler
+                   ::delete-draftset-data-handler
+                   ::delete-draftset-graph-handler
+                   ::delete-draftset-changes-handler
+                   ::put-draftset-data-handler
+                   ::put-draftset-graph-handler
+                   ::draftset-query-handler]
           :req [::user/repo]
           ;; TODO :req-un [::repo]
           ))
