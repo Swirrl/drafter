@@ -76,7 +76,7 @@
     (build-draftset-connection this)))
 
 ;; TODO REMOVE THIS function
-#_(defn draftset-endpoint
+(defn draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"
   [{:keys [backend draftset-ref union-with-live?]}]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]

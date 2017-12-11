@@ -32,7 +32,7 @@
     ;;
     ;; Note calling ->connection on DrafterService returns an
     ;; unrestricted endpoint, that has access to the state graph
-    ;; etc...
+    ;; and can perform updates etc...
     (repo/->connection uncached-repo)))
 
 (defmulti endpoint-repo*
