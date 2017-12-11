@@ -12,3 +12,4 @@
 
 (s/def ::uncached-repo #(instance? Repository %))
 (s/def ::stasher-repo #(instance? Repository %))
+

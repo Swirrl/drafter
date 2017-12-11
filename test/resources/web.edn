@@ -12,7 +12,7 @@
                                                  :endpoint-timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
 
- :drafter.routes.draftsets-api/get-draftsets-handler {:repo #ig/ref :drafter.backend/rdf4j-repo
+ :drafter.routes.draftsets-api/get-draftsets-handler {:drafter/backend #ig/ref :drafter.backend/rdf4j-repo
                                                       :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
  
  :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo

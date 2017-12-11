@@ -16,6 +16,9 @@
                                       }
                                      ^:ref [:drafter.common/config]]
 
+ :drafter/backend {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+                   :stasher-repo #ig/ref :drafter.stasher/repo}
+ 
  :drafter.backend.draftset/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
                                      :stasher-repo #ig/ref :drafter.stasher/repo}
 

@@ -1,0 +1,36 @@
+@prefix : <http://api.stardog.com/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix stardog: <tag:stardog:api:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+	draftset:owned a drafter:DraftSet ;
+		dcterms:modified "2017-11-30T14:15:17.233Z"^^xsd:dateTime ;
+		dcterms:created "2017-11-30T14:15:17.233Z"^^xsd:dateTime ;
+		dcterms:creator <mailto:publisher@swirrl.com> ;
+		drafter:hasOwner <mailto:publisher@swirrl.com> ;
+		rdfs:label "owned" .
+	
+	draftset:claimable a drafter:DraftSet ;
+		dcterms:modified "2017-11-30T14:15:18.348Z"^^xsd:dateTime ;
+		dcterms:created "2017-11-30T14:15:18.348Z"^^xsd:dateTime ;
+		dcterms:creator <mailto:editor@swirrl.com> ;
+		rdfs:label "claimable" ;
+		drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/a74aaec9-a1e5-4418-9528-c07a1d275e72> ;
+		drafter:submittedBy <mailto:editor@swirrl.com> .
+	
+	draftset:unclaimable a drafter:DraftSet ;
+		dcterms:modified "2017-11-30T14:15:19.486Z"^^xsd:dateTime ;
+		dcterms:created "2017-11-30T14:15:19.486Z"^^xsd:dateTime ;
+		dcterms:creator <mailto:editor@swirrl.com> ;
+		drafter:hasOwner <mailto:editor@swirrl.com> .
+	
+	<http://publishmydata.com/def/drafter/submission/a74aaec9-a1e5-4418-9528-c07a1d275e72> a drafter:Submission ;
+		drafter:claimRole "publisher" .
+}

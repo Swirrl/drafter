@@ -8,7 +8,7 @@
              [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sparql :as sparql]
-            [drafter.routes.draftsets-api :refer :all]
+            [drafter.routes.draftsets-api :as sut :refer :all]
             [drafter.swagger :as swagger]
             [drafter.test-common :as tc]
             [drafter.timeouts :as timeouts]
@@ -21,7 +21,8 @@
             [grafter.rdf4j.formats :as formats]
             [grafter.rdf4j.io :refer [rdf-writer]]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]])
+            [swirrl-server.async.jobs :refer [finished-jobs]]
+            [clojure.test :as t])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            java.net.URI
            java.util.Date
@@ -200,7 +201,7 @@
 (defn- get-draftset-info-request [draftset-location user]
   (tc/with-identity user {:uri draftset-location :request-method :get}))
 
-(defn- ok-response->typed-body [schema {:keys [body] :as response}]
+(defn ok-response->typed-body [schema {:keys [body] :as response}]
   (tc/assert-is-ok-response response)
   (tc/assert-schema schema body)
   body)
@@ -278,8 +279,9 @@
   (let [response (route (create-draftset-request test-editor "Test title" "Test description"))]
     (assert-is-see-other-response response)))
 
-(defn- get-draftsets-request [include user]
-  (tc/with-identity user {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
+(defn get-draftsets-request [include user]
+  (tc/with-identity user
+    {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
 
 (defn- get-draftsets-through-api [include user]
   (let [request (get-draftsets-request include user)
@@ -1524,6 +1526,11 @@
 
       (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
         (is (= :deleted (get-in changes [live-graph :status])))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Handler tests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 
 

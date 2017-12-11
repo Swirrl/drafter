@@ -25,8 +25,8 @@
                                      ^:ref [:drafter.common/config]]
 
  ;; TODO construct drafter instance instead
- ;; :drafter.backend.draftset/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
- ;;                                     :stasher-repo #ig/ref :drafter.stasher/repo}
+ :drafter/backend {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+                   :stasher-repo #ig/ref :drafter.stasher/repo}
  
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -49,10 +49,13 @@
  :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.live/endpoint
                                                  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
- :drafter.routes.draftsets-api/get-draftsets-handler {:repo #ig/ref :drafter.backend/rdf4j-repo
+ :drafter.routes.draftsets-api/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
                                                       :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
- :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
+ 
+ 
+ :drafter.routes/draftsets-api {;;:repo #ig/ref :drafter.backend/rdf4j-repo
+                                :backend #ig/ref :drafter/backend
                                 :drafter.user/repo #ig/ref :drafter.user/repo
                                 :wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                 :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler

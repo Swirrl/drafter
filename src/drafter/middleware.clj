@@ -220,7 +220,8 @@
   (fn [request]
     (try
       (let [validated-query-str (bcom/validate-query (get-in request [:sparql :query-string]))
-            pquery (prepare-query executor validated-query-str)]
+            pquery (prepare-query executor validated-query-str) ;; TODO change for repo/prepare-query
+            ]
         (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
       (catch QueryParseException ex
         (let [error-message (.getMessage ex)]
