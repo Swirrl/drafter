@@ -7,24 +7,23 @@
             [clj-logging-config.log4j :as l4j]
             [clojure.java.io :as io]
             [clojure.set :as set]
+            [clojure.spec.alpha :as s]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
-            [drafter.backend.common :refer [prepare-query] :as bcom]
             [drafter.rdf.content-negotiation :as conneg]
-            [drafter.rdf.sesame :as ses :refer [read-statements]]
+            [drafter.rdf.sesame :as ses]
             [drafter.requests :as drafter-request]
             [drafter.responses :as response]
             [drafter.user :as user]
             [drafter.util :as util]
             [grafter.rdf4j.formats :refer [mimetype->rdf-format]]
+            [grafter.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [pantomime.media :refer [media-type-named]]
-            [ring.util.request :as request]
-            [clojure.spec.alpha :as s])
+            [ring.util.request :as request])
   (:import clojure.lang.ExceptionInfo
-           java.io.File
-           org.apache.jena.query.QueryParseException))
+           java.io.File))
 
 (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
   (log/info "auth user" username password)
@@ -125,17 +124,6 @@
             (response/unprocessable-entity-response (str "Invalid value for parameter " (name param-name) ": " val))))
         (invoke-inner default)))))
 
-(defn allowed-methods-handler
-  "Wraps a handler with one which checks whether the method of the
-  incoming request is allowed with a given predicate. If the request
-  method does not pass the predicate a 405 Not Allowed response is
-  returned."
-  [is-allowed-fn inner-handler]
-  (fn [{:keys [request-method] :as request}]
-    (if (is-allowed-fn request-method)
-      (inner-handler request)
-      (response/method-not-allowed-response request-method))))
-
 (defn sparql-query-parser-handler [inner-handler]
   (fn [{:keys [request-method body query-params form-params] :as request}]
     (letfn [(handle [query-string location]
@@ -201,56 +189,6 @@
       (io/copy body temp-file)
       (inner-handler (assoc request :body temp-file)))))
 
-(defn get-sparql-response-content-type [mime-type]
-  (case mime-type
-    ;; if they ask for html they're probably a browser so serve it as
-    ;; text/plain
-    "text/html" "text/plain; charset=utf-8"
-    ;; force a charset of UTF-8 in this case... NOTE this should
-    ;; really consult the Accept-Charset header
-    "text/plain" "text/plain; charset=utf-8"
-    mime-type))
-
-(defn sparql-prepare-query-handler
-  "Returns a ring handler which fetches the query string from an incoming request, validates it and prepares it
-   using the given executor. The unvalidated query string should exist at the path [:sparql :query-string] in
-   the incoming request. The prepared query is associated into the request at the [:sparql :prepared-query] key
-   for access in downstream handlers."
-  [executor inner-handler]
-  (fn [request]
-    (try
-      (let [validated-query-str (bcom/validate-query (get-in request [:sparql :query-string]))
-            pquery (prepare-query executor validated-query-str) ;; TODO change for repo/prepare-query
-            ]
-        (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
-      (catch QueryParseException ex
-        (let [error-message (.getMessage ex)]
-          (log/info "Malformed query: " error-message)
-          {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message})))))
-
-(defn sparql-constant-prepared-query-handler
-  "Returns a handler which associates the given prepared SPARQL query into the request at the key expected
-   by later stages in the SPARQL processing pipeline."
-  [pquery inner-handler]
-  (fn [request]
-    (inner-handler (assoc-in request [:sparql :prepared-query] pquery))))
-
-(defn sparql-negotiation-handler
-  "Performs content negotiation on an incoming SPARQL request and associates the sesame format and response content
-   type into the outgoing request into the :format and :response-content-type keys respecitvely within the :sparql
-   map. This handler expects to find the prepared sesame query at the path [:sparql :prepared-query] within the
-   incoming request map - prepare-sparql-query-handler is a handler which populates this value."
-  [inner-handler]
-  (fn [request]
-    (let [pquery (get-in request [:sparql :prepared-query])
-          accept (drafter-request/accept request)]
-      (let [query-type (ses/get-query-type pquery)]
-        (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
-          (let [to-assoc {:format                result-format
-                          :response-content-type (get-sparql-response-content-type media-type)}
-                updated-request (update request :sparql #(merge % to-assoc))]
-            (inner-handler updated-request))
-          (response/not-acceptable-response))))))
 
 (defn negotiate-sparql-results-content-type-with
   "Returns a handler which performs content negotiation for a SPARQL query with the given negotiation function.
@@ -280,17 +218,4 @@
   (fn [req]
     (datadog/increment! "drafter.requests.total" 1)
     (handler req)))
-
-(defn sparql-timeout-handler
-  "Returns a handler which configures the timeout for the prepared SPARQL query associated with the request.
-   The timeout is calculated based on the optional timeout and max-query-timeout parameters on the request
-   along with the timeout specified for the endpoint."
-  [calculate-timeout-fn inner-handler]
-  (fn [{{pquery :prepared-query} :sparql :as request}]
-    (let [timeout-or-ex (calculate-timeout-fn request)]
-      (if (instance? Exception timeout-or-ex)
-        {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body (.getMessage timeout-or-ex)}
-        (let [query-timeout timeout-or-ex]
-          (.setMaxExecutionTime pquery query-timeout)
-          (inner-handler (assoc-in request [:sparql :timeout] query-timeout)))))))
 

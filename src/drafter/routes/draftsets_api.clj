@@ -1,6 +1,7 @@
 (ns drafter.routes.draftsets-api
   (:require [clj-logging-config.log4j :as l4j]
             [compojure.core :as compojure :refer [context routes]]
+            [drafter.backend :as backend]
             [drafter.backend.draftset :as ep]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as dsops]
@@ -11,16 +12,11 @@
               negotiate-triples-content-type-handler
               optional-enum-param
               require-rdf-content-type
-              sparql-constant-prepared-query-handler
-              sparql-timeout-handler
               temp-file-body]]
             [drafter.rdf.draftset-management.job-util :as jobutil :refer [make-job]]
             [drafter.rdf.draftset-management.jobs :as dsjobs]
             [drafter.rdf.sesame :refer [is-quads-format? is-triples-format?]]
-            [drafter.rdf.sparql-protocol
-             :refer
-             [sparql-execution-handler sparql-protocol-handler]
-             :as sp]
+            [drafter.rdf.sparql-protocol :refer [sparql-execution-handler sparql-protocol-handler] :as sp]
             [drafter.responses
              :refer
              [conflict-detected-response

@@ -242,7 +242,7 @@
         (user-is-owner-clause user)))
 
 (defn- draftset-properties-result->properties [draftset-ref {:keys [created title description creator owner role claimuser submitter modified] :as ds}]
-  (let [required-fields {:id (ds/->draftset-id draftset-ref) #_(str (ds/->draftset-id draftset-ref)) 
+  (let [required-fields {:id (str (ds/->draftset-id draftset-ref)) 
                          :created-at created
                          :created-by (user/uri->username creator)
                          :updated-at modified}

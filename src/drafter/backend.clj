@@ -7,7 +7,8 @@
             [integrant.core :as ig]
             [grafter.url :as url]
             [drafter.draftset :as ds])
-  (:import java.net.URI))
+  (:import java.net.URI
+           drafter.draftset.DraftsetId))
 
 ;; A DrafterBackend is intended to be(come) the top level API access
 ;; to the drafter service.
@@ -51,6 +52,9 @@
   (draftsets/build-draftset-endpoint drafter (ds/->DraftsetId draftset-ref) union-with-live?))
 
 (defmethod endpoint-repo* URI [drafter draftset-ref {:keys [union-with-live?]}]
+  (draftsets/build-draftset-endpoint drafter draftset-ref union-with-live?))
+
+(defmethod endpoint-repo* DraftsetId [drafter draftset-ref {:keys [union-with-live?]}]
   (draftsets/build-draftset-endpoint drafter draftset-ref union-with-live?))
 
 (defn drafter-repo
