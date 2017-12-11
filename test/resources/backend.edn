@@ -1,0 +1,4 @@
+{
+ :drafter/backend {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+                   :stasher-repo #ig/ref :drafter.stasher/repo }
+ }

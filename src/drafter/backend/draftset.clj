@@ -1,6 +1,6 @@
 (ns drafter.backend.draftset
   (:require [clojure.spec.alpha :as sp]
-            [drafter.backend :as backend]
+            [drafter.backend.spec :as bs]
             [drafter.backend.common :as bprot :refer [->sesame-repo]]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as dsmgmt]
@@ -40,8 +40,6 @@
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
     (->RewritingSesameSparqlExecutor backend graph-mapping union-with-live?)))
 
-
-
 (defn build-draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"
   [{:keys [uncached-repo stasher-repo]} draftset-ref union-with-live?]
@@ -49,7 +47,7 @@
     (->RewritingSesameSparqlExecutor stasher-repo graph-mapping union-with-live?)))
 
 (defmethod ig/pre-init-spec ::endpoint [_]
-  (sp/keys :req-un [::backend/uncached-repo ::backend/stasher-repo]))
+  (sp/keys :req-un [::bs/uncached-repo ::bs/stasher-repo]))
 
 (defmethod ig/init-key ::endpoint [_ opts]
   opts)

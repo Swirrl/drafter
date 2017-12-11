@@ -86,14 +86,14 @@
   query-str)
 
 
-(defn prep-and-validate-query [backend sparql-string]
-  (let [repo (->sesame-repo backend)
+(defn prep-and-validate-query [conn sparql-string]
+  (let [;;repo (->sesame-repo backend)
         ;; Technically calls to live endpoint don't need to be
         ;; validated with JENA/ARQ but as draftsets do their rewriting
         ;; through ARQ this helps ensure consistency between
         ;; implementations.
         validated-query-string (validate-query sparql-string)]
-    (repo/prepare-query repo validated-query-string)))
+    (repo/prepare-query conn validated-query-string)))
 
 
 
