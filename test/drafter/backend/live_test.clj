@@ -4,7 +4,7 @@
             [drafter.backend.live :as sut]
             [drafter.stasher-test :as stasher-test]
             [drafter.test-common :as tc :refer [deftest-system]]
-            [grafter.rdf.protocols :refer [->Triple]]
+            [grafter.rdf.protocols :as pr :refer [->Triple]]
             [grafter.rdf4j.repository :as repo])
   (:import java.net.URI))
 
@@ -13,7 +13,7 @@
 
 (def construct-graph-query "CONSTRUCT { ?g ?g ?g } WHERE { GRAPH ?g { ?s ?p ?o }}")
 
-(deftest-system endpoint-test
+(deftest-system endpoint-test-querying
   [{:keys [drafter.backend.live/endpoint
            drafter.stasher/filecache]} "drafter/backend/live-test.edn"]
 
@@ -35,3 +35,13 @@
                                                 (.getDataset preped-query)
                                                 expected-triples)))))))
 
+(def all-live-triples #{(->Triple (URI. "http://a") (URI. "http://a") (URI. "http://a"))
+                        (->Triple (URI. "http://live-only") (URI. "http://live-only") (URI. "http://live-only"))})
+
+(deftest-system endpoint-test-to-statements
+  [{:keys [drafter.backend.live/endpoint
+           drafter.stasher/filecache]} "drafter/backend/live-test.edn"]
+
+  (t/testing "to-statements applies live restriction"
+    (t/is (= all-live-triples
+             (set (pr/to-statements (repo/->connection endpoint) {}))))))
