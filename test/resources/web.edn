@@ -2,24 +2,125 @@
  :drafter.middleware/wrap-auth {:drafter.user/repo #ig/ref :drafter.user/repo
                                 :jws-signing-key "foo"}
 
- [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout 30
-                                                          :jws-signing-key "foo"}
+ ;; [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout 30
+ ;;                                                          :jws-signing-key "foo"}
 
- [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout 30
-                                                              :jws-signing-key "foo"}
+ ;; [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout 30
+ ;;                                                              :jws-signing-key "foo"}
  
- :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.draftset/endpoint
-                                                 :endpoint-timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
+ ;; :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.draftset/endpoint
+ ;;                                                 :endpoint-timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
 
- :drafter.routes.draftsets-api/get-draftsets-handler {:drafter/backend #ig/ref :drafter.backend/rdf4j-repo
+ ;; :drafter.routes.draftsets-api/get-draftsets-handler {:drafter/backend #ig/ref :drafter.backend/rdf4j-repo
+ ;;                                                      :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ 
+ ;; :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
+ ;;                                :drafter.user/repo #ig/ref :drafter.user/repo
+ ;;                                :wrap-auth #ig/ref :drafter.middleware/wrap-auth
+ ;;                                :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
+ ;;                                :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
+                                                          :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
+
+ [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
+                                                              :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
+ 
+ :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.live/endpoint
+                                                 :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
+
+ :drafter.routes.draftsets-api/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
                                                       :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
+ :drafter.routes.draftsets-api/get-draftset-handler {:drafter/backend #ig/ref :drafter/backend
+                                                     :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
+
+ :drafter.routes.draftsets-api/create-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
+                                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
+ :drafter.routes.draftsets-api/wrap-as-draftset-owner {:drafter/backend #ig/ref :drafter/backend
+                                                       :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
+ :drafter.routes.draftsets-api/delete-draftset-handler {:drafter/backend #ig/ref :drafter/backend
+                                                        :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/draftset-options-handler {:drafter/backend #ig/ref :drafter/backend
+                                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
+ :drafter.routes.draftsets-api/draftset-get-data {:drafter/backend #ig/ref :drafter/backend
+                                                  :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner
+                                                  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+
+ :drafter.routes.draftsets-api/delete-draftset-data-handler {:drafter/backend #ig/ref :drafter/backend
+                                                             :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/delete-draftset-graph-handler {:drafter/backend #ig/ref :drafter/backend
+                                                              :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/delete-draftset-changes-handler {:drafter/backend #ig/ref :drafter/backend
+                                                                :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/put-draftset-data-handler {:drafter/backend #ig/ref :drafter/backend
+                                                          :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/put-draftset-graph-handler {:drafter/backend #ig/ref :drafter/backend
+                                                           :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/draftset-query-handler{:drafter/backend #ig/ref :drafter/backend
+                                                      :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner
+                                                      :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+
+ :drafter.routes.draftsets-api/draftset-publish-handler {:drafter/backend #ig/ref :drafter/backend
+                                                         :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/draftset-set-metadata-handler {:drafter/backend #ig/ref :drafter/backend
+                                                              :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/draftset-submit-to-handler {:drafter/backend #ig/ref :drafter/backend
+                                                           :drafter.user/repo #ig/ref :drafter.user/repo
+                                                           :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+
+ :drafter.routes.draftsets-api/draftset-claim-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                                       :drafter/backend #ig/ref :drafter/backend}
+
+ :drafter.routes.draftsets-api/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                                  :drafter.user/repo #ig/ref :drafter.user/repo}
  
- :drafter.routes/draftsets-api {:repo #ig/ref :drafter.backend/rdf4j-repo
+ :drafter.routes/draftsets-api {;;:repo #ig/ref :drafter.backend/rdf4j-repo
+                                :backend #ig/ref :drafter/backend
                                 :drafter.user/repo #ig/ref :drafter.user/repo
                                 :wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner
+
+                                :get-users-handler #ig/ref :drafter.routes.draftsets-api/get-users-handler
                                 :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
-                                :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+                                :create-draftsets-handler #ig/ref :drafter.routes.draftsets-api/create-draftsets-handler
+                                :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
+                                :delete-draftset-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-handler
+                                :draftset-options-handler #ig/ref :drafter.routes.draftsets-api/draftset-options-handler
+                                :draftset-get-data-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
+                                :delete-draftset-data-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-data-handler
+                                :delete-draftset-graph-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-graph-handler
+                                :delete-draftset-changes-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-changes-handler
+                                :put-draftset-data-handler #ig/ref :drafter.routes.draftsets-api/put-draftset-data-handler
+                                :put-draftset-graph-handler #ig/ref :drafter.routes.draftsets-api/put-draftset-graph-handler
+                                :draftset-query-handler #ig/ref :drafter.routes.draftsets-api/draftset-query-handler
+                                :draftset-publish-handler #ig/ref :drafter.routes.draftsets-api/draftset-publish-handler
+                                :draftset-set-metadata-handler #ig/ref :drafter.routes.draftsets-api/draftset-set-metadata-handler
+                                :draftset-submit-to-handler #ig/ref :drafter.routes.draftsets-api/draftset-submit-to-handler
+                                :draftset-claim-handler #ig/ref :drafter.routes.draftsets-api/draftset-claim-handler
+                                
+                                :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]
+                                :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
  
  :drafter.handler/app {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                        :repo #ig/ref :drafter.backend/rdf4j-repo
@@ -32,5 +133,5 @@
  :drafter.server/http {:handler #ig/ref :drafter.handler/app
                        :open-browser? false
                        :stacktraces? false
-                       :port #long #or [#port #env DRAFTER_HTTP_PORT 3003]}
+                       :port #long #or [#port #env DRAFTER_TEST_HTTP_PORT 3003]}
  }
