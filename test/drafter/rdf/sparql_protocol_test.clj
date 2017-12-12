@@ -1,16 +1,16 @@
 (ns drafter.rdf.sparql-protocol-test
   (:require [clojure-csv.core :as csv]
             [clojure.test :refer :all]
-            [drafter.rdf.sparql-protocol :refer :all]
+            [drafter.backend.common :as bcom]
             [drafter.rdf.sparql :as sparql]
+            [drafter.rdf.sparql-protocol :refer :all]
             [drafter.test-common :as tc]
             [grafter.rdf :as rdf]
-            [grafter.rdf4j.formats :as fmt]
-            [grafter.rdf.protocols :as pr]
-            [schema.test :refer [validate-schemas]]
-            [clojure.java.io :as io])
-  (:import [java.util.concurrent CountDownLatch TimeUnit]
-           [java.net URI]))
+            [grafter.rdf4j.repository :as repo]
+            [ring.util.response :as ring]
+            [schema.test :refer [validate-schemas]])
+  (:import java.net.URI
+           [java.util.concurrent CountDownLatch TimeUnit]))
 
 (defn add-triple-to-db [db]
   (sparql/add db (URI. "http://foo.com/my-graph") (tc/test-triples (URI. "http://test.com/data/one"))))
@@ -23,6 +23,77 @@
                                              add-triple-fixture
                                              (tc/wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler])])))
 
+(defn- notifying-handler [a]
+  (fn [r]
+    (reset! a true)
+    (ring/response "")))
+
+(deftest allowed-methods-handler-test
+  (testing "Allowed method"
+    (let [invoked-inner (atom false)
+          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
+          request {:uri "/test" :request-method :get}
+          response (wrapped-handler request)]
+      (is @invoked-inner)))
+
+  (testing "Disallowed method"
+    (let [invoked-inner (atom false)
+          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
+          request {:uri "/test" :request-method :delete}
+          response (wrapped-handler request)]
+      (is (= false @invoked-inner))
+      (tc/assert-is-method-not-allowed-response response))))
+
+(deftest sparql-prepare-query-handler-test
+  (let [r (repo/sail-repo)
+        handler (sparql-prepare-query-handler r identity)]
+    (testing "Valid query"
+      (let [req (handler {:sparql {:query-string "SELECT * WHERE { ?s ?p ?o }"}})]
+        (is (some? (get-in req [:sparql :prepared-query])))))
+
+    (testing "Malformed SPARQL query"
+      (let [response (handler {:sparql {:query-string "NOT A SPARQL QUERY"}})]
+        (tc/assert-is-bad-request-response response)))))
+
+(defn- prepare-query-str [query-str]
+  (bcom/prep-and-validate-query (repo/sail-repo) query-str))
+
+(deftest sparql-negotiation-handler-test
+  (testing "Valid request"
+    (let [handler (sparql-negotiation-handler identity)
+          accept-content-type "application/n-triples"
+          pquery (prepare-query-str "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")
+          request {:uri "/sparql"
+                   :sparql {:prepared-query pquery}
+                   :headers {"accept" accept-content-type}}
+          {{:keys [format response-content-type]} :sparql} (handler request)]
+      (is (= accept-content-type response-content-type))
+      (is (some? format))))
+
+  (testing "Content negotiation failure"
+    (let [handler (sparql-negotiation-handler identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          response (handler {:uri "/test"
+                             :sparql {:prepared-query pquery}
+                             :headers {"accept" "text/trig"}})]
+      (tc/assert-is-not-acceptable-response response))))
+
+(deftest sparql-timeout-handler-test
+  (testing "With valid timeout"
+    (let [timeout 30
+          handler (sparql-timeout-handler (constantly timeout) identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          request {:sparql {:prepared-query pquery}}]
+      (handler request)
+      (is (= timeout (.getMaxQueryTime pquery)))))
+
+  (testing "With invalid timeout"
+    (let [ex (IllegalArgumentException. "Invalid timeout")
+          handler (sparql-timeout-handler (constantly ex) identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          request {:sparql {:prepared-query pquery}}
+          response (handler request)]
+      (is (tc/assert-is-bad-request-response response)))))
 
 (deftest sparql-end-point-test
   (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
