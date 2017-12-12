@@ -441,7 +441,7 @@
   (log/info "Starting make-live for graphs " graphs)
   (when (seq graphs)
     (let [transaction-started-at (Date.)
-          repo (->sesame-repo backend)
+          repo backend ;;(->sesame-repo backend)
           graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at)) graphs)
           update-str (util/make-compound-sparql-query graph-migrate-queries)]
       (update! repo update-str)))
