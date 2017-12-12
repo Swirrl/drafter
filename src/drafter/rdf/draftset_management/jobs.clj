@@ -87,19 +87,21 @@
 
 
 (defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format]
-  (jobs/make-job :background-write [job]
-                 (let [backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
-                       quads (read-statements serialised rdf-format)
-                       graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-                   (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
+  (let [backend (:uncached-repo backend)]
+    (jobs/make-job :background-write [job]
+                   (let [;;backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
+                         quads (read-statements serialised rdf-format)
+                         graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
+                     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job)))))
 
 (defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format]
-  (jobs/make-job :background-write [job]
-                 (let [backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
-                       triples (read-statements serialised rdf-format)
-                       quads (map #(util/make-quad-statement % graph) triples)
-                       graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-                   (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job))))
+  (let [backend (:uncached-repo backend)]
+    (jobs/make-job :background-write [job]
+                   (let [;;backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
+                         triples (read-statements serialised rdf-format)
+                         quads (map #(util/make-quad-statement % graph) triples)
+                         graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
+                     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job)))))
 
 (defn copy-live-graph-into-draftset-job [backend draftset-ref live-graph]
   (jobs/make-job :background-write [job]
@@ -163,12 +165,13 @@
     (copy-graph-for-append* state draftset-ref backend live->draft quad-batches job)))
 
 (defn- append-quads-to-draftset-job [backend draftset-ref quads]
-  (ajobs/create-job :background-write
-                    (fn [job]
-                      (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
-                            quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-                            now (java.util.Date.)]
-                        (append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append :job-started-at now} job)))))
+  (let [backend (:uncached-repo backend)]
+    (ajobs/create-job :background-write
+                      (fn [job]
+                        (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
+                              quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
+                              now (java.util.Date.)]
+                          (append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append :job-started-at now} job))))))
 
 (defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
   (append-quads-to-draftset-job backend draftset-ref (read-statements tempfile rdf-format)))

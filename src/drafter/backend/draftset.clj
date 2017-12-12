@@ -10,7 +10,8 @@
             [grafter.rdf4j.io :as rio]
             [grafter.rdf4j.repository :as repo]
             [integrant.core :as ig]
-            [schema.core :as sc])
+            [schema.core :as sc]
+            [clojure.tools.logging :as log])
   (:import java.io.Closeable
            [org.eclipse.rdf4j.model Resource URI]
            org.eclipse.rdf4j.model.impl.URIImpl))
@@ -69,15 +70,18 @@
   #_(prepare-query [this sparql-string]
     (prepare-rewrite-query live->draft sparql-string inner union-with-live?))
 
+  ;; TODO remove this
   bprot/ToRepository
-  (->sesame-repo [_] (->sesame-repo stasher-repo))
+  (->sesame-repo [_]
+    (log/warn "DEPRECATED CALL TO ->sesame-repo.  TODO: remove call")
+    (->sesame-repo uncached-repo))
 
   repo/ToConnection
   (repo/->connection [this]
     (build-draftset-connection this)))
 
 ;; TODO REMOVE THIS function
-(defn draftset-endpoint
+#_(defn draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"
   [{:keys [backend draftset-ref union-with-live?]}]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
