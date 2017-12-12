@@ -348,9 +348,7 @@
   (wrap-as-draftset-owner
    (parse-union-with-live-handler
     (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-      (let [;;executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
-
-            executor (backend/endpoint-repo backend draftset-id {:union-with-live? union-with-live})
+      (let [executor (backend/endpoint-repo backend draftset-id {:union-with-live? union-with-live})
             handler (sparql-protocol-handler {:repo executor :timeout-fn timeout-fn})]
         (handler request))))))
 
@@ -360,6 +358,94 @@
 
 (defmethod ig/init-key ::draftset-query-handler [_ opts]
   (draftset-query-handler opts))
+
+(defn draftset-publish-handler [{backend :drafter/backend
+                                 :keys [wrap-as-draftset-owner timeout-fn]}]
+  (wrap-as-draftset-owner
+   (fn [{{:keys [draftset-id]} :params user :identity}]
+     (if (user/has-role? user :publisher)
+       (submit-async-job! (dsjobs/publish-draftset-job backend draftset-id))
+       (forbidden-response "You require the publisher role to perform this action")))))
+
+(defmethod ig/pre-init-spec ::draftset-publish-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner]))
+
+(defmethod ig/init-key ::draftset-publish-handler [_ opts]
+  (draftset-publish-handler opts))
+
+(defn draftset-set-metadata-handler [{backend :drafter/backend
+                                      :keys [wrap-as-draftset-owner timeout-fn]}]
+  (wrap-as-draftset-owner
+   (fn [{{:keys [draftset-id] :as params} :params}]
+     (run-sync #(dsops/set-draftset-metadata! backend draftset-id params)
+               #(draftset-sync-write-response % backend draftset-id)))))
+
+(defmethod ig/pre-init-spec ::draftset-set-metadata-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-as-draftset-owner]))
+
+(defmethod ig/init-key ::draftset-set-metadata-handler [_ opts]
+  (draftset-set-metadata-handler opts))
+
+(defn draftset-submit-to-handler [{backend :drafter/backend
+                                   user-repo ::user/repo
+                                   :keys [wrap-as-draftset-owner timeout-fn]}]
+  (wrap-as-draftset-owner
+   (fn [{{:keys [user role draftset-id]} :params owner :identity}]
+     (cond
+       (and (some? user) (some? role))
+       (unprocessable-entity-response "Only one of user and role parameters permitted")
+
+       (some? user)
+       (if-let [target-user (user/find-user-by-username user-repo user)]
+         (run-sync #(dsops/submit-draftset-to-user! backend draftset-id owner target-user)
+                   #(draftset-sync-write-response % backend draftset-id))
+         (unprocessable-entity-response (str "User: " user " not found")))
+
+       (some? role)
+       (let [role-kw (keyword role)]
+         (if (user/is-known-role? role-kw)
+           (run-sync #(dsops/submit-draftset-to-role! backend draftset-id owner role-kw)
+                     #(draftset-sync-write-response % backend draftset-id))
+           (unprocessable-entity-response (str "Invalid role: " role))))
+
+       :else
+       (unprocessable-entity-response (str "user or role parameter required"))))))
+
+(defmethod ig/pre-init-spec ::draftset-submit-to-handler [_]
+  (s/keys :req [:drafter/backend ::user/repo]
+          :req-un [::wrap-as-draftset-owner]))
+
+(defmethod ig/init-key ::draftset-submit-to-handler [_ opts]
+  (draftset-submit-to-handler opts))
+
+(defn draftset-claim-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
+  (wrap-authenticated
+   (existing-draftset-handler
+    backend
+    (fn [{{:keys [draftset-id]} :params user :identity}]
+      (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
+        (if (user/can-claim? user ds-info)
+          (run-sync #(dsops/claim-draftset! backend draftset-id user)
+                    (fn [result]
+                      (if (jobutil/failed-job-result? result)
+                        (response/api-response 500 result)
+                        (let [[claim-outcome ds-info] (:details result)]
+                          (if (= :ok claim-outcome)
+                            (ring/response ds-info)
+                            (conflict-detected-response "Failed to claim draftset"))))))
+          (forbidden-response "User not in role for draftset claim"))
+        (ring/not-found "Draftset not found"))))))
+
+
+(defmethod ig/pre-init-spec ::draftset-claim-handler [_]
+  (s/keys :req [:drafter/backend]
+          :req-un [::wrap-auth]))
+
+(defmethod ig/init-key ::draftset-claim-handler [_ opts]
+  (draftset-claim-handler opts))
+
 
 (defn draftset-api-routes [{backend :drafter/backend
                             user-repo ::user/repo
@@ -376,7 +462,11 @@
                                    delete-draftset-changes-handler
                                    put-draftset-data-handler
                                    put-draftset-graph-handler
-                                   draftset-query-handler]}]
+                                   draftset-query-handler
+                                   draftset-publish-handler
+                                   draftset-set-metadata-handler
+                                   draftset-submit-to-handler
+                                   draftset-claim-handler]}]
   
   (let [version "/v1"]
     (context
@@ -414,43 +504,17 @@
 
       (make-route nil "/draftset/:id/query" draftset-query-handler)
 
-      (make-route :post "/draftset/:id/publish"
-                  (wrap-as-draftset-owner
-                   (fn [{{:keys [draftset-id]} :params user :identity}]
-                     (if (user/has-role? user :publisher)
-                       (submit-async-job! (dsjobs/publish-draftset-job backend draftset-id))
-                       (forbidden-response "You require the publisher role to perform this action")))))
+      (make-route :post "/draftset/:id/publish" draftset-publish-handler)
 
-      (make-route :put "/draftset/:id"
-                  (wrap-as-draftset-owner
-                   (fn [{{:keys [draftset-id] :as params} :params}]
-                     (run-sync #(dsops/set-draftset-metadata! backend draftset-id params)
-                               #(draftset-sync-write-response % backend draftset-id)))))
+      (make-route :put "/draftset/:id" draftset-set-metadata-handler)
 
-      (make-route :post "/draftset/:id/submit-to"
-                  (wrap-as-draftset-owner
-                   (fn [{{:keys [user role draftset-id]} :params owner :identity}]
-                     (cond
-                       (and (some? user) (some? role))
-                       (unprocessable-entity-response "Only one of user and role parameters permitted")
+      (make-route :post "/draftset/:id/submit-to" draftset-submit-to-handler)
 
-                       (some? user)
-                       (if-let [target-user (user/find-user-by-username user-repo user)]
-                         (run-sync #(dsops/submit-draftset-to-user! backend draftset-id owner target-user)
-                                   #(draftset-sync-write-response % backend draftset-id))
-                         (unprocessable-entity-response (str "User: " user " not found")))
-
-                       (some? role)
-                       (let [role-kw (keyword role)]
-                         (if (user/is-known-role? role-kw)
-                           (run-sync #(dsops/submit-draftset-to-role! backend draftset-id owner role-kw)
-                                     #(draftset-sync-write-response % backend draftset-id))
-                           (unprocessable-entity-response (str "Invalid role: " role))))
-
-                       :else
-                       (unprocessable-entity-response (str "user or role parameter required"))))))
-
-      (make-route :put "/draftset/:id/claim"
+      ;; This was duplicated
+      ;; TODO check it's ok to remove it, but I assume it is as the
+      ;; last one should win and the later implementation looks to be
+      ;; more complete.
+      #_(make-route :put "/draftset/:id/claim"
                   (authenticated
                    (existing-draftset-handler
                     backend
@@ -464,29 +528,17 @@
                           (forbidden-response "User not in role for draftset claim"))
                         (ring/not-found "Draftset not found"))))))
 
-      (make-route :put "/draftset/:id/claim"
-                  (authenticated
-                   (existing-draftset-handler
-                    backend
-                    (fn [{{:keys [draftset-id]} :params user :identity}]
-                      (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
-                        (if (user/can-claim? user ds-info)
-                          (run-sync #(dsops/claim-draftset! backend draftset-id user)
-                                    (fn [result]
-                                      (if (jobutil/failed-job-result? result)
-                                        (response/api-response 500 result)
-                                        (let [[claim-outcome ds-info] (:details result)]
-                                          (if (= :ok claim-outcome)
-                                            (ring/response ds-info)
-                                            (conflict-detected-response "Failed to claim draftset"))))))
-                          (forbidden-response "User not in role for draftset claim"))
-                        (ring/not-found "Draftset not found"))))))))))
+      (make-route :put "/draftset/:id/claim" draftset-claim-handler)))))
 
 
 (s/def ::wrap-auth fn?)
 
 (defmethod ig/pre-init-spec :drafter.routes/draftsets-api [_]
-  (s/keys :req-un [::wrap-auth ::sp/timeout-fn :drafter/backend
+  (s/keys :req-un [::wrap-auth
+                   ::sp/timeout-fn
+                   :drafter/backend
+
+                   ;; handlers
                    ::get-draftsets-handler
                    ::create-draftsets-handler
                    ::get-draftset-handler
@@ -498,7 +550,11 @@
                    ::delete-draftset-changes-handler
                    ::put-draftset-data-handler
                    ::put-draftset-graph-handler
-                   ::draftset-query-handler]
+                   ::draftset-query-handler
+                   ::draftset-publish-handler
+                   ::draftset-set-metadata-handler
+                   ::draftset-submit-to-handler
+                   ::draftset-claim-handler]
           :req [::user/repo]
           ;; TODO :req-un [::repo]
           ))
