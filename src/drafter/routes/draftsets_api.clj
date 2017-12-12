@@ -447,11 +447,27 @@
   (draftset-claim-handler opts))
 
 
+(defn get-users-handler [{wrap-authenticated :wrap-auth 
+                          user-repo ::user/repo}]
+  (wrap-authenticated
+   (fn [r]
+     (let [users (user/get-all-users user-repo)
+           summaries (map user/get-summary users)]
+       (ring/response summaries)))))
+
+(defmethod ig/pre-init-spec ::get-users-handler [_]
+  (s/keys :req [::user/repo]
+          :req-un [::wrap-auth]))
+
+(defmethod ig/init-key ::get-users-handler [_ opts]
+  (draftset-claim-handler opts))
+
 (defn draftset-api-routes [{backend :drafter/backend
                             user-repo ::user/repo
                             authenticated :wrap-auth
                             draftset-query-timeout-fn :timeout-fn
-                            :keys [get-draftsets-handler
+                            :keys [get-users-handler
+                                   get-draftsets-handler
                                    get-draftset-handler 
                                    create-draftsets-handler
                                    wrap-as-draftset-owner 
@@ -472,12 +488,7 @@
     (context
      version []
      (routes
-      (make-route :get "/users"
-                  (authenticated
-                   (fn [r]
-                     (let [users (user/get-all-users user-repo)
-                           summaries (map user/get-summary users)]
-                       (ring/response summaries)))))
+      (make-route :get "/users" get-users-handler)
 
       (make-route :get "/draftsets" get-draftsets-handler)
 
@@ -519,7 +530,6 @@
   (s/keys :req-un [::wrap-auth
                    ::sp/timeout-fn
                    :drafter/backend
-
                    ;; handlers
                    ::get-draftsets-handler
                    ::create-draftsets-handler
@@ -536,7 +546,8 @@
                    ::draftset-publish-handler
                    ::draftset-set-metadata-handler
                    ::draftset-submit-to-handler
-                   ::draftset-claim-handler]
+                   ::draftset-claim-handler
+                   ::get-users-handler]
           :req [::user/repo]
           ;; TODO :req-un [::repo]
           ))

@@ -103,6 +103,9 @@
 
  :drafter.routes.draftsets-api/draftset-claim-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                                        :drafter/backend #ig/ref :drafter/backend}
+
+ :drafter.routes.draftsets-api/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                                  :drafter.user/repo #ig/ref :drafter.user/repo}
  
  :drafter.routes/draftsets-api {;;:repo #ig/ref :drafter.backend/rdf4j-repo
                                 :backend #ig/ref :drafter/backend
@@ -110,6 +113,7 @@
                                 :wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                 :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner
 
+                                :get-users-handler #ig/ref :drafter.routes.draftsets-api/get-users-handler
                                 :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
                                 :create-draftsets-handler #ig/ref :drafter.routes.draftsets-api/create-draftsets-handler
                                 :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
