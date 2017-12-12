@@ -39,6 +39,7 @@
       (repo/prepare-query* [this sparql-string _]
         (prepare-rewrite-query stasher-conn uncached-repo live->draft sparql-string union-with-live?))
 
+      ;; TODO fix this interface to work with pull queries.
       proto/ISPARQLable
       (proto/query-dataset [this sparql-string _model]
         (let [pquery (repo/prepare-query* this sparql-string _model)]
