@@ -510,24 +510,6 @@
 
       (make-route :post "/draftset/:id/submit-to" draftset-submit-to-handler)
 
-      ;; This was duplicated
-      ;; TODO check it's ok to remove it, but I assume it is as the
-      ;; last one should win and the later implementation looks to be
-      ;; more complete.
-      #_(make-route :put "/draftset/:id/claim"
-                  (authenticated
-                   (existing-draftset-handler
-                    backend
-                    (fn [{{:keys [draftset-id]} :params user :identity}]
-                      (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
-                        (if (user/can-claim? user ds-info)
-                          (let [[result ds-info] (dsops/claim-draftset! backend draftset-id user)]
-                            (if (= :ok result)
-                              (ring/response ds-info)
-                              (conflict-detected-response "Failed to claim draftset")))
-                          (forbidden-response "User not in role for draftset claim"))
-                        (ring/not-found "Draftset not found"))))))
-
       (make-route :put "/draftset/:id/claim" draftset-claim-handler)))))
 
 
