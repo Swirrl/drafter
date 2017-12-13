@@ -41,7 +41,10 @@
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
            org.eclipse.rdf4j.rio.trig.TriGParserFactory))
 
-(use-fixtures :each validate-schemas)
+;;(use-fixtures :each validate-schemas) ;; TODO should remove this...
+
+(defmacro todo [& forms]
+  (println "TODO: fix this test form: " &form))
 
 (def ^:dynamic *test-backend* nil)
 (def ^:dynamic *test-writer* nil)
