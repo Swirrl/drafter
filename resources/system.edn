@@ -107,13 +107,7 @@
  :drafter.routes.draftsets-api/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                                   :drafter.user/repo #ig/ref :drafter.user/repo}
  
- :drafter.routes/draftsets-api {;;:repo #ig/ref :drafter.backend/rdf4j-repo
-                                :backend #ig/ref :drafter/backend
-                                :drafter.user/repo #ig/ref :drafter.user/repo
-                                :wrap-auth #ig/ref :drafter.middleware/wrap-auth
-                                :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner
-
-                                :get-users-handler #ig/ref :drafter.routes.draftsets-api/get-users-handler
+ :drafter.routes/draftsets-api {:get-users-handler #ig/ref :drafter.routes.draftsets-api/get-users-handler
                                 :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
                                 :create-draftsets-handler #ig/ref :drafter.routes.draftsets-api/create-draftsets-handler
                                 :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
@@ -131,8 +125,7 @@
                                 :draftset-submit-to-handler #ig/ref :drafter.routes.draftsets-api/draftset-submit-to-handler
                                 :draftset-claim-handler #ig/ref :drafter.routes.draftsets-api/draftset-claim-handler
                                 
-                                :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]
-                                :live-query-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+                                }
  
  :drafter.handler/app {:repo #ig/ref :drafter.backend/rdf4j-repo
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route

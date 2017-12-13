@@ -30,13 +30,14 @@
             [swirrl-server.async.jobs :as ajobs]
             [swirrl-server.responses :as response]
             [clojure.spec.alpha :as s]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [grafter.rdf4j.repository :as repo])
   (:import java.net.URI))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
     (let [draftset-id (ds/->DraftsetId id)]
-      (if (dsops/draftset-exists? backend draftset-id)
+      (if (dsops/draftset-exists? (repo/->connection backend) draftset-id)
         (let [updated-request (assoc-in request [:params :draftset-id] draftset-id)]
           (inner-handler updated-request))
         (ring/not-found "")))))
@@ -151,6 +152,8 @@
                      (ring/redirect-after-post (str version "/draftset/"
                                                     (get-in result [:details :id]))))))))))
 
+(s/def ::wrap-auth fn?)
+
 (defmethod ig/pre-init-spec ::create-draftsets-handler [_]
   (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
 
@@ -176,7 +179,6 @@
   (get-draftset-handler opts))
 
 (defn wrap-as-draftset-owner [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (log/info "creating wrap-as-draftset-owner")
   (fn [handler]
     (wrap-authenticated
      (existing-draftset-handler
@@ -461,18 +463,14 @@
           :req-un [::wrap-auth]))
 
 (defmethod ig/init-key ::get-users-handler [_ opts]
-  (draftset-claim-handler opts))
+  (get-users-handler opts))
 
-(defn draftset-api-routes [{backend :drafter/backend
-                            user-repo ::user/repo
-                            authenticated :wrap-auth
-                            draftset-query-timeout-fn :timeout-fn
-                            :keys [get-users-handler
+(defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler
                                    get-draftset-handler 
                                    create-draftsets-handler
-                                   wrap-as-draftset-owner 
                                    delete-draftset-handler
+                                   draftset-options-handler
                                    draftset-get-data-handler 
                                    delete-draftset-data-handler
                                    delete-draftset-graph-handler
@@ -490,10 +488,9 @@
      version []
      (routes
       (make-route :get "/users" get-users-handler)
-
+      
       (make-route :get "/draftsets" get-draftsets-handler)
 
-      ;; create a new draftset
       (make-route :post "/draftsets" create-draftsets-handler)
 
       (make-route :get "/draftset/:id" get-draftset-handler)
@@ -513,7 +510,7 @@
       (make-route :put "/draftset/:id/data" put-draftset-data-handler)
       
       (make-route :put "/draftset/:id/graph" put-draftset-graph-handler)
-
+      
       (make-route nil "/draftset/:id/query" draftset-query-handler)
 
       (make-route :post "/draftset/:id/publish" draftset-publish-handler)
@@ -521,17 +518,12 @@
       (make-route :put "/draftset/:id" draftset-set-metadata-handler)
 
       (make-route :post "/draftset/:id/submit-to" draftset-submit-to-handler)
-
+      
       (make-route :put "/draftset/:id/claim" draftset-claim-handler)))))
 
 
-(s/def ::wrap-auth fn?)
-
 (defmethod ig/pre-init-spec :drafter.routes/draftsets-api [_]
-  (s/keys :req-un [::wrap-auth
-                   ::sp/timeout-fn
-                   :drafter/backend
-                   ;; handlers
+  (s/keys :req-un [;; handlers
                    ::get-draftsets-handler
                    ::create-draftsets-handler
                    ::get-draftset-handler
@@ -548,10 +540,7 @@
                    ::draftset-set-metadata-handler
                    ::draftset-submit-to-handler
                    ::draftset-claim-handler
-                   ::get-users-handler]
-          :req [::user/repo]
-          ;; TODO :req-un [::repo]
-          ))
+                   ::get-users-handler]))
 
 (defmethod ig/init-key :drafter.routes/draftsets-api [_ opts]
   (draftset-api-routes opts))
