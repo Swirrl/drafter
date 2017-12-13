@@ -17,7 +17,6 @@
            org.eclipse.rdf4j.model.impl.URIImpl))
 
 (defn- prepare-rewrite-query [stasher-conn uncached-repo live->draft sparql-string union-with-live?]
-  (println "prepare-rewrite-query")
   (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
         graph-restriction (mgmt/graph-mapping->graph-restriction uncached-repo live->draft union-with-live?)
         pquery (bprot/prep-and-validate-query stasher-conn rewritten-query-string)

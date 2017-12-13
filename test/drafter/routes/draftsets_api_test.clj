@@ -267,16 +267,34 @@
   (let [response (route (create-submit-to-role-request user draftset-location role))]
     (tc/assert-is-ok-response response)))
 
-(deftest create-draftset-without-title-or-description
+#_(deftest create-draftset-without-title-or-description
   (let [response (route (tc/with-identity test-editor {:uri "/v1/draftsets" :request-method :post}))]
     (assert-is-see-other-response response)))
 
-(deftest create-draftset-with-title-and-without-description
-  (let [response (route (create-draftset-request test-editor "Test Title!"))]
+;; define a local alternative to the route fixture wrapper
+(defn valid-swagger-response?
+  "Applies handler to request and validates the response against the
+  swagger spec for the requested route.
+
+  Returns the response if valid, otherwise raises an error."
+  [handler request]
+  (let [swagger-spec (swagger/load-spec-and-resolve-refs)]
+    (swagger/validate-response-against-swagger-spec swagger-spec request (handler request))))
+
+(tc/deftest-system create-draftset-without-title-or-description
+  [{handler :drafter.routes.draftsets-api/create-draftsets-handler} "test-system.edn"]
+  (let [request (tc/with-identity test-editor {:uri "/v1/draftsets" :request-method :post})
+        response (valid-swagger-response? handler request)]
     (assert-is-see-other-response response)))
 
-(deftest create-draftset-with-title-and-description
-  (let [response (route (create-draftset-request test-editor "Test title" "Test description"))]
+(tc/deftest-system create-draftset-with-title-and-without-description
+  [{handler :drafter.routes.draftsets-api/create-draftsets-handler} "test-system.edn"]
+  (let [response (valid-swagger-response? handler (create-draftset-request test-editor "Test Title!"))]
+    (assert-is-see-other-response response)))
+
+(tc/deftest-system create-draftset-with-title-and-description
+  [{handler :drafter.routes.draftsets-api/create-draftsets-handler} "test-system.edn"]
+  (let [response (valid-swagger-response? handler (create-draftset-request test-editor "Test title" "Test description"))]
     (assert-is-see-other-response response)))
 
 (defn get-draftsets-request [include user]
@@ -352,7 +370,7 @@
       (let [response (route {:uri "/v1/draftsets" :request-method :get})]
         (tc/assert-is-unauthorised-response response)))))
 
-(deftest get-all-draftsets-test
+(deftest get-all-draftsets-test  
   (let [owned-ds (create-draftset-through-api test-publisher "owned")
         editing-ds (create-draftset-through-api test-editor "editing")
         claimable-publisher-ds (create-draftset-through-api test-editor "publishing")
