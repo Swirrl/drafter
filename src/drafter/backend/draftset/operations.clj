@@ -1,6 +1,7 @@
 (ns drafter.backend.draftset.operations
   (:require [clojure.string :as string]
             [drafter.backend.common :refer :all]
+            [grafter.rdf4j.repository :refer [prepare-query]]
             [drafter.backend.draftset.draft-management
              :as
              mgmt
@@ -608,6 +609,8 @@
   [backend]
   (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
     (spog-tuple-query->graph-query tuple-query)))
+  (let [conn (repo/->connection backend)
+        tuple-query (repo/prepare-query conn "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
 
 (defn all-graph-triples-query [executor graph]
   (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
