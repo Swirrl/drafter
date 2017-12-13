@@ -577,7 +577,7 @@
     ;;true for all current backends.
     (sparql/add conn graph-uri triple-batch)))
 
-(defn- rdf-handler->spog-tuple-handler [rdf-handler]
+(defn- rdf-handler->spog-tuple-handler [conn rdf-handler]
   (reify TupleQueryResultHandler
     (handleSolution [this bindings]
       (let [subj (.getValue bindings "s")
@@ -592,12 +592,13 @@
     (startQueryResult [this binding-names]
       (.startRDF rdf-handler))
     (endQueryResult [this]
-      (.endRDF rdf-handler))))
+      (.endRDF rdf-handler)
+      (.close conn))))
 
-(defn- spog-tuple-query->graph-query [tuple-query]
+(defn- spog-tuple-query->graph-query [conn tuple-query]
   (reify GraphQuery
     (evaluate [this rdf-handler]
-      (.evaluate tuple-query (rdf-handler->spog-tuple-handler rdf-handler)))
+      (.evaluate tuple-query (rdf-handler->spog-tuple-handler conn rdf-handler)))
     (getMaxExecutionTime [this]
       (.getMaxExecutionTime tuple-query))
     (setMaxExecutionTime [this max]
@@ -607,12 +608,12 @@
   "Returns a Sesame GraphQuery for all quads in the draftset
   represented by the given backend."
   [backend]
-  (let [tuple-query (prepare-query backend "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
-    (spog-tuple-query->graph-query tuple-query)))
   (let [conn (repo/->connection backend)
         tuple-query (repo/prepare-query conn "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
+    (spog-tuple-query->graph-query conn tuple-query)))
 
-(defn all-graph-triples-query [executor graph]
-  (let [unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+(defn all-graph-triples-query [backend graph]
+  (let [conn (repo/->connection backend)
+        unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
         escaped-query (RenderUtils/escape unsafe-query)]
-    (prepare-query executor escaped-query)))
+    (prepare-query conn escaped-query)))
