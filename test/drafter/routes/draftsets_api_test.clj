@@ -1480,10 +1480,21 @@
 (defn- get-users-request [user]
   (tc/with-identity user {:uri "/v1/users" :request-method :get}))
 
-(deftest get-users
-  (let [users (user/get-all-users *user-repo*)
+;; old style... TODO delete
+#_(deftest get-users
+    (let [users (user/get-all-users *user-repo*)
         expected-summaries (map user/get-summary users)
         {:keys [body] :as response} (route (get-users-request test-editor))]
+    (tc/assert-is-ok-response response)
+    (is (= (set expected-summaries) (set body)))))
+
+;; new style...
+(tc/deftest-system get-users-test
+  [{:keys [:drafter.routes.draftsets-api/get-users-handler]
+    user-repo :drafter.user/memory-repository} "test-system.edn"]
+  (let [users (user/get-all-users user-repo)
+        expected-summaries (map user/get-summary users)
+        {:keys [body] :as response} (get-users-handler (get-users-request test-editor))]
     (tc/assert-is-ok-response response)
     (is (= (set expected-summaries) (set body)))))
 

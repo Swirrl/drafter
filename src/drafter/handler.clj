@@ -41,10 +41,8 @@
 
 (defn- build-handler
   [{backend :repo
-    draftset-sparql-query-timeout-fn :query-timeout-fn
     live-sparql-route :live-sparql-query-route
-    draftset-api-routes :draftset-api-routes
-    :as config}]
+    draftset-api-routes :draftset-api-routes}]
   (wrap-handler (app-handler 
                  ;; add your application routes here
                  (-> []
