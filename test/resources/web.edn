@@ -51,9 +51,9 @@
  :drafter.routes.draftsets-api/draftset-options-handler {:drafter/backend #ig/ref :drafter/backend
                                                          :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
- :drafter.routes.draftsets-api/draftset-get-data {:drafter/backend #ig/ref :drafter/backend
-                                                  :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner
-                                                  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.routes.draftsets-api/draftset-get-data-handler {:drafter/backend #ig/ref :drafter/backend
+                                                          :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner
+                                                          :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.routes.draftsets-api/delete-draftset-data-handler {:drafter/backend #ig/ref :drafter/backend
                                                              :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
@@ -102,7 +102,7 @@
                                 :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
                                 :delete-draftset-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-handler
                                 :draftset-options-handler #ig/ref :drafter.routes.draftsets-api/draftset-options-handler
-                                :draftset-get-data-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
+                                :draftset-get-data-handler #ig/ref :drafter.routes.draftsets-api/draftset-get-data-handler
                                 :delete-draftset-data-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-data-handler
                                 :delete-draftset-graph-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-graph-handler
                                 :delete-draftset-changes-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-changes-handler
