@@ -218,12 +218,13 @@
 (defmethod ig/init-key ::draftset-options-handler [_ opts]
   (draftset-options-handler opts))
 
-(defn draftset-get-data [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend
-                          draftset-query-timeout-fn :timeout-fn}]
+(defn draftset-get-data-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend
+                                  draftset-query-timeout-fn :timeout-fn}]
   (wrap-as-draftset-owner
    (parse-union-with-live-handler
     (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
-      (let [executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
+      (let [;;executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
+            executor (ep/build-draftset-endpoint backend draftset-id union-with-live)
             is-triples-query? (contains? params :graph)
             conneg (if is-triples-query?
                      negotiate-triples-content-type-handler
@@ -237,12 +238,12 @@
                          (sp/sparql-constant-prepared-query-handler pquery))]
         (handler request))))))
 
-(defmethod ig/pre-init-spec ::draftset-get-data [_]
+(defmethod ig/pre-init-spec ::draftset-get-data-handler [_]
   (s/keys :req [:drafter/backend]
           :req-un [::wrap-as-draftset-owner ::sp/timeout-fn]))
 
-(defmethod ig/init-key ::draftset-get-data [_ opts]
-  (draftset-get-data opts))
+(defmethod ig/init-key ::draftset-get-data-handler [_ opts]
+  (draftset-get-data-handler opts))
 
 (defn delete-draftset-data-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
   (wrap-as-draftset-owner
