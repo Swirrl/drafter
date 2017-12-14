@@ -54,8 +54,10 @@
 
 (def ^:private SchemaCommon
   {:id (s/protocol DraftsetRef)
+   :changes {URI {:status (s/enum :created :updated :deleted)}}
    :created-by email-schema
-   :created-date Date
+   :created-at Date
+   :updated-at Date
    (s/optional-key :display-name) s/Str
    (s/optional-key :description) s/Str
    (s/optional-key :submitted-by) email-schema})
@@ -80,7 +82,7 @@
   ([creator :- email-schema]
    {:id (->DraftsetId (str (UUID/randomUUID)))
     :created-by creator
-    :created-date (Date.)
+    :created-at (Date.)
     :current-owner creator})
   ([creator :- email-schema
     display-name :- s/Str]

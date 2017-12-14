@@ -135,7 +135,7 @@
         :owned (ring/response (dsops/get-draftsets-owned-by backend user)))))))
 
 (defmethod ig/pre-init-spec ::get-draftsets-handler [_]
-  (s/keys :req [:drafter/backend]))
+  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
 
 (defmethod ig/init-key ::get-draftsets-handler [_ opts]
   (get-draftsets-handler opts))
@@ -346,6 +346,11 @@
 (defmethod ig/init-key ::put-draftset-graph-handler [_ opts]
   (put-draftset-graph-handler opts))
 
+
+;;;;; !!!! TODO TODO TEST THIS WITH STASHER !!!!
+;;;;; !!!! TODO TODO TEST THIS WITH STASHER !!!!
+;;;;; !!!! TODO TODO TEST THIS WITH STASHER !!!!
+;;;;; !!!! TODO TODO TEST THIS WITH STASHER !!!!
 (defn draftset-query-handler [{backend :drafter/backend
                                :keys [wrap-as-draftset-owner timeout-fn]}]
   (wrap-as-draftset-owner
