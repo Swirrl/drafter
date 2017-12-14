@@ -81,5 +81,5 @@
   (case (get-query-type pquery)
     :select (signalling-tuple-query-handler send-channel (create-tuple-query-writer output-stream result-format))
     :construct (signalling-rdf-handler send-channel (create-construct-query-writer output-stream result-format))
-    (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query.")))
+    (throw (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query."))))
 
