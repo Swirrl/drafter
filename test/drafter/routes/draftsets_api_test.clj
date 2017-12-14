@@ -331,45 +331,6 @@
       (tc/assert-schema Draftset body)
       body))
 
-(deftest get-draftsets-test
-  (let [owned-ds (create-draftset-through-api test-publisher "owned")
-        claimable-ds (create-draftset-through-api test-editor "claimable")
-        unclaimable-ds (create-draftset-through-api test-editor)]
-
-    ;;offer claimable-ds to publisher role so it can be claimed by publisher
-    (submit-draftset-to-role-through-api test-editor claimable-ds :publisher)
-
-    (testing "All draftsets"
-      (let [all-draftsets (get-draftsets-through-api :all test-publisher)]
-        (is (= 2 (count all-draftsets)))
-        (is (= #{"owned" "claimable"} (set (map :display-name all-draftsets))))))
-
-    (testing "Missing include filter should return all owned and claimable draftsets"
-      (let [request (tc/with-identity test-publisher {:uri "/v1/draftsets" :request-method :get})
-            response (route request)
-            draftsets (ok-response->typed-body [Draftset] response)]
-        (is (= 2 (count draftsets)))
-        (is (= #{"owned" "claimable"} (set (map :display-name draftsets))))))
-
-    (testing "Owned draftsets"
-      (let [draftsets (get-draftsets-through-api :owned test-publisher)]
-        (is (= 1 (count draftsets)))
-        (is (= "owned" (:display-name (first draftsets))))))
-
-    (testing "Claimable draftsets"
-      (let [draftsets (get-draftsets-through-api :claimable test-publisher)]
-        (is (= 1 (count draftsets)))
-        (is (= "claimable" (:display-name (first draftsets))))))
-
-    (testing "Invalid include parameter"
-      (let [request (get-draftsets-request :invalid test-publisher)
-            response (route request)]
-        (tc/assert-is-unprocessable-response response)))
-
-    (testing "Unauthenticated"
-      (let [response (route {:uri "/v1/draftsets" :request-method :get})]
-        (tc/assert-is-unauthorised-response response)))))
-
 (deftest get-all-draftsets-test  
   (let [owned-ds (create-draftset-through-api test-publisher "owned")
         editing-ds (create-draftset-through-api test-editor "editing")
