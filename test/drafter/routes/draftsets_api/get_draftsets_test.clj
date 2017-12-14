@@ -27,8 +27,7 @@
     (testing "Missing include filter should return all owned and claimable draftsets"
       (let [request (tc/with-identity test-publisher {:uri "/v1/draftsets" :request-method :get})
             response (get-draftsets-handler request)
-            {draftsets :body} response ;;(dat/ok-response->typed-body [Draftset] response)
-            ]
+            draftsets (dat/ok-response->typed-body [dset/Draftset] response)]
         (is (= 2 (count draftsets)))
         (is (= #{"owned" "claimable"} (set (map :display-name draftsets))))))
 
