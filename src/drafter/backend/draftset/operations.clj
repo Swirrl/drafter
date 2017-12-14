@@ -1,6 +1,5 @@
 (ns drafter.backend.draftset.operations
   (:require [clojure.string :as string]
-            [drafter.backend.common :refer :all]
             [grafter.rdf4j.repository :refer [prepare-query]]
             [drafter.backend.draftset.draft-management
              :as
