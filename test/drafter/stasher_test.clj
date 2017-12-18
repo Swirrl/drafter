@@ -62,26 +62,49 @@
       (t/is (= (set cached-file-statements)
                (set expected-data))))))
 
-(deftest-system stasher-repo-cache-and-serve-test
-  [{repo :drafter.stasher/repo
-    cache :drafter.stasher/filecache
-    raw-repo :drafter.backend/rdf4j-repo
-    {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
+(defn box-result [res]
+  (if (boolean? res)
+    [res]
+    res))
 
-  (t/testing "A cache miss returns the results and stores them in the cache"
+(defn assert-caches-query [repo cache query-str expected-data]
+  (t/testing "Cached & uncached queries return expected data and expected data is stored in the cache"
     (with-open [conn (repo/->connection repo)]
-      (let [uncached-results (repo/query conn basic-construct-query) ;; first query should be uncached
-            cached-results (repo/query conn basic-construct-query)
-            fixture-data (rdf/statements (first fixtures) :format :ttl)]
-
+      (let [uncached-results (box-result (repo/query conn query-str)) ;; first query should be uncached
+            cached-results (box-result (repo/query conn query-str))]
+        
         (t/testing "The cached, uncached and fixture data are all the same"
           (t/is (= (set uncached-results)
                    (set cached-results)
-                   (set fixture-data))))
+                   (set (box-result expected-data)))))
 
         (t/testing "Results for query are stored on disk"
           ;; Check that the expected fixture data was stored in the cache on disk
-          (assert-cached-results cache raw-repo basic-construct-query nil fixture-data))))))
+          (assert-cached-results cache repo query-str nil expected-data))))))
+
+(deftest-system stasher-queries-pull-test
+  [{caching-repo :drafter.stasher/repo
+    cache :drafter.stasher/filecache
+    uncached-repo :drafter.backend/rdf4j-repo
+    {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
+
+  (t/testing "Stashing of all query types"
+    (tc/TODO (t/testing "ASK"
+               (assert-caches-query caching-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
+               (assert-caches-query caching-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false})))
+    
+    (t/testing "SELECT"
+      (let [select-query "SELECT * WHERE { ?s ?p ?o } LIMIT 2"
+            expected-data (doall (repo/query (repo/->connection uncached-repo) select-query))]
+        (assert-caches-query caching-repo cache select-query expected-data)))
+
+    (let [graph-data (rdf/statements (first fixtures) :format :ttl)]
+      (t/testing "CONSTRUCT"
+        (assert-caches-query caching-repo cache basic-construct-query graph-data))
+
+      (tc/TODO
+       (t/testing "DESCRIBE" 
+         (assert-caches-query caching-repo cache "DESCRIBE <http://statistics.gov.scot/data/home-care-clients>" graph-data))))))
 
 (defn recording-rdf-handler
   "Convenience function that returns a 2-tuple rdf-handler that will
@@ -155,6 +178,58 @@
                 (t/is (= (set (rdf/statements (first fixtures) :format :ttl))
                          (set cached-file-statements)))))))))))
 
+(deftest-system stasher-queries-push-test
+  [{repo :drafter.stasher/repo
+    cache :drafter.stasher/filecache
+    raw-repo :drafter.backend/rdf4j-repo
+    {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
+
+  (t/testing "CONSTRUCT"
+    (t/testing "Push interface (RDFHandler) to query results"
+      (t/testing "A cache miss returns the results and stores them in the cache"
+        (with-open [conn (repo/->connection repo)]
+          (let [preped-query (.prepareGraphQuery conn basic-construct-query)
+                [uncached-recorded-events uncached-rdf-event-handler] (recording-rdf-handler)
+                [cached-recorded-events cached-rdf-event-handler] (recording-rdf-handler)]
+
+            (.evaluate preped-query uncached-rdf-event-handler) ;; run uncached query 
+            (.evaluate preped-query cached-rdf-event-handler)   ;; run again (the cached query)
+
+            (t/is (= true
+                     (:started @uncached-recorded-events)
+                     (:started @cached-recorded-events))
+                  "startRDF called")
+
+            (t/is (= true
+                     (:ended @uncached-recorded-events)
+                     (:ended @cached-recorded-events))
+                  "endRDF called")
+
+            (t/testing "The cached, uncached queries return the same data"
+              (t/is (= (set (:statements @uncached-recorded-events))
+                       (set (:statements @cached-recorded-events)))))
+            
+            (t/testing "Results for query are stored on disk"
+              ;; evidence that we didn't just run another uncached query
+
+              (let [cache-key (sut/generate-drafter-cache-key cache basic-construct-query nil {:raw-repo raw-repo})
+                    cached-file (fc/cache-key->cache-path cache cache-key)
+                    cached-file-statements (-> cached-file
+                                               io/input-stream
+                                               (rdf/statements :format (fc/backend-rdf-format cache)))]
+
+                (t/testing "Prove the side-effect of creating the file in the cache happened"
+                  (t/is (.exists cached-file)))
+                
+                (t/testing "The cached, uncached and fixture data are all the same"
+                  (t/is (= (set (:statements @uncached-recorded-events))
+                           (set (:statements @cached-recorded-events))
+                           (set cached-file-statements))))
+                
+                (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
+                  (t/is (= (set (rdf/statements (first fixtures) :format :ttl))
+                           (set cached-file-statements))))))))))))
+
 (t/deftest dataset->edn-test
   (let [ds-1 (doto (SimpleDataset.)
                (.addNamedGraph (URIImpl. "http://foo"))
@@ -172,7 +247,12 @@
                (pr-str (sut/dataset->edn ds-2)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; clojure definitions corresponding to idenfitiers/states in drafter-state-1.trig
+;; Drafter State Graph Stashing
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Definitions corresponding to idenfitiers/states in drafter-state-1.trig
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def live-graph-1 (URIImpl. "http://live-and-ds1-and-ds2"))
