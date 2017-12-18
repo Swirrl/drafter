@@ -25,7 +25,8 @@
             [ring.server.standalone :as ring-server]
             [schema.core :as s]
             [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.jobs :refer [create-job]])
+            [swirrl-server.async.jobs :refer [create-job]]
+            [clojure.pprint :as pp])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -43,8 +44,13 @@
 
 ;;(use-fixtures :each validate-schemas) ;; TODO should remove this...
 
-(defmacro todo [& forms]
-  (println "TODO: fix this test form: " &form))
+(defmacro TODO [& forms]
+  (let [pprint-forms# (for [form forms]
+                        `(pp/pprint '~form))]
+    ;;`(println "TODO: fix this test form: in " ~*file* (prn-str '~@forms))
+    `(do
+       (println "TODO Fix" ~*file* "test:")
+       ~@pprint-forms#)))
 
 (def ^:dynamic *test-backend* nil)
 (def ^:dynamic *test-writer* nil)
