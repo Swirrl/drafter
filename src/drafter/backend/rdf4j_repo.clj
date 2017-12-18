@@ -12,10 +12,12 @@
   (:import drafter.rdf.DrafterSPARQLRepository
            [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
            [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
+           [org.eclipse.rdf4j.query.resultio.binary BinaryQueryResultParserFactory]
            org.eclipse.rdf4j.query.resultio.text.BooleanTextParserFactory
            org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
            org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory
+           org.eclipse.rdf4j.rio.turtle.TurtleParserFactory
            org.eclipse.rdf4j.rio.trig.TriGParserFactory))
 
 (extend-type Repository
@@ -57,8 +59,8 @@
 ;; smaller list should mean less bugs in production as we can choose
 ;; the most reliable formats and avoid those with known issues.
 ;;
-(def construct-formats-whitelist #{NTriplesParserFactory NQuadsParserFactory TriGParserFactory})
-(def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory})
+(def construct-formats-whitelist #{#_TurtleParserFactory NTriplesParserFactory NQuadsParserFactory TriGParserFactory})
+(def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory BinaryQueryResultParserFactory})
 (def ask-formats-whitelist #{SPARQLBooleanJSONParserFactory BooleanTextParserFactory SPARQLBooleanXMLParserFactory})
 
 (defn get-backend
@@ -72,7 +74,7 @@
   (reg/register-parser-factories! {:select select-formats-whitelist
                                    :construct construct-formats-whitelist
                                    :ask ask-formats-whitelist})
-
+  
   (create-sparql-repository (str sparql-query-endpoint) (str sparql-update-endpoint)))
 
 

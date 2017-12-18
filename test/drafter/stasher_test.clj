@@ -41,6 +41,8 @@
   (t/testing "Querying a cached value returns the cached RDF"
     ;; sneak a file in to the cache via the backdoor - mutable file system muuhahahaha!!
     (let [cache-key basic-construct-query]
+
+      ;; TODO generalise this to work with SELECT/BOOLEANs
       (add-rdf-file-to-cache! filecache basic-construct-query)
       
       (t/is (= test-triples
@@ -49,7 +51,7 @@
 (defn assert-cached-results 
   [cache raw-repo query dataset expected-data]
   ;; evidence that we didn't just run another uncached query
-  (let [cache-key (sut/generate-drafter-cache-key cache query dataset {:raw-repo raw-repo})
+  (let [cache-key (sut/generate-drafter-cache-key :graph cache query dataset {:raw-repo raw-repo})
         cached-file (fc/cache-key->cache-path cache cache-key)
         cached-file-statements (-> cached-file
                                    io/input-stream
@@ -160,7 +162,7 @@
           (t/testing "Results for query are stored on disk"
             ;; evidence that we didn't just run another uncached query
 
-            (let [cache-key (sut/generate-drafter-cache-key cache basic-construct-query nil {:raw-repo raw-repo})
+            (let [cache-key (sut/generate-drafter-cache-key :graph cache basic-construct-query nil {:raw-repo raw-repo})
                   cached-file (fc/cache-key->cache-path cache cache-key)
                   cached-file-statements (-> cached-file
                                              io/input-stream
@@ -212,7 +214,7 @@
             (t/testing "Results for query are stored on disk"
               ;; evidence that we didn't just run another uncached query
 
-              (let [cache-key (sut/generate-drafter-cache-key cache basic-construct-query nil {:raw-repo raw-repo})
+              (let [cache-key (sut/generate-drafter-cache-key :graph cache basic-construct-query nil {:raw-repo raw-repo})
                     cached-file (fc/cache-key->cache-path cache cache-key)
                     cached-file-statements (-> cached-file
                                                io/input-stream
@@ -305,8 +307,8 @@
              (sut/fetch-modified-state repo (edn->dataset {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]})))))
 
     (t/testing "Fetching draftsets with union-with-live set"
-    ;; Union with live is at this low level equivalent to merging the
-    ;; set of live graphs in to :named-graphs and :default-graphs.
+      ;; Union with live is at this low level equivalent to merging the
+      ;; set of live graphs in to :named-graphs and :default-graphs.
       (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
             dataset (edn->dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live})]
         (t/is (= (merge liveset-most-recently-modified
@@ -319,7 +321,7 @@
 
   (let [dataset (edn->dataset {:named-graphs [live-graph-1 live-graph-only]
                                :default-graphs [live-graph-1 live-graph-only]})
-        result (sut/generate-drafter-cache-key filecache basic-construct-query dataset {:raw-repo repo})]
+        result (sut/generate-drafter-cache-key :graph filecache basic-construct-query dataset {:raw-repo repo})]
     
     (let [{:keys [dataset query-str modified-times]} result]
       (t/is (= 
