@@ -1,5 +1,7 @@
 {
-
+ 
+ :drafter.backend/rdf4j-repo {:sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query" 
+                              :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update" }
  
  :drafter/logging {:config "./test/resources/log-config.edn"}
 

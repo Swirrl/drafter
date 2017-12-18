@@ -289,7 +289,9 @@
           (concat default-graphs named-graphs)))
 
 (deftest-system fetch-modified-state-test
-  [{:keys [drafter.stasher/repo]}  "drafter/stasher-test/drafter-state-1.edn"]  
+  ;; Here we're just testing the underlying modified time queries, so we do
+  ;; so on a standard RDF4j repo, not a stasher/caching one.
+  [{repo :drafter.backend/rdf4j-repo} "drafter/stasher-test/drafter-state-1.edn"]  
 
   (t/testing "Fetching draftset modified times"
     (t/is (= ds-1-most-recently-modified
