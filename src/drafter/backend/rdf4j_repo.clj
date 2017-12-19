@@ -18,7 +18,8 @@
            org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
            org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory
            org.eclipse.rdf4j.rio.turtle.TurtleParserFactory
-           org.eclipse.rdf4j.rio.trig.TriGParserFactory))
+           org.eclipse.rdf4j.rio.trig.TriGParserFactory
+           org.eclipse.rdf4j.rio.binary.BinaryRDFParserFactory))
 
 (extend-type Repository
   drpr/SparqlExecutor
@@ -59,7 +60,7 @@
 ;; smaller list should mean less bugs in production as we can choose
 ;; the most reliable formats and avoid those with known issues.
 ;;
-(def construct-formats-whitelist #{TurtleParserFactory NTriplesParserFactory NQuadsParserFactory TriGParserFactory})
+(def construct-formats-whitelist #{TurtleParserFactory NTriplesParserFactory NQuadsParserFactory TriGParserFactory BinaryRDFParserFactory})
 (def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory BinaryQueryResultParserFactory})
 (def ask-formats-whitelist #{SPARQLBooleanJSONParserFactory BooleanTextParserFactory SPARQLBooleanXMLParserFactory})
 
