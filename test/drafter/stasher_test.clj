@@ -18,10 +18,21 @@
 
 (def test-triples [(rdf/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
 
-(defn- add-rdf-file-to-cache!
+(defn stub-cache-key-generator [query-type cache query-str dataset {repo :raw-repo :as context}]
+  ;; Use minimal cache key of query-type and the query-str for
+  ;; stasher-repo-test-return-cache-hit test
+  {:query-type query-type
+   :query-str query-str})
+
+(defmethod ig/init-key ::stub-cache-key-generator [_ opts]
+  stub-cache-key-generator)
+
+(defn- sneak-rdf-file-into-cache!
   "Force the creation of an entry in the cache via the backdoor "
-  [cache cache-key]
-  (let [tf (java.io.File/createTempFile "drafter.stasher.filecache-test" ".tmp")]
+  [cache query-string]
+  (let [tf (java.io.File/createTempFile "drafter.stasher.filecache-test" ".tmp")
+        ;; use the ::stub-cache-key-generator
+        cache-key (stub-cache-key-generator :graph cache query-string nil {})] 
 
     (rdf/add (gio/rdf-writer tf :format (fc/backend-rdf-format cache))
              test-triples)
@@ -31,11 +42,6 @@
 
 (def basic-construct-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . }")
 
-(defmethod ig/init-key ::stub-cache-key-generator [_ opts]
-  (fn [cache query-str dataset {repo :raw-repo :as context}]
-    ;; Just use query-str as cache key for stasher-repo-test-return-cache-hit
-    query-str))
-
 (deftest-system stasher-repo-return-cache-hit-test
   [{:keys [drafter.stasher/repo drafter.stasher/filecache]}  "drafter/stasher-test/stasher-repo-return-cache-hit-test.edn"]
   (t/testing "Querying a cached value returns the cached RDF"
@@ -43,7 +49,7 @@
     (let [cache-key basic-construct-query]
 
       ;; TODO generalise this to work with SELECT/BOOLEANs
-      (add-rdf-file-to-cache! filecache basic-construct-query)
+      (sneak-rdf-file-into-cache! filecache cache-key)
       
       (t/is (= test-triples
                (repo/query (repo/->connection repo) basic-construct-query))))))

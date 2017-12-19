@@ -59,7 +59,7 @@
 ;; smaller list should mean less bugs in production as we can choose
 ;; the most reliable formats and avoid those with known issues.
 ;;
-(def construct-formats-whitelist #{#_TurtleParserFactory NTriplesParserFactory NQuadsParserFactory TriGParserFactory})
+(def construct-formats-whitelist #{TurtleParserFactory NTriplesParserFactory NQuadsParserFactory TriGParserFactory})
 (def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory BinaryQueryResultParserFactory})
 (def ask-formats-whitelist #{SPARQLBooleanJSONParserFactory BooleanTextParserFactory SPARQLBooleanXMLParserFactory})
 
