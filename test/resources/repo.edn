@@ -2,8 +2,11 @@
                          :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
 
  :drafter.stasher/filecache {}
- 
- :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/filecache}
+
+ :drafter.stasher/cache-thread-pool {}
+
+ :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
+                                :cache #ig/ref :drafter.stasher/filecache}
                                ^:ref [:drafter.common/config]]
  
  

@@ -5,15 +5,43 @@
             [drafter.stasher.filecache :as fc]
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf4j.sparql :as sparql]
-            [integrant.core :as ig])
-  (:import [drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository]
+            [integrant.core :as ig]
+            [clojure.tools.logging :as log])
+  (:import (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
            java.nio.charset.Charset
            org.eclipse.rdf4j.query.impl.BackgroundGraphResult
            org.eclipse.rdf4j.query.QueryLanguage
            org.eclipse.rdf4j.query.resultio.helpers.BackgroundTupleResult
            org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat
-           [org.eclipse.rdf4j.repository.sparql.query SPARQLGraphQuery SPARQLTupleQuery]
-           org.eclipse.rdf4j.rio.RDFFormat))
+           (org.eclipse.rdf4j.repository.sparql.query SPARQLGraphQuery SPARQLTupleQuery)
+           org.eclipse.rdf4j.rio.RDFFormat
+           (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
+
+(s/def ::core-pool-size pos-int?)
+(s/def ::max-pool-size pos-int?)
+(s/def ::keep-alive-time-ms integer?)
+(s/def ::queue-size pos-int?)
+
+(defmethod ig/pre-init-spec ::cache-thread-pool [_]
+  (s/keys :opt-un [::core-pool-size ::max-pool-size ::keep-alive-time-ms ::queue-size]))
+
+;; This threadpool will raise a java.util.concurrent.RejectedExecutionException
+;; when there are no free threads to execute tasks and the queue of
+;; waiting jobs is full.
+(defmethod ig/init-key ::cache-thread-pool [_ {:keys [core-pool-size
+                                                      max-pool-size 
+                                                      keep-alive-time-ms ;; time threads above core-pool-size wait for work before dying.
+                                                      queue-size] :as opts}]
+  
+  (let [queue (ArrayBlockingQueue. (or queue-size 1))]
+    (ThreadPoolExecutor. (or core-pool-size 1)
+                         (or max-pool-size 1)
+                         (or keep-alive-time-ms 1000)
+                         TimeUnit/MILLISECONDS
+                         queue)))
+
+(defmethod ig/halt-key! ::cache-thread-pool [k thread-pool]
+  (.shutdown thread-pool))
 
 (defn dataset->edn
   "Convert a Dataset object into a clojure value with consistent print
@@ -68,12 +96,16 @@
 
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
-  [cache-key base-uri-str cache]
+  [thread-pool cache-key base-uri-str cache]
   (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)       
         bg-graph-result (BackgroundGraphResult. cache-parser cache-stream (when charset (Charset/forName charset)) base-uri-str)]
 
     ;; execute parse thread on a thread pool.
-    (.submit clojure.lang.Agent/soloExecutor bg-graph-result)
+    (.submit thread-pool ^Runnable (fn []
+                                     (try
+                                       (.run bg-graph-result)
+                                       (catch Throwable ex
+                                         (log/warn ex "Error reading data from cache")))))
 
     bg-graph-result))
 
@@ -84,12 +116,16 @@
 
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
-  [cache-key base-uri-str cache]
+  [thread-pool cache-key base-uri-str cache]
   (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)       
         bg-tuple-result (BackgroundTupleResult. cache-parser cache-stream)]
 
     ;; execute parse thread on a thread pool.
-    (.submit clojure.lang.Agent/soloExecutor bg-tuple-result) 
+    (.submit thread-pool ^Runnable (fn []
+                                     (try
+                                       (.run bg-tuple-result)
+                                       (catch Throwable ex
+                                         (log/warn ex "Error reading data from cache"))))) 
     bg-tuple-result))
 
 (defn construct-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache graph-query]
@@ -125,7 +161,7 @@
 
 (defn stashing->construct-query
   "Construct a graph query that checks the stash before evaluating"
-  [httpclient cache query-str base-uri-str {:keys [cache-key-generator] :as opts}]
+  [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
   (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
     (proxy [SPARQLGraphQuery] [httpclient query-str base-uri-str]
       (evaluate
@@ -134,7 +170,7 @@
          (let [dataset (.getDataset this)
                cache-key (cache-key-generator :graph cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
-             (construct-sync-cache-hit cache-key base-uri-str cache)
+             (construct-sync-cache-hit thread-pool cache-key base-uri-str cache)
              
              ;; else send query (and simultaneously stream it to file that gets put in the cache)
              (construct-sync-cache-miss httpclient cache-key base-uri-str cache this))))
@@ -156,8 +192,8 @@
 ;;;;; TODO TODO TODO
 (defn stashing->select-query
   "Construct a tuple query that checks the stash before evaluating"
-  [httpclient cache query-str base-uri-str {:keys [cache-key-generator] :as opts}]
-  (let [cache (fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
+  [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
+  (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
     (proxy [SPARQLTupleQuery] [httpclient query-str base-uri-str]
       (evaluate
         ;; sync results
@@ -165,7 +201,7 @@
          (let [dataset (.getDataset this)
                cache-key (cache-key-generator :tuple cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
-             (tuple-sync-cache-hit cache-key base-uri-str cache)
+             (tuple-sync-cache-hit thread-pool cache-key base-uri-str cache)
              
              ;; else send query (and simultaneously stream it to file that gets put in the cache)
              (tuple-sync-cache-miss httpclient cache-key base-uri-str cache this))))
@@ -254,8 +290,9 @@
 
 (s/def ::sparql-query-endpoint uri?)
 (s/def ::sparql-update-endpoint uri?)
+(s/def ::thread-pool #(instance? java.util.concurrent.ThreadPoolExecutor %))
 
 (defmethod ig/pre-init-spec :drafter.stasher/repo [_]
-  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint]))
+  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::thread-pool]))
 
 
