@@ -5,9 +5,12 @@
  
  :drafter/logging {:config "./test/resources/log-config.edn"}
 
+ :drafter.stasher/cache-thread-pool {}
+ 
  :drafter.stasher/filecache {}
  
  :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/filecache
+                        :thread-pool #ig/ref :drafter.stasher/cache-thread-pool
                         :sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query" ;#env SPARQL_QUERY_ENDPOINT
                         :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update" ;#env SPARQL_UPDATE_ENDPOINT
                         }

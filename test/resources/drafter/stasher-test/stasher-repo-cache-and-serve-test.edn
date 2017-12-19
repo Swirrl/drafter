@@ -9,8 +9,10 @@
 
  ;; raw repository for accessing data in a manner that is un-cached in tests
  :drafter.backend/rdf4j-repo ^:ref [:drafter.common/config]
- 
- :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/filecache}
+
+ :drafter.stasher/cache-thread-pool {}
+ :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool 
+                                :cache #ig/ref :drafter.stasher/filecache}
                                ^:ref [:drafter.common/config]]
 
  ;; instantiate/remove test fixture
