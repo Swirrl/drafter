@@ -66,15 +66,14 @@
   In the case where an extension is shared between parsers the first
   encountered in supported-cache-formats is used."
   [fmt]
-  
-  (when-let [parser-factory (.orElse (condp = (type fmt)
-                                       RDFFormat (.get (org.eclipse.rdf4j.rio.RDFParserRegistry/getInstance) fmt)
-                                       BooleanQueryResultFormat (.get (BooleanQueryResultParserRegistry/getInstance) fmt)
-                                       TupleQueryResultFormat (.get (TupleQueryResultParserRegistry/getInstance) fmt)
-                                       nil (java.util.Optional/empty)) nil)]
-    (let [parser (.getParser parser-factory)]
-      (assert parser (str "Error could not find a parser for format:" fmt))
-      parser)))
+  (let [parser (when-let [parser-factory (.orElse (condp instance? fmt
+                                                    RDFFormat (.get (org.eclipse.rdf4j.rio.RDFParserRegistry/getInstance) fmt)
+                                                    BooleanQueryResultFormat (.get (BooleanQueryResultParserRegistry/getInstance) fmt)
+                                                    TupleQueryResultFormat (.get (TupleQueryResultParserRegistry/getInstance) fmt)
+                                                    (java.util.Optional/empty)) nil)]
+                 (.getParser parser-factory))]
+    (assert parser (str "Error could not find a parser for format:" fmt))
+    parser))
 
 (def default-cache-rdf-format :brf)
 (def default-cache-tuple-format #_:brt :srj)
@@ -86,13 +85,13 @@
 
 
 (defn backend-rdf-format [cache]
-  (or (:backend-rdf-format (.opts cache)) default-cache-rdf-format))
+  (:backend-rdf-format (.opts cache)))
 
 (defn backend-tuple-format [cache]
-  (or (:backend-tuple-format (.opts cache)) default-cache-tuple-format))
+  (:backend-tuple-format (.opts cache)))
 
 (defn backend-boolean-format [cache]
-  (or (:backend-boolean-format (.opts cache)) default-cache-boolean-format))
+  (:backend-boolean-format (.opts cache)))
 
 
 (defmulti backend-format (fn [cache cache-key]
@@ -214,8 +213,13 @@
   (s/and (s/keys :opt-un [::base-cache ::dir ::persist-on-shutdown? ::charset ::backend-rdf-format ::backend-tuple-format ::backend-boolean-format])))
 
 (defn file-cache-factory [opts]
-  (let [{:keys [dir base-cache] :as opts} (merge opts {:base-cache (or (:base-cache opts) {})
-                                                       :dir (or (:dir opts) default-cache-dir)})]
+  (let [default-opts {:base-cache {}
+                      :dir default-cache-dir
+                      :backend-rdf-format default-cache-rdf-format
+                      :backend-tuple-format default-cache-tuple-format
+                      :backend-boolean-format default-cache-boolean-format}
+        
+        {:keys [dir base-cache] :as opts} (merge opts default-opts)]
     (fs/mkdir dir)
     (fs/mkdir (io/file dir "tmp"))
     (FileCache. base-cache opts)))
