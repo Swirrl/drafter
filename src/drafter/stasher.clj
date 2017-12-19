@@ -1,36 +1,19 @@
 (ns drafter.stasher
   (:require [clojure.core.cache :as cache]
             [clojure.java.io :as io]
-            [grafter.rdf4j.repository :as repo]
-            [grafter.rdf :as rdf]
-            [grafter.rdf4j.io :as gio]
-            [grafter.rdf.protocols :as pr]
-            [me.raynes.fs :as fs]
-            [grafter.rdf4j.formats :as fmt]
-            [drafter.stasher.filecache :as fc]
             [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as g]
-            [integrant.core :as ig]
-            [clojure.tools.logging :as log]
-            [grafter.rdf4j.sparql :as sparql])
-  (:import org.eclipse.rdf4j.repository.event.RepositoryConnectionListener
-           java.net.URI
-           (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository DrafterSparqlSession)
-           (org.eclipse.rdf4j.repository Repository RepositoryConnection)
-           (org.eclipse.rdf4j.query QueryLanguage GraphQueryResult TupleQueryResult)
-           (org.eclipse.rdf4j.repository.event.base NotifyingRepositoryWrapper NotifyingRepositoryConnectionWrapper)
-           (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate)
-           (org.eclipse.rdf4j.rio RDFHandler RDFFormat)
-           (org.eclipse.rdf4j.common.lang FileFormat)
-           (org.eclipse.rdf4j.query.resultio TupleQueryResultFormat TupleQueryResultParserRegistry)
-           (org.eclipse.rdf4j.query.resultio BooleanQueryResultFormat BooleanQueryResultParserRegistry)
-           (org.eclipse.rdf4j.model.impl URIImpl)
-           (org.eclipse.rdf4j.query.impl SimpleDataset)
-           (org.eclipse.rdf4j.query.impl BackgroundGraphResult)
-           (org.eclipse.rdf4j.query.resultio.helpers BackgroundTupleResult)
-           java.io.File
-           (java.security DigestOutputStream DigestInputStream MessageDigest)
-           org.apache.commons.codec.binary.Hex))
+            [drafter.stasher.filecache :as fc]
+            [grafter.rdf4j.repository :as repo]
+            [grafter.rdf4j.sparql :as sparql]
+            [integrant.core :as ig])
+  (:import [drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository]
+           java.nio.charset.Charset
+           org.eclipse.rdf4j.query.impl.BackgroundGraphResult
+           org.eclipse.rdf4j.query.QueryLanguage
+           org.eclipse.rdf4j.query.resultio.helpers.BackgroundTupleResult
+           org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat
+           [org.eclipse.rdf4j.repository.sparql.query SPARQLGraphQuery SPARQLTupleQuery]
+           org.eclipse.rdf4j.rio.RDFFormat))
 
 (defn dataset->edn
   "Convert a Dataset object into a clojure value with consistent print
@@ -51,7 +34,7 @@
         dataset-value (dataset->edn dataset)]
 
     (let [k {:dataset dataset-value
-             :query-type query-type
+             :query-type query-type  ;; This is the only field required by the file-cache in the cache-key
              :query-str query-str
              :modified-times modified-state}]
       k)))
@@ -69,14 +52,13 @@
         format (fc/get-format cached-file)
         
         file-stream-map (if (#{RDFFormat/BINARY TupleQueryResultFormat/BINARY} format)
-                             {:cache-stream (io/input-stream cached-file)
-                              :charset nil}
-                             {:cache-stream (io/input-stream cached-file :encoding "UTF-8") #_(io/reader cached-file :encoding "UTF-8")
-                              :charset "UTF-8"})
+                          {:charset nil}
+                          {:charset "UTF-8"})
         
         cached-file-parser (fc/get-parser format)]
 
     (assoc file-stream-map
+           :cache-stream (io/input-stream cached-file)
            :cache-parser cached-file-parser)))
 
 (defn- construct-sync-cache-hit
@@ -88,10 +70,11 @@
   will already be on results where the dataset restriction was set."
   [cache-key base-uri-str cache]
   (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)       
-        bg-graph-result (BackgroundGraphResult. cache-parser cache-stream charset base-uri-str)]
+        bg-graph-result (BackgroundGraphResult. cache-parser cache-stream (when charset (Charset/forName charset)) base-uri-str)]
 
     ;; execute parse thread on a thread pool.
-    (.submit clojure.lang.Agent/soloExecutor bg-graph-result) 
+    (.submit clojure.lang.Agent/soloExecutor bg-graph-result)
+
     bg-graph-result))
 
 (defn- tuple-sync-cache-hit
@@ -143,13 +126,13 @@
 (defn stashing->construct-query
   "Construct a graph query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str {:keys [cache-key-generator] :as opts}]
-  (let [cache (fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
+  (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
     (proxy [SPARQLGraphQuery] [httpclient query-str base-uri-str]
       (evaluate
         ;; sync results
         ([]
          (let [dataset (.getDataset this)
-               cache-key (cache-key-generator cache query-str dataset opts)]
+               cache-key (cache-key-generator :graph cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
              (construct-sync-cache-hit cache-key base-uri-str cache)
              
@@ -210,33 +193,33 @@
   [httpclient cache query-str base-uri-str]
   )
 
-(defn- stasher-connection [repo httpclient cache {:keys [quad-mode] :or {quad-mode false} :as opts}]
+(defn- stasher-connection [repo httpclient cache {:keys [quad-mode base-uri] :or {quad-mode false} :as opts}]
   (proxy [DrafterSPARQLConnection] [repo httpclient quad-mode]
 
-    #_(commit) ;; catch potential cache expirey
-    #_(prepareUpdate [_ query-str base-uri-str]);; catch
+;    #_(commit) ;; catch potential cache expirey
+;    #_(prepareUpdate [_ query-str base-uri-str]);; catch
     
     (prepareTupleQuery
       ([_ query-str base-uri-str]
-       (stashing->select-query httpclient cache query-str base-uri-str opts)))
+       (stashing->select-query httpclient cache query-str (or base-uri-str base-uri) opts)))
     
     (prepareGraphQuery
-      #_([query-str]
-       (stashing->construct-query httpclient cache query-str nil opts))
-      #_([_ query-str]
-       (stashing->construct-query httpclient cache query-str nil opts))
+;      #_([query-str]
+;       (stashing->construct-query httpclient cache query-str nil opts))
+;      #_([_ query-str]
+;       (stashing->construct-query httpclient cache query-str nil opts))
       ([_ query-str base-uri-str]
-       (stashing->construct-query httpclient cache query-str base-uri-str opts)))
-
-    #_(prepareGraphQuery [_ query-str]
+       (stashing->construct-query httpclient cache query-str (or base-uri-str base-uri) opts)))
+    
+;    #_(prepareGraphQuery [_ query-str]
         )
 
-    #_(prepareQuery 
-      ([_ _ query-str]
-       (stashing->construct-query httpclient cache query-str nil opts)))
+;    #_(prepareQuery 
+;      ([_ _ query-str]
+;       (stashing->construct-query httpclient cache query-str nil opts)))
     
     #_(prepareBooleanQuery [_ query-str base-uri-str])
-    ))
+    )
 
 (defn stasher-repo
   "Builds a stasher RDF repository, that implements the standard RDF4j
@@ -255,7 +238,9 @@
         updated-opts (assoc opts
                             :raw-repo raw-repo
                             :cache-key-generator (or (:cache-key-generator opts)
-                                                     generate-drafter-cache-key))]
+                                                     generate-drafter-cache-key)
+                            :base-uri (or (:base-uri opts)
+                                          "http://publishmydata.com/id/"))]
 
     (repo/notifying-repo (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
                            (getConnection []

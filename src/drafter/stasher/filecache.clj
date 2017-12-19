@@ -10,7 +10,7 @@
   (:import java.io.File
            java.security.MessageDigest
            org.apache.commons.codec.binary.Hex
-           (org.eclipse.rdf4j.query GraphQueryResult TupleQueryResultHandler)
+           (org.eclipse.rdf4j.query GraphQueryResult TupleQueryResultHandler TupleQueryResult)
            org.eclipse.rdf4j.rio.RDFFormat
            (org.eclipse.rdf4j.query.resultio BooleanQueryResultFormat BooleanQueryResultParserRegistry
                                              TupleQueryResultWriter TupleQueryResultFormat
@@ -72,7 +72,9 @@
                                        BooleanQueryResultFormat (.get (BooleanQueryResultParserRegistry/getInstance) fmt)
                                        TupleQueryResultFormat (.get (TupleQueryResultParserRegistry/getInstance) fmt)
                                        nil (java.util.Optional/empty)) nil)]
-    (.getParser parser-factory)))
+    (let [parser (.getParser parser-factory)]
+      (assert parser (str "Error could not find a parser for format:" fmt))
+      parser)))
 
 (def default-cache-rdf-format :brf)
 (def default-cache-tuple-format #_:brt :srj)
@@ -93,7 +95,7 @@
   (or (:backend-boolean-format (.opts cache)) default-cache-boolean-format))
 
 
-#dbg (defmulti backend-format (fn [cache cache-key]
+(defmulti backend-format (fn [cache cache-key]
                            (:query-type cache-key)))
 
 (defmethod backend-format :tuple [cache cache-key]
@@ -130,8 +132,19 @@
                        (mapv (partial apply str)))]
      (apply io/file (conj sub-dirs (str hash-key "." (name fmt-extension)))))))
 
+
+(s/def ::query-type #{:graph :tuple :ask})
+(s/def ::cache-key (s/keys :req-un [::query-type]))
+
+(defn assert-spec! [spec value]
+  (when-not (s/valid? spec value)
+    (throw (ex-info (str "Attempt to put an invalid entry in the stasher query cache.  "
+                         (s/explain-str spec value))
+                    (s/explain-data spec value)))))
+
 (defn cache-key->cache-path
   [cache cache-key]
+  (assert-spec! ::cache-key cache-key)
   (let [fmt (backend-format cache cache-key)
         hash-key (hash-key->file-path (cache-key->hash-key cache-key) fmt)]
     (io/file (:dir (.opts cache)) hash-key)))
@@ -230,7 +243,7 @@
   For RDF pull query results."
   [cache cache-key ^BackgroundGraphResult bg-graph-result]
   (let [rdf-format (backend-rdf-format cache)
-        temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (.dir cache) "tmp"))
+        temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir (.opts cache)) "tmp"))
         make-stream (select-output-coercer rdf-format)
         stream (make-stream temp-file :buffer 8192)]
 

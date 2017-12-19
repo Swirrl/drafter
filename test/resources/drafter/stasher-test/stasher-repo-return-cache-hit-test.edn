@@ -13,8 +13,8 @@
                         :cache-key-generator #ig/ref :drafter.stasher-test/stub-cache-key-generator}
 
  :drafter.stasher/filecache {:persist-on-shutdown? false ;; delete cache on shutdown (for tests)
-                             }
-
+                             :backend-rdf-format :ttl}
+ 
  
  ;; instantiate/remove test fixture
  :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo

@@ -2,7 +2,8 @@
   (:require [drafter.stasher.filecache :as sut]
             [clojure.test :as t]
             [me.raynes.fs :as fs]
-            [clojure.core.cache :as cache]))
+            [clojure.core.cache :as cache]
+            [clojure.java.io :as io]))
 
 (def test-path (fs/file "tmp" "filecache-test"))
 
@@ -39,18 +40,26 @@
 
 (t/deftest lookup-file-cache
   (let [cache (sut/file-cache-factory {})]
-    (t/is (nil? (cache/lookup cache {:an :un :cached :key })))
-    (t/is (= :not-found (cache/lookup cache {:an :un :cached :key } :not-found)))
+
+    (t/testing "Assert validity of cache entries"
+      (t/is (thrown? clojure.lang.ExceptionInfo
+                     (cache/miss cache {:foo :bar} (io/file test-path "test.file")))
+            "Must contain a valid :query-type key, so we can serialise the data.")
+      (t/is (thrown? clojure.lang.ExceptionInfo
+                     (cache/miss cache {:query-type :invalid-query-type} (io/file test-path "test.file")))))
+    
+    (t/testing "Not found"
+      (t/is (nil? (cache/lookup cache {:query-type :tuple :an :un :cached :key })))
+      (t/is (= :not-found (cache/lookup cache {:query-type :graph :an :un :cached :key } :not-found))))
 
 
     (t/testing "Add & retrieve file from cache"
-      
       (let [temp-file (create-temp-file!)
-            cache (assoc cache {:cache :me} temp-file)])
+            cache (assoc cache {:query-type :graph :cache :me} temp-file)])
 
-      (t/is (instance? java.io.File (cache/lookup cache {:cache :me}))
+      (t/is (instance? java.io.File (cache/lookup cache {:query-type :graph :cache :me}))
             "File should be in cache under the {:cache :me} key")
 
       (t/testing "Evict key from cache"
-        (t/is (nil? (-> (cache/evict cache {:cache :me})
-                        (cache/lookup {:cache :me}))))))))
+        (t/is (nil? (-> (cache/evict cache {:query-type :graph :cache :me})
+                        (cache/lookup {:query-type :graph :cache :me}))))))))
