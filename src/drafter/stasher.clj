@@ -159,7 +159,7 @@
                (.setRDFHandler rdf-handler)
                (.parse cache-stream base-uri-str))))
 
-(defn stashing->construct-query
+(defn stashing-construct-query
   "Construct a graph query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
   (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
@@ -190,7 +190,8 @@
                                 (.getIncludeInferred this) (.getMaxExecutionTime this)
                                 stashing-rdf-handler (.getBindingsArray this))))))))))
 ;;;;; TODO TODO TODO
-(defn stashing->select-query
+
+(defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
   (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
@@ -237,10 +238,10 @@
 ;    #_(prepareUpdate [_ query-str base-uri-str]);; catch
     
     (prepareTupleQuery [_ query-str base-uri-str]
-      (stashing->select-query httpclient cache query-str (or base-uri-str base-uri) opts))
+      (stashing-select-query httpclient cache query-str (or base-uri-str base-uri) opts))
     
     (prepareGraphQuery [_ query-str base-uri-str]
-      (stashing->construct-query httpclient cache query-str (or base-uri-str base-uri) opts))
+      (stashing-construct-query httpclient cache query-str (or base-uri-str base-uri) opts))
 
     #_(prepareBooleanQuery [_ query-str base-uri-str])
     )
