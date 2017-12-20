@@ -171,6 +171,13 @@
                (.setRDFHandler rdf-handler)
                (.parse cache-stream base-uri-str))))
 
+(defn- tuple-async-cache-hit
+  [query-str tuple-handler base-uri-str cache]
+  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache query-str)]
+             (doto cache-parser
+               (.setQueryResultHandler tuple-handler)
+               (.parse cache-stream))))
+
 (defn stashing-construct-query
   "Construct a graph query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
@@ -224,7 +231,7 @@
          (let [dataset (.getDataset this)
                cache-key (cache-key-generator :tuple cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
-             (construct-async-cache-hit cache-key tuple-handler base-uri-str cache)
+             (tuple-async-cache-hit cache-key tuple-handler base-uri-str cache)
              
              ;; else
              (let [stashing-tuple-handler (fc/stashing-tuple-query-result cache cache-key tuple-handler)

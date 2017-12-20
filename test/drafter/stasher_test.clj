@@ -17,7 +17,9 @@
            (org.eclipse.rdf4j.query.parser ParsedGraphQuery ParsedTupleQuery ParsedBooleanQuery)
            (org.eclipse.rdf4j.query.parser.sparql SPARQLParser)
            org.eclipse.rdf4j.query.resultio.QueryResultIO
-           org.eclipse.rdf4j.rio.RDFHandler))
+           org.eclipse.rdf4j.rio.RDFHandler
+           (org.eclipse.rdf4j.query TupleQueryResult TupleQueryResultHandler)
+           org.eclipse.rdf4j.query.resultio.TupleQueryResultWriter))
 
 (def test-triples [(rdf/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
 
@@ -68,6 +70,11 @@
     [res]
     (doall res)))
 
+(defn binding-set->grafter-type [binding-set]
+  (let [binding-names (.getBindingNames binding-set)]
+    (zipmap (map keyword binding-names)
+            (map #(-> binding-set (.getBinding %) .getValue pr/->grafter-type) binding-names))))
+
 (defn assert-cached-results 
   [cache raw-repo query dataset expected-data]
   ;; evidence that we didn't just run another uncached query
@@ -79,10 +86,8 @@
                                    :tuple (let [tq-res (QueryResultIO/parseTupleBackground stream (fc/fmt-kw->tuple-format (fc/backend-tuple-format cache)))]
                                             (iterator-seq (reify java.util.Iterator
                                                                   (next [this]
-                                                                    (let [binding-set (.next tq-res)
-                                                                          binding-names (.getBindingNames binding-set)]
-                                                                      (zipmap (map keyword binding-names)
-                                                                              (map #(-> binding-set (.getBinding %) .getValue pr/->grafter-type) binding-names))))
+                                                                    (let [binding-set (.next tq-res)]
+                                                                      (binding-set->grafter-type binding-set)))
                                                                   (hasNext [this]
                                                                     (.hasNext tq-res)))))
                                    :graph (rdf/statements stream :format (fc/backend-rdf-format cache))
@@ -136,76 +141,100 @@
         (assert-caches-query caching-repo cache "DESCRIBE <http://statistics.gov.scot/data/home-care-clients>" graph-data)))))
 
 (defn recording-rdf-handler
-  "Convenience function that returns a 2-tuple rdf-handler that will
-  record events inside an atom.
+  "Convenience function that returns a 2-tuple of a recorded events
+  atom and an rdf-handler that will record events inside an atom.
 
   The first item in the tuple is the atom, the second the
   rdf-handler."
   []
   (let [recorded-events (atom {})
         rdf-handler (reify RDFHandler
-                         (startRDF [this]
-                           (swap! recorded-events assoc :started true))
-                         (endRDF [this]
-                           (swap! recorded-events assoc :ended true))
-                         (handleStatement [this statement]
-                           (swap! recorded-events update :statements conj (gio/backend-quad->grafter-quad statement)))
-                         (handleComment [this comment]
-                           (swap! recorded-events update :comments conj comment))
-                         (handleNamespace [this prefix uri]
-                           (swap! recorded-events update :namespaces assoc prefix uri)))]
+                      (startRDF [this]
+                        (swap! recorded-events assoc :started true))
+                      (endRDF [this]
+                        (swap! recorded-events assoc :ended true))
+                      (handleStatement [this statement]
+                        (swap! recorded-events update :statements conj (gio/backend-quad->grafter-quad statement)))
+                      (handleComment [this comment]
+                        (swap! recorded-events update :comments conj comment))
+                      (handleNamespace [this prefix uri]
+                        (swap! recorded-events update :namespaces assoc prefix uri)))]
 
     [recorded-events rdf-handler]))
 
-(deftest-system stasher-repo-test-cache-and-serve-push
-  [{repo :drafter.stasher/repo
-    cache :drafter.stasher/filecache
-    raw-repo :drafter.backend/rdf4j-repo
-    {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
-  (t/testing "Push interface (RDFHandler) to query results"
-    (t/testing "A cache miss returns the results and stores them in the cache"
-      (with-open [conn (repo/->connection repo)]
-        (let [preped-query (.prepareGraphQuery conn basic-construct-query)
-              [uncached-recorded-events uncached-rdf-event-handler] (recording-rdf-handler)
-              [cached-recorded-events cached-rdf-event-handler] (recording-rdf-handler)]
+(defn recording-tuple-handler
+  "Convenience function that returns a 2-tuple of recorded-events and
+  a tuple-handler that will record events inside an atom.
 
-          (.evaluate preped-query uncached-rdf-event-handler) ;; run uncached query 
-          (.evaluate preped-query cached-rdf-event-handler)   ;; run again (the cached query)
+  The first item in the tuple is the atom, the second the
+  rdf-handler."
+  []
+  (let [recorded-events (atom {})
+        tuple-handler (reify
+                        #_TupleQueryResult
+                        #_(getBindingNames [this]
+                          ["foo" "bar"])
+                        TupleQueryResultHandler
+                        (startQueryResult [this binding-names]
+                          (swap! recorded-events assoc
+                                 :started true
+                                 :binding-names binding-names))
+                        (endQueryResult [this]
+                          (swap! recorded-events assoc :ended true))
+                        (handleSolution [this binding-set]
+                          (swap! recorded-events update :solutions conj (binding-set->grafter-type binding-set)))
+                        (handleLinks [this link-urls]
+                          (swap! recorded-events update :links conj link-urls)))]
+    
+    [recorded-events tuple-handler]))
 
-          (t/is (= true
-                   (:started @uncached-recorded-events)
-                   (:started @cached-recorded-events))
-                "startRDF called")
+(defn- assert-same-cached-uncached
+  [preped-query cache raw-repo fixtures make-recording-handler]
+  (t/testing "A cache miss returns the results and stores them in the cache"
+    (let [[uncached-recorded-events uncached-event-handler] (make-recording-handler) 
+          [cached-recorded-events cached-event-handler] (make-recording-handler)]
 
-          (t/is (= true
-                   (:ended @uncached-recorded-events)
-                   (:ended @cached-recorded-events))
-                "endRDF called")
+      (.evaluate preped-query uncached-event-handler) ;; run uncached query 
+      (.evaluate preped-query cached-event-handler) ;; run again (the cached query)
 
-          (t/testing "The cached, uncached queries return the same data"
-            (t/is (= (set (:statements @uncached-recorded-events))
-                     (set (:statements @cached-recorded-events)))))
+      (t/is (= true
+               (:started @uncached-recorded-events)
+               (:started @cached-recorded-events))
+            "startRDF called")
+
+      (t/is (= true
+               (:ended @uncached-recorded-events)
+               (:ended @cached-recorded-events))
+            "endRDF called")
+
+      (t/is (= @uncached-recorded-events
+               @cached-recorded-events)
+            "fires same set of events whether cached or not")
+      
+      (t/testing "The cached, uncached queries return the same data"
+        (t/is (= (set (:statements @uncached-recorded-events))
+                 (set (:statements @cached-recorded-events)))))
+      
+      (t/testing "Results for query are stored on disk"
+        ;; evidence that we didn't just run another uncached query
+
+        (let [cache-key (sut/generate-drafter-cache-key :graph cache basic-construct-query nil {:raw-repo raw-repo})
+              cached-file (fc/cache-key->cache-path cache cache-key)
+              cached-file-statements (-> cached-file
+                                         io/input-stream
+                                         (rdf/statements :format (fc/backend-rdf-format cache)))]
+
+          (t/testing "Prove the side-effect of creating the file in the cache happened"
+            (t/is (.exists cached-file)))
           
-          (t/testing "Results for query are stored on disk"
-            ;; evidence that we didn't just run another uncached query
-
-            (let [cache-key (sut/generate-drafter-cache-key :graph cache basic-construct-query nil {:raw-repo raw-repo})
-                  cached-file (fc/cache-key->cache-path cache cache-key)
-                  cached-file-statements (-> cached-file
-                                             io/input-stream
-                                             (rdf/statements :format (fc/backend-rdf-format cache)))]
-
-              (t/testing "Prove the side-effect of creating the file in the cache happened"
-                (t/is (.exists cached-file)))
-              
-              (t/testing "The cached, uncached and fixture data are all the same"
-                (t/is (= (set (:statements @uncached-recorded-events))
-                         (set (:statements @cached-recorded-events))
-                         (set cached-file-statements))))
-              
-              (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
-                (t/is (= (set (rdf/statements (first fixtures) :format :ttl))
-                         (set cached-file-statements)))))))))))
+          (t/testing "The cached, uncached and fixture data are all the same"
+            (t/is (= (set (:statements @uncached-recorded-events))
+                     (set (:statements @cached-recorded-events))
+                     (set cached-file-statements))))
+          
+          (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
+            (t/is (= (set (rdf/statements (first fixtures) :format :ttl))
+                     (set cached-file-statements)))))))))
 
 (deftest-system stasher-queries-push-test
   [{repo :drafter.stasher/repo
@@ -213,51 +242,15 @@
     raw-repo :drafter.backend/rdf4j-repo
     {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
 
-  (t/testing "CONSTRUCT"
-    (t/testing "Push interface (RDFHandler) to query results"
-      (t/testing "A cache miss returns the results and stores them in the cache"
-        (with-open [conn (repo/->connection repo)]
-          (let [preped-query (.prepareGraphQuery conn basic-construct-query)
-                [uncached-recorded-events uncached-rdf-event-handler] (recording-rdf-handler)
-                [cached-recorded-events cached-rdf-event-handler] (recording-rdf-handler)]
+  (t/testing "Push interface to query results"
+    (with-open [conn (repo/->connection repo)]
+      (t/testing "CONSTRUCT (RDFHandler)"
+        (let [construct-query (.prepareGraphQuery conn basic-construct-query)]
+          (assert-same-cached-uncached construct-query cache raw-repo fixtures recording-rdf-handler)))
 
-            (.evaluate preped-query uncached-rdf-event-handler) ;; run uncached query 
-            (.evaluate preped-query cached-rdf-event-handler)   ;; run again (the cached query)
-
-            (t/is (= true
-                     (:started @uncached-recorded-events)
-                     (:started @cached-recorded-events))
-                  "startRDF called")
-
-            (t/is (= true
-                     (:ended @uncached-recorded-events)
-                     (:ended @cached-recorded-events))
-                  "endRDF called")
-
-            (t/testing "The cached, uncached queries return the same data"
-              (t/is (= (set (:statements @uncached-recorded-events))
-                       (set (:statements @cached-recorded-events)))))
-            
-            (t/testing "Results for query are stored on disk"
-              ;; evidence that we didn't just run another uncached query
-
-              (let [cache-key (sut/generate-drafter-cache-key :graph cache basic-construct-query nil {:raw-repo raw-repo})
-                    cached-file (fc/cache-key->cache-path cache cache-key)
-                    cached-file-statements (-> cached-file
-                                               io/input-stream
-                                               (rdf/statements :format (fc/backend-rdf-format cache)))]
-
-                (t/testing "Prove the side-effect of creating the file in the cache happened"
-                  (t/is (.exists cached-file)))
-                
-                (t/testing "The cached, uncached and fixture data are all the same"
-                  (t/is (= (set (:statements @uncached-recorded-events))
-                           (set (:statements @cached-recorded-events))
-                           (set cached-file-statements))))
-                
-                (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
-                  (t/is (= (set (rdf/statements (first fixtures) :format :ttl))
-                           (set cached-file-statements))))))))))))
+      (t/testing "SELECT (TupleResultHandler)"
+        (let [tuple-query (.prepareTupleQuery conn "SELECT * WHERE { ?s ?p ?o } LIMIT 2")]
+          (assert-same-cached-uncached tuple-query cache raw-repo fixtures recording-tuple-handler))))))
 
 (t/deftest dataset->edn-test
   (let [ds-1 (doto (SimpleDataset.)
