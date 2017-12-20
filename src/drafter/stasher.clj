@@ -189,8 +189,7 @@
 
         ;; async results
         ([rdf-handler]
-         ;; TODO TODO TODO
-         #_(let [dataset (.getDataset this)
+         (let [dataset (.getDataset this)
                cache-key (cache-key-generator :graph cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
              (construct-async-cache-hit cache-key rdf-handler base-uri-str cache)
@@ -248,11 +247,12 @@
             (boolean-sync-cache-hit cache-key base-uri-str cache)
             
             ;; else send query (and simultaneously stream it to file that gets put in the cache)
-            (boolean-sync-cache-miss httpclient cache-key base-uri-str cache)))
+            (boolean-sync-cache-miss httpclient cache-key base-uri-str cache this)))
 
         ;; NOTE unlike for the other two query types there is no
         ;; async/handler interface for boolean queries defined in
-        ;; RDF4j.
+        ;; RDF4j.  So there is no evaluate body with a handler arg as
+        ;; with other query types.
         ))))
 
 
@@ -314,5 +314,3 @@
 
 (defmethod ig/pre-init-spec :drafter.stasher/repo [_]
   (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::thread-pool]))
-
-
