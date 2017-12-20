@@ -301,7 +301,7 @@
   finished.
 
   For RDF pull query results."
-  [cache cache-key ^BackgroundTupleResult bg-tuple-result]
+  [cache cache-key bg-tuple-result]
   (let [tuple-format (backend-tuple-format cache)
         temp-file (File/createTempFile "stasher" (str "tmp." (name tuple-format)) (io/file (:dir (.opts cache)) "tmp"))
         make-stream (select-output-coercer tuple-format)
@@ -315,10 +315,26 @@
       (.startQueryResult cache-file-writer bindings)
       
       (reify
-        #_TupleQueryResultHandler
-        #_(startQueryResult [this binding-names]
-          (.startQueryResult cache-file-writer binding-names))
-        
+        TupleQueryResultHandler
+        (endQueryResult [this]
+          (.close this))
+
+        (handleLinks [this links]
+          (.handleLinks cache-file-writer links)
+          (.handleLinks bg-tuple-result links))
+
+        (handleBoolean [this bool]
+          (.handleBoolean cache-file-writer bool)
+          (.handleBoolean bg-tuple-result bool))
+
+        (handleSolution [this binding-set]
+          (.handleSolution cache-file-writer binding-set)
+          (.handleSolution bg-tuple-result binding-set))
+
+        (startQueryResult [this binding-names]
+          (.startQueryResult cache-file-writer binding-names)
+          (.startQueryResult bg-tuple-result binding-names))
+
         TupleQueryResult
         (getBindingNames [this]
           (.getBindingNames bg-tuple-result))
