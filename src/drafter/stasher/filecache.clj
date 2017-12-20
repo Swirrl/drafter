@@ -132,7 +132,7 @@
      (apply io/file (conj sub-dirs (str hash-key "." (name fmt-extension)))))))
 
 
-(s/def ::query-type #{:graph :tuple :ask})
+(s/def ::query-type #{:graph :tuple :boolean})
 (s/def ::cache-key (s/keys :req-un [::query-type]))
 
 (defn assert-spec! [spec value]

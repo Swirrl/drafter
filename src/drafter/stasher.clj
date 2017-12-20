@@ -208,19 +208,19 @@
 
         ;; TODO TODO TODO
         ;; async results
-        #_([tuple-handler]
+        ([tuple-handler]
          (let [dataset (.getDataset this)
                cache-key (cache-key-generator :tuple cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
              (construct-async-cache-hit cache-key tuple-handler base-uri-str cache)
              
              ;; else
-             (let [stashing-rdf-handler (fc/stashing-tuple-handler cache cache-key tuple-handler)
+             (let [stashing-tuple-handler (fc/stashing-tuple-query-result cache cache-key tuple-handler)
                    dataset (.getDataset this)]
-               (.sendGraphQuery httpclient QueryLanguage/SPARQL
+               (.sendTupleQuery httpclient QueryLanguage/SPARQL
                                 query-str base-uri-str dataset
                                 (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                stashing-rdf-handler (.getBindingsArray this))))))))))
+                                stashing-tuple-handler (.getBindingsArray this))))))))))
 
 
 
@@ -235,26 +235,16 @@
 ;    #_(commit) ;; catch potential cache expirey
 ;    #_(prepareUpdate [_ query-str base-uri-str]);; catch
     
-    (prepareTupleQuery
-      ([_ query-str base-uri-str]
-       (stashing->select-query httpclient cache query-str (or base-uri-str base-uri) opts)))
+    (prepareTupleQuery [_ query-str base-uri-str]
+      (stashing->select-query httpclient cache query-str (or base-uri-str base-uri) opts))
     
-    (prepareGraphQuery
-;      #_([query-str]
-;       (stashing->construct-query httpclient cache query-str nil opts))
-;      #_([_ query-str]
-;       (stashing->construct-query httpclient cache query-str nil opts))
-      ([_ query-str base-uri-str]
-       (stashing->construct-query httpclient cache query-str (or base-uri-str base-uri) opts)))
-    
-;    #_(prepareGraphQuery [_ query-str]
-        )
+    (prepareGraphQuery [_ query-str base-uri-str]
+      (stashing->construct-query httpclient cache query-str (or base-uri-str base-uri) opts))
 
-;    #_(prepareQuery 
-;      ([_ _ query-str]
-;       (stashing->construct-query httpclient cache query-str nil opts)))
-    
     #_(prepareBooleanQuery [_ query-str base-uri-str])
+    )
+
+  
     )
 
 (defn stasher-repo

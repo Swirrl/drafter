@@ -1,20 +1,23 @@
 (ns drafter.stasher-test
-  (:require [drafter.stasher :as sut]
-            [grafter.rdf4j.io :as gio]
-            [clojure.test :as t]
-            [drafter.test-common :as tc :refer [with-system deftest-system]]
+  (:require [clojure.core.cache :as cache]
             [clojure.java.io :as io]
-            [grafter.rdf :as rdf]
+            [clojure.test :as t]
+            [drafter.stasher :as sut]
             [drafter.stasher.filecache :as fc]
-            [clojure.core.cache :as cache]
-            [grafter.rdf4j.repository :as repo]
+            [drafter.test-common :as tc :refer [with-system deftest-system]]
+            [grafter.rdf :as rdf]
             [grafter.rdf.protocols :as pr]
+            [grafter.rdf4j.io :as gio]
+            [grafter.rdf4j.repository :as repo]
             [grafter.url :as url]
             [integrant.core :as ig])
   (:import [java.net URI]
-           org.eclipse.rdf4j.rio.RDFHandler
-           (org.eclipse.rdf4j.model.impl URIImpl)
-           (org.eclipse.rdf4j.query.impl SimpleDataset)))
+           org.eclipse.rdf4j.model.impl.URIImpl
+           org.eclipse.rdf4j.query.impl.SimpleDataset
+           (org.eclipse.rdf4j.query.parser ParsedGraphQuery ParsedTupleQuery ParsedBooleanQuery)
+           (org.eclipse.rdf4j.query.parser.sparql SPARQLParser)
+           org.eclipse.rdf4j.query.resultio.QueryResultIO
+           org.eclipse.rdf4j.rio.RDFHandler))
 
 (def test-triples [(rdf/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
 
@@ -54,15 +57,32 @@
       (t/is (= test-triples
                (repo/query (repo/->connection repo) basic-construct-query))))))
 
+(defn parse-query-type [sparql-query-string]
+  (condp instance? (.parseQuery (SPARQLParser.) sparql-query-string nil)
+    ParsedBooleanQuery :boolean
+    ParsedGraphQuery :graph
+    ParsedTupleQuery :tuple))
+
 (defn assert-cached-results 
   [cache raw-repo query dataset expected-data]
   ;; evidence that we didn't just run another uncached query
-  (let [cache-key (sut/generate-drafter-cache-key :graph cache query dataset {:raw-repo raw-repo})
+  (let [query-type (parse-query-type query)
+        cache-key (sut/generate-drafter-cache-key query-type cache query dataset {:raw-repo raw-repo})
         cached-file (fc/cache-key->cache-path cache cache-key)
-        cached-file-statements (-> cached-file
-                                   io/input-stream
-                                   (rdf/statements :format (fc/backend-rdf-format cache)))]
-
+        cached-file-statements (let [stream (io/input-stream cached-file)]
+                                 (condp = query-type
+                                   :tuple (let [tq-res (QueryResultIO/parseTupleBackground stream (fc/fmt-kw->tuple-format (fc/backend-tuple-format cache)))]
+                                            (iterator-seq (reify java.util.Iterator
+                                                                  (next [this]
+                                                                    (let [binding-set (.next tq-res)
+                                                                          binding-names (.getBindingNames binding-set)]
+                                                                      (zipmap (map keyword binding-names)
+                                                                              (map #(-> binding-set (.getBinding %) .getValue pr/->grafter-type) binding-names))))
+                                                                  (hasNext [this]
+                                                                    (.hasNext tq-res)))))
+                                   :graph (rdf/statements stream :format (fc/backend-rdf-format cache))
+                                   :boolean :TODO))]
+    
     (t/testing "Prove the side-effect of creating the file in the cache happened"
       (t/is (.exists cached-file)))
 
@@ -73,7 +93,7 @@
 (defn box-result [res]
   (if (boolean? res)
     [res]
-    res))
+    (doall res)))
 
 (defn assert-caches-query [repo cache query-str expected-data]
   (t/testing "Cached & uncached queries return expected data and expected data is stored in the cache"
@@ -98,21 +118,21 @@
 
   (t/testing "Stashing of all query types"
     (tc/TODO (t/testing "ASK"
-               (assert-caches-query caching-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
-               (assert-caches-query caching-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false})))
+              (assert-caches-query caching-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
+              (assert-caches-query caching-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false})))
     
     (t/testing "SELECT"
       (let [select-query "SELECT * WHERE { ?s ?p ?o } LIMIT 2"
-            expected-data (doall (repo/query (repo/->connection uncached-repo) select-query))]
+            expected-data (with-open [uncconn (repo/->connection uncached-repo)]
+                            (doall (repo/query uncconn select-query)))]
         (assert-caches-query caching-repo cache select-query expected-data)))
 
     (let [graph-data (rdf/statements (first fixtures) :format :ttl)]
       (t/testing "CONSTRUCT"
         (assert-caches-query caching-repo cache basic-construct-query graph-data))
 
-      (tc/TODO
-       (t/testing "DESCRIBE" 
-         (assert-caches-query caching-repo cache "DESCRIBE <http://statistics.gov.scot/data/home-care-clients>" graph-data))))))
+      (t/testing "DESCRIBE" 
+        (assert-caches-query caching-repo cache "DESCRIBE <http://statistics.gov.scot/data/home-care-clients>" graph-data)))))
 
 (defn recording-rdf-handler
   "Convenience function that returns a 2-tuple rdf-handler that will
