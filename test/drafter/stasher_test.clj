@@ -63,6 +63,11 @@
     ParsedGraphQuery :graph
     ParsedTupleQuery :tuple))
 
+(defn box-result [res]
+  (if (boolean? res)
+    [res]
+    (doall res)))
+
 (defn assert-cached-results 
   [cache raw-repo query dataset expected-data]
   ;; evidence that we didn't just run another uncached query
@@ -81,19 +86,15 @@
                                                                   (hasNext [this]
                                                                     (.hasNext tq-res)))))
                                    :graph (rdf/statements stream :format (fc/backend-rdf-format cache))
-                                   :boolean :TODO))]
+                                   :boolean (let [bqrp (QueryResultIO/createBooleanParser (fc/fmt-kw->boolean-format (fc/backend-boolean-format cache)))]
+                                              (.parse bqrp stream))))]
     
     (t/testing "Prove the side-effect of creating the file in the cache happened"
       (t/is (.exists cached-file)))
 
     (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
-      (t/is (= (set cached-file-statements)
-               (set expected-data))))))
-
-(defn box-result [res]
-  (if (boolean? res)
-    [res]
-    (doall res)))
+      (t/is (= (set (box-result cached-file-statements))
+               (set (box-result expected-data)))))))
 
 (defn assert-caches-query [repo cache query-str expected-data]
   (t/testing "Cached & uncached queries return expected data and expected data is stored in the cache"
@@ -117,9 +118,9 @@
     {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
 
   (t/testing "Stashing of all query types"
-    (tc/TODO (t/testing "ASK"
-              (assert-caches-query caching-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
-              (assert-caches-query caching-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false})))
+    (t/testing "ASK"
+      (assert-caches-query caching-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
+      (assert-caches-query caching-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false}))
     
     (t/testing "SELECT"
       (let [select-query "SELECT * WHERE { ?s ?p ?o } LIMIT 2"
