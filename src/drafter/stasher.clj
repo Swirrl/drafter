@@ -163,7 +163,7 @@
   "Construct a graph query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
   (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
-    (proxy [SPARQLGraphQuery] [httpclient query-str base-uri-str]
+    (proxy [SPARQLGraphQuery] [httpclient base-uri-str query-str]
       (evaluate
         ;; sync results
         ([]
@@ -194,7 +194,8 @@
   "Construct a tuple query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
   (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
-    (proxy [SPARQLTupleQuery] [httpclient query-str base-uri-str]
+    (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
+      (evaluate
       (evaluate
         ;; sync results
         ([]
