@@ -13,7 +13,7 @@
            org.eclipse.rdf4j.query.QueryLanguage
            org.eclipse.rdf4j.query.resultio.helpers.BackgroundTupleResult
            org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat
-           (org.eclipse.rdf4j.repository.sparql.query SPARQLGraphQuery SPARQLTupleQuery)
+           (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery)
            org.eclipse.rdf4j.rio.RDFFormat
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
 
@@ -67,10 +67,6 @@
              :modified-times modified-state}]
       k)))
 
-(defn stashing->boolean-query
-  "Construct a boolean query that checks the stash before evaluating"
-  [httpclient cache query-str base-uri-str])
-
 (defn fetch-cache-parser-and-stream
   "Given a cache and a cache key/query lookup the cached item and
   return a stream and parser on it."
@@ -117,7 +113,7 @@
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
   [thread-pool cache-key base-uri-str cache]
-  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)       
+  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)
         bg-tuple-result (BackgroundTupleResult. cache-parser cache-stream)]
 
     ;; execute parse thread on a thread pool.
@@ -127,6 +123,10 @@
                                        (catch Throwable ex
                                          (log/warn ex "Error reading data from cache"))))) 
     bg-tuple-result))
+
+(defn boolean-sync-cache-hit [cache-key base-uri-str cache]
+  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)]
+    (.parse cache-parser cache-stream)))
 
 (defn construct-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache graph-query]
   (let [dataset (.getDataset graph-query)
@@ -151,6 +151,18 @@
     ;; handler that will move the streamed results into the stasher
     ;; cache when it's finished.
     (fc/stashing-tuple-query-result cache cache-key bg-graph-result)))
+
+(defn boolean-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache boolean-query]
+  (let [dataset (.getDataset boolean-query)
+        boolean-result (.sendBooleanQuery httpclient QueryLanguage/SPARQL
+                                          query-str base-uri-str dataset
+                                          (.getIncludeInferred boolean-query) (.getMaxExecutionTime boolean-query)
+                                          (.getBindingsArray boolean-query))]
+
+    ;; Finally wrap the RDF4j handler we get back in a stashing
+    ;; handler that will move the streamed results into the stasher
+    ;; cache when it's finished.
+    (fc/stashing-boolean-query-result cache cache-key boolean-result)))
 
 (defn- construct-async-cache-hit
   [query-str rdf-handler base-uri-str cache]
@@ -177,7 +189,8 @@
 
         ;; async results
         ([rdf-handler]
-         (let [dataset (.getDataset this)
+         ;; TODO TODO TODO
+         #_(let [dataset (.getDataset this)
                cache-key (cache-key-generator :graph cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
              (construct-async-cache-hit cache-key rdf-handler base-uri-str cache)
@@ -189,14 +202,12 @@
                                 query-str base-uri-str dataset
                                 (.getIncludeInferred this) (.getMaxExecutionTime this)
                                 stashing-rdf-handler (.getBindingsArray this))))))))))
-;;;;; TODO TODO TODO
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
   (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
     (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
-      (evaluate
       (evaluate
         ;; sync results
         ([]
@@ -224,6 +235,26 @@
                                 (.getIncludeInferred this) (.getMaxExecutionTime this)
                                 stashing-tuple-handler (.getBindingsArray this))))))))))
 
+(defn stashing-boolean-query
+  "Construct a boolean query that checks the stash before evaluating"
+  [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
+  (let [cache cache #_(fc/file-cache-factory {})] ;; TODO fix this up to use atom/cache pattern
+    (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
+      (evaluate []
+        ;; sync results only
+        (let [dataset (.getDataset this)
+              cache-key (cache-key-generator :boolean cache query-str dataset opts)]
+          (if (cache/has? cache cache-key)
+            (boolean-sync-cache-hit cache-key base-uri-str cache)
+            
+            ;; else send query (and simultaneously stream it to file that gets put in the cache)
+            (boolean-sync-cache-miss httpclient cache-key base-uri-str cache)))
+
+        ;; NOTE unlike for the other two query types there is no
+        ;; async/handler interface for boolean queries defined in
+        ;; RDF4j.
+        ))))
+
 
 
 (defn stasher-update-query
@@ -243,11 +274,8 @@
     (prepareGraphQuery [_ query-str base-uri-str]
       (stashing-construct-query httpclient cache query-str (or base-uri-str base-uri) opts))
 
-    #_(prepareBooleanQuery [_ query-str base-uri-str])
-    )
-
-  
-    )
+    (prepareBooleanQuery [_ query-str base-uri-str]
+      (stashing-boolean-query httpclient cache query-str (or base-uri-str base-uri) opts))))
 
 (defn stasher-repo
   "Builds a stasher RDF repository, that implements the standard RDF4j

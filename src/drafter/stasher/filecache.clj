@@ -232,6 +232,9 @@
     (log/info "Clearing" k)
     (fs/delete-dir (:dir (.opts cache)))))
 
+
+;; TODO can probably kill this now both sides of conditional are
+;; always an io/output-stream
 (defn select-output-coercer [fmt]
   (let [fmt (or (fmt-kw->rdf-format fmt) (fmt-kw->tuple-format fmt))]
     (if (#{TupleQueryResultFormat/BINARY RDFFormat/BINARY} fmt)
@@ -343,6 +346,22 @@
             (catch Throwable ex
               (.delete temp-file)
               (throw ex))))))))
+
+(defn stashing-boolean-query-result [cache cache-key boolean-result]
+  (let [boolean-format (backend-boolean-format cache)
+        temp-file (File/createTempFile "stasher" (str "tmp." (name boolean-format)) (io/file (:dir (.opts cache)) "tmp"))]
+    
+    (with-open [output-stream (io/output-stream temp-file)]
+      (let [bool-writer (QueryResultIO/createBooleanWriter (fmt-kw->boolean-format boolean-format) output-stream)]
+        ;; Write the result to the file
+        (.handleBoolean bool-writer boolean-result)))
+
+    (move-file-to-cache! cache cache-key temp-file)
+    
+    ;; return the actual result this will get returned to the
+    ;; outer-most call to query.  NOTE that boolean's are different to
+    ;; other query types as they don't have a background-evaluator.
+    boolean-result))
 
 (defn stashing-rdf-handler
   "Wrap an RDFHandler with one that will write the stream of RDF into
