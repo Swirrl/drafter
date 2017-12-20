@@ -1,6 +1,7 @@
 (ns drafter.backend.draftset-test
   (:require [clojure.spec.gen.alpha :as g]
             [clojure.test :as t]
+            [drafter.test-common :as tc]
             [drafter.backend.draftset :as sut]
             [drafter.test-common :as tc :refer [deftest-system-with-keys]]
             [grafter.rdf :as rdf]
@@ -18,7 +19,7 @@
           (t/is (= state/ds-1-dg-1-data (set (rdf/statements ds-endpoint)))))
 
         (t/testing "queries"
-          (tc/todo
+          (tc/TODO
            ;; TODO fix this to work with pull datasets.
            ;; Need to implement .evaluate with a single argument.
            ;;
