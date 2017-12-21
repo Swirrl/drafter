@@ -15,6 +15,7 @@
            org.eclipse.rdf4j.model.impl.URIImpl
            org.eclipse.rdf4j.query.impl.SimpleDataset
            (org.eclipse.rdf4j.query.parser ParsedGraphQuery ParsedTupleQuery ParsedBooleanQuery)
+           (org.eclipse.rdf4j.query BooleanQuery TupleQuery GraphQuery)
            (org.eclipse.rdf4j.query.parser.sparql SPARQLParser)
            org.eclipse.rdf4j.query.resultio.QueryResultIO
            org.eclipse.rdf4j.rio.RDFHandler
@@ -59,7 +60,9 @@
       (t/is (= test-triples
                (repo/query (repo/->connection repo) basic-construct-query))))))
 
-(defn parse-query-type [sparql-query-string]
+(defmulti parse-query-type type)
+
+(defmethod parse-query-type String [sparql-query-string]
   (condp instance? (.parseQuery (SPARQLParser.) sparql-query-string nil)
     ParsedBooleanQuery :boolean
     ParsedGraphQuery :graph
@@ -154,7 +157,7 @@
                       (endRDF [this]
                         (swap! recorded-events assoc :ended true))
                       (handleStatement [this statement]
-                        (swap! recorded-events update :statements conj (gio/backend-quad->grafter-quad statement)))
+                        (swap! recorded-events update :data conj (gio/backend-quad->grafter-quad statement)))
                       (handleComment [this comment]
                         (swap! recorded-events update :comments conj comment))
                       (handleNamespace [this prefix uri]
@@ -171,9 +174,12 @@
   []
   (let [recorded-events (atom {})
         tuple-handler (reify
-                        #_TupleQueryResult
-                        #_(getBindingNames [this]
-                          ["foo" "bar"])
+                        TupleQueryResult
+                        (getBindingNames [this]
+                          ;; Hardcoded as a stub for these specific tests
+                          ["s" "p" "o"])
+                        (close [this]
+                          )
                         TupleQueryResultHandler
                         (startQueryResult [this binding-names]
                           (swap! recorded-events assoc
@@ -182,14 +188,14 @@
                         (endQueryResult [this]
                           (swap! recorded-events assoc :ended true))
                         (handleSolution [this binding-set]
-                          (swap! recorded-events update :solutions conj (binding-set->grafter-type binding-set)))
+                          (swap! recorded-events update :data conj (binding-set->grafter-type binding-set)))
                         (handleLinks [this link-urls]
                           (swap! recorded-events update :links conj link-urls)))]
     
     [recorded-events tuple-handler]))
 
 (defn- assert-same-cached-uncached
-  [preped-query cache raw-repo fixtures make-recording-handler]
+  [query-type preped-query cache raw-repo fixtures make-recording-handler]
   (t/testing "A cache miss returns the results and stores them in the cache"
     (let [[uncached-recorded-events uncached-event-handler] (make-recording-handler) 
           [cached-recorded-events cached-event-handler] (make-recording-handler)]
@@ -212,29 +218,8 @@
             "fires same set of events whether cached or not")
       
       (t/testing "The cached, uncached queries return the same data"
-        (t/is (= (set (:statements @uncached-recorded-events))
-                 (set (:statements @cached-recorded-events)))))
-      
-      (t/testing "Results for query are stored on disk"
-        ;; evidence that we didn't just run another uncached query
-
-        (let [cache-key (sut/generate-drafter-cache-key :graph cache basic-construct-query nil {:raw-repo raw-repo})
-              cached-file (fc/cache-key->cache-path cache cache-key)
-              cached-file-statements (-> cached-file
-                                         io/input-stream
-                                         (rdf/statements :format (fc/backend-rdf-format cache)))]
-
-          (t/testing "Prove the side-effect of creating the file in the cache happened"
-            (t/is (.exists cached-file)))
-          
-          (t/testing "The cached, uncached and fixture data are all the same"
-            (t/is (= (set (:statements @uncached-recorded-events))
-                     (set (:statements @cached-recorded-events))
-                     (set cached-file-statements))))
-          
-          (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
-            (t/is (= (set (rdf/statements (first fixtures) :format :ttl))
-                     (set cached-file-statements)))))))))
+        (t/is (= (set (:data @uncached-recorded-events))
+                 (set (:data @cached-recorded-events))))))))
 
 (deftest-system stasher-queries-push-test
   [{repo :drafter.stasher/repo
@@ -245,12 +230,32 @@
   (t/testing "Push interface to query results"
     (with-open [conn (repo/->connection repo)]
       (t/testing "CONSTRUCT (RDFHandler)"
-        (let [construct-query (.prepareGraphQuery conn basic-construct-query)]
-          (assert-same-cached-uncached construct-query cache raw-repo fixtures recording-rdf-handler)))
+             (let [construct-query (.prepareGraphQuery conn basic-construct-query)]
+               (assert-same-cached-uncached :graph construct-query cache raw-repo fixtures recording-rdf-handler))
+             (let [cache-key (sut/generate-drafter-cache-key :graph cache basic-construct-query nil {:raw-repo raw-repo})
+                   cached-file (fc/cache-key->cache-path cache cache-key)
+                   cached-file-statements (-> cached-file
+                                              io/input-stream
+                                              (rdf/statements :format (fc/backend-rdf-format cache)))]
+               (assert-cached-results cache raw-repo basic-construct-query nil cached-file-statements)))
 
       (t/testing "SELECT (TupleResultHandler)"
-        (let [tuple-query (.prepareTupleQuery conn "SELECT * WHERE { ?s ?p ?o } LIMIT 2")]
-          (assert-same-cached-uncached tuple-query cache raw-repo fixtures recording-tuple-handler))))))
+        (let [simple-select-query "SELECT * WHERE { ?s ?p ?o }"
+              tuple-query (.prepareTupleQuery conn simple-select-query)]
+          (assert-same-cached-uncached :tuple tuple-query cache raw-repo fixtures recording-tuple-handler)
+
+          ;; run the same select query on a fixture repo to get the data in the expected format
+          (let [expected-results (with-open [conn (-> fixtures
+                                                      first
+                                                      rdf/statements
+                                                      repo/fixture-repo
+                                                      repo/->connection)]
+                                   (doall (repo/query conn simple-select-query)))]
+            (assert-cached-results cache raw-repo simple-select-query nil expected-results))))
+
+      ;; NOTE there are no tests for push boolean results, because
+      ;; that .evaluate interface doesn't exist in RDF4j.
+      )))
 
 (t/deftest dataset->edn-test
   (let [ds-1 (doto (SimpleDataset.)
