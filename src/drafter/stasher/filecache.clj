@@ -242,6 +242,14 @@
       #_io/writer
       io/output-stream)))
 
+(defn- create-temp-file!
+  "Create and return a temp file inside the cache :dir.  Takes also a
+  keyword indicating the file format."
+  [cache format-kw]
+  (let [tmp-dir (io/file (:dir (.opts cache)) "tmp")]
+    (fs/mkdir tmp-dir)
+    (File/createTempFile "stasher" (str "tmp." (name format-kw)) tmp-dir)))
+
 (defn stashing-graph-query-result
   "Wrap a BackgroundGraphResult with one that will write the stream of
   RDF into a temp file and move the file into the cache when it's
@@ -381,14 +389,6 @@
           (catch Throwable ex
             (.delete temp-file)
             (throw ex)))))))
-
-(defn- create-temp-file!
-  "Create and return a temp file inside the cache :dir.  Takes also a
-  keyword indicating the file format."
-  [cache format-kw]
-  (let [tmp-dir (io/file (:dir (.opts cache)) "tmp")]
-    (fs/mkdir tmp-dir)
-    (File/createTempFile "stasher" (str "tmp." (name format-kw)) tmp-dir)))
 
 (defn stashing-boolean-query-result [cache cache-key boolean-result]
   (let [boolean-format (backend-boolean-format cache)
