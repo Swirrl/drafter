@@ -58,6 +58,10 @@
         (if (seq is)
           []
           is)))
+
+    (close [this]
+      ;; no-op can't call .close on writer's
+      )
     
     TupleQueryResultHandler
     (startQueryResult [this binding-names]
