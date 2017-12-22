@@ -295,7 +295,7 @@
   (QueryResultIO/createTupleWriter (fmt-kw->tuple-format format) destination))
 
 
-(defn stashing-tuple-query-result
+#dbg (defn stashing-tuple-query-result
   "Wrap a BackgroundTupleResult with one that will write the stream of
   RDF into a temp file and move the file into the cache when it's
   finished.
@@ -368,6 +368,7 @@
           (move-file-to-cache! cache cache-key temp-file)
           
           (catch Throwable ex
+            (log/warn ex "Error whilst closing stream.  Cleaning up stashed tempfile:" temp-file)
             (.delete temp-file)
             (throw ex))))
 
