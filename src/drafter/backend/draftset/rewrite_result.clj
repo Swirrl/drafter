@@ -43,6 +43,9 @@
     TupleQueryResult
     (getBindingNames [this]
       (.getBindingNames handler))
+
+    (close [this]
+      (.close handler))
     
     TupleQueryResultHandler
     (endQueryResult [this]
