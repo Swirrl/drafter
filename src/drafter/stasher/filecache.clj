@@ -242,7 +242,7 @@
       #_io/writer
       io/output-stream)))
 
-(defn- create-temp-file!
+(defn- ^java.io.File create-temp-file!
   "Create and return a temp file inside the cache :dir.  Takes also a
   keyword indicating the file format."
   [cache format-kw]
@@ -312,7 +312,7 @@
          method arity is used.
 
   For RDF pull query results."
-  [mode cache cache-key bg-tuple-result]
+  [mode cache cache-key ^TupleQueryResultHandler bg-tuple-result]
   {:pre [(#{:sync :async} mode)]}
   (let [tuple-format (backend-tuple-format cache)
         temp-file (create-temp-file! cache tuple-format)
@@ -376,14 +376,14 @@
 
       (hasNext [this]
         (try
-          (.hasNext bg-tuple-result)
+          (.hasNext ^TupleQueryResult bg-tuple-result)
           (catch Throwable ex
             (.delete temp-file)
             (throw ex))))
       
       (next [this]
         (try
-          (let [solution (.next bg-tuple-result)]
+          (let [solution (.next ^TupleQueryResult bg-tuple-result)]
             (.handleSolution cache-file-writer solution)
             solution)
           (catch Throwable ex
@@ -411,16 +411,16 @@
   a temp file and move the file into the cache when it's finished.
 
   For RDF push query results."
-  [cache cache-key inner-rdf-handler]
+  [cache cache-key ^RDFHandler inner-rdf-handler]
   (let [rdf-format (backend-rdf-format cache)
         temp-file (create-temp-file! cache rdf-format)
         make-stream (select-output-coercer rdf-format)
-        stream (make-stream temp-file :buffer 8192)
+        stream ^java.io.OutputStream (make-stream temp-file :buffer 8192)
 
         ;; explicitly set prefixes to nil as gio/rdf-writer will write
         ;; the grafter default-prefixes otherwise.  By setting to nil,
         ;; use what comes from the stream instead.
-        cache-file-writer (gio/rdf-writer stream :format rdf-format :prefixes nil)]
+        cache-file-writer ^RDFWriter (gio/rdf-writer stream :format rdf-format :prefixes nil)]
 
     (reify RDFHandler
       (startRDF [this]
