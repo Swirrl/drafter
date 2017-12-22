@@ -27,7 +27,7 @@
            [java.util Date UUID]
            org.eclipse.rdf4j.model.impl.ContextStatementImpl
            org.eclipse.rdf4j.model.Resource
-           [org.eclipse.rdf4j.query GraphQuery TupleQueryResultHandler]
+           [org.eclipse.rdf4j.query GraphQuery TupleQueryResultHandler TupleQueryResult]
            org.eclipse.rdf4j.queryrender.RenderUtils))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
@@ -577,7 +577,13 @@
     (sparql/add conn graph-uri triple-batch)))
 
 (defn- rdf-handler->spog-tuple-handler [conn rdf-handler]
-  (reify TupleQueryResultHandler
+  (reify
+    TupleQueryResult
+    (getBindingNames [this]
+      ;; hard coded as part of this test stub
+      ["s" "p" "o" "g"])
+    
+    TupleQueryResultHandler
     (handleSolution [this bindings]
       (let [subj (.getValue bindings "s")
             pred (.getValue bindings "p")

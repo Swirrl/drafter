@@ -104,11 +104,11 @@
       (t/is (= (set (box-result cached-file-statements))
                (set (box-result expected-data)))))))
 
-(defn assert-caches-query [repo cache query-str expected-data]
+(defn assert-caches-query [cached-repo uncached-repo cache query-str expected-data]
   (t/testing "Cached & uncached queries return expected data and expected data is stored in the cache"
-    (with-open [conn (repo/->connection repo)]
-      (let [uncached-results (box-result (repo/query conn query-str)) ;; first query should be uncached
-            cached-results (box-result (repo/query conn query-str))]
+    (with-open [cached-conn (repo/->connection cached-repo)]
+      (let [uncached-results (box-result (repo/query cached-conn query-str)) ;; first query should be uncached
+            cached-results (box-result (repo/query cached-conn query-str))]
         
         (t/testing "The cached, uncached and fixture data are all the same"
           (t/is (= (set uncached-results)
@@ -117,7 +117,7 @@
 
         (t/testing "Results for query are stored on disk"
           ;; Check that the expected fixture data was stored in the cache on disk
-          (assert-cached-results cache repo query-str nil expected-data))))))
+          (assert-cached-results cache uncached-repo query-str nil expected-data))))))
 
 (deftest-system stasher-queries-pull-test
   [{caching-repo :drafter.stasher/repo
@@ -127,21 +127,21 @@
 
   (t/testing "Stashing of all query types"
     (t/testing "ASK"
-      (assert-caches-query caching-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
-      (assert-caches-query caching-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false}))
+      (assert-caches-query caching-repo uncached-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
+      (assert-caches-query caching-repo uncached-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false}))
     
     (t/testing "SELECT"
       (let [select-query "SELECT * WHERE { ?s ?p ?o } LIMIT 2"
             expected-data (with-open [uncconn (repo/->connection uncached-repo)]
                             (doall (repo/query uncconn select-query)))]
-        (assert-caches-query caching-repo cache select-query expected-data)))
+        (assert-caches-query caching-repo uncached-repo cache select-query expected-data)))
 
     (let [graph-data (rdf/statements (first fixtures) :format :ttl)]
       (t/testing "CONSTRUCT"
-        (assert-caches-query caching-repo cache basic-construct-query graph-data))
+        (assert-caches-query caching-repo uncached-repo cache basic-construct-query graph-data))
 
       (t/testing "DESCRIBE" 
-        (assert-caches-query caching-repo cache "DESCRIBE <http://statistics.gov.scot/data/home-care-clients>" graph-data)))))
+        (assert-caches-query caching-repo uncached-repo cache "DESCRIBE <http://statistics.gov.scot/data/home-care-clients>" graph-data)))))
 
 (defn recording-rdf-handler
   "Convenience function that returns a 2-tuple of a recorded events
@@ -341,12 +341,12 @@
                  (sut/fetch-modified-state repo dataset))))))
 
 (deftest-system generate-drafter-cache-key-test
-  [{:keys [drafter.stasher/repo
+  [{:keys [drafter.backend/rdf4j-repo
            drafter.stasher/filecache]} "drafter/stasher-test/drafter-state-1.edn"]
 
   (let [dataset (edn->dataset {:named-graphs [live-graph-1 live-graph-only]
                                :default-graphs [live-graph-1 live-graph-only]})
-        result (sut/generate-drafter-cache-key :graph filecache basic-construct-query dataset {:raw-repo repo})]
+        result (sut/generate-drafter-cache-key :graph filecache basic-construct-query dataset {:raw-repo rdf4j-repo})]
     
     (let [{:keys [dataset query-str modified-times]} result]
       (t/is (= 

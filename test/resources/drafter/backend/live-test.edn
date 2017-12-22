@@ -4,7 +4,11 @@
 
  :drafter.stasher/filecache {}
 
- :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/filecache}
+ :drafter.stasher/cache-thread-pool {}
+ 
+ :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
+                                :cache #ig/ref :drafter.stasher/filecache}
+                               
                                ^:ref [:drafter.common/config]]
  
  :drafter.backend/rdf4j-repo ^:ref [:drafter.common/config]
