@@ -140,17 +140,17 @@
     ;; cache when it's finished.
     (fc/stashing-graph-query-result cache cache-key bg-graph-result)))
 
-(defn tuple-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache graph-query]
-  (let [dataset (.getDataset graph-query)
+(defn tuple-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache tuple-query]
+  (let [dataset (.getDataset tuple-query)
         bg-graph-result (.sendTupleQuery httpclient QueryLanguage/SPARQL
                                          query-str base-uri-str dataset
-                                         (.getIncludeInferred graph-query) (.getMaxExecutionTime graph-query)
-                                         (.getBindingsArray graph-query))]
+                                         (.getIncludeInferred tuple-query) (.getMaxExecutionTime tuple-query)
+                                         (.getBindingsArray tuple-query))]
 
     ;; Finally wrap the RDF4j handler we get back in a stashing
     ;; handler that will move the streamed results into the stasher
     ;; cache when it's finished.
-    (fc/stashing-tuple-query-result cache cache-key bg-graph-result)))
+    (fc/stashing-tuple-query-result :sync cache cache-key bg-graph-result)))
 
 (defn boolean-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache boolean-query]
   (let [dataset (.getDataset boolean-query)
@@ -234,7 +234,7 @@
              (tuple-async-cache-hit cache-key tuple-handler base-uri-str cache)
              
              ;; else
-             (let [stashing-tuple-handler (fc/stashing-tuple-query-result cache cache-key tuple-handler)
+             (let [stashing-tuple-handler (fc/stashing-tuple-query-result :async cache cache-key tuple-handler)
                    dataset (.getDataset this)]
                (.sendTupleQuery httpclient QueryLanguage/SPARQL
                                 query-str base-uri-str dataset

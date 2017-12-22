@@ -300,68 +300,95 @@
   RDF into a temp file and move the file into the cache when it's
   finished.
 
+  mode - must be either :sync or :async depending on which .evaluate
+         method arity is used.
+
   For RDF pull query results."
-  [cache cache-key bg-tuple-result]
+  [mode cache cache-key bg-tuple-result]
+  {:pre [(#{:sync :async} mode)]}
   (let [tuple-format (backend-tuple-format cache)
-        temp-file (File/createTempFile "stasher" (str "tmp." (name tuple-format)) (io/file (:dir (.opts cache)) "tmp"))
+        temp-file (File/createTempFile "stasher"
+                                       (str "tmp." (name tuple-format))
+                                       (io/file (:dir (.opts cache)) "tmp"))
         make-stream (select-output-coercer tuple-format)
-        stream (make-stream temp-file :buffer 8192)]
+        stream (make-stream temp-file :buffer 8192)
 
-    (let [cache-file-writer ^TupleQueryResultWriter (tuple-writer stream tuple-format)
-          bindings (.getBindingNames bg-tuple-result)]
+        cache-file-writer ^TupleQueryResultWriter (tuple-writer stream tuple-format)
+        bindings (.getBindingNames bg-tuple-result)]
 
-      ;; copy the projected variables/column names across to the
-      ;; cached file.
-      (.startQueryResult cache-file-writer bindings)
+    ;; copy the projected variables/column names across to the
+    ;; cached file.
+    (when (= mode :sync)
+      (.startQueryResult cache-file-writer bindings))
+
+
+    ;; TODO TODO TODO
+    ;; figure out why this stuff ain't working with the tests:
+    ;;
+    ;;  [[file:~/repos/drafter/test/drafter/stasher_test.clj::(t/testing%20"SELECT"][broken test]]
+    (reify
+
+      ;; Push interface...
+      TupleQueryResultHandler
+      (endQueryResult [this]
+        (println "end query result")
+        (.endQueryResult bg-tuple-result) 
+        (.close this))
+
+      (handleLinks [this links]
+        ;; pretty sure this is really a no/op
+        (.handleLinks cache-file-writer links)
+        (.handleLinks bg-tuple-result links))
+
+      (handleBoolean [this bool]
+        ;; pretty sure this is really a no/op
+        (.handleBoolean cache-file-writer bool)
+        (.handleBoolean bg-tuple-result bool))
+
+      (handleSolution [this binding-set]
+        (println "handle solution called" binding-set)
+        (.handleSolution cache-file-writer binding-set)
+        (.handleSolution bg-tuple-result binding-set))
+
+      (startQueryResult [this binding-names]
+        (println "start query result" binding-names)
+        (.startQueryResult cache-file-writer binding-names)
+        (.startQueryResult bg-tuple-result binding-names))
+
+      ;; pull interface
+      TupleQueryResult
+      (getBindingNames [this]
+        (.getBindingNames bg-tuple-result))
       
-      (reify
-        TupleQueryResultHandler
-        (endQueryResult [this]
-          (.close this))
+      (close [this]
+        (println "close called")
+        (try
+          (.close bg-tuple-result)
+          (.endQueryResult cache-file-writer)
+          (move-file-to-cache! cache cache-key temp-file)
+          
+          (catch Throwable ex
+            (.delete temp-file)
+            (throw ex))))
 
-        (handleLinks [this links]
-          (.handleLinks cache-file-writer links)
-          (.handleLinks bg-tuple-result links))
-
-        (handleBoolean [this bool]
-          (.handleBoolean cache-file-writer bool)
-          (.handleBoolean bg-tuple-result bool))
-
-        (handleSolution [this binding-set]
-          (.handleSolution cache-file-writer binding-set)
-          (.handleSolution bg-tuple-result binding-set))
-
-        (startQueryResult [this binding-names]
-          (.startQueryResult cache-file-writer binding-names)
-          (.startQueryResult bg-tuple-result binding-names))
-
-        TupleQueryResult
-        (getBindingNames [this]
-          (.getBindingNames bg-tuple-result))
-        (close [this]
-          (try
-            (.endQueryResult cache-file-writer)
-            (move-file-to-cache! cache cache-key temp-file)
-            (.close bg-tuple-result)
-            (catch Throwable ex
-              (.delete temp-file)
-              (throw ex))))
-
-        (hasNext [this]
-          (try
-            (.hasNext bg-tuple-result)
-            (catch Throwable ex
-              (.delete temp-file)
-              (throw ex))))
-        
-        (next [this]
-          (try
-            (let [solution (.next bg-tuple-result)]
-              (.handleSolution cache-file-writer solution)
-              solution)
-            (catch Throwable ex
-              (.delete temp-file)
-              (throw ex))))))))
+      (hasNext [this]
+        (println "hasNext called")
+        (try
+          (.hasNext bg-tuple-result)
+          (catch Throwable ex
+            (.delete temp-file)
+            (throw ex))))
+      
+      (next [this]
+        (println "next called")
+        (try
+          (let [solution (.next bg-tuple-result)]
+            (println "next called sol" solution)
+            (.handleSolution cache-file-writer solution)
+            solution)
+          (catch Throwable ex
+            (.delete temp-file)
+            (throw ex)))))))
 
 (defn stashing-boolean-query-result [cache cache-key boolean-result]
   (let [boolean-format (backend-boolean-format cache)

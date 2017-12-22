@@ -5,7 +5,7 @@
             [drafter.rdf.draftset-management.job-util :as jobs]
             [grafter.rdf :refer [statements]]
             [grafter.rdf4j.repository :as repo])
-  (:import [org.eclipse.rdf4j.query BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler Update]
+  (:import [org.eclipse.rdf4j.query BindingSet BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult Update]
            org.eclipse.rdf4j.query.resultio.QueryResultIO
            org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.repository.sparql.SPARQLRepository
@@ -50,8 +50,16 @@
 (defn create-construct-query-writer [os result-format]
   (Rio/createWriter result-format os))
 
-(defn signalling-tuple-query-handler [send-channel writer]
-  (reify TupleQueryResultHandler
+(defn signalling-tuple-query-handler [send-channel ^BindingSet binding-set writer]
+  (reify
+    TupleQueryResult
+    (getBindingNames [this]
+      (let [is (iterator-seq (.iterator binding-set))]
+        (if (seq is)
+          []
+          is)))
+    
+    TupleQueryResultHandler
     (startQueryResult [this binding-names]
       (send-channel)
       (.startQueryResult writer binding-names))
@@ -79,7 +87,7 @@
 
 (defn create-signalling-query-handler [pquery output-stream result-format send-channel]
   (case (get-query-type pquery)
-    :select (signalling-tuple-query-handler send-channel (create-tuple-query-writer output-stream result-format))
+    :select (signalling-tuple-query-handler send-channel (.getBindings pquery) (create-tuple-query-writer output-stream result-format))
     :construct (signalling-rdf-handler send-channel (create-construct-query-writer output-stream result-format))
     (throw (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query."))))
 

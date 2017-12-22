@@ -6,7 +6,7 @@
             [drafter.util :as util]
             [grafter.rdf.protocols :refer [map->Quad]])
   (:import [org.eclipse.rdf4j.model.impl ContextStatementImpl StatementImpl]
-           [org.eclipse.rdf4j.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler]
+           [org.eclipse.rdf4j.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult]
            [org.eclipse.rdf4j.query.impl BindingImpl MapBindingSet]
            org.eclipse.rdf4j.rio.RDFHandler))
 
@@ -40,6 +40,10 @@
   according to the given graph mapping."
   [graph-map handler]
   (reify
+    TupleQueryResult
+    (getBindingNames [this]
+      (.getBindingNames handler))
+    
     TupleQueryResultHandler
     (endQueryResult [this]
       (.endQueryResult handler))
@@ -99,6 +103,8 @@
 (defn- rewrite-tuple-query-results [inner-query live->draft]
   (let [draft->live (set/map-invert live->draft)]
     (reify TupleQuery
+      (getBindings [this]
+        (.getBindings inner-query))
       (evaluate [this handler]
         (.evaluate inner-query (make-select-result-rewriter draft->live handler)))
       (getMaxExecutionTime [this]
