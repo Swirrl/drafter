@@ -250,7 +250,7 @@
   For RDF pull query results."
   [cache cache-key ^BackgroundGraphResult bg-graph-result]
   (let [rdf-format (backend-rdf-format cache)
-        temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir (.opts cache)) "tmp"))
+        temp-file (create-temp-file! cache rdf-format)
         make-stream (select-output-coercer rdf-format)
         stream (make-stream temp-file :buffer 8192)]
 
@@ -295,7 +295,7 @@
   (QueryResultIO/createTupleWriter (fmt-kw->tuple-format format) destination))
 
 
-#dbg (defn stashing-tuple-query-result
+(defn stashing-tuple-query-result
   "Wrap a BackgroundTupleResult with one that will write the stream of
   RDF into a temp file and move the file into the cache when it's
   finished.
@@ -307,9 +307,7 @@
   [mode cache cache-key bg-tuple-result]
   {:pre [(#{:sync :async} mode)]}
   (let [tuple-format (backend-tuple-format cache)
-        temp-file (File/createTempFile "stasher"
-                                       (str "tmp." (name tuple-format))
-                                       (io/file (:dir (.opts cache)) "tmp"))
+        temp-file (create-temp-file! cache tuple-format)
         make-stream (select-output-coercer tuple-format)
         stream (make-stream temp-file :buffer 8192)
 
@@ -331,7 +329,6 @@
       ;; Push interface...
       TupleQueryResultHandler
       (endQueryResult [this]
-        (println "end query result")
         (.endQueryResult bg-tuple-result) 
         (.close this))
 
@@ -346,12 +343,10 @@
         (.handleBoolean bg-tuple-result bool))
 
       (handleSolution [this binding-set]
-        (println "handle solution called" binding-set)
         (.handleSolution cache-file-writer binding-set)
         (.handleSolution bg-tuple-result binding-set))
 
       (startQueryResult [this binding-names]
-        (println "start query result" binding-names)
         (.startQueryResult cache-file-writer binding-names)
         (.startQueryResult bg-tuple-result binding-names))
 
@@ -361,7 +356,6 @@
         (.getBindingNames bg-tuple-result))
       
       (close [this]
-        (println "close called")
         (try
           (.close bg-tuple-result)
           (.endQueryResult cache-file-writer)
@@ -373,7 +367,6 @@
             (throw ex))))
 
       (hasNext [this]
-        (println "hasNext called")
         (try
           (.hasNext bg-tuple-result)
           (catch Throwable ex
@@ -381,19 +374,25 @@
             (throw ex))))
       
       (next [this]
-        (println "next called")
         (try
           (let [solution (.next bg-tuple-result)]
-            (println "next called sol" solution)
             (.handleSolution cache-file-writer solution)
             solution)
           (catch Throwable ex
             (.delete temp-file)
             (throw ex)))))))
 
+(defn- create-temp-file!
+  "Create and return a temp file inside the cache :dir.  Takes also a
+  keyword indicating the file format."
+  [cache format-kw]
+  (let [tmp-dir (io/file (:dir (.opts cache)) "tmp")]
+    (fs/mkdir tmp-dir)
+    (File/createTempFile "stasher" (str "tmp." (name format-kw)) tmp-dir)))
+
 (defn stashing-boolean-query-result [cache cache-key boolean-result]
   (let [boolean-format (backend-boolean-format cache)
-        temp-file (File/createTempFile "stasher" (str "tmp." (name boolean-format)) (io/file (:dir (.opts cache)) "tmp"))]
+        temp-file (create-temp-file! cache boolean-format)]
     
     (with-open [output-stream (io/output-stream temp-file)]
       (let [bool-writer (QueryResultIO/createBooleanWriter (fmt-kw->boolean-format boolean-format) output-stream)]
@@ -414,7 +413,7 @@
   For RDF push query results."
   [cache cache-key inner-rdf-handler]
   (let [rdf-format (backend-rdf-format cache)
-        temp-file (File/createTempFile "stasher" (str "tmp." (name rdf-format)) (io/file (:dir (.opts cache)) "tmp"))
+        temp-file (create-temp-file! cache rdf-format)
         make-stream (select-output-coercer rdf-format)
         stream (make-stream temp-file :buffer 8192)
 
