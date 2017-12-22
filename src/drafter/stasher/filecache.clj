@@ -76,7 +76,7 @@
     parser))
 
 (def default-cache-rdf-format :brf)
-(def default-cache-tuple-format #_:brt :srj)
+(def default-cache-tuple-format :brt #_:srj)
 (def default-cache-boolean-format :txt)
 
 (def fmt-kw->rdf-format (build-format-keyword->format-map rdf-formats))
