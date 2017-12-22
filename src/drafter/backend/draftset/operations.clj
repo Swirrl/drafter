@@ -28,6 +28,7 @@
            org.eclipse.rdf4j.model.impl.ContextStatementImpl
            org.eclipse.rdf4j.model.Resource
            [org.eclipse.rdf4j.query GraphQuery TupleQueryResultHandler TupleQueryResult]
+           [org.eclipse.rdf4j.rio RDFHandler RDFWriter]
            org.eclipse.rdf4j.queryrender.RenderUtils))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
@@ -576,7 +577,7 @@
     ;;true for all current backends.
     (sparql/add conn graph-uri triple-batch)))
 
-(defn- rdf-handler->spog-tuple-handler [conn rdf-handler]
+(defn- rdf-handler->spog-tuple-handler [conn ^RDFHandler rdf-handler]
   (reify
     TupleQueryResult
     (getBindingNames [this]

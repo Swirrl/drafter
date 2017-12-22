@@ -6,7 +6,7 @@
             [grafter.rdf :refer [statements]]
             [grafter.rdf4j.repository :as repo])
   (:import [org.eclipse.rdf4j.query BindingSet BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult Update]
-           org.eclipse.rdf4j.query.resultio.QueryResultIO
+           [org.eclipse.rdf4j.query.resultio QueryResultIO QueryResultWriter]
            org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.repository.sparql.SPARQLRepository
            [org.eclipse.rdf4j.rio RDFHandler Rio]))
@@ -50,7 +50,7 @@
 (defn create-construct-query-writer [os result-format]
   (Rio/createWriter result-format os))
 
-(defn signalling-tuple-query-handler [send-channel ^BindingSet binding-set writer]
+(defn signalling-tuple-query-handler [send-channel ^BindingSet binding-set ^QueryResultWriter writer]
   (reify
     TupleQueryResult
     (getBindingNames [this]
@@ -76,7 +76,7 @@
     (handleLinks [this link-urls]
       (.handleLinks writer link-urls))))
 
-(defn signalling-rdf-handler [send-channel handler]
+(defn signalling-rdf-handler [send-channel ^RDFHandler handler]
   (reify RDFHandler
     (startRDF [this]
       (send-channel)
@@ -87,7 +87,8 @@
       (.handleNamespace handler prefix uri))
     (handleStatement [this s]
       (.handleStatement handler s))
-    (handleComment [this comment] (.handleComment comment))))
+    (handleComment [this comment]
+      (.handleComment handler comment))))
 
 (defn create-signalling-query-handler [pquery output-stream result-format send-channel]
   (case (get-query-type pquery)
