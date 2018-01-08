@@ -151,6 +151,8 @@
 
   ;; Target JDK 8 expected JVM version
   :javac-options ["-target" "8" "-source" "8"]
+  :min-lein-version "2.8.1"
+  
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version"
