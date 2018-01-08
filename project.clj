@@ -97,7 +97,8 @@
 
   :profiles
   {
-
+   :java9 {:jvm-opts ["--add-modules" "java.xml.bind"]}
+   
    :uberjar [:prod
              {:aot :all
               :main drafter.main}]
