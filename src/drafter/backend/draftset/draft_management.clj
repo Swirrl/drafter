@@ -15,7 +15,8 @@
             [schema.core :as s]
             [swirrl-server.errors :refer [ex-swirrl]])
   (:import java.net.URI
-           [java.util Date UUID]))
+           [java.util Date UUID Calendar]
+           [javax.xml.bind DatatypeConverter]))
 
 (def drafter-state-graph (URI. "http://publishmydata.com/graphs/drafter/drafts"))
 
@@ -137,9 +138,9 @@
 (defn xsd-datetime
   "Coerce a date into the xsd-datetime string"
   [datetime]
-  (let [date-as-calendar (doto (java.util.Calendar/getInstance)
+  (let [date-as-calendar (doto (Calendar/getInstance)
                            (.setTime datetime))
-        instant (javax.xml.bind.DatatypeConverter/printDateTime date-as-calendar)]
+        instant (DatatypeConverter/printDateTime date-as-calendar)]
 
     (str "\"" instant "\"^^xsd:dateTime")))
 
