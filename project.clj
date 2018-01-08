@@ -138,9 +138,8 @@
              ;;"-Dhttp.maxConnections=1"
              ]
 
-  ;; Target JDK 7 expected JVM version (though we may now be able to target JDK8 in production)
-  :javac-options ["-target" "7" "-source" "7"]
-  :min-lein-version "2.5.0"
+  ;; Target JDK 8 expected JVM version
+  :javac-options ["-target" "8" "-source" "8"]
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version"
