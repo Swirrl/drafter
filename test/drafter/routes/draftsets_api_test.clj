@@ -267,10 +267,6 @@
   (let [response (route (create-submit-to-role-request user draftset-location role))]
     (tc/assert-is-ok-response response)))
 
-#_(deftest create-draftset-without-title-or-description
-  (let [response (route (tc/with-identity test-editor {:uri "/v1/draftsets" :request-method :post}))]
-    (assert-is-see-other-response response)))
-
 ;; define a local alternative to the route fixture wrapper
 (defn valid-swagger-response?
   "Applies handler to request and validates the response against the
