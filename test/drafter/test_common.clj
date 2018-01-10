@@ -254,7 +254,8 @@
   result map."
   [state-atom job-path]
   `(let [job-result# (await-completion ~state-atom ~job-path)]
-     (is (= :ok (:type job-result#)) (str "job failed: " (:exception job-result#)))
+     (is (= :ok (:type job-result#))
+         (str "job failed: " (pr-str job-result#)))
      job-result#))
 
 (defn empty-spo-json-body []
