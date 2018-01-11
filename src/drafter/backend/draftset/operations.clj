@@ -327,21 +327,7 @@
     (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
       (if-let [draft-graph-uri (get graph-mapping graph-uri)]
         (let [modified-at (modified-time-fn)]
-          (with-open [conn (repo/->connection db)]
-            (mgmt/delete-graph-contents! conn draft-graph-uri)
-            (mgmt/set-modifed-at-on-draft-graph! conn draft-graph-uri modified-at)
-            ;; todo wrap in transaction
-            ;; TODO TODO TODO TODO TODO TODO TODO
-            ;; TODO TODO TODO TODO TODO TODO TODO
-            ;; TODO TODO TODO TODO TODO TODO TODO
-            ;; TODO TODO TODO TODO TODO TODO TODO
-            ;; TODO TODO TODO TODO TODO TODO TODO
-            ;; TODO TODO TODO TODO TODO TODO TODO
-
-            
-            #_(repo/with-transaction conn
-                (mgmt/delete-graph-contents! conn draft-graph-uri)
-                (mgmt/set-modifed-at-on-draft-graph! conn draft-graph-uri (Date.))))
+          (mgmt/delete-graph-contents! db draft-graph-uri modified-at)
           draft-graph-uri)
         (mgmt/create-draft-graph! db graph-uri draftset-ref modified-time-fn)))))
 
@@ -552,7 +538,7 @@
 (defn create-or-empty-draft-graph-for [backend draftset-ref live-graph clock-fn]
   (if-let [draft-graph-uri (find-draftset-draft-graph backend draftset-ref live-graph)]
     (do
-      (mgmt/delete-graph-contents! backend draft-graph-uri)
+      (mgmt/delete-graph-contents! backend draft-graph-uri (clock-fn))
       draft-graph-uri)
     (mgmt/create-draft-graph! backend live-graph draftset-ref clock-fn)))
 
