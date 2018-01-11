@@ -155,22 +155,22 @@
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
   with the specified graph.  Returns the draft graph uri."
-  ([db graph triples] (import-data-to-draft! db graph triples nil))
-  ([db graph triples draftset-ref]
+  ([db graph triples] (import-data-to-draft! db graph triples nil util/get-current-time))
+  ([db graph triples draftset-ref clock-fn]
 
    (create-managed-graph! db graph)
    (let [draftset-uri (and draftset-ref (url/->java-uri draftset-ref))
-         draft-graph (create-draft-graph! db graph draftset-uri)]
+         draft-graph (create-draft-graph! db graph draftset-uri clock-fn)]
      (sparql/add db draft-graph triples)
      draft-graph)))
 
 (defn make-graph-live!
-  ([db live-graph-uri]
-     (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1"))))
+  ([db live-graph-uri clock-fn]
+     (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1")) clock-fn))
 
-  ([db live-graph-uri data]
-     (let [draft-graph-uri (import-data-to-draft! db live-graph-uri data)]
-       (migrate-graphs-to-live! db [draft-graph-uri]))
+  ([db live-graph-uri data clock-fn]
+     (let [draft-graph-uri (import-data-to-draft! db live-graph-uri data nil clock-fn)]
+       (migrate-graphs-to-live! db [draft-graph-uri] clock-fn))
      live-graph-uri))
 
 (defn during-exclusive-write-f [f]
@@ -214,7 +214,8 @@
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
-  (sparql/eager-query *test-backend* (str "ASK WHERE {"
+  (sparql/eager-query *test-backend* (str "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"
+                                          "ASK WHERE {"
                         (-> (apply str (interpose " " graphpatterns))
                             (.replace " >" ">")
                             (.replace "< " "<"))

@@ -105,20 +105,20 @@
 
 (defn copy-live-graph-into-draftset-job [backend draftset-ref live-graph]
   (jobs/make-job :background-write [job]
-                 (let [draft-graph-uri (ops/create-or-empty-draft-graph-for backend draftset-ref live-graph)]
+                 (let [draft-graph-uri (ops/create-or-empty-draft-graph-for backend draftset-ref live-graph util/get-current-time)]
                    (ops/lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
                    (jobs/job-succeeded! job))))
 
 (defn publish-draftset-job
   "Return a job that publishes the graphs in a draftset to live and
   then deletes the draftset."
-  [backend draftset-ref]
+  [backend draftset-ref clock-fn]
   ;; TODO combine these into a single job as priorities have now
   ;; changed how these will be applied.
 
   (jobs/make-job :publish-write [job]
                  (try
-                   (ops/publish-draftset-graphs! backend draftset-ref)
+                   (ops/publish-draftset-graphs! backend draftset-ref clock-fn)
                    (ops/delete-draftset-statements! backend draftset-ref)
                    (jobs/job-succeeded! job)
                    (catch Exception ex

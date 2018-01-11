@@ -125,9 +125,10 @@
   ([db live-graph-uri]
    (create-draft-graph! db live-graph-uri nil))
   ([db live-graph-uri draftset-ref]
-   (create-draft-graph! db live-graph-uri draftset-ref (java.util.Date.)))
-  ([db live-graph-uri draftset-ref now]
-   (let [draft-graph-uri (make-draft-graph-uri)
+   (create-draft-graph! db live-graph-uri draftset-ref util/get-current-time))
+  ([db live-graph-uri draftset-ref clock-fn]
+   (let [now (clock-fn)
+         draft-graph-uri (make-draft-graph-uri)
          draftset-uri (some-> draftset-ref (url/->java-uri))
          triple-templates (create-draft-graph live-graph-uri draft-graph-uri now draftset-uri)
          quads (apply to-quads triple-templates)]
@@ -435,14 +436,13 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
-(defn migrate-graphs-to-live! [backend graphs]
+(defn migrate-graphs-to-live! [repo graphs clock-fn]
   "Migrates a collection of draft graphs to live through a single
   compound SPARQL update statement. Explicit UPDATE statements do not
   take part in transactions on the remote sesame SPARQL client."
   (log/info "Starting make-live for graphs " graphs)
   (when (seq graphs)
-    (let [transaction-started-at (Date.)
-          repo backend ;;(->sesame-repo backend)
+    (let [transaction-started-at (clock-fn)
           graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at)) graphs)
           update-str (util/make-compound-sparql-query graph-migrate-queries)]
       (update! repo update-str)))

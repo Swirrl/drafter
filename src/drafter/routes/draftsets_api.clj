@@ -31,8 +31,11 @@
             [swirrl-server.responses :as response]
             [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
-            [grafter.rdf4j.repository :as repo])
-  (:import java.net.URI))
+            [drafter.util :refer [get-current-time]]
+            [grafter.rdf4j.repository :as repo]
+            [drafter.util :as util])
+  (:import java.net.URI
+           java.util.Date))
 
 (defn- existing-draftset-handler [backend inner-handler]
   (fn [{{:keys [id]} :params :as request}]
@@ -145,7 +148,7 @@
   (let [version "/v1"]
     (wrap-authenticated
      (fn [{{:keys [display-name description]} :params user :identity :as request}]
-       (run-sync #(dsops/create-draftset! backend user display-name description)
+       (run-sync #(dsops/create-draftset! backend user display-name description util/create-uuid util/get-current-time)
                  (fn [result]
                    (if (jobutil/failed-job-result? result)
                      (response/api-response 500 result)
@@ -275,7 +278,7 @@
      true
      (fn [{{:keys [draftset-id graph silent]} :params :as request}]
        (if (mgmt/is-graph-managed? backend graph)
-         (run-sync #(dsops/delete-draftset-graph! backend draftset-id graph)
+         (run-sync #(dsops/delete-draftset-graph! backend draftset-id graph get-current-time)
                    #(draftset-sync-write-response % backend draftset-id))
          (if silent
            (ring/response (dsops/get-draftset-info backend draftset-id))
@@ -372,7 +375,7 @@
   (wrap-as-draftset-owner
    (fn [{{:keys [draftset-id]} :params user :identity}]
      (if (user/has-role? user :publisher)
-       (submit-async-job! (dsjobs/publish-draftset-job backend draftset-id))
+       (submit-async-job! (dsjobs/publish-draftset-job backend draftset-id util/get-current-time))
        (forbidden-response "You require the publisher role to perform this action")))))
 
 (defmethod ig/pre-init-spec ::draftset-publish-handler [_]

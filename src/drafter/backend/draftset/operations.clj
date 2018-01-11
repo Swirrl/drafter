@@ -24,7 +24,7 @@
             [grafter.vocabularies.rdf :refer :all]
             [swirrl-server.async.jobs :as ajobs])
   (:import java.io.StringWriter
-           [java.util Date UUID]
+           [java.util Date]
            org.eclipse.rdf4j.model.impl.ContextStatementImpl
            org.eclipse.rdf4j.model.Resource
            [org.eclipse.rdf4j.query GraphQuery TupleQueryResultHandler TupleQueryResult]
@@ -47,10 +47,12 @@
   for the new draftset."
   ([db creator] (create-draftset! db creator nil))
   ([db creator title] (create-draftset! db creator title nil))
-  ([db creator title description] (create-draftset! db creator title description (UUID/randomUUID) (Date.)))
-  ([db creator title description draftset-id created-date]
+  ([db creator title description] (create-draftset! db creator title description util/create-uuid util/get-current-time))
+  ([db creator title description id-creator created-date-fn]
    (with-open [dbcon (repo/->connection db)]
-     (let [user-uri (user/user->uri creator)
+     (let [draftset-id (id-creator)
+           created-date (created-date-fn)
+           user-uri (user/user->uri creator)
            template (create-draftset-statements user-uri title description (url/append-path-segments draftset-uri draftset-id) created-date)
            quads (to-quads template)]
        (rdf/add dbcon quads)
@@ -313,14 +315,35 @@
         delete-query (delete-draftset-query draftset-ref draft-graphs)]
     (sparql/update! db delete-query)))
 
-(defn delete-draftset-graph! [db draftset-ref graph-uri]
+(defn delete-draftset-graph!
+  "Mark the graph for deletion in live by removing its contents.  If
+  the graph doesn't exist in the draftset we create an empty draft
+  graph for it.  Publishing the empty graph will then result in a
+  deletion from live.
+  
+  modified-time-fn - A 0-arg function that returns the modified-time."
+  [db draftset-ref graph-uri modified-time-fn]
   (when (mgmt/is-graph-managed? db graph-uri)
     (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
       (if-let [draft-graph-uri (get graph-mapping graph-uri)]
-        (do
-          (mgmt/delete-graph-contents! db draft-graph-uri)
+        (let [modified-at (modified-time-fn)]
+          (with-open [conn (repo/->connection db)]
+            (mgmt/delete-graph-contents! conn draft-graph-uri)
+            (mgmt/set-modifed-at-on-draft-graph! conn draft-graph-uri modified-at)
+            ;; todo wrap in transaction
+            ;; TODO TODO TODO TODO TODO TODO TODO
+            ;; TODO TODO TODO TODO TODO TODO TODO
+            ;; TODO TODO TODO TODO TODO TODO TODO
+            ;; TODO TODO TODO TODO TODO TODO TODO
+            ;; TODO TODO TODO TODO TODO TODO TODO
+            ;; TODO TODO TODO TODO TODO TODO TODO
+
+            
+            #_(repo/with-transaction conn
+                (mgmt/delete-graph-contents! conn draft-graph-uri)
+                (mgmt/set-modifed-at-on-draft-graph! conn draft-graph-uri (Date.))))
           draft-graph-uri)
-        (mgmt/create-draft-graph! db graph-uri draftset-ref)))))
+        (mgmt/create-draft-graph! db graph-uri draftset-ref modified-time-fn)))))
 
 (def ^:private draftset-param->predicate
   {:display-name rdfs:label
@@ -381,7 +404,7 @@
   claimed by another user in a particular role. If the given user is
   not the current owner of the draftset, no changes are made."
   [backend draftset-ref owner role]
-  (let [q (submit-draftset-to-role-query draftset-ref (UUID/randomUUID) owner role)]
+  (let [q (submit-draftset-to-role-query draftset-ref (util/create-uuid) owner role)]
     (sparql/update! backend q)))
 
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
@@ -412,7 +435,7 @@
      "}")))
 
 (defn submit-draftset-to-user! [backend draftset-ref submitter target]
-  (let [q (submit-to-user-query draftset-ref (UUID/randomUUID) submitter target)]
+  (let [q (submit-to-user-query draftset-ref (util/create-uuid) submitter target)]
     (sparql/update! backend q)))
 
 (defn- try-claim-draftset-query [draftset-ref claimant]
@@ -526,12 +549,12 @@
       :reverted)
     :not-found))
 
-(defn create-or-empty-draft-graph-for [backend draftset-ref live-graph]
+(defn create-or-empty-draft-graph-for [backend draftset-ref live-graph clock-fn]
   (if-let [draft-graph-uri (find-draftset-draft-graph backend draftset-ref live-graph)]
     (do
       (mgmt/delete-graph-contents! backend draft-graph-uri)
       draft-graph-uri)
-    (mgmt/create-draft-graph! backend live-graph draftset-ref)))
+    (mgmt/create-draft-graph! backend live-graph draftset-ref clock-fn)))
 
 (defn lock-writes-and-copy-graph
   "Calls mgmt/copy-graph to copy a live graph into the draftset, but
@@ -546,9 +569,9 @@
     ;; can fail them fast when they are run behind a long running op.
     (mgmt/copy-graph backend live-graph-uri draft-graph-uri opts)))
 
-(defn publish-draftset-graphs! [backend draftset-ref]
+(defn publish-draftset-graphs! [backend draftset-ref clock-fn]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
-    (mgmt/migrate-graphs-to-live! backend (vals graph-mapping))))
+    (mgmt/migrate-graphs-to-live! backend (vals graph-mapping) clock-fn)))
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
