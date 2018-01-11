@@ -217,8 +217,17 @@
 (defn set-isPublic! [db live-graph-uri boolean-value]
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
 
-(defn delete-graph-contents! [db graph-uri]
-  (update! db (str "DROP SILENT GRAPH <" graph-uri ">"))
+(defn delete-graph-contents-query [graph-uri]
+  (str "DROP SILENT GRAPH <" graph-uri ">"))
+
+(defn delete-graph-contents!
+  "Transactionally delete the contents of the supplied graph and set
+  its modified time to the supplied instant.
+
+  Note modified-at is an instant not a 0-arg clock-fn."
+  [db graph-uri modified-at]
+  (update! db (str (delete-graph-contents-query graph-uri) " ; "
+                   (set-timestamp graph-uri drafter:DraftGraph drafter:modifiedAt modified-at)))
   (log/info (str "Deleted graph " graph-uri)))
 
 (defn delete-draft-state-query [draft-graph-uri]
