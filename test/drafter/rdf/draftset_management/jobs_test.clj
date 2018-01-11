@@ -63,7 +63,7 @@
   [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]
   (let [draftset-id (dsops/create-draftset! backend test-editor)
         live-triples (tc/test-triples (URI. "http://test-subject"))
-        live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples)
+        live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples (constantly #inst "2015"))
         {:keys [value-p] :as copy-job} (sut/copy-live-graph-into-draftset-job backend draftset-id live-graph-uri)]
     (scheduler/queue-job! copy-job)
 
@@ -77,9 +77,9 @@
   [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]
   (let [draftset-id (dsops/create-draftset! backend test-editor)
         live-triples (tc/test-triples (URI. "http://test-subject"))
-        live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples)
+        live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples (constantly #inst "2015"))
         initial-draft-triples (tc/test-triples (URI. "http://temp-subject"))
-        draft-graph-uri (tc/import-data-to-draft! backend live-graph-uri initial-draft-triples draftset-id)
+        draft-graph-uri (tc/import-data-to-draft! backend live-graph-uri initial-draft-triples draftset-id (constantly #inst "2016"))
         {:keys [value-p] :as copy-job} (sut/copy-live-graph-into-draftset-job backend draftset-id live-graph-uri)]
 
     (scheduler/queue-job! copy-job)

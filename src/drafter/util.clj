@@ -5,8 +5,19 @@
             [buddy.core.codecs.base64 :as base64]
             [buddy.core.codecs :as codecs])
   (:import java.nio.charset.Charset
+           [java.util Date UUID]
            [javax.mail.internet AddressException InternetAddress]
            org.eclipse.rdf4j.model.impl.URIImpl))
+
+(defn get-current-time
+  "Function that get's the current time."
+  []
+  (Date.))
+
+(defn create-uuid
+  "Function that creates a UUID"
+  []
+  (UUID/randomUUID))
 
 (defn str->base64 [s]
   (codecs/bytes->str (base64/encode s)))

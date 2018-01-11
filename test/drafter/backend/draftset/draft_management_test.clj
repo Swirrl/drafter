@@ -22,7 +22,8 @@
             [grafter.url :as url]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
-            [schema.test :refer [validate-schemas]])
+            [schema.test :refer [validate-schemas]]
+            [drafter.util :as util])
   (:import java.net.URI
            [java.util Date UUID]))
 
@@ -91,7 +92,7 @@
       (is (= false (is-graph-live? *test-backend* graph-uri)))))
 
   (testing "Live graph"
-    (let [graph-uri (make-graph-live! *test-backend* (URI. "http://live"))]
+    (let [graph-uri (make-graph-live! *test-backend* (URI. "http://live") (constantly #inst "2015"))]
       (is (is-graph-live? *test-backend* graph-uri)))))
 
 (deftest create-draft-graph!-test
@@ -100,23 +101,26 @@
     (create-managed-graph! *test-backend* test-graph-uri)
 
     (testing "returns the draft-graph-uri, stores data about it and associates it with the live graph"
-      (let [new-graph-uri (create-draft-graph! *test-backend* test-graph-uri)]
+      (let [new-graph-uri (create-draft-graph! *test-backend* test-graph-uri nil (constantly #inst "2017"))]
         (is (.startsWith (str new-graph-uri) (str staging-base)))
         (is (ask? "<" test-graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                                       "<" drafter:hasDraft "> <" new-graph-uri "> .")))))
+                  "<" drafter:hasDraft "> <" new-graph-uri "> ."
+                  "<" new-graph-uri "> <" dcterms:modified ">" "\"2017-01-01T00:00:00Z\"^^xsd:dateTime . ")))))
 
   (testing "within draft set"
     (create-managed-graph! *test-backend* test-graph-uri)
     (let [draftset-id (UUID/randomUUID)
           ds-uri (url/append-path-segments draftset-uri draftset-id)
-          draft-graph-uri (create-draft-graph! *test-backend* test-graph-uri (->DraftsetId draftset-id))]
-      (is (ask? "<" draft-graph-uri "> <" drafter:inDraftSet "> <" ds-uri ">")))))
+          draft-graph-uri (create-draft-graph! *test-backend* test-graph-uri (->DraftsetId draftset-id) (constantly #inst "2017"))]
+      (is (ask? "<" draft-graph-uri "> <" drafter:inDraftSet "> <" ds-uri "> ;"
+                "<" dcterms:modified ">" "\"2017-01-01T00:00:00Z\"^^xsd:dateTime . ")))))
 
 (defn create-managed-graph-with-draft! [test-graph-uri]
   (create-managed-graph! *test-backend* test-graph-uri)
   (create-draft-graph! *test-backend* test-graph-uri))
 
-(deftest append-data-batch!-test
+(deftest
+  append-data-batch!-test
   (testing "append-data-batch!"
     (testing "on an empty live graph"
       (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
@@ -130,7 +134,8 @@
     (testing "with live graph with existing data, copies data into draft"
       (let [live-uri (make-graph-live! *test-backend*
                                        (URI. "http://clones/original/data")
-                                       (triplify [(URI. "http://starting/data") [(URI. "http://starting/data") (URI. "http://starting/data")]]))
+                                       (triplify [(URI. "http://starting/data") [(URI. "http://starting/data") (URI. "http://starting/data")]])
+                                       (constantly #inst "2015"))
             draft-graph-uri (create-managed-graph-with-draft! live-uri)]
 
         (clone-and-append-data! *test-backend* draft-graph-uri test-triples)
@@ -159,7 +164,7 @@
     (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
           expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
       (append-data-batch! *test-backend* draft-graph-uri test-triples)
-      (migrate-graphs-to-live! *test-backend* [draft-graph-uri])
+      (migrate-graphs-to-live! *test-backend* [draft-graph-uri] (constantly #inst "2015"))
       (is (not (ask? "GRAPH <" draft-graph-uri "> {"
                      expected-triple-pattern
                      "}"))
@@ -196,13 +201,13 @@
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-del-uri test-triples)
 
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri])
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri] (constantly #inst "2015"))
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (constantly #inst "2016"))
 
       ;; Draft for deletion has had data published. Now lets create a delete and publish
       (let [draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)]
         ;; We are migrating an empty graph, so this is deleting.
-        (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
+        (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (constantly #inst "2017"))
         (let [managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
               keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri)]
           (is (not managed-found?)
@@ -226,11 +231,11 @@
 
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-keep-uri3 test-triples)
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri2])
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri2] (constantly #inst "2015"))
       (is (graph-exists? *test-backend* graph-to-keep-uri2))
 
       ;; We are migrating an empty graph, so this is deleting.
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri])
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (constantly #inst "2016"))
       (let [draft-managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
             keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri2)]
         (is draft-managed-found?
@@ -424,7 +429,7 @@
 (deftest set-timestamp-test
   (let [draftset (create-draftset! *test-backend* test-editor)
         triples (test/test-triples (URI. "http://test-subject"))
-        draft-graph-uri (import-data-to-draft! *test-backend* (URI. "http://foo/graph") triples draftset)]
+        draft-graph-uri (import-data-to-draft! *test-backend* (URI. "http://foo/graph") triples draftset (constantly "2015"))]
 
     (set-modifed-at-on-draft-graph! *test-backend* draft-graph-uri (Date.))
 
