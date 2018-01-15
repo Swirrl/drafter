@@ -431,7 +431,7 @@
         triples (test/test-triples (URI. "http://test-subject"))
         draft-graph-uri (import-data-to-draft! *test-backend* (URI. "http://foo/graph") triples draftset (constantly "2015"))]
 
-    (set-modifed-at-on-draft-graph! *test-backend* draft-graph-uri (Date.))
+    (set-modifed-at-on-resource! *test-backend* draft-graph-uri (Date.))
 
     (is (sparql/eager-query *test-backend*
                (str

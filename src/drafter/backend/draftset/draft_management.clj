@@ -145,7 +145,10 @@
 
     (str "\"" instant "\"^^xsd:dateTime")))
 
-(defn- set-timestamp [subject class-uri time-predicate datetime]
+(defn set-timestamp
+  "Returns an update string to update the given subject/resource with
+  the supplied a timestamp."
+  [subject time-predicate datetime]
   (let [instant (xsd-datetime datetime)]
     (str
      "WITH <http://publishmydata.com/graphs/drafter/drafts>"
@@ -156,28 +159,27 @@
      "   <" subject "> <" time-predicate "> " instant " ."
      "}"
      "WHERE {"
-     "   <" subject "> a <" class-uri "> ."
+     "   <" subject "> ?p ?o . "
      "  OPTIONAL {"
      "     <" subject "> <" time-predicate "> ?lastvalue ."
      "  }"
      "}")))
 
-(s/defn set-timestamp-on-instance-of-class!
+(s/defn set-timestamp-on-resource!
   "Sets the specified object on the specified subject/predicate.  It
   assumes the property has a cardinality of 1 or 0, so will delete all
   other values of \":subject :predicate ?object\" if present."
-  [class-uri
-   predicate
+  [predicate
    repo
    subject
    date-time :- Date]
 
-  (update! repo (set-timestamp subject class-uri predicate date-time)))
+  (update! repo (set-timestamp subject predicate date-time)))
 
-(def ^{:doc "Set modified at time on a draft graph.  It is assumed the
+(def ^{:doc "Set modified at time on a resource.  It is assumed the
   cardinality of modifiedAt is at most 1, and that it will be updated in
-  place."}  set-modifed-at-on-draft-graph!
-  (partial set-timestamp-on-instance-of-class! drafter:DraftGraph drafter:modifiedAt))
+  place."}  set-modifed-at-on-resource!
+  (partial set-timestamp-on-resource! drafter:modifiedAt))
 
 (defn ensure-draft-exists-for
   "Finds or creates a draft graph for the given live graph in the
@@ -227,7 +229,7 @@
   Note modified-at is an instant not a 0-arg clock-fn."
   [db graph-uri modified-at]
   (update! db (str (delete-graph-contents-query graph-uri) " ; "
-                   (set-timestamp graph-uri drafter:DraftGraph drafter:modifiedAt modified-at)))
+                   (set-timestamp graph-uri drafter:modifiedAt modified-at)))
   (log/info (str "Deleted graph " graph-uri)))
 
 (defn delete-draft-state-query [draft-graph-uri]
