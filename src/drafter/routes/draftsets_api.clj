@@ -259,8 +259,8 @@
             graph :graph
             rdf-format :rdf-format} :params body :body :as request}]
         (let [delete-job (if (is-quads-format? rdf-format)
-                           (dsjobs/delete-quads-from-draftset-job backend draftset-id body rdf-format)
-                           (dsjobs/delete-triples-from-draftset-job backend draftset-id graph body rdf-format))]
+                           (dsjobs/delete-quads-from-draftset-job backend draftset-id body rdf-format util/get-current-time)
+                           (dsjobs/delete-triples-from-draftset-job backend draftset-id graph body rdf-format util/get-current-time))]
           (submit-async-job! delete-job))))))))
 
 (defmethod ig/pre-init-spec ::delete-draftset-data-handler [_]
@@ -320,9 +320,9 @@
             rdf-format :rdf-format
             graph :graph} :params body :body :as request}]
         (if (is-quads-format? rdf-format)
-          (let [append-job (dsjobs/append-data-to-draftset-job backend draftset-id body rdf-format)]
+          (let [append-job (dsjobs/append-data-to-draftset-job backend draftset-id body rdf-format util/get-current-time)]
             (submit-async-job! append-job))
-          (let [append-job (dsjobs/append-triples-to-draftset-job backend draftset-id body rdf-format graph)]
+          (let [append-job (dsjobs/append-triples-to-draftset-job backend draftset-id body rdf-format graph util/get-current-time)]
             (submit-async-job! append-job)))))))))
 
 (defmethod ig/pre-init-spec ::put-draftset-data-handler [_]

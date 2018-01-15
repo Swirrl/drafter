@@ -1,42 +1,37 @@
 (ns drafter.rdf.draftset-management.jobs
-  (:require [clojure.string :as string]
-            [drafter.backend.common :refer :all]
-            [drafter.backend.draftset :as ep]
-            [drafter.backend.draftset.draft-management
-             :as
-             mgmt
-             :refer
-             [to-quads with-state-graph]]
+  (:require [drafter.backend.common :refer :all]
+            [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as ops]
             [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
             [drafter.draftset :as ds]
-            [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sesame :refer [read-statements]]
             [drafter.rdf.sparql :as sparql]
-            [drafter.user :as user]
             [drafter.util :as util]
             [drafter.write-scheduler :as writes]
             [grafter.rdf :as rdf :refer [context]]
-            [grafter.rdf.protocols :refer [map->Quad map->Triple]]
-            [grafter.rdf4j.formats :as formats]
-            [grafter.rdf4j.io :refer [quad->backend-quad rdf-writer]]
+            [grafter.rdf.protocols :refer [map->Quad]]
+            [grafter.rdf4j.io :refer [quad->backend-quad]]
             [grafter.rdf4j.repository :as repo]
-            [grafter.url :as url]
-            [grafter.vocabularies.rdf :refer :all]
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [swirrl-server.async.jobs :as ajobs])
-  (:import java.io.StringWriter
-           [java.util Date UUID]
-           org.eclipse.rdf4j.model.impl.ContextStatementImpl
-           org.eclipse.rdf4j.model.Resource
-           [org.eclipse.rdf4j.query GraphQuery TupleQueryResultHandler]
-           org.eclipse.rdf4j.queryrender.RenderUtils))
+  (:import java.util.Date
+           org.eclipse.rdf4j.model.Resource))
 
 (defn delete-draftset-job [backend draftset-ref]
   (jobs/make-job
     :background-write [job]
     (do (ops/delete-draftset! backend draftset-ref)
         (jobs/job-succeeded! job))))
+
+(defn touch-graph-in-draftset [draftset-ref draft-graph-uri modified-at]
+  (let [update-str (str (mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at) " ; "
+                        (mgmt/set-timestamp (ds/->draftset-uri draftset-ref) dcterms:modified modified-at))]
+    update-str))
+
+(defn touch-graph-in-draftset! [backend draftset-ref draft-graph-uri modified-at]
+  (sparql/update! backend
+                  (touch-graph-in-draftset draftset-ref draft-graph-uri modified-at)))
 
 (defn- delete-quads-from-draftset [backend quad-batches draftset-ref live->draft {:keys [op job-started-at] :as state} job]
   (case op
@@ -47,7 +42,7 @@
           (if-let [draft-graph-uri (get live->draft live-graph)]
             (do
               (with-open [conn (repo/->connection (->sesame-repo backend))]
-                (mgmt/set-modifed-at-on-draft-graph! conn draft-graph-uri job-started-at)
+                (touch-graph-in-draftset! conn draftset-ref draft-graph-uri job-started-at)
                 (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
                       sesame-statements (map quad->backend-quad rewritten-statements)
                       graph-array (into-array Resource (map util/uri->sesame-uri (vals live->draft)))]
@@ -79,29 +74,29 @@
              (merge state {:op :delete})
              job))))
 
-(defn batch-and-delete-quads-from-draftset [backend quads draftset-ref live->draft job]
+(defn batch-and-delete-quads-from-draftset [backend quads draftset-ref live->draft job clock-fn]
   (let [quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-        now (java.util.Date.)]
+        now (clock-fn)]
     (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
 
 
 
-(defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format]
+(defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format clock-fn]
   (let [backend (:uncached-repo backend)]
     (jobs/make-job :background-write [job]
                    (let [;;backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
                          quads (read-statements serialised rdf-format)
                          graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-                     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job)))))
+                     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn)))))
 
-(defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format]
+(defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format clock-fn]
   (let [backend (:uncached-repo backend)]
     (jobs/make-job :background-write [job]
                    (let [;;backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
                          triples (read-statements serialised rdf-format)
                          quads (map #(util/make-quad-statement % graph) triples)
                          graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-                     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job)))))
+                     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn)))))
 
 (defn copy-live-graph-into-draftset-job [backend draftset-ref live-graph]
   (jobs/make-job :background-write [job]
@@ -133,8 +128,8 @@
       (if-let [draft-graph-uri (get live->draft graph-uri)]
         (do
           (ops/append-data-batch! backend draft-graph-uri triples)
-          (mgmt/set-modifed-at-on-draft-graph! backend draft-graph-uri job-started-at)
-
+          (touch-graph-in-draftset! backend draftset-ref draft-graph-uri job-started-at)
+          
           (let [next-job (ajobs/create-child-job
                           job
                           (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) (merge state {:op :append})))]
@@ -164,21 +159,19 @@
     :copy-graph
     (copy-graph-for-append* state draftset-ref backend live->draft quad-batches job)))
 
-(defn- append-quads-to-draftset-job [backend draftset-ref quads]
+(defn- append-quads-to-draftset-job [backend draftset-ref quads clock-fn]
   (let [backend (:uncached-repo backend)]
     (ajobs/create-job :background-write
                       (fn [job]
                         (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
                               quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-                              now (java.util.Date.)]
+                              now (clock-fn)]
                           (append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append :job-started-at now} job))))))
 
-(defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format]
-  (append-quads-to-draftset-job backend draftset-ref (read-statements tempfile rdf-format)))
+(defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format clock-fn]
+  (append-quads-to-draftset-job backend draftset-ref (read-statements tempfile rdf-format) clock-fn))
 
-(defn append-triples-to-draftset-job [backend draftset-ref tempfile rdf-format graph]
+(defn append-triples-to-draftset-job [backend draftset-ref tempfile rdf-format graph clock-fn]
   (let [triples (read-statements tempfile rdf-format)
         quads (map (comp map->Quad #(assoc % :c graph)) triples)]
-    (append-quads-to-draftset-job backend draftset-ref quads)))
-
-
+    (append-quads-to-draftset-job backend draftset-ref quads clock-fn)))
