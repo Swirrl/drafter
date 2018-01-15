@@ -19,14 +19,19 @@
     (t/is (= true ret)
           "Successful job (returns true doesn't return an exception/error)")))
 
-(defn fetch-draft-graph-modified-at [backend draftset live-graph]
+(defn ensure-draftgraph-and-draftset-modified
+  "Test that the draftgraph and draftset modified times match.  NOTE
+  that because a draftset contains multiple draft graphs these and we
+  expect the cardinality of modifiedAt to be 1 per resource this
+  should only be applied after modifying a specific graph."
+  [backend draftset live-graph]
   (let [ds-uri (do/draftset-id->uri (:id draftset))
         modified-query (str "SELECT ?modified {"
                             "   <" live-graph "> <" drafter:hasDraft "> ?draftgraph ."
                             "   ?draftgraph a <" drafter:DraftGraph "> ;"
                             "                 <" drafter:inDraftSet "> <" ds-uri "> ;"
                             "                 <" drafter:modifiedAt "> ?modified ."
-
+                            "<" ds-uri ">" "<" drafter:modifiedAt "> ?modified ."
                             "} LIMIT 2")]
 
     (let [res (-> backend
@@ -43,18 +48,23 @@
 
 (tc/deftest-system append-data-to-draftset-job-test
   [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]
-  (let [ds (dsops/create-draftset! backend test-editor)]
-    (apply-job! (sut/append-triples-to-draftset-job backend ds (io/file "./test/test-triple.nt") RDFFormat/NTRIPLES (URI. "http://foo/graph")))
-    (let [ts-1 (fetch-draft-graph-modified-at backend ds "http://foo/graph")]
-      (apply-job! (sut/append-triples-to-draftset-job backend ds (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES (URI. "http://foo/graph")))
-      (let [ts-2 (fetch-draft-graph-modified-at backend ds "http://foo/graph")]
-        (t/is (< (.getTime ts-1)
+  (let [initial-time (constantly #inst "2017")
+        update-time (constantly #inst "2018")
+        delete-time (constantly #inst "2019")
+        ds (dsops/create-draftset! backend test-editor)]
+    (apply-job! (sut/append-triples-to-draftset-job backend ds (io/file "./test/test-triple.nt") RDFFormat/NTRIPLES (URI. "http://foo/graph") initial-time))
+    (let [ts-1 (ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
+      (t/is (= (.getTime (initial-time))
+               (.getTime ts-1)))
+      (apply-job! (sut/append-triples-to-draftset-job backend ds (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES (URI. "http://foo/graph") update-time))
+      (let [ts-2 (ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
+        (t/is (= (.getTime (update-time))
                  (.getTime ts-2))
               "Modified time is updated after append")
 
-        (apply-job! (sut/delete-triples-from-draftset-job backend ds (URI. "http://foo/graph") (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES))
-        (let [ts-3 (fetch-draft-graph-modified-at backend ds "http://foo/graph")]
-          (t/is (< (.getTime ts-2)
+        (apply-job! (sut/delete-triples-from-draftset-job backend ds (URI. "http://foo/graph") (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES delete-time))
+        (let [ts-3 (ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
+          (t/is (= (.getTime (delete-time))
                    (.getTime ts-3))
                 "Modified time is updated after delete"))))))
 
@@ -87,8 +97,3 @@
 
     (let [draft-triples (get-graph-triples backend draft-graph-uri)]
       (t/is (= (set live-triples) (set draft-triples))))))
-
-
-
-
-
