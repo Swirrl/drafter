@@ -1,0 +1,24 @@
+@prefix : <http://api.stardog.com/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix stardog: <tag:stardog:api:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+
+draftset:4e7f444f-3e34-420e-9126-f9691aeb986b a drafter:DraftSet ;
+	dcterms:modified "2018-01-16T15:07:20.946Z"^^xsd:dateTime ;
+	dcterms:created "2018-01-16T15:07:20.946Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:editor@swirrl.com> ;
+	drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/ab08a82b-f6ea-4baf-9b98-e5dbb80b6bc9> ;
+	drafter:submittedBy <mailto:editor@swirrl.com> .
+
+<http://publishmydata.com/def/drafter/submission/ab08a82b-f6ea-4baf-9b98-e5dbb80b6bc9> a drafter:Submission ;
+	drafter:claimRole "editor" .
+
+}

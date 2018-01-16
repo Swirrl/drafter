@@ -1,7 +1,7 @@
 (ns drafter.routes.draftsets-api-test
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
-            [clojure.test :refer :all]
+            [clojure.test :refer :all :as t]
             [drafter.middleware :as middleware]
             [drafter.rdf.drafter-ontology
              :refer
@@ -21,8 +21,7 @@
             [grafter.rdf4j.formats :as formats]
             [grafter.rdf4j.io :refer [rdf-writer]]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
-            [clojure.test :as t])
+            [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            java.net.URI
            java.util.Date
@@ -126,7 +125,7 @@
 (def ^:private draftset-with-description-info-schema
   (assoc DraftsetWithoutDescription :description s/Str))
 
-(def ^:private Draftset
+(def Draftset
   (merge DraftsetWithoutTitleOrDescription
          {(s/optional-key :description) s/Str
           (s/optional-key :display-name) s/Str}))
@@ -200,11 +199,6 @@
 
 (defn- get-draftset-info-request [draftset-location user]
   (tc/with-identity user {:uri draftset-location :request-method :get}))
-
-(defn ok-response->typed-body [schema {:keys [body] :as response}]
-  (tc/assert-is-ok-response response)
-  (tc/assert-schema schema body)
-  body)
 
 (defn- get-draftset-info-through-api [draftset-location user]
   (let [{:keys [body] :as response} (route (get-draftset-info-request draftset-location user))]
@@ -293,16 +287,16 @@
   (let [response (valid-swagger-response? handler (create-draftset-request test-editor "Test title" "Test description"))]
     (assert-is-see-other-response response)))
 
-(defn get-draftsets-request [include user]
+#_(defn get-draftsets-request [include user]
   (tc/with-identity user
     {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
 
-(defn- get-draftsets-through-api [include user]
+#_(defn- get-draftsets-through-api [include user]
   (let [request (get-draftsets-request include user)
         {:keys [body] :as response} (route request)]
     (ok-response->typed-body [Draftset] response)))
 
-(defn- get-all-draftsets-through-api [user]
+#_(defn- get-all-draftsets-through-api [user]
   (get-draftsets-through-api :all user))
 
 (defn- submit-draftset-to-username-request [draftset-location target-username user]
@@ -326,21 +320,6 @@
       (tc/assert-is-ok-response claim-response)
       (tc/assert-schema Draftset body)
       body))
-
-(deftest get-all-draftsets-test  
-  (let [owned-ds (create-draftset-through-api test-publisher "owned")
-        editing-ds (create-draftset-through-api test-editor "editing")
-        claimable-publisher-ds (create-draftset-through-api test-editor "publishing")
-        claimable-manager-ds (create-draftset-through-api test-editor "admining")]
-
-    ;;submit two draftsets, one to publishers, the other to managers
-    (submit-draftset-to-role-through-api test-editor claimable-publisher-ds :publisher)
-    (submit-draftset-to-role-through-api test-editor claimable-manager-ds :manager)
-
-    (let [ds-infos (get-all-draftsets-through-api test-publisher)
-          available-names (set (map :display-name ds-infos))]
-      (tc/assert-schema [Draftset] ds-infos)
-      (is (= #{"owned" "publishing"} available-names)))))
 
 (deftest get-all-draftsets-changes-test
   (let [grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
@@ -412,98 +391,6 @@
         get-request (get-draftset-info-request draftset-location test-publisher)
         get-response (route get-request)]
     (tc/assert-is-forbidden-response get-response)))
-
-(defn- get-claimable-draftsets-through-api [user]
-  (let [request (tc/with-identity user
-                  {:uri "/v1/draftsets" :request-method :get :params {:include :claimable}})]
-    (ok-response->typed-body [Draftset] (route request))))
-
-(deftest get-claimable-draftsets-test
-  (let [ds-names (map #(str "Draftset " %) (range 1 6))
-        [ds1 ds2 ds3 ds4 ds5] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
-    (submit-draftset-to-role-through-api test-editor ds1 :editor)
-    (submit-draftset-to-role-through-api test-editor ds2 :publisher)
-    (submit-draftset-to-role-through-api test-editor ds3 :manager)
-    (submit-draftset-to-user-through-api ds5 test-publisher test-editor)
-
-    ;;editor should be able to claim all draftsets just submitted as they have not been claimed
-    (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (let [expected-claimable-names (map #(nth ds-names %) [0 1 2 4])
-            claimable-names (map :display-name editor-claimable)]
-        (is (= (set expected-claimable-names) (set claimable-names)))))
-
-    (let [publisher-claimable (get-claimable-draftsets-through-api test-publisher)]
-      ;;Draftsets 1, 2 and 5 should be on submit to publisher
-      ;;Draftset 3 is in too high a role
-      ;;Draftset 4 is not available
-      (let [claimable-names (map :display-name publisher-claimable)
-            expected-claimable-names (map #(nth ds-names %) [0 1 4])]
-        (is (= (set expected-claimable-names) (set claimable-names)))))
-
-    (doseq [ds [ds1 ds3]]
-      (claim-draftset-through-api ds test-manager))
-
-    (claim-draftset-through-api ds5 test-publisher)
-
-    ;;editor should not be able to see ds1, ds3 or ds5 after they have been claimed
-    (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (is (= 1 (count editor-claimable)))
-      (is (= (:display-name (first editor-claimable)) (nth ds-names 1))))))
-
-(deftest get-claimable-draftset-satisifes-multiple-claim-criteria
-  ;;a draftset may be in a state where it satisified multiple criteria to be claimed by
-  ;;the current user e.g. if a user submits to a role they are in. In this case the user
-  ;;can claim it due to being in the claim role, and because they are the submitter of
-  ;;an unclaimed draftset. Drafter should only return any matching draftsets once in this
-  ;;case
-  (let [draftset-location (create-draftset-through-api test-editor)]
-    (submit-draftset-to-role-through-api test-editor draftset-location :editor)
-    (let [claimable-draftsets (get-claimable-draftsets-through-api test-editor)]
-      (is (= 1 (count claimable-draftsets))))))
-
-(deftest get-all-draftsets-satisfied-multiple-claim-criteria
-  (let [draftset-location (create-draftset-through-api test-editor)]
-    (submit-draftset-to-role-through-api test-editor draftset-location :editor)
-    (let [all-draftsets (get-all-draftsets-through-api test-editor)]
-      (is (= 1 (count all-draftsets))))))
-
-(deftest get-claimable-draftsets-changes-test
-  (let [[[g1 g1-quads] [g2 g2-quads]] (seq (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset1 (create-draftset-through-api test-editor "ds1")
-        draftset2 (create-draftset-through-api test-editor "ds2")]
-    (publish-quads-through-api g1-quads)
-
-    ;;delete published graph in draftset1 and create new graph in draftset2
-    (delete-draftset-graph-through-api test-editor draftset1 g1)
-    (append-quads-to-draftset-through-api test-editor draftset2 g2-quads)
-
-    ;;submit both draftsets to publisher role
-    (doseq [ds [draftset1 draftset2]]
-      (submit-draftset-to-role-through-api test-editor ds :publisher))
-
-    (let [ds-infos (get-claimable-draftsets-through-api test-publisher)
-          ds1-info (first (filter #(= "ds1" (:display-name %)) ds-infos))
-          ds2-info (first (filter #(= "ds2" (:display-name %)) ds-infos))]
-      (is (= :deleted (get-in ds1-info [:changes g1 :status])))
-      (is (= :created (get-in ds2-info [:changes g2 :status]))))))
-
-(defn- get-owned-draftsets-through-api [user]
-  (get-draftsets-through-api :owned user))
-
-(deftest get-owned-draftsets-changes-test
-  (let [[[g1 g1-quads] [g2 g2-quads]] (seq (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api g1-quads)
-
-    ;;delete g1 in draftset and add quads to g2
-    (delete-draftset-graph-through-api test-editor draftset-location g1)
-    (append-quads-to-draftset-through-api test-editor draftset-location g2-quads)
-
-    (let [ds-infos (get-owned-draftsets-through-api test-editor)
-          {:keys [changes] :as ds-info} (first ds-infos)]
-      (is (= 1 (count ds-infos)))
-      (is (= :deleted (get-in changes [g1 :status])))
-      (is (= :created (get-in changes [g2 :status]))))))
 
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
@@ -1452,31 +1339,6 @@
           copy-response (route copy-request)]
       (tc/assert-is-not-found-response copy-response))))
 
-(defn- get-users-request [user]
-  (tc/with-identity user {:uri "/v1/users" :request-method :get}))
-
-;; old style... TODO delete
-#_(deftest get-users
-    (let [users (user/get-all-users *user-repo*)
-        expected-summaries (map user/get-summary users)
-        {:keys [body] :as response} (route (get-users-request test-editor))]
-    (tc/assert-is-ok-response response)
-    (is (= (set expected-summaries) (set body)))))
-
-;; new style...
-(tc/deftest-system get-users-test
-  [{:keys [:drafter.routes.draftsets-api/get-users-handler]
-    user-repo :drafter.user/memory-repository} "test-system.edn"]
-  (let [users (user/get-all-users user-repo)
-        expected-summaries (map user/get-summary users)
-        {:keys [body] :as response} (get-users-handler (get-users-request test-editor))]
-    (tc/assert-is-ok-response response)
-    (is (= (set expected-summaries) (set body)))))
-
-(deftest get-users-unauthenticated
-  (let [response (route {:uri "/v1/users" :request-method :get})]
-    (tc/assert-is-unauthorised-response response)))
-
 (deftest draftset-graphs-state-test
   (testing "Graph created"
     (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
@@ -1517,7 +1379,8 @@
 ;; Handler tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-
-
+(defn ok-response->typed-body [schema {:keys [body] :as response}]
+  (tc/assert-is-ok-response response)
+  (tc/assert-schema schema body)
+  body)
 

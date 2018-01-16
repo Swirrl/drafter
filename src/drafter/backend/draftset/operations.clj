@@ -209,13 +209,6 @@
 (defn- user-is-owner-clause [user]
   (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
 
-(defn- user-is-claim-user-clause [user]
-  (str
-    "{"
-    "  ?ds <" drafter:hasSubmission "> ?submission ."
-    "  ?submission <" drafter:claimUser "> <" (user/user->uri user) "> ."
-    "}"))
-
 (defn- user-is-in-claim-role-clause [user]
   (let [role (user/role user)
         user-role-score (role user/role->permission-level)]
@@ -226,23 +219,6 @@
       "  ?submission <" drafter:claimRole "> ?role ."
       "  FILTER (" user-role-score " >= ?rv)"
       "}")))
-
-(defn- user-is-submitter-clause [user]
-  (str
-    "{"
-    "  ?ds <" drafter:submittedBy "> <" (user/user->uri user) "> ."
-    "  FILTER NOT EXISTS { ?ds <" drafter:hasOwner "> ?owner }"
-    "}")
-  )
-
-(defn- user-claimable-clauses [user]
-  [(user-is-in-claim-role-clause user)
-   (user-is-claim-user-clause user)
-   (user-is-submitter-clause user)])
-
-(defn- user-all-visible-clauses [user]
-  (conj (user-claimable-clauses user)
-        (user-is-owner-clause user)))
 
 (defn- draftset-properties-result->properties [draftset-ref {:keys [created title description creator owner role claimuser submitter modified] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref)) 
@@ -283,7 +259,7 @@
   (let [mappings-query (get-draftsets-matching-graph-mappings-query clauses)]
     (sparql/eager-query repo mappings-query)))
 
-(defn- get-all-draftsets-by [repo clauses]
+(defn get-all-draftsets-by [repo clauses]
   (let [properties (get-all-draftsets-properties-by repo clauses)
         graph-mappings (get-all-draftsets-mappings-by repo clauses)
         graph-states (draftset-graph-mappings->graph-states repo graph-mappings)]
@@ -292,15 +268,6 @@
 
 (defn get-draftset-info [repo draftset-ref]
   (first (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])))
-
-(defn get-all-draftsets-info [repo user]
-  (get-all-draftsets-by repo (user-all-visible-clauses user)))
-
-(defn get-draftsets-claimable-by [repo user]
-  (get-all-draftsets-by repo (user-claimable-clauses user)))
-
-(defn get-draftsets-owned-by [repo user]
-  (get-all-draftsets-by repo [(user-is-owner-clause user)]))
 
 (defn- delete-draftset-query [draftset-ref draft-graph-uris]
   (let [delete-drafts-query (map mgmt/delete-draft-graph-and-remove-from-state-query draft-graph-uris)
