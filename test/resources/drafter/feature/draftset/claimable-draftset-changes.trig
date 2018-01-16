@@ -1,0 +1,66 @@
+@prefix : <http://api.stardog.com/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix stardog: <tag:stardog:api:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+	<http://graph1> a drafter:ManagedGraph ;
+		dcterms:modified "2018-01-16T15:50:27.296Z"^^xsd:dateTime ;
+		drafter:isPublic true ;
+		dcterms:issued "2018-01-16T15:50:27.475Z"^^xsd:dateTime ;
+		drafter:hasDraft draft:dg-1 .
+	
+	<http://graph2> a drafter:ManagedGraph ;
+		drafter:isPublic false ;
+		drafter:hasDraft draft:dg-2 .
+	
+	draftset:ds-1 a drafter:DraftSet ;
+		dcterms:modified "2018-01-16T15:50:26.339Z"^^xsd:dateTime ;
+		dcterms:created "2018-01-16T15:50:26.339Z"^^xsd:dateTime ;
+		dcterms:creator <mailto:editor@swirrl.com> ;
+		rdfs:label "ds1" ;
+		drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/404eb45d-95fe-4ac8-ac0f-cc7e2ace6150> ;
+		drafter:submittedBy <mailto:editor@swirrl.com> .
+	
+	draftset:ds-2 a drafter:DraftSet ;
+		dcterms:modified "2018-01-16T15:50:30.589Z"^^xsd:dateTime ;
+		dcterms:created "2018-01-16T15:50:26.727Z"^^xsd:dateTime ;
+		dcterms:creator <mailto:editor@swirrl.com> ;
+		rdfs:label "ds2" ;
+		drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/f4474524-fd8f-4891-aeb7-7c5f208bef09> ;
+		drafter:submittedBy <mailto:editor@swirrl.com> .
+	
+	draft:dg-1 a drafter:DraftGraph ;
+		dcterms:modified "2018-01-16T15:50:28.957Z"^^xsd:dateTime ;
+		dcterms:created "2018-01-16T15:50:28.957Z"^^xsd:dateTime ;
+		drafter:inDraftSet draftset:ds-1 .
+	
+	draft:dg-2 a drafter:DraftGraph ;
+		dcterms:modified "2018-01-16T15:50:30.589Z"^^xsd:dateTime ;
+		dcterms:created "2018-01-16T15:50:30.602Z"^^xsd:dateTime ;
+		drafter:inDraftSet draftset:ds-2 .
+	
+	<http://publishmydata.com/def/drafter/submission/404eb45d-95fe-4ac8-ac0f-cc7e2ace6150> a drafter:Submission ;
+		drafter:claimRole "publisher" .
+	
+	<http://publishmydata.com/def/drafter/submission/f4474524-fd8f-4891-aeb7-7c5f208bef09> a drafter:Submission ;
+		drafter:claimRole "publisher" .
+}
+
+<http://graph1> {
+	<http://s1> rdf:a <http://example.org/animals/kitten> ;
+		<http://xmlns.com/foaf/0.1/name> "Fluffy" ;
+		<http://likes> "Murder" .
+}
+
+draft:dg-2 {
+	<http://s2> rdf:a <http://example.org/animals/dog> ;
+		<http://xmlns.com/foaf/0.1/name> "Beethoven" ;
+		<http://likes> "Walkies" .
+}

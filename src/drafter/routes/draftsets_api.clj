@@ -125,7 +125,7 @@
                              :route route}
                             (handler-fn req)))))
 
-(defn get-draftsets-handler
+#_(defn get-draftsets-handler
   ":get /draftsets"
   [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
@@ -137,10 +137,10 @@
         :claimable (ring/response (dsops/get-draftsets-claimable-by backend user))
         :owned (ring/response (dsops/get-draftsets-owned-by backend user)))))))
 
-(defmethod ig/pre-init-spec ::get-draftsets-handler [_]
+#_(defmethod ig/pre-init-spec ::get-draftsets-handler [_]
   (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
 
-(defmethod ig/init-key ::get-draftsets-handler [_ opts]
+#_(defmethod ig/init-key ::get-draftsets-handler [_ opts]
   (get-draftsets-handler opts))
 
 
@@ -457,21 +457,6 @@
 (defmethod ig/init-key ::draftset-claim-handler [_ opts]
   (draftset-claim-handler opts))
 
-
-(defn get-users-handler [{wrap-authenticated :wrap-auth 
-                          user-repo ::user/repo}]
-  (wrap-authenticated
-   (fn [r]
-     (let [users (user/get-all-users user-repo)
-           summaries (map user/get-summary users)]
-       (ring/response summaries)))))
-
-(defmethod ig/pre-init-spec ::get-users-handler [_]
-  (s/keys :req [::user/repo]
-          :req-un [::wrap-auth]))
-
-(defmethod ig/init-key ::get-users-handler [_ opts]
-  (get-users-handler opts))
 
 (defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler

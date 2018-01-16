@@ -1,0 +1,50 @@
+@prefix : <http://api.stardog.com/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix stardog: <tag:stardog:api:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+
+draftset:35d0ddb6-e8eb-4672-aab4-a3f53d14c6fe a drafter:DraftSet ;
+	dcterms:modified "2018-01-16T12:31:23.516Z"^^xsd:dateTime ;
+	dcterms:created "2018-01-16T12:31:23.516Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:publisher@swirrl.com> ;
+	drafter:hasOwner <mailto:publisher@swirrl.com> ;
+	rdfs:label "owned" .
+
+draftset:32159abf-d2ca-4f8b-8cc0-9609704c2553 a drafter:DraftSet ;
+	dcterms:modified "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
+	dcterms:created "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:editor@swirrl.com> ;
+	drafter:hasOwner <mailto:editor@swirrl.com> ;
+	rdfs:label "editing" .
+
+draftset:a1fa84aa-59a7-4faf-8211-3985870cc3eb a drafter:DraftSet ;
+	dcterms:modified "2018-01-16T12:31:33.487Z"^^xsd:dateTime ;
+	dcterms:created "2018-01-16T12:31:33.487Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:editor@swirrl.com> ;
+	rdfs:label "publishing" ;
+	drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/f995a4e5-e6b1-4f0d-9391-c9a4bb085b1d> ;
+	drafter:submittedBy <mailto:editor@swirrl.com> .
+
+draftset:55660038-da9e-42d0-a40f-00d5fa4ef44d a drafter:DraftSet ;
+	dcterms:modified "2018-01-16T12:31:34.855Z"^^xsd:dateTime ;
+	dcterms:created "2018-01-16T12:31:34.855Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:editor@swirrl.com> ;
+	rdfs:label "admining" ;
+	drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/dac161e1-ed7e-4ecf-b598-575c61e1a4f0> ;
+	drafter:submittedBy <mailto:editor@swirrl.com> .
+
+<http://publishmydata.com/def/drafter/submission/f995a4e5-e6b1-4f0d-9391-c9a4bb085b1d> a drafter:Submission ;
+	drafter:claimRole "publisher" .
+
+<http://publishmydata.com/def/drafter/submission/dac161e1-ed7e-4ecf-b598-575c61e1a4f0> a drafter:Submission ;
+	drafter:claimRole "manager" .
+
+}
