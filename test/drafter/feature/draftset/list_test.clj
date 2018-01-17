@@ -42,25 +42,67 @@
     (t/is (= 401 (:status (handler (assoc request :headers invalid-password)))))
     (t/is (= 401 (:status (handler (assoc request :headers invalid-user)))))))
 
-(tc/deftest-system-with-keys get-all-draftsets-test
+(tc/deftest-system-with-keys get-draftsets-hander-test+all
   [:drafter.fixture-data/loader :drafter.feature.draftset.list/get-draftsets-handler]
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/list_test-2.edn"]
 
-  (assert-denies-invalid-login-attempts get-draftsets-handler {:uri "/v1/draftsets" :request-method :get :params {:include :all}})
+  (t/testing "All draftsets"
+    (assert-denies-invalid-login-attempts get-draftsets-handler {:uri "/v1/draftsets" :request-method :get :params {:include :all}})
+
+    (assert-visibility #{"owned" "publishing"}
+                       (get-draftsets-handler (get-draftsets-request :all test-publisher))
+                       (str"Expected publisher to see owned and publishing draftsets"))
+
+    (assert-visibility #{"editing" "publishing" "admining"}
+                       (get-draftsets-handler (get-draftsets-request :all test-editor))
+                       (str "Expected editor to see editing, publishing & admining draftsets"))
+
+    (assert-visibility #{"publishing" "admining"}
+                       (get-draftsets-handler (get-draftsets-request :all test-manager))
+                       (str "Expected manager to see publishing and admining draftsets"))))
+
+;; NOTE many of these tests are likely dupes of others in this file
+(tc/deftest-system-with-keys get-draftsets-handler-test+visibility
+  [::sut/get-draftsets-handler :drafter/backend :drafter.fixture-data/loader]
+  [{:keys [:drafter/backend]
+    get-draftsets-handler ::sut/get-draftsets-handler
+    :as sys} "drafter/feature/draftset/list_test-unclaimable.edn"]
   
-  (assert-visibility #{"owned" "publishing"}
-                     (get-draftsets-handler (get-draftsets-request :all test-publisher))
-                     (str"Expected publisher to see owned and publishing draftsets"))
+  (let [get-draftsets-through-api (fn [include user]
+                                    (let [request (get-draftsets-request include user)
+                                          {:keys [body] :as response} (get-draftsets-handler request)]
+                                      
+                                      (ok-response->typed-body [dset-test/Draftset] response)
 
-  (assert-visibility #{"editing" "publishing" "admining"}
-                     (get-draftsets-handler (get-draftsets-request :all test-editor))
-                     (str "Expected publisher to see owned and publishing draftsets"))
+                                      body))]
 
-  (assert-visibility #{"publishing" "admining"}
-                     (get-draftsets-handler (get-draftsets-request :all test-manager))
-                     (str "Expected publisher to see owned and publishing draftsets")))
+    (t/testing "Missing include filter should return all owned and claimable draftsets"
+      (let [request (tc/with-identity test-publisher {:uri "/v1/draftsets" :request-method :get})
+            response (get-draftsets-handler request)
+            draftsets (ok-response->typed-body [dset-test/Draftset] response)]
+        (t/is (= 2 (count draftsets)))
+        (t/is (= #{"owned" "claimable"} (set (map :display-name draftsets))))))
 
-(tc/deftest-system-with-keys get-claimable-draftset-satisifes-multiple-claim-criteria
+    (t/testing "Owned draftsets"
+      (let [draftsets (get-draftsets-through-api :owned test-publisher)]
+        (t/is (= 1 (count draftsets)))
+        (t/is (= "owned" (:display-name (first draftsets))))))
+
+    (t/testing "Claimable draftsets"
+      (let [draftsets (get-draftsets-through-api :claimable test-publisher)]
+        (t/is (= 1 (count draftsets)))
+        (t/is (= "claimable" (:display-name (first draftsets))))))
+
+    (t/testing "Invalid include parameter"
+      (let [request (get-draftsets-request :invalid test-publisher)
+            response (get-draftsets-handler request)]
+        (tc/assert-is-unprocessable-response response)))
+
+    (t/testing "Unauthenticated"
+      (let [response (get-draftsets-handler {:uri "/v1/draftsets" :request-method :get})]
+        (tc/assert-is-unauthorised-response response)))))
+
+(tc/deftest-system-with-keys get-draftsets-handler-test+claimable-1
   [:drafter.fixture-data/loader :drafter.feature.draftset.list/get-draftsets-handler]
   ;;a draftset may be in a state where it satisified multiple criteria to be claimed by
   ;;the current user e.g. if a user submits to a role they are in. In this case the user
@@ -73,7 +115,7 @@
     (t/is (= 200 status))
     (t/is (= 1 (count claimable-draftsets)))))
 
-(tc/deftest-system-with-keys get-claimable-draftset-satisifes-multiple-claim-criteria-2
+(tc/deftest-system-with-keys get-draftsets-handler-test+claimable-2
   [:drafter.fixture-data/loader :drafter.feature.draftset.list/get-draftsets-handler]
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/list_test-1.edn"]
 
@@ -86,39 +128,7 @@
     (t/is (= 0 (count all-draftsets))
           "Other users can't access draftset as it's not been shared (submitted) to them")))
 
-#_(t/deftest get-claimable-draftsets-test
-  (let [ds-names (map #(str "Draftset " %) (range 1 6))
-        [ds1 ds2 ds3 ds4 ds5] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
-    (submit-draftset-to-role-through-api test-editor ds1 :editor)
-    (submit-draftset-to-role-through-api test-editor ds2 :publisher)
-    (submit-draftset-to-role-through-api test-editor ds3 :manager)
-    (submit-draftset-to-user-through-api ds5 test-publisher test-editor)
-
-    ;;editor should be able to claim all draftsets just submitted as they have not been claimed
-    (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (let [expected-claimable-names (map #(nth ds-names %) [0 1 2 4])
-            claimable-names (map :display-name editor-claimable)]
-        (t/is (= (set expected-claimable-names) (set claimable-names)))))
-
-    (let [publisher-claimable (get-claimable-draftsets-through-api test-publisher)]
-      ;;Draftsets 1, 2 and 5 should be on submit to publisher
-      ;;Draftset 3 is in too high a role
-      ;;Draftset 4 is not available
-      (let [claimable-names (map :display-name publisher-claimable)
-            expected-claimable-names (map #(nth ds-names %) [0 1 4])]
-        (t/is (= (set expected-claimable-names) (set claimable-names)))))
-
-    (doseq [ds [ds1 ds3]]
-      (claim-draftset-through-api ds test-manager))
-
-    (claim-draftset-through-api ds5 test-publisher)
-
-    ;;editor should not be able to see ds1, ds3 or ds5 after they have been claimed
-    (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (t/is (= 1 (count editor-claimable)))
-      (t/is (= (:display-name (first editor-claimable)) (nth ds-names 1))))))
-
-(tc/deftest-system-with-keys get-claimable-draftsets-changes-test
+(tc/deftest-system-with-keys get-draftsets-handler-test+changes-claimable
   [:drafter.fixture-data/loader :drafter.feature.draftset.list/get-draftsets-handler]
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/claimable-draftset-changes.edn"]
   (let [g1 (URI. "http://graph1")
@@ -133,13 +143,8 @@
       (t/is (= :deleted (get-in ds1-info [:changes g1 :status])))
       (t/is (= :created (get-in ds2-info [:changes g2 :status]))))))
 
-
-(defn- get-owned-draftsets-through-api [user]
-  (get-draftsets-request :owned user))
-
-
 ;; NOTE this test is almost identical to the above one, we can probably combine them.
-(tc/deftest-system-with-keys get-owned-draftsets-changes-test 
+(tc/deftest-system-with-keys get-draftsets-handler-test+changes-owned 
   [:drafter.fixture-data/loader :drafter.feature.draftset.list/get-draftsets-handler]
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/claimable-draftset-changes-2.edn"]
 
