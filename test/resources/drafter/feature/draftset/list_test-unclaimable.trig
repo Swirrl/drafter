@@ -16,7 +16,8 @@
 		dcterms:creator <mailto:publisher@swirrl.com> ;
 		drafter:hasOwner <mailto:publisher@swirrl.com> ;
 		rdfs:label "owned" .
-	
+
+        # This draftset should be claimable by publisher@swirrl.com (or anyone in publisher role)
 	draftset:claimable a drafter:DraftSet ;
 		dcterms:modified "2017-11-30T14:15:18.348Z"^^xsd:dateTime ;
 		dcterms:created "2017-11-30T14:15:18.348Z"^^xsd:dateTime ;
@@ -24,7 +25,8 @@
 		rdfs:label "claimable" ;
 		drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/a74aaec9-a1e5-4418-9528-c07a1d275e72> ;
 		drafter:submittedBy <mailto:editor@swirrl.com> .
-	
+
+        # This draftset should be unclaimable by publisher@swirrl.com (or anyone else)
 	draftset:unclaimable a drafter:DraftSet ;
 		dcterms:modified "2017-11-30T14:15:19.486Z"^^xsd:dateTime ;
 		dcterms:created "2017-11-30T14:15:19.486Z"^^xsd:dateTime ;
