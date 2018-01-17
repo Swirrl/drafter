@@ -125,25 +125,6 @@
                              :route route}
                             (handler-fn req)))))
 
-#_(defn get-draftsets-handler
-  ":get /draftsets"
-  [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (wrap-authenticated
-   (optional-enum-param
-    :include #{:all :owned :claimable} :all
-    (fn [{user :identity {:keys [include]} :params :as request}]
-      (case include
-        :all (ring/response (dsops/get-all-draftsets-info backend user))
-        :claimable (ring/response (dsops/get-draftsets-claimable-by backend user))
-        :owned (ring/response (dsops/get-draftsets-owned-by backend user)))))))
-
-#_(defmethod ig/pre-init-spec ::get-draftsets-handler [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
-
-#_(defmethod ig/init-key ::get-draftsets-handler [_ opts]
-  (get-draftsets-handler opts))
-
-
 (defn create-draftsets-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (let [version "/v1"]
     (wrap-authenticated
