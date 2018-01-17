@@ -1,2 +1,2 @@
-(ns drafter.feature.draftset.append-by-graph)
+(ns drafter.feature.draftset-data.append-by-graph)
 

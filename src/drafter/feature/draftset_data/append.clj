@@ -1,2 +1,2 @@
-(ns drafter.feature.draftset.append)
+(ns drafter.feature.draftset-data.append)
 
