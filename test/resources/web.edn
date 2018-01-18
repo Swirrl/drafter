@@ -53,11 +53,11 @@
 
  :drafter.routes.draftsets-api/delete-draftset-changes-handler {:drafter/backend #ig/ref :drafter/backend
                                                                 :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
+ 
+ :drafter.feature.draftset-data.append/data-handler {:drafter/backend #ig/ref :drafter/backend
+                                                     :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/put-draftset-data-handler {:drafter/backend #ig/ref :drafter/backend
-                                                          :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
-
- :drafter.routes.draftsets-api/put-draftset-graph-handler {:drafter/backend #ig/ref :drafter/backend
+ :drafter.feature.draftset-data.append-by-graph/handler {:drafter/backend #ig/ref :drafter/backend
                                                            :wrap-as-draftset-owner #ig/ref :drafter.routes.draftsets-api/wrap-as-draftset-owner}
 
  :drafter.routes.draftsets-api/draftset-query-handler{:drafter/backend #ig/ref :drafter/backend
@@ -90,8 +90,8 @@
                                 :delete-draftset-data-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-data-handler
                                 :delete-draftset-graph-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-graph-handler
                                 :delete-draftset-changes-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-changes-handler
-                                :put-draftset-data-handler #ig/ref :drafter.routes.draftsets-api/put-draftset-data-handler
-                                :put-draftset-graph-handler #ig/ref :drafter.routes.draftsets-api/put-draftset-graph-handler
+                                :put-draftset-data-handler #ig/ref :drafter.feature.draftset-data.append/data-handler
+                                :put-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.append-by-graph/handler
                                 :draftset-query-handler #ig/ref :drafter.routes.draftsets-api/draftset-query-handler
                                 :draftset-publish-handler #ig/ref :drafter.routes.draftsets-api/draftset-publish-handler
                                 :draftset-set-metadata-handler #ig/ref :drafter.routes.draftsets-api/draftset-set-metadata-handler

@@ -191,7 +191,7 @@
   (str
     "{ VALUES ?ds { <" (str (ds/->draftset-uri draftset-ref)) "> } }"))
 
-(defn- get-draftset-graph-mapping-query [draftset-ref]
+(defn get-draftset-graph-mapping-query [draftset-ref]
   (get-draftsets-matching-graph-mappings-query
     [(draftset-uri-clause draftset-ref)]))
 
@@ -490,68 +490,9 @@
         [result] (sparql/eager-query backend q)]
     (:dg result)))
 
-(defn revert-graph-changes!
-  "Reverts the changes made to a live graph inside the given
-  draftset. Returns a result indicating the result of the operation:
-    - :reverted If the changes were reverted
-    - :not-found If the draftset does not exist or no changes exist within it."
-  [backend draftset-ref graph]
-  (if-let [draft-graph-uri (find-draftset-draft-graph backend draftset-ref graph)]
-    (do
-      (mgmt/delete-draft-graph! backend draft-graph-uri)
-      :reverted)
-    :not-found))
-
-(defn create-or-empty-draft-graph-for [backend draftset-ref live-graph clock-fn]
-  (if-let [draft-graph-uri (find-draftset-draft-graph backend draftset-ref live-graph)]
-    (do
-      (mgmt/delete-graph-contents! backend draft-graph-uri (clock-fn))
-      draft-graph-uri)
-    (mgmt/create-draft-graph! backend live-graph draftset-ref clock-fn)))
-
-(defn lock-writes-and-copy-graph
-  "Calls mgmt/copy-graph to copy a live graph into the draftset, but
-  does so with the writes lock engaged.  This allows us to fail
-  concurrent sync-writes fast."
-  [backend live-graph-uri draft-graph-uri opts]
-  (writes/with-lock :copy-graph
-    ;; Execute the graph copy inside the write-lock so we can
-    ;; fail :blocking-write operations if they are waiting longer than
-    ;; their timeout period for us to release it.  These writes would
-    ;; likely be blocked inside the database anyway, so this way we
-    ;; can fail them fast when they are run behind a long running op.
-    (mgmt/copy-graph backend live-graph-uri draft-graph-uri opts)))
-
 (defn publish-draftset-graphs! [backend draftset-ref clock-fn]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
     (mgmt/migrate-graphs-to-live! backend (vals graph-mapping) clock-fn)))
-
-(defn quad-batch->graph-triples
-  "Extracts the graph-uri from a sequence of quads and converts all
-  quads into triples. Batch must be non-empty and each contained quad
-  should have the same graph. If the quads have a nil context an
-  exception is thrown as drafts for the default graph are not
-  currently supported."
-  [quads]
-  {:pre [(not (empty? quads))]}
-  (let [graph-uri (context (first quads))]
-    (if (some? graph-uri)
-      {:graph-uri graph-uri :triples (map map->Triple quads)}
-      (let [sw (StringWriter.)
-            msg (format "All statements must have an explicit target graph")]
-        (rdf/add (rdf-writer sw :format :nq) (take 5 quads))
-        (throw (IllegalArgumentException.
-                (str "All statements must have an explicit target graph. The following statements have no graph:\n" sw)))))))
-
-(defn append-data-batch!
-  "Appends a sequence of triples to the given draft graph."
-  [conn graph-uri triple-batch]
-  ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
-  ;;so only create one if there is data in the batch
-  (when-not (empty? triple-batch)
-    ;;WARNING: This assumes the backend is a sesame backend which is
-    ;;true for all current backends.
-    (sparql/add conn graph-uri triple-batch)))
 
 (defn- rdf-handler->spog-tuple-handler [conn ^RDFHandler rdf-handler]
   (reify
