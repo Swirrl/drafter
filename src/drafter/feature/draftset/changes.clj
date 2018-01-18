@@ -9,7 +9,6 @@
             [drafter.feature.common :as feat-common]
             [drafter.feature.middleware :as middleware]
             [drafter.rdf.draftset-management.job-util :as jobutil]
-            [drafter.routes.draftsets-api :refer [wrap-as-draftset-owner]]
             [integrant.core :as ig]
             [ring.util.response :as ring]
             [swirrl-server.responses :as response]))
@@ -39,9 +38,9 @@
                       (ring/response (dsops/get-draftset-info backend draftset-id))
                       (ring/not-found "")))))))))
 
-(defmethod ig/pre-init-spec ::delete-draftset-changes-handler [_]
+(defmethod ig/pre-init-spec ::delete-changes-handler [_]
   (s/keys :req [:drafter/backend]
           :req-un [::wrap-as-draftset-owner]))
 
-(defmethod ig/init-key ::delete-draftset-changes-handler [_ opts]
+(defmethod ig/init-key ::delete-changes-handler [_ opts]
   (delete-draftset-changes-handler opts))

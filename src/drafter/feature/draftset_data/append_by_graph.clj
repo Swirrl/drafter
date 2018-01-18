@@ -5,7 +5,6 @@
             [drafter.feature.middleware :as middleware]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.responses :as response :refer [submit-async-job!]]
-            [drafter.routes.draftsets-api :refer [wrap-as-draftset-owner]]
             [drafter.util :as util]
             [integrant.core :as ig]
             [drafter.feature.draftset-data.common :as ds-data-common]))

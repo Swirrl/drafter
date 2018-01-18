@@ -10,7 +10,7 @@
              ds-data-common
              :refer
              [touch-graph-in-draftset!]]
-            [drafter.feature.draftset-data.common.middleware :as deset-middleware]
+            [drafter.feature.draftset-data.middleware :as deset-middleware]
             [drafter.middleware :refer [require-rdf-content-type temp-file-body]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sesame :refer [is-quads-format? read-statements]]
@@ -103,9 +103,9 @@
                            (delete-triples-from-draftset-job backend draftset-id graph body rdf-format util/get-current-time))]
           (response/submit-async-job! delete-job))))))))
 
-(defmethod ig/pre-init-spec ::delete-draftset-data-handler [_]
+(defmethod ig/pre-init-spec ::delete-data-handler [_]
   (s/keys :req [:drafter/backend]
           :req-un [::wrap-as-draftset-owner]))
 
-(defmethod ig/init-key ::delete-draftset-data-handler [_ opts]
+(defmethod ig/init-key ::delete-data-handler [_ opts]
   (delete-draftset-data-handler opts))
