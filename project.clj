@@ -1,4 +1,4 @@
-(defproject drafter "2.1.8-SNAPSHOT"
+(defproject drafter "2.1.9"
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
