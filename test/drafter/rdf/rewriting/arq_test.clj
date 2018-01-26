@@ -33,4 +33,5 @@
           "Round tripping twice generates same query string")))
 
 (t/deftest rewriting-with-sparql-group-concats
-  (t/is (roundtripable? (load-query "test-queries/group-concat.sparql"))))
+  (t/is (roundtripable? (load-query "test-queries/group-concat.sparql")))
+  (t/is (roundtripable? (load-query "test-queries/empty-values.sparql"))))
