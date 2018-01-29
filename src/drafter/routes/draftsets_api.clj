@@ -65,15 +65,6 @@
                      (ring/redirect-after-post (str version "/draftset/"
                                                     (get-in result [:details :id]))))))))))
 
-(s/def ::wrap-auth fn?)
-
-(defmethod ig/pre-init-spec ::create-draftsets-handler [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
-
-(defmethod ig/init-key ::create-draftsets-handler [_ opts]
-  (create-draftsets-handler opts))
-
-
 (defn get-draftset-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
    (feat-middleware/existing-draftset-handler
