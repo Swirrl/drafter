@@ -7,6 +7,7 @@
              :refer
              [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.rdf.draftset-management.job-util :as jobs]
+            [drafter.feature.draftset.create-test :as create-test]
             [drafter.rdf.sparql :as sparql]
             [drafter.routes.draftsets-api :as sut :refer :all]
             [drafter.swagger :as swagger]
@@ -66,13 +67,6 @@
      :body data-stream
      :headers {"content-type" content-type}}))
 
-(defn- create-draftset-request
-  ([] (create-draftset-request test-editor))
-  ([user] (create-draftset-request user nil))
-  ([user display-name] (create-draftset-request user display-name nil))
-  ([user display-name description]
-   (tc/with-identity user {:uri "/v1/draftsets" :request-method :post :params {:display-name display-name :description description}})))
-
 (defn- make-append-data-to-draftset-request [user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
     (let [request (append-to-draftset-request user draftset-location fs "application/x-trig")]
@@ -99,14 +93,6 @@
   (let [request (statements->append-triples-request user draftset-location triples graph)
         response (route request)]
     (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
-
-(def see-other-response-schema
-  (merge tc/ring-response-schema
-         {:status (s/eq 303)
-          :headers {(s/required-key "Location") s/Str}}))
-
-(defn assert-is-see-other-response [response]
-  (tc/assert-schema see-other-response-schema response))
 
 (def ^:private DraftsetWithoutTitleOrDescription
   {:id s/Str
@@ -144,9 +130,9 @@
   ([user] (create-draftset-through-api user nil))
   ([user display-name] (create-draftset-through-api user display-name nil))
   ([user display-name description]
-   (let [request (create-draftset-request user display-name description)
+   (let [request (create-test/create-draftset-request user display-name description)
          {:keys [headers] :as response} (route request)]
-     (assert-is-see-other-response response)
+     (create-test/assert-is-see-other-response response)
      (get headers "Location"))))
 
 (defn- get-draftset-quads-accept-request [draftset-location user accept union-with-live?-str]
@@ -262,30 +248,9 @@
     (tc/assert-is-ok-response response)))
 
 ;; define a local alternative to the route fixture wrapper
-(defn valid-swagger-response?
-  "Applies handler to request and validates the response against the
-  swagger spec for the requested route.
 
-  Returns the response if valid, otherwise raises an error."
-  [handler request]
-  (let [swagger-spec (swagger/load-spec-and-resolve-refs)]
-    (swagger/validate-response-against-swagger-spec swagger-spec request (handler request))))
 
-(tc/deftest-system create-draftset-without-title-or-description
-  [{handler :drafter.routes.draftsets-api/create-draftsets-handler} "test-system.edn"]
-  (let [request (tc/with-identity test-editor {:uri "/v1/draftsets" :request-method :post})
-        response (valid-swagger-response? handler request)]
-    (assert-is-see-other-response response)))
 
-(tc/deftest-system create-draftset-with-title-and-without-description
-  [{handler :drafter.routes.draftsets-api/create-draftsets-handler} "test-system.edn"]
-  (let [response (valid-swagger-response? handler (create-draftset-request test-editor "Test Title!"))]
-    (assert-is-see-other-response response)))
-
-(tc/deftest-system create-draftset-with-title-and-description
-  [{handler :drafter.routes.draftsets-api/create-draftsets-handler} "test-system.edn"]
-  (let [response (valid-swagger-response? handler (create-draftset-request test-editor "Test title" "Test description"))]
-    (assert-is-see-other-response response)))
 
 #_(defn get-draftsets-request [include user]
   (tc/with-identity user
