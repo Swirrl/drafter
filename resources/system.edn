@@ -9,7 +9,7 @@
                          :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT}
 
  
- :drafter.stasher/filecache {}
+ :drafter.stasher/filecache {} #_{:dir #or [#env STASHER_CACHE_DIR "stasher-cache"]}
 
  :drafter.stasher/cache-thread-pool {}
 
@@ -52,8 +52,8 @@
  :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.live/endpoint
                                                  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
- :drafter.routes.draftsets-api/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
-                                                      :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.draftset.list/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
+                                                       :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.routes.draftsets-api/get-draftset-handler {:drafter/backend #ig/ref :drafter/backend
                                                      :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
@@ -107,11 +107,12 @@
  :drafter.routes.draftsets-api/draftset-claim-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                                        :drafter/backend #ig/ref :drafter/backend}
 
- :drafter.routes.draftsets-api/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
+ #_:drafter.routes.draftsets-api/get-users-handler
+ :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                                   :drafter.user/repo #ig/ref :drafter.user/repo}
  
- :drafter.routes/draftsets-api {:get-users-handler #ig/ref :drafter.routes.draftsets-api/get-users-handler
-                                :get-draftsets-handler #ig/ref :drafter.routes.draftsets-api/get-draftsets-handler
+ :drafter.routes/draftsets-api {:get-users-handler #ig/ref :drafter.feature.users.list/get-users-handler
+                                :get-draftsets-handler #ig/ref :drafter.feature.draftset.list/get-draftsets-handler
                                 :create-draftsets-handler #ig/ref :drafter.routes.draftsets-api/create-draftsets-handler
                                 :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
                                 :delete-draftset-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-handler
