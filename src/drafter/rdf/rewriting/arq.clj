@@ -300,7 +300,20 @@ WHERE  {
       OpAsQuery/asQuery)
 
 
-  (apply-rewriter (partial drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {}) mdg-query)
+  (-> 
+      (partial drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {})
+      (apply-rewriter "SELECT DISTINCT ?mdg
+WHERE  {
+  VALUES ?mdg { }
+         GRAPH ?mdg {
+           ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
+         }
+}
+")
+      str)
+
+  (println "SELECT DISTINCT  ?mdg\nWHERE\n  { VALUES ?mdg { }\n    GRAPH ?mdg\n      { ?ds  a                     <http://publishmydata.com/def/dataset#Dataset> }\n  }\n")
+  
 
 
   (OpAsQuery/asQuery (Algebra/compile (QueryFactory/create "SELECT ?foo WHERE { ?foo ?bar ?baz . VALUES ?foo {} }")))
