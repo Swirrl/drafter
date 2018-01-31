@@ -1,4 +1,6 @@
-(defproject drafter "2.1.12"
+(def VERSION (or (System/getenv "TRAVIS_TAG") "local-2.1.x-SNAPSHOT"))
+
+(defproject drafter VERSION
   :description "Backend PMD service"
   :url "http://github.com/Swirrl/drafter"
   :license {:name "Proprietary & Commercially Licensed Only"
