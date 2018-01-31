@@ -5,14 +5,20 @@
             [grafter.rdf.protocols :as pr]
             [clojure.java.io :as io]
             [integrant.core :as ig]
-            [clojure.spec.alpha :as s])
+            [clojure.spec.alpha :as s]
+            [clojure.tools.logging :as log])
   (:import org.eclipse.rdf4j.repository.Repository))
 
+(defn drop-all! [repo]
+  (log/debug "Tearing down fixtures")
+  (with-open [conn (repo/->connection repo)]
+    (pr/update! conn "DROP ALL ;")))
 
 (defn load-fixture! [{:keys [repo fixtures format] :as opts}]
   (with-open [conn (repo/->connection repo)]
     (doseq [res-path fixtures]
       (rdf/add conn (rdf/statements res-path :format format))))
+  (log/debug "Loaded fixtures" fixtures)
   (assoc opts :repo repo))
 
 (s/def ::resource #(instance? java.net.URL %)) ;; io/resource creates urls.
@@ -25,8 +31,6 @@
   (s/keys :req-un [::repo ::fixtures]))
 
 (defmethod ig/init-key ::loader [_ opts]
+  (drop-all! (:repo opts))
   (load-fixture! opts))
 
-(defmethod ig/halt-key! ::loader [_ {:keys [repo] :as sys}]
-  (with-open [conn (repo/->connection repo)]
-    (pr/update! conn "DROP ALL ;")))
