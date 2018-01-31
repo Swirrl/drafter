@@ -34,8 +34,6 @@
 (defn assert-is-see-other-response [response]
   (tc/assert-schema see-other-response-schema response))
 
-
-
 (defn valid-swagger-response?
   "Applies handler to request and validates the response against the
   swagger spec for the requested route.
@@ -54,18 +52,21 @@
   ([user display-name description]
    (tc/with-identity user {:uri "/v1/draftsets" :request-method :post :params {:display-name display-name :description description}})))
 
-(tc/deftest-system create-draftset-without-title-or-description
+(tc/deftest-system-with-keys create-draftset-without-title-or-description
+  [:drafter.fixture-data/loader :drafter.feature.draftset.create/handler]
   [{handler :drafter.feature.draftset.create/handler} "test-system.edn"]
   (let [request (tc/with-identity test-editor {:uri "/v1/draftsets" :request-method :post})
         response (valid-swagger-response? handler request)]
     (assert-is-see-other-response response)))
 
-(tc/deftest-system create-draftset-with-title-and-without-description
+(tc/deftest-system-with-keys create-draftset-with-title-and-without-description
+  [:drafter.fixture-data/loader :drafter.feature.draftset.create/handler]
   [{handler :drafter.feature.draftset.create/handler} "test-system.edn"]
   (let [response (valid-swagger-response? handler (create-draftset-request test-editor "Test Title!"))]
     (assert-is-see-other-response response)))
 
-(tc/deftest-system create-draftset-with-title-and-description
+(tc/deftest-system-with-keys create-draftset-with-title-and-description
+  [:drafter.fixture-data/loader :drafter.feature.draftset.create/handler]
   [{handler :drafter.feature.draftset.create/handler} "test-system.edn"]
   (let [response (valid-swagger-response? handler (create-draftset-request test-editor "Test title" "Test description"))]
     (assert-is-see-other-response response)))
