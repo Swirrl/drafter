@@ -2,6 +2,7 @@
   "Testing round tripping through Jena ARC"
   (:require [clojure.java.io :as io]
             [clojure.test :as t]
+            [clojure.string :as str]
             [drafter.rdf.rewriting.arq :as sut]))
 
 (defn load-query [res-path]
@@ -33,4 +34,17 @@
           "Round tripping twice generates same query string")))
 
 (t/deftest rewriting-with-sparql-group-concats
-  (t/is (roundtripable? (load-query "test-queries/group-concat.sparql"))))
+  (t/is (roundtripable? (load-query "test-queries/group-concat.sparql")))
+  (t/is (roundtripable? (load-query "test-queries/empty-values.sparql"))))
+
+(defn normalise-whitespace
+  "Replace all consecutive whitespace with a single space."
+  [q]
+  (str/replace q #"\s+" " "))
+
+(t/deftest preserves-empty-values-blocks
+  (let [normalised-query (normalise-whitespace (load-query "test-queries/empty-values.sparql"))]
+    (t/is (= normalised-query (normalise-whitespace (round-trip-query-string normalised-query)))
+          "Empty Values blocks are preserved")))
+
+

@@ -57,5 +57,14 @@
   (apply-rewriter (partial uri-constant-rewriter {"http://foo.com/" "http://bar.com/"})
                   "SELECT * WHERE { GRAPH <http://foo.com/> { ?s ?p ?o }}")
 
+  (apply-rewriter (partial uri-constant-rewriter {})
+                  "SELECT DISTINCT ?mdg 
+WHERE  {
+  VALUES ?mdg {  }
+         GRAPH ?mdg {
+           ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
+         }
+}")
+
 
 )
