@@ -60,7 +60,7 @@
                  [com.sun.mail/javax.mail "1.6.0"]
                  ;;[com.taoensso/tower "2.0.2"]
 
-                 [grafter "0.11.0-alpha1-SNAPSHOT"]
+                 [grafter "0.11.0-drafter-rdf4j"]
 
                  [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]
