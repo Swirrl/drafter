@@ -27,6 +27,8 @@ before_deploy:
 - mkdir -p dist
 - cp target/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
 - cp target/drafter.jar dist/drafter-private-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar
+- mkdir releases
+- cp target/drafter.jar releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar
 deploy:
   - provider: s3
     access_key_id: AKIAJZVFELTIBDDYV5OQ
@@ -40,3 +42,18 @@ deploy:
     on:
       repo: Swirrl/drafter
       branch: master
+  - provider: releases
+    api_key: "$RELEASE_OAUTH_TOKEN"
+    file: "releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
+    skip_cleanup: true
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+$
+  - provider: releases
+    api_key: "$RELEASE_OAUTH_TOKEN"
+    file: "releases/drafter-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar"
+    prerelease: true
+    skip_cleanup: true
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^[a-z,A-Z]+.*

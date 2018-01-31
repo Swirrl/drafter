@@ -1,0 +1,7 @@
+SELECT DISTINCT ?mdg 
+WHERE  {
+  VALUES ?mdg {  }
+         GRAPH ?mdg {
+           ?ds a <http://publishmydata.com/def/dataset#Dataset> 
+         }
+}

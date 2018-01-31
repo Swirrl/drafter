@@ -4,7 +4,8 @@
 
 A RESTful Clojure web service to support PMD's admin tool in moving data updates between draft and live triple stores.
 
-Be sure to see the [Getting Started Guide](https://github.com/Swirrl/drafter/blob/master/doc/getting-started.org) for how to use Drafter and set up your Dev environment.
+- Using Drafter as part of PMD or otherwise?  Then see the [User Guide](https://github.com/Swirrl/drafter/blob/master/doc/using-drafter.md)
+- Developing on Drafter itself?  Then see the [Getting Started Guide](https://github.com/Swirrl/drafter/blob/master/doc/getting-started.org) for how to use Drafter and set up your Dev environment.
 
 ## Configuring Drafter
 

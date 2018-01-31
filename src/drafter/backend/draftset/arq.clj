@@ -67,7 +67,7 @@
        (.isList i)))
 
 (defn sse-zipper
-  "Construct a zipper on a Sparql SExpression Item, that allows easy persistent
+  "Construct a zipper on a Sparql SExpression Item, that allows easy 
   walking of the sparql algebra tree."
   [sse-item]
   (z/zipper sse-list-item?
@@ -104,15 +104,36 @@
   in the SSE algebra tree, such as the set of prefixes and the query type."
   [rewriter qstr]
 
-  (let [q (sparql-string->arq-query qstr)
-        transform-query (fn [q]
-                          (-> q
-                              ->sse-item
-                              sse-zipper
-                              rewriter
-                              str
-                              (SSE/parseOp (.getPrefixMapping q))
-                              OpAsQuery/asQuery))]
+  (let [q (QueryFactory/create qstr Syntax/syntaxSPARQL_11)
+        ;q (sparql-string->arq-query qstr)
+         transform-query (fn [q]
+                           (-> q
+                               ->sse-item
+                               sse-zipper
+                               rewriter
+                               str
+                               (SSE/parseOp (.getPrefixMapping q))
+                               OpAsQuery/asQuery)
+                           
+                           #_(-> q
+                               ->sse-item
+                               sse-zipper
+                               rewriter
+                              
+                              
+                               org.apache.jena.sparql.sse.builders.BuilderOp/build
+
+
+                             OpAsQuery/asQuery)
+
+                           #_(->> (-> q
+                                    
+                                    Algebra/compile
+                                    sse-zipper)
+                                
+                                rewriter
+                                org.apache.jena.sparql.sse.builders.BuilderOp/build
+                                OpAsQuery/asQuery))]
 
     (doto (cond
             ;; NOTE that to support primitive DESCRIBE queries such as those of
@@ -155,6 +176,14 @@
 
 (comment
 
+  (println (str (->sse-item (sparql-string->arq-query "SELECT DISTINCT ?mdg
+WHERE  {
+ VALUES ?mdg { <urn:val> }
+         GRAPH ?mdg {
+           ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
+         }
+}"))))
+  
   ;; Playing with zippers
 
   (let [item (->sse-item (sparql-string->arq-query "SELECT * WHERE { GRAPH <http://replace-me.com> { ?s ?p ?o } GRAPH <http://bar.com> { ?s ?p ?o } }"))]
@@ -174,34 +203,119 @@
         SSE/parseOp
         OpAsQuery/asQuery))
 
-;; constructs are different...
-(str ( (query->rewritable "PREFIX : <http://foo> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . ?s2 ?p ?o2 }") identity))
+  ;; constructs are different...
+  (str ( (query->rewritable "PREFIX : <http://foo> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . ?s2 ?p ?o2 }") identity))
 
-;; NOTE it returns a SELECT... weird... I think it's because select/construct/ask is decided outside the algebra
-;; => "PREFIX  :     <http://foo>\n\nSELECT  *\nWHERE\n  { ?s ?p ?o .\n    ?s2 ?p ?o2\n  }\n"
+  ;; NOTE it returns a SELECT... weird... I think it's because select/construct/ask is decided outside the algebra
+  ;; => "PREFIX  :     <http://foo>\n\nSELECT  *\nWHERE\n  { ?s ?p ?o .\n    ?s2 ?p ?o2\n  }\n"
 
-;; https://jena.apache.org/documentation/query/algebra.html
+  ;; https://jena.apache.org/documentation/query/algebra.html
 
-;; round tripping from sparql string -> sse algebra -> sparql string
-(-> (QueryFactory/create "PREFIX dcterms: <http://purl.org/dc/terms/> SELECT * WHERE { ?s ?p ?o }")
-    Algebra/compile
-    OpAsQuery/asQuery)
+  ;; round tripping from sparql string -> sse algebra -> sparql string
+  (-> (QueryFactory/create "PREFIX dcterms: <http://purl.org/dc/terms/> SELECT * WHERE { ?s ?p ?o }")
+      Algebra/compile
+      OpAsQuery/asQuery)
 
-(-> (QueryFactory/create "PREFIX dcterms: <http://purl.org/dc/terms/>   SELECT * WHERE { ?s ?p ?o }")
-    Algebra/compile
-    OpAsQuery/asQuery
-    str
-    SSE/parseItem
-    .getList
-    seq)
+  (-> (QueryFactory/create "PREFIX dcterms: <http://purl.org/dc/terms/>   SELECT * WHERE { ?s ?p ?o }")
+      Algebra/compile
+      OpAsQuery/asQuery
+      str
+      SSE/parseItem
+      .getList
+      seq)
 
-(QueryFactory/create "PREFIX : <http://foo> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . ?s2 ?p ?o2 }")
+  (QueryFactory/create "PREFIX : <http://foo> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . ?s2 ?p ?o2 }")
 
-(Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
+  (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
 
-(Algebra/optimize (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }")))
+  (Algebra/optimize (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }")))
 
-(Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
+                  
+  (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
 
-(last (.getList (SSE/parseItem "(graph :foo (bgp (triple ?s ?p ?o)))")))
-)
+  (last (.getList (SSE/parseItem "(graph :foo (bgp (triple ?s ?p ?o)))")))
+
+
+
+  ;; (OpAsQuery/asQuery (drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {} (Algebra/compile (sparql-string->arq-query "SELECT DISTINCT ?mdg 
+  ;; WHERE  {
+  ;;   VALUES ?mdg {  }
+  ;;          GRAPH ?mdg {
+  ;;            ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
+  ;;          }
+  ;; }
+  ;; "))))
+
+  ;; simplified
+  (->> (-> 
+        "SELECT DISTINCT ?mdg
+WHERE  {
+  VALUES ?mdg {  }
+         GRAPH ?mdg {
+           ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
+         }
+}
+"
+        sparql-string->arq-query
+        Algebra/compile
+        sse-zipper
+        )
+       (drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {} )
+       OpAsQuery/asQuery)
+
+
+  (def mdg-query "SELECT DISTINCT ?mdg
+WHERE  {
+  VALUES ?mdg { }
+         GRAPH ?mdg {
+           ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
+         }
+}
+")
+
+  ;; expanded
+  (->> (-> 
+        mdg-query
+        (QueryFactory/create Syntax/syntaxSPARQL_11)
+        Algebra/compile
+        sse-zipper
+        )
+     
+       (drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {} )
+       OpAsQuery/asQuery)
+  ;; above works wtf...
+
+  (-> mdg-query
+      sparql-string->arq-query
+      ->sse-item
+      sse-zipper
+      z/root
+                                        ;#_str
+                                        ;#_(SSE/parseOp (.getPrefixMapping q))
+                                        ;#_OpAsQuery/asQuery
+                              
+                              
+      org.apache.jena.sparql.sse.builders.BuilderOp/build
+
+      OpAsQuery/asQuery)
+
+
+  (-> 
+      (partial drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {})
+      (apply-rewriter "SELECT DISTINCT ?mdg
+WHERE  {
+  VALUES ?mdg { }
+         GRAPH ?mdg {
+           ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
+         }
+}
+")
+      str)
+
+  (println "SELECT DISTINCT  ?mdg\nWHERE\n  { VALUES ?mdg { }\n    GRAPH ?mdg\n      { ?ds  a                     <http://publishmydata.com/def/dataset#Dataset> }\n  }\n")
+  
+
+
+  (OpAsQuery/asQuery (Algebra/compile (QueryFactory/create "SELECT ?foo WHERE { ?foo ?bar ?baz . VALUES ?foo {} }")))
+  
+  )
