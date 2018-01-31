@@ -15,6 +15,11 @@
   ;;                             :passphrase :env
   ;;                             :snapshots false}]]
 
+  :repositories [["apache-dev" {:url "https://repository.apache.org/content/repositories/snapshots/"
+                                :releases false}]
+                 
+                 ]
+  
   :classifiers {:prod :prod
                 :dev :dev}
 
@@ -53,23 +58,21 @@
 
                  [metosin/ring-swagger-ui "2.2.10"]
                  
-                 ;;
-                 ;; Bump JENA to 3.7.0-SNAPSHOT based on this commit: 
+                 ;; Use JENA for our query rewriting
+
+               
+                 ;; Lock JENA to a specific 3.7.0-SNAPSHOT based on this commit: 
                  ;; https://github.com/afs/jena/tree/2586abf09751fd962ca7afe25d4ab3d9431ce716
                  ;;
-                 ;; To test upstream fixes for https://issues.apache.org/jira/browse/JENA-1468
-                 ;;
-                 ;; When this patch gets deployed to mainline jena we should be able to
-                 ;; revert: https://github.com/Swirrl/publish_my_data_2/pull/763
-                 ;; 
-                 ;; Use JENA for our query rewriting
-                 [org.apache.jena/jena-arq "3.7.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api
-                                                                org.slf4j/jcl-over-slf4j
-                                                                org.apache.httpcomponents/httpclient]]
-                 [org.apache.jena/jena-base "3.7.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-core "3.7.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-iri "3.7.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
+                 ;; We should update these deps when 3.7.0 is released.
+                 [org.apache.jena/jena-arq "3.7.0-20180131.100034-17" :exclusions [org.slf4j/slf4j-api
+                                                                                   org.slf4j/jcl-over-slf4j
+                                                                                   org.apache.httpcomponents/httpclient]]
+                 [org.apache.jena/jena-base "3.7.0-20180131.095758-17" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-core "3.7.0-20180131.095918-17" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-iri "3.7.0-20180131.095726-17" :exclusions [org.slf4j/slf4j-api]]
                  
+
                  [org.mindrot/jbcrypt "0.4"]
 
                  [org.slf4j/slf4j-log4j12 "1.7.25" :exclusions [log4j org.slf4j/slf4j-api]]
