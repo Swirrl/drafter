@@ -40,3 +40,10 @@ deploy:
     on:
       repo: Swirrl/drafter
       branch: master
+  - provider: releases
+    api_key: "$RELEASE_OAUTH_TOKEN"
+    file: "target/drafter.jar"
+    skip_cleanup: true
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+$
