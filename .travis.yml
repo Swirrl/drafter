@@ -27,6 +27,8 @@ before_deploy:
 - mkdir -p dist
 - cp target/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
 - cp target/drafter.jar dist/drafter-private-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar
+- mkdir releases
+- cp target/drafter.jar releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar
 deploy:
   - provider: s3
     access_key_id: AKIAJZVFELTIBDDYV5OQ
@@ -42,7 +44,7 @@ deploy:
       branch: master
   - provider: releases
     api_key: "$RELEASE_OAUTH_TOKEN"
-    file: "target/drafter.jar"
+    file: "releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
     skip_cleanup: true
     on:
       tags: true
