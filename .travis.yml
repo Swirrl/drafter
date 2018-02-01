@@ -7,7 +7,7 @@ services:
   - mongodb
 env:
   global:
-  - STARDOG_VERSION='stardog-4.1.2'
+  - STARDOG_VERSION='stardog-5.2.0'
 before_install:
 - "sudo ./travis/install_base.sh"  
 - "sudo ./travis/bootstrap_stardog.sh"
