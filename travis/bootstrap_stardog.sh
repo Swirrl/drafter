@@ -13,8 +13,7 @@ echo "> Stardog home: $STARDOG_HOME"
 
 echo '> Downloading and unzipping Stardog...'
 cd /opt/stardog/releases
-sudo curl -O https://stardog-versions.s3.amazonaws.com/$STARDOG_VERSION.zip
-sudo unzip $STARDOG_VERSION.zip
+curl -O https://stardog-versions.s3.amazonaws.com/$STARDOG_VERSION.zip --negotiate --user 'swirrldev:)B^G[T$5%jxt`W4P'
 unzip $STARDOG_VERSION.zip
 cd $WORKING_DIR
 
