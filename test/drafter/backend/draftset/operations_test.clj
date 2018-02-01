@@ -179,7 +179,7 @@
         (make-graph-live! *test-backend* live-graph initial-time-fn) ;; note this isn't actual a publish operation it's just setting up stategraph state
 
         (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples (URI. "http://subject")) draftset-id initial-time-fn)
-              fetch-modified (fn [repo graph-uri] (:modified (first (repo/query (repo/->connection repo) (format "SELECT ?modified WHERE { <%s> dcterms:modified ?modified .}" graph-uri)))))
+              fetch-modified (fn [repo graph-uri] (:modified (first (repo/query (repo/->connection repo) (format "SELECT ?modified WHERE { <%s> <http://purl.org/dc/terms/modified> ?modified .}" graph-uri)))))
               initially-modified-at (fetch-modified *test-backend* live-graph)]
                                                                                                                                   
           (is (mgmth/draft-exists? *test-backend* draft-graph))
