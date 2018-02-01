@@ -30,7 +30,7 @@ deploy:
     skip_cleanup: true
     on:
       repo: Swirrl/drafter
-      branch: master
+      all_branches: true
   - provider: releases
     api_key: "$RELEASE_OAUTH_TOKEN"
     file: "releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
