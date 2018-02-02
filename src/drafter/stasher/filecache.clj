@@ -219,7 +219,7 @@
                       :backend-tuple-format default-cache-tuple-format
                       :backend-boolean-format default-cache-boolean-format}
         
-        {:keys [dir base-cache] :as opts} (merge opts default-opts)]
+        {:keys [dir base-cache] :as opts} (merge default-opts opts)]
     (fs/mkdir dir)
     (fs/mkdir (io/file dir "tmp"))
     (FileCache. base-cache opts)))
