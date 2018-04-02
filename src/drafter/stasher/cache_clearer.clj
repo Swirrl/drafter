@@ -47,42 +47,84 @@
         sorted (sort-by first items-with-diffs)]
     (map second sorted)))
 
+(defn within-threshold? [target i]
+  (let [threshold 0.1]
+    (if (<= (- target (* threshold target))
+            i
+            (+ target (* threshold target)))
+      i)))
+
+(defn close-enough? [target items]
+  (let [threshold 0.1]
+    (->> items
+         (filter
+          #(within-threshold? target %)))))
+
+#_(defn- find-close-match [target-quota items-a items-b items-c]
+  (let [i (atom 0)]
+    (->> (for [a items-a
+               b items-b
+               c items-c
+               :when (= 3 (count (hash-set a b c)))
+               items (com/partitions [a b c])
+               item items
+               
+               :when (within-threshold? target-quota (sum item))
+               
+               ]
+           
+           item)
+         
+         (take 5)
+         (sort-by count (comparator <))
+         first)))
+
+(defn- find-close-match [target-quota groups]
+  (->> (for [group groups
+             partitions (sort-by count (comparator >) (com/partitions group))
+             item partitions
+             :when (within-threshold? target-quota (sum item))]
+         item)
+       
+       first)
+  
+  #_(reduce (fn [acc [a b c]]
+              (if (= 3 (count (hash-set a b c)))
+                (concat acc (for [item-group (sort-by count (comparator >) (com/partitions [a b c]))
+                                  item item-group
+                                  :when (within-threshold? target-quota (sum item))]
+                              item))
+                acc)) [])
+  
+  )
+
 (defn cull [target-quota items]
-  (let [[nearest-item & rest-items] (sorted-by-distance target-quota items)]
-    (if nearest-item
-      (let [diff-remaining (- target-quota nearest-item)]
-        (cond
-          (= 0 diff-remaining)
-          [nearest-item]
-          (neg? diff-remaining)
-          [nearest-item]
-          :else
-          (cons nearest-item (cull diff-remaining
-                                   rest-items))))
-      [])))
+  (let [sample-1 (random-sample 0.1 items)
+        sample-2 (random-sample 0.1 items)
+        sample-3 (random-sample 0.1 items)
+        sample-4 (random-sample 0.1 items)
+        sample-5 (random-sample 0.1 items)]
+    (find-close-match target-quota (map vector sample-1 sample-2 sample-3 sample-4 sample-5)))
+  #_(let [[nearest-item & rest-items] (sorted-by-distance target-quota items)]
+     (if nearest-item
+       (let [diff-remaining (- target-quota nearest-item)]
+         (cond
+           #_(= 0 diff-remaining)
+           #_[nearest-item]
+           (neg? diff-remaining)
+           [nearest-item :neg]
+           ;; (pos? diff-remaining)
+           :else
 
+           (let [sample-1 (random-sample 0.1 items)
+                 sample-2 (random-sample 0.1 items)
+                 sample-3 (random-sample 0.1 items)]
+             (find-close-match target-quota sample-1 sample-2 sample-3))
+           
+           ))
+       
+       [])))
 
-#_(defn select-items-to-cull
-  "Sum weight of items, if the total is more than the allowed quota
-  select a random sample of the items at a probability P "
-  ([quota items] (select-items-to-cull quota items 0.1))
-  ([quota items probability]
-   (println probability)
-   (let [total-size (reduce + items)
-         diff (Math/abs (- quota total-size))]
-     (if (> total-size quota)
-       (let [sample (random-sample probability items)
-             quantity (reduce + sample)
-             sample-big-enough-for-cull? (>= quantity diff)]
-         (if sample-big-enough-for-cull?
-           (let [batch (smallest-batch diff sample)
-                 batch-size (reduce + batch)
-                 batch-big-enough-for-cull? (>= batch-size diff)]
-             (if batch-big-enough-for-cull?
-               batch
-               (select-items-to-cull quota items (+ 0.1 probability)) ;; try again with a bigger sample probability
-               ))
-           (select-items-to-cull quota items (+ 0.1 probability))))))))
 
 
 
@@ -90,6 +132,8 @@
 
 
   (def test-data [3 2 1 4 2 3 5 6 7 3 4])  ;; total-size 40
+
+  (def test-data (take 1000000 (repeatedly (partial rand-int 500))))
   
   (def target-size 30)
 
