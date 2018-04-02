@@ -17,25 +17,13 @@
 (defmethod ig/init-key :drafter.stasher/cache-clearer [_ opts]
   )
 
-#_(defn smallest-batch [target-quota items]
-  (let [items (sort (comparator >) items)]
-    (:items (reduce (fn [{:keys [sum items] :as acc} i]
-                     (cond
-                       (>= sum target-quota) (reduced acc)
-                       :else (-> acc
-                                 (update :items #(conj % i))
-                                 (update :sum + i))))
-                    {:sum 0 :items []} items))))
-
 (defn diff [a b]
   (Math/abs (- a b)))
 
 (defn sum [items]
   (reduce + items))
 
-
-
-(defn sorted-by-distance
+#_(defn sorted-by-distance
   "Given a target integer and a seq of items return the items sorted
   by their difference from the target.
 
@@ -47,83 +35,63 @@
         sorted (sort-by first items-with-diffs)]
     (map second sorted)))
 
-(defn within-threshold? [target i]
-  (let [threshold 0.1]
-    (if (<= (- target (* threshold target))
-            i
-            (+ target (* threshold target)))
-      i)))
+(def threshold 0.1)
 
-(defn close-enough? [target items]
+(defn within-threshold? [target i]
+  (if (<= (- target (* threshold target))
+          i
+          (+ target (* threshold target)))
+    i))
+
+#_(defn close-enough? [target items]
   (let [threshold 0.1]
     (->> items
          (filter
           #(within-threshold? target %)))))
 
-#_(defn- find-close-match [target-quota items-a items-b items-c]
-  (let [i (atom 0)]
-    (->> (for [a items-a
-               b items-b
-               c items-c
-               :when (= 3 (count (hash-set a b c)))
-               items (com/partitions [a b c])
-               item items
-               
-               :when (within-threshold? target-quota (sum item))
-               
-               ]
-           
-           item)
-         
-         (take 5)
-         (sort-by count (comparator <))
-         first)))
-
-(defn- find-close-match [target-quota groups]
-  (->> (for [group groups
+(defn- find-close-match
+  "Returns the closest match it can find using within-threshold?  A
+  match may be one or many items that sum to within-threshold?"
+  [target-quota things]
+  (->> (for [thing things ;;todo tidy names up here
+             group thing
              partitions (sort-by count (comparator >) (com/partitions group))
              item partitions
              :when (within-threshold? target-quota (sum item))]
          item)
-       
-       first)
-  
-  #_(reduce (fn [acc [a b c]]
-              (if (= 3 (count (hash-set a b c)))
-                (concat acc (for [item-group (sort-by count (comparator >) (com/partitions [a b c]))
-                                  item item-group
-                                  :when (within-threshold? target-quota (sum item))]
-                              item))
-                acc)) [])
-  
-  )
+       first))
 
-(defn cull [target-quota items]
-  (let [sample-1 (random-sample 0.1 items)
-        sample-2 (random-sample 0.1 items)
-        sample-3 (random-sample 0.1 items)
-        sample-4 (random-sample 0.1 items)
-        sample-5 (random-sample 0.1 items)]
-    (find-close-match target-quota (map vector sample-1 sample-2 sample-3 sample-4 sample-5)))
-  #_(let [[nearest-item & rest-items] (sorted-by-distance target-quota items)]
-     (if nearest-item
-       (let [diff-remaining (- target-quota nearest-item)]
-         (cond
-           #_(= 0 diff-remaining)
-           #_[nearest-item]
-           (neg? diff-remaining)
-           [nearest-item :neg]
-           ;; (pos? diff-remaining)
-           :else
+(def max-group-size 100)
 
-           (let [sample-1 (random-sample 0.1 items)
-                 sample-2 (random-sample 0.1 items)
-                 sample-3 (random-sample 0.1 items)]
-             (find-close-match target-quota sample-1 sample-2 sample-3))
-           
-           ))
-       
-       [])))
+(defn create-groupings
+  "Group items and return an ordered list of things to try.  First we
+  try groups of size 1, then 2, 3, 4 up to max-group-size.  This gives
+  us opportunities for finding items to cull by culling multiple
+  items.
+
+  The probability of an item being in a group gets less as the groups
+  grow (This may/may-not be a good idea or)"
+  ([items]
+   (create-groupings 1 0.8 items))
+  ([gsize prob items]
+   (println gsize)
+   (if (= max-group-size
+          gsize)
+     []
+     (let [total (count items)]
+       (cons (partition gsize (random-sample prob items))
+               (lazy-seq (create-groupings (inc gsize)
+                                           (- prob 0.01)
+                                           items)))))))
+
+(defn cull
+  "Attempt to bring the items within a threshold/margin (currently
+  10%) of the target-quota by selecting a set of items to delete.
+
+  Returns the seq of items to remove."
+  [target-quota items]
+  (let [groups (create-groupings items)]
+    (find-close-match target-quota groups)))
 
 
 
@@ -133,7 +101,7 @@
 
   (def test-data [3 2 1 4 2 3 5 6 7 3 4])  ;; total-size 40
 
-  (def test-data (take 1000000 (repeatedly (partial rand-int 500))))
+  (def test-data (take 1e6 (repeatedly (partial rand-int 500))))
   
   (def target-size 30)
 
