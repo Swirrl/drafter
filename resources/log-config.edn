@@ -1,5 +1,5 @@
 (let [console (org.apache.log4j.ConsoleAppender. (org.apache.log4j.EnhancedPatternLayout. "%d{ISO8601} %-5p %20.20c{1} %12X{jobId} %12X{reqId} :: %m%n"))]
-  (set-loggers!
+  (clj-logging-config.log4j/set-loggers!
    ["org.openrdf" "drafter"]
    {:name "drafter"
     :level :warn
