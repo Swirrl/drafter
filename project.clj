@@ -96,7 +96,8 @@
                  [ring/ring-core "1.6.2"]
                  ;;[selmer "0.6.9"]
                  [swirrl/lib-swirrl-server "0.6.3" :exclusions [clout org.clojure/java.classpath]]
-                 [wrap-verbs "0.1.1"]]
+                 [wrap-verbs "0.1.1"]
+                 [clojurewerkz/statistiker "0.1.0-SNAPSHOT"]]
 
   ;; Ensure we build the java sub project source code too!
   :java-source-paths ["src-java/drafter_sparql_repository/src/main/java"]
