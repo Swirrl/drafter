@@ -12,7 +12,7 @@
           '[org.apache.log4j.helpers DateLayout]
           '[java.util UUID])
 
-  (require '[clj-logging-config.log4j :refer [set-loggers!]]
+  (require '[clj-logging-config.log4j]
            'drafter.errors))
 
 (defn- load-logging-configuration [config-file]
