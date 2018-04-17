@@ -68,7 +68,7 @@
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
 
                  [metosin/ring-swagger-ui "2.2.10"]
-                 
+
                  ;; Use JENA for our query rewriting
                  ;; Use private release of Jena based on commit 44b478ea8637ca16035e56ef49d6cb6e59abc289
                  ;; See https://github.com/Swirrl/drafter/issues/270
