@@ -3,7 +3,8 @@
             [clojure.test :as t]
             [me.raynes.fs :as fs]
             [clojure.core.cache :as cache]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [drafter.stasher.cache-key :as ck]))
 
 (def test-path (fs/file "tmp" "filecache-test"))
 
@@ -49,17 +50,29 @@
                      (cache/miss cache {:query-type :invalid-query-type} (io/file test-path "test.file")))))
     
     (t/testing "Not found"
-      (t/is (nil? (cache/lookup cache {:query-type :tuple :an :un :cached :key })))
-      (t/is (= :not-found (cache/lookup cache {:query-type :graph :an :un :cached :key } :not-found))))
+      (let [uncached-key (ck/map->CacheKey
+                          {:query-type :tuple
+                           :query-str "an uncached query"
+                           :dataset {:default-graphs #{}
+                                     :named-graphs #{}}
+                           :modified-times {}})]
+        (t/is (nil? (cache/lookup cache uncached-key)))
+        (t/is (= :not-found (cache/lookup cache uncached-key :not-found)))))
 
 
     (t/testing "Add & retrieve file from cache"
       (let [temp-file (create-temp-file!)
-            cache (assoc cache {:query-type :graph :cache :me} temp-file)])
+            cache-key (ck/map->CacheKey
+                       {:query-type :tuple
+                        :query-str "cache me"
+                        :dataset {:default-graphs #{}
+                                  :named-graphs #{}}
+                        :modified-times {}})
+            cache (assoc cache cache-key temp-file)]
 
-      (t/is (instance? java.io.File (cache/lookup cache {:query-type :graph :cache :me}))
-            "File should be in cache under the {:cache :me} key")
+        (t/is (instance? java.io.File (cache/lookup cache cache-key))
+              "File should be in cache under the {:cache :me} key")
 
-      (t/testing "Evict key from cache"
-        (t/is (nil? (-> (cache/evict cache {:query-type :graph :cache :me})
-                        (cache/lookup {:query-type :graph :cache :me}))))))))
+        (t/testing "Evict key from cache"
+          (t/is (nil? (-> (cache/evict cache cache-key)
+                          (cache/lookup cache-key)))))))))

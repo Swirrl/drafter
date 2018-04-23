@@ -2,17 +2,11 @@
  
  :drafter/logging {:config "./test/resources/log-config.edn"}
  
- :drafter.stasher-test/stub-cache-key-generator {}
-
  :drafter.stasher/cache-thread-pool {}
  
  :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/filecache
                         :sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
                         :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"
-                        ;; This is needed for this test to override
-                        ;; the default generator with something more
-                        ;; simple/predictable.
-                        :cache-key-generator #ig/ref :drafter.stasher-test/stub-cache-key-generator
                         :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
 
  :drafter.stasher/filecache {:persist-on-shutdown? false ;; delete cache on shutdown (for tests)
