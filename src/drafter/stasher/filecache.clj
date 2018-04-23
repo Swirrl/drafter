@@ -6,7 +6,8 @@
             [grafter.rdf4j.formats :as fmt]
             [grafter.rdf4j.io :as gio]
             [integrant.core :as ig]
-            [me.raynes.fs :as fs])
+            [me.raynes.fs :as fs]
+            [drafter.stasher.cache-key :as ck])
   (:import java.io.File
            java.security.MessageDigest
            org.apache.commons.codec.binary.Hex
@@ -132,9 +133,6 @@
      (apply io/file (conj sub-dirs (str hash-key "." (name fmt-extension)))))))
 
 
-(s/def ::query-type #{:graph :tuple :boolean})
-(s/def ::cache-key (s/keys :req-un [::query-type]))
-
 (defn assert-spec! [spec value]
   (when-not (s/valid? spec value)
     (throw (ex-info (str "Attempt to put an invalid entry in the stasher query cache.  "
@@ -143,7 +141,7 @@
 
 (defn cache-key->cache-path
   [cache cache-key]
-  (assert-spec! ::cache-key cache-key)
+  (assert-spec! ::ck/cache-key cache-key)
   (let [fmt (backend-format cache cache-key)
         hash-key (hash-key->file-path (cache-key->hash-key cache-key) fmt)]
     (io/file (:dir (.opts cache)) hash-key)))

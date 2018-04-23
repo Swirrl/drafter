@@ -24,41 +24,36 @@
 
 (def test-triples [(rdf/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
 
-(defn stub-cache-key-generator [query-type cache query-str dataset {repo :raw-repo :as context}]
-  ;; Use minimal cache key of query-type and the query-str for
-  ;; stasher-repo-test-return-cache-hit test
-  {:query-type query-type
-   :query-str query-str})
-
 (defmethod ig/init-key ::stub-cache-key-generator [_ opts]
-  stub-cache-key-generator)
+  sut/generate-drafter-cache-key)
 
 (defn- sneak-rdf-file-into-cache!
   "Force the creation of an entry in the cache via the backdoor "
-  [cache query-string]
+  [cache repo dataset query-string]
   (let [tf (java.io.File/createTempFile "drafter.stasher.filecache-test" ".tmp")
         ;; use the ::stub-cache-key-generator
-        cache-key (stub-cache-key-generator :graph cache query-string nil {})] 
+        cache-key (sut/generate-drafter-cache-key :graph cache query-string dataset {:raw-repo repo})] 
 
     (rdf/add (gio/rdf-writer tf :format (fc/backend-rdf-format cache))
              test-triples)
-    
+
     ;; move file in to cache
     (cache/miss cache cache-key tf)))
 
 (def basic-construct-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . }")
 
 (deftest-system stasher-repo-return-cache-hit-test
-  [{:keys [drafter.stasher/repo drafter.stasher/filecache]}  "drafter/stasher-test/stasher-repo-return-cache-hit-test.edn"]
+  [{:keys [drafter.stasher/repo drafter.stasher/filecache]}
+   "drafter/stasher-test/stasher-repo-return-cache-hit-test.edn"]
   (t/testing "Querying a cached value returns the cached RDF"
-    ;; sneak a file in to the cache via the backdoor - mutable file system muuhahahaha!!
-    (let [cache-key basic-construct-query]
+    (let [dataset (SimpleDataset.)
+          query-str basic-construct-query]
 
-      ;; TODO generalise this to work with SELECT/BOOLEANs
-      (sneak-rdf-file-into-cache! filecache cache-key)
-      
+      (sneak-rdf-file-into-cache! filecache repo dataset query-str)
+
       (t/is (= test-triples
-               (repo/query (repo/->connection repo) basic-construct-query))))))
+               (repo/query (repo/->connection repo) query-str))))))
+
 
 (defmulti parse-query-type type)
 
@@ -103,6 +98,8 @@
     (t/testing "Prove the file that was written to the cache is the same as the fixture data that went in"
       (t/is (= (set (box-result cached-file-statements))
                (set (box-result expected-data)))))))
+
+
 
 (defn assert-caches-query [cached-repo uncached-repo cache query-str expected-data]
   (t/testing "Cached & uncached queries return expected data and expected data is stored in the cache"
@@ -257,7 +254,7 @@
       ;; that .evaluate interface doesn't exist in RDF4j.
       )))
 
-(t/deftest dataset->edn-test
+(t/deftest dataset->graph-edn-test
   (let [ds-1 (doto (SimpleDataset.)
                (.addNamedGraph (URIImpl. "http://foo"))
                (.addNamedGraph (URIImpl. "http://bar"))
@@ -269,9 +266,9 @@
                (.addNamedGraph (URIImpl. "http://foo"))
                (.addDefaultGraph (URIImpl. "http://foo")))]
 
-    (t/testing "dataset->edn prints same value irrespective of assembly order"
-      (t/is (= (pr-str (sut/dataset->edn ds-1))
-               (pr-str (sut/dataset->edn ds-2)))))))
+    (t/testing "dataset->graphs, graphs->edn prints same value irrespective of assembly order"
+      (t/is (= (pr-str (sut/graphs->edn (sut/dataset->graphs ds-1)))
+               (pr-str (sut/graphs->edn (sut/dataset->graphs ds-2))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Drafter State Graph Stashing
@@ -289,7 +286,6 @@
 
 (def ds-1-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
 (def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
-
 (def ds-1 "draftset-1 is made of dg-1 dg-2" #{ds-1-dg-1 ds-1-dg-2})
 
 (def ds-1-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
@@ -303,6 +299,7 @@
 (def ds-2-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
   {:draftmod #inst "2017-05-05T05:05:05.000-00:00"})
 
+
 (defn edn->dataset [{:keys [default-graphs named-graphs]}]
   (reduce (fn [dataset graph]
             (doto dataset
@@ -315,27 +312,28 @@
           (SimpleDataset.)
           (concat default-graphs named-graphs)))
 
+
 (deftest-system fetch-modified-state-test
   ;; Here we're just testing the underlying modified time queries, so we do
   ;; so on a standard RDF4j repo, not a stasher/caching one.
-  [{repo :drafter.backend/rdf4j-repo} "drafter/stasher-test/drafter-state-1.edn"]  
+  [{repo :drafter.backend/rdf4j-repo} "drafter/stasher-test/drafter-state-1.edn"]
 
   (t/testing "Fetching draftset modified times"
     (t/is (= ds-1-most-recently-modified
-             (sut/fetch-modified-state repo (edn->dataset {:named-graphs ds-1 :default-graphs ds-1}))))
+             (sut/fetch-modified-state repo {:named-graphs ds-1 :default-graphs ds-1})))
 
     (t/is (= ds-2-most-recently-modified
-             (sut/fetch-modified-state repo (edn->dataset {:named-graphs ds-2 :default-graphs ds-2})))))
+             (sut/fetch-modified-state repo {:named-graphs ds-2 :default-graphs ds-2}))))
 
   (t/testing "Fetching live graph modified times"
     (t/is (= liveset-most-recently-modified
-             (sut/fetch-modified-state repo (edn->dataset {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]})))))
+             (sut/fetch-modified-state repo {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]}))))
 
     (t/testing "Fetching draftsets with union-with-live set"
       ;; Union with live is at this low level equivalent to merging the
       ;; set of live graphs in to :named-graphs and :default-graphs.
       (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
-            dataset (edn->dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live})]
+            dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}]
         (t/is (= (merge liveset-most-recently-modified
                         ds-1-most-recently-modified)
                  (sut/fetch-modified-state repo dataset))))))
@@ -350,8 +348,8 @@
     
     (let [{:keys [dataset query-str modified-times]} result]
       (t/is (= 
-             {:default-graphs ["http://live-and-ds1-and-ds2" "http://live-only"],
-              :named-graphs ["http://live-and-ds1-and-ds2" "http://live-only"]}
+             {:default-graphs #{"http://live-and-ds1-and-ds2" "http://live-only"},
+              :named-graphs #{"http://live-and-ds1-and-ds2" "http://live-only"}}
              dataset))
       (t/is (= basic-construct-query
                query-str))

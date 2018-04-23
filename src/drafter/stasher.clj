@@ -3,6 +3,7 @@
             [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
             [drafter.stasher.filecache :as fc]
+            [drafter.stasher.cache-key :as ck]
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf4j.sparql :as sparql]
             [integrant.core :as ig]
@@ -11,6 +12,7 @@
            java.nio.charset.Charset
            org.eclipse.rdf4j.query.impl.BackgroundGraphResult
            org.eclipse.rdf4j.query.QueryLanguage
+           org.eclipse.rdf4j.query.Dataset
            org.eclipse.rdf4j.query.resultio.helpers.BackgroundTupleResult
            org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery)
@@ -43,29 +45,36 @@
 (defmethod ig/halt-key! ::cache-thread-pool [k thread-pool]
   (.shutdown thread-pool))
 
-(defn dataset->edn
-  "Convert a Dataset object into a clojure value with consistent print
+(defn dataset->graphs
+  "Extract graphs from the dataset"
+  [?dataset]
+  (when ?dataset
+    {:default-graphs (.getDefaultGraphs ?dataset)
+     :named-graphs (.getNamedGraphs ?dataset)}))
+
+(defn graphs->edn
+  "Convert Graphs objects into a clojure value with consistent print
   order, so it's suitable for hashing."
-  [dataset]
-  (when dataset
-    {:default-graphs (sort (map str (.getDefaultGraphs dataset)))
-     :named-graphs (sort (map str (.getNamedGraphs dataset)))}))
+  [{:keys [default-graphs named-graphs] :as graphs}]
+  {:default-graphs (set (map str default-graphs))
+   :named-graphs (set (map str named-graphs))})
 
-(defn fetch-modified-state [repo dataset]
-  (let [values {:graph (set (when dataset (concat (.getDefaultGraphs dataset)
-                                                  (.getNamedGraphs dataset))))}]
+(defn fetch-modified-state [repo {:keys [named-graphs default-graphs] :as graphs}]
+  (let [values {:graph (set (concat default-graphs named-graphs))}]
     (with-open [conn (repo/->connection repo)]
-      (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn))))))
+      (first (sparql/query "drafter/stasher/modified-state.sparql" values conn)))))
 
-(defn generate-drafter-cache-key [query-type _cache query-str dataset {raw-repo :raw-repo :as context}]
-  (let [modified-state (fetch-modified-state raw-repo dataset)
-        dataset-value (dataset->edn dataset)]
-
-    (let [k {:dataset dataset-value
-             :query-type query-type  ;; This is the only field required by the file-cache in the cache-key
-             :query-str query-str
-             :modified-times modified-state}]
-      k)))
+(defn generate-drafter-cache-key [query-type _cache query-str ?dataset {raw-repo :raw-repo :as context}]
+  {:pre [(or (instance? Dataset ?dataset)
+             ;; What does it mean when there is no dataset?
+             (nil? ?dataset))]
+   :post [(s/valid? ::ck/cache-key %)]}
+  (let [graphs (dataset->graphs ?dataset)
+        modified-state (fetch-modified-state raw-repo graphs)]
+    (ck/map->CacheKey {:dataset (graphs->edn graphs)
+                       :query-type query-type
+                       :query-str query-str
+                       :modified-times modified-state})))
 
 (defn fetch-cache-parser-and-stream
   "Given a cache and a cache key/query lookup the cached item and
