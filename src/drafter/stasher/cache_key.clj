@@ -1,7 +1,6 @@
 (ns drafter.stasher.cache-key
   (:require [clojure.spec.alpha :as s]))
 
-(defrecord CacheKey [dataset query-type query-str modified-times])
 
 (s/def ::livemod inst?)
 (s/def ::draftmod inst?)
@@ -15,24 +14,36 @@
   (s/keys :req-un [::dataset ::query-type ::query-str]
           :opt-un [::modified-times]))
 
+(defn static-component [cache-key]
+  {:pre [(s/valid? ::cache-key cache-key)]}
+  (-> (dissoc cache-key :modified-times)
+      (update-in [:dataset] (comp sort (partial apply into) vals))
+      sort))
+
+(defn time-component [cache-key]
+  {:pre [(s/valid? ::cache-key cache-key)]}
+  (let [{:keys [livemod draftmod]} (:modified-times cache-key)]
+    (str (or (some-> livemod inst-ms) "empty")
+         (and draftmod
+              (str "-" (inst-ms draftmod))))))
+
+
 (comment
 
   (s/explain-str ::cache-key
-                 (map->CacheKey
-                  {:dataset {:default-graphs #{}
-                             :named-graphs #{}}
-                   :query-type :tuple
-                   :query-str "select adf"
-                   :modified-times {:livemod #inst "2018-04-16T16:23:18.000-00:00"
-                                    :draftmod #inst "2018-04-16T16:23:18.000-00:00"}}))
+                 {:dataset {:default-graphs #{}
+                            :named-graphs #{}}
+                  :query-type :tuple
+                  :query-str "select adf"
+                  :modified-times {:livemod #inst "2018-04-16T16:23:18.000-00:00"
+                                   :draftmod #inst "2018-04-16T16:23:18.000-00:00"}})
 
   (s/explain-str ::cache-key
-                 (map->CacheKey
-                  {:dataset {:default-graphs #{}
-                             :named-graphs #{}}
-                   :query-type :tuple
-                   :query-str "select adf"
-                   :modified-times {}}))
+                 {:dataset {:default-graphs #{}
+                            :named-graphs #{}}
+                  :query-type :tuple
+                  :query-str "select adf"
+                  :modified-times {}})
 
 
 
