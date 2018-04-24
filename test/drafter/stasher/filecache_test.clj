@@ -76,9 +76,9 @@
     (t/testing "Not found"
       (let [uncached-key {:query-type :tuple
                           :query-str "an uncached query"
-                          :dataset {:default-graphs #{}
+                          :dataset {:default-graphs #{"http://graphs/test-graph"}
                                     :named-graphs #{}}
-                          :modified-times {}}]
+                          :modified-times {:livemod #inst "2017-02-02T02:02:02.000-00:00"}}]
         (t/is (nil? (cache/lookup cache uncached-key)))
         (t/is (= :not-found (cache/lookup cache uncached-key :not-found)))))
 
@@ -87,7 +87,7 @@
       (let [temp-file (create-temp-file!)
             cache-key {:query-type :tuple
                        :query-str "cache me"
-                       :dataset {:default-graphs #{}
+                       :dataset {:default-graphs #{"http://graphs/test-graph"}
                                  :named-graphs #{}}
                        :modified-times {}}
             cache (assoc cache cache-key temp-file)]
@@ -98,3 +98,52 @@
         (t/testing "Evict key from cache"
           (t/is (nil? (-> (cache/evict cache cache-key)
                           (cache/lookup cache-key)))))))))
+
+(t/deftest store-last-modified-on-cache-hit
+  ;; These test require a few workarounds for filesystems that do not store ms
+  ;; precision on the last modified stamp.
+  (let [cache (sut/file-cache-factory {:dir "tmp/test-stasher-cache"
+                                       :backend-rdf-format :test})
+        ->sec (fn [ms]
+                (.toSeconds java.util.concurrent.TimeUnit/MILLISECONDS ms))]
+    (t/testing "Cache miss sets last access to now (more or less)"
+      (let [cache-key {:query-type :tuple
+                       :query-str "stored entries have a last access set"
+                       :dataset {:default-graphs #{"http://graphs/test-graph"}
+                                 :named-graphs #{}}
+                       :modified-times {:livemod #inst "2017-02-02T02:02:02.000-00:00"}}]
+        (let [before-ms (System/currentTimeMillis)
+              _ (cache/miss cache cache-key (create-temp-file!))
+              last-access-ms (sut/last-accessed-time (sut/cache-key->cache-path cache cache-key))
+              after-ms (System/currentTimeMillis)]
+          (t/is (<= (->sec before-ms)
+                    (->sec last-access-ms)
+                    (->sec after-ms))))))
+    (t/testing "Cache hit bumps the last access time"
+      (let [cache-key {:query-type :tuple
+                       :query-str "cache hit bumps access time"
+                       :dataset {:default-graphs #{"http://graphs/test-graph"}
+                                 :named-graphs #{}}
+                       :modified-times {:livemod #inst "2017-02-02T02:02:02.000-00:00"}}
+            fake-last-access-time (- (System/currentTimeMillis) 10000)]
+        (cache/miss cache cache-key (create-temp-file!))
+        (fs/touch (sut/cache-key->cache-path cache cache-key) fake-last-access-time)
+        (t/is (= (->sec fake-last-access-time)
+                 (->sec (sut/last-accessed-time (sut/cache-key->cache-path cache cache-key)))))
+        (cache/hit cache cache-key)
+        (t/is (< fake-last-access-time
+                 (sut/last-accessed-time (sut/cache-key->cache-path cache cache-key))))))
+    (t/testing "Cache lookup bumps the last access time"
+      (let [cache-key {:query-type :tuple
+                       :query-str "cache lookup bumps access time"
+                       :dataset {:default-graphs #{"http://graphs/test-graph"}
+                                 :named-graphs #{}}
+                       :modified-times {:livemod #inst "2017-02-02T02:02:02.000-00:00"}}
+            fake-last-access-time (- (System/currentTimeMillis) 10000)]
+        (cache/miss cache cache-key (create-temp-file!))
+        (fs/touch (sut/cache-key->cache-path cache cache-key) fake-last-access-time)
+        (t/is (= (->sec fake-last-access-time)
+                 (->sec (sut/last-accessed-time (sut/cache-key->cache-path cache cache-key)))))
+        (cache/lookup cache cache-key)
+        (t/is (< fake-last-access-time
+                 (sut/last-accessed-time (sut/cache-key->cache-path cache cache-key))))))))

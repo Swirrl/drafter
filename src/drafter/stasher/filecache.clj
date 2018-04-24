@@ -165,20 +165,22 @@
 (cache/defcache FileCache [base opts]
   cache/CacheProtocol
 
-  ;; TODO implement these
   (cache/lookup [this item]
                 (cache/lookup this item nil))
   
   (cache/lookup [this item not-found]
                 (let [cache-fpath (cache-key->cache-path this item)]
                   (if (.exists cache-fpath)
-                    cache-fpath ;; TODO wrap in rdf-handler
+                    (do (fs/touch cache-fpath)
+                        cache-fpath) ;; TODO wrap in rdf-handler
                     not-found)))
 
   (cache/has? [this item]
               (.exists (cache-key->cache-path this item)))
   
-  (cache/hit [this item] this)
+  (cache/hit [this item]
+             (fs/touch (cache-key->cache-path this item))
+             this)
 
   ;; add file to cache here
   (cache/miss [this item result]
@@ -195,6 +197,9 @@
   
   Object
   (toString [_] (str (:dir opts))))
+
+(defn last-accessed-time [cache-entry-path]
+  (fs/mod-time cache-entry-path))
 
 (s/def ::base-cache #(satisfies? cache/CacheProtocol %))
 (s/def ::dir fs/directory?)
