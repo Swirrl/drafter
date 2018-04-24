@@ -71,10 +71,10 @@
    :post [(s/valid? ::ck/cache-key %)]}
   (let [graphs (dataset->graphs ?dataset)
         modified-state (fetch-modified-state raw-repo graphs)]
-    (ck/map->CacheKey {:dataset (graphs->edn graphs)
-                       :query-type query-type
-                       :query-str query-str
-                       :modified-times modified-state})))
+    {:dataset (graphs->edn graphs)
+     :query-type query-type
+     :query-str query-str
+     :modified-times modified-state}))
 
 (defn fetch-cache-parser-and-stream
   "Given a cache and a cache key/query lookup the cached item and

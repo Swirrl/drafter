@@ -4,7 +4,9 @@
             [me.raynes.fs :as fs]
             [clojure.core.cache :as cache]
             [clojure.java.io :as io]
-            [drafter.stasher.cache-key :as ck]))
+            [clojure.spec.test.alpha :as st]
+            [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as sg]))
 
 (def test-path (fs/file "tmp" "filecache-test"))
 
@@ -19,22 +21,44 @@
 
 (t/deftest cache-key->hashed-key-test
   (t/testing "Same values should generate same hash"
-    ;; Note hash-maps are unordered, so they print differently
-    ;; depending on their construction order.  This essentially tests
-    ;; the implementation sorts the keys before generating an md5
-    ;; hash.
-    (t/is (= (sut/cache-key->hash-key {:b 2
-                                       :a 1
-                                       :d 4
-                                       :c 3
-                                       })
+    (let [cache (sut/file-cache-factory {:dir "tmp/test-stasher-cache"
+                                         :backend-rdf-format :test})
+          key {:dataset {:default-graphs #{"http://graphs/2"
+                                           "http://graphs/1"
+                                           "http://graphs/3"
+                                           "http://graphs/4"
+                                           "http://graphs/5"},
+                         :named-graphs #{"http://graphs/3"
+                                         "http://graphs/4"
+                                         "http://graphs/5"
+                                         "http://graphs/6"
+                                         "http://graphs/7"
+                                         "http://graphs/8"}},
+               :query-type :graph,
+               :query-str "7ACswxwR95kCP743"
+               :modified-times {:livemod #inst "2018-01-01T10:03:18.000-00:00"
+                                :draftmod #inst "2018-04-16T16:23:18.000-00:00"}}]
+      ;; Note hash-maps are unordered, so they print differently
+      ;; depending on their construction order.  This essentially tests
+      ;; the implementation sorts the keys before generating an md5
+      ;; hash.
+      (t/is (= (sut/cache-key->cache-path cache key)
+               (sut/cache-key->cache-path cache (-> key
+                                                    (dissoc :query-type)
+                                                    (assoc :query-type :graph)))
+               (sut/cache-key->cache-path cache (-> key
+                                                    (update-in [:dataset :default-graphs]
+                                                               (comp set shuffle))))
+               (sut/cache-key->cache-path cache (-> key
+                                                    (update :modified-times dissoc :livemod)
+                                                    (assoc-in [:modified-times :livemod]
+                                                              #inst "2018-01-01T10:03:18.000-00:00")))
+               (sut/cache-key->cache-path cache
+                                          (into {} (map (fn [[k v]] (if (map? v)
+                                                                     [k (into {} (shuffle (vec v)))]
+                                                                     [k v]))
+                                                        key))))))))
 
-             (sut/cache-key->hash-key {:a 1
-                                       :b 2
-                                       :c 3
-                                       :d 4})
-
-             "0cc23d1cefa62b120c5f3b289503c01e"))))
 
 (defn create-temp-file! []
   (java.io.File/createTempFile "drafter.stasher.filecache-test" ".tmp"))
@@ -50,24 +74,22 @@
                      (cache/miss cache {:query-type :invalid-query-type} (io/file test-path "test.file")))))
     
     (t/testing "Not found"
-      (let [uncached-key (ck/map->CacheKey
-                          {:query-type :tuple
-                           :query-str "an uncached query"
-                           :dataset {:default-graphs #{}
-                                     :named-graphs #{}}
-                           :modified-times {}})]
+      (let [uncached-key {:query-type :tuple
+                          :query-str "an uncached query"
+                          :dataset {:default-graphs #{}
+                                    :named-graphs #{}}
+                          :modified-times {}}]
         (t/is (nil? (cache/lookup cache uncached-key)))
         (t/is (= :not-found (cache/lookup cache uncached-key :not-found)))))
 
 
     (t/testing "Add & retrieve file from cache"
       (let [temp-file (create-temp-file!)
-            cache-key (ck/map->CacheKey
-                       {:query-type :tuple
-                        :query-str "cache me"
-                        :dataset {:default-graphs #{}
-                                  :named-graphs #{}}
-                        :modified-times {}})
+            cache-key {:query-type :tuple
+                       :query-str "cache me"
+                       :dataset {:default-graphs #{}
+                                 :named-graphs #{}}
+                       :modified-times {}}
             cache (assoc cache cache-key temp-file)]
 
         (t/is (instance? java.io.File (cache/lookup cache cache-key))

@@ -107,31 +107,26 @@
 (defmethod backend-format :boolean [cache cache-key]
   (backend-boolean-format cache))
 
-(defn cache-key->hash-key
+(defn- cache-key->hash-key
   "Cache keys at the interface to the cache are maps, but we need to
   repeatably hash these to an MD5 sum for the filename/location on
   disk.  This function takes a cache-key (map) and converts it into an
   MD5 sum."
   [cache-key]
-  (let [cache-key-str (pr-str (if (coll? cache-key)
-                                (sort cache-key)
-                                cache-key))
+  (let [cache-key-str (pr-str (ck/static-component cache-key))
         md (MessageDigest/getInstance "MD5")]
     (Hex/encodeHexString (.digest md (.getBytes cache-key-str)))))
 
-(defn hash-key->file-path
-  "Returns a relative path styled variant of the hash key with a
-  supplied format extension appended.  e.g. given a hash-key of
-  \"0cc23d1cefa62b120c5f3b289503c01e\" and an extension of :ext converts
-  it into the string \"0c/c2/0cc23d1cefa62b120c5f3b289503c01e.ext\".
-  "
-  ([hash-key fmt-extension]
-   (let [sub-dirs (->> hash-key
-                       (partition 2)
-                       (take 2)
-                       (mapv (partial apply str)))]
-     (apply io/file (conj sub-dirs (str hash-key "." (name fmt-extension)))))))
-
+(defn- hash-key->file-path
+  "Returns a relative path styled variant of the hash key.
+   e.g. given a hash-key of \"0cc23d1cefa62b120c5f3b289503c01e\", convert
+  it into the vector [\"0c\" \"c2\" \"0cc23d1cefa62b120c5f3b289503c01e\"]."
+  [hash-key]
+  (let [sub-dirs (->> hash-key
+                      (partition 2)
+                      (take 2)
+                      (mapv (partial apply str)))]
+    (conj sub-dirs hash-key)))
 
 (defn assert-spec! [spec value]
   (when-not (s/valid? spec value)
@@ -139,12 +134,18 @@
                          (s/explain-str spec value))
                     (s/explain-data spec value)))))
 
+(defn- cache-key->file-name [cache-key fmt]
+  (format "%s.%s" (ck/time-component cache-key) (name fmt)))
+
 (defn cache-key->cache-path
   [cache cache-key]
   (assert-spec! ::ck/cache-key cache-key)
-  (let [fmt (backend-format cache cache-key)
-        hash-key (hash-key->file-path (cache-key->hash-key cache-key) fmt)]
-    (io/file (:dir (.opts cache)) hash-key)))
+  (let [hash (cache-key->hash-key cache-key)
+        dirs (hash-key->file-path hash)
+        fmt (backend-format cache cache-key)
+        filename (cache-key->file-name cache-key fmt)]
+    (apply io/file (concat [(:dir (.opts cache))]
+                           (conj dirs filename)))))
 
 (defn- move-file-to-cache!
   "Move the supplied file into the cache under the specified
