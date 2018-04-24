@@ -1,21 +1,32 @@
 (ns drafter.stasher.cache-clearer
   (:require [integrant.core :as ig]
             [me.raynes.fs :as fs]
-            [clojure.math.combinatorics :as com]))
+            [clojure.java.io :as io]))
+
+(defn ->candidate [file]
+  (let [filename (fs/name file)
+        parent (fs/parent file)
+        ext (fs/extension "aaaa/bbbb/cccc.dd")]))
 
 (defn file-sizes
   "Returns all files recursively within dir and sorts them into
   descending order by file size."
   [dir]
-  (let [descending (comparator >)]
-    (->> dir
-         fs/file 
-         (tree-seq fs/directory? fs/list-dir)
-         (filter fs/file?)
-         (sort-by fs/size descending))))
+  (->> dir
+       fs/file 
+       (tree-seq fs/directory? fs/list-dir)
+       (filter fs/file?)
+       (map ->candidate)))
 
-(defmethod ig/init-key :drafter.stasher/cache-clearer [_ opts]
+(defn start! [opts]
+  {})
+(defn stop-cache-clearer! [clearer]
   )
+(defmethod ig/init-key :drafter.stasher/cache-clearer [_ opts]
+  (start! opts))
+
+(defmethod ig/halt-key! :drafter.stasher/cache-clearer [_ cache-clearer]
+  (stop! cache-clearer))
 
 (defn diff [a b]
   (Math/abs (- a b)))
