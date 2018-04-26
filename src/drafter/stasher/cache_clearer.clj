@@ -1,126 +1,123 @@
 (ns drafter.stasher.cache-clearer
   (:require [integrant.core :as ig]
             [me.raynes.fs :as fs]
-            [clojure.java.io :as io]))
+            [clojure.tools.logging :as log]
+            [clojure.java.io :as io]
+            [clojure.string :as str]))
 
-(defn ->candidate [file]
-  (let [filename (fs/name file)
+(defn ->entry-meta-data [file]
+  (let [file (fs/file file)
+        filename (fs/name file)
+        [livemod draftmod] (str/split filename #"-")
         parent (fs/parent file)
-        ext (fs/extension "aaaa/bbbb/cccc.dd")]))
+        hash (fs/name parent)
+        ext (fs/extension file)
+        size-bytes (fs/size file)
+        last-access (fs/mod-time file)]
+    (try
+      {:file file
+       :hash hash
+       :livemod (when-not (= livemod "empty") (Long/parseLong livemod))
+       :draftmod (some->> draftmod Long/parseLong)
+       :size-bytes size-bytes
+       :last-access last-access}
+      (catch Exception e
+        {:exception e
+         :file file}))))
 
-(defn file-sizes
-  "Returns all files recursively within dir and sorts them into
-  descending order by file size."
+(defn- valid? [entry-meta-data]
+  (or (not (contains? entry-meta-data :exception))
+      (log/warnf "invalid file in cache %s" (:file entry-meta-data))))
+
+
+(defn all-files
   [dir]
   (->> dir
-       fs/file 
+       fs/file
        (tree-seq fs/directory? fs/list-dir)
        (filter fs/file?)
-       (map ->candidate)))
+       (map ->entry-meta-data)
+       (filter valid?)))
+
+(defn find-biggest [key-fn coll]
+  (last (sort (map key-fn coll))))
+
+(defn find-expired-for-hash
+  "Given a list of files with the same hash, return those that are expired"
+  [files]
+  {:pre [(apply = (map :hash files))]}
+  (let [latest-livemod (find-biggest :livemod files)
+        drafts-on-latest-live (filter #(and (= latest-livemod (:livemod %))
+                                            (contains? % :draftmod))
+                                      files)
+        latest-draft (find-biggest :draftmod drafts-on-latest-live)]
+    (remove
+     (fn [{:keys [livemod draftmod]}]
+       (and (= latest-livemod livemod)
+            (or (nil? draftmod)
+                (= latest-draft draftmod))))
+     files)))
+
+(defn find-expired
+  "Given a list of files, return those that are expired"
+  [files]
+  (let [grouped-by-hash (group-by :hash files)]
+    (mapcat find-expired-for-hash (vals grouped-by-hash))))
+
+(defn measure-size [files]
+  (reduce + 0 (map :size files)))
+
+(defn ->bytes [gb-size]
+  (* gb-size 1024 1024 1024))
+
+(defn find-old-files [files bytes-to-remove]
+  (:files (reduce (fn [{:keys [bytes-to-remove files] :as acc} next-val]
+                    (if (<= bytes-to-remove 0)
+                      (reduced acc)
+                      (let [next-size (:size next-val)]
+                        {:bytes-to-remove (- bytes-to-remove next-size)
+                         :files (conj files next-val)})))
+                  {:bytes-to-remove bytes-to-remove
+                   :files []}
+                  (sort-by :last-access files))))
+
+(defn find-files-to-remove*
+  [all-files delete-at delete-until]
+  {:pre [(< 0 delete-until delete-at)]}
+  (let [cache-size (measure-size all-files)]
+    (when (> cache-size delete-at)
+      (let [expired-files (find-expired all-files)
+            expired-size (measure-size expired-files)]
+        (log/debugf "Found %d expired files measuring %.2fGB to delete"
+                    (count expired-files)
+                    (/ expired-size 1024 1024 1024.0))
+        (merge
+          {:expired-files expired-files}
+          (when (<= delete-until (- cache-size expired-size))
+            ;; Find more if we haven't reached out limit
+            (let [not-expired-files (remove (set expired-files) all-files)
+                  files-to-remove (find-old-files not-expired-files
+                                                  (- cache-size delete-until expired-size))]
+              {:old-files files-to-remove})))))))
+
+(defn find-files-to-remove [all-files max-cache-size-gb delete-at delete-until]
+  {:pre [(<= 0 delete-until delete-at 1)]}
+  (let [delete-at (int (* (->bytes max-cache-size-gb) delete-at))
+        delete-until (int (* (->bytes max-cache-size-gb) delete-until))]
+    (find-files-to-remove* all-files delete-at delete-until)))
+
+
 
 (defn start! [opts]
   {})
-(defn stop-cache-clearer! [clearer]
-  )
+
+(defn stop! [clearer])
+
 (defmethod ig/init-key :drafter.stasher/cache-clearer [_ opts]
   (start! opts))
 
 (defmethod ig/halt-key! :drafter.stasher/cache-clearer [_ cache-clearer]
   (stop! cache-clearer))
 
-(defn diff [a b]
-  (Math/abs (- a b)))
-
-(defn sum [items]
-  (reduce + items))
-
-#_(defn sorted-by-distance
-  "Given a target integer and a seq of items return the items sorted
-  by their difference from the target.
-
-  i.e. the first item in the returned sequence will be the item
-  closest to the target."
-  [target items]
-  (let [diffs (map (partial diff target) items)
-        items-with-diffs (map vector diffs items)
-        sorted (sort-by first items-with-diffs)]
-    (map second sorted)))
-
-(def threshold 0.1)
-
-(defn within-threshold? [target i]
-  (if (<= (- target (* threshold target))
-          i
-          (+ target (* threshold target)))
-    i))
-
-#_(defn close-enough? [target items]
-  (let [threshold 0.1]
-    (->> items
-         (filter
-          #(within-threshold? target %)))))
-
-(defn- find-close-match
-  "Returns the closest match it can find using within-threshold?  A
-  match may be one or many items that sum to within-threshold?"
-  [target-quota things]
-  (->> (for [thing things ;;todo tidy names up here
-             group thing
-             partitions (sort-by count (comparator >) (com/partitions group))
-             item partitions
-             :when (within-threshold? target-quota (sum item))]
-         item)
-       first))
-
-(def max-group-size 100)
-
-(defn create-groupings
-  "Group items and return an ordered list of things to try.  First we
-  try groups of size 1, then 2, 3, 4 up to max-group-size.  This gives
-  us opportunities for finding items to cull by culling multiple
-  items.
-
-  The probability of an item being in a group gets less as the groups
-  grow (This may/may-not be a good idea or)"
-  ([items]
-   (create-groupings 1 0.8 items))
-  ([gsize prob items]
-   (println gsize)
-   (if (= max-group-size
-          gsize)
-     []
-     (let [total (count items)]
-       (cons (partition gsize (random-sample prob items))
-               (lazy-seq (create-groupings (inc gsize)
-                                           (- prob 0.01)
-                                           items)))))))
-
-(defn cull
-  "Attempt to bring the items within a threshold/margin (currently
-  10%) of the target-quota by selecting a set of items to delete.
-
-  Returns the seq of items to remove."
-  [target-quota items]
-  (let [groups (create-groupings items)]
-    (find-close-match target-quota groups)))
 
 
-
-
-(comment
-
-
-  (def test-data [3 2 1 4 2 3 5 6 7 3 4])  ;; total-size 40
-
-  (def test-data (take 1e6 (repeatedly (partial rand-int 500))))
-  
-  (def target-size 30)
-
-  (let [items [6 4 3 3 3 1]]
-    (->> items
-         (reductions +)
-         (map vector items)
-         (take-while (fn [[_v acc]] (<= acc 10)))
-         (map first)))
-
-  )
