@@ -216,7 +216,7 @@
                (sut/find-files-to-remove* [current-file expired-file]
                                           delete-at
                                           delete-until)))))
-  (t/testing "Remove non-expired files to bring the cache down to the removal limit"
+  (t/testing "Remove expired and non-expired files to bring the cache down to the lower limit"
     (let [delete-at (gb->bytes 9)
           delete-until (gb->bytes 1)
           current-file {:size (gb->bytes 6)
@@ -232,5 +232,6 @@
                (sut/find-files-to-remove* [current-file expired-file]
                                           delete-at
                                           delete-until))))))
+
 
 

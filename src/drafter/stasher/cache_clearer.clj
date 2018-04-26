@@ -88,25 +88,39 @@
     (when (> cache-size delete-at)
       (let [expired-files (find-expired all-files)
             expired-size (measure-size expired-files)]
-        (log/debugf "Found %d expired files measuring %.2fGB to delete"
+        (log/debugf "Found %d expired files for removal measuring %.2fGB"
                     (count expired-files)
                     (/ expired-size 1024 1024 1024.0))
         (merge
-          {:expired-files expired-files}
-          (when (<= delete-until (- cache-size expired-size))
-            ;; Find more if we haven't reached out limit
-            (let [not-expired-files (remove (set expired-files) all-files)
-                  files-to-remove (find-old-files not-expired-files
-                                                  (- cache-size delete-until expired-size))]
-              {:old-files files-to-remove})))))))
+         {:expired-files expired-files}
+         (when (<= delete-until (- cache-size expired-size))
+           ;; Find more if we haven't reached out limit
+           (let [not-expired-files (remove (set expired-files) all-files)
+                 old-files (find-old-files not-expired-files
+                                           (- cache-size delete-until expired-size))
+                 old-files-size (measure-size old-files)]
+             (log/debugf "Found %d old files for removal measuring %.2fGB"
+                         (count old-files)
+                         (/ old-files-size 1024 1024 1024.0))
+             {:old-files old-files})))))))
 
 (defn find-files-to-remove [all-files max-cache-size-gb delete-at delete-until]
   {:pre [(<= 0 delete-until delete-at 1)]}
-  (let [delete-at (int (* (->bytes max-cache-size-gb) delete-at))
-        delete-until (int (* (->bytes max-cache-size-gb) delete-until))]
+  (let [delete-at (long (* (->bytes max-cache-size-gb) delete-at))
+        delete-until (long (* (->bytes max-cache-size-gb) delete-until))]
     (find-files-to-remove* all-files delete-at delete-until)))
 
-
+(defn clear-cache [delete-fn cache-dir max-cache-size-gb delete-at delete-until]
+  (let [files (all-files cache-dir)
+        {:keys [expired-files
+                old-files]} (find-files-to-remove files
+                                                  max-cache-size-gb
+                                                  delete-at
+                                                  delete-until)]
+    (log/infof "Deleting %d expired files" (count expired-files))
+    (delete-fn expired-files)
+    (log/infof "Deleting %d old files" (count old-files))
+    (delete-fn old-files)))
 
 (defn start! [opts]
   {})
