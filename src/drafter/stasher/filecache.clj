@@ -144,7 +144,7 @@
         dirs (hash-key->file-path hash)
         fmt (backend-format cache cache-key)
         filename (cache-key->file-name cache-key fmt)]
-    (apply io/file (concat [(:dir (.opts cache))]
+    (apply io/file (concat [(:dir (.opts cache)) "cache"]
                            (conj dirs filename)))))
 
 (defn- move-file-to-cache!
@@ -225,6 +225,7 @@
         
         {:keys [dir base-cache] :as opts} (merge default-opts opts)]
     (fs/mkdir dir)
+    (fs/mkdir (io/file dir "cache"))
     (fs/mkdir (io/file dir "tmp"))
     (FileCache. base-cache opts)))
 

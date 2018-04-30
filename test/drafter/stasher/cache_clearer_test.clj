@@ -176,7 +176,7 @@
   "The find-old-files function accepts a list of files and an amount in bytes 
    and will remove a minimum of this many bytes from the list"
   (t/testing "Basic functionality"
-    (let [files [{:size (gb->bytes 1)}]]
+    (let [files [{:size-bytes (gb->bytes 1)}]]
       (t/is (= files
                (sut/find-old-files files 1))
             "Something is found for removal when bytes to remove is non-zero"))
@@ -184,15 +184,15 @@
       (t/is (empty? (sut/find-old-files files 0))
             "Nothing is found for removal when bytes to remove is zero")))
   (t/testing "Prefer older files to newer files"
-    (let [old-file {:size (gb->bytes 1)
+    (let [old-file {:size-bytes (gb->bytes 1)
                     :last-access (inst-ms #inst "1970")}
-          new-file {:size (gb->bytes 1)
+          new-file {:size-bytes (gb->bytes 1)
                     :last-access (inst-ms #inst "2070")}]
       (t/is (= [old-file]
                (sut/find-old-files [old-file new-file]
                                    (gb->bytes 1)))
             "The older file is chosen for removal")
-      (let [new-small-file {:size (gb->bytes 0.1)
+      (let [new-small-file {:size-bytes (gb->bytes 0.1)
                             :last-access (inst-ms #inst "2070")}]
         (t/is (= [old-file]
                  (sut/find-old-files [old-file new-file new-small-file]
@@ -204,11 +204,11 @@
   (t/testing "Keep non-expired files below the removal limit"
     (let [delete-at (gb->bytes 9)
           delete-until (gb->bytes 7)
-          current-file {:size (gb->bytes 6)
+          current-file {:size-bytes (gb->bytes 6)
                         :livemod 10
                         :last-access (inst-ms #inst "2018-02")
                         :hash "first-file"}
-          expired-file {:size (gb->bytes 6)
+          expired-file {:size-bytes (gb->bytes 6)
                         :livemod 1
                         :last-access (inst-ms #inst "2018-01")
                         :hash "first-file"}]
@@ -219,11 +219,11 @@
   (t/testing "Remove expired and non-expired files to bring the cache down to the lower limit"
     (let [delete-at (gb->bytes 9)
           delete-until (gb->bytes 1)
-          current-file {:size (gb->bytes 6)
+          current-file {:size-bytes (gb->bytes 6)
                         :livemod 10
                         :last-access (inst-ms #inst "2018-02")
                         :hash "first-file"}
-          expired-file {:size (gb->bytes 6)
+          expired-file {:size-bytes (gb->bytes 6)
                         :livemod 1
                         :last-access (inst-ms #inst "2018-01")
                         :hash "first-file"}]
