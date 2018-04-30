@@ -9,7 +9,13 @@
                          :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT}
 
  
- :drafter.stasher/filecache {} #_{:dir #or [#env STASHER_CACHE_DIR "stasher-cache"]}
+ :drafter.stasher/filecache {:dir #or [#env STASHER_CACHE_DIR "stasher-cache"]}
+
+ :drafter.stasher.cache-clearer/scheduler {:pool-size 1}
+
+ :drafter.stasher/cache-clearer {:scheduler #ig/ref :drafter.stasher.cache-clearer/scheduler
+                                 :cache-dir #or [#env STASHER_CACHE_DIR "stasher-cache"]
+                                 :max-cache-size-gb 1}
 
  :drafter.stasher/cache-thread-pool {}
 
