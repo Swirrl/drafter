@@ -7,7 +7,8 @@
             [grafter.rdf4j.io :as gio]
             [integrant.core :as ig]
             [me.raynes.fs :as fs]
-            [drafter.stasher.cache-key :as ck])
+            [drafter.stasher.cache-key :as ck]
+            [cognician.dogstatsd :as dd])
   (:import java.io.File
            java.security.MessageDigest
            org.apache.commons.codec.binary.Hex
@@ -171,7 +172,7 @@
   (cache/lookup [this item not-found]
                 (let [cache-fpath (cache-key->cache-path this item)]
                   (if (.exists cache-fpath)
-                    (do (fs/touch cache-fpath)
+                    (do (cache/hit this item)
                         cache-fpath) ;; TODO wrap in rdf-handler
                     not-found)))
 
@@ -179,11 +180,13 @@
               (.exists (cache-key->cache-path this item)))
   
   (cache/hit [this item]
+             (dd/increment! "drafter.stasher.cache_hit" 1)
              (fs/touch (cache-key->cache-path this item))
              this)
 
   ;; add file to cache here
   (cache/miss [this item result]
+              (dd/increment! "drafter.stasher.cache_miss" 1)
               (move-file-to-cache! this item result))
   
   (cache/evict [this key]
@@ -278,7 +281,7 @@
         (close [this]
           (try
             (.endRDF cache-file-writer)
-            (move-file-to-cache! cache cache-key temp-file)
+            (cache/miss cache cache-key temp-file)
             (.close bg-graph-result)
             (catch Throwable ex
               (.delete temp-file)
@@ -372,7 +375,7 @@
         (try
           (.close bg-tuple-result)
           (.endQueryResult cache-file-writer)
-          (move-file-to-cache! cache cache-key temp-file)
+          (cache/miss cache cache-key temp-file)
           
           (catch Throwable ex
             (log/warn ex "Error whilst closing stream.  Cleaning up stashed tempfile:" temp-file)
@@ -404,7 +407,7 @@
         ;; Write the result to the file
         (.handleBoolean bool-writer boolean-result)))
 
-    (move-file-to-cache! cache cache-key temp-file)
+    (cache/miss cache cache-key temp-file)
     
     ;; return the actual result this will get returned to the
     ;; outer-most call to query.  NOTE that boolean's are different to
@@ -436,11 +439,11 @@
             (.delete temp-file)
             (throw ex))))
       (endRDF [this]
-        (try 
+        (try
           (.endRDF cache-file-writer)
           (.endRDF inner-rdf-handler)
           (.close stream)
-          (move-file-to-cache! cache cache-key temp-file)
+          (cache/miss cache cache-key temp-file)
           (catch Throwable ex
             (.delete temp-file)
             (throw ex))))
