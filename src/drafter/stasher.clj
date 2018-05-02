@@ -7,7 +7,8 @@
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf4j.sparql :as sparql]
             [integrant.core :as ig]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [cognician.dogstatsd :as dd])
   (:import (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
            java.nio.charset.Charset
            org.eclipse.rdf4j.query.impl.BackgroundGraphResult
@@ -134,8 +135,10 @@
     bg-tuple-result))
 
 (defn boolean-sync-cache-hit [cache-key base-uri-str cache]
-  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)]
-    (.parse cache-parser cache-stream)))
+  (dd/measure!
+   "drafter.stasher.boolean_sync.cache_hit" nil
+   (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)]
+     (.parse cache-parser cache-stream))))
 
 (defn construct-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache graph-query]
   (let [dataset (.getDataset graph-query)
@@ -162,16 +165,18 @@
     (fc/stashing-tuple-query-result :sync cache cache-key bg-graph-result)))
 
 (defn boolean-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache boolean-query]
-  (let [dataset (.getDataset boolean-query)
-        boolean-result (.sendBooleanQuery httpclient QueryLanguage/SPARQL
-                                          query-str base-uri-str dataset
-                                          (.getIncludeInferred boolean-query) (.getMaxExecutionTime boolean-query)
-                                          (.getBindingsArray boolean-query))]
+  (dd/measure!
+   "drafter.stasher.boolean_sync.cache_miss" nil
+   (let [dataset (.getDataset boolean-query)
+         boolean-result (.sendBooleanQuery httpclient QueryLanguage/SPARQL
+                                           query-str base-uri-str dataset
+                                           (.getIncludeInferred boolean-query) (.getMaxExecutionTime boolean-query)
+                                           (.getBindingsArray boolean-query))]
 
-    ;; Finally wrap the RDF4j handler we get back in a stashing
-    ;; handler that will move the streamed results into the stasher
-    ;; cache when it's finished.
-    (fc/stashing-boolean-query-result cache cache-key boolean-result)))
+     ;; Finally wrap the RDF4j handler we get back in a stashing
+     ;; handler that will move the streamed results into the stasher
+     ;; cache when it's finished.
+     (fc/stashing-boolean-query-result cache cache-key boolean-result))))
 
 (defn- construct-async-cache-hit
   [query-str rdf-handler base-uri-str cache]
@@ -199,7 +204,7 @@
                cache-key (cache-key-generator :graph cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
              (construct-sync-cache-hit thread-pool cache-key base-uri-str cache)
-             
+
              ;; else send query (and simultaneously stream it to file that gets put in the cache)
              (construct-sync-cache-miss httpclient cache-key base-uri-str cache this))))
 
@@ -209,7 +214,7 @@
                cache-key (cache-key-generator :graph cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
              (construct-async-cache-hit cache-key rdf-handler base-uri-str cache)
-             
+
              ;; else
              (let [stashing-rdf-handler (fc/stashing-rdf-handler cache cache-key rdf-handler)
                    dataset (.getDataset this)]
