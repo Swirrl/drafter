@@ -12,12 +12,12 @@
   (:import (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
            java.nio.charset.Charset
            org.eclipse.rdf4j.query.impl.BackgroundGraphResult
-           org.eclipse.rdf4j.query.QueryLanguage
-           org.eclipse.rdf4j.query.Dataset
+           (org.eclipse.rdf4j.query Dataset GraphQueryResult QueryLanguage
+                                    TupleQueryResultHandler TupleQueryResult)
            org.eclipse.rdf4j.query.resultio.helpers.BackgroundTupleResult
            org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery)
-           org.eclipse.rdf4j.rio.RDFFormat
+           (org.eclipse.rdf4j.rio RDFFormat RDFHandler)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
 
 (s/def ::core-pool-size pos-int?)
@@ -32,10 +32,10 @@
 ;; when there are no free threads to execute tasks and the queue of
 ;; waiting jobs is full.
 (defmethod ig/init-key ::cache-thread-pool [_ {:keys [core-pool-size
-                                                      max-pool-size 
+                                                      max-pool-size
                                                       keep-alive-time-ms ;; time threads above core-pool-size wait for work before dying.
                                                       queue-size] :as opts}]
-  
+
   (let [queue (ArrayBlockingQueue. (or queue-size 1))]
     (ThreadPoolExecutor. (or core-pool-size 1)
                          (or max-pool-size 1)
@@ -84,11 +84,11 @@
   [cache cache-key]
   (let [cached-file (cache/lookup cache cache-key)
         format (fc/get-format cached-file)
-        
+
         file-stream-map (if (#{RDFFormat/BINARY TupleQueryResultFormat/BINARY} format)
                           {:charset nil}
                           {:charset "UTF-8"})
-        
+
         cached-file-parser (fc/get-parser format)]
 
     (assoc file-stream-map
@@ -103,13 +103,16 @@
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
   [thread-pool cache-key base-uri-str cache]
-  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)       
+  (let [start-time (System/currentTimeMillis)
+        {:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)
         bg-graph-result (BackgroundGraphResult. cache-parser cache-stream (when charset (Charset/forName charset)) base-uri-str)]
 
     ;; execute parse thread on a thread pool.
     (.submit thread-pool ^Runnable (fn []
                                      (try
                                        (.run bg-graph-result)
+                                       (dd/histogram! "drafter.stasher.construct_sync.cache_hit"
+                                                      (- (System/currentTimeMillis) start-time))
                                        (catch Throwable ex
                                          (log/warn ex "Error reading data from cache")))))
 
@@ -123,15 +126,18 @@
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
   [thread-pool cache-key base-uri-str cache]
-  (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)
+  (let [start-time (System/currentTimeMillis)
+        {:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)
         bg-tuple-result (BackgroundTupleResult. cache-parser cache-stream)]
 
     ;; execute parse thread on a thread pool.
     (.submit thread-pool ^Runnable (fn []
                                      (try
                                        (.run bg-tuple-result)
+                                       (dd/histogram! "drafter.stasher.tuple_sync.cache_hit"
+                                                      (- (System/currentTimeMillis) start-time))
                                        (catch Throwable ex
-                                         (log/warn ex "Error reading data from cache"))))) 
+                                         (log/warn ex "Error reading data from cache")))))
     bg-tuple-result))
 
 (defn boolean-sync-cache-hit [cache-key base-uri-str cache]
@@ -140,8 +146,69 @@
    (let [{:keys [cache-stream cache-parser charset]} (fetch-cache-parser-and-stream cache cache-key)]
      (.parse cache-parser cache-stream))))
 
+(defn- tuple-time-reporting-query-result
+  "Wrap up a tuple query result / handler to record how long it takes."
+  [metric-name start-time query-result]
+  (reify
+    TupleQueryResultHandler
+    (endQueryResult [_]
+      (.endQueryResult query-result))
+    (handleLinks [_ links]
+      (.handleLinks query-result links))
+    (handleBoolean [_ bool]
+      (.handleBoolean query-result bool))
+    (handleSolution [_ binding-set]
+      (.handleSolution query-result binding-set))
+    (startQueryResult [_ binding-names]
+      (.startQueryResult query-result binding-names))
+    TupleQueryResult
+    (getBindingNames [_]
+      (.getBindingNames query-result))
+    (close [_]
+      (.close query-result)
+      (dd/histogram! metric-name
+                     (- (System/currentTimeMillis) start-time)))
+    (hasNext [this]
+      (.hasNext ^TupleQueryResult query-result))
+    (next [this]
+      (.next query-result))))
+
+(defn- construct-time-reporting-query-result
+  "Wrap up a construct query result to record how long it takes."
+  [metric-name start-time query-result]
+  (reify GraphQueryResult
+    (getNamespaces [_]
+      (.getNamespaces query-result))
+    (close [_]
+      (.close query-result)
+      (dd/histogram! metric-name
+                     (- (System/currentTimeMillis) start-time)))
+    (hasNext [this]
+      (.hasNext query-result))
+    (next [this]
+      (.next query-result))
+    (remove [this]
+      (.remove query-result))))
+
+(defn- time-reporting-rdf-handler
+  "Wrap up a construct query result to record how long it takes."
+  [metric-name start-time rdf-handler]
+  (reify RDFHandler
+    (startRDF [_]
+      (.startRDF rdf-handler))
+    (endRDF [_]
+      (.endRDF rdf-handler)
+      (dd/histogram! metric-name (- (System/currentTimeMillis) start-time)))
+    (handleStatement [_ statement]
+      (.handleStatement rdf-handler statement))
+    (handleComment [_ comment]
+      (.handleComment rdf-handler comment))
+    (handleNamespace [_ prefix-str uri-str]
+      (.handleNamespace rdf-handler prefix-str uri-str))))
+
 (defn construct-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache graph-query]
-  (let [dataset (.getDataset graph-query)
+  (let [start-time (System/currentTimeMillis)
+        dataset (.getDataset graph-query)
         bg-graph-result (.sendGraphQuery httpclient QueryLanguage/SPARQL
                                          query-str base-uri-str dataset
                                          (.getIncludeInferred graph-query) (.getMaxExecutionTime graph-query)
@@ -150,10 +217,14 @@
     ;; Finally wrap the RDF4j handler we get back in a stashing
     ;; handler that will move the streamed results into the stasher
     ;; cache when it's finished.
-    (fc/stashing-graph-query-result cache cache-key bg-graph-result)))
+    (construct-time-reporting-query-result
+     "drafter.stasher.construct_sync.cache_miss"
+     start-time
+     (fc/stashing-graph-query-result cache cache-key bg-graph-result))))
 
 (defn tuple-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache tuple-query]
-  (let [dataset (.getDataset tuple-query)
+  (let [start-time (System/currentTimeMillis)
+        dataset (.getDataset tuple-query)
         bg-graph-result (.sendTupleQuery httpclient QueryLanguage/SPARQL
                                          query-str base-uri-str dataset
                                          (.getIncludeInferred tuple-query) (.getMaxExecutionTime tuple-query)
@@ -162,7 +233,10 @@
     ;; Finally wrap the RDF4j handler we get back in a stashing
     ;; handler that will move the streamed results into the stasher
     ;; cache when it's finished.
-    (fc/stashing-tuple-query-result :sync cache cache-key bg-graph-result)))
+    (tuple-time-reporting-query-result
+     "drafter.stasher.tuple_sync.cache_miss"
+     start-time
+     (fc/stashing-tuple-query-result :sync cache cache-key bg-graph-result))))
 
 (defn boolean-sync-cache-miss [httpclient {:keys [query-str] :as cache-key} base-uri-str cache boolean-query]
   (dd/measure!
@@ -213,11 +287,17 @@
          (let [dataset (.getDataset this)
                cache-key (cache-key-generator :graph cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
-             (construct-async-cache-hit cache-key rdf-handler base-uri-str cache)
+             (let [rdf-handler (time-reporting-rdf-handler "drafter.stasher.construct_async.cache_hit"
+                                                           (System/currentTimeMillis)
+                                                           rdf-handler)]
+               (construct-async-cache-hit cache-key rdf-handler base-uri-str cache))
 
              ;; else
-             (let [stashing-rdf-handler (fc/stashing-rdf-handler cache cache-key rdf-handler)
-                   dataset (.getDataset this)]
+             (let [dataset (.getDataset this)
+                   stashing-rdf-handler (fc/stashing-rdf-handler cache cache-key rdf-handler)
+                   stashing-rdf-handler (time-reporting-rdf-handler "drafter.stasher.construct_async.cache_miss"
+                                                                              (System/currentTimeMillis)
+                                                                              stashing-rdf-handler)]
                (.sendGraphQuery httpclient QueryLanguage/SPARQL
                                 query-str base-uri-str dataset
                                 (.getIncludeInferred this) (.getMaxExecutionTime this)
@@ -235,7 +315,7 @@
                cache-key (cache-key-generator :tuple cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
              (tuple-sync-cache-hit thread-pool cache-key base-uri-str cache)
-             
+
              ;; else send query (and simultaneously stream it to file that gets put in the cache)
              (tuple-sync-cache-miss httpclient cache-key base-uri-str cache this))))
 
@@ -245,10 +325,16 @@
          (let [dataset (.getDataset this)
                cache-key (cache-key-generator :tuple cache query-str dataset opts)]
            (if (cache/has? cache cache-key)
-             (tuple-async-cache-hit cache-key tuple-handler base-uri-str cache)
-             
+             (let [tuple-handler (tuple-time-reporting-query-result "drafter.stasher.tuple_async.cache_hit"
+                                                                    (System/currentTimeMillis)
+                                                                    tuple-handler)]
+               (tuple-async-cache-hit cache-key tuple-handler base-uri-str cache))
+
              ;; else
-             (let [stashing-tuple-handler (fc/stashing-tuple-query-result :async cache cache-key tuple-handler)
+             (let [stashing-tuple-handler (tuple-time-reporting-query-result
+                                           "drafter.stasher.tuple_async.cache_miss"
+                                           (System/currentTimeMillis)
+                                           (fc/stashing-tuple-query-result :async cache cache-key tuple-handler))
                    dataset (.getDataset this)]
                (.sendTupleQuery httpclient QueryLanguage/SPARQL
                                 query-str base-uri-str dataset
@@ -266,7 +352,7 @@
               cache-key (cache-key-generator :boolean cache query-str dataset opts)]
           (if (cache/has? cache cache-key)
             (boolean-sync-cache-hit cache-key base-uri-str cache)
-            
+
             ;; else send query (and simultaneously stream it to file that gets put in the cache)
             (boolean-sync-cache-miss httpclient cache-key base-uri-str cache this)))
 
