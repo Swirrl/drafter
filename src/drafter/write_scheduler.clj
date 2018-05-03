@@ -77,9 +77,9 @@
                               :route req-route})
               job)]
     (log/info "Queueing job: " job (meta job))
-    (let [changed (.add writes-queue job)]
-      (datadog/increment! "drafter.jobs_queued" 1)
-      changed)))
+    ;; Record the inc value since we can't do an atomic add+size op
+    (datadog/gauge! "drafter.jobs_queue_size" (inc (.size writes-queue)))
+    (.add writes-queue job)))
 
 ;;await-sync-job! :: Job -> ApiResponse
 (defn exec-sync-job!
@@ -114,8 +114,8 @@
       (when-let [{task-f! :function
                   priority :priority
                   job-id :id
-                  promis :value-p :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS )]
-        (datadog/increment! "drafter.jobs_queued" -1)
+                  promis :value-p :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS)]
+        (datadog/gauge! "drafter.jobs_queue_size" (.size writes-queue))
         (l4j/with-logging-context (assoc
                                    (meta job)
                                    :jobId (str "job-" (.substring (str job-id) 0 8)))
@@ -131,7 +131,7 @@
                 (with-lock :publish-write
                   (task-f! job))
                 (task-f! job)))
-            
+
             (catch Exception ex
               (log/warn ex "A task raised an error.  Delivering error to promise")
               ;; TODO improve error returned
