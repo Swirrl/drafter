@@ -24,13 +24,8 @@
   (log/info "Initialising datadog")
   (datadog/configure! statsd-address {:tags tags}))
 
-(def pre-initialised-keys #{:drafter/logging :drafter.main/datadog})
-
 (defn initialisation-side-effects! [config]
-  ;;(println "Initialisation Effects")
   (ig/load-namespaces config)
-  (ig/init config pre-initialised-keys)
-
   ;; TODO consider moving these calls into more specific components
   (enc/register-custom-encoders!)
   (writers/register-custom-rdf-writers!)
@@ -42,15 +37,28 @@
     (-> system-config
         aero/read-config)))
 
+(defn- inject-logging [system-config]
+  "Add logging to datadog, and add logging and datadog to everything else."
+  (merge-with
+   merge
+   (zipmap (keys (dissoc system-config :drafter/logging :drafter.main/datadog))
+           (repeat (merge (when (contains? system-config :drafter/logging)
+                            {:logging (ig/->Ref :drafter/logging)})
+                          (when (contains? system-config :drafter.main/datadog)
+                            {:datadog (ig/->Ref :drafter.main/datadog)}))))
+   (when (and (contains? system-config :drafter.main/datadog)
+              (contains? system-config :drafter/logging))
+     {:drafter.main/datadog {:logging (ig/->Ref :drafter/logging)}})
+   system-config))
+
 (defn- load-system
   "Initialises the given system map."
   [system-config sys-keys]
-
   (initialisation-side-effects! system-config)
-  
-  (let [start-keys (->> (or sys-keys (keys system-config))
-                        (remove pre-initialised-keys))]
+  (let [start-keys (or sys-keys (keys system-config))
+        system-config (inject-logging system-config)]
     (ig/init system-config start-keys)))
+
 
 (defn start-system!
   "Starts drafter with the supplied system.edn file (assumed to be in
