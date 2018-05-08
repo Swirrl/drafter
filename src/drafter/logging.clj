@@ -29,8 +29,12 @@
 
       (let [chosen-config (or config-file default-config)]
         (eval chosen-config)
-        (log/debug "Loaded logging config" chosen-config)))))
+        (log/debug "Loaded logging config" chosen-config))))
+  {:config config-file})
 
 
 (defmethod ig/init-key :drafter/logging [_ {:keys [config]}]
   (configure-logging! config))
+
+(defmethod ig/halt-key! :drafter/logging [_ _]
+  (clj-logging-config.log4j/reset-logging!))

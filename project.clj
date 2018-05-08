@@ -42,7 +42,7 @@
 
                  [aero "1.1.2"]
 
-                 [integrant "0.6.1"]
+                 [integrant "0.6.3"]
                  
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
