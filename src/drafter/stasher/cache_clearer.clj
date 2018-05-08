@@ -174,6 +174,8 @@
                             cache-dir max-cache-size-gb archive-at archive-until)
         clean-fn (partial clean-archives! cache-dir archive-dir archive-ttl)]
     (assert (<= 0 archive-until archive-at 1))
+    (log/infof "CacheCleaner process will run in %d minutes and then every %d minutes after. The cache size is configured to %f and cleanup will occur at %f of capacity and reduce it to %f."
+               delay period max-cache-size-gb archive-at archive-until)
     (fs/mkdir (io/file cache-dir archive-dir))
     {:archiver (schedule scheduler archive-fn delay period)
      :archiver-fn archive-fn
