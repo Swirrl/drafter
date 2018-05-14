@@ -9,7 +9,10 @@
                          :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT}
 
  
- :drafter.stasher/filecache {:dir #or [#env STASHER_CACHE_DIR "stasher-cache"]}
+ :drafter.stasher.filecache/file-backend {:dir #or [#env STASHER_CACHE_DIR "stasher-cache"]}
+
+ :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
+                         :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
 
  :drafter.stasher.cache-clearer/scheduler {:pool-size 1}
 
@@ -20,7 +23,7 @@
  :drafter.stasher/cache-thread-pool {}
 
  :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
-                                :cache #ig/ref :drafter.stasher/filecache}
+                                :cache #ig/ref :drafter.stasher/cache}
                                ^:ref [:drafter.common/config]]
  
 

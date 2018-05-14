@@ -1,12 +1,16 @@
 {:drafter.common/config {:sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
                          :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
 
- :drafter.stasher/filecache {}
-
  :drafter.stasher/cache-thread-pool {}
+ 
+ :drafter.stasher.filecache/file-backend {}
+
+ :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
+                         :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
+
 
  :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
-                                :cache #ig/ref :drafter.stasher/filecache}
+                                :cache #ig/ref :drafter.stasher/cache}
                                ^:ref [:drafter.common/config]]
  
  

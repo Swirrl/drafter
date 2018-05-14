@@ -15,22 +15,19 @@
 
 (deftest-system endpoint-test-prepare-query
   [{:keys [drafter.backend.live/endpoint
-           drafter.stasher/filecache]
+           drafter.stasher/cache]
     uncached-repo :drafter.backend/rdf4j-repo} "drafter/backend/live-test.edn"]
-
   (t/testing ":drafter.backend.live/endpoint is both cached and restricted"
     (t/testing "Restricted Endpoint restricts queries to live graphs only"
       (let [preped-query (repo/prepare-query (repo/->connection endpoint) construct-graph-query)
-            
             ;; As this test uses a construct :s is indeed :g
             visible-graphs (set (map :s (repo/evaluate preped-query)))]
         (t/is (= #{live-graph-1 live-graph-only}
                  visible-graphs))
-        
         (t/testing "Stashes results in a stasher cache"
           (let [expected-triples #{(->Triple live-graph-1 live-graph-1 live-graph-1)
                                    (->Triple live-graph-only live-graph-only live-graph-only)}]
-            (stasher-test/assert-cached-results filecache
+            (stasher-test/assert-cached-results cache
                                                 uncached-repo
                                                 construct-graph-query
                                                 (.getDataset preped-query)
