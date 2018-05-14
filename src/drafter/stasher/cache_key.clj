@@ -27,6 +27,11 @@
          (and draftmod
               (str "-" (inst-ms draftmod))))))
 
+(defn query-type [cache-key]
+  (:query-type cache-key))
+
+(defn query [cache-key]
+  (prn-str (:query-str cache-key)))
 
 (comment
 
