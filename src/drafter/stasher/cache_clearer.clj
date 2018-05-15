@@ -154,7 +154,31 @@
 (defn stop-scheduled-task [task]
   (.cancel task false))
 
-(defn start! [opts]
+(defn start!
+  "Start the cache cleaner process. This is made up of two parts, one that
+   removes expired and old files from the cache directory into an archive
+   directoty, and another that deletes files from the archive directory after a
+   set time. The purpose of the archiving process is to remove the file from the
+   cache and make it inaccessible, but to do so without disrupting any ongoing
+   cache reads of that entry.
+
+   The keys:
+   cache-dir:         Where on disk the cache is
+   archive-dir:       The sub directory of cache-dir where the archive files are
+                        stored
+   max-cache-size-gb: The size of the disk allocated for the cache
+   delay:             Time, in minutes, after starting that the first run of the
+                        cleaner will take place
+   period:            The interval, in minutes, between runs of the cleaner
+   archive-at:        0-1, the clean process will be permitted to archive files
+                        when this threshold of the max size has been breached
+   archive-until:     0-1, cache entries will be progressively archived until
+                        the size of the cache falls under this threshold.
+   archive-ttl:       How long, in minutes, that files will remain in the
+                        archive before being deleted. This is a minimum, files
+                        will be removed on the next run of the cleaner and not
+                        immediately."
+  [opts]
   (let [defaults {:archive-at 0.8
                   :archive-until 0.6
                   :delay 10
