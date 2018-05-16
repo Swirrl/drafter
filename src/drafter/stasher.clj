@@ -435,13 +435,13 @@
 
 (defn stashing-graph-query
   "Construct a graph query that checks the stash before evaluating"
-  [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
+  [httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
   (proxy [SPARQLGraphQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
        (let [dataset (.getDataset this)
-             cache-key (cache-key-generator :graph cache query-str dataset opts)]
+             cache-key (generate-drafter-cache-key :graph cache query-str dataset opts)]
          (or (get-result cache cache-key base-uri-str)
              (wrap-result cache cache-key
                           (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -452,7 +452,7 @@
       ;; async results
       ([rdf-handler]
        (let [dataset (.getDataset this)
-             cache-key (cache-key-generator :graph cache query-str dataset opts)]
+             cache-key (generate-drafter-cache-key :graph cache query-str dataset opts)]
          (or (async-read cache cache-key rdf-handler base-uri-str)
              (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
                (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -462,13 +462,13 @@
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
-  [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
+  [httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
   (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
        (let [dataset (.getDataset this)
-             cache-key (cache-key-generator :tuple cache query-str dataset opts)]
+             cache-key (generate-drafter-cache-key :tuple cache query-str dataset opts)]
          (or (get-result cache cache-key base-uri-str)
              (wrap-result cache cache-key
                           (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -478,7 +478,7 @@
                                            (.getBindingsArray this))))))
       ([tuple-handler]
        (let [dataset (.getDataset this)
-             cache-key (cache-key-generator :tuple cache query-str dataset opts)]
+             cache-key (generate-drafter-cache-key :tuple cache query-str dataset opts)]
          (or (async-read cache cache-key tuple-handler base-uri-str)
              (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
                (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -489,11 +489,11 @@
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
   Boolean queries are sync only"
-  [httpclient cache query-str base-uri-str {:keys [cache-key-generator thread-pool] :as opts}]
+  [httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
       (let [dataset (.getDataset this)
-            cache-key (cache-key-generator :boolean cache query-str dataset opts)]
+            cache-key (generate-drafter-cache-key :boolean cache query-str dataset opts)]
         (or (get-result cache cache-key base-uri-str)
             (wrap-result cache cache-key
                          (.sendBooleanQuery httpclient QueryLanguage/SPARQL
@@ -533,8 +533,6 @@
                    (.initialize))
         updated-opts (assoc opts
                             :raw-repo raw-repo
-                            :cache-key-generator (or (:cache-key-generator opts)
-                                                     generate-drafter-cache-key)
                             :base-uri (or (:base-uri opts)
                                           "http://publishmydata.com/id/"))]
 
