@@ -18,7 +18,7 @@
 
  :drafter.stasher/cache-clearer {:scheduler #ig/ref :drafter.stasher.cache-clearer/scheduler
                                  :cache-dir #or [#env STASHER_CACHE_DIR "stasher-cache"]
-                                 :max-cache-size-gb 1}
+                                 :max-cache-size-gb 1.0}
 
  :drafter.stasher/cache-thread-pool {}
 

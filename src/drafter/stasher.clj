@@ -397,9 +397,7 @@
   (get-result [this cache-key base-uri-str]
     (let [fmt (data-format formats cache-key)]
       (when-let [in-stream (fc/source-stream cache-backend cache-key fmt)]
-        (log/debugf "Found entry in cache for %s query %s"
-                    (ck/query-type cache-key)
-                    (ck/query cache-key))
+        (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
         (case (ck/query-type cache-key)
           :graph (read-graph-cache-stream thread-pool base-uri-str in-stream fmt)
           :tuple (read-tuple-cache-stream thread-pool in-stream fmt)
@@ -409,9 +407,7 @@
   (wrap-result [this cache-key query-result]
     (let [fmt (data-format formats cache-key)
           out-stream (fc/destination-stream cache-backend cache-key fmt)]
-      (log/debugf "Preparing to insert entry for %s query %s"
-                  (ck/query-type cache-key)
-                  (ck/query cache-key))
+      (log/debugf "Preparing to insert entry for %s query" (ck/query-type cache-key))
       (case (:query-type cache-key)
         :graph (wrap-graph-result query-result fmt out-stream)
         :tuple (wrap-tuple-result query-result fmt out-stream :sync)
@@ -419,9 +415,7 @@
   (async-read [this cache-key handler base-uri-str]
     (let [fmt (data-format formats cache-key)]
       (when-let [in-stream (fc/source-stream cache-backend cache-key fmt)]
-        (log/debugf "Found entry in cache for %s query %s"
-                    (ck/query-type cache-key)
-                    (ck/query cache-key))
+        (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
         (case (:query-type cache-key)
           :graph (async-read-graph-cache-stream in-stream fmt handler base-uri-str)
           :tuple (async-read-tuple-cache-stream in-stream fmt handler))

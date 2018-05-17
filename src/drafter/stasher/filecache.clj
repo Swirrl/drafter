@@ -22,6 +22,11 @@
         md (MessageDigest/getInstance "MD5")]
     (Hex/encodeHexString (.digest md (.getBytes cache-key-str)))))
 
+(defn- cache-key->query-id
+  ""
+  [cache-key]
+  (subs (cache-key->hash-key cache-key) 0 8))
+
 (defn- hash-key->file-path
   "Returns a relative path styled variant of the hash key.
    e.g. given a hash-key of \"0cc23d1cefa62b120c5f3b289503c01e\", convert
@@ -54,7 +59,7 @@
     (log/debugf "Created cache entry %s for %s query %s"
                 cache-key-fname
                 (ck/query-type cache-key)
-                (ck/query cache-key))
+                (cache-key->query-id cache-key))
     (io/make-parents cache-key-fname)
     (fs/rename temp-file cache-key-fname)))
 
@@ -86,12 +91,12 @@
   (destination-stream [this cache-key fmt]
     (log/debugf "Creating destination stream for %s query %s"
                 (ck/query-type cache-key)
-                (ck/query cache-key))
+                (cache-key->query-id cache-key))
     (let [temp-file (create-temp-file! dir fmt)]
       (log/tracef "Created temp file %s for %s query %s"
                   temp-file
                   (ck/query-type cache-key)
-                  (ck/query cache-key))
+                  (cache-key->query-id cache-key))
       (proxy [BufferedOutputStream drafter.stasher.filecache.DestinationOutputStream]
           [(FileOutputStream. temp-file) buffer-size]
         (close []
@@ -102,7 +107,7 @@
           (when (fs/exists? temp-file)
             (log/errorf "Deleting temp file without moving into the cache for %s query %s"
                         (ck/query-type cache-key)
-                        (ck/query cache-key))
+                        (cache-key->query-id cache-key))
             (.delete temp-file))
           (.close this)))))
   (source-stream [this cache-key fmt]
