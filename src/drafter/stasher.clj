@@ -488,13 +488,15 @@
     (evaluate []
       (let [dataset (.getDataset this)
             cache-key (generate-drafter-cache-key :boolean cache query-str dataset opts)]
-        (or (get-result cache cache-key base-uri-str)
+        (let [result (get-result cache cache-key base-uri-str)]
+          (if (some? result)
+            result
             (wrap-result cache cache-key
                          (.sendBooleanQuery httpclient QueryLanguage/SPARQL
                                             query-str base-uri-str dataset
                                             (.getIncludeInferred this)
                                             (.getMaxExecutionTime this)
-                                            (.getBindingsArray this))))))))
+                                            (.getBindingsArray this)))))))))
 
 
 (defn- stasher-connection [repo httpclient cache {:keys [quad-mode base-uri] :or {quad-mode false} :as opts}]
