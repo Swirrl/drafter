@@ -30,9 +30,6 @@
 (defn query-type [cache-key]
   (:query-type cache-key))
 
-(defn query [cache-key]
-  (prn-str (:query-str cache-key)))
-
 (comment
 
   (s/explain-str ::cache-key
