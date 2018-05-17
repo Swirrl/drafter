@@ -260,12 +260,14 @@
             (throw ex)))))))
 
 (defn- stash-boolean-result [result fmt-kw stream]
+  {:post [(some? %)]}
   ;; return the actual result this will get returned to the
   ;; outer-most call to query.  NOTE that boolean's are different to
   ;; other query types as they don't have a background-evaluator.
   (let [format (get-in supported-cache-formats [:boolean fmt-kw])]
     (dd/measure!
      "drafter.stasher.boolean_sync.cache_miss"
+     {}
      (with-open [stream stream]
        (let [bool-writer (QueryResultIO/createBooleanWriter format stream)]
          ;; Write the result to the file
@@ -322,16 +324,20 @@
     bg-graph-result))
 
 (defn- async-read-graph-cache-stream [stream fmt rdf-handler base-uri]
+  {:post [(some? %)]}
   (dd/measure!
    "drafter.stasher.graph_async.cache_hit"
+   {}
    (let [parser (get-parser :graph fmt)]
      (doto parser
        (.setRDFHandler rdf-handler)
        (.parse stream base-uri)))))
 
 (defn- async-read-tuple-cache-stream [stream fmt tuple-handler]
+  {:post [(some? %)]}
   (dd/measure!
    "drafter.stasher.tuple_async.cache_hit"
+   {}
    (let [parser (get-parser :tuple fmt)]
      (doto parser
        (.setQueryResultHandler tuple-handler)
@@ -403,6 +409,7 @@
           :tuple (read-tuple-cache-stream thread-pool in-stream fmt)
           :boolean (dd/measure!
                     "drafter.stasher.boolean_sync.cache_hit"
+                    {}
                     (.parse (get-parser :boolean fmt) in-stream)) ))))
   (wrap-result [this cache-key query-result]
     (let [fmt (data-format formats cache-key)
@@ -562,3 +569,5 @@
 (defmethod ig/pre-init-spec :drafter.stasher/cache [_]
   (s/keys :req-un [::cache-backend ::thread-pool]
           :opt-un [::formats]))
+
+
