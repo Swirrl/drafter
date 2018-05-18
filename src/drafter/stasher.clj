@@ -525,17 +525,12 @@
   "Builds a stasher RDF repository, that implements the standard RDF4j
   repository interface but caches query results to disk and
   transparently returns cached results if they're in the cache."
-  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache] :as opts}]
+  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache raw-repo] :as opts}]
   (let [query-endpoint (str sparql-query-endpoint)
         update-endpoint (str sparql-update-endpoint)
         deltas (boolean (or report-deltas true))
 
-        ;; construct a second hidden raw-repo for performing uncached
-        ;; queries on, e.g. draftset modified times.
-        raw-repo (doto (DrafterSPARQLRepository. query-endpoint update-endpoint)
-                   (.initialize))
         updated-opts (assoc opts
-                            :raw-repo raw-repo
                             :base-uri (or (:base-uri opts)
                                           "http://publishmydata.com/id/"))]
 
@@ -564,7 +559,7 @@
 (s/def ::thread-pool #(instance? java.util.concurrent.ThreadPoolExecutor %))
 
 (defmethod ig/pre-init-spec :drafter.stasher/repo [_]
-  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::cache]))
+  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::cache ::raw-repo]))
 
 (defmethod ig/pre-init-spec :drafter.stasher/cache [_]
   (s/keys :req-un [::cache-backend ::thread-pool]
