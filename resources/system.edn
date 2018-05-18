@@ -23,6 +23,7 @@
  :drafter.stasher/cache-thread-pool {}
 
  :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
+                                :raw-repo #ig/ref :drafter.backend/rdf4j-repo
                                 :cache #ig/ref :drafter.stasher/cache}
                                ^:ref [:drafter.common/config]]
  

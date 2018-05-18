@@ -9,11 +9,19 @@
  :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
                          :thread-pool #ig/ref :drafter.stasher/cache-thread-pool
                          :formats {:graph :brf}}
+
+ :drafter.common/config {:sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
+                         :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
  
- :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/cache
-                        :sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
-                        :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"
-                        :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
+ :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/cache
+                                :raw-repo #ig/ref :drafter.backend/rdf4j-repo
+                                :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
+                               ^:ref [:drafter.common/config]]
+
+ :drafter.backend/rdf4j-repo #merge [{:batched-write-size #or [#env "batched-write-size" 75000]
+                                      ;; TODO  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
+                                      }
+                                     ^:ref [:drafter.common/config]]
 
  
  ;; instantiate/remove test fixture
