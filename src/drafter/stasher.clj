@@ -10,7 +10,8 @@
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as dd]
             [me.raynes.fs :as fs])
-  (:import (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
+  (:import java.net.URI
+           (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
            java.nio.charset.Charset
            org.eclipse.rdf4j.query.impl.BackgroundGraphResult
            (org.eclipse.rdf4j.query Dataset GraphQueryResult QueryLanguage
@@ -108,15 +109,17 @@
   {:default-graphs (set (map str default-graphs))
    :named-graphs (set (map str named-graphs))})
 
+(defn is-state-graph? [dataset]
+  (some #{(URI. "http://publishmydata.com/graphs/drafter/drafts")}
+        (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
+
 (defn fetch-modified-state [repo {:keys [named-graphs default-graphs] :as graphs}]
   (let [values {:graph (set (concat default-graphs named-graphs))}]
     (with-open [conn (repo/->connection repo)]
       (first (sparql/query "drafter/stasher/modified-state.sparql" values conn)))))
 
 (defn generate-drafter-cache-key [query-type _cache query-str ?dataset {raw-repo :raw-repo :as context}]
-  {:pre [(or (instance? Dataset ?dataset)
-             ;; What does it mean when there is no dataset?
-             (nil? ?dataset))]
+  {:pre [(instance? Dataset ?dataset)]
    :post [(s/valid? ::ck/cache-key %)]}
   (let [graphs (dataset->graphs ?dataset)
         modified-state (fetch-modified-state raw-repo graphs)]
@@ -434,6 +437,10 @@
         :graph (wrap-graph-async-handler handler fmt out-stream)
         :tuple (wrap-tuple-result handler fmt out-stream :async)))))
 
+(defn- cache? [query-str dataset]
+  (and (some? dataset)
+       (not (is-state-graph? dataset))))
+
 (defn stashing-graph-query
   "Construct a graph query that checks the stash before evaluating"
   [httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
@@ -441,25 +448,35 @@
     (evaluate
       ;; sync results
       ([]
-       (let [dataset (.getDataset this)
-             cache-key (generate-drafter-cache-key :graph cache query-str dataset opts)]
-         (or (get-result cache cache-key base-uri-str)
-             (wrap-result cache cache-key
-                          (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                           query-str base-uri-str dataset
-                                           (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                           (.getBindingsArray this))))))
+       (let [dataset (.getDataset this)]
+         (if (cache? query-str dataset)
+           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset opts)]
+             (or (get-result cache cache-key base-uri-str)
+                 (wrap-result cache cache-key
+                              (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                               query-str base-uri-str dataset
+                                               (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                               (.getBindingsArray this)))))
+           (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                            query-str base-uri-str dataset
+                            (.getIncludeInferred this) (.getMaxExecutionTime this)
+                            (.getBindingsArray this)))))
 
       ;; async results
       ([rdf-handler]
-       (let [dataset (.getDataset this)
-             cache-key (generate-drafter-cache-key :graph cache query-str dataset opts)]
-         (or (async-read cache cache-key rdf-handler base-uri-str)
-             (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
-               (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                query-str base-uri-str dataset
-                                (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                stashing-rdf-handler (.getBindingsArray this)))))))))
+       (let [dataset (.getDataset this)]
+         (if (cache? query-str dataset)
+           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset opts)]
+             (or (async-read cache cache-key rdf-handler base-uri-str)
+                 (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
+                   (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                    query-str base-uri-str dataset
+                                    (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                    stashing-rdf-handler (.getBindingsArray this)))))
+           (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                            query-str base-uri-str dataset
+                            (.getIncludeInferred this) (.getMaxExecutionTime this)
+                            rdf-handler (.getBindingsArray this))))))))
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
@@ -468,24 +485,35 @@
     (evaluate
       ;; sync results
       ([]
-       (let [dataset (.getDataset this)
-             cache-key (generate-drafter-cache-key :tuple cache query-str dataset opts)]
-         (or (get-result cache cache-key base-uri-str)
-             (wrap-result cache cache-key
-                          (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                                           query-str base-uri-str dataset
-                                           (.getIncludeInferred this)
-                                           (.getMaxExecutionTime this)
-                                           (.getBindingsArray this))))))
+       (let [dataset (.getDataset this)]
+         (if (cache? query-str dataset)
+           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset opts)]
+             (or (get-result cache cache-key base-uri-str)
+                 (wrap-result cache cache-key
+                              (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                               query-str base-uri-str dataset
+                                               (.getIncludeInferred this)
+                                               (.getMaxExecutionTime this)
+                                               (.getBindingsArray this)))))
+           (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                            query-str base-uri-str dataset
+                            (.getIncludeInferred this)
+                            (.getMaxExecutionTime this)
+                            (.getBindingsArray this)))))
       ([tuple-handler]
-       (let [dataset (.getDataset this)
-             cache-key (generate-drafter-cache-key :tuple cache query-str dataset opts)]
-         (or (async-read cache cache-key tuple-handler base-uri-str)
-             (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
-               (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                                query-str base-uri-str dataset
-                                (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                stashing-tuple-handler (.getBindingsArray this)))))))))
+       (let [dataset (.getDataset this)]
+         (if (cache? query-str dataset)
+           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset opts)]
+             (or (async-read cache cache-key tuple-handler base-uri-str)
+                 (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
+                   (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                    query-str base-uri-str dataset
+                                    (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                    stashing-tuple-handler (.getBindingsArray this)))))
+           (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                            query-str base-uri-str dataset
+                            (.getIncludeInferred this) (.getMaxExecutionTime this)
+                            tuple-handler (.getBindingsArray this))))))))
 
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
@@ -493,17 +521,23 @@
   [httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
-      (let [dataset (.getDataset this)
-            cache-key (generate-drafter-cache-key :boolean cache query-str dataset opts)]
-        (let [result (get-result cache cache-key base-uri-str)]
-          (if (some? result)
-            result
-            (wrap-result cache cache-key
-                         (.sendBooleanQuery httpclient QueryLanguage/SPARQL
-                                            query-str base-uri-str dataset
-                                            (.getIncludeInferred this)
-                                            (.getMaxExecutionTime this)
-                                            (.getBindingsArray this)))))))))
+      (let [dataset (.getDataset this)]
+        (if (cache? query-str dataset)
+          (let [cache-key (generate-drafter-cache-key :boolean cache query-str dataset opts)
+                result (get-result cache cache-key base-uri-str)]
+            (if (some? result)
+              result
+              (wrap-result cache cache-key
+                           (.sendBooleanQuery httpclient QueryLanguage/SPARQL
+                                              query-str base-uri-str dataset
+                                              (.getIncludeInferred this)
+                                              (.getMaxExecutionTime this)
+                                              (.getBindingsArray this)))))
+          (.sendBooleanQuery httpclient QueryLanguage/SPARQL
+                             query-str base-uri-str dataset
+                             (.getIncludeInferred this)
+                             (.getMaxExecutionTime this)
+                             (.getBindingsArray this)))))))
 
 
 (defn- stasher-connection [repo httpclient cache {:keys [quad-mode base-uri] :or {quad-mode false} :as opts}]
