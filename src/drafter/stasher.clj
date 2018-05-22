@@ -566,11 +566,13 @@
 
         updated-opts (assoc opts
                             :base-uri (or (:base-uri opts)
-                                          "http://publishmydata.com/id/"))]
-
-    (repo/notifying-repo (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
-                           (getConnection []
-                             (stasher-connection this (.createHTTPClient this) cache updated-opts))) deltas)))
+                                          "http://publishmydata.com/id/"))
+        repo (doto (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
+                     (getConnection []
+                       (stasher-connection this (.createHTTPClient this) cache updated-opts)))
+               (.initialize))]
+    (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
+    (repo/notifying-repo repo deltas)))
 
 (defn stasher-cache [opts]
   (let [default-formats {:boolean :txt

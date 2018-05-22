@@ -29,7 +29,7 @@
  
 
  ;;;; A repo specifically for the live query endpoint
- :drafter.backend.live/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+ :drafter.backend.live/endpoint {:uncached-repo #ig/ref :drafter.stasher/repo ;; :drafter.backend/rdf4j-repo
                                  :stasher-repo #ig/ref :drafter.stasher/repo}
  
  :drafter.backend/rdf4j-repo #merge [{:batched-write-size #or [#env "batched-write-size" 75000]
@@ -38,7 +38,7 @@
                                      ^:ref [:drafter.common/config]]
 
  ;; TODO construct drafter instance instead
- :drafter/backend {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
+ :drafter/backend {:uncached-repo #ig/ref :drafter.stasher/repo ;; :drafter.backend/rdf4j-repo
                    :stasher-repo #ig/ref :drafter.stasher/repo}
  
 
@@ -141,7 +141,7 @@
                                 
                                 }
  
- :drafter.handler/app {:repo #ig/ref :drafter.backend/rdf4j-repo
+ :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo ;; :drafter.backend/rdf4j-repo
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
                        :draftset-api-routes #ig/ref :drafter.routes/draftsets-api
                        }
