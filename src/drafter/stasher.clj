@@ -313,13 +313,10 @@
   ;; outer-most call to query.  NOTE that boolean's are different to
   ;; other query types as they don't have a background-evaluator.
   (let [format (get-in supported-cache-formats [:boolean fmt-kw])]
-    (dd/measure!
-     "drafter.stasher.boolean_sync.cache_miss"
-     {}
-     (with-open [stream stream]
-       (let [bool-writer (QueryResultIO/createBooleanWriter format stream)]
-         ;; Write the result to the file
-         (.handleBoolean bool-writer result)))))
+    (with-open [stream stream]
+      (let [bool-writer (QueryResultIO/createBooleanWriter format stream)]
+        ;; Write the result to the file
+        (.handleBoolean bool-writer result))))
   result)
 
 (defn- read-tuple-cache-stream
@@ -572,12 +569,15 @@
                 result (get-result cache cache-key base-uri-str)]
             (if (some? result)
               result
-              (wrap-result cache cache-key
-                           (.sendBooleanQuery httpclient QueryLanguage/SPARQL
-                                              query-str base-uri-str dataset
-                                              (.getIncludeInferred this)
-                                              (.getMaxExecutionTime this)
-                                              (.getBindingsArray this)))))
+              (dd/measure!
+               "drafter.stasher.boolean_sync.cache_miss"
+               {}
+               (wrap-result cache cache-key
+                            (.sendBooleanQuery httpclient QueryLanguage/SPARQL
+                                               query-str base-uri-str dataset
+                                               (.getIncludeInferred this)
+                                               (.getMaxExecutionTime this)
+                                               (.getBindingsArray this))))))
           (.sendBooleanQuery httpclient QueryLanguage/SPARQL
                              query-str base-uri-str dataset
                              (.getIncludeInferred this)
