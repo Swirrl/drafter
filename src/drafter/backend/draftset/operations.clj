@@ -124,6 +124,7 @@
     (= owner username)))
 
 (defn- get-draftset-graph-status [{:keys [public draft-graph-exists]}]
+  {:pre [(some? draft-graph-exists)]}
   (cond (and public draft-graph-exists) :updated
         (and public (not draft-graph-exists)) :deleted
         (and (not public) draft-graph-exists) :created
@@ -134,11 +135,14 @@
                   [live-graph-uri {:status (get-draftset-graph-status state)}])
                  states)))
 
-(defn- graph-mapping-result->graph-state [repo {:keys [lg dg public]}]
+(defn- graph-mapping-result->graph-mapping [{:keys [lg dg]}]
   {:live-graph-uri lg
-   :draft-graph-uri dg
-   :public public
-   :draft-graph-exists (sparql/eager-query repo (graph-exists-query dg))})
+   :draft-graph-uri dg})
+
+(defn- graph-mapping-result->graph-state [repo {:keys [lg dg public] :as res}]
+  (assoc (graph-mapping-result->graph-mapping res)
+         :public public
+         :draft-graph-exists (sparql/eager-query repo (graph-exists-query dg))))
 
 (defn- union-clauses [clauses]
   (string/join " UNION " clauses))
@@ -199,7 +203,7 @@
   (let [q (get-draftset-graph-mapping-query draftset-ref)]
     (->> q
          (sparql/eager-query repo)
-         (map #(graph-mapping-result->graph-state repo %)))))
+         (map graph-mapping-result->graph-mapping))))
 
 (defn get-draftset-graph-mapping [repo draftset-ref]
   (let [graph-states (get-draftset-graph-states repo draftset-ref)
