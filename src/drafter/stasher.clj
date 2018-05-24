@@ -651,7 +651,8 @@
 (s/def ::thread-pool #(instance? java.util.concurrent.ThreadPoolExecutor %))
 
 (defmethod ig/pre-init-spec :drafter.stasher/repo [_]
-  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::cache]))
+  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::cache]
+          :opt-un [::quad-mode ::report-deltas ::base-uri]))
 
 (defmethod ig/pre-init-spec :drafter.stasher/cache [_]
   (s/keys :req-un [::cache-backend ::thread-pool]
