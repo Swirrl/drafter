@@ -23,6 +23,7 @@
                                              TupleQueryResultWriter BooleanQueryResultParserRegistry
                                              TupleQueryResultParserRegistry)
            org.eclipse.rdf4j.repository.Repository
+           org.eclipse.rdf4j.repository.RepositoryConnection
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery)
            (org.eclipse.rdf4j.rio RDFFormat RDFHandler RDFWriter RDFParserRegistry)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
@@ -157,20 +158,16 @@
   (some #{(URI. "http://publishmydata.com/graphs/drafter/drafts")}
         (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
 
-(defn fetch-modified-state [repo {:keys [named-graphs default-graphs] :as graphs}]
+(defn fetch-modified-state [conn {:keys [named-graphs default-graphs] :as graphs}]
   (let [values {:graph (set (concat default-graphs named-graphs))}]
-    (with-open [conn (repo/->connection repo)]
-      (first (sparql/query "drafter/stasher/modified-state.sparql" values conn)))))
+    (first (sparql/query "drafter/stasher/modified-state.sparql" values conn))))
 
-(defn generate-drafter-cache-key [query-type _cache query-str ?dataset repo]
+(defn generate-drafter-cache-key [query-type _cache query-str ?dataset conn]
   {:pre [(instance? Dataset ?dataset)
-         ;; Should we pass a connection in here?
-         ;; If yes, we may be able to re-use the current one.
-         ;; I think, anyway, that it's safe enough that we can
-         (instance? Repository repo)]
+         (instance? RepositoryConnection conn)]
    :post [(s/valid? ::ck/cache-key %)]}
   (let [graphs (dataset->graphs ?dataset)
-        modified-state (fetch-modified-state repo graphs)]
+        modified-state (fetch-modified-state conn graphs)]
     {:dataset (graphs->edn graphs)
      :query-type query-type
      :query-str query-str
@@ -491,14 +488,14 @@
 
 (defn stashing-graph-query
   "Construct a graph query that checks the stash before evaluating"
-  [httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
+  [conn httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
   (proxy [SPARQLGraphQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset (:raw-repo opts))]
+           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -514,7 +511,7 @@
       ([rdf-handler]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset (:raw-repo opts))]
+           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
                  (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -528,14 +525,14 @@
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
-  [httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
+  [conn httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
   (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset (:raw-repo opts))]
+           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -551,7 +548,7 @@
       ([tuple-handler]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset (:raw-repo opts))]
+           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
                  (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -566,12 +563,12 @@
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
   Boolean queries are sync only"
-  [httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
+  [conn httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
       (let [dataset (.getDataset this)]
         (if (cache? query-str dataset)
-          (let [cache-key (generate-drafter-cache-key :boolean cache query-str dataset (:raw-repo opts))
+          (let [cache-key (generate-drafter-cache-key :boolean cache query-str dataset conn)
                 result (get-result cache cache-key base-uri-str)]
             (if (some? result)
               result
@@ -595,19 +592,19 @@
 ;    #_(prepareUpdate [_ query-str base-uri-str]);; catch
 
     (prepareTupleQuery [_ query-str base-uri-str]
-      (stashing-select-query httpclient cache query-str (or base-uri-str base-uri) opts))
+      (stashing-select-query this httpclient cache query-str (or base-uri-str base-uri) opts))
 
     (prepareGraphQuery [_ query-str base-uri-str]
-      (stashing-graph-query httpclient cache query-str (or base-uri-str base-uri) opts))
+      (stashing-graph-query this httpclient cache query-str (or base-uri-str base-uri) opts))
 
     (prepareBooleanQuery [_ query-str base-uri-str]
-      (stashing-boolean-query httpclient cache query-str (or base-uri-str base-uri) opts))))
+      (stashing-boolean-query this httpclient cache query-str (or base-uri-str base-uri) opts))))
 
 (defn stasher-repo
   "Builds a stasher RDF repository, that implements the standard RDF4j
   repository interface but caches query results to disk and
   transparently returns cached results if they're in the cache."
-  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache raw-repo] :as opts}]
+  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache] :as opts}]
   ;; This call here obliterates the sesame defaults for registered
   ;; parsers.  Forcing content negotiation to work only with the
   ;; parsers we explicitly whitelist above.
@@ -654,7 +651,7 @@
 (s/def ::thread-pool #(instance? java.util.concurrent.ThreadPoolExecutor %))
 
 (defmethod ig/pre-init-spec :drafter.stasher/repo [_]
-  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::cache ::raw-repo]))
+  (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::cache]))
 
 (defmethod ig/pre-init-spec :drafter.stasher/cache [_]
   (s/keys :req-un [::cache-backend ::thread-pool]

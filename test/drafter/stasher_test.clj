@@ -30,7 +30,8 @@
 (defn- sneak-rdf-file-into-cache!
   "Force the creation of an entry in the cache via the backdoor "
   [cache repo dataset query-string]
-  (let [cache-key (sut/generate-drafter-cache-key :graph cache query-string dataset repo)
+  (let [cache-key (with-open [conn (.getConnection repo)]
+                    (sut/generate-drafter-cache-key :graph cache query-string dataset conn))
         fmt (get-in cache [:formats :graph])]
     (with-open [in-stream (fc/destination-stream (:cache-backend cache)
                                                  cache-key
@@ -78,7 +79,8 @@
   (let [query-type (parse-query-type query)
         dir (get-in cache [:cache-backend :dir])
         fmt (get-in cache [:formats query-type])
-        cache-key (sut/generate-drafter-cache-key query-type cache query dataset raw-repo)
+        cache-key (with-open [conn (.getConnection raw-repo)]
+                    (sut/generate-drafter-cache-key query-type cache query dataset conn))
         cached-file (fc/cache-key->cache-path dir fmt cache-key)]
     (t/testing "Prove the side-effect of creating the file in the cache happened"
       (t/is (.exists cached-file)
@@ -322,18 +324,20 @@
 (deftest-system fetch-modified-state-test
   ;; Here we're just testing the underlying modified time queries, so we do
   ;; so on a standard RDF4j repo, not a stasher/caching one.
-  [{repo :drafter.backend/rdf4j-repo} "drafter/stasher-test/drafter-state-1.edn"]
+  [{repo :drafter.stasher/repo} "drafter/stasher-test/drafter-state-1.edn"]
+  (t/is (some? repo) "No repo!")
+  (with-open [conn (.getConnection repo)]
 
-  (t/testing "Fetching draftset modified times"
-    (t/is (= ds-1-most-recently-modified
-             (sut/fetch-modified-state repo {:named-graphs ds-1 :default-graphs ds-1})))
+    (t/testing "Fetching draftset modified times"
+      (t/is (= ds-1-most-recently-modified
+               (sut/fetch-modified-state conn {:named-graphs ds-1 :default-graphs ds-1})))
 
-    (t/is (= ds-2-most-recently-modified
-             (sut/fetch-modified-state repo {:named-graphs ds-2 :default-graphs ds-2}))))
+      (t/is (= ds-2-most-recently-modified
+               (sut/fetch-modified-state conn {:named-graphs ds-2 :default-graphs ds-2}))))
 
-  (t/testing "Fetching live graph modified times"
-    (t/is (= liveset-most-recently-modified
-             (sut/fetch-modified-state repo {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]}))))
+    (t/testing "Fetching live graph modified times"
+      (t/is (= liveset-most-recently-modified
+               (sut/fetch-modified-state conn {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]}))))
 
     (t/testing "Fetching draftsets with union-with-live set"
       ;; Union with live is at this low level equivalent to merging the
@@ -342,15 +346,16 @@
             dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}]
         (t/is (= (merge liveset-most-recently-modified
                         ds-1-most-recently-modified)
-                 (sut/fetch-modified-state repo dataset))))))
+                 (sut/fetch-modified-state conn dataset)))))))
 
 (deftest-system generate-drafter-cache-key-test
-  [{:keys [drafter.backend/rdf4j-repo
+  [{:keys [drafter.stasher/repo
            drafter.stasher/filecache]} "drafter/stasher-test/drafter-state-1.edn"]
 
   (let [dataset (edn->dataset {:named-graphs [live-graph-1 live-graph-only]
                                :default-graphs [live-graph-1 live-graph-only]})
-        result (sut/generate-drafter-cache-key :graph filecache basic-construct-query dataset rdf4j-repo)]
+        result (with-open [conn (.getConnection repo)]
+                 (sut/generate-drafter-cache-key :graph filecache basic-construct-query dataset conn))]
     
     (let [{:keys [dataset query-str modified-times]} result]
       (t/is (= 

@@ -103,7 +103,7 @@
 
 
  
- :drafter.handler/app {:repo #ig/ref :drafter.backend/rdf4j-repo
+ :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
                        :draftset-api-routes #ig/ref :drafter.routes/draftsets-api
                        }

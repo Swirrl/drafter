@@ -10,12 +10,8 @@
  :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
                          :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
 
- ;; raw repository for accessing data in a manner that is un-cached in tests
- :drafter.backend/rdf4j-repo ^:ref [:drafter.common/config]
-
  :drafter.stasher/cache-thread-pool {}
  :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
-                                :raw-repo #ig/ref :drafter.backend/rdf4j-repo
                                 :cache #ig/ref :drafter.stasher/cache}
                                ^:ref [:drafter.common/config]]
 

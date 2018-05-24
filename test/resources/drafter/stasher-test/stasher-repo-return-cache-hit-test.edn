@@ -14,16 +14,9 @@
                          :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
  
  :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/cache
-                                :raw-repo #ig/ref :drafter.backend/rdf4j-repo
                                 :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
                                ^:ref [:drafter.common/config]]
 
- :drafter.backend/rdf4j-repo #merge [{:batched-write-size #or [#env "batched-write-size" 75000]
-                                      ;; TODO  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
-                                      }
-                                     ^:ref [:drafter.common/config]]
-
- 
  ;; instantiate/remove test fixture
  :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo
                                :format :ttl
