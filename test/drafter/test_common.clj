@@ -5,7 +5,6 @@
             [drafter.backend.draftset.draft-management
              :refer
              [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
-            [drafter.backend.rdf4j-repo :refer [get-backend]]
             [drafter.configuration :refer [get-configuration]]
             [drafter.draftset :refer [->draftset-uri]]
             [drafter.main :as main]
@@ -132,9 +131,10 @@
   [system start-keys]
   (fn [test-fn]
     (let [started-system (main/start-system! (io/resource system) start-keys)
-          backend (:drafter.backend/rdf4j-repo started-system)
+          backend (:drafter.stasher/repo started-system)
           writer (:drafter/write-scheduler started-system)
           configured-factories (reg/registered-parser-factories)]
+      ;(assert backend (str "No backend in " system))
       (binding [*test-system* started-system
                 *test-backend* backend
                 *test-writer* writer]

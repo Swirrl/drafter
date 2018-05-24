@@ -1,5 +1,4 @@
-#merge [{:drafter.backend.draftset/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
-                                             :cached-repo #ig/ref :drafter.stasher/repo }}
+#merge [{:drafter.backend.draftset/endpoint {:repo #ig/ref :drafter.stasher/repo }}
         #include "../repo.edn"
         #include "../user-repo.edn"
         #include "../log-system.edn"

@@ -21,7 +21,7 @@
 
 (use-fixtures :each (join-fixtures (reverse [validate-schemas
                                              add-triple-fixture
-                                             (tc/wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler])])))
+                                             (tc/wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler])])))
 
 (defn- notifying-handler [a]
   (fn [r]

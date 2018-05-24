@@ -10,7 +10,7 @@
             [drafter.draftset :as ds])
   (:import java.net.URI))
 
-(t/use-fixtures :each (tc/wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
+(t/use-fixtures :each (tc/wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler]))
 
 (t/deftest revert-changes-from-graph-only-in-draftset
   (let [modified-time (constantly #inst "2017")
