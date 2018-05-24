@@ -30,7 +30,7 @@
 (defn- sneak-rdf-file-into-cache!
   "Force the creation of an entry in the cache via the backdoor "
   [cache repo dataset query-string]
-  (let [cache-key (sut/generate-drafter-cache-key :graph cache query-string dataset {:raw-repo repo})
+  (let [cache-key (sut/generate-drafter-cache-key :graph cache query-string dataset repo)
         fmt (get-in cache [:formats :graph])]
     (with-open [in-stream (fc/destination-stream (:cache-backend cache)
                                                  cache-key
@@ -78,7 +78,7 @@
   (let [query-type (parse-query-type query)
         dir (get-in cache [:cache-backend :dir])
         fmt (get-in cache [:formats query-type])
-        cache-key (sut/generate-drafter-cache-key query-type cache query dataset {:raw-repo raw-repo})
+        cache-key (sut/generate-drafter-cache-key query-type cache query dataset raw-repo)
         cached-file (fc/cache-key->cache-path dir fmt cache-key)]
     (t/testing "Prove the side-effect of creating the file in the cache happened"
       (t/is (.exists cached-file)
@@ -350,7 +350,7 @@
 
   (let [dataset (edn->dataset {:named-graphs [live-graph-1 live-graph-only]
                                :default-graphs [live-graph-1 live-graph-only]})
-        result (sut/generate-drafter-cache-key :graph filecache basic-construct-query dataset {:raw-repo rdf4j-repo})]
+        result (sut/generate-drafter-cache-key :graph filecache basic-construct-query dataset rdf4j-repo)]
     
     (let [{:keys [dataset query-str modified-times]} result]
       (t/is (= 

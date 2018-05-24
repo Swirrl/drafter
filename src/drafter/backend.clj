@@ -25,16 +25,13 @@
 ;; In the future this would be a natural place to add internal
 ;; functions to the drafter API, so it can be used as a drafter
 ;; client etc...
-(defrecord DrafterService [uncached-repo stasher-repo]
+(defrecord DrafterService [repo]
   repo/ToConnection
   (repo/->connection [this]
-    ;; For now return the uncached connection here; though in the
-    ;; future we should be able to cache them too.
-    ;;
     ;; Note calling ->connection on DrafterService returns an
     ;; unrestricted endpoint, that has access to the state graph
     ;; and can perform updates etc...
-    (repo/->connection uncached-repo)))
+    (repo/->connection repo)))
 
 (defmulti endpoint-repo*
   "The multimethod that backs endpoint-repo, end users should use endpoint-repo."
@@ -60,10 +57,8 @@
 (defn drafter-repo
   "Return a repository from the backend that has acccess to the
   drafter state graph and information."
-  [{:keys [::bs/uncached-repo]}]
-
-  ;; TODO when drafter 
-  uncached-repo)
+  [{:keys [::bs/repo]}]
+  repo)
 
 (defn endpoint-repo
   "Given a drafter backend and an endpoint id, return a repository on
@@ -76,7 +71,7 @@
    (endpoint-repo* drafter endpoint-id opts)))
 
 (defmethod ig/pre-init-spec :drafter/backend [_]
-  (s/keys :req-un [::bs/uncached-repo ::bs/stasher-repo]))
+  (s/keys :req-un [::bs/repo]))
 
 (defmethod ig/init-key :drafter/backend [_ opts]
   (map->DrafterService opts))

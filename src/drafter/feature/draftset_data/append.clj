@@ -69,7 +69,7 @@
     (copy-graph-for-append* state draftset-ref backend live->draft quad-batches job)))
 
 (defn- append-quads-to-draftset-job [backend draftset-ref quads clock-fn]
-  (let [backend (:uncached-repo backend)]
+  (let [backend (:repo backend)]
     (ajobs/create-job :background-write
                       (fn [job]
                         (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)

@@ -16,9 +16,7 @@
  
  :drafter.backend/rdf4j-repo ^:ref [:drafter.common/config]
  
- :drafter.backend.live/endpoint {:uncached-repo #ig/ref :drafter.backend/rdf4j-repo
-                                 :stasher-repo #ig/ref :drafter.stasher/repo
-                                 }
+ :drafter.backend.live/endpoint {:repo #ig/ref :drafter.stasher/repo}
 
  ;; instantiate/remove test fixture
  :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo

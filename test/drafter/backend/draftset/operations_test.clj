@@ -32,7 +32,7 @@
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
 
-(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
+(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler]))
 ;(use-fixtures :each wrap-clean-test-db)
 
 

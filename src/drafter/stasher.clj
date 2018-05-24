@@ -9,7 +9,9 @@
             [integrant.core :as ig]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as dd]
-            [me.raynes.fs :as fs])
+            [me.raynes.fs :as fs]
+            [drafter.backend.common :as drpr]
+            [grafter.rdf4j.repository.registry :as reg])
   (:import java.net.URI
            (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
            java.nio.charset.Charset
@@ -20,9 +22,27 @@
            (org.eclipse.rdf4j.query.resultio TupleQueryResultFormat BooleanQueryResultFormat QueryResultIO
                                              TupleQueryResultWriter BooleanQueryResultParserRegistry
                                              TupleQueryResultParserRegistry)
+           org.eclipse.rdf4j.repository.Repository
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery)
            (org.eclipse.rdf4j.rio RDFFormat RDFHandler RDFWriter RDFParserRegistry)
-           (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)))
+           (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
+           [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
+           [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
+           [org.eclipse.rdf4j.query.resultio.binary BinaryQueryResultParserFactory]
+           org.eclipse.rdf4j.query.resultio.text.BooleanTextParserFactory
+           org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
+           org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory
+           org.eclipse.rdf4j.rio.turtle.TurtleParserFactory
+           org.eclipse.rdf4j.rio.trig.TriGParserFactory
+           org.eclipse.rdf4j.rio.binary.BinaryRDFParserFactory))
+
+(extend-type Repository
+  drpr/SparqlExecutor
+  (drpr/prepare-query [this sparql-string]
+    (drpr/prep-and-validate-query this sparql-string))
+
+  drpr/ToRepository
+  (drpr/->sesame-repo [r] r))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)
@@ -63,6 +83,30 @@
 (def boolean-formats [BooleanQueryResultFormat/TEXT
                       BooleanQueryResultFormat/JSON
                       BooleanQueryResultFormat/SPARQL])
+
+;; TODO:
+;;
+;; We should turn these whitelist sets into proper configuration.
+;;
+;; Set some whitelists that ensure we're much more strict around what
+;; formats we negotiate with stardog.  If you want to run drafter
+;; against another (non stardog) store we should configure these to be
+;; different.
+;;
+;; For construct we avoid Turtle because of Stardog bug #3087
+;; (https://complexible.zendesk.com/hc/en-us/requests/524)
+;;
+;; Also we avoid RDF+XML because RDF+XML can't even represent some RDF graphs:
+;; https://www.w3.org/TR/REC-rdf-syntax/#section-Serialising which
+;; causes us some issues when URI's for predicates contain parentheses.
+;;
+;; Ideally we'd just run with sesame's defaults, but providing a
+;; smaller list should mean less bugs in production as we can choose
+;; the most reliable formats and avoid those with known issues.
+;;
+(def construct-formats-whitelist #{TurtleParserFactory NTriplesParserFactory NQuadsParserFactory TriGParserFactory BinaryRDFParserFactory})
+(def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory BinaryQueryResultParserFactory})
+(def ask-formats-whitelist #{SPARQLBooleanJSONParserFactory BooleanTextParserFactory SPARQLBooleanXMLParserFactory})
 
 
 
@@ -118,11 +162,15 @@
     (with-open [conn (repo/->connection repo)]
       (first (sparql/query "drafter/stasher/modified-state.sparql" values conn)))))
 
-(defn generate-drafter-cache-key [query-type _cache query-str ?dataset {raw-repo :raw-repo :as context}]
-  {:pre [(instance? Dataset ?dataset)]
+(defn generate-drafter-cache-key [query-type _cache query-str ?dataset repo]
+  {:pre [(instance? Dataset ?dataset)
+         ;; Should we pass a connection in here?
+         ;; If yes, we may be able to re-use the current one.
+         ;; I think, anyway, that it's safe enough that we can
+         (instance? Repository repo)]
    :post [(s/valid? ::ck/cache-key %)]}
   (let [graphs (dataset->graphs ?dataset)
-        modified-state (fetch-modified-state raw-repo graphs)]
+        modified-state (fetch-modified-state repo graphs)]
     {:dataset (graphs->edn graphs)
      :query-type query-type
      :query-str query-str
@@ -450,7 +498,7 @@
       ([]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset opts)]
+           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset (:raw-repo opts))]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -466,7 +514,7 @@
       ([rdf-handler]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset opts)]
+           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset (:raw-repo opts))]
              (or (async-read cache cache-key rdf-handler base-uri-str)
                  (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -487,7 +535,7 @@
       ([]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset opts)]
+           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset (:raw-repo opts))]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -503,7 +551,7 @@
       ([tuple-handler]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset opts)]
+           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset (:raw-repo opts))]
              (or (async-read cache cache-key tuple-handler base-uri-str)
                  (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -523,7 +571,7 @@
     (evaluate []
       (let [dataset (.getDataset this)]
         (if (cache? query-str dataset)
-          (let [cache-key (generate-drafter-cache-key :boolean cache query-str dataset opts)
+          (let [cache-key (generate-drafter-cache-key :boolean cache query-str dataset (:raw-repo opts))
                 result (get-result cache cache-key base-uri-str)]
             (if (some? result)
               result
@@ -560,6 +608,12 @@
   repository interface but caches query results to disk and
   transparently returns cached results if they're in the cache."
   [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache raw-repo] :as opts}]
+  ;; This call here obliterates the sesame defaults for registered
+  ;; parsers.  Forcing content negotiation to work only with the
+  ;; parsers we explicitly whitelist above.
+  (reg/register-parser-factories! {:select select-formats-whitelist
+                                   :construct construct-formats-whitelist
+                                   :ask ask-formats-whitelist})
   (let [query-endpoint (str sparql-query-endpoint)
         update-endpoint (str sparql-update-endpoint)
         deltas (boolean (or report-deltas true))
@@ -583,6 +637,11 @@
 
 (defmethod ig/init-key :drafter.stasher/repo [_ opts]
   (stasher-repo opts))
+
+(defmethod ig/halt-key! :drafter.stasher/repo [_ repo]
+  (log/info "Shutting down stasher repo")
+  (drpr/stop-backend repo))
+
 
 (defmethod ig/init-key :drafter.stasher/cache [_ opts]
   (stasher-cache opts))

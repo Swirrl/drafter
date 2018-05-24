@@ -138,12 +138,6 @@
 (defmethod ig/init-key ::draftset-get-data-handler [_ opts]
   (draftset-get-data-handler opts))
 
-
-
-;;;;; !!!! TODO TODO TEST THIS WITH STASHER !!!!
-;;;;; !!!! TODO TODO TEST THIS WITH STASHER !!!!
-;;;;; !!!! TODO TODO TEST THIS WITH STASHER !!!!
-;;;;; !!!! TODO TODO TEST THIS WITH STASHER !!!!
 (defn draftset-query-handler [{backend :drafter/backend
                                :keys [wrap-as-draftset-owner timeout-fn]}]
   (wrap-as-draftset-owner

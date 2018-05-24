@@ -16,15 +16,15 @@
            [org.eclipse.rdf4j.model Resource URI]
            org.eclipse.rdf4j.model.impl.URIImpl))
 
-(defn- prepare-rewrite-query [stasher-conn uncached-repo live->draft sparql-string union-with-live?]
+(defn- prepare-rewrite-query [conn live->draft sparql-string union-with-live?]
   (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
-        graph-restriction (mgmt/graph-mapping->graph-restriction uncached-repo live->draft union-with-live?)
-        pquery (bprot/prep-and-validate-query stasher-conn rewritten-query-string)
+        graph-restriction (mgmt/graph-mapping->graph-restriction conn live->draft union-with-live?)
+        pquery (bprot/prep-and-validate-query conn rewritten-query-string)
         pquery (bprot/apply-restriction pquery graph-restriction)]
     (rewrite-query-results pquery live->draft)))
 
-(defn- build-draftset-connection [{:keys [stasher-repo uncached-repo live->draft union-with-live?]}]
-  (let [stasher-conn (repo/->connection stasher-repo)]
+(defn- build-draftset-connection [{:keys [repo live->draft union-with-live?]}]
+  (let [conn (repo/->connection repo)]
     (reify
       
       #_bprot/SparqlExecutor
@@ -37,7 +37,7 @@
 
       repo/IPrepareQuery
       (repo/prepare-query* [this sparql-string _]
-        (prepare-rewrite-query stasher-conn uncached-repo live->draft sparql-string union-with-live?))
+        (prepare-rewrite-query conn live->draft sparql-string union-with-live?))
 
       ;; TODO fix this interface to work with pull queries.
       proto/ISPARQLable
@@ -47,7 +47,7 @@
       
       Closeable
       (close [this]
-        (.close stasher-conn))
+        (.close conn))
 
       ;; For completeness... a to-statements implementation that
       ;; enforces the graph restriction.
@@ -57,12 +57,11 @@
                   (when (.hasNext i)
                     (let [v (.next i)]
                       (lazy-seq (cons (rio/backend-quad->grafter-quad v) (next-item i))))))]
-          (let [iter (.getStatements stasher-conn nil nil nil infer (into-array Resource (map #(URIImpl. (str %)) (vals live->draft))))]
+          (let [iter (.getStatements conn nil nil nil infer (into-array Resource (map #(URIImpl. (str %)) (vals live->draft))))]
             (f iter)))))))
 
 
-(sc/defrecord RewritingSesameSparqlExecutor [stasher-repo :- (sc/protocol bprot/SparqlExecutor)
-                                             uncached-repo :- org.eclipse.rdf4j.repository.Repository
+(sc/defrecord RewritingSesameSparqlExecutor [repo :- (sc/protocol bprot/SparqlExecutor)
                                              live->draft :- {URI URI}
                                              union-with-live? :- Boolean]
   #_bprot/SparqlExecutor
@@ -73,7 +72,7 @@
   bprot/ToRepository
   (->sesame-repo [_]
     (log/warn "DEPRECATED CALL TO ->sesame-repo.  TODO: remove call")
-    (->sesame-repo uncached-repo))
+    (->sesame-repo repo))
 
   repo/ToConnection
   (repo/->connection [this]
@@ -88,12 +87,12 @@
 
 (defn build-draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"
-  [{:keys [uncached-repo stasher-repo]} draftset-ref union-with-live?]
-  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping uncached-repo draftset-ref)]
-    (->RewritingSesameSparqlExecutor stasher-repo uncached-repo graph-mapping union-with-live?)))
+  [{:keys [repo]} draftset-ref union-with-live?]
+  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping repo draftset-ref)]
+    (->RewritingSesameSparqlExecutor repo graph-mapping union-with-live?)))
 
 (defmethod ig/pre-init-spec ::endpoint [_]
-  (sp/keys :req-un [::bs/uncached-repo ::bs/stasher-repo]))
+  (sp/keys :req-un [::bs/repo]))
 
 (defmethod ig/init-key ::endpoint [_ opts]
   opts)

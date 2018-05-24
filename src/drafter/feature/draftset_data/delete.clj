@@ -73,7 +73,7 @@
 
 
 (defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format clock-fn]
-  (let [backend (:uncached-repo backend)]
+  (let [backend (:repo backend)]
     (jobs/make-job :background-write [job]
                    (let [;;backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
                          quads (read-statements serialised rdf-format)
@@ -81,7 +81,7 @@
                      (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn)))))
 
 (defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format clock-fn]
-  (let [backend (:uncached-repo backend)]
+  (let [backend (:repo backend)]
     (jobs/make-job :background-write [job]
                    (let [;;backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
                          triples (read-statements serialised rdf-format)

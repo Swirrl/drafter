@@ -458,5 +458,5 @@
              dest-graph)
           "Should be a copy of the source graph"))))
 
-(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.backend/rdf4j-repo :drafter/write-scheduler]))
+(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler]))
 ;(use-fixtures :each wrap-clean-test-db)

@@ -59,14 +59,11 @@
 
 (defn live-endpoint-with-stasher
   "Creates a backend restricted to the live graphs."
-  [{:keys [uncached-repo stasher-repo]}]
-  ;; TODO: remove need for uncached repo. Doing so will require
-  ;; state-graph inception, i.e. storing data on the state graph in
-  ;; the stategraph.
-  (->RestrictedExecutor stasher-repo (partial mgmt/live-graphs uncached-repo)))
+  [{:keys [repo]}]
+  (->RestrictedExecutor repo (partial mgmt/live-graphs repo)))
 
 (defmethod ig/pre-init-spec ::endpoint [_]
-  (s/keys :req-un [::bs/uncached-repo ::bs/stasher-repo]))
+  (s/keys :req-un [::bs/repo]))
 
 (defmethod ig/init-key ::endpoint [_ opts]
   (live-endpoint-with-stasher opts))
