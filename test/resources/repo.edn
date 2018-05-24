@@ -10,18 +10,12 @@
 
 
  :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
-                                :raw-repo #ig/ref :drafter.backend/rdf4j-repo
                                 :cache #ig/ref :drafter.stasher/cache}
                                ^:ref [:drafter.common/config]]
  
  
  ;;;; A repo specifically for the live query endpoint
  :drafter.backend.live/endpoint {:repo #ig/ref :drafter.stasher/repo}
- 
- :drafter.backend/rdf4j-repo #merge [{:batched-write-size #or [#env "batched-write-size" 75000]
-                                      ;; TODO  :batched-write-size #opt-nat #env DRAFTER_BATCHED_WRITE_SIZE
-                                      }
-                                     ^:ref [:drafter.common/config]]
 
  :drafter/backend {:repo #ig/ref :drafter.stasher/repo}
  

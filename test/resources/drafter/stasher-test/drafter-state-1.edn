@@ -1,8 +1,5 @@
 {
  
- :drafter.backend/rdf4j-repo {:sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query" 
-                              :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update" }
- 
  :drafter/logging {:config "./test/resources/log-config.edn"}
 
  :drafter.stasher/cache-thread-pool {}
@@ -14,10 +11,8 @@
  
  :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/cache
                         :thread-pool #ig/ref :drafter.stasher/cache-thread-pool
-                        :raw-repo #ig/ref :drafter.backend/rdf4j-repo
-                        :sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query" ;#env SPARQL_QUERY_ENDPOINT
-                        :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update" ;#env SPARQL_UPDATE_ENDPOINT
-                        }
+                        :sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
+                        :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
 
 
  ;; instantiate/remove test fixture
