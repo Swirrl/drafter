@@ -3,6 +3,7 @@
             [clojure.spec.alpha :as s]
             [drafter.stasher.filecache :as fc]
             [drafter.stasher.cache-key :as ck]
+            [drafter.stasher.timing :as timing]
             [grafter.rdf4j.repository :as repo]
             [grafter.rdf4j.sparql :as sparql]
             [grafter.rdf4j.io :as gio]
@@ -196,8 +197,7 @@
     parser))
 
 (defn- wrap-graph-result [bg-graph-result format stream]
-  (let [start-time (System/currentTimeMillis)
-        prefixes (.getNamespaces bg-graph-result) ;; take prefixes from supplied result
+  (let [prefixes (.getNamespaces bg-graph-result) ;; take prefixes from supplied result
         cache-file-writer ^RDFWriter (grafter.rdf4j.io/rdf-writer
                                       stream
                                       :format format
@@ -213,8 +213,6 @@
           (.close bg-graph-result)
           (.endRDF cache-file-writer)
           (.close stream)
-          (dd/histogram! "drafter.stasher.graph_sync.cache_miss"
-                         (- (System/currentTimeMillis) start-time))
           (catch Throwable ex
             (fc/cancel-and-close stream)
             (throw ex))))
@@ -241,8 +239,7 @@
 
 (defn- wrap-tuple-result
   [^TupleQueryResultHandler bg-tuple-result fmt stream mode]
-  (let [start-time (System/currentTimeMillis)
-        tuple-format (get-in supported-cache-formats [:tuple fmt])
+  (let [tuple-format (get-in supported-cache-formats [:tuple fmt])
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)
         bindings (.getBindingNames bg-tuple-result)]
     ;; copy the projected variables/column names across to the
@@ -256,9 +253,7 @@
         (log/infof "Result ended, closing tuple writer")
         (.endQueryResult cache-file-writer)
         (.endQueryResult bg-tuple-result)
-        (.close stream)
-        (dd/histogram! (format "drafter.stasher.tuple_%s.cache_miss" (name mode))
-                       (- (System/currentTimeMillis) start-time)))
+        (.close stream))
       (handleLinks [this links]
         ;; pretty sure this is really a no/op
         (.handleLinks cache-file-writer links)
@@ -287,8 +282,6 @@
           (.close bg-tuple-result)
           (.endQueryResult cache-file-writer)
           (.close stream)
-          (dd/histogram! (format "drafter.stasher.tuple_%s.cache_miss" (name mode))
-                         (- (System/currentTimeMillis) start-time))
           (catch Throwable ex
             (fc/cancel-and-close stream)
             (throw ex))))
@@ -393,8 +386,7 @@
    the cache
 
   For RDF push query results."
-  (let [start-time (System/currentTimeMillis)
-        rdf-format  (get-in supported-cache-formats [:graph fmt])
+  (let [rdf-format  (get-in supported-cache-formats [:graph fmt])
         ;; explicitly set prefixes to nil as gio/rdf-writer will write
         ;; the grafter default-prefixes otherwise.  By setting to nil,
         ;; use what comes from the stream instead.
@@ -412,8 +404,6 @@
           (.endRDF cache-file-writer)
           (.endRDF inner-rdf-handler)
           (.close out-stream)
-          (dd/histogram! "drafter.stasher.graph_async.cache_miss"
-                         (- (System/currentTimeMillis) start-time))
           (catch Throwable ex
             (fc/cancel-and-close out-stream)
             (throw ex))))
@@ -461,8 +451,12 @@
           out-stream (fc/destination-stream cache-backend cache-key fmt)]
       (log/debugf "Preparing to insert entry for %s query" (ck/query-type cache-key))
       (case (:query-type cache-key)
-        :graph (wrap-graph-result query-result fmt out-stream)
-        :tuple (wrap-tuple-result query-result fmt out-stream :sync)
+        :graph (timing/graph-result
+                "drafter.stasher.graph_sync.cache_miss"
+                (wrap-graph-result query-result fmt out-stream))
+        :tuple (timing/tuple-result
+                "drafter.stasher.tuple_sync.cache_miss"
+                (wrap-tuple-result query-result fmt out-stream :sync))
         :boolean (stash-boolean-result query-result fmt out-stream))))
   (async-read [this cache-key handler base-uri-str]
     (let [fmt (data-format formats cache-key)]
@@ -476,8 +470,12 @@
     (let [fmt (data-format formats cache-key)
           out-stream (fc/destination-stream cache-backend cache-key fmt)]
       (case (:query-type cache-key)
-        :graph (wrap-graph-async-handler handler fmt out-stream)
-        :tuple (wrap-tuple-result handler fmt out-stream :async)))))
+        :graph (timing/rdf-handler
+                "drafter.stasher.graph_async.cache_miss"
+                (wrap-graph-async-handler handler fmt out-stream))
+        :tuple (timing/tuple-handler
+                "drafter.stasher.tuple_async.cache_miss"
+                (wrap-tuple-result handler fmt out-stream :async))))))
 
 (defn- cache? [query-str dataset]
   (and (some? dataset)
@@ -499,10 +497,12 @@
                                                query-str base-uri-str dataset
                                                (.getIncludeInferred this) (.getMaxExecutionTime this)
                                                (.getBindingsArray this)))))
-           (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                            query-str base-uri-str dataset
-                            (.getIncludeInferred this) (.getMaxExecutionTime this)
-                            (.getBindingsArray this)))))
+           (timing/graph-result
+            "drafter.stasher.graph_sync.no_cache"
+            (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                                       query-str base-uri-str dataset
+                                                       (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                                       (.getBindingsArray this))))))
 
       ;; async results
       ([rdf-handler]
@@ -515,10 +515,11 @@
                                     query-str base-uri-str dataset
                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
                                     stashing-rdf-handler (.getBindingsArray this)))))
-           (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                            query-str base-uri-str dataset
-                            (.getIncludeInferred this) (.getMaxExecutionTime this)
-                            rdf-handler (.getBindingsArray this))))))))
+           (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
+             (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                              query-str base-uri-str dataset
+                              (.getIncludeInferred this) (.getMaxExecutionTime this)
+                              timing-rdf-handler (.getBindingsArray this)))))))))
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
@@ -537,11 +538,13 @@
                                                (.getIncludeInferred this)
                                                (.getMaxExecutionTime this)
                                                (.getBindingsArray this)))))
-           (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                            query-str base-uri-str dataset
-                            (.getIncludeInferred this)
-                            (.getMaxExecutionTime this)
-                            (.getBindingsArray this)))))
+           (timing/tuple-result
+            "drafter.stasher.tuple_sync.no_cache"
+            (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                             query-str base-uri-str dataset
+                             (.getIncludeInferred this)
+                             (.getMaxExecutionTime this)
+                             (.getBindingsArray this))))))
       ([tuple-handler]
        (let [dataset (.getDataset this)]
          (if (cache? query-str dataset)
@@ -552,10 +555,11 @@
                                     query-str base-uri-str dataset
                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
                                     stashing-tuple-handler (.getBindingsArray this)))))
-           (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                            query-str base-uri-str dataset
-                            (.getIncludeInferred this) (.getMaxExecutionTime this)
-                            tuple-handler (.getBindingsArray this))))))))
+           (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
+             (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                              query-str base-uri-str dataset
+                              (.getIncludeInferred this) (.getMaxExecutionTime this)
+                              timing-tuple-handler (.getBindingsArray this)))))))))
 
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
@@ -578,11 +582,14 @@
                                                (.getIncludeInferred this)
                                                (.getMaxExecutionTime this)
                                                (.getBindingsArray this))))))
-          (.sendBooleanQuery httpclient QueryLanguage/SPARQL
-                             query-str base-uri-str dataset
-                             (.getIncludeInferred this)
-                             (.getMaxExecutionTime this)
-                             (.getBindingsArray this)))))))
+          (dd/measure!
+           "drafter.stasher.boolean_sync.no_cache"
+           {}
+           (.sendBooleanQuery httpclient QueryLanguage/SPARQL
+                              query-str base-uri-str dataset
+                              (.getIncludeInferred this)
+                              (.getMaxExecutionTime this)
+                              (.getBindingsArray this))))))))
 
 
 (defn- stasher-connection [repo httpclient cache {:keys [quad-mode base-uri] :or {quad-mode false} :as opts}]
