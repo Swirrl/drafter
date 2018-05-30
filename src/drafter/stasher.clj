@@ -25,7 +25,7 @@
                                              TupleQueryResultParserRegistry)
            org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.repository.RepositoryConnection
-           (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery)
+           (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate)
            (org.eclipse.rdf4j.rio RDFFormat RDFHandler RDFWriter RDFParserRegistry)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
            [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
@@ -515,7 +515,7 @@
       ([]
        (let [dataset (.getDataset this)]
          (if (cache? dataset)
-           (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :graph cache query-str dataset conn)]
+           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -533,7 +533,7 @@
       ([rdf-handler]
        (let [dataset (.getDataset this)]
          (if (cache? dataset)
-           (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :graph cache query-str dataset conn)]
+           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
                  (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -555,7 +555,7 @@
       ([]
        (let [dataset (.getDataset this)]
          (if (cache? dataset)
-           (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
+           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -573,7 +573,7 @@
       ([tuple-handler]
        (let [dataset (.getDataset this)]
          (if (cache? dataset)
-           (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
+           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
                  (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -594,7 +594,7 @@
     (evaluate []
       (let [dataset (.getDataset this)]
         (if (cache? dataset)
-          (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :boolean cache query-str dataset conn)
+          (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
                 result (get-result cache cache-key base-uri-str)]
             (if (some? result)
               result
@@ -616,12 +616,27 @@
                               (.getMaxExecutionTime this)
                               (.getBindingsArray this))))))))
 
+(defn- get-state-graph-modified-time []
+  (let [state-graph-modified-time (java.util.Date.)]
+    (log/infof "Using new state graph modified time of: %s" state-graph-modified-time)
+    state-graph-modified-time))
+
+(defn cache-busting-update-statement
+  [httpclient query-str base-uri-str state-graph-modified-time]
+  (proxy [SPARQLUpdate] [httpclient base-uri-str query-str]
+    (execute []
+      (proxy-super execute)
+      (reset! state-graph-modified-time (get-state-graph-modified-time)))))
+
 
 (defn- stasher-connection [repo httpclient cache {:keys [quad-mode base-uri] :or {quad-mode false} :as opts}]
   (proxy [DrafterSPARQLConnection] [repo httpclient quad-mode]
 
-;    #_(commit) ;; catch potential cache expirey
-;    #_(prepareUpdate [_ query-str base-uri-str]);; catch
+    (commit []
+      (proxy-super commit)
+      (reset! (:state-graph-modified-time opts) (get-state-graph-modified-time)))
+    (prepareUpdate [_ query-str base-uri-str]
+      (cache-busting-update-statement httpclient query-str (or base-uri-str base-uri) (:state-graph-modified-time opts)))
 
     (prepareTupleQuery [_ query-str base-uri-str]
       (stashing-select-query this httpclient cache query-str (or base-uri-str base-uri) opts))
@@ -631,11 +646,6 @@
 
     (prepareBooleanQuery [_ query-str base-uri-str]
       (stashing-boolean-query this httpclient cache query-str (or base-uri-str base-uri) opts))))
-
-(defn- get-state-graph-modified-time []
-  (let [state-graph-modified-time (java.util.Date.)]
-    (log/infof "Using state graph modified time of: %s" state-graph-modified-time)
-    state-graph-modified-time))
 
 (defn stasher-repo
   "Builds a stasher RDF repository, that implements the standard RDF4j
@@ -655,7 +665,7 @@
         updated-opts (assoc opts
                             :base-uri (or (:base-uri opts)
                                           "http://publishmydata.com/id/")
-                            :state-graph-modified-time (get-state-graph-modified-time))
+                            :state-graph-modified-time (atom (get-state-graph-modified-time)))
         repo (doto (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
                      (getConnection []
                        (stasher-connection this (.createHTTPClient this) cache updated-opts)))
