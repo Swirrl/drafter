@@ -159,20 +159,44 @@
   (some #{(URI. "http://publishmydata.com/graphs/drafter/drafts")}
         (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
 
-(defn fetch-modified-state [conn {:keys [named-graphs default-graphs] :as graphs}]
-  (let [values {:graph (set (concat default-graphs named-graphs))}]
-    (first (sparql/query "drafter/stasher/modified-state.sparql" values conn))))
+(def ^:dynamic *cache-state-graph-query* false)
 
-(defn generate-drafter-cache-key [query-type _cache query-str ?dataset conn]
-  {:pre [(instance? Dataset ?dataset)
-         (instance? RepositoryConnection conn)]
-   :post [(s/valid? ::ck/cache-key %)]}
+(defn fetch-modified-state [conn {:keys [named-graphs default-graphs] :as graphs}]
+  (binding [*cache-state-graph-query* true]
+    (let [values {:graph (set (concat default-graphs named-graphs))}]
+      (->> (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn)))
+           (remove (comp nil? second))
+           (into {})))))
+
+(defn- use-state-graph-key? [dataset]
+  (or (nil? dataset)
+      (is-state-graph? dataset)))
+
+(defn generate-cache-key [query-type query-str ?dataset conn]
   (let [graphs (dataset->graphs ?dataset)
         modified-state (fetch-modified-state conn graphs)]
     {:dataset (graphs->edn graphs)
      :query-type query-type
      :query-str query-str
      :modified-times modified-state}))
+
+
+(defn generate-state-graph-cache-key [query-type query-str ?dataset state-graph-modified-time]
+  (let [graphs (dataset->graphs ?dataset)]
+    {:dataset (graphs->edn graphs)
+     :query-type query-type
+     :query-str query-str
+     :modified-time state-graph-modified-time}))
+
+(defn generate-drafter-cache-key [state-graph-modified-time query-type _cache query-str ?dataset conn]
+  {:pre [(or (instance? Dataset ?dataset)
+             (nil? ?dataset))
+         (instance? RepositoryConnection conn)]
+   :post [(or (s/valid? ::ck/cache-key %)
+              (s/valid? ::ck/state-graph-cache-key %))]}
+  (or (and (use-state-graph-key? ?dataset)
+           (generate-state-graph-cache-key query-type query-str ?dataset state-graph-modified-time))
+      (generate-cache-key query-type query-str ?dataset conn)))
 
 (defn get-charset [format]
   {:pre [(instance? org.eclipse.rdf4j.common.lang.FileFormat format)]}
@@ -237,68 +261,67 @@
             (fc/cancel-and-close stream)
             (throw ex)))))))
 
-(defn- wrap-tuple-result
-  [^TupleQueryResultHandler bg-tuple-result fmt stream mode]
-  (let [tuple-format (get-in supported-cache-formats [:tuple fmt])
-        cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)
-        bindings (.getBindingNames bg-tuple-result)]
-    ;; copy the projected variables/column names across to the
-    ;; cached file.
-    (when (= mode :sync)
-      (.startQueryResult cache-file-writer bindings))
-    (reify
-      ;; Push interface...
-      TupleQueryResultHandler
-      (endQueryResult [this]
-        (log/infof "Result ended, closing tuple writer")
-        (.endQueryResult cache-file-writer)
-        (.endQueryResult bg-tuple-result)
-        (.close stream))
-      (handleLinks [this links]
-        ;; pretty sure this is really a no/op
-        (.handleLinks cache-file-writer links)
-        (.handleLinks bg-tuple-result links))
-
-      (handleBoolean [this bool]
-        ;; pretty sure this is really a no/op
-        (.handleBoolean cache-file-writer bool)
-        (.handleBoolean bg-tuple-result bool))
-
-      (handleSolution [this binding-set]
-        (.handleSolution cache-file-writer binding-set)
-        (.handleSolution bg-tuple-result binding-set))
-
-      (startQueryResult [this binding-names]
-        (.startQueryResult cache-file-writer binding-names)
-        (.startQueryResult bg-tuple-result binding-names))
-
-      ;; pull interface
-      TupleQueryResult
+(defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt stream]
+  (let [bindings (.getBindingNames bg-tuple-result)
+        tuple-format (get-in supported-cache-formats [:tuple fmt])
+        cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
+    (.startQueryResult cache-file-writer bindings)
+    ;; pull interface
+    (reify TupleQueryResult
       (getBindingNames [this]
         (.getBindingNames bg-tuple-result))
       (close [this]
         (log/infof "Result closed, closing tuple writer")
         (try
           (.close bg-tuple-result)
-          (.endQueryResult cache-file-writer)
-          (.close stream)
+          (if (.hasNext this)
+            (do (log/warn "Trying to close query result before consuming. Not writing cache")
+                (fc/cancel-and-close stream))
+            (do (.endQueryResult cache-file-writer)
+                (.close stream)))
           (catch Throwable ex
+            (.printStackTrace ex)
             (fc/cancel-and-close stream)
             (throw ex))))
       (hasNext [this]
         (try
-          (.hasNext ^TupleQueryResult bg-tuple-result)
+          (.hasNext bg-tuple-result)
           (catch Throwable ex
             (fc/cancel-and-close stream)
             (throw ex))))
       (next [this]
         (try
-          (let [solution (.next ^TupleQueryResult bg-tuple-result)]
+          (let [solution (.next bg-tuple-result)]
             (.handleSolution cache-file-writer solution)
             solution)
           (catch Throwable ex
             (fc/cancel-and-close stream)
             (throw ex)))))))
+
+(defn- wrap-tuple-result-push
+  [^TupleQueryResultHandler result-handler fmt stream]
+  (let [tuple-format (get-in supported-cache-formats [:tuple fmt])
+        cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
+    (reify
+      ;; Push interface...
+      TupleQueryResultHandler
+      (endQueryResult [this]
+        (log/infof "Result ended, closing tuple writer")
+        (.endQueryResult cache-file-writer)
+        (.endQueryResult result-handler)
+        (.close stream))
+      (handleLinks [this links]
+        (.handleLinks cache-file-writer links)
+        (.handleLinks result-handler links))
+      (handleBoolean [this bool]
+        (.handleBoolean cache-file-writer bool)
+        (.handleBoolean result-handler bool))
+      (handleSolution [this binding-set]
+        (.handleSolution cache-file-writer binding-set)
+        (.handleSolution result-handler binding-set))
+      (startQueryResult [this binding-names]
+        (.startQueryResult cache-file-writer binding-names)
+        (.startQueryResult result-handler binding-names)))))
 
 (defn- stash-boolean-result [result fmt-kw stream]
   {:post [(some? %)]}
@@ -456,7 +479,7 @@
                 (wrap-graph-result query-result fmt out-stream))
         :tuple (timing/tuple-result
                 "drafter.stasher.tuple_sync.cache_miss"
-                (wrap-tuple-result query-result fmt out-stream :sync))
+                (wrap-tuple-result-pull query-result fmt out-stream))
         :boolean (stash-boolean-result query-result fmt out-stream))))
   (async-read [this cache-key handler base-uri-str]
     (let [fmt (data-format formats cache-key)]
@@ -475,11 +498,13 @@
                 (wrap-graph-async-handler handler fmt out-stream))
         :tuple (timing/tuple-handler
                 "drafter.stasher.tuple_async.cache_miss"
-                (wrap-tuple-result handler fmt out-stream :async))))))
+                (wrap-tuple-result-push handler fmt out-stream))))))
 
-(defn- cache? [query-str dataset]
-  (and (some? dataset)
-       (not (is-state-graph? dataset))))
+(defn- cache? [dataset]
+  (or (and dataset
+           (not (is-state-graph? dataset)))
+      *cache-state-graph-query*))
+
 
 (defn stashing-graph-query
   "Construct a graph query that checks the stash before evaluating"
@@ -489,8 +514,8 @@
       ;; sync results
       ([]
        (let [dataset (.getDataset this)]
-         (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset conn)]
+         (if (cache? dataset)
+           (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -507,8 +532,8 @@
       ;; async results
       ([rdf-handler]
        (let [dataset (.getDataset this)]
-         (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :graph cache query-str dataset conn)]
+         (if (cache? dataset)
+           (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
                  (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -529,8 +554,8 @@
       ;; sync results
       ([]
        (let [dataset (.getDataset this)]
-         (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset conn)]
+         (if (cache? dataset)
+           (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -547,8 +572,8 @@
                              (.getBindingsArray this))))))
       ([tuple-handler]
        (let [dataset (.getDataset this)]
-         (if (cache? query-str dataset)
-           (let [cache-key (generate-drafter-cache-key :tuple cache query-str dataset conn)]
+         (if (cache? dataset)
+           (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
                  (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -568,8 +593,8 @@
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
       (let [dataset (.getDataset this)]
-        (if (cache? query-str dataset)
-          (let [cache-key (generate-drafter-cache-key :boolean cache query-str dataset conn)
+        (if (cache? dataset)
+          (let [cache-key (generate-drafter-cache-key (:state-graph-modified-time opts) :boolean cache query-str dataset conn)
                 result (get-result cache cache-key base-uri-str)]
             (if (some? result)
               result
@@ -607,6 +632,11 @@
     (prepareBooleanQuery [_ query-str base-uri-str]
       (stashing-boolean-query this httpclient cache query-str (or base-uri-str base-uri) opts))))
 
+(defn- get-state-graph-modified-time []
+  (let [state-graph-modified-time (java.util.Date.)]
+    (log/infof "Using state graph modified time of: %s" state-graph-modified-time)
+    state-graph-modified-time))
+
 (defn stasher-repo
   "Builds a stasher RDF repository, that implements the standard RDF4j
   repository interface but caches query results to disk and
@@ -624,7 +654,8 @@
 
         updated-opts (assoc opts
                             :base-uri (or (:base-uri opts)
-                                          "http://publishmydata.com/id/"))
+                                          "http://publishmydata.com/id/")
+                            :state-graph-modified-time (get-state-graph-modified-time))
         repo (doto (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
                      (getConnection []
                        (stasher-connection this (.createHTTPClient this) cache updated-opts)))
