@@ -31,7 +31,7 @@
   "Force the creation of an entry in the cache via the backdoor "
   [cache repo dataset query-string]
   (let [cache-key (with-open [conn (.getConnection repo)]
-                    (sut/generate-drafter-cache-key :graph cache query-string dataset conn))
+                    (sut/generate-drafter-cache-key nil :graph cache query-string dataset conn))
         fmt (get-in cache [:formats :graph])]
     (with-open [in-stream (fc/destination-stream (:cache-backend cache)
                                                  cache-key
@@ -80,7 +80,7 @@
         dir (get-in cache [:cache-backend :dir])
         fmt (get-in cache [:formats query-type])
         cache-key (with-open [conn (.getConnection raw-repo)]
-                    (sut/generate-drafter-cache-key query-type cache query dataset conn))
+                    (sut/generate-drafter-cache-key nil query-type cache query dataset conn))
         cached-file (fc/cache-key->cache-path dir fmt cache-key)]
     (t/testing "Prove the side-effect of creating the file in the cache happened"
       (t/is (.exists cached-file)
@@ -355,7 +355,7 @@
   (let [dataset (edn->dataset {:named-graphs [live-graph-1 live-graph-only]
                                :default-graphs [live-graph-1 live-graph-only]})
         result (with-open [conn (.getConnection repo)]
-                 (sut/generate-drafter-cache-key :graph filecache basic-construct-query dataset conn))]
+                 (sut/generate-drafter-cache-key nil :graph filecache basic-construct-query dataset conn))]
     
     (let [{:keys [dataset query-str modified-times]} result]
       (t/is (= 
