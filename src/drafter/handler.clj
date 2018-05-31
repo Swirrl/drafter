@@ -61,6 +61,7 @@
                               wrap-verbs
                               wrap-encode-errors
                               middleware/wrap-total-requests-counter
+                              middleware/wrap-request-timer
                               log-request
                               ;;wrap-file-info       ;; Content-Type, Content-Length, and Last Modified headers for files in body
                               ]
