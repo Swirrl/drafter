@@ -219,3 +219,9 @@
     (datadog/increment! "drafter.requests.total" 1)
     (handler req)))
 
+(defn wrap-request-timer [handler]
+  (fn [req]
+    (datadog/measure!
+     "drafter.request.time" {}
+     (handler req))))
+
