@@ -159,14 +159,11 @@
   (some #{(URI. "http://publishmydata.com/graphs/drafter/drafts")}
         (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
 
-(def ^:dynamic *cache-state-graph-query* false)
-
 (defn fetch-modified-state [conn {:keys [named-graphs default-graphs] :as graphs}]
-  (binding [*cache-state-graph-query* true]
-    (let [values {:graph (set (concat default-graphs named-graphs))}]
-      (->> (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn)))
-           (remove (comp nil? second))
-           (into {})))))
+  (let [values {:graph (set (concat default-graphs named-graphs))}]
+    (->> (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn)))
+         (remove (comp nil? second))
+         (into {}))))
 
 (defn- use-state-graph-key? [dataset]
   (or (nil? dataset)
@@ -500,21 +497,15 @@
                 "drafter.stasher.tuple_async.cache_miss"
                 (wrap-tuple-result-push handler fmt out-stream))))))
 
-(defn- cache? [dataset]
-  (or (and dataset
-           (not (is-state-graph? dataset)))
-      *cache-state-graph-query*))
-
-
 (defn stashing-graph-query
   "Construct a graph query that checks the stash before evaluating"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
+  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLGraphQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
        (let [dataset (.getDataset this)]
-         (if (cache? dataset)
+         (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
@@ -532,7 +523,7 @@
       ;; async results
       ([rdf-handler]
        (let [dataset (.getDataset this)]
-         (if (cache? dataset)
+         (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
                  (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
@@ -548,13 +539,13 @@
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
+  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
        (let [dataset (.getDataset this)]
-         (if (cache? dataset)
+         (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
@@ -572,7 +563,7 @@
                              (.getBindingsArray this))))))
       ([tuple-handler]
        (let [dataset (.getDataset this)]
-         (if (cache? dataset)
+         (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
                  (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
@@ -589,11 +580,11 @@
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
   Boolean queries are sync only"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool] :as opts}]
+  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
       (let [dataset (.getDataset this)]
-        (if (cache? dataset)
+        (if cache? 
           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
                 result (get-result cache cache-key base-uri-str)]
             (if (some? result)
@@ -663,6 +654,7 @@
         deltas (boolean (or report-deltas true))
 
         updated-opts (assoc opts
+                            :cache? (get opts :cache? true)
                             :base-uri (or (:base-uri opts)
                                           "http://publishmydata.com/id/")
                             :state-graph-modified-time (atom (get-state-graph-modified-time)))
@@ -700,7 +692,7 @@
 
 (defmethod ig/pre-init-spec :drafter.stasher/repo [_]
   (s/keys :req-un [::sparql-query-endpoint ::sparql-update-endpoint ::cache]
-          :opt-un [::quad-mode ::report-deltas ::base-uri]))
+          :opt-un [::quad-mode ::report-deltas ::base-uri ::cache?]))
 
 (defmethod ig/pre-init-spec :drafter.stasher/cache [_]
   (s/keys :req-un [::cache-backend ::thread-pool]
