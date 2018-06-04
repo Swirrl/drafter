@@ -105,12 +105,12 @@
 
 
 
-(defn assert-caches-query [cached-repo uncached-repo cache query-str expected-data]
+(defn assert-caches-query [cached-repo cache query-str expected-data]
   (t/testing "Cached & uncached queries return expected data and expected data is stored in the cache"
     (with-open [cached-conn (repo/->connection cached-repo)]
-      (let [uncached-results (box-result (repo/query cached-conn query-str :default-graph "http://fake-graph.com/")) ;; first query should be uncached
-            cached-results (box-result (repo/query cached-conn query-str :default-graph "http://fake-graph.com/"))
-            dataset (repo/make-restricted-dataset :default-graph [] "http://fake-graph.com/")]
+      (let [uncached-results (box-result (repo/query cached-conn query-str)) ;; first query should be uncached
+            cached-results (box-result (repo/query cached-conn query-str))
+            dataset (repo/make-restricted-dataset)]
         
         (t/testing "The cached, uncached and fixture data are all the same"
           (t/is (= (set uncached-results)
@@ -119,18 +119,24 @@
 
         (t/testing "Results for query are stored on disk"
           ;; Check that the expected fixture data was stored in the cache on disk
-          (assert-cached-results cache uncached-repo query-str dataset expected-data))))))
+          ;; TODO Dan: I've commented this out because stasher now generates a
+          ;; TODO Dan: cache key containing the state graph modified time, and
+          ;; TODO Dan: we don't have access to that here to recreate the same
+          ;; TODO Dan: key.
+          ;; TODO Dan: Long term, I'd like to split stasher / repo / filecache
+          ;; TODO Dan: tests and remove all disk checks from here
+          ;; (assert-cached-results cache uncached-repo query-str dataset expected-data)
+          )))))
 
-#_(deftest-system stasher-queries-pull-test
+(deftest-system stasher-queries-pull-test
   [{caching-repo :drafter.stasher/repo
     cache :drafter.stasher/cache
-    uncached-repo :drafter.backend/rdf4j-repo
-    {:keys [fixtures]} :drafter.fixture-data/loader} "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
-
+    {:keys [fixtures]} :drafter.fixture-data/loader}
+   "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
   (t/testing "Stashing of all query types"
     (t/testing "ASK"
-      (assert-caches-query caching-repo uncached-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
-      (assert-caches-query caching-repo uncached-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false}))
+      (assert-caches-query caching-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
+      (assert-caches-query caching-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false}))
     
     ;; (t/testing "SELECT"
     ;;   (let [select-query "SELECT * WHERE { ?s ?p ?o } LIMIT 2"
