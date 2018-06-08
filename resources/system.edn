@@ -18,12 +18,17 @@
 
  :drafter.stasher/cache-clearer {:scheduler #ig/ref :drafter.stasher.cache-clearer/scheduler
                                  :cache-dir #or [#env STASHER_CACHE_DIR "stasher-cache"]
-                                 :max-cache-size-gb 1.0}
+                                 :max-cache-size-gb #or [#env STASHER_CACHE_SIZE 10.0]
+                                 :delay #or [#env STASHER_CACHE_CLEANER_DELAY 10]
+                                 :period #or [#env STASHER_CACHE_CLEANER_PERIOD 30]
+                                 :archive-ttl #or [#env STASHER_CACHE_CLEANER_ARCHIVE_TTL 240]
+                                 :archive-at #or [#env STASHER_CACHE_CLEANER_ARCHIVE_AT 0.8]
+                                 :archive-until #or [#env STASHER_CACHE_CLEANER_ARCHIVE_UNTIL 0.6]}
 
  :drafter.stasher/cache-thread-pool {}
 
- :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
-                                :cache #ig/ref :drafter.stasher/cache}
+ :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/cache
+                                :enabled? #boolean #or [#env STASHER_CACHE_ENABLED true]}
                                ^:ref [:drafter.common/config]]
 
 
