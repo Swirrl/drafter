@@ -1,4 +1,4 @@
-(def VERSION (or (System/getenv "TRAVIS_TAG") "local-2.1.x-SNAPSHOT"))
+(def VERSION (or (System/getenv "TRAVIS_TAG") "local-2.2.x-SNAPSHOT"))
 
 (defproject drafter VERSION
   :description "Backend PMD service"
