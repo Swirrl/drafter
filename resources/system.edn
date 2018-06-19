@@ -28,7 +28,7 @@
  :drafter.stasher/cache-thread-pool {}
 
  :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/cache
-                                :enabled? #boolean #or [#env STASHER_CACHE_ENABLED true]}
+                                :cache? #boolean #or [#env STASHER_CACHE_ENABLED true]}
                                ^:ref [:drafter.common/config]]
 
 
