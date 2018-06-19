@@ -663,6 +663,7 @@
                        (stasher-connection this (.createHTTPClient this) cache updated-opts)))
                (.initialize))]
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
+    (log/infof "Stasher Caching enabled: %b" (get updated-opts :cache?))
     (repo/notifying-repo repo deltas)))
 
 (defn stasher-cache [opts]
