@@ -61,18 +61,12 @@
                  [metosin/ring-swagger-ui "2.2.10"]
                  
                  ;; Use JENA for our query rewriting
-
-               
-                 ;; Lock JENA to a specific 3.7.0-SNAPSHOT based on this commit: 
-                 ;; https://github.com/afs/jena/tree/2586abf09751fd962ca7afe25d4ab3d9431ce716
-                 ;;
-                 ;; We should update these deps when 3.7.0 is released.
-                 [org.apache.jena/jena-arq "3.7.0-20180131.100034-17" :exclusions [org.slf4j/slf4j-api
-                                                                                   org.slf4j/jcl-over-slf4j
-                                                                                   org.apache.httpcomponents/httpclient]]
-                 [org.apache.jena/jena-base "3.7.0-20180131.095758-17" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-core "3.7.0-20180131.095918-17" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-iri "3.7.0-20180131.095726-17" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-arq "3.9.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api
+                                                                         org.slf4j/jcl-over-slf4j
+                                                                         org.apache.httpcomponents/httpclient]]
+                 [org.apache.jena/jena-base "3.9.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-core "3.9.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-iri "3.9.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
                  
 
                  [org.mindrot/jbcrypt "0.4"]
