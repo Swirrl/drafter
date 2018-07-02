@@ -61,12 +61,15 @@
                  [metosin/ring-swagger-ui "2.2.10"]
                  
                  ;; Use JENA for our query rewriting
-                 [org.apache.jena/jena-arq "3.9.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api
+                 ;; Use private release of Jena based on commit 44b478ea8637ca16035e56ef49d6cb6e59abc289
+                 ;; See https://github.com/Swirrl/drafter/issues/270
+                 ;; This should be updated to use 3.9.0 when that version is released
+                 [org.apache.jena/jena-arq "3.9.0-44b478ea" :exclusions [org.slf4j/slf4j-api
                                                                          org.slf4j/jcl-over-slf4j
                                                                          org.apache.httpcomponents/httpclient]]
-                 [org.apache.jena/jena-base "3.9.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-core "3.9.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
-                 [org.apache.jena/jena-iri "3.9.0-SNAPSHOT" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-base "3.9.0-44b478ea" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-core "3.9.0-44b478ea" :exclusions [org.slf4j/slf4j-api]]
+                 [org.apache.jena/jena-iri "3.9.0-44b478ea" :exclusions [org.slf4j/slf4j-api]]
                  
 
                  [org.mindrot/jbcrypt "0.4"]
