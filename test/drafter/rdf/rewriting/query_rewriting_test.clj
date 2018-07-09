@@ -169,4 +169,8 @@
                                    .
                           }
                           GROUP BY ?obs
-                          HAVING (COUNT(?value) > 1)")))))
+                          HAVING (COUNT(?value) > 1)")))
+
+    (testing "JENA-1566"
+      (is-tree= "SELECT ?b WHERE { VALUES ?b { true }}"
+                (rewrite "SELECT ?b WHERE { VALUES ?b { true }}")))))
