@@ -113,7 +113,7 @@
 
 
 (defn- build-format-keyword->format-map [formats]
-  "Builds a hashmap from format keywords to RDFFormat's. 
+  "Builds a hashmap from format keywords to RDFFormat's.
 
   e.g. nt => RDFFormat/NTRIPLES etc..."
   (reduce (fn [acc fmt]
@@ -131,15 +131,16 @@
 
 
 (defprotocol Stash
-  ;; This will return a nil on cache miss, or a Background[Graph|Tuple]Result
-  ;;or a boolean on hit, depending on the query-type.
-  (get-result [this cache-key base-uri-str])
-  ;; Wrap the query-result to insert it into the cache as it is being read by the caller
-  (wrap-result [this cache-key query-result])
-  ;; Read into the handler, return nil to indicate a cache miss
-  (async-read [this cache-key handler base-uri-str])
-  ;; Wrap the handler, putting the async thing into the cache as it is being handled
-  (wrap-async-handler [this cache-key async-handler]))
+  (get-result [this cache-key base-uri-str]
+    "This will return a nil on cache miss, or a
+    Background[Graph|Tuple]Result or a boolean on hit, depending on
+    the query-type.")
+  (wrap-result [this cache-key query-result]
+    "Wrap the query-result to insert it into the cache as it is being read by the caller")
+  (async-read [this cache-key handler base-uri-str]
+    "Read into the handler, return nil to indicate a cache miss")
+  (wrap-async-handler [this cache-key async-handler]
+    "Wrap the handler, putting the async thing into the cache as it is being handled"))
 
 (defn dataset->graphs
   "Extract graphs from the dataset"
@@ -584,7 +585,7 @@
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
       (let [dataset (.getDataset this)]
-        (if cache? 
+        (if cache?
           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
                 result (get-result cache cache-key base-uri-str)]
             (if (some? result)
@@ -698,5 +699,3 @@
 (defmethod ig/pre-init-spec :drafter.stasher/cache [_]
   (s/keys :req-un [::cache-backend ::thread-pool]
           :opt-un [::formats]))
-
-
