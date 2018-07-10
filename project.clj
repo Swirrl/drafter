@@ -109,10 +109,8 @@
   :profiles
   {
    :java9 {:jvm-opts ["--add-modules" "java.xml.bind"]}
-   
-   :uberjar [:prod
-             {:aot :all
-              :main drafter.main}]
+
+   :uberjar [:prod {:aot :all}]
 
    :prod {:uberjar-name "drafter.jar"
           :source-paths ["env/prod/clj"]
@@ -162,4 +160,6 @@
                   ["change" "version" "leiningen.release/bump-version"]
                   ["vcs" "commit"]
                   ;;["vcs" "push"]
-                  ])
+                  ]
+
+  :main drafter.main)
