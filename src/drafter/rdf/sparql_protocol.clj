@@ -1,18 +1,118 @@
 (ns drafter.rdf.sparql-protocol
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.spec.alpha :as s]
+            [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
+            [grafter.rdf4j.repository :as repo]
             [compojure.core :refer [make-route]]
-            [drafter
-             [channels :refer :all]
-             [middleware :refer [allowed-methods-handler sparql-negotiation-handler sparql-prepare-query-handler sparql-timeout-handler sparql-query-parser-handler]]
-             [timeouts :as timeouts]]
+            [drafter.channels :refer :all]
+            [drafter.requests :as drafter-request]
+            [drafter.rdf.content-negotiation :as conneg]
+            [drafter.backend.common :as bcom]
             [drafter.rdf.sesame
              :refer
-             [create-signalling-query-handler get-query-type]])
+             [create-signalling-query-handler get-query-type]
+             :as ses]
+            [drafter.responses :as response]
+            [drafter.timeouts :as timeouts]
+            [integrant.core :as ig]
+            [ring.util.request :as request])
   (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            java.util.concurrent.TimeUnit
            org.eclipse.rdf4j.query.QueryInterruptedException
-           org.eclipse.rdf4j.query.resultio.QueryResultIO))
+           org.eclipse.rdf4j.query.resultio.QueryResultIO
+           org.apache.jena.query.QueryParseException))
+
+(defn sparql-prepare-query-handler
+  "Returns a ring handler which fetches the query string from an
+  incoming request, validates it and prepares it using the given
+  executor. The unvalidated query string should exist at the
+  path [:sparql :query-string] in the incoming request. The prepared
+  query is associated into the request at
+  the [:sparql :prepared-query] key for access in downstream
+  handlers."
+  [executor inner-handler]
+  (fn [request]
+    (with-open [conn (repo/->connection executor)]
+      (try
+        (let [validated-query-str (bcom/validate-query (get-in request [:sparql :query-string]))
+              pquery (repo/prepare-query conn validated-query-str)]
+          (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
+        (catch QueryParseException ex
+          (let [error-message (.getMessage ex)]
+            (log/info "Malformed query: " error-message)
+            {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body error-message}))))))
+
+(defn sparql-constant-prepared-query-handler
+  "Returns a handler which associates the given prepared SPARQL query
+  into the request at the key expected by later stages in the SPARQL
+  processing pipeline."
+  [pquery inner-handler]
+  (fn [request]
+    (inner-handler (assoc-in request [:sparql :prepared-query] pquery))))
+
+
+(defn get-sparql-response-content-type [mime-type]
+  (case mime-type
+    ;; if they ask for html they're probably a browser so serve it as
+    ;; text/plain
+    "text/html" "text/plain; charset=utf-8"
+    ;; force a charset of UTF-8 in this case... NOTE this should
+    ;; really consult the Accept-Charset header
+    "text/plain" "text/plain; charset=utf-8"
+    mime-type))
+
+(defn sparql-negotiation-handler
+  "Performs content negotiation on an incoming SPARQL request and
+  associates the sesame format and response content type into the
+  outgoing request into the :format and :response-content-type keys
+  respecitvely within the :sparql map. This handler expects to find
+  the prepared sesame query at the path [:sparql :prepared-query]
+  within the incoming request map - prepare-sparql-query-handler is a
+  handler which populates this value."
+  [inner-handler]
+  (fn [request]
+    (let [pquery (get-in request [:sparql :prepared-query])
+          accept (drafter-request/accept request)]
+      (let [query-type (ses/get-query-type pquery)]
+        (if-let [[result-format media-type] (conneg/negotiate query-type accept)]
+          (let [to-assoc {:format                result-format
+                          :response-content-type (get-sparql-response-content-type media-type)}
+                updated-request (update request :sparql #(merge % to-assoc))]
+            (inner-handler updated-request))
+          (response/not-acceptable-response))))))
+
+(defn allowed-methods-handler
+  "Wraps a handler with one which checks whether the method of the
+  incoming request is allowed with a given predicate. If the request
+  method does not pass the predicate a 405 Not Allowed response is
+  returned."
+  [is-allowed-fn inner-handler]
+  (fn [{:keys [request-method] :as request}]
+    (if (is-allowed-fn request-method)
+      (inner-handler request)
+      (response/method-not-allowed-response request-method))))
+
+(defn sparql-query-parser-handler [inner-handler]
+  (fn [{:keys [request-method body query-params form-params] :as request}]
+    (letfn [(handle [query-string location]
+              (cond
+                (string? query-string)
+                (inner-handler (assoc-in request [:sparql :query-string] query-string))
+
+                (coll? query-string)
+                (response/unprocessable-entity-response "Exactly one query parameter required")
+
+                :else
+                (response/unprocessable-entity-response (str "Expected SPARQL query in " location))))]
+      (case request-method
+        :get (handle (get query-params "query") "'query' query string parameter")
+        :post (case (request/content-type request)
+                "application/x-www-form-urlencoded" (handle (get form-params "query") "'query' form parameter")
+                "application/sparql-query" (handle body "body")
+                (do
+                  (log/warn "Handling SPARQL POST query with missing content type")
+                  (handle (get-in request [:params :query]) "'query' form or query parameter")))
+        (response/method-not-allowed-response request-method)))))
 
 (defn- execute-boolean-query [pquery result-format response-content-type]
   (let [os (ByteArrayOutputStream. 1024)
@@ -79,6 +179,20 @@
   (log/info (str "Running query\n" prepared-query "\nwith graph restrictions"))
   (execute-prepared-query prepared-query format response-content-type))
 
+(defn sparql-timeout-handler
+  "Returns a handler which configures the timeout for the prepared SPARQL query associated with the request.
+   The timeout is calculated based on the optional timeout and
+  max-query-timeout parameters on the request along with the timeout
+  specified for the endpoint."
+  [calculate-timeout-fn inner-handler]
+  (fn [{{pquery :prepared-query} :sparql :as request}]
+    (let [timeout-or-ex (calculate-timeout-fn request)]
+      (if (instance? Exception timeout-or-ex)
+        {:status 400 :headers {"Content-Type" "text/plain; charset=utf-8"} :body (.getMessage timeout-or-ex)}
+        (let [query-timeout timeout-or-ex]
+          (.setMaxExecutionTime pquery query-timeout)
+          (inner-handler (assoc-in request [:sparql :timeout] query-timeout)))))))
+
 (defn build-sparql-protocol-handler [prepare-handler exec-handler query-timeout-fn]
   (->> exec-handler
        (sparql-timeout-handler query-timeout-fn)
@@ -86,14 +200,25 @@
        (prepare-handler)
        (sparql-query-parser-handler)))
 
-(defn sparql-protocol-handler [executor query-timeout-fn]
-  (build-sparql-protocol-handler #(sparql-prepare-query-handler executor %) sparql-execution-handler query-timeout-fn))
+(def default-query-timeout-fn (fn [request] timeouts/default-query-timeout))
+
+(s/def ::timeout-fn fn?)
+
+(defn sparql-protocol-handler
+  "Builds a SPARQL endpoint from a SPARQL executor/repo and a
+  timeout-fn.  The handler is not mounted to a specific route/path."
+  [{:keys [repo timeout-fn]}]
+  (build-sparql-protocol-handler #(sparql-prepare-query-handler repo %) sparql-execution-handler timeout-fn))
+
+(defmethod ig/init-key ::handler [_ opts]
+  (sparql-protocol-handler opts))
 
 (defn sparql-end-point
   "Builds a SPARQL end point from a mount-path, a SPARQL executor and
   an optional restriction function which returns a list of graph uris
   to restrict both the union and named-graph queries too."
 
-  ([mount-path executor] (sparql-end-point mount-path executor (fn [request] timeouts/default-query-timeout)))
+  ([mount-path executor] (sparql-end-point mount-path executor default-query-timeout-fn))
   ([mount-path executor query-timeout-fn]
-   (make-route nil mount-path (sparql-protocol-handler executor query-timeout-fn))))
+   (make-route nil mount-path (sparql-protocol-handler {:repo executor :timeout-fn query-timeout-fn}))))
+

@@ -1,0 +1,35 @@
+prefix dcterms: <http://purl.org/dc/terms/> 
+prefix drafter: <http://publishmydata.com/def/drafter/> 
+prefix xsd: <http://www.w3.org/2001/XMLSchema#> 
+prefix draft: <http://publishmydata.com/graphs/drafter/draft> 
+prefix draftset: <http://publishmydata.com/def/drafter/draftset/> 
+
+SELECT ?livemod ?draftmod WHERE {
+  OPTIONAL {
+
+    SELECT ?livemod WHERE {
+      
+      VALUES ?graph {
+      }
+      
+      GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        ?graph a drafter:ManagedGraph ;
+               drafter:isPublic "true"^^xsd:boolean ;
+               dcterms:modified ?livemod .
+        
+      }
+    }
+  } OPTIONAL {
+    SELECT ?draftmod WHERE {
+      GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        ?graph a drafter:DraftGraph ;
+            dcterms:modified ?draftmod .      
+      }
+        
+      VALUES ?graph {
+      }
+      
+    }
+    
+  }
+} ORDER BY DESC(?livemod) DESC(?draftmod) LIMIT 1

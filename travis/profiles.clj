@@ -1,11 +1,11 @@
 {:system
   {:repositories
-  [["swirrl-jars-snapshots"
+  [["snapshots"
     {:url "s3p://swirrl-jars/snapshots/"
      :username :env
      :passphrase :env
      :releases false}]
-   ["swirrl-jars-releases"
+   ["releases"
     {:url "s3p://swirrl-jars/releases/"
      :username :env
      :passphrase :env

@@ -1,0 +1,64 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix scotqual: <http://statistics.gov.scot/def/statistical-quality/> .
+@prefix void: <http://rdfs.org/ns/void#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sdmx-attribute: <http://purl.org/linked-data/sdmx/2009/attribute#> .
+@prefix qb: <http://purl.org/linked-data/cube#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix sdmx-concept: <http://purl.org/linked-data/sdmx/2009/concept#> .
+@prefix pmd: <http://publishmydata.com/def/dataset#> .
+
+
+<http://statistics.gov.scot/data/home-care-clients> a qb:DataSet , pmd:Dataset , pmd:LinkedDataset , void:Dataset , dcat:Dataset ;
+	rdfs:label "Home Care Clients" ;
+	dcterms:title "Home Care Clients" ;
+	rdfs:comment "Number and rate per 1,000 population of home care clients by age and gender." ;
+	pmd:contactEmail <mailto:statistics.enquiries@scotland.gsi.gov.uk> ;
+	pmd:graph <http://statistics.gov.scot/graph/home-care-clients> ;
+	dcterms:issued "2014-07-29T01:00:00.000+01:00"^^xsd:dateTime ;
+	dcterms:modified "2016-02-03T00:00:00.000Z"^^xsd:dateTime ;
+	dcterms:license <http://www.nationalarchives.gov.uk/doc/open-government-licence/version/2/> ;
+	dcterms:creator <http://statistics.gov.scot/id/organisation/scottish-government> ;
+	dcterms:publisher <http://statistics.gov.scot/id/organisation/scottish-government> ;
+	dcterms:references <http://docs.publishmydata.com> ;
+	void:sparqlEndpoint <http://statistics.gov.scot/sparql> ;
+	dcat:theme <http://statistics.gov.scot/def/concept/folders/themes/health-and-social-care> ;
+	<http://publishmydata.com/def/ontology/folder/inFolder> <http://statistics.gov.scot/def/concept/folders/themes/health-and-social-care> , <http://statistics.gov.scot/def/concept/folders/organisations/scottish-government> ;
+	dcterms:description """Data on social care provided or purchased by Local Authorities from the Social Care Survey (Home Care Census prior to 2013), for the week that includes 31 March of the given year.  The data is supplied by all 32 Local Authorities in Scotland, who collect this information as part of their Social Care Management Information system and is submitted to Scottish Government via ProcXed.
+
+Information is returned for every person who has had a Social Care assessment and receives or uses:
+During the Census Week (any week including 31 March 2015): 
+• Home Care services, including re-ablement services
+• Meals services (provided or purchased by the local authority);
+• Housing Support services;
+• OPTIONAL - other services e.g. Shopping, Laundry. 
+
+During the financial year 1 April 2014 to 31 March 2015:
+• Community Alarms / other Telecare services (this was previously only collected for the census week);
+• Services or support provided through Self-Directed Support, including Direct Payments;
+• Social Worker / support worker services
+
+Ratio for clients aged 65+ is the percentage of home care clients that are aged 65 and over.  Ratio for ‘older’ clients is the rate per 1,000 population of clients aged 65 and over.
+
+Gender split only available for all clients (i.e. no split by age and gender).
+
+Link to publication: http://www.gov.scot/Topics/Statistics/Browse/Health/Data/HomeCare
+Population data from NRS mid-year estimates: http://www.nrscotland.gov.uk/statistics-and-data/statistics/statistics-by-theme/population/population-estimates/mid-year-population-estimates  (Note: Rates for 2005-09 on ODPP are likely to use population estimates before rebasing on 2011 Census.)""" ;
+	scotqual:relevance """Users of Home Care statistics:
+• Scottish Government (feeds into National Indicators and resource allocation formula, to inform policy decisions relating to social care)
+• NHS (feeds into NHS Scotland indicator)
+• Local Authorities (for benchmarking and strategic planning)
+• Care Inspectorate (to inform inspections)
+• Private sector care providers (for information about supply of/demand for care)
+• Third sector providers (often for information on a group of people who require care for a specific reason)
+• Carers and general public""" ;
+	scotqual:accuracy-and-reliability "Data goes through a validation process when entered into ProcXed, and any unusual/unexpected values are checked with the Local Authority." ;
+	scotqual:timeliness-and-punctuality "Data for 2014/15 (for users of Home Care services at end of March 2015) published in November 2015." ;
+	scotqual:accessibility-and-clarity "No restrictions on access to dataset." ;
+	scotqual:confidentiality "Data submitted to Scottish Government using the secure ProcXed system.  Outputs rounded to nearest 10 (clients) (applies to current published data only - no rounding on the 2005-09 data currently on ODPP)." ;
+	qb:structure <http://statistics.gov.scot/data/structure/home-care-clients> .

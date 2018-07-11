@@ -167,7 +167,7 @@ public class DrafterSparqlSession extends SPARQLProtocolSession /*SparqlSession*
             response = httpClient.execute(method, httpContext);
         }
         catch (ConnectionPoolTimeoutException ex) {
-            throw new QueryInterruptedException();
+            throw new QueryInterruptedException("Error executing query against remote endpoint.", ex);
         }
 
         try {

@@ -7,28 +7,17 @@ services:
   - mongodb
 env:
   global:
-  - STARDOG_VERSION='stardog-4.1.2'
+  - STARDOG_VERSION='stardog-5.2.0'
 before_install:
-- sudo apt-get update
-- sudo apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
-- sudo chown -R travis ./travis/*
-- sudo chmod +x ./travis/*
-- sudo mkdir -p /etc/leiningen/
-- sudo mv ./travis/profiles.clj /etc/leiningen/profiles.clj
-- "./travis/bootstrap_stardog.sh"
+- "sudo ./travis/install_base.sh"  
+- "sudo ./travis/bootstrap_stardog.sh"
 before_script:
-- sleep 15
-- env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java /opt/stardog/stardog/stardog-4.1.2/bin/stardog-admin db create -n drafter  -t D -o strict.parsing=false -o query.all.graphs=true -o reasoning.type=none --
-- sleep 10
+- "./travis/before_script.sh"  
 script: travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
 after_success:
 - env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
 before_deploy:
-- mkdir -p dist
-- cp target/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
-- cp target/drafter.jar dist/drafter-private-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar
-- mkdir -p releases
-- cp target/drafter.jar releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar
+- "./travis/before_deploy.sh"
 deploy:
   - provider: s3
     access_key_id: AKIAJZVFELTIBDDYV5OQ
@@ -51,9 +40,13 @@ deploy:
       condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+$
   - provider: releases
     api_key: "$RELEASE_OAUTH_TOKEN"
-    file: "releases/drafter-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar"
+    file: "releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
     prerelease: true
     skip_cleanup: true
     on:
       tags: true
-      condition: $TRAVIS_TAG =~ ^[a-z,A-Z]+.*
+      condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+-.+$
+  - provider: script
+    script: lein deploy
+    on:
+      tags: true

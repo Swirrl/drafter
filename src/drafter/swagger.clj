@@ -78,7 +78,10 @@
   [status]
   (and (>= status 400) (< status 500)))
 
-(defn- validate-response-against-swagger-spec [spec {request-uri :uri :as request} {:keys [status body] :as response}]
+(defn validate-response-against-swagger-spec
+  "Find the swagger spec for the route specified in request and
+  validate that the response conforms to what we expect."
+  [spec {request-uri :uri :as request} {:keys [status body] :as response}]
   (if-let [route-spec (find-route-spec spec request)]
     (if-let [{:keys [schema] :as response-spec} (get-in route-spec [:responses (keyword (str status))])]
       ;; only validate JSON responses when schema defined in the spec

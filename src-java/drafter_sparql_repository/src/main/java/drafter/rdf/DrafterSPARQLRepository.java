@@ -12,6 +12,7 @@ public class DrafterSPARQLRepository extends SPARQLRepository {
 
     private HttpClientSessionManager httpClientManager;
     private Integer maxConcurrentHttpConnections;
+    private boolean quadMode = false;
 
     public DrafterSPARQLRepository(String queryEndpoint) { super(queryEndpoint); }
     public DrafterSPARQLRepository(String queryEndpoint, String updateEndpoint) {
@@ -22,7 +23,7 @@ public class DrafterSPARQLRepository extends SPARQLRepository {
          if(!this.isInitialized()) {
              throw new RepositoryException("SPARQLRepository not initialized.");
          } else {
-             return new DrafterSPARQLConnection(this, createHTTPClient());
+             return new DrafterSPARQLConnection(this, createHTTPClient(), quadMode);
          }
      }
 
@@ -42,7 +43,22 @@ public class DrafterSPARQLRepository extends SPARQLRepository {
 //         return this.httpClientManager;
 //     }
 
-
+    /**
+     * Activate quad mode for this {@link SPARQLRepository}, i.e. for retrieval of statements also retrieve
+     * the graph.
+     * <p>
+     * Note: the setting is only applied in newly created {@link SPARQLConnection}s as the setting is an
+     * immutable configuration of a connection instance.
+     * 
+     * @param flag
+     *        flag to enable or disable the quad mode
+     * @see SPARQLConnection#getStatements(org.eclipse.rdf4j.model.Resource, org.eclipse.rdf4j.model.URI,
+     *      org.eclipse.rdf4j.model.Value, boolean, org.eclipse.rdf4j.model.Resource...)
+     */
+    public void enableQuadMode(boolean flag) {
+        this.quadMode = flag;
+    }
+    
     @Override public synchronized void setHttpClientSessionManager(HttpClientSessionManager httpMan) {
         this.httpClientManager = httpMan;
     }

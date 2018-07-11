@@ -1,15 +1,14 @@
 (ns drafter.routes.dump
-  (:require [compojure.core :refer [GET routes context]]
-            [drafter.rdf.draft-management :refer [drafter-state-graph]]
+  (:require [clojure.tools.logging :as log]
+            [compojure.core :refer [context GET routes]]
+            [drafter.backend.draftset.draft-management :refer [drafter-state-graph]]
             [drafter.rdf.drafter-ontology :refer [drafter]]
-            [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :refer [add statements]]
-            [grafter.rdf.formats :refer [rdf-trig]]
-            [grafter.rdf.io :refer [default-prefixes]]
-            [grafter.rdf4j.io :refer [rdf-writer]]
+            [grafter.rdf4j.io :as gio :refer [default-prefixes rdf-writer]]
+            [grafter.rdf4j.repository :as repo]
+            [grafter.url :as url]
             [ring.util.io :as rio]
-            [ring.util.response :refer [not-found]]
-            [grafter.url :as url]))
+            [ring.util.response :refer [not-found]]))
 
 (def drafter-prefixes (assoc default-prefixes
                              "drafter" drafter
@@ -21,8 +20,10 @@
   the RAW database as a Trig String for debugging.  Don't use on large
   databases as it will be loaded into memory."
   [db ostream]
-  (add (rdf-writer ostream :format rdf-trig :prefixes drafter-prefixes)
-       (statements db)))
+
+  (with-open [conn (repo/->connection db)]
+    (add (rdf-writer ostream :format :trig :prefixes drafter-prefixes)
+         (statements conn))))
 
 (defn build-dump-route [backend]
   (GET "/dump" []

@@ -1,7 +1,22 @@
 (ns drafter.user
-  (:require [drafter.util :as util])
+  (:require [clojure.spec.alpha :as s]
+            [drafter.util :as util]
+            [integrant.core :as ig])
   (:import java.net.URI
            org.mindrot.jbcrypt.BCrypt))
+
+(defprotocol UserRepository
+  (find-user-by-username [this username]
+    "Attempts to find a user with the given user name in the
+    underlying store. Returns nil if no such user was found.")
+  
+  (get-all-users [this]
+    "Returns all users in this repository"))
+
+(defrecord User [email role password-digest])
+
+(defmethod ig/init-key :drafter.user/repo [k opts]
+  (throw (ex-info "Config error.  Please use a concrete implementation of the user repo instead." {})))
 
 (def ^{:doc "Ordered list of roles from least permissions to greatest
 permissions."
@@ -9,11 +24,18 @@ permissions."
 
 (def role->permission-level (zipmap roles (iterate inc 1))) ;; e.g. {:editor 1, :publisher 2, :manager 3}
 
-(defrecord User [email role password-digest])
-
 (def username :email)
 (def role :role)
+
+(defn get-digest
+  "Generate the hashed password from the given plaintext password."
+  [passwd-str]
+  (BCrypt/hashpw passwd-str (BCrypt/gensalt)))
+
 (def password-digest :password-digest)
+
+(defn password-valid? [user submitted-key]
+  (BCrypt/checkpw submitted-key (password-digest user)))
 
 (defn username->uri
   "Gets a user's URI from their username."
@@ -60,6 +82,14 @@ permissions."
   [{:keys [email role] :as user}]
   (create-authenticated-user email role))
 
+(defn try-authenticate
+  "Tries to authenticate a user with the given candidate
+  password. Return a representation of the authenticated user if
+  successful, or nil if the authentication failed."
+  [user submitted-password]
+  (when (password-valid? user submitted-password)
+    (authenticated! user)))
+
 (defn get-summary
   "Returns a map containing summary information about a user."
   [{:keys [email role] :as user}]
@@ -71,20 +101,6 @@ permissions."
   [{:keys [role] :as user} requested]
   {:pre [(is-known-role? requested)]}
   (<= (role->permission-level requested) (role->permission-level role)))
-
-(defn get-digest [s]
-  (BCrypt/hashpw s (BCrypt/gensalt)))
-
-(defn password-valid? [user submitted-key]
-  (BCrypt/checkpw submitted-key (password-digest user)))
-
-(defn try-authenticate
-  "Tries to authenticate a user with the given candidate
-  password. Return a representation of the authenticated user if
-  successful, or nil if the authentication failed."
-  [user submitted-password]
-  (when (password-valid? user submitted-password)
-    (authenticated! user)))
 
 (defn- user-token-invalid [token invalid-key info]
   (let [msg (str "User token invalid: " info " (" invalid-key " = '" (invalid-key token) "')")]
@@ -134,3 +150,5 @@ permissions."
    #{:claim}
 
    :else #{}))
+
+(s/def ::repo (partial satisfies? UserRepository))

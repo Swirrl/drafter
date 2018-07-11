@@ -1,0 +1,3 @@
+@prefix : <http://www.example.org/rdf#> .
+
+:should-not :see-me :in-test-output .

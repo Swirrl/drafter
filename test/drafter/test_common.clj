@@ -1,32 +1,38 @@
 (ns drafter.test-common
-  (:require [clojure.test :refer :all]
-            [drafter.util :as util]
-            [grafter.rdf.templater :refer [triplify]]
-            [grafter.rdf.repository.registry :as reg]
-            [grafter.rdf.repository :as repo]
-            [grafter.url :as url]
-            [ring.middleware.params :refer [wrap-params]]
-            [ring.server.standalone :as ring-server]
-            [drafter.user :as user]
-            [drafter.backend.sesame.remote :refer [get-backend]]
-            [drafter.backend.protocols :refer [stop-backend]]
-            [drafter.rdf.draft-management :refer [create-managed-graph! migrate-graphs-to-live!
-                                                  create-draft-graph!]]
-            [drafter.rdf.sparql :refer [update!] :as sparql]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
+            [drafter.backend.common :refer [stop-backend]]
+            [drafter.backend.draftset.draft-management
+             :refer
+             [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
             [drafter.configuration :refer [get-configuration]]
             [drafter.draftset :refer [->draftset-uri]]
-            [drafter.write-scheduler :refer [start-writer! stop-writer! queue-job!
-                                             global-writes-lock]]
-            [swirrl-server.async.jobs :refer [create-job]]
+            [drafter.main :as main]
+            [drafter.rdf.sparql :as sparql]
+            [drafter.user :as user]
+            [drafter.util :as util]
+            [drafter.write-scheduler
+             :refer
+             [global-writes-lock queue-job! start-writer! stop-writer!]]
+            [grafter.rdf :as rdf]
+            [grafter.rdf.templater :refer [triplify]]
+            [grafter.rdf4j.repository :as repo]
+            [grafter.rdf4j.repository.registry :as reg]
+            [grafter.url :as url]
+            [integrant.core :as ig]
+            [ring.middleware.params :refer [wrap-params]]
+            [ring.server.standalone :as ring-server]
+            [schema.core :as s]
             [schema.test :refer [validate-schemas]]
-            [schema.core :as s])
-  (:import [java.util Scanner UUID ArrayList]
+            [swirrl-server.async.jobs :refer [create-job]]
+            [clojure.pprint :as pp])
+  (:import drafter.rdf.DrafterSPARQLRepository
+           [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
+           java.lang.AutoCloseable
+           [java.net InetSocketAddress ServerSocket SocketException URI]
+           java.nio.charset.Charset
+           [java.util ArrayList Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
-           [java.io ByteArrayOutputStream ByteArrayInputStream OutputStream PrintWriter]
-           [java.nio.charset Charset]
-           [java.net URI InetSocketAddress SocketException ServerSocket]
-           [java.lang AutoCloseable]
-           [drafter.rdf DrafterSPARQLRepository]
            [org.apache.http.entity ContentLengthStrategy ContentType StringEntity]
            org.apache.http.impl.entity.StrictContentLengthStrategy
            [org.apache.http.impl.io ChunkedOutputStream ContentLengthOutputStream DefaultHttpRequestParser DefaultHttpResponseWriter HttpTransportMetricsImpl IdentityOutputStream SessionInputBufferImpl SessionOutputBufferImpl]
@@ -35,9 +41,19 @@
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
            org.eclipse.rdf4j.rio.trig.TriGParserFactory))
 
-(use-fixtures :each validate-schemas)
+;;(use-fixtures :each validate-schemas) ;; TODO should remove this...
 
-(def ^:dynamic *test-backend*)
+(defmacro TODO [& forms]
+  (let [pprint-forms# (for [form forms]
+                        `(pp/pprint '~form))]
+    ;;`(println "TODO: fix this test form: in " ~*file* (prn-str '~@forms))
+    `(do
+       (println "TODO Fix" ~*file* "test:")
+       ~@pprint-forms#)))
+
+(def ^:dynamic *test-backend* nil)
+(def ^:dynamic *test-writer* nil)
+(def ^:dynamic *test-system* nil)
 
 (defn test-triples [subject-uri]
   (triplify [subject-uri
@@ -75,51 +91,86 @@
     (.unlock lock)
     (throw (RuntimeException. (str "Lock not released after " period-ms "ms")))))
 
-(declare ^:dynamic *test-writer*)
+(defmacro with-system
+  "Convenience macro to build a drafter system and shut it down
+  outside of with-system's lexical scope."
+  ([binding-form form]
+   `(with-system nil ~binding-form ~form))
 
-(defn wrap-db-setup [test-fn]
-  (let [config (get-configuration)
-        backend (get-backend config)
-        configured-factories (reg/registered-parser-factories)]
-    (binding [*test-backend* backend
-              *test-writer* (start-writer!)]
-      (do
-        ; Some tests need to load and parse trig file data
-        (reg/register-parser-factory! :construct TriGParserFactory)
-        (try
-          (test-fn)
-          (finally
-            (stop-backend backend)
-            (stop-writer! *test-writer*)
-            (reg/register-parser-factories! configured-factories)))))))
+  ([start-keys [binding-form system-cfg] form]
+   `(let [system# (main/start-system! (io/resource ~system-cfg) ~start-keys)
+          ~binding-form system#
+          ;; drafter specific gunk that we can ultimately remove
+          configured-factories# (reg/registered-parser-factories)]
+      ;; Some tests need to load and parse trig file data drafter specific gunk..  can remove when we generalise
+      (reg/register-parser-factory! :construct TriGParserFactory)
+      (try
+        ~form
+        (finally
+          (ig/halt! system#)
 
-(defn wrap-clean-test-db
-  ([test-fn] (wrap-clean-test-db identity test-fn))
-  ([setup-state-fn test-fn]
-   (sparql/update! *test-backend*
-            "DROP ALL ;")
-   (setup-state-fn *test-backend*)
-   (test-fn)))
+          ;; drafter specific gunk... can remove when we generalise
+          (reg/register-parser-factories! configured-factories#))))))
+
+(defmacro deftest-system
+  ([name binding-form & forms]
+   `(deftest ~name
+      (with-system ~binding-form
+        (do ~@forms)))))
+
+(defmacro deftest-system-with-keys
+  [name start-keys binding-form & forms]
+  `(deftest ~name
+     (with-system ~start-keys ~binding-form
+       (do ~@forms))))
+
+(defn ^{:deprecated "Use with-system instead."} wrap-system-setup
+  "Start an integrant test system.  Uses dynamic bindings to support
+  old test suite style.  For new code please try the with-system maro
+  instead."
+  [system start-keys]
+  (fn [test-fn]
+    (let [started-system (main/start-system! (io/resource system) start-keys)
+          backend (:drafter.stasher/repo started-system)
+          writer (:drafter/write-scheduler started-system)
+          configured-factories (reg/registered-parser-factories)]
+      ;(assert backend (str "No backend in " system))
+      (binding [*test-system* started-system
+                *test-backend* backend
+                *test-writer* writer]
+        (do
+          ;; Some tests need to load and parse trig file data
+          (reg/register-parser-factory! :construct TriGParserFactory)
+          (try
+            (test-fn)
+            (finally
+              (when *test-backend* (sparql/update! *test-backend* "DROP ALL ;"))
+              (when (:drafter.stasher/repo *test-system*) (sparql/update! (:drafter.stasher/repo *test-system*) "DROP ALL ;"))
+              (ig/halt! started-system)
+              ;; TODO change to halt system
+              ;;(stop-backend backend)
+              ;;(stop-writer! *test-writer*)
+              (reg/register-parser-factories! configured-factories))))))))
 
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
   with the specified graph.  Returns the draft graph uri."
-  ([db graph triples] (import-data-to-draft! db graph triples nil))
-  ([db graph triples draftset-ref]
+  ([db graph triples] (import-data-to-draft! db graph triples nil util/get-current-time))
+  ([db graph triples draftset-ref clock-fn]
 
    (create-managed-graph! db graph)
    (let [draftset-uri (and draftset-ref (url/->java-uri draftset-ref))
-         draft-graph (create-draft-graph! db graph draftset-uri)]
+         draft-graph (create-draft-graph! db graph draftset-uri clock-fn)]
      (sparql/add db draft-graph triples)
      draft-graph)))
 
 (defn make-graph-live!
-  ([db live-graph-uri]
-     (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1"))))
+  ([db live-graph-uri clock-fn]
+     (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1")) clock-fn))
 
-  ([db live-graph-uri data]
-     (let [draft-graph-uri (import-data-to-draft! db live-graph-uri data)]
-       (migrate-graphs-to-live! db [draft-graph-uri]))
+  ([db live-graph-uri data clock-fn]
+     (let [draft-graph-uri (import-data-to-draft! db live-graph-uri data nil clock-fn)]
+       (migrate-graphs-to-live! db [draft-graph-uri] clock-fn))
      live-graph-uri))
 
 (defn during-exclusive-write-f [f]
@@ -163,7 +214,8 @@
 
 (defn ask? [& graphpatterns]
   "Bodgy convenience function for ask queries"
-  (sparql/eager-query *test-backend* (str "ASK WHERE {"
+  (sparql/eager-query *test-backend* (str "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"
+                                          "ASK WHERE {"
                         (-> (apply str (interpose " " graphpatterns))
                             (.replace " >" ">")
                             (.replace "< " "<"))
@@ -203,7 +255,8 @@
   result map."
   [state-atom job-path]
   `(let [job-result# (await-completion ~state-atom ~job-path)]
-     (is (= :ok (:type job-result#)) (str "job failed: " (:exception job-result#)))
+     (is (= :ok (:type job-result#))
+         (str "job failed: " (pr-str job-result#)))
      job-result#))
 
 (defn empty-spo-json-body []

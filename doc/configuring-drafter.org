@@ -2,8 +2,13 @@
 
 Drafter uses [[https://github.com/juxt/aero][aero]] for its configuration.  This means it uses
 environment variables (and/or java properties) to pass configuration
-variables from the environment. The file config-settings.edn defines all configuration settings,
+variables from the environment. The file system.edn defines all configuration settings,
 along with their types, default values and the locations they are loaded from.
+
+You can provide an alternative system.edn file at boot by passing the
+file path as drafters first command line argument.  If you do not
+provide a =system.edn= drafter will start up with the default one, which
+can be configured via the environment variables described in this file.
 
 ** Stardog
 

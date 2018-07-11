@@ -1,12 +1,12 @@
 (ns drafter.rdf.sesame
   (:require [clojure.tools.logging :as log]
-            [drafter.backend.protocols :refer [->sesame-repo]]
-            [drafter.rdf.draft-management.jobs :as jobs]
-            [drafter.rdf.rewriting.arq :refer [sparql-string->arq-query]]
+            [drafter.backend.common :refer [->sesame-repo]]
+            [drafter.backend.draftset.arq :refer [sparql-string->arq-query]]
+            [drafter.rdf.draftset-management.job-util :as jobs]
             [grafter.rdf :refer [statements]]
-            [grafter.rdf.repository :as repo])
-  (:import [org.eclipse.rdf4j.query BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler Update]
-           org.eclipse.rdf4j.query.resultio.QueryResultIO
+            [grafter.rdf4j.repository :as repo])
+  (:import [org.eclipse.rdf4j.query BindingSet BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult Update]
+           [org.eclipse.rdf4j.query.resultio QueryResultIO QueryResultWriter]
            org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.repository.sparql.SPARQLRepository
            [org.eclipse.rdf4j.rio RDFHandler Rio]))
@@ -38,41 +38,11 @@
       Update :update
       nil))
 
-(defn validate-query [query-str]
-  "Validates a query by parsing it using ARQ. If the query is invalid
-  a QueryParseException is thrown."
-  (sparql-string->arq-query query-str)
-  query-str)
 
-(defn prepare-query [backend sparql-string]
-    (let [repo (->sesame-repo backend)
-          validated-query-string (validate-query sparql-string)]
-      (repo/prepare-query repo validated-query-string)))
 
-(defn- get-restrictions [graph-restrictions]
-  (cond
-   (coll? graph-restrictions) graph-restrictions
-   (fn? graph-restrictions) (graph-restrictions)
-   :else nil))
 
-(defn restricted-dataset
-  "Returns a restricted dataset or nil when given either a 0-arg
-  function or a collection of graph uris."
-  [graph-restrictions]
-  {:pre [(or (nil? graph-restrictions)
-             (coll? graph-restrictions)
-             (fn? graph-restrictions))]
-   :post [(or (instance? Dataset %)
-              (nil? %))]}
-  (when-let [graph-restrictions (get-restrictions graph-restrictions)]
-    (let [stringified-restriction (map str graph-restrictions)]
-      (repo/make-restricted-dataset :default-graph stringified-restriction
-                                    :named-graphs stringified-restriction))))
 
-(defn apply-restriction [pquery restriction]
-  (let [dataset (restricted-dataset restriction)]
-    (.setDataset pquery dataset)
-    pquery))
+
 
 (defn create-tuple-query-writer [os result-format]
   (QueryResultIO/createWriter result-format os))
@@ -80,8 +50,20 @@
 (defn create-construct-query-writer [os result-format]
   (Rio/createWriter result-format os))
 
-(defn signalling-tuple-query-handler [send-channel writer]
-  (reify TupleQueryResultHandler
+(defn signalling-tuple-query-handler [send-channel ^BindingSet binding-set ^QueryResultWriter writer]
+  (reify
+    TupleQueryResult
+    (getBindingNames [this]
+      (let [is (iterator-seq (.iterator binding-set))]
+        (if (seq is)
+          []
+          is)))
+
+    (close [this]
+      ;; no-op can't call .close on writer's
+      )
+    
+    TupleQueryResultHandler
     (startQueryResult [this binding-names]
       (send-channel)
       (.startQueryResult writer binding-names))
@@ -94,7 +76,7 @@
     (handleLinks [this link-urls]
       (.handleLinks writer link-urls))))
 
-(defn signalling-rdf-handler [send-channel handler]
+(defn signalling-rdf-handler [send-channel ^RDFHandler handler]
   (reify RDFHandler
     (startRDF [this]
       (send-channel)
@@ -105,11 +87,12 @@
       (.handleNamespace handler prefix uri))
     (handleStatement [this s]
       (.handleStatement handler s))
-    (handleComment [this comment] (.handleComment comment))))
+    (handleComment [this comment]
+      (.handleComment handler comment))))
 
 (defn create-signalling-query-handler [pquery output-stream result-format send-channel]
   (case (get-query-type pquery)
-    :select (signalling-tuple-query-handler send-channel (create-tuple-query-writer output-stream result-format))
+    :select (signalling-tuple-query-handler send-channel (.getBindings pquery) (create-tuple-query-writer output-stream result-format))
     :construct (signalling-rdf-handler send-channel (create-construct-query-writer output-stream result-format))
-    (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query.")))
+    (throw (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query."))))
 

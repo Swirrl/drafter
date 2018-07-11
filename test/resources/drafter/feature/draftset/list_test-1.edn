@@ -1,0 +1,7 @@
+#merge [#include "../../../backend.edn"
+        #include "../../../repo.edn"
+        #include "../../../user-repo.edn"
+        #include "../../../log-system.edn"
+        #include "../../../web.edn"
+        {:drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo
+                                       :fixtures [#resource "drafter/feature/draftset/list_test-1.trig"]}}]

@@ -15,6 +15,7 @@
             [clojure.tools.logging :as log]
             [drafter.util :refer [log-time-taken]]
             [swirrl-server.async.jobs :refer [job-failed!]]
+            [integrant.core :as ig]
             [swirrl-server.errors :refer [ex-swirrl]])
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
            java.util.concurrent.atomic.AtomicBoolean
@@ -37,6 +38,7 @@
   ReentrantLock javadocs for details."
   true)
 
+;; TODO integrantify
 (def global-writes-lock (ReentrantLock. fairness))
 
 (defonce ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
@@ -75,9 +77,9 @@
                               :route req-route})
               job)]
     (log/info "Queueing job: " job (meta job))
-    (let [changed (.add writes-queue job)]
-      (datadog/increment! "drafter.jobs_queued" 1)
-      changed)))
+    ;; Record the inc value since we can't do an atomic add+size op
+    (datadog/gauge! "drafter.jobs_queue_size" (inc (.size writes-queue)))
+    (.add writes-queue job)))
 
 ;;await-sync-job! :: Job -> ApiResponse
 (defn exec-sync-job!
@@ -112,8 +114,8 @@
       (when-let [{task-f! :function
                   priority :priority
                   job-id :id
-                  promis :value-p :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS )]
-        (datadog/increment! "drafter.jobs_queued" -1)
+                  promis :value-p :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS)]
+        (datadog/gauge! "drafter.jobs_queue_size" (.size writes-queue))
         (l4j/with-logging-context (assoc
                                    (meta job)
                                    :jobId (str "job-" (.substring (str job-id) 0 8)))
@@ -129,7 +131,7 @@
                 (with-lock :publish-write
                   (task-f! job))
                 (task-f! job)))
-            
+
             (catch Exception ex
               (log/warn ex "A task raised an error.  Delivering error to promise")
               ;; TODO improve error returned
@@ -147,3 +149,10 @@
 (defn stop-writer! [{:keys [should-continue thread]}]
   (.set should-continue false)
   (.join thread))
+
+
+(defmethod ig/init-key :drafter/write-scheduler [_ opts]
+  (start-writer!))
+
+(defmethod ig/halt-key! :drafter/write-scheduler [_ writer]
+  (stop-writer! writer))

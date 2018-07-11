@@ -1,22 +1,20 @@
 (ns drafter.middleware-test
   (:require [buddy.auth :as auth]
-            [drafter.util :as util]
             [clojure.java.io :as io]
             [clojure.test :refer :all]
-            [drafter
-             [middleware :refer :all]
-             [test-common :as tc]
-             [user :as user]
-             [user-test :refer [test-editor test-publisher]]]
-            [drafter.rdf.sesame :as ses]
+            [drafter.backend.common :as bcom]
+            [drafter.middleware :refer :all]
+            [drafter.test-common :as tc]
+            [drafter.user :as user]
+            [drafter.user-test :refer [test-editor test-publisher]]
             [drafter.user.memory-repository :as memory-repo]
-            [grafter.rdf
-             [formats :as formats]
-             [repository :as repo]]
+            [drafter.util :as util]
+            [grafter.rdf4j.formats :as formats]
+            [grafter.rdf4j.repository :as repo]
             [ring.util.response :refer [response]])
   (:import clojure.lang.ExceptionInfo
-           java.io.File
-           (java.io ByteArrayInputStream)))
+           [java.io ByteArrayInputStream File]
+           org.eclipse.rdf4j.rio.RDFFormat))
 
 (defn- add-auth-header [m username password]
   (let [credentials (util/str->base64 (str username ":" password))]
@@ -38,7 +36,7 @@
         password "dslkfjsejw"
         password-digest (user/get-digest password)
         user (user/create-user username :publisher password-digest)
-        repo (memory-repo/create-repository* user)
+        repo (memory-repo/init-repository* user)
         handler (basic-authentication repo identity)
         request (create-authorised-request username password)
         {:keys [identity] :as response} (handler request)]
@@ -48,28 +46,28 @@
 (deftest invalid-password-should-not-authenticate-test
   (let [username "test@example.com"
         user (user/create-user username :editor (user/get-digest "password"))
-        repo (memory-repo/create-repository* user)
+        repo (memory-repo/init-repository* user)
         handler (basic-authentication repo identity)
         request (create-authorised-request username "invalidpassword")
         response (handler request)]
     (is (= false (auth/authenticated? response)))))
 
 (deftest non-existent-user-should-not-authenticate-test
-  (let [repo (memory-repo/create-repository*)
+  (let [repo (memory-repo/init-repository*)
         handler (basic-authentication repo identity)
         request (create-authorised-request "missing@example.com" (user/get-digest "sdkfiwe"))
         response (handler request)]
     (is (= false (auth/authenticated? response)))))
 
 (deftest request-without-credentials-should-not-authenticate
-  (let [repo (memory-repo/create-repository*)
+  (let [repo (memory-repo/init-repository*)
         handler (basic-authentication repo identity)
         response (handler {:uri "/test" :request-method :get})]
     (is (= false (auth/authenticated? response)))))
 
 (deftest handler-should-return-not-authenticated-response-if-inner-handler-throws-unauthorised
   (let [inner-handler (fn [req] (auth/throw-unauthorized {:message "Auth required"}))
-        handler (basic-authentication (memory-repo/create-repository*) inner-handler)
+        handler (basic-authentication (memory-repo/init-repository*) inner-handler)
         response (handler {:uri "/test" :request-method :get})]
     (assert-is-unauthorised-basic-response response)))
 
@@ -126,21 +124,7 @@
             response (handler request)]
         (tc/assert-is-unprocessable-response response)))))
 
-(deftest allowed-methods-handler-test
-  (testing "Allowed method"
-    (let [invoked-inner (atom false)
-          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
-          request {:uri "/test" :request-method :get}
-          response (wrapped-handler request)]
-      (is @invoked-inner)))
 
-  (testing "Disallowed method"
-    (let [invoked-inner (atom false)
-          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
-          request {:uri "/test" :request-method :delete}
-          response (wrapped-handler request)]
-      (is (= false @invoked-inner))
-      (tc/assert-is-method-not-allowed-response response))))
 
 (defn- ok-handler [request]
   (response "OK"))
@@ -170,11 +154,11 @@
   (testing "With valid RDF content type"
     (let [handler (fn [req] (:params req))
           wrapped-handler (require-rdf-content-type handler)
-          content-type (.getDefaultMIMEType formats/rdf-nquads)
+          content-type (.getDefaultMIMEType (formats/->rdf-format :nq))
           request {:uri "/test" :headers {"content-type" content-type}}
           {:keys [rdf-format rdf-content-type]} (wrapped-handler request)]
       (is (= content-type rdf-content-type))
-      (is (= formats/rdf-nquads rdf-format))))
+      (is (= RDFFormat/NQUADS rdf-format))))
 
   (testing "With unknown RDF content type"
     (let [handler (require-rdf-content-type ok-handler)
@@ -277,60 +261,9 @@
             resp (handler req)]
         (tc/assert-is-method-not-allowed-response resp)))))
 
-(deftest sparql-prepare-query-handler-test
-  (let [r (repo/repo)
-        handler (sparql-prepare-query-handler r identity)]
-    (testing "Valid query"
-      (let [req (handler {:sparql {:query-string "SELECT * WHERE { ?s ?p ?o }"}})]
-        (is (some? (get-in req [:sparql :prepared-query])))))
-
-    (testing "Malformed SPARQL query"
-      (let [response (handler {:sparql {:query-string "NOT A SPARQL QUERY"}})]
-        (tc/assert-is-bad-request-response response)))))
-
-(defn- prepare-query-str [query-str]
-  (ses/prepare-query (repo/repo) query-str))
-
-(deftest sparql-negotiation-handler-test
-  (testing "Valid request"
-    (let [handler (sparql-negotiation-handler identity)
-          accept-content-type "application/n-triples"
-          pquery (prepare-query-str "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")
-          request {:uri "/sparql"
-                   :sparql {:prepared-query pquery}
-                   :headers {"accept" accept-content-type}}
-          {{:keys [format response-content-type]} :sparql} (handler request)]
-      (is (= accept-content-type response-content-type))
-      (is (some? format))))
-
-  (testing "Content negotiation failure"
-    (let [handler (sparql-negotiation-handler identity)
-          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
-          response (handler {:uri "/test"
-                             :sparql {:prepared-query pquery}
-                             :headers {"accept" "text/trig"}})]
-      (tc/assert-is-not-acceptable-response response))))
-
-(deftest sparql-timeout-handler-test
-  (testing "With valid timeout"
-    (let [timeout 30
-          handler (sparql-timeout-handler (constantly timeout) identity)
-          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
-          request {:sparql {:prepared-query pquery}}]
-      (handler request)
-      (is (= timeout (.getMaxQueryTime pquery)))))
-
-  (testing "With invalid timeout"
-    (let [ex (IllegalArgumentException. "Invalid timeout")
-          handler (sparql-timeout-handler (constantly ex) identity)
-          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
-          request {:sparql {:prepared-query pquery}}
-          response (handler request)]
-      (is (tc/assert-is-bad-request-response response)))))
-
 (deftest negotiate-sparql-results-content-type-with-test
   (testing "Negotiation succeeds"
-    (let [format formats/rdf-ntriples
+    (let [format RDFFormat/NTRIPLES
           response-content-type "text/plain"
           handler (negotiate-sparql-results-content-type-with (constantly [format response-content-type]) ":(" identity)
           request {:headers {"accept" "text/plain"}}

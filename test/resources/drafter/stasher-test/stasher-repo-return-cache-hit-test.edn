@@ -1,0 +1,25 @@
+{
+ 
+ :drafter/logging {:config "./test/resources/log-config.edn"}
+ 
+ :drafter.stasher/cache-thread-pool {}
+
+ :drafter.stasher.filecache/file-backend {:persist-on-shutdown? false}
+
+ :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
+                         :thread-pool #ig/ref :drafter.stasher/cache-thread-pool
+                         :formats {:graph :brf}}
+
+ :drafter.common/config {:sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
+                         :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
+ 
+ :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/cache
+                                :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
+                               ^:ref [:drafter.common/config]]
+
+ ;; instantiate/remove test fixture
+ :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo
+                               :format :ttl
+                               :fixtures [#resource "drafter/stasher-test/stasher-repo-return-cache-hit-test.ttl"]}
+ 
+ }

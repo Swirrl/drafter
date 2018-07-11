@@ -1,0 +1,107 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+## State is:
+#
+# - 1 Public graph "a"
+#
+# - 1 draftset 8d1e with 2 draft graphs in it.  One draftgraph in it
+#   is of the live graph "a".  The other is for an upublished graph "b".
+# 
+# This should give us the following state combinations we need for
+# testing stasher:
+# 
+# - live only query (unionwithlive irrelevant)
+# - draftset only query (unionwithlive false)
+# - live+draftset (unionwithlive true) 
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+
+	########################################################################
+	# Live graphs
+	########################################################################
+
+	# Live graph with two changes in 2 draftsets
+	<http://live-and-ds1-and-ds2> a drafter:ManagedGraph ;
+		dcterms:modified "2017-01-01T01:01:01.000Z"^^xsd:dateTime ;
+		drafter:isPublic "true"^^xsd:boolean ;
+		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime .
+
+	# a graph not in a draftset
+	<http://live-only> a drafter:ManagedGraph ;
+		dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
+		drafter:isPublic "true"^^xsd:boolean ;
+		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime .
+
+	########################################################################
+	# The first draftset with two draftgraphs in it.
+	# Changes on <http://live-and-ds1-and-ds2> and unpublished graph <http://b>
+	########################################################################
+	draftset:ds-1 a drafter:DraftSet ;
+		dcterms:created "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
+		dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
+		dcterms:creator <mailto:manager@swirrl.com> ;
+		drafter:hasOwner <mailto:manager@swirrl.com> .
+
+        # unpublished graph
+	<http://unpublished-graph-ds1> a drafter:ManagedGraph ;
+		drafter:isPublic "false"^^xsd:boolean ;
+		drafter:hasDraft draft:ds-1-dg-1 .
+
+	draft:ds-1-dg-1 a drafter:DraftGraph ;
+		dcterms:created "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
+		dcterms:modified "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
+		drafter:inDraftSet draftset:ds-1 .
+
+	draft:ds-1-dg-2 a drafter:DraftGraph ;
+		dcterms:created "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
+		dcterms:modified "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
+		drafter:inDraftSet draftset:ds-1 .
+
+
+	########################################################################
+	# The second draftset, with a single change on <http://live-and-ds1-and-ds2>	
+	########################################################################
+	draftset:ds-2 a drafter:DraftSet ;
+		dcterms:created "2017-11-16T15:13:46.901Z"^^xsd:dateTime ;
+		dcterms:modified "2017-11-16T15:13:46.901Z"^^xsd:dateTime ;
+		dcterms:creator <mailto:editor@swirrl.com> ;
+		drafter:hasOwner <mailto:editor@swirrl.com> .
+
+	draft:ds-2-dg-1 a drafter:DraftGraph ;
+		dcterms:created "2017-05-05T05:05:05.000Z"^^xsd:dateTime ;
+		dcterms:modified "2017-05-05T05:05:05.000Z"^^xsd:dateTime ;
+		drafter:inDraftSet draftset:ds-2 .
+ 
+}
+
+<http://live-and-ds1-and-ds2> {
+	<http://a> <http://a> <http://a> .
+}
+
+# a live graph which currently has no draftset mods
+<http://live-only> {
+	<http://live-only> <http://live-only> <http://live-only> .   
+}
+
+# the new un published draft in draftset ds-1
+draft:ds-1-dg-1 {
+	<http://unpublished-graph-ds1> <http://unpublished-graph-ds1> <http://unpublished-graph-ds1> .  
+}
+
+# a draft modification to one of the live graphs in ds-1
+draft:ds-1-dg-2 {
+	<http://a> <http://a> <http://a> .
+	<http://ds1> <http://ds1> <http://ds1> . # a drafted addition to live graph
+}
+
+# a modification to a live graph in ds-2 
+draft:ds-2-dg-1 {
+	<http://a> <http://a> <http://a> .
+	<http://ds-2> <http://ds-2> <http://ds-2> . # a drafted addition to live graph
+}

@@ -1,24 +1,102 @@
 (ns drafter.rdf.sparql-protocol-test
   (:require [clojure-csv.core :as csv]
             [clojure.test :refer :all]
-            [drafter.rdf.sparql-protocol :refer :all]
+            [drafter.backend.common :as bcom]
             [drafter.rdf.sparql :as sparql]
-            [drafter.test-common :refer :all]
+            [drafter.rdf.sparql-protocol :refer :all]
+            [drafter.test-common :as tc]
             [grafter.rdf :as rdf]
-            [grafter.rdf
-             [formats :refer [rdf-ntriples]]
-             [protocols :as pr]]
+            [grafter.rdf4j.repository :as repo]
+            [ring.util.response :as ring]
             [schema.test :refer [validate-schemas]])
-  (:import [java.util.concurrent CountDownLatch TimeUnit]
-           [java.net URI]))
-
-(use-fixtures :each validate-schemas)
+  (:import java.net.URI
+           [java.util.concurrent CountDownLatch TimeUnit]))
 
 (defn add-triple-to-db [db]
-  (sparql/add db (URI. "http://foo.com/my-graph") (test-triples (URI. "http://test.com/data/one"))))
+  (sparql/add db (URI. "http://foo.com/my-graph") (tc/test-triples (URI. "http://test.com/data/one"))))
+
+(def add-triple-fixture (fn [test]
+                          (add-triple-to-db tc/*test-backend*)
+                          (test)))
+
+(use-fixtures :each (join-fixtures (reverse [validate-schemas
+                                             add-triple-fixture
+                                             (tc/wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler])])))
+
+(defn- notifying-handler [a]
+  (fn [r]
+    (reset! a true)
+    (ring/response "")))
+
+(deftest allowed-methods-handler-test
+  (testing "Allowed method"
+    (let [invoked-inner (atom false)
+          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
+          request {:uri "/test" :request-method :get}
+          response (wrapped-handler request)]
+      (is @invoked-inner)))
+
+  (testing "Disallowed method"
+    (let [invoked-inner (atom false)
+          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
+          request {:uri "/test" :request-method :delete}
+          response (wrapped-handler request)]
+      (is (= false @invoked-inner))
+      (tc/assert-is-method-not-allowed-response response))))
+
+(deftest sparql-prepare-query-handler-test
+  (let [r (repo/sail-repo)
+        handler (sparql-prepare-query-handler r identity)]
+    (testing "Valid query"
+      (let [req (handler {:sparql {:query-string "SELECT * WHERE { ?s ?p ?o }"}})]
+        (is (some? (get-in req [:sparql :prepared-query])))))
+
+    (testing "Malformed SPARQL query"
+      (let [response (handler {:sparql {:query-string "NOT A SPARQL QUERY"}})]
+        (tc/assert-is-bad-request-response response)))))
+
+(defn- prepare-query-str [query-str]
+  (bcom/prep-and-validate-query (repo/sail-repo) query-str))
+
+(deftest sparql-negotiation-handler-test
+  (testing "Valid request"
+    (let [handler (sparql-negotiation-handler identity)
+          accept-content-type "application/n-triples"
+          pquery (prepare-query-str "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")
+          request {:uri "/sparql"
+                   :sparql {:prepared-query pquery}
+                   :headers {"accept" accept-content-type}}
+          {{:keys [format response-content-type]} :sparql} (handler request)]
+      (is (= accept-content-type response-content-type))
+      (is (some? format))))
+
+  (testing "Content negotiation failure"
+    (let [handler (sparql-negotiation-handler identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          response (handler {:uri "/test"
+                             :sparql {:prepared-query pquery}
+                             :headers {"accept" "text/trig"}})]
+      (tc/assert-is-not-acceptable-response response))))
+
+(deftest sparql-timeout-handler-test
+  (testing "With valid timeout"
+    (let [timeout 30
+          handler (sparql-timeout-handler (constantly timeout) identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          request {:sparql {:prepared-query pquery}}]
+      (handler request)
+      (is (= timeout (.getMaxQueryTime pquery)))))
+
+  (testing "With invalid timeout"
+    (let [ex (IllegalArgumentException. "Invalid timeout")
+          handler (sparql-timeout-handler (constantly ex) identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          request {:sparql {:prepared-query pquery}}
+          response (handler request)]
+      (is (tc/assert-is-bad-request-response response)))))
 
 (deftest sparql-end-point-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
+  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "Standard SPARQL query with no dataset restrictions"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -29,7 +107,7 @@
         (is (= 200 status))
         (is (= "text/csv" (headers "Content-Type")))
 
-        (let [csv-result (csv/parse-csv (stream->string body))]
+        (let [csv-result (csv/parse-csv (tc/stream->string body))]
           (is (= ["s" "p" "o"] (first csv-result)))
           (is (= ["http://test.com/data/one" "http://test.com/hasProperty" "http://test.com/data/1"]
                  (second csv-result))))))))
@@ -38,7 +116,7 @@
   (set (map (fn [{:keys [s p o]}] [s p o]) triples)))
 
 (deftest sparql-end-point-graph-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
+  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "Standard SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method           :get
@@ -50,13 +128,13 @@
         (is (= "application/n-triples" (headers "Content-Type")))
 
         (let [triple-reader (java.io.InputStreamReader. body)
-              triples (get-spo-set (rdf/statements triple-reader :format rdf-ntriples))
-              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
+              triples (get-spo-set (rdf/statements triple-reader :format :nt))
+              expected-triples (get-spo-set (tc/test-triples (URI. "http://test.com/data/one")))]
 
           (is (= expected-triples triples)))))))
 
 (deftest sparql-end-point-tuple-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
+  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "Tuple SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -67,14 +145,14 @@
         (is (= 200 status))
         (is (= "text/csv" (headers "Content-Type")))
 
-        (let [csv-result (csv/parse-csv (stream->string body))
+        (let [csv-result (csv/parse-csv (tc/stream->string body))
               triples (set (map (fn [row] (map #(URI. %) row)) (drop 1 csv-result)))
-              expected-triples (get-spo-set (test-triples (URI. "http://test.com/data/one")))]
+              expected-triples (get-spo-set (tc/test-triples (URI. "http://test.com/data/one")))]
           (is (= ["s" "p" "o"] (first csv-result)))
           (is (= expected-triples triples)))))))
 
 (deftest sparql-end-point-boolean-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
+  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "Boolean SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as resp} (end-point {:request-method :get
@@ -85,11 +163,11 @@
         (is (= 200 status))
         (is (= "text/plain; charset=utf-8" (headers "Content-Type")))
 
-        (let [body-str (stream->string body)]
+        (let [body-str (tc/stream->string body)]
           (is (= "true" body-str)))))))
 
 (deftest sparql-endpoint-sets-content-type-text-plain-if-html-requested
-  (let [end-point (sparql-end-point "/live/sparql" *test-backend*)]
+  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "SPARQL endpoint sets content type to text/plain if text/html requested"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -102,7 +180,7 @@
 
 (deftest sparql-endpoint-invalid-query
   (testing "SPARQL endpoint returns client error if SPARQL query invalid"
-    (let [endpoint (sparql-end-point "/live/sparql" *test-backend*)
+    (let [endpoint (sparql-end-point "/live/sparql" tc/*test-backend*)
           request {:request-method :get
                    :uri "/live/sparql"
                    :query-params {"query" "NOT A VALID SPARQL QUERY"}
@@ -115,13 +193,13 @@
         max-connections (int 2)
         connection-latch (CountDownLatch. max-connections)
         release-latch (CountDownLatch. 1)
-        repo (doto (get-latched-http-server-repo test-port) (.setMaxConcurrentHttpConnections max-connections))
+        repo (doto (tc/get-latched-http-server-repo test-port) (.setMaxConcurrentHttpConnections max-connections))
         endpoint (sparql-end-point "/live/sparql" repo)
         test-request {:uri "/live/sparql"
                       :request-method :get
                       :query-params {"query" "SELECT * WHERE { ?s ?p ?o }"}
                       :headers {"accept" "application/sparql-results+json"}}]
-    (with-open [server (latched-http-server test-port connection-latch release-latch (get-spo-http-response))]
+    (with-open [server (tc/latched-http-server test-port connection-latch release-latch (tc/get-spo-http-response))]
       (let [blocked-connections (doall (map (fn [i] (future (endpoint test-request))) (range 1 (inc max-connections))))]
         ;;wait for max number of connections to be accepted by the server
         (if (.await connection-latch 5000 TimeUnit/MILLISECONDS)
@@ -130,15 +208,10 @@
             (let [rf (future (endpoint test-request))]
               ;;should be rejected almost immediately
               (let [response (.get rf 5000 TimeUnit/MILLISECONDS)]
-                (assert-is-service-unavailable-response response)))
+                (tc/assert-is-service-unavailable-response response)))
 
             ;;release previous connections and wait for them to complete
             (.countDown release-latch)
             (doseq [f blocked-connections]
               (.get f 100 TimeUnit/MILLISECONDS)))
           (throw (RuntimeException. "Server failed to accept connections within timeout")))))))
-
-(use-fixtures :once wrap-db-setup)
-
-(use-fixtures :each (partial wrap-clean-test-db
-                             add-triple-to-db))

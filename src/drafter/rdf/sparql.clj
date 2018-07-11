@@ -4,7 +4,7 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [grafter.rdf :as rdf]
             [grafter.rdf.protocols :as pr]
-            [grafter.rdf.repository :as repo]
+            [grafter.rdf4j.repository :as repo]
             [medley.core :as med]))
 
 (defn eager-query 

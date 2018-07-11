@@ -5,27 +5,39 @@ Not developing drafter itself then just grab a recent build from
 
 * Developing Drafter
 
-- clone this project
-- [[http://leiningen.org/#install][Install leiningen]]
-- cd into the project directory =cd drafter=
-- =lein repl= This will start an http server on port 3001
+1. clone this project
+2. [[http://leiningen.org/#install][Install leiningen]]
+3. cd into the project directory =cd drafter=
 
-To run a dev build of the drafter server with configuration defaults
-(port 3001 and a repo stored in =./drafter-db=) simply run:
+** Testing 
 
-=$ lein repl=
 
-To run the tests from the console:
+1. To run the unit tests you must currently have a database called
+   =drafter-test-db= created and ready.  You can create this with the
+   command: =stardog-admin db create -n drafter-test-db=
+2. You should enable stardog ICV constraints on this database by
+   running the command =./bin/enforce-drafter-constraints.sh
+   drafter-test-db= This ensures the database is never inconsistent
+   with regards to the rules defined in =resources/drafter/state-graph-constraints.ttl=
+
+3. To run these tests from the console run the command:
 
 =$ lein test=
 
-To run a test from a repl, make sure the test namespace is loaded
-(evaling it will usually do this) then run (for example):
+** Local Development
 
-#+BEGIN_SRC clojure
-(clojure.test/run-tests 'drafter.routes.sparql-test)
-#+END_SRC
+1. You should also create a database for local
+   development. =stardog-admin db create drafter-dev-db=
+2. Again you should consider adding constraints to this database:
 
+   =./bin/enforce-drafter-constraints.sh drafter-dev-db=
+
+
+2. =lein repl=
+3. =(dev)= to load dev namespace
+4. =(start-system!)= To start the drafter service on the configured port.
+
+To run the tests from the console:
 To build:
 
 =$ lein uberjar=

@@ -1,42 +1,49 @@
 (ns drafter.routes.draftsets-api-test
-  (:require [clojure
-             [set :as set]
-             [test :refer :all]]
-            [clojure.java.io :as io]
-            [drafter
-             [middleware :as middleware]
-             [swagger :as swagger]
-             [test-common :refer :all]
-             [timeouts :as timeouts]
-             [user :as user]
-             [user-test :refer [test-editor test-manager test-password test-publisher]]
-             [util :as util]]
-            [drafter.rdf
-             [sparql :as sparql]]
-            [drafter.rdf.draft-management.jobs :as jobs]
+  (:require [clojure.java.io :as io]
+            [clojure.set :as set]
+            [clojure.test :refer :all :as t]
+            [drafter.middleware :as middleware]
             [drafter.rdf.drafter-ontology
              :refer
              [drafter:DraftGraph drafter:modifiedAt]]
-            [drafter.routes.draftsets-api :refer :all]
-            [drafter.user
-             [memory-repository :as memrepo]
-             [repository :as user-repo]]
+            [drafter.rdf.draftset-management.job-util :as jobs]
+            [drafter.feature.draftset.create-test :as create-test]
+            [drafter.rdf.sparql :as sparql]
+            [drafter.routes.draftsets-api :as sut :refer :all]
+            [drafter.swagger :as swagger]
+            [drafter.test-common :as tc]
+            [drafter.timeouts :as timeouts]
+            [drafter.user :as user]
+            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
+            [drafter.user.memory-repository :as memrepo]
+            [drafter.util :as util]
             [grafter.rdf :refer [add context statements]]
-            [grafter.rdf
-             [formats :as formats]
-             [io :refer [rdf-serializer]]
-             [protocols :refer [->Quad ->Triple map->Triple]]
-             [repository :as repo]]
+            [grafter.rdf.protocols :refer [->Quad ->Triple map->Triple]]
+            [grafter.rdf4j.formats :as formats]
+            [grafter.rdf4j.io :refer [rdf-writer]]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
+           java.net.URI
            java.util.Date
            org.eclipse.rdf4j.query.QueryResultHandler
-           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser
-           (java.net URI)))
+           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
 
-(def ^:private ^:dynamic *route*)
-(def ^:private ^:dynamic *user-repo*)
+(def ^:private ^:dynamic *route* nil)
+(def ^:private ^:dynamic *user-repo* nil)
+
+(defn- setup-route [test-function]
+  (let [users (:drafter.user/memory-repository tc/*test-system*)
+        swagger-spec (swagger/load-spec-and-resolve-refs)
+        api-handler (:drafter.routes/draftsets-api tc/*test-system*)]
+
+    (binding [*user-repo* users
+              *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
+      (test-function))))
+
+(use-fixtures :each (join-fixtures [(tc/wrap-system-setup "test-system.edn" [:drafter.user/repo :drafter.routes/draftsets-api :drafter.backend/rdf4j-repo :drafter/write-scheduler])
+                                    setup-route]))
+
 
 (defn is-client-error-response?
   "Whether the given ring response map represents a client error."
@@ -49,23 +56,16 @@
 
 (defn- statements->input-stream [statements format]
   (let [bos (ByteArrayOutputStream.)
-        serialiser (rdf-serializer bos :format format)]
+        serialiser (rdf-writer bos :format format)]
     (add serialiser statements)
     (ByteArrayInputStream. (.toByteArray bos))))
 
 (defn- append-to-draftset-request [user draftset-location data-stream content-type]
-  (with-identity user
+  (tc/with-identity user
     {:uri (str draftset-location "/data")
      :request-method :put
      :body data-stream
      :headers {"content-type" content-type}}))
-
-(defn- create-draftset-request
-  ([] (create-draftset-request test-editor))
-  ([user] (create-draftset-request user nil))
-  ([user display-name] (create-draftset-request user display-name nil))
-  ([user display-name description]
-   (with-identity user {:uri "/v1/draftsets" :request-method :post :params {:display-name display-name :description description}})))
 
 (defn- make-append-data-to-draftset-request [user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
@@ -74,33 +74,25 @@
 
 (defn- append-data-to-draftset-through-api [user draftset-location draftset-data-file]
   (let [append-response (make-append-data-to-draftset-request user draftset-location draftset-data-file)]
-    (await-success finished-jobs (:finished-job (:body append-response)))))
+    (tc/await-success finished-jobs (:finished-job (:body append-response)))))
 
 (defn- statements->append-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)]
-    (append-to-draftset-request user draftset-location input-stream (.getDefaultMIMEType format))))
+    (append-to-draftset-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
 
 (defn- append-quads-to-draftset-through-api [user draftset-location quads]
-  (let [request (statements->append-request user draftset-location quads formats/rdf-nquads)
+  (let [request (statements->append-request user draftset-location quads :nq)
         response (route request)]
-    (await-success finished-jobs (get-in response [:body :finished-job]))))
+    (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
 
 (defn- statements->append-triples-request [user draftset-location triples graph]
-  (-> (statements->append-request user draftset-location triples formats/rdf-ntriples)
+  (-> (statements->append-request user draftset-location triples :nt)
       (assoc-in [:params :graph] (str graph))))
 
 (defn- append-triples-to-draftset-through-api [user draftset-location triples graph]
   (let [request (statements->append-triples-request user draftset-location triples graph)
         response (route request)]
-    (await-success finished-jobs (get-in response [:body :finished-job]))))
-
-(def see-other-response-schema
-  (merge ring-response-schema
-         {:status (s/eq 303)
-          :headers {(s/required-key "Location") s/Str}}))
-
-(defn assert-is-see-other-response [response]
-  (assert-schema see-other-response-schema response))
+    (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
 
 (def ^:private DraftsetWithoutTitleOrDescription
   {:id s/Str
@@ -119,7 +111,7 @@
 (def ^:private draftset-with-description-info-schema
   (assoc DraftsetWithoutDescription :description s/Str))
 
-(def ^:private Draftset
+(def Draftset
   (merge DraftsetWithoutTitleOrDescription
          {(s/optional-key :description) s/Str
           (s/optional-key :display-name) s/Str}))
@@ -138,47 +130,47 @@
   ([user] (create-draftset-through-api user nil))
   ([user display-name] (create-draftset-through-api user display-name nil))
   ([user display-name description]
-   (let [request (create-draftset-request user display-name description)
+   (let [request (create-test/create-draftset-request user display-name description)
          {:keys [headers] :as response} (route request)]
-     (assert-is-see-other-response response)
+     (create-test/assert-is-see-other-response response)
      (get headers "Location"))))
 
 (defn- get-draftset-quads-accept-request [draftset-location user accept union-with-live?-str]
-  (with-identity user
+  (tc/with-identity user
     {:uri (str draftset-location "/data")
      :request-method :get
      :headers {"accept" accept}
      :params {:union-with-live union-with-live?-str}}))
 
 (defn- get-draftset-quads-request [draftset-location user format union-with-live?-str]
-  (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType format) union-with-live?-str))
+  (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType (formats/->rdf-format format)) union-with-live?-str))
 
 (defn- get-draftset-quads-through-api
   ([draftset-location user]
    (get-draftset-quads-through-api draftset-location user "false"))
   ([draftset-location user union-with-live?]
-   (let [data-request (get-draftset-quads-request draftset-location user formats/rdf-nquads union-with-live?)
+   (let [data-request (get-draftset-quads-request draftset-location user :nq union-with-live?)
          data-response (route data-request)]
-     (assert-is-ok-response data-response)
-     (concrete-statements (:body data-response) formats/rdf-nquads))))
+     (tc/assert-is-ok-response data-response)
+     (concrete-statements (:body data-response) :nq))))
 
 (defn- get-draftset-graph-triples-through-api [draftset-location user graph union-with-live?-str]
   (let [data-request {:uri            (str draftset-location "/data")
                       :request-method :get
                       :headers        {"accept" "application/n-triples"}
                       :params         {:union-with-live union-with-live?-str :graph (str graph)}}
-        data-request (with-identity user data-request)
+        data-request (tc/with-identity user data-request)
         {:keys [body] :as data-response} (route data-request)]
-    (assert-is-ok-response data-response)
-    (concrete-statements body formats/rdf-ntriples)))
+    (tc/assert-is-ok-response data-response)
+    (concrete-statements body :nt)))
 
 (defn- create-publish-request [draftset-location user]
-  (with-identity user {:uri (str draftset-location "/publish") :request-method :post}))
+  (tc/with-identity user {:uri (str draftset-location "/publish") :request-method :post}))
 
 (defn- publish-draftset-through-api [draftset-location user]
   (let [publish-request (create-publish-request draftset-location user)
         publish-response (route publish-request)]
-    (await-success finished-jobs (:finished-job (:body publish-response)))))
+    (tc/await-success finished-jobs (:finished-job (:body publish-response)))))
 
 (defn- publish-quads-through-api [quads]
   (let [draftset-location (create-draftset-through-api test-publisher)]
@@ -186,45 +178,40 @@
     (publish-draftset-through-api draftset-location test-publisher)))
 
 (defn- create-delete-quads-request [user draftset-location input-stream format]
-  (with-identity user {:uri (str draftset-location "/data")
+  (tc/with-identity user {:uri (str draftset-location "/data")
                        :request-method :delete
                        :body input-stream
                        :headers {"content-type" format}}))
 
 (defn- get-draftset-info-request [draftset-location user]
-  (with-identity user {:uri draftset-location :request-method :get}))
-
-(defn- ok-response->typed-body [schema {:keys [body] :as response}]
-  (assert-is-ok-response response)
-  (assert-schema schema body)
-  body)
+  (tc/with-identity user {:uri draftset-location :request-method :get}))
 
 (defn- get-draftset-info-through-api [draftset-location user]
   (let [{:keys [body] :as response} (route (get-draftset-info-request draftset-location user))]
-    (assert-is-ok-response response)
-    (assert-schema Draftset body)
+    (tc/assert-is-ok-response response)
+    (tc/assert-schema Draftset body)
     body))
 
 (defn- delete-draftset-graph-request [user draftset-location graph-to-delete]
-  (with-identity user {:uri (str draftset-location "/graph") :request-method :delete :params {:graph (str graph-to-delete)}}))
+  (tc/with-identity user {:uri (str draftset-location "/graph") :request-method :delete :params {:graph (str graph-to-delete)}}))
 
 (defn- delete-draftset-graph-through-api [user draftset-location graph-to-delete]
   (let [delete-graph-request (delete-draftset-graph-request user draftset-location graph-to-delete)
         {:keys [body] :as delete-graph-response} (route delete-graph-request)]
-    (assert-is-ok-response delete-graph-response)
-    (assert-schema Draftset body)
+    (tc/assert-is-ok-response delete-graph-response)
+    (tc/assert-schema Draftset body)
     body))
 
 (defn- await-delete-statements-response [response]
-  (let [job-result (await-success finished-jobs (get-in response [:body :finished-job]))]
+  (let [job-result (tc/await-success finished-jobs (get-in response [:body :finished-job]))]
     (get-in job-result [:details :draftset])))
 
 (defn- create-delete-statements-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)]
-    (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType format))))
+    (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
 
 (defn- create-delete-triples-request [user draftset-location statements graph]
-  (assoc-in (create-delete-statements-request user draftset-location statements formats/rdf-ntriples)
+  (assoc-in (create-delete-statements-request user draftset-location statements :nt)
             [:params :graph] (str graph)))
 
 (defn- delete-triples-through-api [user draftset-location triples graph]
@@ -233,12 +220,12 @@
       await-delete-statements-response))
 
 (defn- delete-quads-through-api [user draftset-location quads]
-  (let [delete-request (create-delete-statements-request user draftset-location quads formats/rdf-nquads)
+  (let [delete-request (create-delete-statements-request user draftset-location quads :nq)
         delete-response (route delete-request)]
     (await-delete-statements-response delete-response)))
 
 (defn- delete-draftset-triples-through-api [user draftset-location triples graph]
-  (let [delete-request (create-delete-statements-request user draftset-location triples formats/rdf-ntriples)
+  (let [delete-request (create-delete-statements-request user draftset-location triples :nt)
         delete-request (assoc-in delete-request [:params :graph] (str graph))
         delete-response (route delete-request)]
     (await-delete-statements-response delete-response)))
@@ -254,37 +241,31 @@
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
 (defn- create-submit-to-role-request [user draftset-location role]
-  (with-identity user {:uri (str draftset-location "/submit-to") :request-method :post :params {:role (name role)}}))
+  (tc/with-identity user {:uri (str draftset-location "/submit-to") :request-method :post :params {:role (name role)}}))
 
 (defn- submit-draftset-to-role-through-api [user draftset-location role]
   (let [response (route (create-submit-to-role-request user draftset-location role))]
-    (assert-is-ok-response response)))
+    (tc/assert-is-ok-response response)))
 
-(deftest create-draftset-without-title-or-description
-  (let [response (route (with-identity test-editor {:uri "/v1/draftsets" :request-method :post}))]
-    (assert-is-see-other-response response)))
+;; define a local alternative to the route fixture wrapper
 
-(deftest create-draftset-with-title-and-without-description
-  (let [response (route (create-draftset-request test-editor "Test Title!"))]
-    (assert-is-see-other-response response)))
 
-(deftest create-draftset-with-title-and-description
-  (let [response (route (create-draftset-request test-editor "Test title" "Test description"))]
-    (assert-is-see-other-response response)))
 
-(defn- get-draftsets-request [include user]
-  (with-identity user {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
 
-(defn- get-draftsets-through-api [include user]
+#_(defn get-draftsets-request [include user]
+  (tc/with-identity user
+    {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
+
+#_(defn- get-draftsets-through-api [include user]
   (let [request (get-draftsets-request include user)
         {:keys [body] :as response} (route request)]
     (ok-response->typed-body [Draftset] response)))
 
-(defn- get-all-draftsets-through-api [user]
+#_(defn- get-all-draftsets-through-api [user]
   (get-draftsets-through-api :all user))
 
 (defn- submit-draftset-to-username-request [draftset-location target-username user]
-  (with-identity user
+  (tc/with-identity user
     {:uri (str draftset-location "/submit-to") :request-method :post :params {:user target-username}}))
 
 (defn- submit-draftset-to-user-request [draftset-location target-user user]
@@ -293,71 +274,17 @@
 (defn- submit-draftset-to-user-through-api [draftset-location target-user user]
   (let [request (submit-draftset-to-user-request draftset-location target-user user)
         response (route request)]
-    (assert-is-ok-response response)))
+    (tc/assert-is-ok-response response)))
 
 (defn- create-claim-request [draftset-location user]
-  (with-identity user {:uri (str draftset-location "/claim") :request-method :put}))
+  (tc/with-identity user {:uri (str draftset-location "/claim") :request-method :put}))
 
 (defn- claim-draftset-through-api [draftset-location user]
   (let [claim-request (create-claim-request draftset-location user)
         {:keys [body] :as claim-response} (route claim-request)]
-      (assert-is-ok-response claim-response)
-      (assert-schema Draftset body)
+      (tc/assert-is-ok-response claim-response)
+      (tc/assert-schema Draftset body)
       body))
-
-(deftest get-draftsets-test
-  (let [owned-ds (create-draftset-through-api test-publisher "owned")
-        claimable-ds (create-draftset-through-api test-editor "claimable")
-        unclaimable-ds (create-draftset-through-api test-editor)]
-
-    ;;offer claimable-ds to publisher role so it can be claimed by publisher
-    (submit-draftset-to-role-through-api test-editor claimable-ds :publisher)
-
-    (testing "All draftsets"
-      (let [all-draftsets (get-draftsets-through-api :all test-publisher)]
-        (is (= 2 (count all-draftsets)))
-        (is (= #{"owned" "claimable"} (set (map :display-name all-draftsets))))))
-
-    (testing "Missing include filter should return all owned and claimable draftsets"
-      (let [request (with-identity test-publisher {:uri "/v1/draftsets" :request-method :get})
-            response (route request)
-            draftsets (ok-response->typed-body [Draftset] response)]
-        (is (= 2 (count draftsets)))
-        (is (= #{"owned" "claimable"} (set (map :display-name draftsets))))))
-
-    (testing "Owned draftsets"
-      (let [draftsets (get-draftsets-through-api :owned test-publisher)]
-        (is (= 1 (count draftsets)))
-        (is (= "owned" (:display-name (first draftsets))))))
-
-    (testing "Claimable draftsets"
-      (let [draftsets (get-draftsets-through-api :claimable test-publisher)]
-        (is (= 1 (count draftsets)))
-        (is (= "claimable" (:display-name (first draftsets))))))
-
-    (testing "Invalid include parameter"
-      (let [request (get-draftsets-request :invalid test-publisher)
-            response (route request)]
-        (assert-is-unprocessable-response response)))
-
-    (testing "Unauthenticated"
-      (let [response (route {:uri "/v1/draftsets" :request-method :get})]
-        (assert-is-unauthorised-response response)))))
-
-(deftest get-all-draftsets-test
-  (let [owned-ds (create-draftset-through-api test-publisher "owned")
-        editing-ds (create-draftset-through-api test-editor "editing")
-        claimable-publisher-ds (create-draftset-through-api test-editor "publishing")
-        claimable-manager-ds (create-draftset-through-api test-editor "admining")]
-
-    ;;submit two draftsets, one to publishers, the other to managers
-    (submit-draftset-to-role-through-api test-editor claimable-publisher-ds :publisher)
-    (submit-draftset-to-role-through-api test-editor claimable-manager-ds :manager)
-
-    (let [ds-infos (get-all-draftsets-through-api test-publisher)
-          available-names (set (map :display-name ds-infos))]
-      (assert-schema [Draftset] ds-infos)
-      (is (= #{"owned" "publishing"} available-names)))))
 
 (deftest get-all-draftsets-changes-test
   (let [grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
@@ -383,13 +310,13 @@
 (deftest get-empty-draftset-without-title-or-description
   (let [draftset-location (create-draftset-through-api test-editor)
         ds-info (get-draftset-info-through-api draftset-location test-editor)]
-    (assert-schema DraftsetWithoutTitleOrDescription ds-info)))
+    (tc/assert-schema DraftsetWithoutTitleOrDescription ds-info)))
 
 (deftest get-empty-draftset-without-description
   (let [display-name "Test title!"
         draftset-location (create-draftset-through-api test-editor display-name)
         ds-info (get-draftset-info-through-api draftset-location test-editor)]
-    (assert-schema DraftsetWithoutDescription ds-info)
+    (tc/assert-schema DraftsetWithoutDescription ds-info)
     (is (= display-name (:display-name ds-info)))))
 
 (deftest get-empty-draftset-with-description
@@ -398,7 +325,7 @@
         draftset-location (create-draftset-through-api test-editor display-name description)]
 
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
-      (assert-schema draftset-with-description-info-schema ds-info)
+      (tc/assert-schema draftset-with-description-info-schema ds-info)
       (is (= display-name (:display-name ds-info)))
       (is (= description (:description ds-info))))))
 
@@ -410,14 +337,14 @@
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
 
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
-      (assert-schema DraftsetWithoutDescription ds-info)
+      (tc/assert-schema DraftsetWithoutDescription ds-info)
 
       (is (= display-name (:display-name ds-info)))
-      (is (= live-graphs (key-set (:changes ds-info)))))))
+      (is (= live-graphs (tc/key-set (:changes ds-info)))))))
 
 (deftest get-draftset-request-for-non-existent-draftset
   (let [response (route (get-draftset-info-request "/v1/draftset/missing" test-publisher))]
-    (assert-is-not-found-response response)))
+    (tc/assert-is-not-found-response response)))
 
 (deftest get-draftset-available-for-claim
   (let [draftset-location (create-draftset-through-api test-editor)]
@@ -428,105 +355,14 @@
   (let [draftset-location (create-draftset-through-api test-editor)
         get-request (get-draftset-info-request draftset-location test-publisher)
         get-response (route get-request)]
-    (assert-is-forbidden-response get-response)))
-
-(defn- get-claimable-draftsets-through-api [user]
-  (let [request (with-identity user {:uri "/v1/draftsets" :request-method :get :params {:include :claimable}})]
-    (ok-response->typed-body [Draftset] (route request))))
-
-(deftest get-claimable-draftsets-test
-  (let [ds-names (map #(str "Draftset " %) (range 1 6))
-        [ds1 ds2 ds3 ds4 ds5] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
-    (submit-draftset-to-role-through-api test-editor ds1 :editor)
-    (submit-draftset-to-role-through-api test-editor ds2 :publisher)
-    (submit-draftset-to-role-through-api test-editor ds3 :manager)
-    (submit-draftset-to-user-through-api ds5 test-publisher test-editor)
-
-    ;;editor should be able to claim all draftsets just submitted as they have not been claimed
-    (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (let [expected-claimable-names (map #(nth ds-names %) [0 1 2 4])
-            claimable-names (map :display-name editor-claimable)]
-        (is (= (set expected-claimable-names) (set claimable-names)))))
-
-    (let [publisher-claimable (get-claimable-draftsets-through-api test-publisher)]
-      ;;Draftsets 1, 2 and 5 should be on submit to publisher
-      ;;Draftset 3 is in too high a role
-      ;;Draftset 4 is not available
-      (let [claimable-names (map :display-name publisher-claimable)
-            expected-claimable-names (map #(nth ds-names %) [0 1 4])]
-        (is (= (set expected-claimable-names) (set claimable-names)))))
-
-    (doseq [ds [ds1 ds3]]
-      (claim-draftset-through-api ds test-manager))
-
-    (claim-draftset-through-api ds5 test-publisher)
-
-    ;;editor should not be able to see ds1, ds3 or ds5 after they have been claimed
-    (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (is (= 1 (count editor-claimable)))
-      (is (= (:display-name (first editor-claimable)) (nth ds-names 1))))))
-
-(deftest get-claimable-draftset-satisifes-multiple-claim-criteria
-  ;;a draftset may be in a state where it satisified multiple criteria to be claimed by
-  ;;the current user e.g. if a user submits to a role they are in. In this case the user
-  ;;can claim it due to being in the claim role, and because they are the submitter of
-  ;;an unclaimed draftset. Drafter should only return any matching draftsets once in this
-  ;;case
-  (let [draftset-location (create-draftset-through-api test-editor)]
-    (submit-draftset-to-role-through-api test-editor draftset-location :editor)
-    (let [claimable-draftsets (get-claimable-draftsets-through-api test-editor)]
-      (is (= 1 (count claimable-draftsets))))))
-
-(deftest get-all-draftsets-satisfied-multiple-claim-criteria
-  (let [draftset-location (create-draftset-through-api test-editor)]
-    (submit-draftset-to-role-through-api test-editor draftset-location :editor)
-    (let [all-draftsets (get-all-draftsets-through-api test-editor)]
-      (is (= 1 (count all-draftsets))))))
-
-(deftest get-claimable-draftsets-changes-test
-  (let [[[g1 g1-quads] [g2 g2-quads]] (seq (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset1 (create-draftset-through-api test-editor "ds1")
-        draftset2 (create-draftset-through-api test-editor "ds2")]
-    (publish-quads-through-api g1-quads)
-
-    ;;delete published graph in draftset1 and create new graph in draftset2
-    (delete-draftset-graph-through-api test-editor draftset1 g1)
-    (append-quads-to-draftset-through-api test-editor draftset2 g2-quads)
-
-    ;;submit both draftsets to publisher role
-    (doseq [ds [draftset1 draftset2]]
-      (submit-draftset-to-role-through-api test-editor ds :publisher))
-
-    (let [ds-infos (get-claimable-draftsets-through-api test-publisher)
-          ds1-info (first (filter #(= "ds1" (:display-name %)) ds-infos))
-          ds2-info (first (filter #(= "ds2" (:display-name %)) ds-infos))]
-      (is (= :deleted (get-in ds1-info [:changes g1 :status])))
-      (is (= :created (get-in ds2-info [:changes g2 :status]))))))
-
-(defn- get-owned-draftsets-through-api [user]
-  (get-draftsets-through-api :owned user))
-
-(deftest get-owned-draftsets-changes-test
-  (let [[[g1 g1-quads] [g2 g2-quads]] (seq (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api g1-quads)
-
-    ;;delete g1 in draftset and add quads to g2
-    (delete-draftset-graph-through-api test-editor draftset-location g1)
-    (append-quads-to-draftset-through-api test-editor draftset-location g2-quads)
-
-    (let [ds-infos (get-owned-draftsets-through-api test-editor)
-          {:keys [changes] :as ds-info} (first ds-infos)]
-      (is (= 1 (count ds-infos)))
-      (is (= :deleted (get-in changes [g1 :status])))
-      (is (= :created (get-in changes [g2 :status]))))))
+    (tc/assert-is-forbidden-response get-response)))
 
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
         quads (statements data-file-path)
         draftset-location (create-draftset-through-api test-editor)]
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
-    (let [draftset-graphs (key-set (:changes (get-draftset-info-through-api draftset-location test-editor)))
+    (let [draftset-graphs (tc/key-set (:changes (get-draftset-info-through-api draftset-location test-editor)))
           graph-statements (group-by context quads)]
       (doseq [[live-graph graph-quads] graph-statements]
         (let [graph-triples (get-draftset-graph-triples-through-api draftset-location test-editor live-graph "false")
@@ -564,7 +400,7 @@
                                       ;; There is only one draftgraph in this
                                       ;; test - so we can get away with a bit of
                                       ;; a sloppy query.
-                                      (-> *test-backend*
+                                      (-> tc/*test-backend*
                                           (sparql/eager-query
                                            (str "SELECT ?modified {"
                                                 "   ?draftgraph a <" drafter:DraftGraph "> ;"
@@ -616,21 +452,21 @@
 
 (deftest append-data-to-non-existent-draftset
   (let [append-response (make-append-data-to-draftset-request test-publisher "/v1/draftset/missing" "test/resources/test-draftset.trig")]
-    (assert-is-not-found-response append-response)))
+    (tc/assert-is-not-found-response append-response)))
 
 (deftest append-quads-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
         quads (statements "test/resources/test-draftset.trig")
-        append-request (statements->append-request test-publisher draftset-location quads formats/rdf-nquads)
+        append-request (statements->append-request test-publisher draftset-location quads :nq)
         append-response (route append-request)]
-    (assert-is-forbidden-response append-response)))
+    (tc/assert-is-forbidden-response append-response)))
 
 (deftest append-graph-triples-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
         [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         append-request (statements->append-triples-request test-publisher draftset-location graph-quads graph)
         append-response (route append-request)]
-    (assert-is-forbidden-response append-response)))
+    (tc/assert-is-forbidden-response append-response)))
 
 (deftest delete-quads-from-live-graphs-in-draftset
   (let [quads (statements "test/resources/test-draftset.trig")
@@ -679,16 +515,16 @@
 
     (let [draftset-info (delete-quads-through-api test-editor draftset-location graph-statements)
           expected-graphs (set (map :c initial-statements))
-          draftset-graphs (key-set (:changes draftset-info))]
+          draftset-graphs (tc/key-set (:changes draftset-info))]
       ;;graph should still be in draftset even if it is empty since it should be deleted on publish
       (is (= expected-graphs draftset-graphs)))))
 
 (deftest delete-quads-with-malformed-body
   (let [draftset-location (create-draftset-through-api test-editor)
-        body (string->input-stream "NOT NQUADS")
-        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType formats/rdf-nquads))
+        body (tc/string->input-stream "NOT NQUADS")
+        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :nq)))
         delete-response (route delete-request)
-        job-result (await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
+        job-result (tc/await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))
 
 (deftest delete-triples-from-graph-in-live
@@ -701,7 +537,7 @@
     (let [draftset-info (delete-quads-through-api test-editor draftset-location [(first graph-quads)])
           draftset-quads (get-draftset-quads-through-api draftset-location test-editor "false")
           expected-quads (eval-statements (rest graph-quads))]
-      (is (= #{live-graph} (key-set (:changes draftset-info))))
+      (is (= #{live-graph} (tc/key-set (:changes draftset-info))))
       (is (= (set expected-quads) (set draftset-quads))))))
 
 (deftest delete-triples-from-graph-not-in-live
@@ -741,7 +577,7 @@
 
     (let [draftset-info (delete-draftset-triples-through-api test-editor draftset-location triples-to-delete graph)
           draftset-quads (get-draftset-quads-through-api draftset-location test-editor "false")
-          draftset-graphs (key-set (:changes draftset-info))]
+          draftset-graphs (tc/key-set (:changes draftset-info))]
 
       (is (= #{graph} draftset-graphs))
       (is (empty? draftset-quads)))))
@@ -751,32 +587,32 @@
         draftset-quads (statements "test/resources/test-draftset.trig")]
     (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
 
-    (with-open [input-stream (statements->input-stream (take 2 draftset-quads) formats/rdf-ntriples)]
-      (let [delete-request (create-delete-quads-request test-editor draftset-location input-stream (.getDefaultMIMEType formats/rdf-ntriples))
+    (with-open [input-stream (statements->input-stream (take 2 draftset-quads) :nt)]
+      (let [delete-request (create-delete-quads-request test-editor draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format :nt)))
             delete-response (route delete-request)]
-        (assert-is-unprocessable-response delete-response)))))
+        (tc/assert-is-unprocessable-response delete-response)))))
 
 (deftest delete-triples-with-malformed-body
   (let [draftset-location (create-draftset-through-api test-editor)
-        body (string->input-stream "NOT TURTLE")
-        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType formats/rdf-turtle))
+        body (tc/string->input-stream "NOT TURTLE")
+        delete-request (create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :ttl)))
         delete-request (assoc-in delete-request [:params :graph] "http://test-graph")
         delete-response (route delete-request)
-        job-result (await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
+        job-result (tc/await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))
 
 (deftest delete-draftset-data-for-non-existent-draftset
   (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [delete-request (with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :body fs})
+    (let [delete-request (tc/with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :body fs})
           delete-response (route delete-request)]
-      (assert-is-not-found-response delete-response))))
+      (tc/assert-is-not-found-response delete-response))))
 
 (deftest delete-draftset-data-request-with-unknown-content-type
   (with-open [input-stream (io/input-stream "test/resources/test-draftset.trig")]
     (let [draftset-location (create-draftset-through-api test-editor)
           delete-request (create-delete-quads-request test-editor draftset-location input-stream "application/unknown-quads-format")
           delete-response (route delete-request)]
-      (assert-is-unsupported-media-type-response delete-response))))
+      (tc/assert-is-unsupported-media-type-response delete-response))))
 
 (deftest delete-non-existent-live-graph-in-draftset
   (let [draftset-location (create-draftset-through-api test-editor)
@@ -786,17 +622,17 @@
     (testing "silent"
       (let [delete-request (assoc-in delete-request [:params :silent] "true")
             delete-response (route delete-request)]
-        (assert-is-ok-response delete-response)))
+        (tc/assert-is-ok-response delete-response)))
 
     (testing "malformed silent flag"
       (let [delete-request (assoc-in delete-request [:params :silent] "invalid")
             delete-response (route delete-request)]
-        (assert-is-unprocessable-response delete-response)))
+        (tc/assert-is-unprocessable-response delete-response)))
 
     (testing "not silent"
       (let [delete-request (delete-draftset-graph-request test-editor draftset-location "http://live-graph")
             delete-response (route delete-request)]
-        (assert-is-unprocessable-response delete-response)))))
+        (tc/assert-is-unprocessable-response delete-response)))))
 
 (deftest delete-live-graph-not-in-draftset
   (let [quads (statements "test/resources/test-draftset.trig")
@@ -836,9 +672,10 @@
       (is (= (set expected-graphs) (set draftset-graphs))))))
 
 (deftest delete-graph-request-for-non-existent-draftset
-  (let [request (with-identity test-manager {:uri "/v1/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
+  (let [request (tc/with-identity test-manager {:uri "/v1/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
         response (route request)]
-    (assert-is-not-found-response response)))
+    (tc/assert-is-not-found-response response)))
+
 (deftest delete-graph-by-non-owner
 
  (let [draftset-location (create-draftset-through-api test-editor)
@@ -847,7 +684,7 @@
 
     (let [delete-request (delete-draftset-graph-request test-publisher draftset-location graph)
           delete-response (route delete-request)]
-      (assert-is-forbidden-response delete-response))))
+      (tc/assert-is-forbidden-response delete-response))))
 
 (deftest publish-draftset-with-graphs-not-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
@@ -929,14 +766,14 @@
     (assert-live-quads graph-quads)))
 
 (deftest publish-non-existent-draftset
-  (let [response (route (with-identity test-publisher {:uri "/v1/draftset/missing/publish" :request-method :post}))]
-    (assert-is-not-found-response response)))
+  (let [response (route (tc/with-identity test-publisher {:uri "/v1/draftset/missing/publish" :request-method :post}))]
+    (tc/assert-is-not-found-response response)))
 
 (deftest publish-by-non-publisher-test
   (let [draftset-location (create-draftset-through-api test-editor)]
     (append-quads-to-draftset-through-api test-editor draftset-location (statements "test/resources/test-draftset.trig"))
     (let [publish-response (route (create-publish-request draftset-location test-editor))]
-      (assert-is-forbidden-response publish-response))))
+      (tc/assert-is-forbidden-response publish-response))))
 
 (deftest publish-by-non-owner-test
   (let [draftset-location (create-draftset-through-api test-publisher)
@@ -944,29 +781,29 @@
     (append-quads-to-draftset-through-api test-publisher draftset-location quads)
     (let [publish-request (create-publish-request draftset-location test-manager)
           publish-response (route publish-request)]
-      (assert-is-forbidden-response publish-response))))
+      (tc/assert-is-forbidden-response publish-response))))
 
 (defn- create-delete-draftset-request [draftset-location user]
-  (with-identity user
+  (tc/with-identity user
     {:uri draftset-location :request-method :delete}))
 
 (deftest delete-draftset-test
   (let [draftset-location (create-draftset-through-api test-editor)
         delete-response (route (create-delete-draftset-request draftset-location test-editor))]
-    (assert-is-accepted-response delete-response)
-    (await-success finished-jobs (get-in delete-response [:body :finished-job]))
+    (tc/assert-is-accepted-response delete-response)
+    (tc/await-success finished-jobs (get-in delete-response [:body :finished-job]))
 
-    (let [get-response (route (with-identity test-editor {:uri draftset-location :request-method :get}))]
-      (assert-is-not-found-response get-response))))
+    (let [get-response (route (tc/with-identity test-editor {:uri draftset-location :request-method :get}))]
+      (tc/assert-is-not-found-response get-response))))
 
 (deftest delete-non-existent-draftset-test
   (let [delete-response (route (create-delete-draftset-request "/v1/draftset/missing" test-publisher))]
-    (assert-is-not-found-response delete-response)))
+    (tc/assert-is-not-found-response delete-response)))
 
 (deftest delete-draftset-by-non-owner-test
   (let [draftset-location (create-draftset-through-api test-editor)
         delete-response (route (create-delete-draftset-request draftset-location test-manager))]
-    (assert-is-forbidden-response delete-response)))
+    (tc/assert-is-forbidden-response delete-response)))
 
 (defn- result-set-handler [result-state]
   (reify QueryResultHandler
@@ -980,7 +817,7 @@
         (swap! result-state conj binding-map)))))
 
 (defn- create-query-request [user draftset-location query accept-content-type & {:keys [union-with-live?]}]
-  (with-identity user
+  (tc/with-identity user
     {:uri (str draftset-location "/query")
      :headers {"accept" accept-content-type}
      :request-method :post
@@ -989,7 +826,7 @@
 (defn- select-query-draftset-through-api [user draftset-location select-query & {:keys [union-with-live?]}]
   (let [request (create-query-request user draftset-location select-query "application/sparql-results+json" :union-with-live? union-with-live?)
         {:keys [body] :as query-response} (route request)]
-    (assert-is-ok-response query-response)
+    (tc/assert-is-ok-response query-response)
     (let [result-state (atom #{})
           result-handler (result-set-handler result-state)
           parser (doto (SPARQLResultsJSONParser.) (.setQueryResultHandler result-handler))]
@@ -1001,13 +838,13 @@
   (let [draftset-location (create-draftset-through-api test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
         append-response (make-append-data-to-draftset-request test-editor draftset-location draftset-data-file)]
-    (await-success finished-jobs (:finished-job (:body append-response)) )
+    (tc/await-success finished-jobs (:finished-job (:body append-response)) )
     (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
           query-request (create-query-request test-editor draftset-location query "application/n-triples")
           query-response (route query-request)
-          response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format grafter.rdf.formats/rdf-ntriples)) )
+          response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format :nt)) )
           expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
-      (assert-is-ok-response query-response)
+      (tc/assert-is-ok-response query-response)
 
       (is (= expected-triples response-triples)))))
 
@@ -1028,7 +865,7 @@
         q "SELECT * WHERE { ?s ?p ?o }"
         request (create-query-request test-editor draftset-location q "application/sparql-results+json" :union-with-live? "notbool")
         response (route request)]
-    (assert-is-unprocessable-response response)))
+    (tc/assert-is-unprocessable-response response)))
 
 (deftest query-draftset-unioned-with-live
   (let [test-quads (statements "test/resources/test-draftset.trig")
@@ -1055,25 +892,25 @@
 (deftest query-non-existent-draftset
   (let [request (create-query-request test-editor "/v1/draftset/missing" "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
         response (route request)]
-    (assert-is-not-found-response response)))
+    (tc/assert-is-not-found-response response)))
 
 (deftest query-draftset-request-with-missing-query-parameter
   (let [draftset-location (create-draftset-through-api test-editor)
-        response (route (with-identity test-editor {:uri (str draftset-location "/query") :request-method :post}))]
-    (assert-is-unprocessable-response response)))
+        response (route (tc/with-identity test-editor {:uri (str draftset-location "/query") :request-method :post}))]
+    (tc/assert-is-unprocessable-response response)))
 
 (deftest query-draftset-request-with-invalid-http-method
   (let [draftset-location (create-draftset-through-api test-editor)
         query-request (create-query-request test-editor draftset-location "SELECT * WHERE { ?s ?p ?o }" "text/plain")
         query-request (assoc query-request :request-method :put)
         response (route query-request)]
-    (assert-is-method-not-allowed-response response)))
+    (tc/assert-is-method-not-allowed-response response)))
 
 (deftest query-draftset-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
         query-request (create-query-request test-publisher draftset-location "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
         query-response (route query-request)]
-    (assert-is-forbidden-response query-response)))
+    (tc/assert-is-forbidden-response query-response)))
 
 (deftest get-draftset-graph-triples-data
   (let [draftset-location (create-draftset-through-api test-editor)
@@ -1100,7 +937,7 @@
     (append-data-to-draftset-through-api test-editor draftset-location "test/resources/test-draftset.trig")
     (let [data-request (get-draftset-quads-accept-request draftset-location test-editor "text/invalidrdfformat" "false")
           data-response (route data-request)]
-      (assert-is-not-acceptable-response data-response))))
+      (tc/assert-is-not-acceptable-response data-response))))
 
 (deftest get-draftset-quads-data-with-multiple-accepted
   (let [draftset-location (create-draftset-through-api test-editor)]
@@ -1108,7 +945,7 @@
     (let [accepted "application/n-quads,application/trig,apllication/trix,application/n-triples,application/rdf+xml,text/turtle"
           data-request (get-draftset-quads-accept-request draftset-location test-editor accepted "false")
           data-response (route data-request)]
-      (assert-is-ok-response data-response))))
+      (tc/assert-is-ok-response data-response))))
 
 (deftest get-draftset-quads-unioned-with-live
   (let [quads (statements "test/resources/test-draftset.trig")
@@ -1162,29 +999,29 @@
     (let [data-request {:uri (str draftset-location "/data")
                         :request-method :get
                         :headers {"accept" "application/n-triples"}}
-          data-request (with-identity test-editor data-request)
+          data-request (tc/with-identity test-editor data-request)
           data-response (route data-request)]
-      (assert-is-not-acceptable-response data-response))))
+      (tc/assert-is-not-acceptable-response data-response))))
 
 (deftest get-draftset-data-for-missing-draftset
-  (let [response (route (with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :get :headers {"accept" "application/n-quads"}}))]
-    (assert-is-not-found-response response)))
+  (let [response (route (tc/with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :get :headers {"accept" "application/n-quads"}}))]
+    (tc/assert-is-not-found-response response)))
 
 (deftest get-draftset-data-for-unowned-draftset
   (let [draftset-location (create-draftset-through-api test-editor)
-        get-data-request (get-draftset-quads-request draftset-location test-publisher formats/rdf-nquads "false")
+        get-data-request (get-draftset-quads-request draftset-location test-publisher :nq "false")
         response (route get-data-request)]
-    (assert-is-forbidden-response response)))
+    (tc/assert-is-forbidden-response response)))
 
 (defn- create-update-draftset-metadata-request [user draftset-location title description]
-  (with-identity user
+  (tc/with-identity user
     {:uri draftset-location :request-method :put :params {:display-name title :description description}}))
 
 (defn- update-draftset-metadata-through-api [user draftset-location title description]
   (let [request (create-update-draftset-metadata-request user draftset-location title description)
         {:keys [body] :as response} (route request)]
-    (assert-is-ok-response response)
-    (assert-schema Draftset body)
+    (tc/assert-is-ok-response response)
+    (tc/assert-schema Draftset body)
     body))
 
 (deftest set-draftset-with-existing-title-and-description-metadata
@@ -1206,42 +1043,42 @@
 (deftest set-missing-draftset-metadata
   (let [meta-request (create-update-draftset-metadata-request test-manager "/v1/draftset/missing" "Title!" "Description")
         meta-response (route meta-request)]
-    (assert-is-not-found-response meta-response)))
+    (tc/assert-is-not-found-response meta-response)))
 
 (deftest set-metadata-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor "Test draftset" "Test description")
         update-request (create-update-draftset-metadata-request test-publisher draftset-location "New title" "New description")
         update-response (route update-request)]
-    (assert-is-forbidden-response update-response)))
+    (tc/assert-is-forbidden-response update-response)))
 
 (deftest submit-draftset-to-role
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-request (create-submit-to-role-request test-editor draftset-location :publisher)
         {ds-info :body :as submit-response} (route submit-request)]
-    (assert-is-ok-response submit-response)
-    (assert-schema Draftset ds-info)
+    (tc/assert-is-ok-response submit-response)
+    (tc/assert-schema Draftset ds-info)
 
     (is (= false (contains? ds-info :current-owner)))))
 
 (deftest submit-non-existent-draftset-to-role
   (let [submit-response (route (create-submit-to-role-request test-editor "/v1/draftset/missing" :publisher))]
-    (assert-is-not-found-response submit-response)))
+    (tc/assert-is-not-found-response submit-response)))
 
 (deftest submit-draftset-to-role-by-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-response (route (create-submit-to-role-request test-publisher draftset-location :manager))]
-    (assert-is-forbidden-response submit-response)))
+    (tc/assert-is-forbidden-response submit-response)))
 
 (deftest submit-draftset-to-invalid-role
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-response (route (create-submit-to-role-request test-editor draftset-location :invalid))]
-    (assert-is-unprocessable-response submit-response)))
+    (tc/assert-is-unprocessable-response submit-response)))
 
 (deftest submit-draftset-to-user
   (let [draftset-location (create-draftset-through-api test-editor)
         {:keys [body] :as submit-response} (route (submit-draftset-to-user-request draftset-location test-publisher test-editor))]
-    (assert-is-ok-response submit-response)
-    (assert-schema Draftset body)
+    (tc/assert-is-ok-response submit-response)
+    (tc/assert-schema Draftset body)
 
     (let [{:keys [current-owner claim-user] :as ds-info} body]
       (is (nil? current-owner))
@@ -1250,30 +1087,30 @@
 (deftest submit-draftset-to-user-as-non-owner
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-response (route (submit-draftset-to-user-request draftset-location test-manager test-publisher))]
-    (assert-is-forbidden-response submit-response)))
+    (tc/assert-is-forbidden-response submit-response)))
 
 (deftest submit-non-existent-draftset-to-user
   (let [submit-response (route (submit-draftset-to-user-request "/v1/draftset/missing" test-publisher test-editor))]
-    (assert-is-not-found-response submit-response)))
+    (tc/assert-is-not-found-response submit-response)))
 
 (deftest submit-draftset-to-non-existent-user
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-response (route (submit-draftset-to-username-request draftset-location "invalid-user@example.com" test-editor))]
-    (assert-is-unprocessable-response submit-response)))
+    (tc/assert-is-unprocessable-response submit-response)))
 
 (deftest submit-draftset-without-user-param
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-request (submit-draftset-to-user-request draftset-location test-publisher test-editor)
         submit-request (update-in submit-request [:params] dissoc :user)
         response (route submit-request)]
-    (assert-is-unprocessable-response response)))
+    (tc/assert-is-unprocessable-response response)))
 
 (deftest submit-to-with-both-user-and-role-params
   (let [draftset-location (create-draftset-through-api test-editor)
         request (submit-draftset-to-user-request draftset-location test-publisher test-editor)
         request (assoc-in request [:params :role] "editor")
         response (route request)]
-    (assert-is-unprocessable-response response)))
+    (tc/assert-is-unprocessable-response response)))
 
 (deftest claim-draftset-submitted-to-role
   (let [draftset-location (create-draftset-through-api test-editor)]
@@ -1295,13 +1132,13 @@
     (submit-draftset-to-user-through-api draftset-location test-publisher test-editor)
     (let [claim-request (create-claim-request draftset-location test-manager)
           claim-response (route claim-request)]
-      (assert-is-forbidden-response claim-response))))
+      (tc/assert-is-forbidden-response claim-response))))
 
 (deftest claim-draftset-owned-by-self
   (let [draftset-location (create-draftset-through-api test-editor)
         claim-request (create-claim-request draftset-location test-editor)
         {:keys [body] :as claim-response} (route claim-request)]
-    (assert-is-ok-response claim-response)
+    (tc/assert-is-ok-response claim-response)
     (is (= (user/username test-editor) (:current-owner body)))))
 
 (deftest claim-unowned-draftset-submitted-by-self
@@ -1315,13 +1152,13 @@
     (claim-draftset-through-api draftset-location test-publisher)
 
     (let [response (route (create-claim-request draftset-location test-editor))]
-      (assert-is-forbidden-response response))))
+      (tc/assert-is-forbidden-response response))))
 
 (deftest claim-draftset-owned-by-other-user
   (let [draftset-location (create-draftset-through-api test-editor)
         claim-request (create-claim-request draftset-location test-publisher)
         claim-response (route claim-request)]
-    (assert-is-forbidden-response claim-response)))
+    (tc/assert-is-forbidden-response claim-response)))
 
 (deftest claim-draftset-by-user-not-in-role
   (let [other-editor (user/create-user "edtheduck@example.com" :editor (user/get-digest test-password))
@@ -1329,30 +1166,30 @@
     (memrepo/add-user *user-repo* other-editor)
     (submit-draftset-to-role-through-api test-editor draftset-location :publisher)
     (let [claim-response (route (create-claim-request draftset-location other-editor))]
-      (assert-is-forbidden-response claim-response))))
+      (tc/assert-is-forbidden-response claim-response))))
 
 (deftest claim-non-existent-draftset
   (let [claim-response (route (create-claim-request "/v1/draftset/missing" test-publisher))]
-    (assert-is-not-found-response claim-response)))
+    (tc/assert-is-not-found-response claim-response)))
 
 (deftest get-options-test
   (let [draftset-location (create-draftset-through-api test-editor)
-        options-request (with-identity test-editor {:uri draftset-location :request-method :options})
+        options-request (tc/with-identity test-editor {:uri draftset-location :request-method :options})
         {:keys [body] :as options-response} (route options-request)]
-    (assert-is-ok-response options-response)
+    (tc/assert-is-ok-response options-response)
     (is (= #{:edit :delete :submit :claim} (set body)))))
 
 (deftest get-options-for-non-existent-draftset
-  (let [response (route (with-identity test-manager {:uri "/v1/draftset/missing" :request-method :options}))]
-    (assert-is-not-found-response response)))
+  (let [response (route (tc/with-identity test-manager {:uri "/v1/draftset/missing" :request-method :options}))]
+    (tc/assert-is-not-found-response response)))
 
 (defn- revert-draftset-graph-changes-request [draftset-location user graph]
-  (with-identity user {:uri (str draftset-location "/changes") :request-method :delete :params {:graph (str graph)}}))
+  (tc/with-identity user {:uri (str draftset-location "/changes") :request-method :delete :params {:graph (str graph)}}))
 
 (defn- revert-draftset-graph-changes-through-api [draftset-location user graph]
   (let [{:keys [body] :as response} (route (revert-draftset-graph-changes-request draftset-location user graph))]
-    (assert-is-ok-response response)
-    (assert-schema Draftset body)
+    (tc/assert-is-ok-response response)
+    (tc/assert-schema Draftset body)
     body))
 
 (deftest revert-graph-change-in-draftset
@@ -1362,10 +1199,10 @@
     (delete-draftset-graph-through-api test-editor draftset-location live-graph)
 
     (let [{:keys [changes]} (get-draftset-info-through-api draftset-location test-editor)]
-      (is (= #{live-graph} (key-set changes))))
+      (is (= #{live-graph} (tc/key-set changes))))
 
     (let [{:keys [changes] :as ds-info} (revert-draftset-graph-changes-through-api draftset-location test-editor live-graph)]
-      (is (= #{} (key-set changes))))
+      (is (= #{} (tc/key-set changes))))
 
     (let [ds-quads (get-draftset-quads-through-api draftset-location test-editor "true")]
       (is (= (set (eval-statements quads)) (set ds-quads))))))
@@ -1378,7 +1215,7 @@
 
     (let [revert-request (revert-draftset-graph-changes-request draftset-location test-publisher live-graph)
           response (route revert-request)]
-      (assert-is-forbidden-response response))))
+      (tc/assert-is-forbidden-response response))))
 
 (deftest revert-graph-change-in-draftset-unauthorised
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
@@ -1388,37 +1225,37 @@
 
     (let [revert-request {:uri (str draftset-location "/changes") :request-method :delete :params {:graph live-graph}}
           response (route revert-request)]
-      (assert-is-unauthorised-response response))))
+      (tc/assert-is-unauthorised-response response))))
 
 (deftest revert-non-existent-graph-change-in-draftest
   (let [draftset-location (create-draftset-through-api test-editor)
         revert-request (revert-draftset-graph-changes-request draftset-location test-editor "http://missing")
         response (route revert-request)]
-    (assert-is-not-found-response response)))
+    (tc/assert-is-not-found-response response)))
 
 (deftest revert-change-in-non-existent-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
     (publish-quads-through-api quads)
     (let [revert-request (revert-draftset-graph-changes-request "/v1/draftset/missing" test-manager live-graph)
           response (route revert-request)]
-      (assert-is-not-found-response response))))
+      (tc/assert-is-not-found-response response))))
 
 (deftest revert-graph-change-request-without-graph-parameter
   (let [draftset-location (create-draftset-through-api test-editor)
         revert-request (revert-draftset-graph-changes-request draftset-location test-editor "tmp")
         revert-request (update-in revert-request [:params] dissoc :graph)
         response (route revert-request)]
-    (assert-is-unprocessable-response response)))
+    (tc/assert-is-unprocessable-response response)))
 
 (defn- copy-live-graph-into-draftset-request [draftset-location user live-graph]
-  (with-identity
+  (tc/with-identity
     user
     {:uri (str draftset-location "/graph") :request-method :put :params {:graph (str live-graph)}}))
 
 (defn- copy-live-graph-into-draftset [draftset-location user live-graph]
   (let [request (copy-live-graph-into-draftset-request draftset-location user live-graph)
         response (route request)]
-    (await-success finished-jobs (:finished-job (:body response)))))
+    (tc/await-success finished-jobs (:finished-job (:body response)))))
 
 (deftest copy-live-graph-into-draftset-test
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
@@ -1452,34 +1289,20 @@
     (publish-quads-through-api quads)
     (let [copy-request (copy-live-graph-into-draftset-request draftset-location test-publisher live-graph)
           copy-response (route copy-request)]
-      (assert-is-forbidden-response copy-response))))
+      (tc/assert-is-forbidden-response copy-response))))
 
 (deftest copy-non-existent-live-graph
   (let [draftset-location (create-draftset-through-api test-editor)
         copy-request (copy-live-graph-into-draftset-request draftset-location test-editor "http://missing")
         copy-response (route copy-request)]
-    (assert-is-unprocessable-response copy-response)))
+    (tc/assert-is-unprocessable-response copy-response)))
 
 (deftest copy-live-graph-into-non-existent-draftset
   (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
     (publish-quads-through-api quads)
     (let [copy-request (copy-live-graph-into-draftset-request "/v1/draftset/missing" test-publisher live-graph)
           copy-response (route copy-request)]
-      (assert-is-not-found-response copy-response))))
-
-(defn- get-users-request [user]
-  (with-identity user {:uri "/v1/users" :request-method :get}))
-
-(deftest get-users
-  (let [users (user-repo/get-all-users *user-repo*)
-        expected-summaries (map user/get-summary users)
-        {:keys [body] :as response} (route (get-users-request test-editor))]
-    (assert-is-ok-response response)
-    (is (= (set expected-summaries) (set body)))))
-
-(deftest get-users-unauthenticated
-  (let [response (route {:uri "/v1/users" :request-method :get})]
-    (assert-is-unauthorised-response response)))
+      (tc/assert-is-not-found-response copy-response))))
 
 (deftest draftset-graphs-state-test
   (testing "Graph created"
@@ -1517,16 +1340,12 @@
       (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
         (is (= :deleted (get-in changes [live-graph :status])))))))
 
-(defn- setup-route [test-function]
-  (let [users (memrepo/create-repository* test-editor test-publisher test-manager)
-        authenticated-fn (middleware/make-authenticated-wrapper users {})
-        swagger-spec (swagger/load-spec-and-resolve-refs)
-        api-handler (draftset-api-routes *test-backend* users authenticated-fn timeouts/calculate-default-request-timeout)]
-    (binding [*user-repo* users
-              *route* (swagger/wrap-response-swagger-validation swagger-spec api-handler)]
-      (test-function))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Handler tests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use-fixtures :once wrap-db-setup)
-(use-fixtures :each setup-route)
-(use-fixtures :each (fn [tf]
-                      (wrap-clean-test-db #(setup-route tf))))
+(defn ok-response->typed-body [schema {:keys [body] :as response}]
+  (tc/assert-is-ok-response response)
+  (tc/assert-schema schema body)
+  body)
+

@@ -107,4 +107,4 @@
 ;; TODO add tests for batched-write copying etc...
 
 ;;(use-fixtures :once wrap-db-setup)
-;;(use-fixtures :each wrap-clean-test-db)
+

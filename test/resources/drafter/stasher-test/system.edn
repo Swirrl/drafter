@@ -1,0 +1,15 @@
+{
+ :drafter.stasher/cache-thread-pool {}
+ 
+ :drafter.stasher.filecache/file-backend {:persist-on-shutdown? false}
+
+ :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
+                         :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
+ 
+ :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/cache
+                        :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
+                        :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT }
+
+ :drafter/logging {:config "./test/resources/log-config.edn"}
+
+ }

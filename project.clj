@@ -1,4 +1,4 @@
-(def VERSION (or (System/getenv "TRAVIS_TAG") "local-2.1.x-SNAPSHOT"))
+(def VERSION (or (System/getenv "TRAVIS_TAG") "local-2.2.x-SNAPSHOT"))
 
 (defproject drafter VERSION
   :description "Backend PMD service"
@@ -27,16 +27,23 @@
 
   :dependencies [[buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-core "1.4.0"]
-                 [org.clojure/clojure "1.9.0-beta2"]
+
+                 [org.clojure/clojure "1.9.0"]
+                 [org.clojure/spec.alpha "0.1.134"]
+                 
                  [org.clojure/math.combinatorics "0.1.4"]
                  
                  [cognician/dogstatsd-clj "0.1.2"]
+
+                 [commons-codec "1.11"]
                  
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.4.0"] ;; for validating our Swagger/JSON schemas
 
                  [aero "1.1.2"]
 
+                 [integrant "0.6.3"]
+                 
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
                  ;; and the scjsv json schema validator.
@@ -52,14 +59,16 @@
 
                  [com.sun.mail/javax.mail "1.6.0"]
                  ;;[com.taoensso/tower "2.0.2"]
-                 [grafter "0.10.1"]
+
+                 [grafter "0.11.0.2-drafter-rdf4j"]
+
                  [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
 
                  [metosin/ring-swagger-ui "2.2.10"]
-                 
+
                  ;; Use JENA for our query rewriting
                  ;; Use private release of Jena based on commit 44b478ea8637ca16035e56ef49d6cb6e59abc289
                  ;; See https://github.com/Swirrl/drafter/issues/270
@@ -92,18 +101,6 @@
   :resource-paths ["resources"]
   :pedantic :abort
 
-  :repl-options {:init-ns drafter.repl
-                 :init (-main)
-                 :timeout 180000}
-
-  :plugins [[lein-ring "0.8.10" :exclusions [org.clojure/clojure]]
-            [lein-test-out "0.3.1" :exclusions [org.clojure/tools.namespace]]]
-
-  :ring {:handler drafter.handler/app
-         :init    drafter.handler/init
-         :destroy drafter.handler/destroy
-         :open-browser? false }
-
   ;;:target-path "target/%s" ;; ensure profiles don't pollute each other with
   ;; compiled classes etc...
 
@@ -111,27 +108,30 @@
 
   :profiles
   {
+   :java9 {:jvm-opts ["--add-modules" "java.xml.bind"]}
 
-   :uberjar [:prod
-             {:aot :all
-              :main drafter.repl}]
+   :uberjar [:prod {:aot :all}]
 
    :prod {:uberjar-name "drafter.jar"
           :source-paths ["env/prod/clj"]
           :resource-paths ["env/prod/resources"]}
 
-   :dev [:dev-common :dev-overrides]
+   :dev [:dev-common]
 
    :dev-common {:plugins [[com.aphyr/prism "0.1.1"] ;; autotest support simply run: lein prism
                           [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
+                :repl-options {:init-ns user
+                               :timeout 180000}
+                
                 :source-paths ["env/dev/clj"]
-                :resource-paths ["env/dev/resources"]
+                :resource-paths ["env/dev/resources" "test/resources"]
 
                 :dependencies [[clojure-csv/clojure-csv "2.0.2"]
                                [org.clojure/data.json "0.2.6"]
                                [ring-mock "0.1.5"]
                                [ring/ring-devel "1.6.2" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
+                               [eftest "0.3.2"] ;; repl test runner support
                                [org.clojure/test.check "0.9.0"]]
 
                 ;;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
@@ -147,9 +147,10 @@
              ;;"-Dhttp.maxConnections=1"
              ]
 
-  ;; Target JDK 7 expected JVM version (though we may now be able to target JDK8 in production)
-  :javac-options ["-target" "7" "-source" "7"]
-  :min-lein-version "2.5.0"
+  ;; Target JDK 8 expected JVM version
+  :javac-options ["-target" "8" "-source" "8"]
+  :min-lein-version "2.8.1"
+  
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version"
@@ -159,4 +160,6 @@
                   ["change" "version" "leiningen.release/bump-version"]
                   ["vcs" "commit"]
                   ;;["vcs" "push"]
-                  ])
+                  ]
+
+  :main drafter.main)
