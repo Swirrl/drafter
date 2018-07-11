@@ -48,5 +48,6 @@ deploy:
       condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+-.+$
   - provider: script
     script: lein deploy
+    skip_cleanup: true
     on:
       tags: true
