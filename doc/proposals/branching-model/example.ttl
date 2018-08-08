@@ -1,0 +1,404 @@
+PREFIX : <http://data/>
+PREFIX drafter: <http://drafter/>
+PREFIX policy:  <http://drafter/policy/>
+PREFIX draftergraph: <http://blah/drafter/graphs/>
+PREFIX sg: <http://blah/drafter/graphs/storage/>
+
+
+# An empty drafter is initialised with a state graph in a starting
+# state, built by us.
+#
+# Initially to retain compatibility with the rest API the
+# endpoint:live will be the starting graph.  However later on when we
+# introduce roles/permissions, we might want to start with a genesis
+# graph, from which the live endpoint is created, and mapped to the
+# UI.
+#
+# Here's our initial starting state, which corresponds to a single
+# live endpoint (branch) with no data loaded.
+draftergraph:state {
+  # rootCommit is as an individual defined in the drafter vocab.
+  drafter:rootCommit a drafter:Commit ;
+    rdfs:comment "The root/initial commit of an endpoint.  This special commit has no parent." .
+
+  # endpoints are effectively sparql endpoints + branches.  In the
+  # future endpoints will inherit permissions from their parents, or
+  # at creation be initialised with a set of permissions.
+  #
+  # But for now lets focus on the git-like branching model, expressed
+  # in RDF.
+  #
+  # Endpoints are mutable things, that contain a mutable reference to
+  # a GraphSet, and a mutable reference to a graphset, and a
+  # potentially mutable human readable name.  Also will have
+  # modified/created times etc on it.
+  endpoint:live a drafter:Endpoint ;
+    drafter:endpointName "Public/Live Endpoint" ;
+    drafter:hasOwner <mailto:manager@swirrl.com> ;
+    # An endpoint has one graphset, which where we store all the
+    # named-graph -> storage-graph mappings.  The hasGraphSet
+    # references can be changed.
+    drafter:hasGraphSet graphset:live .
+
+  # A GraphSet is basically a summary of the graphs in an endpoint as
+  # they are at a particular commit.  GraphSet's are strictly
+  # redundant information as you could rebuild them by replaying the
+  # commit log, but we don't want to have to walk the entire commit
+  # history to calculate the GraphSet on every query to an endpoint.
+  graphset:live a drafter:GraphSet ;
+    drafter:head drafter:rootCommit .
+
+  # At this point our history looks like this:
+  #
+  # o [live] (root-commit)
+
+  # A user rick@swirrl.com forks the graphset/endpoint:
+
+  graphset:draft a drafter:GraphSet ;
+     drafter:forkOf graphset:live .
+
+  # Fork live endpoint to a draft.
+  endpoint:draft a drafter:Endpoint ;
+     drafter:hasGraphSet graphset:draft ;
+     drafter:hasOwner <mailto:rick@swirrl.com> .
+
+  # At this point our history looks like this:
+  #
+  # o [live] [draft] (root-commit) both branches pointing to an empty GraphSet.
+
+}
+
+# Now lets create divergent branches...
+
+################################################################################
+# BEGIN commit <manager@swirrl.com>
+################################################################################
+# Committing directly to live is now possible, as live is no longer a
+# privileged branch by design, but can be by convention.
+#
+# manager@swirrl.com PUTs some trig data in the endpoint.  Drafter does the following...
+#
+# As our endpoint is empty, drafter puts the data for each named graph
+# in the uploaded trig data into a storage graph.  One for each named
+# graph.
+
+
+sg:a1 {
+  :live :foo :foo .
+}
+
+sg:b1 {
+  :live :bar :bar .
+}
+
+sg:c1 {
+  :live :baz :baz .
+}
+
+
+draftergraph:state {
+  # Drafter also creates mappings from the original graph URI to the
+  # storage graph name.  This is similar to what we do in drafter just
+  # now.
+  #
+  # StorageGraph's are shared across branches, meaning we don't need
+  # to clone all the data when we create a new branch.  However they
+  # are only allowed to be written to if they're not shared by another
+  # branch.
+  #
+  # If more than one branch is referencing the same StorageGraph then
+  # before we can mutate it we must take a copy i.e. COW (Copy On Write).
+
+  sg:a1 a drafter:StorageGraph ;
+          drafter:namedGraph named-graph:a .
+
+  sg:b1 a drafter:StorageGraph ;
+          drafter:namedGraph named-graph:b .
+
+  sg:c1 a drafter:StorageGraph ;
+          drafter:namedGraph named-graph:c .
+
+ # Drafter also creates a commit, representing the change.  Commits
+ # like in git reference a parentCommit.
+ #
+ # Note we also store the uploaded file, so we can in theory
+ # rebuild/rewind/fastforward history and materialise it in the
+ # database at any previous state from the commit history and
+ # transactionFiles, by replaying commits.
+ #
+ # Commits also summarise their changes, here we state which storage
+ # graphs we've "mutated" by adding triples to (appendedTriples) and
+ # what graphs we've added/removed (addedGraph/removedGraph) to the
+ # GraphSet.  Again this is strictly discoverable by looking at the
+ # transactionFile, but it's useful not to have to.
+ transaction:l1 a drafter:AppendCommit ;
+    dcterms:modified "T1" ;
+    drafter:parentCommit transaction:rootCommit ;
+    drafter:comment "Append some quads to live" ;
+    drafter:addedGraph sg:a1, sg:b1 ;
+    drafter:appendedTriples sg:a1, sg:b1 ;
+    drafter:transactionFile <file:append-l1.ttl>
+    drafter:author <mailto:manager@swirrl.com> .
+
+  # graphset:live is then modified in place to this:
+  graphset:live a drafter:GraphSet ;
+        drafter:head transaction:l1 ;
+        drafter:storageGraph sg:a1 , sg:b1, sg:c1 .
+
+}
+
+################################################################################
+# End commit <manager@swirrl.com>
+################################################################################
+
+# At this point we have this situation:
+#
+# o [live] (named-graph:a, named-graph:b, named-graph:c) <manager@swirrl.com>
+# |
+# o [draft] (root-commit empty graphset) <rick@swirrl.com>
+#
+# At this point in the UI rick may be informed that live has moved on
+# and be given the option to merge live changes into their branch.
+#
+# live queries for SELECT * ... will return :live :foo :foo .  draft
+# queries for the same will return nothing.
+#
+# For the time being we will assume Rick ignores this, and decides to
+# create some changes of his own.
+
+################################################################################
+# Begin commit <rick@swirrl.com>
+################################################################################
+
+# Rick adds some new data in graphs named graphs a, b, d and e. to his
+# draft endpoint...
+#
+# Note sg:a2 and sg:b2 are new storage graphs for named-graph:a and
+# named-graph:b, these will be conflicts in a future merge.
+sg:a2 {
+  :draft :foo :foo .
+  :draft :bar :bar .
+}
+
+sg:b2 {
+  :draft :baz :baz .
+}
+
+sg:d1 {
+  :draft :blah :blah .
+}
+
+sg:e1 {
+  :draft :qux :qux .
+}
+
+draftergraph:state {
+  transaction:d1 a drafter:AppendCommit ;
+    dcterms:modified "T2" ;
+    drafter:parentCommit transaction:rootCommit ;
+    drafter:comment "Append some quads to draftset" ;
+    drafter:addedTriples sg:a2, sg:b1, sg:d1, sg:e1 ;
+    drafter:addedGraph sg:a2, sg:b1, sg:d1, sg:e1 ;
+    drafter:transactionFile <file:append-d1.ttl> ;
+    drafter:author <mailto:rick@swirrl.com> .
+
+  # We add storage graph mappings for every graph appended in the
+  # commit.  sg:a is a generated name mapping sg:a to the user name
+  # named-graph:a
+  sg:a2 a drafter:StorageGraph ;
+         drafter:namedGraph named-graph:a .
+
+  sg:b1 a drafter:StorageGraph ;
+         drafter:namedGraph named-graph:b .
+
+  sg:d1 a drafter:StorageGraph ;
+         drafter:namedGraph named-graph:d .
+
+  sg:e1 a drafter:StorageGraph ;
+         drafter:namedGraph named-graph:e .
+
+# graphset changed to:
+  graphset:draft drafter:storageGraph sg:a2 , sg:b1, sg:d1, sg:e1 ;
+           drafter:head transaction:d1 .
+
+}
+################################################################################
+# End commit <rick@swirrl.com>
+################################################################################
+
+# At this point our history looks like this:
+#
+#   o draft (named-graph:a, b, d & e) <rick@swirrl.com>
+# o | live (named-graph:a, b, c) <manager@swirrl.com>
+# |/
+# o
+
+################################################################################
+# Begin commit <rick@swirrl.com>
+################################################################################
+
+draftergraph:state {
+  # We represent different commits depending on the operation performed:
+  #
+  # - AppendCommit
+  # - DeleteCommit
+  # - MergeCommit
+  #
+  # transaction to delete triple from sg:a (storage graphs are mutable by their owner)
+  #
+  # NOTE: Append/Delete commits not only represent modifications to a
+  #       storage graph, but also track the addition/removal of graphs
+  #       from the graphset.
+
+ transaction:d2 a drafter:DeleteCommit ;
+    dcterms:modified "T2" ;
+    drafter:parentCommit transaction:d1 ;
+    drafter:deletedTriples sg:a2 ;
+    drafter:removedGraph sg:d1 ;
+    drafter:transactionFile <file:delete-d2.ttl>
+    drafter:comment "Delete :foo2 :bar2 :baz2 quad from draftset.  And completely remove sg:c graph." .
+
+  # graphset for draft updated in place to:
+  graphset:draft a drafter:GraphSet ;
+        drafter:storageGraph sg:a2 , sg:b1, sg:e1 ;
+        drafter:forkOf graphset:live ;
+        drafter:head transaction:d2 .
+}
+
+################################################################################
+# End commit <rick@swirrl.com>
+################################################################################
+
+# At this point our history looks like this:
+#
+#   o draft (named-graph:a named-graph:b, named-graph:e) <rick@swirrl.com>
+#   |
+#   o
+# o | live (named-graph:a, named-graph:b, named-graph:c) <manager@swirrl.com>
+# |/
+# o
+
+################################################################################
+# Begin commit <rick@swirrl.com>
+################################################################################
+
+# MERGING
+#
+# rick@swirrl.com wants to push his changes on the draft branch to
+# live.  To do this he resolves the conflict in his branch first by
+# creating a merge commit, then he can create a pull request upstream
+# and manager@swirrl.com can acquire the changes in live.
+
+sg:b3 {
+  :draft :baz :baz . # from sg:b2
+  :live :bar :bar .  # from sg:b1
+}
+
+draftergraph:state {
+  # We represent the graph union in a special type of storage graph
+  # that records what went into it.
+
+  sg:b3 a drafter:MergedGraph ; # MergedGraph < StorageGraph
+        drafter:namedGraph named-graph:c ;
+        drafter:unionsGraph sg:a1 ;
+        drafter:unionsGraph sg:a2 .
+
+  # A MergeCommit can have two or more parents.
+  transaction:d3 a drafter:MergeCommit ;
+    dcterms:modified "T2" ;
+    drafter:parentCommit transaction:d2 ;
+    drafter:parentCommit transaction:l1 ;
+    drafter:addedGraph sg:a1, sg:b3 ;
+    drafter:removedGraph sg:a2 ;
+    drafter:selectedGraph sg:e1 ; # selectedGraph < addedGraph
+    drafter:ignoredGraph sg:c1 .  # ignoredGraph < removedGraph
+
+  # Note above the merge comimt represents the union of graphs on
+  # named-graph:c by a MergedGraph StorageGraph, and the picking of
+  # storage graph a1 over a2 by an add/remove where both storage
+  # graphs reference the same named-graph:a.  Along with also the
+  # selection of e1 and c1 from each branch.
+
+  # and finally we update the graphset to represent the graphs we're
+  # now using.
+  graphset:draft a drafter:GraphSet ;
+        drafter:storageGraph sg:a1 , sg:b3, sg:e1 ;
+        drafter:forkOf graphset:live ;
+        drafter:head transaction:d3 .
+
+# At this point our history has changes from both branches.
+#
+#   o draft (named-graph:a, named-graph:b, named-graph:e) <rick@swirrl.com>
+#  /|
+# / o
+# o | live (named-graph:a, named-graph:b, named-graph:c) <manager@swirrl.com>
+# |/
+# o
+
+}
+
+draftergraph:state {
+ # rick@swirrl.com creates a PR to merge with live, this is like what
+ # was previously a drafter submission.
+ #
+ # NOTE: we reference the endpoint not the graphset, so changes to
+ # graphset after the PR was made are applied.
+
+ pr:1 a drafter:PullRequest ;
+        drafter:mergeTarget endpoint:live ;
+        drafter:mergeSource endpoint:draft ;
+        drafter:author <mailto:rick@swirrl.com> ;
+        rdfs:comment "Please merge my draftset into live.  k thx bye." .
+
+ # At this point the user gets the option to merge the PR.  They can
+ # do many things at this point.  Some things would be:
+ #
+ # 1. Acquire the merge commit, share the graphset draft endpoint is
+ #    using, so both live and draft reference the same graphset.  This
+ #    is basically equivalent to a Fast Forward in git.
+ #
+ # 2. Merge the mergecommit linking to the mergecommit, with a
+ #    new change, e.g. live might decide to add back in named-graph:c.
+ #
+ # 3. Reject the PR.
+ #
+ # 4. Ignore the PR, for now.... create some more commits against live
+ #    or against draft, prior to merging.
+ #
+ # When a PR is rejected a user may go away and fix up their branch so
+ # it's more suitable for merging.  In the future we can provide some
+ # tools to let them rewind/undo decisions/commits, by replaying the
+ # commit log.  Though obviously this is where things will get
+ # complicated.
+ #
+ # Lets assume the user goes with option 1, and effectively does the
+ # fast forward.
+ #
+ # Note that we still want to record that a decision for a
+ # fast-forward was made here, and provide a way to (theoretically)
+ # undo the fastforward.  In order to do this we need to create a new
+ # graphset that references the previous (retired) GraphSet.
+ #
+ # The undo would be possible, by simply swapping the graphset, so
+ # long as the unreferenced storage graphs have not been GC'd.
+ #
+ # (We could alternatively not do this, and provide facilities to
+ # replay the commits, though that will obviously be quite a lot of
+ # extra work.)
+ #
+ # To do this we create a new graphset which has ours, i.e. we drop
+ # all our storageGraph references and take all theirs, same for the
+ # drafter:head reference.
+
+  graphset:live-2 a drafter:GraphSet ;
+        drafter:storageGraph sg:a1 , sg:b3, sg:e1 ;
+        drafter:previousGraphSet graphset:live ;
+        drafter:head transaction:d3 .
+
+  endpoint:live a drafter:Endpoint ;
+    drafter:hasGraphSet graphset:live-2 . # changed from graphset:live
+
+  pr:1 drafter:resolvedBy drafter:accepted-with-fast-forward .
+
+
+}
