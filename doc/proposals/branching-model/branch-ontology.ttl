@@ -1,0 +1,448 @@
+@prefix : <http://publishmydata.com/def/drafter/branch#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@base <http://publishmydata.com/def/drafter/branch> .
+
+<http://publishmydata.com/def/drafter/branch> rdf:type owl:Ontology ;
+                                               owl:imports <http://www.w3.org/ns/sparql-service-description#> ,
+                                                           <http://xmlns.com/foaf/0.1/> .
+
+#################################################################
+#    Annotation properties
+#################################################################
+
+###  http://publishmydata.com/def/drafter/branch#commitMessage
+:commitMessage rdf:type owl:AnnotationProperty ;
+               rdfs:subPropertyOf rdfs:label ;
+               rdfs:domain :Commit .
+
+
+###  http://publishmydata.com/def/drafter/branch#endpointName
+:endpointName rdf:type owl:AnnotationProperty ;
+              rdfs:subPropertyOf rdfs:label ;
+              rdfs:range <http://xmlns.com/foaf/0.1/Agent> .
+
+
+###  http://publishmydata.com/def/drafter/branch#namedGraph
+:namedGraph rdf:type owl:AnnotationProperty ;
+            rdfs:subPropertyOf <http://www.w3.org/ns/sparql-service-description#name> ;
+            rdfs:range xsd:anyURI ;
+            rdfs:domain :StorageGraph .
+
+
+###  http://publishmydata.com/def/drafter/branch#transactionFile
+:transactionFile rdf:type owl:AnnotationProperty ;
+                 rdfs:comment "Links a commit to a stored file of the data that was part of the append/delete operation." ;
+                 rdfs:range xsd:anyURI ;
+                 rdfs:domain :ChildCommit .
+
+
+#################################################################
+#    Object Properties
+#################################################################
+
+###  http://publishmydata.com/def/drafter/branch#addedGraph
+:addedGraph rdf:type owl:ObjectProperty ;
+            rdfs:subPropertyOf :graphSetModification ;
+            rdfs:domain :AppendCommit ;
+            rdfs:comment "Represents the addition of a graph to a GraphSet by a specific commit." .
+
+
+###  http://publishmydata.com/def/drafter/branch#ancestorCommit
+:ancestorCommit rdf:type owl:ObjectProperty ;
+                rdfs:subPropertyOf :commitReference ;
+                rdf:type owl:IrreflexiveProperty ;
+                rdfs:domain :ChildCommit ;
+                rdfs:comment """An ancestral commit.
+
+With reasoning enabled through transitivity this can be used to find the set of all ancester commits.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#appendedTriples
+:appendedTriples rdf:type owl:ObjectProperty ;
+                 rdfs:subPropertyOf :graphModification ;
+                 rdfs:domain :AppendCommit ;
+                 rdfs:comment "Represents the modification of a graph by appending triples to it from a specific commit." .
+
+
+###  http://publishmydata.com/def/drafter/branch#author
+:author rdf:type owl:ObjectProperty ;
+        rdfs:subPropertyOf owl:topObjectProperty ;
+        rdfs:domain :Commit ;
+        rdfs:range <http://xmlns.com/foaf/0.1/Agent> ;
+        rdfs:comment "Author of the commit." .
+
+
+###  http://publishmydata.com/def/drafter/branch#childCommit
+:childCommit rdf:type owl:ObjectProperty ;
+             rdfs:subPropertyOf :descendantCommit ;
+             owl:inverseOf :parentCommit ;
+             rdf:type owl:IrreflexiveProperty ;
+             rdfs:range :ParentCommit ;
+             owl:propertyDisjointWith :parentCommit ;
+             rdfs:comment "The inverseOf parent commit.  Allows queries to find out what commits are direct children." .
+
+
+###  http://publishmydata.com/def/drafter/branch#commitReference
+:commitReference rdf:type owl:ObjectProperty ;
+                 rdfs:subPropertyOf owl:topObjectProperty ;
+                 rdf:type owl:AsymmetricProperty ;
+                 rdfs:domain :Commit ;
+                 rdfs:range :Commit ;
+                 rdfs:comment "An abstract directed super property reference from one commit to another." .
+
+
+###  http://publishmydata.com/def/drafter/branch#deletedTriples
+:deletedTriples rdf:type owl:ObjectProperty ;
+                rdfs:subPropertyOf :graphModification ;
+                rdfs:domain :DeleteCommit ;
+                rdfs:comment "Represents the modification of a graph by deleting triples from it from a specific commit." .
+
+
+###  http://publishmydata.com/def/drafter/branch#derivedFrom
+:derivedFrom rdf:type owl:ObjectProperty ;
+             rdfs:subPropertyOf owl:topObjectProperty ;
+             owl:inverseOf :hasDerivation ;
+             rdf:type owl:TransitiveProperty ,
+                      owl:IrreflexiveProperty ;
+             rdfs:comment """A transitive relationship inferred from using of forkOf.
+
+e.g. 
+
+endpoint:a forkOf endpoint:b
+endpoint:b forkOf endpoint:c 
+
+⇒
+
+endpoint:a derivedFrom endpoint:b 
+endpoint:a derivedFrom endpoint:c
+endpoint:b derivedFrom endpoint:c""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#descendantCommit
+:descendantCommit rdf:type owl:ObjectProperty ;
+                  rdfs:subPropertyOf :commitReference ;
+                  rdf:type owl:TransitiveProperty ,
+                           owl:IrreflexiveProperty ;
+                  rdfs:comment "A transitive property representing all descendant commits from the given commit." .
+
+
+###  http://publishmydata.com/def/drafter/branch#forkOf
+:forkOf rdf:type owl:ObjectProperty ;
+        rdfs:subPropertyOf :derivedFrom ;
+        owl:inverseOf :hasFork ;
+        rdf:type owl:IrreflexiveProperty ;
+        rdfs:domain :GraphSet ;
+        rdfs:range :GraphSet ;
+        rdfs:comment "Indicates endpoint is a direct fork of another endpoint" .
+
+
+###  http://publishmydata.com/def/drafter/branch#graphModification
+:graphModification rdf:type owl:ObjectProperty ;
+                   rdfs:subPropertyOf :modification ;
+                   rdfs:domain :ChildCommit ;
+                   rdfs:range :StorageGraph ;
+                   rdfs:comment """Inferred super property representing the modification of a graph in a commit through the appending or deleting of triples.
+
+Allows queries to ask questions like: \"Has this graph been modified?\", without having to care about all the kinds of modification.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#graphSetModification
+:graphSetModification rdf:type owl:ObjectProperty ;
+                      rdfs:subPropertyOf :modification ;
+                      rdfs:range :StorageGraph ;
+                      rdfs:comment "Super property representing modifications made by the commit to the  graphs in the active GraphSet." .
+
+
+###  http://publishmydata.com/def/drafter/branch#hasDerivation
+:hasDerivation rdf:type owl:ObjectProperty ,
+                        owl:TransitiveProperty ,
+                        owl:IrreflexiveProperty ;
+               rdfs:comment "Inverse (inferred relationship) of derivedFrom." .
+
+
+###  http://publishmydata.com/def/drafter/branch#hasFork
+:hasFork rdf:type owl:ObjectProperty ;
+         rdfs:subPropertyOf :hasDerivation ;
+         rdfs:comment "Inverse (inferred) relationship of forkOf" .
+
+
+###  http://publishmydata.com/def/drafter/branch#hasGraphSet
+:hasGraphSet rdf:type owl:ObjectProperty ;
+             rdfs:subPropertyOf owl:topObjectProperty ;
+             rdf:type owl:FunctionalProperty ;
+             rdfs:domain :Endpoint ;
+             rdfs:range :GraphSet ;
+             rdfs:comment "Each endpoint references one GraphSet, which stores the storage<->named-graph mappings." .
+
+
+###  http://publishmydata.com/def/drafter/branch#hasOwner
+:hasOwner rdf:type owl:ObjectProperty ;
+          rdfs:domain :Endpoint ;
+          rdfs:range <http://xmlns.com/foaf/0.1/Agent> ;
+          rdfs:comment """The owner of the endpoint.
+
+NOTE: we might change this when we introduce RBAC.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#head
+:head rdf:type owl:ObjectProperty ,
+               owl:FunctionalProperty ;
+      rdfs:domain :Endpoint ;
+      rdfs:range :Commit ;
+      rdfs:comment "A mutable reference from an endpoint/branch to a single commit that identifies the head of that branches history." .
+
+
+###  http://publishmydata.com/def/drafter/branch#ignoredGraph
+:ignoredGraph rdf:type owl:ObjectProperty ;
+              rdfs:subPropertyOf :removedGraph ;
+              rdfs:domain :MergeCommit ;
+              rdfs:comment "In a MergeCommit this represents the decision to exclude a StorageGraph from one of the merged branches." .
+
+
+###  http://publishmydata.com/def/drafter/branch#mergeDestination
+:mergeDestination rdf:type owl:ObjectProperty ;
+                  rdfs:subPropertyOf :mergeDirection ;
+                  rdfs:comment "The intended target destination endpoint/branch of a pull request." .
+
+
+###  http://publishmydata.com/def/drafter/branch#mergeDirection
+:mergeDirection rdf:type owl:ObjectProperty ;
+                rdfs:subPropertyOf owl:topObjectProperty ;
+                rdf:type owl:FunctionalProperty ;
+                rdfs:domain :PullRequest ;
+                rdfs:range :Endpoint ;
+                rdfs:comment "Properties representing the direction of a merge, i.e. what the source and target are." .
+
+
+###  http://publishmydata.com/def/drafter/branch#mergeSource
+:mergeSource rdf:type owl:ObjectProperty ;
+             rdfs:subPropertyOf :mergeDirection ;
+             rdfs:comment "The intended source endpoint/branch for a merge request." .
+
+
+###  http://publishmydata.com/def/drafter/branch#modification
+:modification rdf:type owl:ObjectProperty ;
+              rdfs:subPropertyOf owl:topObjectProperty ;
+              rdfs:domain :ChildCommit ;
+              rdfs:comment "Inferred super property representing RDF \"modifications\" made by a commit." .
+
+
+###  http://publishmydata.com/def/drafter/branch#parentCommit
+:parentCommit rdf:type owl:ObjectProperty ;
+              rdfs:subPropertyOf :ancestorCommit ;
+              rdf:type owl:IrreflexiveProperty ;
+              rdfs:range :Commit ;
+              rdfs:comment """When a new commit is created this reference points to its parentCommit, forming a tree of references in an append only style.
+
+This reference is what implementations should write into the data, when creating a new commit.  
+
+Other relationships such as childCommit and ancesterCommit can be inferred from this.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#removedGraph
+:removedGraph rdf:type owl:ObjectProperty ;
+              rdfs:subPropertyOf :graphSetModification ;
+              rdfs:domain :DeleteCommit ;
+              rdfs:comment "Represents the removal of a graph from a GraphSet by a specific commit." .
+
+
+###  http://publishmydata.com/def/drafter/branch#replacesGraphSet
+:replacesGraphSet rdf:type owl:ObjectProperty ;
+                  rdfs:subPropertyOf owl:topObjectProperty ;
+                  rdf:type owl:FunctionalProperty ,
+                           owl:IrreflexiveProperty ;
+                  rdfs:domain :GraphSet ;
+                  rdfs:range :GraphSet ;
+                  rdfs:comment "When a PR is accepted another decision is being taken which is to change the GraphSet of a branch/endpoint.  This is recorded through this predicate, which links to the previous graphset it was replacing." .
+
+
+###  http://publishmydata.com/def/drafter/branch#resolvedBy
+:resolvedBy rdf:type owl:ObjectProperty ;
+            rdfs:subPropertyOf owl:topObjectProperty ;
+            rdfs:domain :PullRequest ;
+            rdfs:range :Resolution ;
+            rdfs:comment "Indicates how a PR was resolved." .
+
+
+###  http://publishmydata.com/def/drafter/branch#selectedGraph
+:selectedGraph rdf:type owl:ObjectProperty ;
+               rdfs:subPropertyOf :addedGraph ;
+               rdfs:domain :MergeCommit ;
+               rdfs:comment "In a MergeCommit this represents the decision to include a StorageGraph from one of the merged branches." .
+
+
+###  http://publishmydata.com/def/drafter/branch#setOperation
+:setOperation rdf:type owl:ObjectProperty ;
+              rdfs:comment "At somepoint we might want to provide all the different set operations beyond just set union, as merge strategies for a graph conflict e.g. intersection, complements (to do this we'll need to represent the ordering of operands as complements are non-commutative), symetric difference etc..." .
+
+
+###  http://publishmydata.com/def/drafter/branch#unionGraph
+:unionGraph rdf:type owl:ObjectProperty ;
+            rdfs:subPropertyOf :setOperation ;
+            rdf:type owl:IrreflexiveProperty ;
+            rdfs:domain :MergedGraph ;
+            rdfs:range :StorageGraph ;
+            rdfs:comment "When a MergeCommit occurs one resolution strategy is for graph level conflicts to be resolved by graph union.  This predicate represents the set of StorageGraphs that became this MergedGraph." .
+
+
+#################################################################
+#    Classes
+#################################################################
+
+###  http://publishmydata.com/def/drafter/branch#Accepted
+:Accepted rdf:type owl:Class ;
+          rdfs:subClassOf :Resolution ;
+          owl:disjointWith :Rejected ;
+          rdfs:comment "An Accepted PullRequest." .
+
+
+###  http://publishmydata.com/def/drafter/branch#AppendCommit
+:AppendCommit rdf:type owl:Class ;
+              rdfs:subClassOf :ChildCommit ;
+              rdfs:comment "A commit that Appended some triples." .
+
+
+###  http://publishmydata.com/def/drafter/branch#ChildCommit
+:ChildCommit rdf:type owl:Class ;
+             rdfs:subClassOf :Commit ;
+             owl:disjointWith :RootCommit ;
+             rdfs:comment "A commit that has a drafter:parentCommit property pointing to its parent, and forming a tree of ancestors." .
+
+
+###  http://publishmydata.com/def/drafter/branch#Commit
+:Commit rdf:type owl:Class ;
+        rdfs:comment "The SuperClass of all Commits." .
+
+
+###  http://publishmydata.com/def/drafter/branch#DeleteCommit
+:DeleteCommit rdf:type owl:Class ;
+              rdfs:subClassOf :ChildCommit ;
+              rdfs:comment "A commit that Deleted some triples." .
+
+
+###  http://publishmydata.com/def/drafter/branch#Endpoint
+:Endpoint rdf:type owl:Class ;
+          rdfs:comment """An Endpoint is the combination of several things under a single named identity:
+
+1. It represents a SPARQL query endpoint, and the data within it.  Every Endpoint has one GraphSet in it, which represents the queryable data.
+2. An endpoint is also like a git branch, i.e. its head points to a commit that identifies a tree of changes that led to its current state, which is theoretically equivalent to materialising and replaying the branches commit history.
+3. In the future it will be a way of inheriting and controlling permissions and access rights on data.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#GraphSet
+:GraphSet rdf:type owl:Class ;
+          rdfs:subClassOf <http://www.w3.org/ns/sparql-service-description#GraphCollection> ;
+          rdfs:comment "A set of StorageGraph to NamedGraph mappings." .
+
+
+###  http://publishmydata.com/def/drafter/branch#MergeCommit
+:MergeCommit rdf:type owl:Class ;
+             rdfs:subClassOf :ChildCommit ;
+             rdfs:comment """A commit representing a merge of two or more commit subtrees (i.e. has 2 or more drafter:parentCommit's).  
+
+Note also that a MergeCommit can both add and delete triples, so a MergeCommit might also be an AppendCommit or a DeleteCommit, or both.
+
+These commits can also contain extra metadata properties about the changes to the graphset, e.g. ignoredGraph/selectedGraph etc.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#MergedGraph
+:MergedGraph rdf:type owl:Class ;
+             rdfs:subClassOf :StorageGraph ;
+             rdfs:comment """Represents a StorageGraph that was unioned together with one or more other StorageGraph's during a MergeCommit.
+
+This lets us know what source graphs were combined together.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#ParentCommit
+:ParentCommit rdf:type owl:Class ;
+              rdfs:subClassOf :Commit ;
+              rdfs:comment "A commit that has been inferred to be a parent commit, through the inverse relationship on parentCommit." .
+
+
+###  http://publishmydata.com/def/drafter/branch#PullRequest
+:PullRequest rdf:type owl:Class ;
+             rdfs:comment """Represents a request to merge one endpoint/branch into another.  It is not the merge itself.
+
+Pull Requests are resolved/closed with a Resolution.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#Rejected
+:Rejected rdf:type owl:Class ;
+          rdfs:subClassOf :Resolution ;
+          rdfs:comment "A PullRequest that was rejected." .
+
+
+###  http://publishmydata.com/def/drafter/branch#Resolution
+:Resolution rdf:type owl:Class ;
+            rdfs:comment "A decision marking the resolution of a PullRequest." .
+
+
+###  http://publishmydata.com/def/drafter/branch#RootCommit
+:RootCommit rdf:type owl:Class ;
+            rdfs:subClassOf :ParentCommit ;
+            rdfs:comment """A special commit representing the start of a commit history.
+
+Note in this drafter branch model, it is possible to support disjoint histories.  It is also possible to merge two disjoint histories and have a tree with two or more rootCommits.""" .
+
+
+###  http://publishmydata.com/def/drafter/branch#StorageGraph
+:StorageGraph rdf:type owl:Class ;
+              rdfs:subClassOf <http://www.w3.org/ns/sparql-service-description#NamedGraph> ;
+              rdfs:comment "A StorageGraph is where we store the data for a NamedGraph in an endpoint." .
+
+
+###  http://publishmydata.com/def/drafter/branch#User
+:User rdf:type owl:Class ;
+      rdfs:subClassOf <http://xmlns.com/foaf/0.1/Agent> ;
+      rdfs:comment "A drafter user" .
+
+
+#################################################################
+#    Individuals
+#################################################################
+
+###  http://publishmydata.com/def/drafter/branch#rootCommit
+:rootCommit rdf:type owl:NamedIndividual ,
+                     :Commit ;
+            rdfs:comment "The rootCommit indicating the end of history, it is the only commit that has no parent." .
+
+
+#################################################################
+#    General axioms
+#################################################################
+
+[ rdf:type owl:AllDisjointClasses ;
+  owl:members ( :Commit
+                :Endpoint
+                :PullRequest
+                :Resolution
+                <http://www.w3.org/ns/formats/Format>
+                <http://www.w3.org/ns/sparql-service-description#Feature>
+                <http://www.w3.org/ns/sparql-service-description#Graph>
+                <http://www.w3.org/ns/sparql-service-description#GraphCollection>
+                <http://www.w3.org/ns/sparql-service-description#NamedGraph>
+                <http://www.w3.org/ns/sparql-service-description#Service>
+                <http://xmlns.com/foaf/0.1/Agent>
+              )
+] .
+
+
+[ rdf:type owl:AllDisjointClasses ;
+  owl:members ( :Commit
+                :Endpoint
+                :PullRequest
+                <http://www.w3.org/ns/formats/Format>
+                <http://www.w3.org/ns/sparql-service-description#Feature>
+                <http://www.w3.org/ns/sparql-service-description#Graph>
+                <http://www.w3.org/ns/sparql-service-description#GraphCollection>
+                <http://www.w3.org/ns/sparql-service-description#NamedGraph>
+                <http://www.w3.org/ns/sparql-service-description#Service>
+              )
+] .
+
+
+###  Generated by the OWL API (version 4.2.8.20170104-2310) https://github.com/owlcs/owlapi
