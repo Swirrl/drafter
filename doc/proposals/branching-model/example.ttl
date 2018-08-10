@@ -1,5 +1,5 @@
 PREFIX : <http://data/>
-PREFIX drafter: <http://drafter/>
+PREFIX drafter: <http://publishmydata.com/def/drafter/branch>
 PREFIX policy:  <http://drafter/policy/>
 PREFIX draftergraph: <http://blah/drafter/graphs/>
 PREFIX sg: <http://blah/drafter/graphs/storage/>
@@ -392,7 +392,7 @@ draftergraph:state {
 
   graphset:live-2 a drafter:GraphSet ;
         drafter:storageGraph sg:a1 , sg:b3, sg:e1 ;
-        drafter:previousGraphSet graphset:live ;
+        drafter:replacesGraphSet graphset:live ;
         drafter:head transaction:d3 .
 
   endpoint:live a drafter:Endpoint ;
