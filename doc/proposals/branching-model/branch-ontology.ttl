@@ -1,14 +1,17 @@
 @prefix : <http://publishmydata.com/def/drafter/branch#> .
+@prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @base <http://publishmydata.com/def/drafter/branch> .
 
 <http://publishmydata.com/def/drafter/branch> rdf:type owl:Ontology ;
-                                               owl:imports <http://www.w3.org/ns/sparql-service-description#> ,
-                                                           <http://xmlns.com/foaf/0.1/> .
+                                               owl:imports sd: ,
+                                                           foaf: ;
+                                               rdfs:comment "Proposed Draft ontology for a git-like Drafter branching model." .
 
 #################################################################
 #    Annotation properties
@@ -23,12 +26,12 @@
 ###  http://publishmydata.com/def/drafter/branch#endpointName
 :endpointName rdf:type owl:AnnotationProperty ;
               rdfs:subPropertyOf rdfs:label ;
-              rdfs:range <http://xmlns.com/foaf/0.1/Agent> .
+              rdfs:range foaf:Agent .
 
 
 ###  http://publishmydata.com/def/drafter/branch#namedGraph
 :namedGraph rdf:type owl:AnnotationProperty ;
-            rdfs:subPropertyOf <http://www.w3.org/ns/sparql-service-description#name> ;
+            rdfs:subPropertyOf sd:name ;
             rdfs:range xsd:anyURI ;
             rdfs:domain :StorageGraph .
 
@@ -72,7 +75,7 @@ With reasoning enabled through transitivity this can be used to find the set of 
 :author rdf:type owl:ObjectProperty ;
         rdfs:subPropertyOf owl:topObjectProperty ;
         rdfs:domain :Commit ;
-        rdfs:range <http://xmlns.com/foaf/0.1/Agent> ;
+        rdfs:range foaf:Agent ;
         rdfs:comment "Author of the commit." .
 
 
@@ -182,7 +185,7 @@ Allows queries to ask questions like: \"Has this graph been modified?\", without
 ###  http://publishmydata.com/def/drafter/branch#hasOwner
 :hasOwner rdf:type owl:ObjectProperty ;
           rdfs:domain :Endpoint ;
-          rdfs:range <http://xmlns.com/foaf/0.1/Agent> ;
+          rdfs:range foaf:Agent ;
           rdfs:comment """The owner of the endpoint.
 
 NOTE: we might change this when we introduce RBAC.""" .
@@ -335,7 +338,7 @@ Other relationships such as childCommit and ancesterCommit can be inferred from 
 
 ###  http://publishmydata.com/def/drafter/branch#GraphSet
 :GraphSet rdf:type owl:Class ;
-          rdfs:subClassOf <http://www.w3.org/ns/sparql-service-description#GraphCollection> ;
+          rdfs:subClassOf sd:GraphCollection ;
           rdfs:comment "A set of StorageGraph to NamedGraph mappings." .
 
 
@@ -391,13 +394,13 @@ Note in this drafter branch model, it is possible to support disjoint histories.
 
 ###  http://publishmydata.com/def/drafter/branch#StorageGraph
 :StorageGraph rdf:type owl:Class ;
-              rdfs:subClassOf <http://www.w3.org/ns/sparql-service-description#NamedGraph> ;
+              rdfs:subClassOf sd:NamedGraph ;
               rdfs:comment "A StorageGraph is where we store the data for a NamedGraph in an endpoint." .
 
 
 ###  http://publishmydata.com/def/drafter/branch#User
 :User rdf:type owl:Class ;
-      rdfs:subClassOf <http://xmlns.com/foaf/0.1/Agent> ;
+      rdfs:subClassOf foaf:Agent ;
       rdfs:comment "A drafter user" .
 
 
@@ -421,12 +424,12 @@ Note in this drafter branch model, it is possible to support disjoint histories.
                 :PullRequest
                 :Resolution
                 <http://www.w3.org/ns/formats/Format>
-                <http://www.w3.org/ns/sparql-service-description#Feature>
-                <http://www.w3.org/ns/sparql-service-description#Graph>
-                <http://www.w3.org/ns/sparql-service-description#GraphCollection>
-                <http://www.w3.org/ns/sparql-service-description#NamedGraph>
-                <http://www.w3.org/ns/sparql-service-description#Service>
-                <http://xmlns.com/foaf/0.1/Agent>
+                sd:Feature
+                sd:Graph
+                sd:GraphCollection
+                sd:NamedGraph
+                sd:Service
+                foaf:Agent
               )
 ] .
 
@@ -436,11 +439,11 @@ Note in this drafter branch model, it is possible to support disjoint histories.
                 :Endpoint
                 :PullRequest
                 <http://www.w3.org/ns/formats/Format>
-                <http://www.w3.org/ns/sparql-service-description#Feature>
-                <http://www.w3.org/ns/sparql-service-description#Graph>
-                <http://www.w3.org/ns/sparql-service-description#GraphCollection>
-                <http://www.w3.org/ns/sparql-service-description#NamedGraph>
-                <http://www.w3.org/ns/sparql-service-description#Service>
+                sd:Feature
+                sd:Graph
+                sd:GraphCollection
+                sd:NamedGraph
+                sd:Service
               )
 ] .
 
