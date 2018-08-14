@@ -52,7 +52,8 @@
 (s/def ::queue-size pos-int?)
 
 (defmethod ig/pre-init-spec ::cache-thread-pool [_]
-  (s/keys :opt-un [::core-pool-size ::max-pool-size ::keep-alive-time-ms ::queue-size]))
+  (s/keys :req-un [::core-pool-size ::max-pool-size ::keep-alive-time-ms
+                   ::queue-size]))
 
 ;; This threadpool will raise a java.util.concurrent.RejectedExecutionException
 ;; when there are no free threads to execute tasks and the queue of
@@ -62,12 +63,15 @@
                 max-pool-size
                 keep-alive-time-ms ;; time threads above core-pool-size wait for work before dying.
                 queue-size]} opts
-        queue (ArrayBlockingQueue. (or queue-size 1))]
-    (ThreadPoolExecutor. (or core-pool-size 1)
-                         (or max-pool-size 1)
-                         (or keep-alive-time-ms 1000)
-                         TimeUnit/MILLISECONDS
-                         queue)))
+        queue (ArrayBlockingQueue. queue-size)]
+    (proxy [ThreadPoolExecutor] [core-pool-size
+                                 max-pool-size
+                                 keep-alive-time-ms
+                                 TimeUnit/MILLISECONDS
+                                 queue]
+      (beforeExecute [t r]
+        (proxy-super beforeExecute t r)
+        (dd/histogram! "stasher_thread_pool_size" (.getPoolSize this))))))
 
 (defmethod ig/halt-key! ::cache-thread-pool [k thread-pool]
   (.shutdown thread-pool))

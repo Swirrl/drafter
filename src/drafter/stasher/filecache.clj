@@ -140,7 +140,7 @@
 ;; Specs
 
 
-(s/def ::dir fs/directory?)
+(s/def ::dir string?)
 (s/def ::buffer-size int?)
 (s/def ::persist-on-shutdown? boolean?)
 
