@@ -25,7 +25,10 @@
                                  :archive-at #or [#env STASHER_CACHE_CLEANER_ARCHIVE_AT 0.8]
                                  :archive-until #or [#env STASHER_CACHE_CLEANER_ARCHIVE_UNTIL 0.6]}
 
- :drafter.stasher/cache-thread-pool {}
+ :drafter.stasher/cache-thread-pool {:core-pool-size #long #or [#env STASHER_CORE_POOL_SIZE 1]
+                                     :max-pool-size #long #or [#env STASHER_MAX_POOL_SIZE 10]
+                                     :keep-alive-time-ms #long #or [#env STASHER_KEEP_ALIVE_TIME_MS 1000]
+                                     :queue-size #long #or [#env STASHER_QUEUE_SIZE 1]}
 
  :drafter.stasher/repo #merge [{:cache #ig/ref :drafter.stasher/cache
                                 :cache? #boolean #or [#env STASHER_CACHE_ENABLED true]}

@@ -1,11 +1,14 @@
 {
- :drafter.stasher/cache-thread-pool {}
- 
+ :drafter.stasher/cache-thread-pool {:core-pool-size 1
+                                     :max-pool-size 1
+                                     :keep-alive-time-ms 1000
+                                     :queue-size 1}
+
  :drafter.stasher.filecache/file-backend {:persist-on-shutdown? false}
 
  :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
                          :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
- 
+
  :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/cache
                         :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
                         :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT }
