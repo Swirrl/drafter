@@ -32,11 +32,10 @@ Configuration properties summary:
 | DRAFTER_BATCHED_WRITE_SIZE              | No       | 10000      | Max size of write batches in triples                 |
 | DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE     | No       | 30 seconds | Live endpoint max query timeout                      |
 | DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET | No       | 30 seconds | Draftset endpoint max query timeout                  |
-| DRAFTER_USER_REPO_NS                    |          |            | Backend for user database                            |
-| DRAFTER_USER_DB_NAME                    |          |            | Specific user database in mongo backend user server  |
-| DRAFTER_MONGO_USER_COLLECTION           |          |            | The collection in mongo backend that holds the users |
-| DRAFTER_MONGO_HOST                      |          |            | Hostname for backend mongo service                   |
-| DRAFTER_MONGO_PORT                      |          |            | Port for backend mongo service                       |
+| DRAFTER_USER_DB_NAME                    | Yes      |            | Specific user database in mongo backend user server  |
+| DRAFTER_MONGO_USER_COLLECTION           | No       | users      | The collection in mongo backend that holds the users |
+| DRAFTER_MONGO_HOST                      | Yes      |            | Hostname for backend mongo service                   |
+| DRAFTER_MONGO_PORT                      | Yes      |            | Port for backend mongo service                       |
 | DRAFTER_JWS_SIGNING_KEY                 | Yes      |            | Shared token for JWT signing                         |
 
 
