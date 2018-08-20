@@ -18,7 +18,7 @@ PREFIX sg: <http://blah/drafter/graphs/storage/>
 # live endpoint (branch) with no data loaded.
 draftergraph:state {
   # rootCommit is as an individual defined in the drafter vocab.
-  drafter:rootCommit a drafter:Commit ;
+  drafter:rootCommit a drafter:RootCommit ;
     rdfs:comment "The root/initial commit of an endpoint.  This special commit has no parent." .
 
   # endpoints are effectively sparql endpoints + branches.  In the
@@ -55,7 +55,9 @@ draftergraph:state {
   # A user rick@swirrl.com forks the graphset/endpoint:
 
   graphset:draft a drafter:GraphSet ;
-     drafter:forkOf graphset:live .
+        drafter:forkOf graphset:live ;
+        drafter:head drafter:rootCommit .
+
 
   # Fork live endpoint to a draft.
   endpoint:draft a drafter:Endpoint ;
@@ -135,8 +137,8 @@ draftergraph:state {
     dcterms:modified "T1" ;
     drafter:parentCommit transaction:rootCommit ;
     drafter:comment "Append some quads to live" ;
-    drafter:addedGraph sg:a1, sg:b1 ;
-    drafter:appendedTriples sg:a1, sg:b1 ;
+    drafter:addedGraph sg:a1, sg:b1, sg:c1 ;
+    drafter:appendedTriples sg:a1, sg:b1, sg:c1 ;
     drafter:transactionFile <file:append-l1.ttl>
     drafter:author <mailto:manager@swirrl.com> .
 
@@ -256,7 +258,7 @@ draftergraph:state {
     drafter:deletedTriples sg:a2 ;
     drafter:removedGraph sg:d1 ;
     drafter:transactionFile <file:delete-d2.ttl>
-    drafter:comment "Delete :foo2 :bar2 :baz2 quad from draftset.  And completely remove sg:c graph." .
+    drafter:comment "Delete :foo2 :bar2 :baz2 quad from draftset.  And completely remove sg:d1 graph." .
 
   # graphset for draft updated in place to:
   graphset:draft a drafter:GraphSet ;
@@ -299,9 +301,9 @@ draftergraph:state {
   # that records what went into it.
 
   sg:b3 a drafter:MergedGraph ; # MergedGraph < StorageGraph
-        drafter:namedGraph named-graph:c ;
-        drafter:unionsGraph sg:a1 ;
-        drafter:unionsGraph sg:a2 .
+        drafter:namedGraph named-graph:b ;
+        drafter:unionsGraph sg:b1 ;
+        drafter:unionsGraph sg:b2 .
 
   # A MergeCommit can have two or more parents.
   transaction:d3 a drafter:MergeCommit ;
