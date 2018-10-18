@@ -132,7 +132,7 @@
                   (task-f! job))
                 (task-f! job)))
 
-            (catch Exception ex
+            (catch Throwable ex
               (log/warn ex "A task raised an error.  Delivering error to promise")
               ;; TODO improve error returned
               (job-failed! job ex)))))
