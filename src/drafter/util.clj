@@ -92,7 +92,7 @@
   take-batches lazily."
   [take-batches partition-fn output-batch-size]
   (lazy-seq
-    (if (seq take-batches)
+    (when (seq take-batches)
       (let [take-batch (first take-batches)
             batch-groups (vals (group-by partition-fn take-batch))
             batches (mapcat (fn [inner]
