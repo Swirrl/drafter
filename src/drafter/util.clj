@@ -86,6 +86,20 @@
      (conj ~col ~x)
      ~col))
 
+(defn- create-partition-batches
+  "Given a sequence of batches, creates an equivalence partition by partition-fn within each batch
+  and then partitions each equivalence partition by output-batch-size. Processes each batch within
+  take-batches lazily."
+  [take-batches partition-fn output-batch-size]
+  (lazy-seq
+    (when (seq take-batches)
+      (let [take-batch (first take-batches)
+            batch-groups (vals (group-by partition-fn take-batch))
+            batches (mapcat (fn [inner]
+                      (partition-all output-batch-size inner))
+                    batch-groups)]
+        (concat batches (create-partition-batches (rest take-batches) partition-fn output-batch-size))))))
+
 (defn batch-partition-by
   "Partitions an input sequence into a sequence of batches, partitions
   each batch by the given partition function and flattens the result
@@ -105,12 +119,10 @@
 
   batch-patition-by [:a :b :a :b :a] identity 2 4
   => [[:a :a] [:b :b] [:a]]"
-  ([seq partition-fn output-batch-size] (batch-partition-by seq partition-fn output-batch-size (* 4 output-batch-size)))
+  ([seq partition-fn output-batch-size]
+    (batch-partition-by seq partition-fn output-batch-size (* 4 output-batch-size)))
   ([seq partition-fn output-batch-size take-batch-size]
-   (let [take-batches (partition-all take-batch-size seq)
-         grouped-batches (map #(group-by partition-fn %) take-batches)
-         batches (mapcat vals grouped-batches)]
-     (mapcat #(partition-all output-batch-size %) batches))))
+   (create-partition-batches (partition-all take-batch-size seq) partition-fn output-batch-size)))
 
 (defn uri->sesame-uri
   "Converts a java.net.URI into a sesame URI"
