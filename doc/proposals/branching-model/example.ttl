@@ -311,7 +311,8 @@ draftergraph:state {
     drafter:parentCommit transaction:d2 ;
     drafter:parentCommit transaction:l1 ;
     drafter:addedGraph sg:a1, sg:b3 ;
-    drafter:removedGraph sg:a2 ;
+    drafter:appendedTriplesFromUnion sg:b3 ;
+    drafter:removedGraph sg:a2 , sg:b1, sg:b2 ;
     drafter:selectedGraph sg:e1 ; # selectedGraph < addedGraph
     drafter:ignoredGraph sg:c1 .  # ignoredGraph < removedGraph
 
