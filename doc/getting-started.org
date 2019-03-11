@@ -15,12 +15,7 @@ Not developing drafter itself then just grab a recent build from
 1. To run the unit tests you must currently have a database called
    =drafter-test-db= created and ready.  You can create this with the
    command: =stardog-admin db create -n drafter-test-db=
-2. You should enable stardog ICV constraints on this database by
-   running the command =./bin/enforce-drafter-constraints.sh
-   drafter-test-db= This ensures the database is never inconsistent
-   with regards to the rules defined in =resources/drafter/state-graph-constraints.ttl=
-
-3. To run these tests from the console run the command:
+2. To run these tests from the console run the command:
 
 =$ lein test=
 
