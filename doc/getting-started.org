@@ -23,10 +23,6 @@ Not developing drafter itself then just grab a recent build from
 
 1. You should also create a database for local
    development. =stardog-admin db create drafter-dev-db=
-2. Again you should consider adding constraints to this database:
-
-   =./bin/enforce-drafter-constraints.sh drafter-dev-db=
-
 
 2. =lein repl=
 3. =(dev)= to load dev namespace
