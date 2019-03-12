@@ -94,10 +94,14 @@
 
 (defn sparql-query-parser-handler [inner-handler]
   (fn [{:keys [request-method body query-params form-params] :as request}]
-    (letfn [(handle [query-string location]
+    (letfn [(handle [query-string default-graph-uri named-graph-uri location]
               (cond
                 (string? query-string)
-                (inner-handler (assoc-in request [:sparql :query-string] query-string))
+                (-> request
+                    (assoc-in [:sparql :query-string] query-string)
+                    (assoc-in [:sparql :default-graph-uri] default-graph-uri)
+                    (assoc-in [:sparql :named-graph-uri] named-graph-uri)
+                    (inner-handler))
 
                 (coll? query-string)
                 (response/unprocessable-entity-response "Exactly one query parameter required")
@@ -105,10 +109,21 @@
                 :else
                 (response/unprocessable-entity-response (str "Expected SPARQL query in " location))))]
       (case request-method
-        :get (handle (get query-params "query") "'query' query string parameter")
+        :get (handle (get query-params "query")
+                     (get query-params "default-graph-uri")
+                     (get query-params "named-graph-uri")
+                     "'query' query string parameter")
         :post (case (request/content-type request)
-                "application/x-www-form-urlencoded" (handle (get form-params "query") "'query' form parameter")
-                "application/sparql-query" (handle body "body")
+                "application/x-www-form-urlencoded"
+                (handle (get form-params "query")
+                        (get form-params "default-graph-uri")
+                        (get form-params "named-graph-uri")
+                        "'query' form parameter")
+                "application/sparql-query"
+                (handle body
+                        (get query-params "default-graph-uri")
+                        (get query-params "named-graph-uri")
+                        "body")
                 (do
                   (log/warn "Handling SPARQL POST query with missing content type")
                   (handle (get-in request [:params :query]) "'query' form or query parameter")))
