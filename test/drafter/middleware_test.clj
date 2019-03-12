@@ -9,6 +9,7 @@
             [drafter.user-test :refer [test-editor test-publisher]]
             [drafter.user.memory-repository :as memory-repo]
             [drafter.util :as util]
+            [drafter.rdf.sparql-protocol :refer [sparql-query-parser-handler]]
             [grafter.rdf4j.formats :as formats]
             [grafter.rdf4j.repository :as repo]
             [ring.util.response :refer [response]])

@@ -1,5 +1,6 @@
 (ns drafter.routes.draftsets-api-test
-  (:require [clojure.java.io :as io]
+  (:require [clojure-csv.core :as csv]
+            [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.test :refer :all :as t]
             [drafter.middleware :as middleware]
@@ -1348,4 +1349,3 @@
   (tc/assert-is-ok-response response)
   (tc/assert-schema schema body)
   body)
-

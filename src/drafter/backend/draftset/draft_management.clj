@@ -459,7 +459,8 @@
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
 
-(defn calculate-graph-restriction [public-live-graphs live-graph-drafts supplied-draft-graphs]
+(defn calculate-graph-restriction
+  [public-live-graphs live-graph-drafts supplied-draft-graphs]
   (set/union
    (set/difference (set public-live-graphs) (set live-graph-drafts))
    (set supplied-draft-graphs)))

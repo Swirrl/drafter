@@ -147,23 +147,19 @@
    {default-b :default-graph named-b :named-graphs}]
   (let [restricted-graphs (set/intersection (set/union default-a named-a)
                                             (set/union default-b named-b))]
-    (letfn [(intersection [& sets]
-              (apply set/intersection restricted-graphs (filter seq sets)))]
-      {:default-graph (intersection default-a default-b)
-       :named-graphs (intersection named-a named-b)})))
+    {:default-graph (set/intersection restricted-graphs default-a default-b)
+     :named-graphs (set/intersection restricted-graphs named-a named-b)}))
 
 (defn restrict-query
-  [pquery user-protocol-dataset query-dataset-restriction graph-restriction]
+  [pquery user-restriction query-dataset-restriction graph-restriction]
   (letfn [(do-restrict [query restriction]
             (doto pquery
               (.setDataset (repo/make-restricted-dataset
                             :default-graph (:default-graph restriction)
                             :named-graphs (:named-graphs restriction)))))]
     (let [graph-restriction (normalize-restriction graph-restriction)]
-      (if-let [restriction (some->> (or (some-> user-protocol-dataset
-                                          dataset->restriction)
-                                        query-dataset-restriction)
-                             (some-restriction)
+      (if-let [restriction (some->> (or (some-restriction user-restriction)
+                                        (some-restriction query-dataset-restriction))
                              (stringify-restriction)
                              (restriction-intersection graph-restriction))]
         (do-restrict pquery restriction)
@@ -178,7 +174,7 @@
 (comment
   ;; experiments
 
-  
+
 
 
   (let [at (atom [])
@@ -191,16 +187,16 @@
                      (swap! at conj [:close]))
                    (commit [this conn]
                      (swap! at conj [:commit])))
-        
+
         repo (doto (grafter.rdf.repository/notifying-repo (grafter.rdf.repository/sparql-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update"))
                (.addRepositoryConnectionListener listener))]
 
     (with-open [conn (grafter.rdf.repository/->connection repo)]
       (grafter.rdf/add conn [(grafter.rdf.protocols/->Quad (URI. "http://foo") (URI. "http://foo") (URI. "http://foo") (URI. "http://foo"))]))
-    
+
     @at)
 
   ;; => [[:begin] [:add #object[org.eclipse.rdf4j.model.impl.URIImpl 0x4e213334 "http://foo"] #object[org.eclipse.rdf4j.model.impl.URIImpl 0x211a94a8 "http://foo"] #object[org.eclipse.rdf4j.model.impl.URIImpl 0x667e19c8 "http://foo"] #object["[Lorg.eclipse.rdf4j.model.Resource;" 0x2bfcfcbe "[Lorg.eclipse.rdf4j.model.Resource;@2bfcfcbe"]] [:commit] [:close]]
-  
-  
+
+
   )

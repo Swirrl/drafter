@@ -20,17 +20,20 @@
       repo/IPrepareQuery
       (repo/prepare-query* [this sparql-string dataset]
         (let [query (QueryFactory/create sparql-string Syntax/syntaxSPARQL_11)
-              query-dataset (bprot/query-dataset-restriction query)]
+              user-restriction (some-> dataset bprot/dataset->restriction)
+              query-restriction (bprot/query-dataset-restriction query)]
           (-> stasher-conn
               (bprot/prep-and-validate-query sparql-string)
-              (bprot/restrict-query dataset query-dataset restriction))))
+              (bprot/restrict-query user-restriction
+                                    query-restriction
+                                    restriction))))
 
       ;; Currently restricted connections only support querying...
       proto/ISPARQLable
       (proto/query-dataset [this sparql-string dataset]
         (let [pquery (repo/prepare-query* this sparql-string dataset)]
           (repo/evaluate pquery)))
-      
+
       Closeable
       (close [this]
         (.close stasher-conn))

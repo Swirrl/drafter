@@ -31,14 +31,20 @@
   the [:sparql :prepared-query] key for access in downstream
   handlers."
   [executor inner-handler]
-  (fn [{:keys [sparql] :as request}]
+  (fn [{{:keys [default-graph-uri named-graph-uri] :as sparql} :sparql :as request}]
     (with-open [conn (repo/->connection executor)]
       (try
         (let [validated-query-str (bcom/validate-query (get sparql :query-string))
               pquery (repo/prepare-query conn
                                          validated-query-str
-                                         (bcom/user-dataset sparql))]
-          (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
+                                         (bcom/user-dataset sparql))
+              response (-> request
+                           (assoc-in [:sparql :prepared-query] pquery)
+                           (inner-handler))]
+          response #_(cond-> response
+            (seq default-graph-uri)
+            (assoc-in [:headers "X-SPARQL-default-graph"]))
+          )
         (catch QueryParseException ex
           (let [error-message (.getMessage ex)]
             (log/info "Malformed query: " error-message)
@@ -126,9 +132,12 @@
                         (get query-params "default-graph-uri")
                         (get query-params "named-graph-uri")
                         "body")
-                (do
+                (let [params (:params request)]
                   (log/warn "Handling SPARQL POST query with missing content type")
-                  (handle (get-in request [:params :query]) "'query' form or query parameter")))
+                  (handle (get params :query)
+                          (get params :default-graph-uri)
+                          (get params :named-graph-uri)
+                          "'query' form or query parameter")))
         (response/method-not-allowed-response request-method)))))
 
 (defn- execute-boolean-query [pquery result-format response-content-type]
@@ -238,4 +247,3 @@
   ([mount-path executor] (sparql-end-point mount-path executor default-query-timeout-fn))
   ([mount-path executor query-timeout-fn]
    (make-route nil mount-path (sparql-protocol-handler {:repo executor :timeout-fn query-timeout-fn}))))
-

@@ -108,6 +108,8 @@
     (reify TupleQuery
       (getBindings [this]
         (.getBindings inner-query))
+      (evaluate [this]
+        (.evaluate inner-query))
       (evaluate [this handler]
         (.evaluate inner-query (make-select-result-rewriter draft->live handler)))
       (getMaxExecutionTime [this]
