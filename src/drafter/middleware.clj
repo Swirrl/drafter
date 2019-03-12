@@ -124,28 +124,6 @@
             (response/unprocessable-entity-response (str "Invalid value for parameter " (name param-name) ": " val))))
         (invoke-inner default)))))
 
-(defn sparql-query-parser-handler [inner-handler]
-  (fn [{:keys [request-method body query-params form-params] :as request}]
-    (letfn [(handle [query-string location]
-              (cond
-                (string? query-string)
-                (inner-handler (assoc-in request [:sparql :query-string] query-string))
-
-                (coll? query-string)
-                (response/unprocessable-entity-response "Exactly one query parameter required")
-
-                :else
-                (response/unprocessable-entity-response (str "Expected SPARQL query in " location))))]
-      (case request-method
-        :get (handle (get query-params "query") "'query' query string parameter")
-        :post (case (request/content-type request)
-                "application/x-www-form-urlencoded" (handle (get form-params "query") "'query' form parameter")
-                "application/sparql-query" (handle body "body")
-                (do
-                  (log/warn "Handling SPARQL POST query with missing content type")
-                  (handle (get-in request [:params :query]) "'query' form or query parameter")))
-        (response/method-not-allowed-response request-method)))))
-
 (defn require-content-type
   "Wraps a ring handler in one which requires the incoming request has
   a valid content type. If no content type is present, or if it is
