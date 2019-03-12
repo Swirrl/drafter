@@ -31,11 +31,13 @@
   the [:sparql :prepared-query] key for access in downstream
   handlers."
   [executor inner-handler]
-  (fn [request]
+  (fn [{:keys [sparql] :as request}]
     (with-open [conn (repo/->connection executor)]
       (try
-        (let [validated-query-str (bcom/validate-query (get-in request [:sparql :query-string]))
-              pquery (repo/prepare-query conn validated-query-str)]
+        (let [validated-query-str (bcom/validate-query (get sparql :query-string))
+              pquery (repo/prepare-query conn
+                                         validated-query-str
+                                         (bcom/user-dataset sparql))]
           (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
         (catch QueryParseException ex
           (let [error-message (.getMessage ex)]
