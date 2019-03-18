@@ -3,10 +3,12 @@
             [clojure.test :as t]
             [drafter.test-common :as tc]
             [drafter.backend.draftset :as sut]
-            [drafter.test-common :as tc :refer [deftest-system-with-keys]]
+            [drafter.test-common :as tc
+             :refer [deftest-system deftest-system-with-keys]]
             [grafter.rdf :as rdf]
             [grafter.rdf4j.repository :as repo]
-            [drafter.fixtures.state-1 :as state]))
+            [drafter.fixtures.state-1 :as state])
+  (:import java.net.URI))
 
 (deftest-system-with-keys build-draftset-endpoint-test [:drafter.backend.draftset/endpoint :drafter.fixture-data/loader]
   [{:keys [:drafter.backend.draftset/endpoint] :as sys} "drafter/backend-test.edn"]

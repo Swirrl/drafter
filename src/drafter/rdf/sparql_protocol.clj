@@ -126,9 +126,12 @@
                         (get query-params "default-graph-uri")
                         (get query-params "named-graph-uri")
                         "body")
-                (do
+                (let [params (:params request)]
                   (log/warn "Handling SPARQL POST query with missing content type")
-                  (handle (get-in request [:params :query]) "'query' form or query parameter")))
+                  (handle (get params :query)
+                          (get params :default-graph-uri)
+                          (get params :named-graph-uri)
+                          "'query' form or query parameter")))
         (response/method-not-allowed-response request-method)))))
 
 (defn- execute-boolean-query [pquery result-format response-content-type]
