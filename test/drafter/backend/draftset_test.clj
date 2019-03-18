@@ -3,8 +3,10 @@
             [drafter.backend.draftset :as sut]
             [drafter.fixtures.state-1 :as state]
             [drafter.test-common :as tc :refer [deftest-system-with-keys]]
+            [grafter-2.rdf :as rdf]
             [grafter-2.rdf4j.io :as rio]
-            [grafter-2.rdf4j.repository :as repo]))
+            [grafter-2.rdf4j.repository :as repo])
+  (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
