@@ -1,0 +1,16 @@
+@prefix : <http://test.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+:PublicGraph2 {
+  :Whippet a rdfs:Class ;
+    rdfs:label "Whippet" ;
+    rdfs:comment "A whippet." ;
+    rdfs:subClassOf :Dog .
+
+  :Snappy a :Whippet .
+}

@@ -1,0 +1,54 @@
+@prefix : <http://test.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+  :PublicGraph a drafter:ManagedGraph ;
+    drafter:isPublic true .
+  :PublicGraph2 a drafter:ManagedGraph ;
+    drafter:isPublic true .
+}
+
+:PublicGraph {
+  :Lifeform a rdfs:Class ;
+    rdfs:label "Lifeform" ;
+    rdfs:comment "A living thing." .
+
+  :Animal a rdfs:Class ;
+    rdfs:label "Animal" ;
+    rdfs:comment "An animal." ;
+    rdfs:subClassOf :Lifeform .
+
+  :Mammal a rdfs:Class ;
+    rdfs:label "Mammal" ;
+    rdfs:comment "A mammal." ;
+    rdfs:subClassOf :Animal .
+
+  :Cat a rdfs:Class ;
+    rdfs:label "Cat" ;
+    rdfs:comment "A cat." ;
+    rdfs:subClassOf :Mammal .
+
+  :Dog a rdfs:Class ;
+    rdfs:label "Dog" ;
+    rdfs:comment "A dog." ;
+    rdfs:subClassOf :Mammal .
+
+  :Tiger a rdfs:Class ;
+    rdfs:label "Tiger" ;
+    rdfs:comment "A tiger." ;
+    rdfs:subClassOf :Cat .
+
+  :WestHighlandTerrier a rdfs:Class ;
+    rdfs:label "West Highland Terrier" ;
+    rdfs:comment "A west highland terrier." ;
+    rdfs:subClassOf :Dog .
+
+  :Tigger a :Tiger .
+
+  :Stevie a :WestHighlandTerrier .
+}
