@@ -110,6 +110,7 @@ public class DrafterSparqlSession extends SPARQLProtocolSession /*SparqlSession*
         else return false;
     }
 
+    private static final String INCLUDE_INFERRED_PARAM_NAME = "reasoning";
     private static final String TIMEOUT_QUERY_PARAM_NAME = "timeout";
 
     private static void removeTimeoutQueryParams(List<NameValuePair> queryPairs) {
@@ -124,6 +125,13 @@ public class DrafterSparqlSession extends SPARQLProtocolSession /*SparqlSession*
 
     @Override protected List<NameValuePair> getQueryMethodParameters(QueryLanguage ql, String query, String baseURI, Dataset dataset, boolean includeInferred, int maxQueryTime, Binding... bindings) {
         List<NameValuePair> pairs = super.getQueryMethodParameters(ql, query, baseURI, dataset, includeInferred, maxQueryTime, bindings);
+
+        // SPARQLProtocolSession (super) only implements standard query
+        // parameters so if we want to send reasoning parameters we have to add
+        // them ourselves.
+        if (includeInferred) {
+            pairs.add(new BasicNameValuePair(INCLUDE_INFERRED_PARAM_NAME, "true"));
+        }
 
         //sesame adds a timeout=period_seconds query parameter if the maximum query time is set
         //remove this parameter and replace it with our own
