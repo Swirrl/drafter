@@ -34,12 +34,12 @@
   (testing "User can select triples from public graphs"
     (let [q "SELECT DISTINCT ?s WHERE { ?s ?p ?o }"
           result (run-query q)]
-      (is (= (contains? result "http://test.com/subject-1")))))
+      (is (contains? result "http://test.com/subject-1"))))
 
   (testing "User cannot select triples from private graphs"
     (let [q "SELECT DISTINCT ?s WHERE { ?s ?p ?o }"
           result (run-query q)]
-      (is (= (not (contains? result "http://test.com/subject-4"))))))
+      (is (not (contains? result "http://test.com/subject-4")))))
 
   (testing "Public / private restrictions in query\n"
 
