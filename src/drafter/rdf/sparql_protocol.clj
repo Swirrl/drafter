@@ -22,6 +22,12 @@
            org.eclipse.rdf4j.query.resultio.QueryResultIO
            org.apache.jena.query.QueryParseException))
 
+(defn- parse-reasoning [{params :query-params :as request}]
+  (let [param (or (get params "reasoning") (get params "infer"))]
+    (if (string? param)
+      (Boolean/parseBoolean param)
+      false)))
+
 (defn sparql-prepare-query-handler
   "Returns a ring handler which fetches the query string from an
   incoming request, validates it and prepares it using the given
@@ -38,6 +44,8 @@
               pquery (repo/prepare-query conn
                                          validated-query-str
                                          (bcom/user-dataset sparql))]
+          (when-let [reasoning (parse-reasoning request)]
+            (doto pquery (.setIncludeInferred reasoning)))
           (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
         (catch QueryParseException ex
           (let [error-message (.getMessage ex)]
@@ -50,8 +58,9 @@
   processing pipeline."
   [pquery inner-handler]
   (fn [request]
+    (when-let [reasoning (parse-reasoning request)]
+      (doto pquery (.setIncludeInferred reasoning)))
     (inner-handler (assoc-in request [:sparql :prepared-query] pquery))))
-
 
 (defn get-sparql-response-content-type [mime-type]
   (case mime-type
