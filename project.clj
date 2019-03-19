@@ -59,7 +59,9 @@
                  [com.sun.mail/javax.mail "1.6.2"]
                  ;;[com.taoensso/tower "2.0.2"]
 
-                 [grafter "0.11.0.2-drafter-rdf4j"]
+                 [grafter "2.0.0"]
+                 [com.novemberain/pantomime "2.11.0"] ;; mime types
+                 [org.eclipse.rdf4j/rdf4j-queryrender "2.5.0"]
 
                  [grafter/url "0.2.5"]
                  ;[grafter/vocabularies "0.1.3"]
