@@ -505,112 +505,124 @@
 (defn stashing-graph-query
   "Construct a graph query that checks the stash before evaluating"
   [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
-  (proxy [SPARQLGraphQuery] [httpclient base-uri-str query-str]
-    (evaluate
-      ;; sync results
-      ([]
-       (let [dataset (.getDataset this)]
-         (if cache?
-           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
-             (or (get-result cache cache-key base-uri-str)
-                 (wrap-result cache cache-key
-                              (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                               query-str base-uri-str dataset
-                                               (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                               (.getBindingsArray this)))))
-           (timing/graph-result
-            "drafter.stasher.graph_sync.no_cache"
-            (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                                       query-str base-uri-str dataset
-                                                       (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                                       (.getBindingsArray this))))))
+  (doto (proxy [SPARQLGraphQuery] [httpclient base-uri-str query-str]
+          (evaluate
+            ;; sync results
+            ([]
+             (let [dataset (.getDataset this)]
+               (if cache?
+                 (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
+                   (or (get-result cache cache-key base-uri-str)
+                       (wrap-result cache cache-key
+                                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                                     query-str base-uri-str dataset
+                                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                                     (.getBindingsArray this)))))
+                 (timing/graph-result
+                  "drafter.stasher.graph_sync.no_cache"
+                  (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                   query-str base-uri-str dataset
+                                   (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                   (.getBindingsArray this))))))
 
-      ;; async results
-      ([rdf-handler]
-       (let [dataset (.getDataset this)]
-         (if cache?
-           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
-             (or (async-read cache cache-key rdf-handler base-uri-str)
-                 (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
+            ;; async results
+            ([rdf-handler]
+             (let [dataset (.getDataset this)]
+               (if cache?
+                 (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
+                   (or (async-read cache cache-key rdf-handler base-uri-str)
+                       (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
+                         (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                          query-str base-uri-str dataset
+                                          (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                          stashing-rdf-handler (.getBindingsArray this)))))
+                 (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
                                     query-str base-uri-str dataset
                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                    stashing-rdf-handler (.getBindingsArray this)))))
-           (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
-             (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                              query-str base-uri-str dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this)
-                              timing-rdf-handler (.getBindingsArray this)))))))))
+                                    timing-rdf-handler (.getBindingsArray this))))))))
+    ;; org.eclipse.rdf4j.query.impl.AbstractOperation sets `includeInferred` to
+    ;; `true` on initialization by default, even though their SPARQL client
+    ;; doesn't implement it.
+    (.setIncludeInferred false)))
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
   [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
-  (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
-    (evaluate
-      ;; sync results
-      ([]
-       (let [dataset (.getDataset this)]
-         (if cache?
-           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
-             (or (get-result cache cache-key base-uri-str)
-                 (wrap-result cache cache-key
-                              (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                                               query-str base-uri-str dataset
-                                               (.getIncludeInferred this)
-                                               (.getMaxExecutionTime this)
-                                               (.getBindingsArray this)))))
-           (timing/tuple-result
-            "drafter.stasher.tuple_sync.no_cache"
-            (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                             query-str base-uri-str dataset
-                             (.getIncludeInferred this)
-                             (.getMaxExecutionTime this)
-                             (.getBindingsArray this))))))
-      ([tuple-handler]
-       (let [dataset (.getDataset this)]
-         (if cache?
-           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
-             (or (async-read cache cache-key tuple-handler base-uri-str)
-                 (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
+  (doto (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
+          (evaluate
+            ;; sync results
+            ([]
+             (let [dataset (.getDataset this)]
+               (if cache?
+                 (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
+                   (or (get-result cache cache-key base-uri-str)
+                       (wrap-result cache cache-key
+                                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                                     query-str base-uri-str dataset
+                                                     (.getIncludeInferred this)
+                                                     (.getMaxExecutionTime this)
+                                                     (.getBindingsArray this)))))
+                 (timing/tuple-result
+                  "drafter.stasher.tuple_sync.no_cache"
+                  (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                   query-str base-uri-str dataset
+                                   (.getIncludeInferred this)
+                                   (.getMaxExecutionTime this)
+                                   (.getBindingsArray this))))))
+            ([tuple-handler]
+             (let [dataset (.getDataset this)]
+               (if cache?
+                 (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
+                   (or (async-read cache cache-key tuple-handler base-uri-str)
+                       (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
+                         (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                          query-str base-uri-str dataset
+                                          (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                          stashing-tuple-handler (.getBindingsArray this)))))
+                 (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
                                     query-str base-uri-str dataset
                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                    stashing-tuple-handler (.getBindingsArray this)))))
-           (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
-             (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                              query-str base-uri-str dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this)
-                              timing-tuple-handler (.getBindingsArray this)))))))))
+                                    timing-tuple-handler (.getBindingsArray this))))))))
+    ;; org.eclipse.rdf4j.query.impl.AbstractOperation sets `includeInferred` to
+    ;; `true` on initialization by default, even though their SPARQL client
+    ;; doesn't implement it.
+    (.setIncludeInferred false)))
 
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
   Boolean queries are sync only"
   [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
-  (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
-    (evaluate []
-      (let [dataset (.getDataset this)]
-        (if cache?
-          (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
-                result (get-result cache cache-key base-uri-str)]
-            (if (some? result)
-              result
-              (dd/measure!
-               "drafter.stasher.boolean_sync.cache_miss"
-               {}
-               (wrap-result cache cache-key
-                            (.sendBooleanQuery httpclient QueryLanguage/SPARQL
-                                               query-str base-uri-str dataset
-                                               (.getIncludeInferred this)
-                                               (.getMaxExecutionTime this)
-                                               (.getBindingsArray this))))))
-          (dd/measure!
-           "drafter.stasher.boolean_sync.no_cache"
-           {}
-           (.sendBooleanQuery httpclient QueryLanguage/SPARQL
-                              query-str base-uri-str dataset
-                              (.getIncludeInferred this)
-                              (.getMaxExecutionTime this)
-                              (.getBindingsArray this))))))))
+  (doto (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
+          (evaluate []
+            (let [dataset (.getDataset this)]
+              (if cache?
+                (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
+                      result (get-result cache cache-key base-uri-str)]
+                  (if (some? result)
+                    result
+                    (dd/measure!
+                     "drafter.stasher.boolean_sync.cache_miss"
+                     {}
+                     (wrap-result cache cache-key
+                                  (.sendBooleanQuery httpclient QueryLanguage/SPARQL
+                                                     query-str base-uri-str dataset
+                                                     (.getIncludeInferred this)
+                                                     (.getMaxExecutionTime this)
+                                                     (.getBindingsArray this))))))
+                (dd/measure!
+                 "drafter.stasher.boolean_sync.no_cache"
+                 {}
+                 (.sendBooleanQuery httpclient QueryLanguage/SPARQL
+                                    query-str base-uri-str dataset
+                                    (.getIncludeInferred this)
+                                    (.getMaxExecutionTime this)
+                                    (.getBindingsArray this)))))))
+    ;; org.eclipse.rdf4j.query.impl.AbstractOperation sets `includeInferred` to
+    ;; `true` on initialization by default, even though their SPARQL client
+    ;; doesn't implement it.
+    (.setIncludeInferred false)))
 
 (defn- get-state-graph-modified-time []
   (let [state-graph-modified-time (java.util.Date.)]
