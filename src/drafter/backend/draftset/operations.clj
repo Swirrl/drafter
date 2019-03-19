@@ -526,6 +526,10 @@
   (reify GraphQuery
     (evaluate [this rdf-handler]
       (.evaluate tuple-query (rdf-handler->spog-tuple-handler conn rdf-handler)))
+    (getIncludeInferred [this]
+      (.getIncludeInferred tuple-query))
+    (setIncludeInferred [this include-inferred?]
+      (.setIncludeInferred tuple-query include-inferred?))
     (getMaxExecutionTime [this]
       (.getMaxExecutionTime tuple-query))
     (setMaxExecutionTime [this max]

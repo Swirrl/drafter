@@ -98,6 +98,10 @@
     (reify GraphQuery
       (evaluate [this handler]
         (.evaluate inner-query (rewriting-rdf-handler handler draft->live)))
+      (getIncludeInferred [this]
+        (.getIncludeInferred inner-query))
+      (setIncludeInferred [this include-inferred?]
+        (.setIncludeInferred inner-query include-inferred?))
       (getMaxExecutionTime [this]
         (.getMaxExecutionTime inner-query))
       (setMaxExecutionTime [this max]
@@ -110,6 +114,10 @@
         (.getBindings inner-query))
       (evaluate [this handler]
         (.evaluate inner-query (make-select-result-rewriter draft->live handler)))
+      (getIncludeInferred [this]
+        (.getIncludeInferred inner-query))
+      (setIncludeInferred [this include-inferred?]
+        (.setIncludeInferred inner-query include-inferred?))
       (getMaxExecutionTime [this]
         (.getMaxExecutionTime inner-query))
       (setMaxExecutionTime [this max]
