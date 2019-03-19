@@ -77,3 +77,112 @@ Accept-Language: en-US,en;q=0.5
 Content-Type: application/sparql-query
 
 SELECT ?s ?p ?o WHERE { ?s ?p ?o }
+
+
+# GET stardog request
+GET http://localhost:5820/drafter-test-db/query?query=SELECT * WHERE { ?s ?p ?o }
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+Accept: application/sparql-results+json
+Accept-Language: en-US,en;q=0.5
+# -*- restclient -*-
+
+#
+POST http://localhost:5820/drafter-test-db/query?reasoning=true
+Host: localhost:5820
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+Accept: text/csv
+Accept-Language: en-US,en;q=0.5
+Content-Type: application/sparql-query
+
+PREFIX : <http://test.com/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT ?t ?name
+{
+    ?t a :Dog .
+    ?t a ?type .
+    ?type rdfs:label ?name
+}
+
+#
+POST http://localhost:5820/drafter-test-db/query?reasoning=true
+Host: localhost:5820
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+Accept: text/csv
+Accept-Language: en-US,en;q=0.5
+Content-Type: application/sparql-query
+
+PREFIX : <http://test.com/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?t WHERE {
+  ?t a :Mammal .
+  ?t a ?type
+  FILTER NOT EXISTS {
+    ?type rdfs:label ?name
+  }
+}
+
+# Query to drafter
+POST http://localhost:3001/v1/sparql/live?reasoning=true
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+Accept: text/csv
+Accept-Language: en-US,en;q=0.5
+Content-Type: application/sparql-query
+
+PREFIX : <http://test.com/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT ?t ?name
+{
+    ?t a :Dog .
+    ?t a ?type .
+    ?type rdfs:label ?name
+}
+
+# Query to drafter
+POST http://localhost:3001/v1/sparql/live?reasoning=true
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+Accept: text/csv
+Accept-Language: en-US,en;q=0.5
+Content-Type: application/sparql-query
+
+PREFIX : <http://test.com/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?t WHERE {
+  ?t a :Mammal .
+  ?t a ?type
+  FILTER NOT EXISTS {
+    ?type rdfs:label ?name
+  }
+}
+
+# Query to drafter with infer=true
+POST http://localhost:3001/v1/sparql/live?infer=true
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+Accept: text/csv
+Accept-Language: en-US,en;q=0.5
+Content-Type: application/sparql-query
+
+PREFIX : <http://test.com/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?t WHERE {
+  ?t a :Mammal .
+  ?t a ?type
+  FILTER NOT EXISTS {
+    ?type rdfs:label ?name
+  }
+}
