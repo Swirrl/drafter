@@ -13,7 +13,8 @@
             [me.raynes.fs :as fs]
             [drafter.backend.common :as drpr]
             [grafter-2.rdf4j.repository.registry :as reg]
-            [grafter-2.rdf4j.io :as rio])
+            [grafter-2.rdf4j.io :as rio]
+            [drafter.stasher.formats :as formats])
   (:import java.net.URI
            (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
            java.nio.charset.Charset
@@ -27,17 +28,10 @@
            org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.repository.RepositoryConnection
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate)
-           (org.eclipse.rdf4j.rio RDFFormat RDFHandler RDFWriter RDFParserRegistry)
+           (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry)
+           (org.eclipse.rdf4j.query.resultio TupleQueryResultParser BooleanQueryResultParser)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
-           [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
-           [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
-           [org.eclipse.rdf4j.query.resultio.binary BinaryQueryResultParserFactory]
-           org.eclipse.rdf4j.query.resultio.text.BooleanTextParserFactory
-           org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
-           org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory
-           org.eclipse.rdf4j.rio.turtle.TurtleParserFactory
-           org.eclipse.rdf4j.rio.trig.TriGParserFactory
-           org.eclipse.rdf4j.rio.binary.BinaryRDFParserFactory))
+           java.time.OffsetDateTime))
 
 (extend-type Repository
   drpr/SparqlExecutor
@@ -77,61 +71,9 @@
 (defmethod ig/halt-key! ::cache-thread-pool [k thread-pool]
   (.shutdown thread-pool))
 
-(def rdf-formats [RDFFormat/BINARY
-                  RDFFormat/NTRIPLES
-                  RDFFormat/RDFXML
-                  RDFFormat/RDFJSON
-                  RDFFormat/TURTLE])
-
-(def tuple-formats [TupleQueryResultFormat/BINARY
-                    TupleQueryResultFormat/SPARQL
-                    TupleQueryResultFormat/JSON])
-
-(def boolean-formats [BooleanQueryResultFormat/TEXT
-                      BooleanQueryResultFormat/JSON
-                      BooleanQueryResultFormat/SPARQL])
-
-;; TODO:
-;;
-;; We should turn these whitelist sets into proper configuration.
-;;
-;; Set some whitelists that ensure we're much more strict around what
-;; formats we negotiate with stardog.  If you want to run drafter
-;; against another (non stardog) store we should configure these to be
-;; different.
-;;
-;; For construct we avoid Turtle because of Stardog bug #3087
-;; (https://complexible.zendesk.com/hc/en-us/requests/524)
-;;
-;; Also we avoid RDF+XML because RDF+XML can't even represent some RDF graphs:
-;; https://www.w3.org/TR/REC-rdf-syntax/#section-Serialising which
-;; causes us some issues when URI's for predicates contain parentheses.
-;;
-;; Ideally we'd just run with sesame's defaults, but providing a
-;; smaller list should mean less bugs in production as we can choose
-;; the most reliable formats and avoid those with known issues.
-;;
-(def construct-formats-whitelist #{TurtleParserFactory NTriplesParserFactory NQuadsParserFactory TriGParserFactory BinaryRDFParserFactory})
-(def select-formats-whitelist #{SPARQLResultsXMLParserFactory SPARQLResultsJSONParserFactory BinaryQueryResultParserFactory})
-(def ask-formats-whitelist #{SPARQLBooleanJSONParserFactory BooleanTextParserFactory SPARQLBooleanXMLParserFactory})
 
 
 
-(defn- build-format-keyword->format-map [formats]
-  "Builds a hashmap from format keywords to RDFFormat's.
-
-  e.g. nt => RDFFormat/NTRIPLES etc..."
-  (reduce (fn [acc fmt]
-            (merge acc
-                   (zipmap (map keyword (.getFileExtensions fmt))
-                           (repeat fmt))))
-          {}
-          formats))
-
-(def supported-cache-formats
-  {:graph (build-format-keyword->format-map rdf-formats)
-   :tuple (build-format-keyword->format-map tuple-formats)
-   :boolean (build-format-keyword->format-map boolean-formats)})
 
 
 
@@ -192,14 +134,18 @@
      :modified-time state-graph-modified-time}))
 
 (defn generate-drafter-cache-key [state-graph-modified-time query-type _cache query-str ?dataset conn]
-  {:pre [(or (instance? Dataset ?dataset)
-             (nil? ?dataset))
-         (instance? RepositoryConnection conn)]
-   :post [(or (s/valid? ::ck/cache-key %)
-              (s/valid? ::ck/state-graph-cache-key %))]}
   (or (and (use-state-graph-key? ?dataset)
            (generate-state-graph-cache-key query-type query-str ?dataset state-graph-modified-time))
       (generate-cache-key query-type query-str ?dataset conn)))
+
+(s/fdef generate-drafter-cache-key
+  :args (s/cat :modtime :drafter.stasher.cache-key/datetime-with-tz
+               :query-type :drafter.stasher.cache-key/query-type
+               :cache any?
+               :query-str string?
+               :dataset (s/nilable #(instance? Dataset %))
+               :conn #(instance? RepositoryConnection %))
+  :ret :drafter.stasher.cache-key/either-cache-key)
 
 (defn get-charset [format]
   {:pre [(instance? org.eclipse.rdf4j.common.lang.FileFormat format)]}
@@ -210,9 +156,9 @@
   "Given a query type and format, find an RDF4j file format parser for that
   format."
   [query-type fmt-kw]
-  {:pre [(some #{query-type} (keys supported-cache-formats))
+  {:pre [(some #{query-type} (keys formats/supported-cache-formats))
          (keyword? fmt-kw)]}
-  (let [fmt (get-in supported-cache-formats [query-type fmt-kw])
+  (let [fmt (get-in formats/supported-cache-formats [query-type fmt-kw])
         parser (when-let [parser-factory (.orElse (condp instance? fmt
                                                     RDFFormat (.get (RDFParserRegistry/getInstance) fmt)
                                                     BooleanQueryResultFormat (.get (BooleanQueryResultParserRegistry/getInstance) fmt)
@@ -222,6 +168,14 @@
                  (.getParser parser-factory))]
     (assert parser (str "Error could not find a parser for format:" fmt))
     parser))
+
+(s/fdef get-parser
+  :args (s/cat :query-type :drafter.stasher.formats/query-type-keyword
+               :format :drafter.stasher.formats/cache-format-keyword)
+
+  :ret (s/or :rdf-parser #(instance? RDFParser %)
+             :tuple-parser #(instance? TupleQueryResultParser %)
+             :boolean-parser #(instance? BooleanQueryResultParser %)))
 
 (defn- wrap-graph-result [bg-graph-result format stream]
   (let [prefixes (.getNamespaces bg-graph-result) ;; take prefixes from supplied result
@@ -266,7 +220,7 @@
 
 (defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt stream]
   (let [bindings (.getBindingNames bg-tuple-result)
-        tuple-format (get-in supported-cache-formats [:tuple fmt])
+        tuple-format (get-in formats/supported-cache-formats [:tuple fmt])
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
     (.startQueryResult cache-file-writer bindings)
     ;; pull interface
@@ -303,7 +257,7 @@
 
 (defn- wrap-tuple-result-push
   [^TupleQueryResultHandler result-handler fmt stream]
-  (let [tuple-format (get-in supported-cache-formats [:tuple fmt])
+  (let [tuple-format (get-in formats/supported-cache-formats [:tuple fmt])
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
     (reify
       ;; Push interface...
@@ -331,7 +285,7 @@
   ;; return the actual result this will get returned to the
   ;; outer-most call to query.  NOTE that boolean's are different to
   ;; other query types as they don't have a background-evaluator.
-  (let [format (get-in supported-cache-formats [:boolean fmt-kw])]
+  (let [format (get-in formats/supported-cache-formats [:boolean fmt-kw])]
     (with-open [stream stream]
       (let [bool-writer (QueryResultIO/createBooleanWriter format stream)]
         ;; Write the result to the file
@@ -369,7 +323,7 @@
   will already be on results where the dataset restriction was set."
   [thread-pool base-uri-str stream fmt-kw]
   (let [start-time (System/currentTimeMillis)
-        fmt (get-in supported-cache-formats [:graph fmt-kw])
+        fmt (get-in formats/supported-cache-formats [:graph fmt-kw])
         charset (get-charset fmt)
         bg-graph-result (BackgroundGraphResult. (get-parser :graph fmt-kw)
                                                 stream
@@ -412,7 +366,7 @@
    the cache
 
   For RDF push query results."
-  (let [rdf-format  (get-in supported-cache-formats [:graph fmt])
+  (let [rdf-format  (get-in formats/supported-cache-formats [:graph fmt])
         ;; explicitly set prefixes to nil as gio/rdf-writer will write
         ;; the grafter default-prefixes otherwise.  By setting to nil,
         ;; use what comes from the stream instead.
@@ -614,7 +568,7 @@
                               (.getBindingsArray this))))))))
 
 (defn- get-state-graph-modified-time []
-  (let [state-graph-modified-time (java.util.Date.)]
+  (let [state-graph-modified-time (OffsetDateTime/now)]
     (log/infof "Using new state graph modified time of: %s" state-graph-modified-time)
     state-graph-modified-time))
 
@@ -652,9 +606,9 @@
   ;; This call here obliterates the sesame defaults for registered
   ;; parsers.  Forcing content negotiation to work only with the
   ;; parsers we explicitly whitelist above.
-  (reg/register-parser-factories! {:select select-formats-whitelist
-                                   :construct construct-formats-whitelist
-                                   :ask ask-formats-whitelist})
+  (reg/register-parser-factories! {:select formats/select-formats-whitelist
+                                   :construct formats/construct-formats-whitelist
+                                   :ask formats/ask-formats-whitelist})
   (let [query-endpoint (str sparql-query-endpoint)
         update-endpoint (str sparql-update-endpoint)
         deltas (boolean (or report-deltas true))

@@ -4,7 +4,8 @@
             [me.raynes.fs :as fs]
             [clojure.test :as t])
   (:import org.apache.commons.codec.binary.Hex
-           java.security.MessageDigest))
+           java.security.MessageDigest
+           java.time.OffsetDateTime))
 
 (t/deftest build-cache-entry-meta-data
   (t/testing "Cache of a draft"
@@ -82,7 +83,7 @@
 
 
 (t/deftest expired-files
-  "An expired file is one that has a timestamp older than the latest version in 
+  "An expired file is one that has a timestamp older than the latest version in
    the cache."
   (t/testing "All files with the same hash"
     (t/testing "Single live entry for hash is not expired"
@@ -173,7 +174,7 @@
 
 
 (t/deftest finding-old-files-to-delete
-  "The find-old-files function accepts a list of files and an amount in bytes 
+  "The find-old-files function accepts a list of files and an amount in bytes
    and will remove a minimum of this many bytes from the list"
   (t/testing "Basic functionality"
     (let [files [{:size-bytes (gb->bytes 1)}]]
@@ -185,15 +186,15 @@
             "Nothing is found for removal when bytes to remove is zero")))
   (t/testing "Prefer older files to newer files"
     (let [old-file {:size-bytes (gb->bytes 1)
-                    :last-access (inst-ms #inst "1970")}
+                    :last-access (inst-ms (OffsetDateTime/parse "1970-01-01T00:00:00Z"))}
           new-file {:size-bytes (gb->bytes 1)
-                    :last-access (inst-ms #inst "2070")}]
+                    :last-access (inst-ms (OffsetDateTime/parse "2070-01-01T00:00:00Z"))}]
       (t/is (= [old-file]
                (sut/find-old-files [old-file new-file]
                                    (gb->bytes 1)))
             "The older file is chosen for removal")
       (let [new-small-file {:size-bytes (gb->bytes 0.1)
-                            :last-access (inst-ms #inst "2070")}]
+                            :last-access (inst-ms (OffsetDateTime/parse "2070-01-01T00:00:00Z"))}]
         (t/is (= [old-file]
                  (sut/find-old-files [old-file new-file new-small-file]
                                      (gb->bytes 0.1)))
@@ -206,11 +207,11 @@
           delete-until (gb->bytes 7)
           current-file {:size-bytes (gb->bytes 6)
                         :livemod 10
-                        :last-access (inst-ms #inst "2018-02")
+                        :last-access (inst-ms (OffsetDateTime/parse "2018-02-01T00:00:00Z"))
                         :hash "first-file"}
           expired-file {:size-bytes (gb->bytes 6)
                         :livemod 1
-                        :last-access (inst-ms #inst "2018-01")
+                        :last-access (inst-ms (OffsetDateTime/parse "2018-01-01T00:00:00Z"))
                         :hash "first-file"}]
       (t/is (= {:expired-files [expired-file]}
                (sut/find-files-to-remove* [current-file expired-file]
@@ -221,17 +222,14 @@
           delete-until (gb->bytes 1)
           current-file {:size-bytes (gb->bytes 6)
                         :livemod 10
-                        :last-access (inst-ms #inst "2018-02")
+                        :last-access (inst-ms (OffsetDateTime/parse "2018-02-01T00:00:00Z"))
                         :hash "first-file"}
           expired-file {:size-bytes (gb->bytes 6)
                         :livemod 1
-                        :last-access (inst-ms #inst "2018-01")
+                        :last-access (inst-ms (OffsetDateTime/parse "2018-01-01T00:00:00Z"))
                         :hash "first-file"}]
       (t/is (= {:expired-files [expired-file]
                 :old-files [current-file]}
                (sut/find-files-to-remove* [current-file expired-file]
                                           delete-at
                                           delete-until))))))
-
-
-

@@ -12,7 +12,8 @@
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.core :as s]
-            [swirrl-server.errors :refer [ex-swirrl]])
+            [swirrl-server.errors :refer [ex-swirrl]]
+            [grafter-2.rdf4j.io :as rio])
   (:import java.net.URI
            [java.util Date UUID Calendar]
            [javax.xml.bind DatatypeConverter]))
@@ -137,12 +138,8 @@
 
 (defn xsd-datetime
   "Coerce a date into the xsd-datetime string"
-  [datetime]
-  (let [date-as-calendar (doto (Calendar/getInstance)
-                           (.setTime datetime))
-        instant (DatatypeConverter/printDateTime date-as-calendar)]
-
-    (str "\"" instant "\"^^xsd:dateTime")))
+  [offset-datetime]
+  (str (rio/->backend-type offset-datetime)))
 
 (defn set-timestamp
   "Returns an update string to update the given subject/resource with

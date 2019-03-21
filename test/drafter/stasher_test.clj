@@ -7,6 +7,7 @@
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
+            [drafter.stasher.formats :as formats]
             [grafter.url :as url]
             [integrant.core :as ig]
             [me.raynes.fs :as fs])
@@ -19,7 +20,8 @@
            org.eclipse.rdf4j.query.resultio.QueryResultIO
            org.eclipse.rdf4j.rio.RDFHandler
            (org.eclipse.rdf4j.query TupleQueryResult TupleQueryResultHandler)
-           org.eclipse.rdf4j.query.resultio.TupleQueryResultWriter))
+           org.eclipse.rdf4j.query.resultio.TupleQueryResultWriter
+           java.time.OffsetDateTime))
 
 (def test-triples [(pr/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
 
@@ -89,15 +91,15 @@
       (when (fs/exists? cached-file)
         (let [cached-file-statements (let [stream (io/input-stream cached-file)]
                                        (condp = query-type
-                                         :tuple (let [tq-res (QueryResultIO/parseTupleBackground stream (get-in sut/supported-cache-formats [:tuple fmt]))]
+                                         :tuple (let [tq-res (QueryResultIO/parseTupleBackground stream (get-in formats/supported-cache-formats [:tuple fmt]))]
                                                   (iterator-seq (reify java.util.Iterator
                                                                   (next [this]
                                                                     (let [binding-set (.next tq-res)]
                                                                       (binding-set->grafter-type binding-set)))
                                                                   (hasNext [this]
                                                                     (.hasNext tq-res)))))
-                                         :graph (rio/statements stream :format (get-in sut/supported-cache-formats [:graph fmt]))
-                                         :boolean (let [bqrp (QueryResultIO/createBooleanParser (get-in sut/supported-cache-formats [:boolean fmt]))]
+                                         :graph (rio/statements stream :format (get-in formats/supported-cache-formats [:graph fmt]))
+                                         :boolean (let [bqrp (QueryResultIO/createBooleanParser (get-in formats/supported-cache-formats [:boolean fmt]))]
                                                     (.parse bqrp stream))))]
           (t/is (= (set (box-result cached-file-statements))
                    (set (box-result expected-data)))))))))
@@ -246,7 +248,7 @@
                    cached-file (fc/cache-key->cache-path dir fmt cache-key)
                    cached-file-statements (-> cached-file
                                               io/input-stream
-                                              (rio/statements :format (get-in sut/supported-cache-formats [:graph fmt])))]
+                                              (rio/statements :format (get-in formats/supported-cache-formats [:graph fmt])))]
                (assert-cached-results cache raw-repo basic-construct-query nil cached-file-statements)))
 
       (t/testing "SELECT (TupleResultHandler)"
@@ -295,14 +297,14 @@
 (def live-graph-1 (URIImpl. "http://live-and-ds1-and-ds2"))
 (def live-graph-only (URIImpl. "http://live-only"))
 
-(def liveset-most-recently-modified {:livemod #inst "2017-02-02T02:02:02.000-00:00"})
+(def liveset-most-recently-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")})
 
 (def ds-1-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
 (def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
 (def ds-1 "draftset-1 is made of dg-1 dg-2" #{ds-1-dg-1 ds-1-dg-2})
 
 (def ds-1-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
-  {:draftmod #inst "2017-04-04T04:04:04.000-00:00"})
+  {:draftmod (OffsetDateTime/parse "2017-04-04T04:04:04.000-00:00")})
 
 
 (def ds-2-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
@@ -310,7 +312,7 @@
 (def ds-2 #{ds-2-dg-1})
 
 (def ds-2-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
-  {:draftmod #inst "2017-05-05T05:05:05.000-00:00"})
+  {:draftmod (OffsetDateTime/parse "2017-05-05T05:05:05.000-00:00")})
 
 
 (defn edn->dataset [{:keys [default-graphs named-graphs]}]
@@ -325,6 +327,20 @@
           (SimpleDataset.)
           (concat default-graphs named-graphs)))
 
+
+(comment
+
+
+  ;;; TODO TODO TODO TODO
+
+
+  (def repo (grafter-2.rdf4j.repository/resource-repo "drafter/stasher-test/drafter-state-1.trig" ))
+  ;(def repo (grafter-2.rdf4j.repository/sparql-repo "http://localhost:5820/drafter-test-db/query"))
+
+  (sut/fetch-modified-state (grafter-2.rdf4j.repository/->connection repo)
+                            {:named-graphs ds-1 :default-graphs ds-1})
+
+  )
 
 (deftest-system fetch-modified-state-test
   [{repo :drafter.stasher/repo} "drafter/stasher-test/drafter-state-1.edn"]
@@ -389,7 +405,7 @@
       (t/is (= basic-construct-query
                query-str))
       (t/is (= modified-times
-               {:livemod #inst "2017-02-02T02:02:02.000-00:00"})))))
+               {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")})))))
 
 
 (comment

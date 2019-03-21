@@ -5,14 +5,15 @@
             [buddy.core.codecs.base64 :as base64]
             [buddy.core.codecs :as codecs])
   (:import java.nio.charset.Charset
-           [java.util Date UUID]
+           [java.util UUID]
+           [java.time OffsetDateTime]
            [javax.mail.internet AddressException InternetAddress]
            org.eclipse.rdf4j.model.impl.URIImpl))
 
 (defn get-current-time
   "Function that get's the current time."
   []
-  (Date.))
+  (OffsetDateTime/now))
 
 (defn create-uuid
   "Function that creates a UUID"

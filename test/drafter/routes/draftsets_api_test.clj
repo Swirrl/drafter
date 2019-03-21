@@ -24,7 +24,7 @@
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            java.net.URI
-           java.util.Date
+           java.time.OffsetDateTime
            org.eclipse.rdf4j.query.QueryResultHandler
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
 
@@ -96,8 +96,8 @@
 (def ^:private DraftsetWithoutTitleOrDescription
   {:id s/Str
    :changes {URI {:status (s/enum :created :updated :deleted)}}
-   :created-at Date
-   :updated-at Date
+   :created-at OffsetDateTime
+   :updated-at OffsetDateTime
    :created-by s/Str
    (s/optional-key :current-owner) s/Str
    (s/optional-key :claim-role) s/Keyword
@@ -412,23 +412,23 @@
       (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
 
       (let [first-timestamp (get-draft-graph-modified-at)]
-        (is (instance? Date first-timestamp))
+        (is (instance? OffsetDateTime first-timestamp))
 
         (testing "Publishing more triples afterwards updates the modified time"
 
           (append-triples-to-draftset-through-api test-editor draftset-location quads "http://foo/")
           (let [second-timestamp (get-draft-graph-modified-at)]
-            (is (instance? Date second-timestamp))
+            (is (instance? OffsetDateTime second-timestamp))
 
-            (is (< (.getTime first-timestamp)
-                   (.getTime second-timestamp))
+            (is (.isBefore first-timestamp
+                           second-timestamp)
                 "Modified time is updated after append")
 
             (delete-triples-through-api test-editor draftset-location quads "http://foo/")
             (let [third-timestamp (get-draft-graph-modified-at)]
 
-              (is (< (.getTime second-timestamp)
-                     (.getTime third-timestamp))
+              (is (.isBefore second-timestamp
+                             third-timestamp)
                   "Modified time is updated after delete"))))))))
 
 (deftest append-triples-to-graph-which-exists-in-live
@@ -1057,7 +1057,8 @@
     (tc/assert-is-ok-response submit-response)
     (tc/assert-schema Draftset ds-info)
 
-    (is (= false (contains? ds-info :current-owner)))))
+    (is (= false (contains? ds-info :current-owner))))
+  )
 
 (deftest submit-non-existent-draftset-to-role
   (let [submit-response (route (create-submit-to-role-request test-editor "/v1/draftset/missing" :publisher))]

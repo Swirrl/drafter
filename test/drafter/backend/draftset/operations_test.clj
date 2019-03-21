@@ -187,8 +187,8 @@
           (sut/delete-draftset-graph! *test-backend* draftset-id live-graph modified-time-fn)
 
           (let [subsequently-modified-at (fetch-modified (repo/->connection *test-backend*) draft-graph)]
-            (is (< (.getTime initially-modified-at)
-                   (.getTime subsequently-modified-at))
+            (is (.isBefore initially-modified-at
+                           subsequently-modified-at)
                 "Modified time is updated"))
 
           (is (mgmth/draft-exists? *test-backend* draft-graph))

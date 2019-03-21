@@ -7,18 +7,19 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]])
   (:import java.net.URI
-           org.eclipse.rdf4j.rio.RDFFormat))
+           org.eclipse.rdf4j.rio.RDFFormat
+           java.time.OffsetDateTime))
 
 (tc/deftest-system delete-draftset-data-test
   [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]
-  (let [initial-time (constantly #inst "2017")
-        update-time (constantly #inst "2018")
-        delete-time (constantly #inst "2019")
+  (let [initial-time (constantly (OffsetDateTime/parse "2017-01-01T01:01:01Z"))
+        update-time (constantly (OffsetDateTime/parse "2018-01-01T01:01:01Z"))
+        delete-time (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
         ds (dsops/create-draftset! backend test-editor)]
-    
+
 
     (th/apply-job! (sut/delete-triples-from-draftset-job backend ds (URI. "http://foo/graph") (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES delete-time))
     (let [ts-3 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-      (t/is (= (.getTime (delete-time))
-               (.getTime ts-3))
+      (t/is (.isEqual (delete-time)
+                       ts-3)
             "Modified time is updated after delete"))))
