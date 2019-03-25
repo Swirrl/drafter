@@ -1,13 +1,12 @@
 (ns drafter.stasher.filecache
   (:require [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as g]
             [clojure.tools.logging :as log]
-            [integrant.core :as ig]
-            [me.raynes.fs :as fs]
             [drafter.stasher.cache-key :as ck]
-            [cognician.dogstatsd :as dd]
-            [drafter.stasher.formats :as formats])
-  (:import (java.io File FileOutputStream BufferedOutputStream)
+            [integrant.core :as ig]
+            [me.raynes.fs :as fs])
+  (:import [java.io BufferedOutputStream File FileOutputStream]
            java.security.MessageDigest
            org.apache.commons.codec.binary.Hex))
 
@@ -50,9 +49,15 @@
     (apply io/file (concat [dir "cache"]
                            (conj dirs filename)))))
 
+(s/def ::directory (s/with-gen (s/or :string string?
+                                     :file #(instance? java.io.File %))
+                     #(g/fmap
+                       (fn [s]
+                         (java.io.File. (str "/tmp/" s "/")))
+                       (g/string-alphanumeric))))
+
 (s/fdef cache-key->cache-path
-  :args (s/cat :dir (s/or :string string?
-                          :file #(instance? java.io.File %))
+  :args (s/cat :dir ::directory
                :fmt :drafter.stasher.formats/cache-format-keyword
                :cache-key :drafter.stasher.cache-key/either-cache-key)
   :ret #(instance? java.io.File %))

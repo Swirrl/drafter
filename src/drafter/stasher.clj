@@ -14,7 +14,8 @@
             [drafter.backend.common :as drpr]
             [grafter-2.rdf4j.repository.registry :as reg]
             [grafter-2.rdf4j.io :as rio]
-            [drafter.stasher.formats :as formats])
+            [drafter.stasher.formats :as formats]
+            [clojure.spec.gen.alpha :as g])
   (:import java.net.URI
            (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
            java.nio.charset.Charset
@@ -140,13 +141,21 @@
            (generate-state-graph-cache-key query-type query-str ?dataset state-graph-modified-time))
       (generate-cache-key query-type query-str ?dataset conn)))
 
+(s/def ::dataset (s/with-gen (s/nilable #(instance? Dataset %))
+                   #(g/frequency [[1 (g/return nil)]
+                                  [1 (g/return (org.eclipse.rdf4j.query.impl.DatasetImpl.))]])))
+
+(s/def ::connection (s/with-gen #(instance? RepositoryConnection %)
+                      #(g/return
+                        (repo/->connection (repo/sparql-repo "http://localhost:1234/dummy-connection/query")))))
+
 (s/fdef generate-drafter-cache-key
   :args (s/cat :modtime :drafter.stasher.cache-key/datetime-with-tz
                :query-type :drafter.stasher.cache-key/query-type
                :cache any?
                :query-str string?
-               :dataset (s/nilable #(instance? Dataset %))
-               :conn #(instance? RepositoryConnection %))
+               :dataset ::dataset
+               :conn ::connection)
   :ret :drafter.stasher.cache-key/either-cache-key)
 
 (defn get-charset [format]
@@ -158,8 +167,6 @@
   "Given a query type and format, find an RDF4j file format parser for that
   format."
   [query-type fmt-kw]
-  {:pre [(some #{query-type} (keys formats/supported-cache-formats))
-         (keyword? fmt-kw)]}
   (let [fmt (get-in formats/supported-cache-formats [query-type fmt-kw])
         parser (when-let [parser-factory (.orElse (condp instance? fmt
                                                     RDFFormat (.get (RDFParserRegistry/getInstance) fmt)
@@ -172,8 +179,13 @@
     parser))
 
 (s/fdef get-parser
-  :args (s/cat :query-type :drafter.stasher.formats/query-type-keyword
-               :format :drafter.stasher.formats/cache-format-keyword)
+  :args (s/with-gen
+          (s/cat :query-type :drafter.stasher.formats/query-type-keyword
+                 :format :drafter.stasher.formats/cache-format-keyword)
+          #(g/fmap
+            (fn [qt]
+              [qt (rand-nth (keys (formats/supported-cache-formats qt)))])
+            (s/gen #{:graph :tuple :boolean})))
 
   :ret (s/or :rdf-parser #(instance? RDFParser %)
              :tuple-parser #(instance? TupleQueryResultParser %)
