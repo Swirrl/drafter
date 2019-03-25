@@ -2,9 +2,10 @@
   (:require [cheshire.core :refer [generate-string parse-string]]
             [clojure.test :refer :all]
             [drafter.common.json-encoders :refer :all]
-            [schema.test :refer [validate-schemas]]))
+            [schema.test :refer [validate-schemas]]
+            [drafter.test-common :as tc]))
 
-(use-fixtures :each validate-schemas)
+(use-fixtures :each validate-schemas tc/with-spec-instrumentation)
 
 (register-custom-encoders!)
 

@@ -28,11 +28,14 @@
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf.protocols :refer [->Quad ->Triple context context]]
             [grafter.url :as url]
-            [grafter.vocabularies.rdf :refer :all])
+            [grafter.vocabularies.rdf :refer :all]
+            [drafter.test-common :as tc])
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
 
-(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler]))
+(use-fixtures :each
+  (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler])
+  tc/with-spec-instrumentation)
 ;(use-fixtures :each wrap-clean-test-db)
 
 

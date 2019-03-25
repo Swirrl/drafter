@@ -1,11 +1,14 @@
 (ns drafter.stasher.cache-clearer-test
-  (:require [drafter.stasher.cache-clearer :as sut]
-            [clojure.java.io :as io]
-            [me.raynes.fs :as fs]
-            [clojure.test :as t])
-  (:import org.apache.commons.codec.binary.Hex
-           java.security.MessageDigest
-           java.time.OffsetDateTime))
+  (:require [clojure.java.io :as io]
+            [clojure.test :as t]
+            [drafter.stasher.cache-clearer :as sut]
+            [drafter.test-common :as tc]
+            [me.raynes.fs :as fs])
+  (:import java.security.MessageDigest
+           java.time.OffsetDateTime
+           org.apache.commons.codec.binary.Hex))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (t/deftest build-cache-entry-meta-data
   (t/testing "Cache of a draft"

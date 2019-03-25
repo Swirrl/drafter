@@ -23,6 +23,8 @@
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]]))
 
+(t/use-fixtures :each tc/with-spec-instrumentation)
+
 (def see-other-response-schema
   (merge tc/ring-response-schema
          {:status (s/eq 303)

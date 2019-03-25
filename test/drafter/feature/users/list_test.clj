@@ -1,9 +1,11 @@
 (ns drafter.feature.users.list-test
-  (:require [drafter.feature.users.list :as sut]
-            [clojure.test :as t]
+  (:require [clojure.test :as t]
+            [drafter.feature.users.list :as sut]
             [drafter.test-common :as tc]
             [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]))
+            [drafter.user-test :refer [test-editor]]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (defn- get-users-request
   "Issue a request as the given user."

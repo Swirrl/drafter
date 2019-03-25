@@ -24,7 +24,8 @@
             [schema.core :as s]
             [schema.test :refer [validate-schemas]]
             [swirrl-server.async.jobs :refer [create-job]]
-            [clojure.pprint :as pp])
+            [clojure.pprint :as pp]
+            [clojure.spec.test.alpha :as st])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -39,6 +40,13 @@
            org.apache.http.ProtocolVersion
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
            org.eclipse.rdf4j.rio.trig.TriGParserFactory))
+
+(defn with-spec-instrumentation [f]
+  (try
+    (st/instrument)
+    (f)
+    (finally
+      (st/unstrument))))
 
 ;;(use-fixtures :each validate-schemas) ;; TODO should remove this...
 

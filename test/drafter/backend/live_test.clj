@@ -8,6 +8,8 @@
             [grafter-2.rdf4j.repository :as repo])
   (:import java.net.URI))
 
+(t/use-fixtures :each tc/with-spec-instrumentation)
+
 (def live-graph-1 (URI. "http://live-and-ds1-and-ds2"))
 (def live-graph-only (URI. "http://live-only"))
 

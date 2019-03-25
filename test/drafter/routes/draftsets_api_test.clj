@@ -41,7 +41,8 @@
       (test-function))))
 
 (use-fixtures :each (join-fixtures [(tc/wrap-system-setup "test-system.edn" [:drafter.user/repo :drafter.routes/draftsets-api :drafter.backend/rdf4j-repo :drafter/write-scheduler])
-                                    setup-route]))
+                                    setup-route])
+  tc/with-spec-instrumentation)
 
 
 (defn is-client-error-response?

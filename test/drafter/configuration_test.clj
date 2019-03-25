@@ -1,10 +1,11 @@
 (ns drafter.configuration-test
-  (:require [drafter.configuration :refer :all]
+  (:require [aero.core :as aero]
             [clojure.test :refer :all]
-            [schema.test :refer [validate-schemas]]
-            [aero.core :as aero]))
+            [drafter.test-common :as tc]
+            [schema.test :refer [validate-schemas]]))
 
-(use-fixtures :each validate-schemas)
+(use-fixtures :each validate-schemas
+  tc/with-spec-instrumentation)
 
 (defn- read-port [s]
   (aero/reader {} 'port s))

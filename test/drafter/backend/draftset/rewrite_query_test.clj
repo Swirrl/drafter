@@ -3,9 +3,12 @@
             [clojure.test :refer :all]
             [drafter.backend.draftset.arq :refer :all]
             [drafter.backend.draftset.rewrite-query :refer :all]
-            [schema.test :refer [validate-schemas]]))
+            [schema.test :refer [validate-schemas]]
+            [drafter.test-common :as tc]))
 
-(use-fixtures :each validate-schemas)
+(use-fixtures :each
+  validate-schemas
+  tc/with-spec-instrumentation)
 
 (defn rewrite [rewriter q]
   (-> q

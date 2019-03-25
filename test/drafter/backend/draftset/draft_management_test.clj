@@ -23,12 +23,13 @@
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
-            [drafter.util :as util])
+            [drafter.util :as util]
+            [drafter.test-common :as tc])
   (:import java.net.URI
            [java.util UUID]
            [java.time OffsetDateTime]))
 
-(use-fixtures :each validate-schemas)
+(use-fixtures :each validate-schemas tc/with-spec-instrumentation)
 
 (defn clone-data-from-live-to-draft-query [draft-graph-uri]
   (str

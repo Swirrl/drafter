@@ -3,7 +3,10 @@
   (:require [clojure.java.io :as io]
             [clojure.test :as t]
             [clojure.string :as str]
-            [drafter.backend.draftset.arq :as sut]))
+            [drafter.backend.draftset.arq :as sut]
+            [drafter.test-common :as tc]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (defn load-query [res-path]
   (slurp (io/resource res-path)))
@@ -46,5 +49,3 @@
   (let [normalised-query (normalise-whitespace (load-query "test-queries/empty-values.sparql"))]
     (t/is (= normalised-query (normalise-whitespace (round-trip-query-string normalised-query)))
           "Empty Values blocks are preserved")))
-
-

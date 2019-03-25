@@ -5,9 +5,11 @@
              [write-scheduler :refer :all]]
             [drafter.test-helpers.lock-manager :as lm]
             [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.jobs :refer [->Job create-job job-succeeded!]]))
+            [swirrl-server.async.jobs :refer [->Job create-job job-succeeded!]]
+            [drafter.test-common :as tc]))
 
-(use-fixtures :each validate-schemas)
+(use-fixtures :each validate-schemas
+  tc/with-spec-instrumentation)
 
 (defn t
   "Just a dummy function"
@@ -107,4 +109,3 @@
 ;; TODO add tests for batched-write copying etc...
 
 ;;(use-fixtures :once wrap-db-setup)
-

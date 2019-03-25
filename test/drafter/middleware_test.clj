@@ -2,19 +2,18 @@
   (:require [buddy.auth :as auth]
             [clojure.java.io :as io]
             [clojure.test :refer :all]
-            [drafter.backend.common :as bcom]
             [drafter.middleware :refer :all]
             [drafter.test-common :as tc]
             [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-publisher]]
             [drafter.user.memory-repository :as memory-repo]
             [drafter.util :as util]
             [grafter-2.rdf4j.formats :as formats]
-            [grafter-2.rdf4j.repository :as repo]
             [ring.util.response :refer [response]])
   (:import clojure.lang.ExceptionInfo
            [java.io ByteArrayInputStream File]
            org.eclipse.rdf4j.rio.RDFFormat))
+
+(use-fixtures :each tc/with-spec-instrumentation)
 
 (defn- add-auth-header [m username password]
   (let [credentials (util/str->base64 (str username ":" password))]

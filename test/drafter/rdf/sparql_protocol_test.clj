@@ -12,6 +12,8 @@
   (:import java.net.URI
            [java.util.concurrent CountDownLatch TimeUnit]))
 
+(use-fixtures :each tc/with-spec-instrumentation)
+
 (defn add-triple-to-db [db]
   (sparql/add db (URI. "http://foo.com/my-graph") (tc/test-triples (URI. "http://test.com/data/one"))))
 

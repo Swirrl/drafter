@@ -1,20 +1,13 @@
 (ns drafter.feature.draftset.list-test
-  (:require [drafter.feature.draftset.list :as sut]
-            [clojure.test :as t]
-            [grafter-2.rdf.protocols :refer [add context]]
-            [grafter-2.rdf4j.io :refer [statements]]
-            [drafter.test-common :as tc]
-            [drafter.util :as dutil]
-            [drafter.swagger :as swagger]
+  (:require [clojure.test :as t]
+            [drafter.feature.draftset.list :as sut]
             [drafter.routes.draftsets-api-test :as dset-test]
-            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
-            [grafter-2.rdf4j.io :as gio]
-            [drafter.user :as user]
-            [grafter-2.rdf4j.formats :as formats]
-            [swirrl-server.async.jobs :as asjobs])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
-           java.net.URI
-           java.util.Date))
+            [drafter.test-common :as tc]
+            [drafter.user-test :refer [test-editor test-manager test-publisher]]
+            [drafter.util :as dutil])
+  (:import java.net.URI))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (defn ok-response->typed-body [schema {:keys [body] :as response}]
   (tc/assert-is-ok-response response)

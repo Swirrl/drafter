@@ -1,6 +1,8 @@
 (ns drafter.feature.draftset.show-test
-  (:require [drafter.feature.draftset.show :as sut]
-            [clojure.test :as t]))
+  (:require [clojure.test :as t]
+            [drafter.test-common :as tc]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 ;; TODO move from draftset-api-test
 #_(t/deftest get-all-draftsets-changes-test

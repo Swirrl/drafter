@@ -4,12 +4,13 @@
             [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.draftset-data.append :as sut]
             [drafter.feature.draftset-data.test-helper :as th]
-            [drafter.rdf.sparql :as sparql]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]])
   (:import java.net.URI
-           org.eclipse.rdf4j.rio.RDFFormat
-           java.time.OffsetDateTime))
+           java.time.OffsetDateTime
+           org.eclipse.rdf4j.rio.RDFFormat))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (tc/deftest-system append-data-to-draftset-job-test
   [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]

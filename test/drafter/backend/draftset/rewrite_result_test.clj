@@ -13,11 +13,14 @@
             [drafter.util :refer [map-values]]
             [grafter-2.rdf4j.templater :refer [triplify]]
             [grafter-2.rdf4j.repository :as repo]
-            [schema.test :refer [validate-schemas]])
+            [schema.test :refer [validate-schemas]]
+            [drafter.test-common :as tc])
   (:import java.net.URI
            org.eclipse.rdf4j.model.impl.URIImpl))
 
-(use-fixtures :each validate-schemas)
+(use-fixtures :each
+  validate-schemas
+  tc/with-spec-instrumentation)
 
 (def uri-query
   "SELECT * WHERE {

@@ -1,12 +1,26 @@
 (ns drafter.user.mongo-test
   (:require [clojure.test :refer :all]
+            [drafter.test-common :as tc]
             [drafter.user :as user]
             [drafter.user.mongo :as um]
-            [drafter.user.repository :refer :all]
             [monger.core :as mg])
   (:import org.bson.types.ObjectId))
 
 (def ^:private ^:dynamic *user-repo*)
+
+(defn- with-clean-mongo-db [test-function]
+  (let [conn (mg/connect)
+        db-name "drafter_test"
+        user-collection "Users"]
+    (mg/drop-db conn db-name)
+    (let [user-db (mg/get-db conn db-name)]
+      (with-open [repo (um/->MongoUserRepository conn user-db user-collection)]
+        (binding [*user-repo* repo]
+          (test-function))))))
+
+(use-fixtures :each  with-clean-mongo-db tc/with-spec-instrumentation)
+
+
 
 (deftest find-existing-user-test
   (let [email "test@example.com"
@@ -40,15 +54,3 @@
     (um/insert-document *user-repo* user-record)
 
     (is (thrown? RuntimeException (user/find-user-by-username *user-repo* email)))))
-
-(defn- with-clean-mongo-db [test-function]
-  (let [conn (mg/connect)
-        db-name "drafter_test"
-        user-collection "Users"]
-    (mg/drop-db conn db-name)
-    (let [user-db (mg/get-db conn db-name)]
-      (with-open [repo (um/->MongoUserRepository conn user-db user-collection)]
-        (binding [*user-repo* repo]
-          (test-function))))))
-
-(use-fixtures :each with-clean-mongo-db)

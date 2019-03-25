@@ -1,12 +1,11 @@
 (ns drafter.stasher.filecache-test
-  (:require [drafter.stasher.filecache :as sut]
-            [clojure.test :as t]
-            [me.raynes.fs :as fs]
-            [clojure.java.io :as io]
-            [clojure.spec.test.alpha :as st]
-            [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as sg])
-  (:import [java.time OffsetDateTime]))
+  (:require [clojure.test :as t]
+            [drafter.stasher.filecache :as sut]
+            [drafter.test-common :as tc]
+            [me.raynes.fs :as fs])
+  (:import java.time.OffsetDateTime))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def test-path (fs/file "tmp" "filecache-test"))
 

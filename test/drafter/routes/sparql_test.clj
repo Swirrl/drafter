@@ -1,28 +1,20 @@
 (ns drafter.routes.sparql-test
   (:require [clojure-csv.core :as csv]
-            [clojure.java.io :as io]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]
             [drafter.backend.draftset.draft-management :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.routes.sparql :refer :all]
             [drafter.test-common
+             :as
+             tc
              :refer
-             [*test-backend*
-              assert-is-forbidden-response
-              import-data-to-draft!
-              select-all-in-graph
-              stream->string
-              test-triples
-              with-identity
-              wrap-system-setup
-              deftest-system]]
-            [drafter.timeouts :as timeouts]
-            [drafter.user-test :refer [test-editor test-system]]
+             [deftest-system select-all-in-graph stream->string]]
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI))
 
-(use-fixtures :each (join-fixtures [validate-schemas]))
+(use-fixtures :each
+  (join-fixtures [validate-schemas])
+  tc/with-spec-instrumentation)
 
 (def draft-graph-1 (draft:graph "dg-1"))
 (def draft-graph-2 (draft:graph "dg-2"))
@@ -83,6 +75,3 @@
                                (live-query
                                 (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
         (is (not= graph-1-result (second csv-result)))))))
-
-
-

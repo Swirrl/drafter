@@ -1,10 +1,12 @@
 (ns drafter.user-test
   (:require [clojure.test :refer :all]
-            [drafter
-             [draftset :as ds]
-             [user :refer :all]])
+            [drafter.draftset :as ds]
+            [drafter.test-common :as tc]
+            [drafter.user :refer :all])
   (:import clojure.lang.ExceptionInfo
            java.util.UUID))
+
+(use-fixtures :each tc/with-spec-instrumentation)
 
 (def test-password "password")
 (def test-editor (create-user "editor@swirrl.com" :editor (get-digest test-password)))

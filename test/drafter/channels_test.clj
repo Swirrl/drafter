@@ -1,7 +1,10 @@
 (ns drafter.channels-test
   (:require [clojure.test :refer :all]
-            [drafter.channels :refer :all])
+            [drafter.channels :refer :all]
+            [drafter.test-common :as tc])
   (:import java.util.concurrent.TimeUnit))
+
+(use-fixtures :each tc/with-spec-instrumentation)
 
 (deftest create-send-once-channel-test
   (testing "sends ok"

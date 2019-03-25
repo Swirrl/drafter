@@ -23,6 +23,8 @@
            org.eclipse.rdf4j.query.resultio.TupleQueryResultWriter
            java.time.OffsetDateTime))
 
+(t/use-fixtures :each tc/with-spec-instrumentation)
+
 (def test-triples [(pr/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
 
 (defmethod ig/init-key ::stub-cache-key-generator [_ opts]

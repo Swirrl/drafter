@@ -1,14 +1,16 @@
 (ns drafter.feature.draftset-data.delete-test
   (:require [clojure.java.io :as io]
             [clojure.test :as t]
-            [drafter.feature.draftset-data.test-helper :as th]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.draftset-data.delete :as sut]
+            [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]])
   (:import java.net.URI
-           org.eclipse.rdf4j.rio.RDFFormat
-           java.time.OffsetDateTime))
+           java.time.OffsetDateTime
+           org.eclipse.rdf4j.rio.RDFFormat))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (tc/deftest-system delete-draftset-data-test
   [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]
