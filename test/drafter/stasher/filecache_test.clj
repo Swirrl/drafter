@@ -21,7 +21,7 @@
 (t/deftest cache-key->hashed-key-test
   (t/testing "Same values should generate same hash"
     (let [dir "tmp/test-stasher-cache"
-          ext :test
+          ext :nt
           key {:dataset {:default-graphs #{"http://graphs/2"
                                            "http://graphs/1"
                                            "http://graphs/3"
@@ -61,19 +61,19 @@
 
 (t/deftest lookup-file-cache
   (let [cache (sut/make-file-backend {:dir test-path})
-        fmt :ext]
+        fmt :srj]
     (t/testing "Searching for an entry not in the cache returns a nil source"
       (let [uncached-key {:query-type :tuple
                           :query-str "an uncached query"
                           :dataset {:default-graphs #{"http://graphs/test-graph"}
                                     :named-graphs #{}}
                           :modified-times {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}]
-        (t/is (nil? (sut/source-stream cache uncached-key :ext)))))))
+        (t/is (nil? (sut/source-stream cache uncached-key :srj)))))))
 
 (t/deftest writing-and-reading
   (t/testing "Add & retrieve file from cache"
     (let [cache (sut/make-file-backend {})
-          fmt :ext
+          fmt :json
           cache-key {:query-type :tuple
                      :query-str (str "cache me" (.nextInt (java.util.Random.) 100000000))
                      :dataset {:default-graphs #{"http://graphs/test-graph"}
@@ -92,7 +92,7 @@
   ;; These test require a few workarounds for filesystems that do not store ms
   ;; precision on the last modified stamp.
   (let [dir "tmp/test-stasher-cache"
-        fmt :tupleasdfdasf
+        fmt :brt ;; binary tuple format
 
         cache (sut/make-file-backend {:dir dir})
         ->sec (fn [ms]
