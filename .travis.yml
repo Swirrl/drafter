@@ -9,11 +9,13 @@ env:
   global:
   - STARDOG_VERSION='stardog-5.2.0'
 before_install:
-- "sudo ./travis/install_base.sh"  
+- "sudo ./travis/install_base.sh"
 - "sudo ./travis/bootstrap_stardog.sh"
 before_script:
-- "./travis/before_script.sh"  
-script: travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
+- "./travis/before_script.sh"
+script:
+  - travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
+  - env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein spec
 after_success:
 - env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
 before_deploy:

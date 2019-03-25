@@ -51,7 +51,7 @@
      {:drafter.main/datadog {:logging (ig/->Ref :drafter/logging)}})
    system-config))
 
-(defn- load-system
+(defn load-system
   "Initialises the given system map."
   [system-config sys-keys]
   (initialisation-side-effects! system-config)
@@ -72,7 +72,7 @@
 
   If two args are given the second argument is expected to be a set of
   keys to start from within the given system."
-  
+
   ([] (start-system! (io/resource "system.edn")))
   ([sys] (start-system! sys nil))
   ([system-config start-keys]

@@ -61,10 +61,12 @@
 
                  [grafter "2.0.1-SNAPSHOT"]
                  [com.novemberain/pantomime "2.11.0"] ;; mime types
-                 [org.eclipse.rdf4j/rdf4j-queryrender "2.5.0"]
+                 [org.eclipse.rdf4j/rdf4j-runtime "2.5.0" :exclusions [ch.qos.logback/logback-classic]]
+
 
                  [grafter/url "0.2.5"]
-                 ;[grafter/vocabularies "0.1.3"]
+                 ;;[grafter/vocabularies "0.1.3"]
+
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
 
@@ -161,4 +163,8 @@
                   ;;["vcs" "push"]
                   ]
 
-  :main drafter.main)
+  :main drafter.main
+
+  :aliases {"spec" ["with-profile" "system,dev,user" "run" "-m" "drafter.repl/check-specs" "100" "true"]}
+
+  )
