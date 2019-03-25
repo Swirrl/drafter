@@ -58,7 +58,8 @@
         (tc/assert-is-bad-request-response response)))))
 
 (defn- prepare-query-str [query-str]
-  (bcom/prep-and-validate-query (repo/sail-repo) query-str))
+  (with-open [conn (repo/->connection (repo/sail-repo))]
+    (bcom/prep-and-validate-query conn query-str)))
 
 (deftest sparql-negotiation-handler-test
   (testing "Valid request"

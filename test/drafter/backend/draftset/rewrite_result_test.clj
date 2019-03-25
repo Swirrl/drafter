@@ -76,14 +76,16 @@
   execute prepared queries on the SPARQLExecutor protocol!"
   (let [result-substitutions (set/map-invert query-substitutions)
         result (repo/evaluate prepared-query)]
-    (map #(rewrite-result result-substitutions %) result)))
+    (doall
+     (map #(rewrite-result result-substitutions %) result))))
 
 (defn evaluate-with-graph-rewriting
   "Rewrites the results in the query."
   [db query-str query-substitutions]
-  (let [rewritten-query (rewrite-sparql-string query-substitutions query-str)
-        prepared-query (prepare-query db rewritten-query)]
-    (rewrite-graph-results query-substitutions prepared-query)))
+  (with-open [conn (repo/->connection db)]
+    (let [rewritten-query (rewrite-sparql-string query-substitutions query-str)
+          prepared-query (prepare-query conn rewritten-query)]
+      (rewrite-graph-results query-substitutions prepared-query))))
 
 (defn first-result [results key]
   (-> results first (get key)))

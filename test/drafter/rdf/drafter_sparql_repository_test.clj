@@ -22,23 +22,24 @@
   (testing "Raises QueryInterruptedException on timeout response"
     (let [repo (tc/get-latched-http-server-repo test-port)]
       (tc/with-server test-port query-timeout-handler
-                   (is (thrown? QueryInterruptedException (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }"))))))
+        (is (thrown? QueryInterruptedException (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }"))))))
 
   (testing "sends timeout header when maxExecutionTime set"
     (let [query-params (atom nil)
           repo (tc/get-latched-http-server-repo test-port)]
       (tc/with-server test-port (tc/extract-query-params-handler query-params tc/ok-spo-query-response)
-                   (let [pquery (repo/prepare-query repo "SELECT * WHERE { ?s ?p ?o }")]
-                     (.setMaxExecutionTime pquery 2)
-                     (.evaluate pquery)
-                     (is (= "2000" (get @query-params "timeout")))))))
+        (with-open [conn (repo/->connection repo)]
+          (let [pquery (repo/prepare-query conn "SELECT * WHERE { ?s ?p ?o }")]
+            (.setMaxExecutionTime pquery 2)
+            (.evaluate pquery)
+            (is (= "2000" (get @query-params "timeout"))))))))
 
   (testing "does not send timeout header when maxExecutionTime not set"
     (let [query-params (atom nil)
           repo (tc/get-latched-http-server-repo test-port)]
       (tc/with-server test-port (tc/extract-query-params-handler query-params tc/ok-spo-query-response)
-                   (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }")
-                   (is (= false (contains? @query-params "timeout")))))))
+        (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }")
+        (is (= false (contains? @query-params "timeout")))))))
 
 (def stardog-max-url-length 4083)
 

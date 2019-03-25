@@ -34,12 +34,14 @@
            java.time.OffsetDateTime))
 
 (extend-type Repository
-  drpr/SparqlExecutor
-  (drpr/prepare-query [this sparql-string]
-    (drpr/prep-and-validate-query this sparql-string))
-
+  ;; TODO can probably remove this...
   drpr/ToRepository
   (drpr/->sesame-repo [r] r))
+
+(extend-type RepositoryConnection
+  drpr/SparqlExecutor
+  (drpr/prepare-query [this sparql-string]
+    (drpr/prep-and-validate-query this sparql-string)))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)
