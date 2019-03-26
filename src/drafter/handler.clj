@@ -15,7 +15,11 @@
              :refer
              [global-writes-lock start-writer! stop-writer!]]
             [integrant.core :as ig]
+            [jsonista.core :as json]
             [noir.util.middleware :refer [app-handler]]
+            [reitit.ring :as ring]
+            [reitit.swagger :as swagger]
+            [reitit.swagger-ui :as swagger-ui]
             [ring.middleware.defaults :refer [api-defaults]]
             [ring.middleware.file-info :refer [wrap-file-info]]
             [ring.middleware.resource :refer [wrap-resource]]
@@ -43,7 +47,7 @@
   [{backend :repo
     live-sparql-route :live-sparql-query-route
     draftset-api-routes :draftset-api-routes}]
-  (wrap-handler (app-handler 
+  (wrap-handler (app-handler
                  ;; add your application routes here
                  (-> []
                      (add-route (pages-routes))
@@ -73,8 +77,36 @@
                  :formats [:json-kw :edn])))
 
 
-(defmethod ig/init-key :drafter.handler/app [k opts]
-  (build-handler opts))
+;; (defmethod ig/init-key :drafter.handler/app [k opts]
+;;   (build-handler opts))
+
+(defn- build-resources
+  [{backend :repo
+    live-sparql-route :live-sparql-query-route
+    draftset-resources :draftset-resources}]
+  (ring/ring-handler
+   (ring/router
+    ["/" {:swagger {:id :my-api} :middleware [swagger/swagger-feature]}
+     ["swagger.json"
+      {:get {:no-doc true
+             :swagger {:info {:title "my-api" :description "with reitit-ring"}}
+             :handler (fn [request]
+                        (-> ((swagger/create-swagger-handler) request)
+                            (update :body json/write-value-as-string)))}}]
+     draftset-resources])
+   (swagger-ui/create-swagger-ui-handler {:path "/api-docs"})
+   )
+  ;; (wrap-handler)
+  ;; (wrap-resource "swagger-ui")
+  ;; (wrap-verbs)
+  ;; (wrap-encode-errors)
+  ;; (middleware/wrap-total-requests-counter)
+  ;; (middleware/wrap-request-timer)
+  ;; (log-request)
+  )
+
+(defmethod ig/init-key :drafter.handler/app [_ opts]
+  (build-resources opts))
 
 ;; TODO remove/replace
 #_(defn destroy

@@ -19,9 +19,9 @@
 
   :repositories [["apache-dev" {:url "https://repository.apache.org/content/repositories/snapshots/"
                                 :releases false}]
-                 
+
                  ]
-  
+
   :classifiers {:prod :prod
                 :dev :dev}
 
@@ -30,20 +30,20 @@
 
                  [org.clojure/clojure "1.9.0"]
                  [org.clojure/spec.alpha "0.1.134"]
-                 
+
                  [org.clojure/math.combinatorics "0.1.4"]
-                 
+
                  [cognician/dogstatsd-clj "0.1.2"]
 
                  [commons-codec "1.11"]
-                 
+
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.4.0"] ;; for validating our Swagger/JSON schemas
 
                  [aero "1.1.2"]
 
                  [integrant "0.6.3"]
-                 
+
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
                  ;; and the scjsv json schema validator.
@@ -53,8 +53,8 @@
                  ;;
                  ;; Without this you get errors like:
                  ;; java.lang.NoClassDefFoundError: com/fasterxml/jackson/core/FormatFeature, compiling:(cheshire/factory.clj:54:7)
-                 [com.fasterxml.jackson.core/jackson-core "2.6.7"]
-                 
+                 ;; [com.fasterxml.jackson.core/jackson-core "2.6.7"]
+
                  [com.novemberain/monger "3.1.0"]
 
                  [com.sun.mail/javax.mail "1.6.0"]
@@ -69,6 +69,9 @@
 
                  [metosin/ring-swagger-ui "2.2.10"]
 
+                 ;; routing spike
+                 [metosin/reitit "0.3.1"]
+
                  ;; Use JENA for our query rewriting
                  ;; Use private release of Jena based on commit 44b478ea8637ca16035e56ef49d6cb6e59abc289
                  ;; See https://github.com/Swirrl/drafter/issues/270
@@ -79,7 +82,7 @@
                  [org.apache.jena/jena-base "3.9.0-44b478ea" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-core "3.9.0-44b478ea" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-iri "3.9.0-44b478ea" :exclusions [org.slf4j/slf4j-api]]
-                 
+
 
                  [org.mindrot/jbcrypt "0.4"]
 
@@ -123,7 +126,7 @@
 
                 :repl-options {:init-ns user
                                :timeout 180000}
-                
+
                 :source-paths ["env/dev/clj"]
                 :resource-paths ["env/dev/resources" "test/resources"]
 
@@ -150,7 +153,7 @@
   ;; Target JDK 8 expected JVM version
   :javac-options ["-target" "8" "-source" "8"]
   :min-lein-version "2.8.1"
-  
+
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version"

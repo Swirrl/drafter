@@ -244,11 +244,11 @@
 
 (defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler
-                                   get-draftset-handler 
+                                   get-draftset-handler
                                    create-draftsets-handler
                                    delete-draftset-handler
                                    draftset-options-handler
-                                   draftset-get-data-handler 
+                                   draftset-get-data-handler
                                    delete-draftset-data-handler
                                    delete-draftset-graph-handler
                                    delete-draftset-changes-handler
@@ -259,13 +259,13 @@
                                    draftset-set-metadata-handler
                                    draftset-submit-to-handler
                                    draftset-claim-handler]}]
-  
+
   (let [version "/v1"]
     (context
      version []
      (routes
       (make-route :get "/users" get-users-handler)
-      
+
       (make-route :get "/draftsets" get-draftsets-handler)
 
       (make-route :post "/draftsets" create-draftsets-handler)
@@ -285,9 +285,9 @@
       (make-route :delete "/draftset/:id/changes" delete-draftset-changes-handler)
 
       (make-route :put "/draftset/:id/data" put-draftset-data-handler)
-      
+
       (make-route :put "/draftset/:id/graph" put-draftset-graph-handler)
-      
+
       (make-route nil "/draftset/:id/query" draftset-query-handler)
 
       (make-route :post "/draftset/:id/publish" draftset-publish-handler)
@@ -295,7 +295,7 @@
       (make-route :put "/draftset/:id" draftset-set-metadata-handler)
 
       (make-route :post "/draftset/:id/submit-to" draftset-submit-to-handler)
-      
+
       (make-route :put "/draftset/:id/claim" draftset-claim-handler)))))
 
 
@@ -321,4 +321,17 @@
 
 (defmethod ig/init-key :drafter.routes/draftsets-api [_ opts]
   (draftset-api-routes opts))
- 
+
+(defn draftset-resources [{:keys [get-users-resource]}]
+
+  (let [version "/v1"]
+    ;; version
+    [version ["/users" get-users-resource]]
+
+    ))
+
+(defmethod ig/pre-init-spec :drafter.routes/draftset-api [_]
+  (s/keys :req-un [::get-users-resource]))
+
+(defmethod ig/init-key :drafter.routes/draftset-api [_ opts]
+  (draftset-resources opts))
