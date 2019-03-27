@@ -165,6 +165,6 @@
 
   :main drafter.main
 
-  :aliases {"spec" ["with-profile" "system,dev,user" "run" "-m" "drafter.repl/check-specs" "100" "true"]}
+  :aliases {"spec" ["with-profile" "system,dev,user" "run" "-m" "drafter.check-specs/check-specs" "100" "true"]}
 
   )
