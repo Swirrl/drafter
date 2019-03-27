@@ -3,12 +3,14 @@
             [clojure.spec.test.alpha :as st]
             [clojure.spec.alpha :as s]
             [drafter.check-specs :refer [check-specs]]
-            [drafter.main :as main :refer [system]]
+            [drafter.main :as main :refer [system stop-system!]]
             [eftest.runner :as eftest]
             [grafter-2.rdf4j.repository :as repo]
-            [integrant.core :as ig]))
+            [integrant.core :as ig]
+            [clojure.java.io :as io]
+            [meta-merge.core :as mm]))
 
-
+(def profiles [(io/resource "drafter-base-config.edn") (io/resource "drafter-dev-config.edn") (io/resource "drafter-local-config.edn")])
 
 (defn stub-fdefs [set-of-syms]
   (st/instrument set-of-syms {:stub set-of-syms}))
@@ -17,7 +19,9 @@
   ([] (start-system! {:instrument? true}))
   ([{:keys [instrument?] :as opts}]
 
-   (main/start-system!)
+   (main/start-system! (apply mm/meta-merge (->> profiles
+                                                 (remove nil?)
+                                                 (map main/read-system))))
    (when instrument?
      (st/instrument))))
 

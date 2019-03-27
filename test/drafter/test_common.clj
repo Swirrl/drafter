@@ -105,7 +105,7 @@
    `(with-system nil ~binding-form ~form))
 
   ([start-keys [binding-form system-cfg] form]
-   `(let [system# (main/start-system! (io/resource ~system-cfg) ~start-keys)
+   `(let [system# (main/start-system! (main/read-system (io/resource ~system-cfg)) ~start-keys)
           ~binding-form system#
           ;; drafter specific gunk that we can ultimately remove
           configured-factories# (reg/registered-parser-factories)]
@@ -137,7 +137,7 @@
   instead."
   [system start-keys]
   (fn [test-fn]
-    (let [started-system (main/start-system! (io/resource system) start-keys)
+    (let [started-system (main/start-system! (main/read-system (io/resource system)) start-keys)
           backend (:drafter.stasher/repo started-system)
           writer (:drafter/write-scheduler started-system)
           configured-factories (reg/registered-parser-factories)]

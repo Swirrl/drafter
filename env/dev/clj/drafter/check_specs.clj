@@ -57,7 +57,7 @@
   ([num-tests]
 
    (s/check-asserts true)
-   (load-system (main/read-system (io/resource "system.edn")))
+   (load-system (main/read-system (io/resource "drafter-base-config.edn")))
 
    (check-specs* (if (string? num-tests)
                    (Integer/parseInt num-tests)
