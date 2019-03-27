@@ -2,8 +2,8 @@
   (:require [drafter.main :refer [start-system! stop-system! system]]
             [eftest.runner :as eftest]
             [clojure.java.io :as io]
-            [grafter.rdf4j.repository :as repo]
-            [grafter.rdf.protocols :as pr]))
+            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as pr]))
 
 (defn run-tests []
   (eftest/run-tests (eftest/find-tests "test") {:multithread? false}))
@@ -26,15 +26,15 @@
 (comment
 
   (do
-    (require '[grafter.rdf.protocols :as pr])
-    (require '[grafter.rdf4j.repository :as repo])
+    (require '[grafter.core :as pr])
+    (require '[grafter-2.rdf4j.repository :as repo])
 
     (def repo (:drafter.backend/rdf4j-repo system))
     (def conn (repo/->connection repo))
-    
-    
+
+
 
     (repo/query conn "PREFIX : <http://example> \n select * where { ?s ?p ?o } limit 10"))
 
-  
+
   )

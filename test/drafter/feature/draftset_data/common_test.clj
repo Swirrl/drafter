@@ -1,7 +1,7 @@
 (ns drafter.feature.draftset-data.common-test
   (:require [clojure.test :as t]
             [drafter.feature.draftset-data.common :as sut]
-            [grafter.rdf :refer [->Quad triple=]])
+            [grafter-2.rdf.protocols :refer [->Quad triple=]])
   (:import java.net.URI))
 
 (t/deftest quad-batch->graph-triples-test

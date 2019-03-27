@@ -4,8 +4,8 @@
             [drafter.test-common :as tc]
             [drafter.backend.draftset :as sut]
             [drafter.test-common :as tc :refer [deftest-system-with-keys]]
-            [grafter.rdf :as rdf]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.io :as rio]
+            [grafter-2.rdf4j.repository :as repo]
             [drafter.fixtures.state-1 :as state]))
 
 (deftest-system-with-keys build-draftset-endpoint-test [:drafter.backend.draftset/endpoint :drafter.fixture-data/loader]
@@ -16,7 +16,7 @@
                                   (sut/build-draftset-endpoint "ds-1" true)
                                   repo/->connection)]
         (t/testing "statements"
-          (t/is (= state/ds-1-dg-1-data (set (rdf/statements ds-endpoint)))))
+          (t/is (= state/ds-1-dg-1-data (set (rio/statements ds-endpoint)))))
 
         (t/testing "queries"
           (tc/TODO

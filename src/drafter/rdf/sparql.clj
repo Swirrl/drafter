@@ -2,12 +2,11 @@
   (:require [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
             [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.rdf :as rdf]
-            [grafter.rdf.protocols :as pr]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.repository :as repo]
             [medley.core :as med]))
 
-(defn eager-query 
+(defn eager-query
   "Executes a SPARQL query which returns a sequence of results and
   ensures it is eagerly consumed before being returned. The underlying
   TCP connection is not released until all results have been iterated
@@ -33,7 +32,7 @@
 (defn add
   ([db triples]
    (with-open [conn (repo/->connection db)]
-     (rdf/add conn triples)))
+     (pr/add conn triples)))
   ([db graph-uri triples]
    (with-open [conn (repo/->connection db)]
-     (rdf/add conn graph-uri triples))))
+     (pr/add conn graph-uri triples))))

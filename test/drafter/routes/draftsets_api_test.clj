@@ -17,10 +17,9 @@
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [drafter.user.memory-repository :as memrepo]
             [drafter.util :as util]
-            [grafter.rdf :refer [add context statements]]
-            [grafter.rdf.protocols :refer [->Quad ->Triple map->Triple]]
-            [grafter.rdf4j.formats :as formats]
-            [grafter.rdf4j.io :refer [rdf-writer]]
+            [grafter-2.rdf4j.io :refer [rdf-writer statements]]
+            [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
+            [grafter-2.rdf4j.formats :as formats]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
@@ -1348,4 +1347,3 @@
   (tc/assert-is-ok-response response)
   (tc/assert-schema schema body)
   body)
-

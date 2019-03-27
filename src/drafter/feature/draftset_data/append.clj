@@ -13,8 +13,7 @@
             [drafter.responses :as response]
             [drafter.util :as util]
             [drafter.write-scheduler :as writes]
-            [grafter.rdf :as rdf]
-            [grafter.rdf.protocols :as pr]
+            [grafter-2.rdf.protocols :as pr]
             [integrant.core :as ig]
             [swirrl-server.async.jobs :as ajobs]))
 
@@ -38,7 +37,7 @@
         (do
           (append-data-batch! backend draft-graph-uri triples)
           (ds-data-common/touch-graph-in-draftset! backend draftset-ref draft-graph-uri job-started-at)
-          
+
           (let [next-job (ajobs/create-child-job
                           job
                           (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) (merge state {:op :append})))]
@@ -73,7 +72,7 @@
     (ajobs/create-job :background-write
                       (fn [job]
                         (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
-                              quad-batches (util/batch-partition-by quads rdf/context jobs/batched-write-size)
+                              quad-batches (util/batch-partition-by quads pr/context jobs/batched-write-size)
                               now (clock-fn)]
                           (append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append :job-started-at now} job))))))
 

@@ -3,9 +3,9 @@
             [compojure.core :refer [context GET routes]]
             [drafter.backend.draftset.draft-management :refer [drafter-state-graph]]
             [drafter.rdf.drafter-ontology :refer [drafter]]
-            [grafter.rdf :refer [add statements]]
-            [grafter.rdf4j.io :as gio :refer [default-prefixes rdf-writer]]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :refer [add]]
+            [grafter-2.rdf4j.io :as gio :refer [statements default-prefixes rdf-writer]]
+            [grafter-2.rdf4j.repository :as repo]
             [grafter.url :as url]
             [ring.util.io :as rio]
             [ring.util.response :refer [not-found]]))

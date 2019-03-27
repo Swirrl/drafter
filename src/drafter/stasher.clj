@@ -4,15 +4,16 @@
             [drafter.stasher.filecache :as fc]
             [drafter.stasher.cache-key :as ck]
             [drafter.stasher.timing :as timing]
-            [grafter.rdf4j.repository :as repo]
-            [grafter.rdf4j.sparql :as sparql]
-            [grafter.rdf4j.io :as gio]
+            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.sparql :as sparql]
+            [grafter-2.rdf4j.io :as gio]
             [integrant.core :as ig]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as dd]
             [me.raynes.fs :as fs]
             [drafter.backend.common :as drpr]
-            [grafter.rdf4j.repository.registry :as reg])
+            [grafter-2.rdf4j.repository.registry :as reg]
+            [grafter-2.rdf4j.io :as rio])
   (:import java.net.URI
            (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
            java.nio.charset.Charset
@@ -224,7 +225,7 @@
 
 (defn- wrap-graph-result [bg-graph-result format stream]
   (let [prefixes (.getNamespaces bg-graph-result) ;; take prefixes from supplied result
-        cache-file-writer ^RDFWriter (grafter.rdf4j.io/rdf-writer
+        cache-file-writer ^RDFWriter (rio/rdf-writer
                                       stream
                                       :format format
                                       :prefixes prefixes)]

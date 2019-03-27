@@ -28,7 +28,7 @@
               unprocessable-entity-response]]
             [drafter.user :as user]
             [drafter.util :as util]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [ring.util.response :as ring]
             [swirrl-server.responses :as response]))
@@ -244,11 +244,11 @@
 
 (defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler
-                                   get-draftset-handler 
+                                   get-draftset-handler
                                    create-draftsets-handler
                                    delete-draftset-handler
                                    draftset-options-handler
-                                   draftset-get-data-handler 
+                                   draftset-get-data-handler
                                    delete-draftset-data-handler
                                    delete-draftset-graph-handler
                                    delete-draftset-changes-handler
@@ -259,13 +259,13 @@
                                    draftset-set-metadata-handler
                                    draftset-submit-to-handler
                                    draftset-claim-handler]}]
-  
+
   (let [version "/v1"]
     (context
      version []
      (routes
       (make-route :get "/users" get-users-handler)
-      
+
       (make-route :get "/draftsets" get-draftsets-handler)
 
       (make-route :post "/draftsets" create-draftsets-handler)
@@ -285,9 +285,9 @@
       (make-route :delete "/draftset/:id/changes" delete-draftset-changes-handler)
 
       (make-route :put "/draftset/:id/data" put-draftset-data-handler)
-      
+
       (make-route :put "/draftset/:id/graph" put-draftset-graph-handler)
-      
+
       (make-route nil "/draftset/:id/query" draftset-query-handler)
 
       (make-route :post "/draftset/:id/publish" draftset-publish-handler)
@@ -295,7 +295,7 @@
       (make-route :put "/draftset/:id" draftset-set-metadata-handler)
 
       (make-route :post "/draftset/:id/submit-to" draftset-submit-to-handler)
-      
+
       (make-route :put "/draftset/:id/claim" draftset-claim-handler)))))
 
 
@@ -321,4 +321,3 @@
 
 (defmethod ig/init-key :drafter.routes/draftsets-api [_ opts]
   (draftset-api-routes opts))
- 

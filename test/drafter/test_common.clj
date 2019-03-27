@@ -14,10 +14,9 @@
             [drafter.write-scheduler
              :refer
              [global-writes-lock queue-job! start-writer! stop-writer!]]
-            [grafter.rdf :as rdf]
-            [grafter.rdf.templater :refer [triplify]]
-            [grafter.rdf4j.repository :as repo]
-            [grafter.rdf4j.repository.registry :as reg]
+            [grafter-2.rdf4j.templater :refer [triplify]]
+            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.repository.registry :as reg]
             [grafter.url :as url]
             [integrant.core :as ig]
             [ring.middleware.params :refer [wrap-params]]

@@ -9,7 +9,7 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]]
             [drafter.write-scheduler :as scheduler]
-            [grafter.rdf :refer [->Triple]])
+            [grafter-2.rdf.protocols :refer [->Triple]])
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
 

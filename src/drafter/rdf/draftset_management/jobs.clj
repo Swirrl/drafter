@@ -9,10 +9,9 @@
             [drafter.rdf.sparql :as sparql]
             [drafter.util :as util]
             [drafter.write-scheduler :as writes]
-            [grafter.rdf :as rdf :refer [context]]
-            [grafter.rdf.protocols :refer [map->Quad]]
-            [grafter.rdf4j.io :refer [quad->backend-quad]]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as rdf :refer [context map->Quad]]
+            [grafter-2.rdf4j.io :refer [quad->backend-quad]]
+            [grafter-2.rdf4j.repository :as repo]
             [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [swirrl-server.async.jobs :as ajobs])
   (:import java.util.Date
@@ -47,5 +46,3 @@
                    (jobs/job-succeeded! job)
                    (catch Exception ex
                      (jobs/job-failed! job ex)))))
-
-

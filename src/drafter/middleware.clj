@@ -17,8 +17,8 @@
             [drafter.responses :as response]
             [drafter.user :as user]
             [drafter.util :as util]
-            [grafter.rdf4j.formats :refer [mimetype->rdf-format]]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
+            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [pantomime.media :refer [media-type-named]]
             [ring.util.request :as request])
@@ -224,4 +224,3 @@
     (datadog/measure!
      "drafter.request.time" {}
      (handler req))))
-

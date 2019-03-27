@@ -1,6 +1,5 @@
 (ns drafter.backend.draftset.operations
   (:require [clojure.string :as string]
-            [grafter.rdf4j.repository :refer [prepare-query]]
             [drafter.backend.draftset.draft-management
              :as
              mgmt
@@ -15,11 +14,11 @@
             [drafter.user :as user]
             [drafter.util :as util]
             [drafter.write-scheduler :as writes]
-            [grafter.rdf :as rdf :refer [context]]
-            [grafter.rdf.protocols :refer [map->Quad map->Triple]]
-            [grafter.rdf4j.formats :as formats]
-            [grafter.rdf4j.io :refer [quad->backend-quad rdf-writer]]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as rdf :refer [map->Quad map->Triple context]]
+            [grafter-2.rdf4j.repository :refer [prepare-query]]
+            [grafter-2.rdf4j.formats :as formats]
+            [grafter-2.rdf4j.io :refer [quad->backend-quad rdf-writer]]
+            [grafter-2.rdf4j.repository :as repo]
             [grafter.url :as url]
             [grafter.vocabularies.rdf :refer :all]
             [swirrl-server.async.jobs :as ajobs])
@@ -225,7 +224,7 @@
       "}")))
 
 (defn- draftset-properties-result->properties [draftset-ref {:keys [created title description creator owner role claimuser submitter modified] :as ds}]
-  (let [required-fields {:id (str (ds/->draftset-id draftset-ref)) 
+  (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :created-at created
                          :created-by (user/uri->username creator)
                          :updated-at modified}
@@ -291,7 +290,7 @@
   the graph doesn't exist in the draftset we create an empty draft
   graph for it.  Publishing the empty graph will then result in a
   deletion from live.
-  
+
   modified-time-fn - A 0-arg function that returns the modified-time."
   [db draftset-ref graph-uri modified-time-fn]
   (when (mgmt/is-graph-managed? db graph-uri)
@@ -504,7 +503,7 @@
     (getBindingNames [this]
       ;; hard coded as part of this test stub
       ["s" "p" "o" "g"])
-    
+
     TupleQueryResultHandler
     (handleSolution [this bindings]
       (let [subj (.getValue bindings "s")

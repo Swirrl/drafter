@@ -1,6 +1,6 @@
 (ns drafter.fixtures.state-1
   (:require [drafter.rdf.drafter-ontology :refer [draftset-id->uri]]
-            [grafter.rdf :as rdf])
+            [grafter-2.rdf.protocols :as rdf])
   (:import java.net.URI))
 
 (def expected-live-graphs #{(URI. "http://live-and-ds1-and-ds2")

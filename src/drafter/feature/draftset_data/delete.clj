@@ -17,9 +17,9 @@
             [drafter.responses :as response]
             [drafter.util :as util]
             [drafter.write-scheduler :as writes]
-            [grafter.rdf :refer [context]]
-            [grafter.rdf4j.io :refer [quad->backend-quad]]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :refer [context]]
+            [grafter-2.rdf4j.io :refer [quad->backend-quad]]
+            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [swirrl-server.async.jobs :as ajobs])
   (:import org.eclipse.rdf4j.model.Resource))

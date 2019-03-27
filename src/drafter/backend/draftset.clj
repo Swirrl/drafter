@@ -6,9 +6,9 @@
             [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
             [drafter.backend.draftset.rewrite-result :refer [rewrite-query-results]]
             [drafter.backend.spec :as bs]
-            [grafter.rdf.protocols :as proto]
-            [grafter.rdf4j.io :as rio]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as proto]
+            [grafter-2.rdf4j.io :as rio]
+            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [schema.core :as sc]
             [clojure.tools.logging :as log])
@@ -26,7 +26,7 @@
 (defn- build-draftset-connection [{:keys [repo live->draft union-with-live?]}]
   (let [conn (repo/->connection repo)]
     (reify
-      
+
       #_bprot/SparqlExecutor
       #_(prepare-query [this sparql-string]
         (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
@@ -44,7 +44,7 @@
       (proto/query-dataset [this sparql-string _model]
         (let [pquery (repo/prepare-query* this sparql-string _model)]
           (repo/evaluate pquery)))
-      
+
       Closeable
       (close [this]
         (.close conn))

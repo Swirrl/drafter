@@ -11,8 +11,8 @@
              :refer
              [*test-backend* test-triples wrap-system-setup]]
             [drafter.util :refer [map-values]]
-            [grafter.rdf.templater :refer [triplify]]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.templater :refer [triplify]]
+            [grafter-2.rdf4j.repository :as repo]
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI
            org.eclipse.rdf4j.model.impl.URIImpl))

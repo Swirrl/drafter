@@ -1,7 +1,7 @@
 (ns drafter.rdf.drafter-sparql-repository-test
   (:require [clojure.test :refer :all]
             [drafter.test-common :as tc]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.repository :as repo]
             [drafter.rdf.sparql :as sparql])
   (:import drafter.rdf.DrafterSparqlSession
            java.io.ByteArrayOutputStream

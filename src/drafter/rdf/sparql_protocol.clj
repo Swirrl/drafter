@@ -2,7 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.repository :as repo]
             [compojure.core :refer [make-route]]
             [drafter.channels :refer :all]
             [drafter.requests :as drafter-request]
@@ -221,4 +221,3 @@
   ([mount-path executor] (sparql-end-point mount-path executor default-query-timeout-fn))
   ([mount-path executor query-timeout-fn]
    (make-route nil mount-path (sparql-protocol-handler {:repo executor :timeout-fn query-timeout-fn}))))
-

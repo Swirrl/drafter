@@ -5,8 +5,8 @@
             [drafter.rdf.sparql :as sparql]
             [drafter.rdf.sparql-protocol :refer :all]
             [drafter.test-common :as tc]
-            [grafter.rdf :as rdf]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.io :as rio]
+            [grafter-2.rdf4j.repository :as repo]
             [ring.util.response :as ring]
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI
@@ -128,7 +128,7 @@
         (is (= "application/n-triples" (headers "Content-Type")))
 
         (let [triple-reader (java.io.InputStreamReader. body)
-              triples (get-spo-set (rdf/statements triple-reader :format :nt))
+              triples (get-spo-set (rio/statements triple-reader :format :nt))
               expected-triples (get-spo-set (tc/test-triples (URI. "http://test.com/data/one")))]
 
           (is (= expected-triples triples)))))))
