@@ -123,6 +123,7 @@
                           [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
                 :repl-options {:init-ns user
+                               :init (println "Run: (dev)")
                                :timeout 180000}
 
                 :source-paths ["env/dev/clj"]
