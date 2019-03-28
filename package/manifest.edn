@@ -1,0 +1,65 @@
+{:omni/package-format "1"
+ :omni/package-name "drafter"
+ :omni/package-version #join [#env TRAVIS_TAG "-" #env TRAVIS_BUILD_NUMBER]
+ :omni/defs {:jar-name #join ["drafter-" #ref [:omni/package-version] ".jar"]}
+ :omni/keys {:drafter/http-port {:default 3001
+                                 :doc "HTTP port to listen on"}
+             :drafter/batched-write-size {:key :drafter/batched-write-size
+                                          :doc "Batch size for writing statments to stardog"}
+             :drafter/user-repo-ns {}
+             :drafter/user-repo-db-name {:doc "The name of the mongodb user collection"}
+             :drafter/sparql-query-endpoint {:doc "URI of the stardog SPARQL query endpoint"}
+             :drafter/sparql-update-endpoint {:doc "URI of the stardog SPARQL update endpoint"}
+             :drafter/jws-signing-key {:doc "Signing key for JWS tokens"}
+             :drafter/timeout-query-endpoint-live {:doc "Query timeout for the live endpoint"
+                                                   :default 600}
+             :drafter/timeout-query-endpoint-draftset {:doc "Query timeout for draftset endpoints"
+                                                       :default 900}
+             :drafter/stasher-cache-endabled {:doc "Whether stasher caching is enabled"
+                                              :default true}
+             :drafter/stasher-cache-dir {:doc "Directory used to write cached results to"}
+             :drafter/stasher-max-pool-size {:doc "Max thread pool size for stasher"
+                                             :default 10}
+             :drafter/stasher-queue-size {:doc "Size of the queue for cache requests"}}
+ :omni/metadata {:omni/repository-uri "https://github.com/swirrl/drafter"}
+ :omni/facets {:install [{:type :selmer/template
+                          :path "cleanup-drafter-temp.sh"
+                          :mode "755"
+                          :facet :cron}
+                         {:type :selmer/template
+                          :path "drafter-start.sh"
+                          :mode "755"}
+                         #ref [:omni/defs :jar-name]
+                         {:type :symlink
+                          :dest-path "drafter.jar"       
+                          :target #ref [:omni/defs :jar-name]}
+                         {:type :selmer/template
+                          :path "drafter-env.list.template"
+                          :dest-path "drafter-env.list"
+                          :mode "660"
+                          :keys [:drafter/http-port
+                                 :drafter/batched-write-size
+                                 :drafter/backend
+                                 :drafter/user-repo-ns
+                                 :drafter/user-db-name
+                                 :drafter/sparql-query-endpoint
+                                 :drafter/sparql-update-endpoint
+                                 :drafter/jws-signing-key
+                                 :drafter/timeout-query-endpoint-live
+                                 :drafter/stasher-cache-dir
+                                 :drafter/stasher-max-pool-size
+                                 :drafter/stasher-queue-size]
+                          :facet :systemd}
+                         {:type :selmer/template
+                          :path "log-config.edn.template"
+                          :dest-path "log-config.edn"
+                          :keys [:drafter/sparql-log-file
+                                 :drafter/drafter-log-file-path]}]
+               :systemd [{:type :selmer/template
+                          :path "drafter.service"                          
+                          :keys [:omni/install-dir]}]
+               :cron {:files [{:type :selmer/template
+                               :path "cleanup-drafter-temp.template"
+                               :dest-path "cleanup-drafter-temp"
+                               :keys [:drafter/cleanup-log-file
+                                      :omni/install-dir]}]}}}

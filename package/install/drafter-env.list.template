@@ -1,0 +1,14 @@
+DRAFTER_HTTP_PORT={{drafter/http-port}}
+DRAFTER_BATCHED_WRITE_SIZE={{drafter/batched-write-size}}
+DRAFTER_USER_REPO_NS={{drafter/user-repo-ns}}
+DRAFTER_USER_DB_NAME={{drafter/user-db-name}}
+SPARQL_QUERY_ENDPOINT={{drafter/sparql-query-endpoint}}
+SPARQL_UPDATE_ENDPOINT={{drafter/sparql-update-endpoint}}
+DRAFTER_JWS_SIGNING_KEY={{drafter/jws-signing-key}}
+DATADOG_STATSD_ADDRESS=localhost:8125
+DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE={{drafter/timeout-query-endpoint-live}}
+DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET={{drafter/timeout-query-endpoint-draftset}}
+STASHER_CACHE_DIR={{drafter/stasher-cache-dir}}
+STASHER_CACHE_ENABLED={{drafter/stasher-cache-enabled}}
+STASHER_MAX_POOL_SIZE={{drafter/stasher-max-pool-size}}
+STASHER_QUEUE_SIZE={{drafter/stasher-queue-size}}

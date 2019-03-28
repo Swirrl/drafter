@@ -1,0 +1,24 @@
+(let [log-pattern "%d{ISO8601} %-5p %20.20c{1} %5X{user} %12X{jobId} %12X{reqId} :: %m%n"
+      max-backups 7
+      max-file-size "100MB"
+      sparql-log (doto (org.apache.log4j.RollingFileAppender.
+                        (org.apache.log4j.EnhancedPatternLayout. log-pattern)
+                        "{{drafter/sparql-log-file-path}}")
+                   (.setMaxBackupIndex max-backups)
+                   (.setMaxFileSize max-file-size))
+      drafter-log (doto (org.apache.log4j.RollingFileAppender.
+                         (org.apache.log4j.EnhancedPatternLayout. log-pattern)
+                         "{{drafter/drafter-log-file-path}}")
+                    (.setMaxBackupIndex max-backups)
+                    (.setMaxFileSize max-file-size))]
+
+  (clj-logging-config.log4j/set-loggers!
+   ["org.openrdf" "drafter" "swirrl-server"]
+   {:name "drafter"
+    :level :info
+    :out drafter-log}
+
+   ["drafter.rdf.sparql-protocol" "drafter.routes.sparql-update"]
+   {:name "sparql"
+    :level :info
+    :out sparql-log}))
