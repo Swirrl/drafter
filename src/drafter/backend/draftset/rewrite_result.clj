@@ -4,7 +4,7 @@
   (:require [clojure.set :as set]
             [clojure.tools.logging :as log]
             [drafter.util :as util]
-            [grafter.rdf.protocols :refer [map->Quad]])
+            [grafter-2.rdf.protocols :refer [map->Quad]])
   (:import [org.eclipse.rdf4j.model.impl ContextStatementImpl StatementImpl]
            [org.eclipse.rdf4j.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult]
            [org.eclipse.rdf4j.query.impl BindingImpl MapBindingSet]
@@ -46,7 +46,7 @@
 
     (close [this]
       (.close handler))
-    
+
     TupleQueryResultHandler
     (endQueryResult [this]
       (.endQueryResult handler))

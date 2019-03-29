@@ -10,7 +10,9 @@
             [drafter.draftset :as ds])
   (:import java.net.URI))
 
-(t/use-fixtures :each (tc/wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler]))
+(t/use-fixtures :each
+  (tc/wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler])
+  tc/with-spec-instrumentation)
 
 (t/deftest revert-changes-from-graph-only-in-draftset
   (let [modified-time (constantly #inst "2017")
@@ -57,4 +59,3 @@
   (let [live-graph (tc/make-graph-live! *test-backend* (URI. "http://live") (constantly #inst "2017"))
         result (sut/revert-graph-changes! *test-backend* (ds/->DraftsetId "missing") live-graph)]
     (t/is (= :not-found result))))
-

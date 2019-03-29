@@ -1,12 +1,12 @@
 (ns drafter.stasher.filecache
   (:require [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as g]
             [clojure.tools.logging :as log]
-            [integrant.core :as ig]
-            [me.raynes.fs :as fs]
             [drafter.stasher.cache-key :as ck]
-            [cognician.dogstatsd :as dd])
-  (:import (java.io File FileOutputStream BufferedOutputStream)
+            [integrant.core :as ig]
+            [me.raynes.fs :as fs])
+  (:import [java.io BufferedOutputStream File FileOutputStream]
            java.security.MessageDigest
            org.apache.commons.codec.binary.Hex))
 
@@ -43,12 +43,24 @@
 
 (defn cache-key->cache-path
   [dir fmt cache-key]
-  {:pre [(s/valid? ::ck/cache-key cache-key)]}
   (let [hash (cache-key->hash-key cache-key)
         dirs (hash-key->file-path hash)
         filename (cache-key->file-name cache-key fmt)]
     (apply io/file (concat [dir "cache"]
                            (conj dirs filename)))))
+
+(s/def ::directory (s/with-gen (s/or :string string?
+                                     :file #(instance? java.io.File %))
+                     #(g/fmap
+                       (fn [s]
+                         (java.io.File. (str "/tmp/" s "/")))
+                       (g/string-alphanumeric))))
+
+(s/fdef cache-key->cache-path
+  :args (s/cat :dir ::directory
+               :fmt :drafter.stasher.formats/cache-format-keyword
+               :cache-key :drafter.stasher.cache-key/either-cache-key)
+  :ret #(instance? java.io.File %))
 
 (defn- move-file-to-cache!
   "Move the supplied file into the cache under the specified
@@ -111,7 +123,7 @@
             (.delete temp-file))
           (.close this)))))
   (source-stream [this cache-key fmt]
-    (some-> (lookup dir fmt cache-key) 
+    (some-> (lookup dir fmt cache-key)
             fs/touch
             io/input-stream)))
 
@@ -147,5 +159,3 @@
 
 (defmethod ig/pre-init-spec :drafter.stasher.filecache/file-backend [_]
   (s/keys :opt-un [::dir ::buffer-size ::persist-on-shutdown?]))
-
-

@@ -1,19 +1,13 @@
 (ns drafter.feature.draftset.list-test
-  (:require [drafter.feature.draftset.list :as sut]
-            [clojure.test :as t]
-            [grafter.rdf :refer [add context statements]]
-            [drafter.test-common :as tc]
-            [drafter.util :as dutil]
-            [drafter.swagger :as swagger]
+  (:require [clojure.test :as t]
+            [drafter.feature.draftset.list :as sut]
             [drafter.routes.draftsets-api-test :as dset-test]
-            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
-            [grafter.rdf4j.io :as gio]
-            [drafter.user :as user]
-            [grafter.rdf4j.formats :as formats]
-            [swirrl-server.async.jobs :as asjobs])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
-           java.net.URI
-           java.util.Date))
+            [drafter.test-common :as tc]
+            [drafter.user-test :refer [test-editor test-manager test-publisher]]
+            [drafter.util :as dutil])
+  (:import java.net.URI))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (defn ok-response->typed-body [schema {:keys [body] :as response}]
   (tc/assert-is-ok-response response)
@@ -67,11 +61,11 @@
   [{:keys [:drafter/backend]
     get-draftsets-handler ::sut/get-draftsets-handler
     :as sys} "drafter/feature/draftset/list_test-unclaimable.edn"]
-  
+
   (let [get-draftsets-through-api (fn [include user]
                                     (let [request (get-draftsets-request include user)
                                           {:keys [body] :as response} (get-draftsets-handler request)]
-                                      
+
                                       (ok-response->typed-body [dset-test/Draftset] response)
 
                                       body))]
@@ -120,7 +114,7 @@
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/list_test-1.edn"]
 
   ;; This test contains just a single empty draftset created by test-editor.
-  
+
   (let [{all-draftsets :body} (get-draftsets-handler (get-draftsets-request :all test-editor))]
     (t/is (= 1 (count all-draftsets))))
 
@@ -138,13 +132,13 @@
           grouped-draftsets (group-by :display-name ds-infos)
           ds1-info (first (grouped-draftsets "ds1"))
           ds2-info (first (grouped-draftsets "ds2"))]
-           
+
       (t/is (= 200 status))
       (t/is (= :deleted (get-in ds1-info [:changes g1 :status])))
       (t/is (= :created (get-in ds2-info [:changes g2 :status]))))))
 
 ;; NOTE this test is almost identical to the above one, we can probably combine them.
-(tc/deftest-system-with-keys get-draftsets-handler-test+changes-owned 
+(tc/deftest-system-with-keys get-draftsets-handler-test+changes-owned
   [:drafter.fixture-data/loader :drafter.feature.draftset.list/get-draftsets-handler]
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/claimable-draftset-changes-2.edn"]
 
@@ -152,9 +146,8 @@
         g2 (URI. "http://graph2")
         {ds-infos :body status :status} (get-draftsets-handler (get-draftsets-request :owned test-editor))
         {:keys [changes] :as ds-info} (first ds-infos)]
-    
+
     (t/is (= 200 status))
     (t/is (= 1 (count ds-infos)))
     (t/is (= :deleted (get-in changes [g1 :status])))
     (t/is (= :created (get-in changes [g2 :status])))))
-

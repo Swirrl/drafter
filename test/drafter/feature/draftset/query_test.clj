@@ -1,4 +1,5 @@
 (ns drafter.feature.draftset.query-test
-  (:require [drafter.feature.draftset.query :as sut]
-            [clojure.test :as t]))
+  (:require [clojure.test :as t]
+            [drafter.test-common :as tc]))
 
+(t/use-fixtures :each tc/with-spec-instrumentation)

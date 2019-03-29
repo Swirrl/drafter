@@ -24,15 +24,18 @@
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [drafter.util :as util]
             [drafter.write-scheduler :as scheduler]
-            [grafter.rdf :refer [context statements triple=]]
-            [grafter.rdf.protocols :refer [->Quad ->Triple]]
+            [grafter-2.rdf4j.io :refer [statements]]
+            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :refer [->Quad ->Triple context context]]
             [grafter.url :as url]
             [grafter.vocabularies.rdf :refer :all]
-            [grafter.rdf4j.repository :as repo])
+            [drafter.test-common :as tc])
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
 
-(use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler]))
+(use-fixtures :each
+  (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler])
+  tc/with-spec-instrumentation)
 ;(use-fixtures :each wrap-clean-test-db)
 
 
@@ -181,16 +184,16 @@
         (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples (URI. "http://subject")) draftset-id initial-time-fn)
               fetch-modified (fn [repo graph-uri] (:modified (first (repo/query (repo/->connection repo) (format "SELECT ?modified WHERE { <%s> <http://purl.org/dc/terms/modified> ?modified .}" graph-uri)))))
               initially-modified-at (fetch-modified *test-backend* live-graph)]
-                                                                                                                                  
+
           (is (mgmth/draft-exists? *test-backend* draft-graph))
 
           (sut/delete-draftset-graph! *test-backend* draftset-id live-graph modified-time-fn)
-                                                                                                                                  
+
           (let [subsequently-modified-at (fetch-modified (repo/->connection *test-backend*) draft-graph)]
-            (is (< (.getTime initially-modified-at)
-                   (.getTime subsequently-modified-at))
+            (is (.isBefore initially-modified-at
+                           subsequently-modified-at)
                 "Modified time is updated"))
-                                                                                                                                  
+
           (is (mgmth/draft-exists? *test-backend* draft-graph))
           (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph)))))))))
 
@@ -362,6 +365,3 @@
   (testing "Draftset does not exist"
     (let [[result _] (sut/claim-draftset! *test-backend* (->DraftsetURI "http://missing-draftset") test-publisher)]
       (is (= :not-found result)))))
-
-
-

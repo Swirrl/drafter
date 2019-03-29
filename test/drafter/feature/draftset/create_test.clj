@@ -17,12 +17,13 @@
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [drafter.user.memory-repository :as memrepo]
             [drafter.util :as util]
-            [grafter.rdf :refer [add context statements]]
-            [grafter.rdf.protocols :refer [->Quad ->Triple map->Triple]]
-            [grafter.rdf4j.formats :as formats]
-            [grafter.rdf4j.io :refer [rdf-writer]]
+            [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
+            [grafter-2.rdf4j.formats :as formats]
+            [grafter-2.rdf4j.io :refer [statements rdf-writer]]
             [schema.core :as s]
             [swirrl-server.async.jobs :refer [finished-jobs]]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def see-other-response-schema
   (merge tc/ring-response-schema

@@ -4,7 +4,7 @@
             [drafter.backend.draftset.operations :as dsops]
             [drafter.draftset :as ds]
             [drafter.responses :as response :refer [unprocessable-entity-response]]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [ring.util.response :as ring])
   (:import java.net.URI))

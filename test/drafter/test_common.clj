@@ -14,10 +14,9 @@
             [drafter.write-scheduler
              :refer
              [global-writes-lock queue-job! start-writer! stop-writer!]]
-            [grafter.rdf :as rdf]
-            [grafter.rdf.templater :refer [triplify]]
-            [grafter.rdf4j.repository :as repo]
-            [grafter.rdf4j.repository.registry :as reg]
+            [grafter-2.rdf4j.templater :refer [triplify]]
+            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.repository.registry :as reg]
             [grafter.url :as url]
             [integrant.core :as ig]
             [ring.middleware.params :refer [wrap-params]]
@@ -25,7 +24,8 @@
             [schema.core :as s]
             [schema.test :refer [validate-schemas]]
             [swirrl-server.async.jobs :refer [create-job]]
-            [clojure.pprint :as pp])
+            [clojure.pprint :as pp]
+            [clojure.spec.test.alpha :as st])
   (:import drafter.rdf.DrafterSPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -40,6 +40,13 @@
            org.apache.http.ProtocolVersion
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
            org.eclipse.rdf4j.rio.trig.TriGParserFactory))
+
+(defn with-spec-instrumentation [f]
+  (try
+    (st/instrument)
+    (f)
+    (finally
+      (st/unstrument))))
 
 ;;(use-fixtures :each validate-schemas) ;; TODO should remove this...
 
@@ -98,7 +105,7 @@
    `(with-system nil ~binding-form ~form))
 
   ([start-keys [binding-form system-cfg] form]
-   `(let [system# (main/start-system! (io/resource ~system-cfg) ~start-keys)
+   `(let [system# (main/start-system! (main/read-system (io/resource ~system-cfg)) ~start-keys)
           ~binding-form system#
           ;; drafter specific gunk that we can ultimately remove
           configured-factories# (reg/registered-parser-factories)]
@@ -130,7 +137,7 @@
   instead."
   [system start-keys]
   (fn [test-fn]
-    (let [started-system (main/start-system! (io/resource system) start-keys)
+    (let [started-system (main/start-system! (main/read-system (io/resource system)) start-keys)
           backend (:drafter.stasher/repo started-system)
           writer (:drafter/write-scheduler started-system)
           configured-factories (reg/registered-parser-factories)]

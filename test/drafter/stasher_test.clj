@@ -4,10 +4,10 @@
             [drafter.stasher :as sut]
             [drafter.stasher.filecache :as fc]
             [drafter.test-common :as tc :refer [with-system deftest-system]]
-            [grafter.rdf :as rdf]
-            [grafter.rdf.protocols :as pr]
-            [grafter.rdf4j.io :as gio]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.io :as rio]
+            [grafter-2.rdf4j.repository :as repo]
+            [drafter.stasher.formats :as formats]
             [grafter.url :as url]
             [integrant.core :as ig]
             [me.raynes.fs :as fs])
@@ -20,24 +20,30 @@
            org.eclipse.rdf4j.query.resultio.QueryResultIO
            org.eclipse.rdf4j.rio.RDFHandler
            (org.eclipse.rdf4j.query TupleQueryResult TupleQueryResultHandler)
-           org.eclipse.rdf4j.query.resultio.TupleQueryResultWriter))
+           org.eclipse.rdf4j.query.resultio.TupleQueryResultWriter
+           java.time.OffsetDateTime))
 
-(def test-triples [(rdf/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
+(t/use-fixtures :each tc/with-spec-instrumentation)
+
+(def test-triples [(pr/->Quad (URI. "http://foo") (URI."http://is/a") (URI."http://is/triple") nil)])
 
 (defmethod ig/init-key ::stub-cache-key-generator [_ opts]
   sut/generate-drafter-cache-key)
+
+(def fixed-time "A fixed time to ensure queries are cached with a known cache key (for testing)"
+  (java.time.OffsetDateTime/parse "2019-01-25T01:01:01Z"))
 
 (defn- sneak-rdf-file-into-cache!
   "Force the creation of an entry in the cache via the backdoor "
   [cache repo dataset query-string]
   (let [cache-key (with-open [conn (.getConnection repo)]
-                    (sut/generate-drafter-cache-key nil :graph cache query-string dataset conn))
+                    (sut/generate-drafter-cache-key fixed-time :graph cache query-string dataset conn))
         fmt (get-in cache [:formats :graph])]
     (with-open [in-stream (fc/destination-stream (:cache-backend cache)
                                                  cache-key
                                                  fmt)]
-      (let [writer (gio/rdf-writer in-stream :format fmt)]
-        (rdf/add writer test-triples)
+      (let [writer (rio/rdf-writer in-stream :format fmt)]
+        (pr/add writer test-triples)
         (.endRDF writer)))))
 
 (def basic-construct-query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o . }")
@@ -80,7 +86,7 @@
         dir (get-in cache [:cache-backend :dir])
         fmt (get-in cache [:formats query-type])
         cache-key (with-open [conn (.getConnection raw-repo)]
-                    (sut/generate-drafter-cache-key nil query-type cache query dataset conn))
+                    (sut/generate-drafter-cache-key fixed-time query-type cache query dataset conn))
         cached-file (fc/cache-key->cache-path dir fmt cache-key)]
     (t/testing "Prove the side-effect of creating the file in the cache happened"
       (t/is (.exists cached-file)
@@ -90,15 +96,15 @@
       (when (fs/exists? cached-file)
         (let [cached-file-statements (let [stream (io/input-stream cached-file)]
                                        (condp = query-type
-                                         :tuple (let [tq-res (QueryResultIO/parseTupleBackground stream (get-in sut/supported-cache-formats [:tuple fmt]))]
+                                         :tuple (let [tq-res (QueryResultIO/parseTupleBackground stream (get-in formats/supported-cache-formats [:tuple fmt]))]
                                                   (iterator-seq (reify java.util.Iterator
                                                                   (next [this]
                                                                     (let [binding-set (.next tq-res)]
                                                                       (binding-set->grafter-type binding-set)))
                                                                   (hasNext [this]
                                                                     (.hasNext tq-res)))))
-                                         :graph (rdf/statements stream :format (get-in sut/supported-cache-formats [:graph fmt]))
-                                         :boolean (let [bqrp (QueryResultIO/createBooleanParser (get-in sut/supported-cache-formats [:boolean fmt]))]
+                                         :graph (rio/statements stream :format (get-in formats/supported-cache-formats [:graph fmt]))
+                                         :boolean (let [bqrp (QueryResultIO/createBooleanParser (get-in formats/supported-cache-formats [:boolean fmt]))]
                                                     (.parse bqrp stream))))]
           (t/is (= (set (box-result cached-file-statements))
                    (set (box-result expected-data)))))))))
@@ -111,7 +117,7 @@
       (let [uncached-results (box-result (repo/query cached-conn query-str)) ;; first query should be uncached
             cached-results (box-result (repo/query cached-conn query-str))
             dataset (repo/make-restricted-dataset)]
-        
+
         (t/testing "The cached, uncached and fixture data are all the same"
           (t/is (= (set uncached-results)
                    (set cached-results)
@@ -137,18 +143,18 @@
     (t/testing "ASK"
       (assert-caches-query caching-repo cache "ASK WHERE { ?s ?p ?o }" #{true})
       (assert-caches-query caching-repo cache "ASK WHERE { <http://not> <http://in> <http://db> }" #{false}))
-    
+
     ;; (t/testing "SELECT"
     ;;   (let [select-query "SELECT * WHERE { ?s ?p ?o } LIMIT 2"
     ;;         expected-data (with-open [uncconn (repo/->connection uncached-repo)]
     ;;                         (doall (repo/query uncconn select-query)))]
     ;;     (assert-caches-query caching-repo uncached-repo cache select-query expected-data)))
 
-    ;; (let [graph-data (rdf/statements (first fixtures) :format :ttl)]
+    ;; (let [graph-data (rio/statements (first fixtures) :format :ttl)]
     ;;   (t/testing "CONSTRUCT"
     ;;     (assert-caches-query caching-repo uncached-repo cache basic-construct-query graph-data))
 
-    ;;   (t/testing "DESCRIBE" 
+    ;;   (t/testing "DESCRIBE"
     ;;     (assert-caches-query caching-repo uncached-repo cache "DESCRIBE <http://statistics.gov.scot/data/home-care-clients>" graph-data)))
     ))
 
@@ -166,7 +172,7 @@
                       (endRDF [this]
                         (swap! recorded-events assoc :ended true))
                       (handleStatement [this statement]
-                        (swap! recorded-events update :data conj (gio/backend-quad->grafter-quad statement)))
+                        (swap! recorded-events update :data conj (rio/backend-quad->grafter-quad statement)))
                       (handleComment [this comment]
                         (swap! recorded-events update :comments conj comment))
                       (handleNamespace [this prefix uri]
@@ -200,16 +206,16 @@
                           (swap! recorded-events update :data conj (binding-set->grafter-type binding-set)))
                         (handleLinks [this link-urls]
                           (swap! recorded-events update :links conj link-urls)))]
-    
+
     [recorded-events tuple-handler]))
 
 (defn- assert-same-cached-uncached
   [query-type preped-query cache raw-repo fixtures make-recording-handler]
   (t/testing "A cache miss returns the results and stores them in the cache"
-    (let [[uncached-recorded-events uncached-event-handler] (make-recording-handler) 
+    (let [[uncached-recorded-events uncached-event-handler] (make-recording-handler)
           [cached-recorded-events cached-event-handler] (make-recording-handler)]
 
-      (.evaluate preped-query uncached-event-handler) ;; run uncached query 
+      (.evaluate preped-query uncached-event-handler) ;; run uncached query
       (.evaluate preped-query cached-event-handler) ;; run again (the cached query)
 
       (t/is (= true
@@ -225,7 +231,7 @@
       (t/is (= @uncached-recorded-events
                @cached-recorded-events)
             "fires same set of events whether cached or not")
-      
+
       (t/testing "The cached, uncached queries return the same data"
         (t/is (= (set (:data @uncached-recorded-events))
                  (set (:data @cached-recorded-events))))))))
@@ -247,7 +253,7 @@
                    cached-file (fc/cache-key->cache-path dir fmt cache-key)
                    cached-file-statements (-> cached-file
                                               io/input-stream
-                                              (rdf/statements :format (get-in sut/supported-cache-formats [:graph fmt])))]
+                                              (rio/statements :format (get-in formats/supported-cache-formats [:graph fmt])))]
                (assert-cached-results cache raw-repo basic-construct-query nil cached-file-statements)))
 
       (t/testing "SELECT (TupleResultHandler)"
@@ -258,7 +264,7 @@
           ;; run the same select query on a fixture repo to get the data in the expected format
           (let [expected-results (with-open [conn (-> fixtures
                                                       first
-                                                      rdf/statements
+                                                      rio/statements
                                                       repo/fixture-repo
                                                       repo/->connection)]
                                    (doall (repo/query conn simple-select-query)))]
@@ -296,14 +302,14 @@
 (def live-graph-1 (URIImpl. "http://live-and-ds1-and-ds2"))
 (def live-graph-only (URIImpl. "http://live-only"))
 
-(def liveset-most-recently-modified {:livemod #inst "2017-02-02T02:02:02.000-00:00"})
+(def liveset-most-recently-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")})
 
 (def ds-1-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
 (def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
 (def ds-1 "draftset-1 is made of dg-1 dg-2" #{ds-1-dg-1 ds-1-dg-2})
 
 (def ds-1-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
-  {:draftmod #inst "2017-04-04T04:04:04.000-00:00"})
+  {:draftmod (OffsetDateTime/parse "2017-04-04T04:04:04.000-00:00")})
 
 
 (def ds-2-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
@@ -311,7 +317,7 @@
 (def ds-2 #{ds-2-dg-1})
 
 (def ds-2-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
-  {:draftmod #inst "2017-05-05T05:05:05.000-00:00"})
+  {:draftmod (OffsetDateTime/parse "2017-05-05T05:05:05.000-00:00")})
 
 
 (defn edn->dataset [{:keys [default-graphs named-graphs]}]
@@ -326,6 +332,20 @@
           (SimpleDataset.)
           (concat default-graphs named-graphs)))
 
+
+(comment
+
+
+  ;;; TODO TODO TODO TODO
+
+
+  (def repo (grafter-2.rdf4j.repository/resource-repo "drafter/stasher-test/drafter-state-1.trig" ))
+  ;(def repo (grafter-2.rdf4j.repository/sparql-repo "http://localhost:5820/drafter-test-db/query"))
+
+  (sut/fetch-modified-state (grafter-2.rdf4j.repository/->connection repo)
+                            {:named-graphs ds-1 :default-graphs ds-1})
+
+  )
 
 (deftest-system fetch-modified-state-test
   [{repo :drafter.stasher/repo} "drafter/stasher-test/drafter-state-1.edn"]
@@ -380,17 +400,17 @@
   (let [dataset (edn->dataset {:named-graphs [live-graph-1 live-graph-only]
                                :default-graphs [live-graph-1 live-graph-only]})
         result (with-open [conn (.getConnection repo)]
-                 (sut/generate-drafter-cache-key nil :graph filecache basic-construct-query dataset conn))]
-    
+                 (sut/generate-drafter-cache-key fixed-time :graph filecache basic-construct-query dataset conn))]
+
     (let [{:keys [dataset query-str modified-times]} result]
-      (t/is (= 
+      (t/is (=
              {:default-graphs #{"http://live-and-ds1-and-ds2" "http://live-only"},
               :named-graphs #{"http://live-and-ds1-and-ds2" "http://live-only"}}
              dataset))
       (t/is (= basic-construct-query
                query-str))
       (t/is (= modified-times
-               {:livemod #inst "2017-02-02T02:02:02.000-00:00"})))))
+               {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")})))))
 
 
 (comment
@@ -412,16 +432,16 @@
                  (execute [this conn ql updt-str base-uri operation]
                    #_(println "execute")
                    (swap! at conj [:execute ql updt-str base-uri operation])))
-      
+
       repo (doto (stasher-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
              (.addRepositoryConnectionListener listener))]
 
   (with-open [conn (repo/->connection repo)]
-    (rdf/add conn [(pr/->Quad (URI. "http://foo") (URI. "http://foo") (URI. "http://foo") (URI. "http://foo"))])
+    (pr/add conn [(pr/->Quad (URI. "http://foo") (URI. "http://foo") (URI. "http://foo") (URI. "http://foo"))])
     (println (doall (repo/query conn "construct { ?s ?p ?o } where { ?s ?p ?o } limit 10")))
 
     (pr/update! conn "drop all"))
-  
+
   @at)
 
   )

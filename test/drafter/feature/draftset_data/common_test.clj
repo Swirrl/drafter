@@ -1,8 +1,11 @@
 (ns drafter.feature.draftset-data.common-test
   (:require [clojure.test :as t]
             [drafter.feature.draftset-data.common :as sut]
-            [grafter.rdf :refer [->Quad triple=]])
+            [drafter.test-common :as tc]
+            [grafter-2.rdf.protocols :refer [->Quad triple=]])
   (:import java.net.URI))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (t/deftest quad-batch->graph-triples-test
   (t/testing "Batch quads have nil graph"

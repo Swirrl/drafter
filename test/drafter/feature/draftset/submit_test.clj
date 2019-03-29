@@ -1,8 +1,10 @@
 (ns drafter.feature.draftset.submit-test
-  (:require [drafter.feature.draftset.submit :as sut]
-            [clojure.test :as t]))
+  (:require [clojure.test :as t]
+            [drafter.test-common :as tc]))
 
-;; TODO 
+(t/use-fixtures :each tc/with-spec-instrumentation)
+
+;; TODO
 #_(defn- submit-draftset-to-username-request [draftset-location target-username user]
   (tc/with-identity user
     {:uri (str draftset-location "/submit-to") :request-method :post :params {:user target-username}}))

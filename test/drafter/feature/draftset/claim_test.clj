@@ -1,6 +1,8 @@
 (ns drafter.feature.draftset.claim-test
-  (:require [drafter.feature.draftset.claim :as sut]
-            [clojure.test :as t]))
+  (:require [clojure.test :as t]
+            [drafter.test-common :as tc]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 ;; TODO
 

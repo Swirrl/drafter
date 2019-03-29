@@ -4,9 +4,11 @@
             [drafter.backend.live :as sut]
             [drafter.stasher-test :as stasher-test]
             [drafter.test-common :as tc :refer [deftest-system]]
-            [grafter.rdf.protocols :as pr :refer [->Triple]]
-            [grafter.rdf4j.repository :as repo])
+            [grafter-2.rdf.protocols :as pr :refer [->Triple]]
+            [grafter-2.rdf4j.repository :as repo])
   (:import java.net.URI))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def live-graph-1 (URI. "http://live-and-ds1-and-ds2"))
 (def live-graph-only (URI. "http://live-only"))

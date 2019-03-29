@@ -5,9 +5,9 @@
             [drafter.backend.common :as bprot :refer [->sesame-repo]]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.spec :as bs]
-            [grafter.rdf.protocols :as proto]
-            [grafter.rdf4j.io :as rio]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as proto]
+            [grafter-2.rdf4j.io :as rio]
+            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig])
   (:import java.io.Closeable
            org.eclipse.rdf4j.model.impl.URIImpl
@@ -21,13 +21,13 @@
         (let [pquery (-> (bprot/prep-and-validate-query stasher-conn sparql-string)
                          (bprot/apply-restriction restriction))]
           pquery))
-      
+
       ;; Currently restricted connections only support querying...
       proto/ISPARQLable
       (proto/query-dataset [this sparql-string dataset]
         (let [pquery (repo/prepare-query* this sparql-string dataset)]
           (repo/evaluate pquery)))
-      
+
       Closeable
       (close [this]
         (.close stasher-conn))

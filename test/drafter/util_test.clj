@@ -1,11 +1,14 @@
 (ns drafter.util-test
   (:require [clojure.math.combinatorics :refer [permutations]]
-            [clojure.test :refer :all]
-            [drafter.util :refer :all]
             [clojure.test.check :as tc]
+            [clojure.test.check.clojure-test :refer [assert-check]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [clojure.test.check.clojure-test :refer [defspec assert-check]]))
+            [drafter.test-common :as tcom]
+            [drafter.util :refer :all]
+            [clojure.test :refer :all]))
+
+(use-fixtures :each tcom/with-spec-instrumentation)
 
 (deftest base64-codec-test
   (let [p (prop/for-all [s gen/string]
@@ -57,7 +60,7 @@
                           (let [batches (batch-partition-by v even? 5)]
                             (every? #(not (empty? %)) batches)))]
       (assert-check (tc/quick-check 100 p))))
-  
+
   (testing "all batches no larger than output batch size"
     (let [p (prop/for-all [v (gen/vector gen/int)]
                           (let [output-batch-size 3

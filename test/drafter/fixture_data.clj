@@ -1,8 +1,8 @@
 (ns drafter.fixture-data
   (:require [clojure.test :as t]
-            [grafter.rdf4j.repository :as repo]
-            [grafter.rdf :as rdf]
-            [grafter.rdf.protocols :as pr]
+            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.io :as rio]
+            [grafter-2.rdf.protocols :as pr]
             [clojure.java.io :as io]
             [integrant.core :as ig]
             [clojure.spec.alpha :as s]
@@ -17,7 +17,7 @@
 (defn load-fixture! [{:keys [repo fixtures format] :as opts}]
   (with-open [conn (repo/->connection repo)]
     (doseq [res-path fixtures]
-      (rdf/add conn (rdf/statements res-path :format format))))
+      (pr/add conn (rio/statements res-path :format format))))
   (log/debug "Loaded fixtures" fixtures)
   (assoc opts :repo repo))
 
@@ -25,7 +25,7 @@
 
 (s/def ::repo #(instance? Repository %))
 
-(s/def ::fixtures (s/coll-of ::resource)) 
+(s/def ::fixtures (s/coll-of ::resource))
 
 (defmethod ig/pre-init-spec ::loader [_]
   (s/keys :req-un [::repo ::fixtures]))
@@ -33,4 +33,3 @@
 (defmethod ig/init-key ::loader [_ opts]
   (drop-all! (:repo opts))
   (load-fixture! opts))
-

@@ -19,31 +19,31 @@
 
   :repositories [["apache-dev" {:url "https://repository.apache.org/content/repositories/snapshots/"
                                 :releases false}]
-                 
+
                  ]
-  
+
   :classifiers {:prod :prod
                 :dev :dev}
 
   :dependencies [[buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-core "1.5.0"]
 
-                 [org.clojure/clojure "1.10.0"]
-                 [org.clojure/spec.alpha "0.2.176"]
-                 
+                 [org.clojure/clojure "1.10.1-beta1"]
+
                  [org.clojure/math.combinatorics "0.1.4"]
-                 
+
                  [cognician/dogstatsd-clj "0.1.2"]
 
                  [commons-codec "1.12"]
-                 
+
                  [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.5.0"] ;; for validating our Swagger/JSON schemas
 
                  [aero "1.1.3"]
 
                  [integrant "0.7.0"]
-                 
+                 [meta-merge "1.0.0"]
+
                  ;; Lock dependency of jackson to a version that
                  ;; works with sesame's sparql json results renderer
                  ;; and the scjsv json schema validator.
@@ -54,32 +54,34 @@
                  ;; Without this you get errors like:
                  ;; java.lang.NoClassDefFoundError: com/fasterxml/jackson/core/FormatFeature, compiling:(cheshire/factory.clj:54:7)
                  [com.fasterxml.jackson.core/jackson-core "2.9.8"]
-                 
+
                  [com.novemberain/monger "3.5.0"]
 
                  [com.sun.mail/javax.mail "1.6.2"]
                  ;;[com.taoensso/tower "2.0.2"]
 
-                 [grafter "0.11.0.2-drafter-rdf4j"]
+                 [grafter "2.0.1-SNAPSHOT"]
+                 [com.novemberain/pantomime "2.11.0"] ;; mime types
+                 [org.eclipse.rdf4j/rdf4j-runtime "2.5.0" :exclusions [ch.qos.logback/logback-classic]]
+
 
                  [grafter/url "0.2.5"]
-                 ;[grafter/vocabularies "0.1.3"]
+                 ;;[grafter/vocabularies "0.1.3"]
+
                  [lib-noir "0.9.9" :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]]
                  [me.raynes/fs "1.4.6"] ;; filesystem utils
 
                  [metosin/ring-swagger-ui "3.20.1"]
 
                  ;; Use JENA for our query rewriting
-                 ;; Use private release of Jena based on commit 44b478ea8637ca16035e56ef49d6cb6e59abc289
-                 ;; See https://github.com/Swirrl/drafter/issues/270
-                 ;; This should be updated to use 3.9.0 when that version is released
                  [org.apache.jena/jena-arq "3.10.0" :exclusions [org.slf4j/slf4j-api
-                                                                         org.slf4j/jcl-over-slf4j
-                                                                         org.apache.httpcomponents/httpclient]]
+                                                                 org.slf4j/jcl-over-slf4j
+                                                                 org.apache.httpcomponents/httpclient]]
+
                  [org.apache.jena/jena-base "3.10.0" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-core "3.10.0" :exclusions [org.slf4j/slf4j-api]]
                  [org.apache.jena/jena-iri "3.10.0" :exclusions [org.slf4j/slf4j-api]]
-                 
+
 
                  [org.mindrot/jbcrypt "0.4"]
 
@@ -122,8 +124,9 @@
                           [s3-wagon-private "1.1.2" :exclusions [commons-logging commons-codec]]]
 
                 :repl-options {:init-ns user
+                               :init (println "Run: (dev)")
                                :timeout 180000}
-                
+
                 :source-paths ["env/dev/clj"]
                 :resource-paths ["env/dev/resources" "test/resources"]
 
@@ -150,7 +153,7 @@
   ;; Target JDK 8 expected JVM version
   :javac-options ["-target" "8" "-source" "8"]
   :min-lein-version "2.8.1"
-  
+
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version"
@@ -162,4 +165,8 @@
                   ;;["vcs" "push"]
                   ]
 
-  :main drafter.main)
+  :main drafter.main
+
+  :aliases {"spec" ["with-profile" "system,dev,user" "run" "-m" "drafter.check-specs/check-specs" "100" "true"]}
+
+  )

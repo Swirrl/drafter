@@ -3,7 +3,7 @@
             [drafter.backend.draftset :as draftsets]
             [drafter.backend.live :as live]
             [drafter.backend.spec :as bs]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [grafter.url :as url]
             [drafter.draftset :as ds])
@@ -75,5 +75,3 @@
 
 (defmethod ig/init-key :drafter/backend [_ opts]
   (map->DrafterService opts))
-
-

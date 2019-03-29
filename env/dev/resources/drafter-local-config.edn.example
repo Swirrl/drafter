@@ -1,0 +1,8 @@
+{
+  ;; If you want to tweak the drafter config for just yourself at the
+  ;; repl you can copy this file to drafter-local-config.edn and add your
+  ;; custom config.
+
+
+
+}

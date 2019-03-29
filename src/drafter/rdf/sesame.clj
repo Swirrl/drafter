@@ -3,8 +3,8 @@
             [drafter.backend.common :refer [->sesame-repo]]
             [drafter.backend.draftset.arq :refer [sparql-string->arq-query]]
             [drafter.rdf.draftset-management.job-util :as jobs]
-            [grafter.rdf :refer [statements]]
-            [grafter.rdf4j.repository :as repo])
+            [grafter-2.rdf4j.io :refer [statements]]
+            [grafter-2.rdf4j.repository :as repo])
   (:import [org.eclipse.rdf4j.query BindingSet BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult Update]
            [org.eclipse.rdf4j.query.resultio QueryResultIO QueryResultWriter]
            org.eclipse.rdf4j.repository.Repository
@@ -62,7 +62,7 @@
     (close [this]
       ;; no-op can't call .close on writer's
       )
-    
+
     TupleQueryResultHandler
     (startQueryResult [this binding-names]
       (send-channel)
@@ -95,4 +95,3 @@
     :select (signalling-tuple-query-handler send-channel (.getBindings pquery) (create-tuple-query-writer output-stream result-format))
     :construct (signalling-rdf-handler send-channel (create-construct-query-writer output-stream result-format))
     (throw (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query."))))
-

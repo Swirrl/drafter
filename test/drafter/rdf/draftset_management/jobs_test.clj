@@ -1,17 +1,15 @@
 (ns drafter.rdf.draftset-management.jobs-test
-  (:require [clojure.java.io :as io]
-            [clojure.test :as t]
-            [drafter.feature.draftset-data.append-by-graph :as append-graph]
+  (:require [clojure.test :as t]
             [drafter.backend.draftset.operations :as dsops]
-            [drafter.rdf.drafter-ontology :as do :refer :all]
-            [drafter.rdf.draftset-management.jobs :as sut]
+            [drafter.feature.draftset-data.append-by-graph :as append-graph]
             [drafter.rdf.sparql :as sparql]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]]
             [drafter.write-scheduler :as scheduler]
-            [grafter.rdf :refer [->Triple]])
-  (:import java.net.URI
-           org.eclipse.rdf4j.rio.RDFFormat))
+            [grafter-2.rdf.protocols :refer [->Triple]])
+  (:import java.net.URI))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (defn- get-graph-triples [backend graph-uri]
   (let [results (sparql/eager-query backend (tc/select-all-in-graph graph-uri))]

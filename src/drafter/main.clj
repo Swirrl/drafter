@@ -8,9 +8,12 @@
             [drafter.common.json-encoders :as enc]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.writers :as writers]
-            [integrant.core :as ig]))
+            [integrant.core :as ig]
+            [meta-merge.core :as mm]))
 
 (require 'drafter.configuration)
+
+(def profiles [(io/resource "drafter-base-config.edn") (io/resource "drafter-prod-config.edn")])
 
 (def system nil)
 
@@ -51,7 +54,7 @@
      {:drafter.main/datadog {:logging (ig/->Ref :drafter/logging)}})
    system-config))
 
-(defn- load-system
+(defn load-system
   "Initialises the given system map."
   [system-config sys-keys]
   (initialisation-side-effects! system-config)
@@ -61,23 +64,18 @@
 
 
 (defn start-system!
-  "Starts drafter with the supplied system.edn file (assumed to be in
+  "Starts drafter with the supplied edn config (assumed to be in
   integrant & aero format).
-
-  If no argument is given it will start drafter using the default
-  system.edn resource.
 
   If a single arg is given it will load the given resource, file or if
   it's a map use its value as the system and start it.
 
   If two args are given the second argument is expected to be a set of
   keys to start from within the given system."
-  
-  ([] (start-system! (io/resource "system.edn")))
+
   ([sys] (start-system! sys nil))
-  ([system-config start-keys]
-   (let [system (read-system system-config)
-         initialised-sys (load-system system start-keys)]
+  ([system start-keys]
+   (let [initialised-sys (load-system system start-keys)]
      (alter-var-root #'system (constantly initialised-sys)))))
 
 (defn stop-system! []
@@ -103,5 +101,11 @@
   (println "Starting Drafter")
   (add-shutdown-hook!)
   (if-let [config-file (first args)]
-    (start-system! config-file)
-    (start-system!)))
+    (start-system! (read-system (io/file config-file)))
+    (start-system!
+
+     (apply mm/meta-merge (->> profiles
+                               (remove nil?)
+                               (map read-system)))
+
+     )))

@@ -5,12 +5,14 @@
             [drafter.rdf.sparql :as sparql]
             [drafter.rdf.sparql-protocol :refer :all]
             [drafter.test-common :as tc]
-            [grafter.rdf :as rdf]
-            [grafter.rdf4j.repository :as repo]
+            [grafter-2.rdf4j.io :as rio]
+            [grafter-2.rdf4j.repository :as repo]
             [ring.util.response :as ring]
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI
            [java.util.concurrent CountDownLatch TimeUnit]))
+
+(use-fixtures :each tc/with-spec-instrumentation)
 
 (defn add-triple-to-db [db]
   (sparql/add db (URI. "http://foo.com/my-graph") (tc/test-triples (URI. "http://test.com/data/one"))))
@@ -56,7 +58,8 @@
         (tc/assert-is-bad-request-response response)))))
 
 (defn- prepare-query-str [query-str]
-  (bcom/prep-and-validate-query (repo/sail-repo) query-str))
+  (with-open [conn (repo/->connection (repo/sail-repo))]
+    (bcom/prep-and-validate-query conn query-str)))
 
 (deftest sparql-negotiation-handler-test
   (testing "Valid request"
@@ -128,7 +131,7 @@
         (is (= "application/n-triples" (headers "Content-Type")))
 
         (let [triple-reader (java.io.InputStreamReader. body)
-              triples (get-spo-set (rdf/statements triple-reader :format :nt))
+              triples (get-spo-set (rio/statements triple-reader :format :nt))
               expected-triples (get-spo-set (tc/test-triples (URI. "http://test.com/data/one")))]
 
           (is (= expected-triples triples)))))))

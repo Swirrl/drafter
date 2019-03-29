@@ -7,7 +7,10 @@
               drafter:hasDraft
               drafter:inDraftSet
               drafter:modifiedAt]]
-            [drafter.rdf.sparql :as sparql]))
+            [drafter.rdf.sparql :as sparql]
+            [drafter.test-common :as tc]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (defn apply-job!
   "Execute the job in this thread"
@@ -37,7 +40,3 @@
       (assert (= 1 (count res)) "There were multiple modifiedAt timestamps, we expect just one.")
 
       (-> res first :modified))))
-
-
-
-

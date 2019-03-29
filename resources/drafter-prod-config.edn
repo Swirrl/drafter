@@ -1,0 +1,19 @@
+{
+
+ ;; This file is meta-merged over drafter-base-config.edn when the
+ ;; system is launched via drafter.main.
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; User Database config
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ :drafter.user/mongo {:mongo-host #env DRAFTER_MONGO_HOST
+                      :mongo-port #port #env DRAFTER_MONGO_PORT
+                      :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]
+                      :mongo-db-name #env DRAFTER_USER_DB_NAME
+
+                      :realm #join ["Drafter: " #env DRAFTER_USER_DB_NAME]
+                      }
+
+
+ }

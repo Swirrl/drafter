@@ -6,7 +6,7 @@
              [with-state-graph]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql]
-            [grafter.rdf4j.repository :as repo]))
+            [grafter-2.rdf4j.repository :as repo]))
 
 (defn draft-exists?
   "Checks state graph to see if a draft graph exists"

@@ -3,9 +3,8 @@
             [drafter.draftset :as ds]
             [drafter.rdf.sparql :as sparql]
             [drafter.write-scheduler :as writes]
-            [grafter.rdf :as rdf :refer [context]]
-            [grafter.rdf.protocols :refer [map->Triple]]
-            [grafter.rdf4j.io :refer [rdf-writer]]
+            [grafter-2.rdf.protocols :as rdf :refer [context map->Triple]]
+            [grafter-2.rdf4j.io :refer [rdf-writer]]
             [grafter.vocabularies.dcterms :refer [dcterms:modified]])
   (:import java.io.StringWriter))
 
