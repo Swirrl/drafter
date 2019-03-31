@@ -173,24 +173,24 @@
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; User Database config
- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
- :drafter.user/mongo {:mongo-host #env DRAFTER_MONGO_HOST
-                      :mongo-port #port #env DRAFTER_MONGO_PORT
-                      :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]
-                      :mongo-db-name #env DRAFTER_USER_DB_NAME
+ ;; :drafter.user/mongo {:mongo-host #env DRAFTER_MONGO_HOST
+ ;;                      :mongo-port #port #env DRAFTER_MONGO_PORT
+ ;;                      :mongo-user-collection #or [#env DRAFTER_MONGO_USER_COLLECTION "users"]
+ ;;                      :mongo-db-name #env DRAFTER_USER_DB_NAME
 
-                      ;; TODO DEV only!
-                      :realm #join ["Drafter: " #env DRAFTER_USER_DB_NAME] 
-                      }
+ ;;                      ;; TODO DEV only!
+ ;;                      :realm #join ["Drafter: " #env DRAFTER_USER_DB_NAME]
+ ;;                      }
 
 
 
  ;;;; Uncomment below for an in memory repo
 
- ;; :drafter.user/memory-repository {:users [{:username "editor@swirrl.com" :password "password" :role :editor}
- ;;                                          {:username "publisher@swirrl.com" :password "password" :role :publisher}
- ;;                                          {:username "manager@swirrl.com" :password "password" :role :manager}
- ;;                                          {:username "system@swirrl.com" :password "password" :role :system}]
- ;;                                  :realm "Drafter Memory Repo"}
+ :drafter.user/memory-repository {:users [{:username "editor@swirrl.com" :password "password" :role :editor}
+                                          {:username "publisher@swirrl.com" :password "password" :role :publisher}
+                                          {:username "manager@swirrl.com" :password "password" :role :manager}
+                                          {:username "system@swirrl.com" :password "password" :role :system}]
+                                  :realm "Drafter Memory Repo"}
  }
