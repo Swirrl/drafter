@@ -2,13 +2,14 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
-            [compojure.core :refer [context defroutes]]
+            [compojure.core :refer [context defroutes GET]]
             [compojure.route :as route]
             [drafter.backend.common :refer [stop-backend]]
             [drafter.env :as denv]
             [drafter.middleware :as middleware]
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.status :refer [status-routes]]
+            [drafter.swagger :as swagger]
             [drafter.timeouts :as timeouts]
             [drafter.util :refer [conj-if set-var-root!]]
             [drafter.write-scheduler
@@ -25,6 +26,10 @@
             [swirrl-server.middleware.log-request :refer [log-request]]))
 
 (defroutes app-routes
+  (GET "/swagger/swagger.json" []
+       {:status 200
+        :headers {"Content-Type" "application/json"}
+        :body (swagger/load-spec-and-resolve-refs)})
   (route/resources "/")
   (route/not-found "Not Found"))
 
@@ -43,7 +48,7 @@
   [{backend :repo
     live-sparql-route :live-sparql-query-route
     draftset-api-routes :draftset-api-routes}]
-  (wrap-handler (app-handler 
+  (wrap-handler (app-handler
                  ;; add your application routes here
                  (-> []
                      (add-route (pages-routes))
