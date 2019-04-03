@@ -9,44 +9,47 @@
 <http://publishmydata.com/graphs/drafter/drafts> {
   :PublicGraph a drafter:ManagedGraph ;
     drafter:isPublic true .
-  :PublicGraph2 a drafter:ManagedGraph ;
-    drafter:isPublic true .
+}
+
+<http://publishmydata.com/graphs/reasoning-tbox> {
+  :Lifeform            a rdfs:Class .
+  :Animal              a rdfs:Class ; rdfs:subClassOf :Lifeform .
+  :Mammal              a rdfs:Class ; rdfs:subClassOf :Animal .
+  :Cat                 a rdfs:Class ; rdfs:subClassOf :Mammal .
+  :Dog                 a rdfs:Class ; rdfs:subClassOf :Mammal .
+  :Tiger               a rdfs:Class ; rdfs:subClassOf :Cat .
+  :WestHighlandTerrier a rdfs:Class ; rdfs:subClassOf :Dog .
 }
 
 :PublicGraph {
-  :Lifeform a rdfs:Class ;
+
+  :Lifeform
     rdfs:label "Lifeform" ;
     rdfs:comment "A living thing." .
 
-  :Animal a rdfs:Class ;
+  :Animal
     rdfs:label "Animal" ;
-    rdfs:comment "An animal." ;
-    rdfs:subClassOf :Lifeform .
+    rdfs:comment "An animal.".
 
-  :Mammal a rdfs:Class ;
+  :Mammal
     rdfs:label "Mammal" ;
-    rdfs:comment "A mammal." ;
-    rdfs:subClassOf :Animal .
+    rdfs:comment "A mammal." .
 
-  :Cat a rdfs:Class ;
+  :Cat
     rdfs:label "Cat" ;
-    rdfs:comment "A cat." ;
-    rdfs:subClassOf :Mammal .
+    rdfs:comment "A cat." .
 
-  :Dog a rdfs:Class ;
+  :Dog
     rdfs:label "Dog" ;
-    rdfs:comment "A dog." ;
-    rdfs:subClassOf :Mammal .
+    rdfs:comment "A dog." .
 
-  :Tiger a rdfs:Class ;
+  :Tiger
     rdfs:label "Tiger" ;
-    rdfs:comment "A tiger." ;
-    rdfs:subClassOf :Cat .
+    rdfs:comment "A tiger." .
 
-  :WestHighlandTerrier a rdfs:Class ;
+  :WestHighlandTerrier
     rdfs:label "West Highland Terrier" ;
-    rdfs:comment "A west highland terrier." ;
-    rdfs:subClassOf :Dog .
+    rdfs:comment "A west highland terrier." .
 
   :Tigger a :Tiger .
 

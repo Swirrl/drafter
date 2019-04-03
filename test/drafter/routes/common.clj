@@ -23,8 +23,8 @@
       (cond-> reasoning (assoc-in [:query-params "reasoning"] "true"))))
 
 (defn draftset-query
-  [draftset qstr & {:keys [union-with-live reasoning] :as kwargs}]
-  (tc/with-identity test-editor
+  [draftset qstr & {:keys [user union-with-live reasoning] :as kwargs}]
+  (tc/with-identity (or user test-editor)
     (-> (str draftset "/query")
         (build-query qstr kwargs)
         (cond->
@@ -53,5 +53,13 @@
 
 (defn append-quads-to-draftset-through-api [api user draftset-location quads]
   (let [request (statements->append-request user draftset-location quads :nq)
+        response (api request)]
+    (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
+
+(defn publish-draftset [api user draftset-location]
+  (let [content-type (.getDefaultMIMEType (formats/->rdf-format :nq))
+        request (tc/with-identity user
+                  {:uri (str draftset-location "/publish")
+                   :request-method :post})
         response (api request)]
     (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
