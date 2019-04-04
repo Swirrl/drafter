@@ -1,0 +1,22 @@
+#!/bin/bash
+
+cd `dirname $0`
+
+JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java
+
+cd ../drafter
+lein test
+lein spec
+env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
+
+cp log-config.edn.example log-config.edn
+java -jar target/drafter.jar
+
+../stardog/bin/stardog-admin db create drafter-client-test
+../stardog/bin/stardog-admin db create -n drafter-client-test --
+
+cd ../drafter-client
+
+sleep 15 # give drafter a few seconds to start up
+
+lein test
