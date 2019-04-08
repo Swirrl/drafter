@@ -26,7 +26,7 @@
             [swirrl-server.async.jobs :refer [create-job]]
             [clojure.pprint :as pp]
             [clojure.spec.test.alpha :as st])
-  (:import drafter.rdf.DrafterSPARQLRepository
+  (:import grafter_2.rdf.SPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
            [java.net InetSocketAddress ServerSocket SocketException URI]
@@ -350,11 +350,11 @@
           (catch InterruptedException ex nil))))))
 
 (defn get-latched-http-server-repo
-  "Returns a DrafterSPARQLRepository with a query URI matching latched-http-handler
+  "Returns a SPARQLRepository with a query URI matching latched-http-handler
    listening on the given port."
   [port]
   (let [uri (URI. "http" nil "localhost" port nil nil nil)
-        repo (DrafterSPARQLRepository. (str uri))]
+        repo (SPARQLRepository. (str uri))]
     (.initialize repo)
     repo))
 

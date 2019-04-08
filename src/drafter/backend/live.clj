@@ -5,7 +5,7 @@
             [drafter.backend.common :as bprot :refer [->sesame-repo]]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.spec :as bs]
-            [grafter-2.rdf.protocols :as proto]
+            [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig])
@@ -23,8 +23,10 @@
           pquery))
 
       ;; Currently restricted connections only support querying...
-      proto/ISPARQLable
-      (proto/query-dataset [this sparql-string dataset]
+      pr/ISPARQLable
+      (pr/query-dataset [this sparql-string dataset]
+        (pr/query-dataset this sparql-string dataset {}))
+      (pr/query-dataset [this sparql-string dataset opts]
         (let [pquery (repo/prepare-query* this sparql-string dataset)]
           (repo/evaluate pquery)))
 
@@ -34,7 +36,7 @@
 
       ;; For completeness... a to-statements implementation that
       ;; enforces the graph restriction.
-      proto/ITripleReadable
+      pr/ITripleReadable
       (pr/to-statements [this {:keys [:grafter.repository/infer] :or {infer true}}]
         (let [f (fn next-item [i]
                   (when (.hasNext i)
