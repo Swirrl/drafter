@@ -111,7 +111,7 @@
         (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
 
 (defn fetch-modified-state [conn {:keys [named-graphs default-graphs] :as graphs}]
-  (let [values {:graph (set (concat default-graphs named-graphs))}]
+  (let [values {:graph (distinct (concat default-graphs named-graphs))}]
     (->> (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn)))
          (remove (comp nil? second))
          (into {}))))

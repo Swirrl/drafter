@@ -60,7 +60,7 @@
                  [com.sun.mail/javax.mail "1.6.2"]
                  ;;[com.taoensso/tower "2.0.2"]
 
-                 [grafter "2.0.1-SNAPSHOT"]
+                 [grafter "2.0.0"]
                  [com.novemberain/pantomime "2.11.0"] ;; mime types
                  [org.eclipse.rdf4j/rdf4j-runtime "2.5.0" :exclusions [ch.qos.logback/logback-classic]]
 
