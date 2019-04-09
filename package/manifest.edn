@@ -61,10 +61,16 @@
                           :dest-path "drafter-env.list"
                           :mode "660"
                           :facet :systemd}
+                         {:type :env
+                          :dest-path "config.env"}
+                         {:type :selmer/template
+                          :path "start.sh"
+                          :mode "755"
+                          :keys [:omni/install-dir]}
                          {:type :selmer/template
                           :path "log-config.edn.template"
                           :dest-path "log-config.edn"
-                          :keys [:drafter/sparql-log-file
+                          :keys [:drafter/sparql-log-file-path
                                  :drafter/drafter-log-file-path]}]
                :systemd [{:type :selmer/template
                           :path "drafter.service"                          
