@@ -27,7 +27,7 @@
       (pr/query-dataset [this sparql-string dataset]
         (pr/query-dataset this sparql-string dataset {}))
       (pr/query-dataset [this sparql-string dataset opts]
-        (let [pquery (repo/prepare-query* this sparql-string dataset)]
+        (let [pquery (repo/prepare-query this sparql-string dataset opts)]
           (repo/evaluate pquery)))
 
       Closeable
