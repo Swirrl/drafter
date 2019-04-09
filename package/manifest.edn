@@ -2,7 +2,7 @@
  :omni/package-name "drafter"
  :omni/package-version #join [#env TRAVIS_TAG "-" #env TRAVIS_BUILD_NUMBER]
  :omni/dependencies {"stardog" "5.2.0"
-                     "mongodb" "3.4"}
+                     "mongodb" "3.2"}
  :omni/defs {:jar-name #join ["drafter-" #ref [:omni/package-version] ".jar"]}
  :omni/keys {:drafter/http-port {:doc "HTTP port to listen on"
                                  :env-var DRAFTER_HTTP_PORT
