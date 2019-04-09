@@ -1,6 +1,6 @@
 #! /bin/bash
 
-cd /opt/drafter
+cd {{omni/install-dir}}
 java -Xmx4g -Dcom.sun.management.jmxremote.ssl=false \
 -Dcom.sun.management.jmxremote.authenticate=false \
 -Dcom.sun.management.jmxremote.port=3007 \

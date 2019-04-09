@@ -1,26 +1,50 @@
 {:omni/package-format "1"
  :omni/package-name "drafter"
  :omni/package-version #join [#env TRAVIS_TAG "-" #env TRAVIS_BUILD_NUMBER]
+ :omni/dependencies {"stardog" "5.2.0"
+                     "mongodb" "3.4"}
  :omni/defs {:jar-name #join ["drafter-" #ref [:omni/package-version] ".jar"]}
- :omni/keys {:drafter/http-port {:default 3001
-                                 :doc "HTTP port to listen on"}
+ :omni/keys {:drafter/http-port {:doc "HTTP port to listen on"
+                                 :env-var DRAFTER_HTTP_PORT
+                                 :optional true}
              :drafter/batched-write-size {:key :drafter/batched-write-size
-                                          :doc "Batch size for writing statments to stardog"}
-             :drafter/user-repo-ns {}
-             :drafter/user-repo-db-name {:doc "The name of the mongodb user collection"}
-             :drafter/sparql-query-endpoint {:doc "URI of the stardog SPARQL query endpoint"}
-             :drafter/sparql-update-endpoint {:doc "URI of the stardog SPARQL update endpoint"}
-             :drafter/jws-signing-key {:doc "Signing key for JWS tokens"}
+                                          :doc "Batch size for writing statments to stardog"
+                                          :env-var DRAFTER_BATCHED_WRITE_SIZE
+                                          :optional true}
+             :drafter/user-db-name {:doc "The name of the mongodb user collection"
+                                    :env-var DRAFTER_USER_DB_NAME}
+             :drafter/sparql-query-endpoint {:doc "URI of the stardog SPARQL query endpoint"
+                                             :env-var DRAFTER_SPARQL_QUERY_ENDPOINT}
+             :drafter/sparql-update-endpoint {:doc "URI of the stardog SPARQL update endpoint"
+                                              :env-var DRAFTER_SPARQL_UPDATE_ENDPOINT}
+             :drafter/jws-signing-key {:doc "Signing key for JWS tokens"
+                                       :env-var DRAFTER_JWS_SIGNING_KEY}
              :drafter/timeout-query-endpoint-live {:doc "Query timeout for the live endpoint"
-                                                   :default 600}
+                                                   :optional true
+                                                   :env-var DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
              :drafter/timeout-query-endpoint-draftset {:doc "Query timeout for draftset endpoints"
-                                                       :default 900}
+                                                       :optional true
+                                                       :env-var DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET}
              :drafter/stasher-cache-endabled {:doc "Whether stasher caching is enabled"
-                                              :default true}
-             :drafter/stasher-cache-dir {:doc "Directory used to write cached results to"}
+                                              :optional true
+                                              :env-var STASHER_CACHE_ENABLED}
+             :drafter/stasher-cache-dir {:doc "Directory used to write cached results to"
+                                         :optional true
+                                         :env-var STASHER_CACHE_DIR}
              :drafter/stasher-max-pool-size {:doc "Max thread pool size for stasher"
-                                             :default 10}
-             :drafter/stasher-queue-size {:doc "Size of the queue for cache requests"}}
+                                             :env-var STASHER_MAX_POOL_SIZE
+                                             :optional true}
+             :drafter/stasher-queue-size {:doc "Size of the queue for cache requests"
+                                          :env-var STASHER_QUEUE_SIZE
+                                          :optional true}
+             :drafter/drafter-log-file-path {:doc "Path to the drafter log file"
+                                             :default "drafter.log"}
+             :drafter/sparql-log-file-path {:doc "Path to the sparql log file"
+                                            :default "sparql.log"}
+             :datadog/statsd-address {:doc "Address of the statsd service"
+                                      :env-var DATADOG_STATSD_ADDRESS
+                                      :default "localhost:8125"
+                                      :optional true}}
  :omni/metadata {:omni/repository-uri "https://github.com/swirrl/drafter"}
  :omni/facets {:install [{:type :selmer/template
                           :path "cleanup-drafter-temp.sh"
