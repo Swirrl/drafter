@@ -57,22 +57,9 @@
                          {:type :symlink
                           :dest-path "drafter.jar"       
                           :target #ref [:omni/defs :jar-name]}
-                         {:type :selmer/template
-                          :path "drafter-env.list.template"
+                         {:type :env                          
                           :dest-path "drafter-env.list"
                           :mode "660"
-                          :keys [:drafter/http-port
-                                 :drafter/batched-write-size
-                                 :drafter/backend
-                                 :drafter/user-repo-ns
-                                 :drafter/user-db-name
-                                 :drafter/sparql-query-endpoint
-                                 :drafter/sparql-update-endpoint
-                                 :drafter/jws-signing-key
-                                 :drafter/timeout-query-endpoint-live
-                                 :drafter/stasher-cache-dir
-                                 :drafter/stasher-max-pool-size
-                                 :drafter/stasher-queue-size]
                           :facet :systemd}
                          {:type :selmer/template
                           :path "log-config.edn.template"
