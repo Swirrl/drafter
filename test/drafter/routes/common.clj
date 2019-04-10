@@ -1,9 +1,9 @@
 (ns drafter.routes.common
   (:require [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]]
-            [grafter.rdf :refer [add statements]]
-            [grafter.rdf4j.formats :as formats]
-            [grafter.rdf4j.io :refer [rdf-writer]]
+            [grafter-2.rdf.protocols :refer [add]]
+            [grafter-2.rdf4j.formats :as formats]
+            [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [swirrl-server.async.jobs :refer [finished-jobs]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
