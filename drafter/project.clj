@@ -22,8 +22,8 @@
 
                  ]
 
-  :classifiers {:prod :prod
-                :dev :dev}
+  ;; :classifiers {:prod :prod
+  ;;               :dev :dev}
 
   :dependencies [[buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-core "1.5.0"]
