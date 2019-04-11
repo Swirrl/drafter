@@ -14,9 +14,9 @@
              :drafter/user-db-name {:doc "The name of the mongodb user collection"
                                     :env-var DRAFTER_USER_DB_NAME}
              :drafter/sparql-query-endpoint {:doc "URI of the stardog SPARQL query endpoint"
-                                             :env-var DRAFTER_SPARQL_QUERY_ENDPOINT}
+                                             :env-var SPARQL_QUERY_ENDPOINT}
              :drafter/sparql-update-endpoint {:doc "URI of the stardog SPARQL update endpoint"
-                                              :env-var DRAFTER_SPARQL_UPDATE_ENDPOINT}
+                                              :env-var SPARQL_UPDATE_ENDPOINT}
              :drafter/jws-signing-key {:doc "Signing key for JWS tokens"
                                        :env-var DRAFTER_JWS_SIGNING_KEY}
              :drafter/timeout-query-endpoint-live {:doc "Query timeout for the live endpoint"
