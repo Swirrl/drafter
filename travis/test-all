@@ -17,7 +17,9 @@ lein spec
 env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
 
 cp log-config.edn.example log-config.edn
-java -jar target/drafter.jar
+
+# Run drafter-client tests against our in memory dev/users db
+java -jar target/drafter.jar env/dev/resources/drafter-dev-config.edn
 
 ../stardog/bin/stardog-admin db create drafter-client-test
 ../stardog/bin/stardog-admin db create -n drafter-client-test --
