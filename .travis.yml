@@ -16,7 +16,6 @@ cache:
   - $HOME/.m2
 before_install:
 - sudo travis/install_base.sh
-- curl 'https://raw.githubusercontent.com/Swirrl/stardog/master/consume/setup-stardog?token=AABCpLUdCWZQ-1MW8nm70bQLGqZJfGNeks5csMkIwA%3D%3D' | env STARDOG_BUILD=stardog-5.2.0-21 CREATE_DB=drafter-test-db START_STARDOG=true AWS_INSTALL=true bash
 install:
 - cd drafter
 - lein deps
