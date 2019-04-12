@@ -1,10 +1,17 @@
 #!/bin/bash
 
+set -e
+set -o pipefail
+
+if [ -z "${SPARQL_QUERY_ENDPOINT}" ] && [ -z "${SPARQL_UPDATE_ENDPOINT}" ] ; then
+   echo You must set env vars for SPARQL_UPDATE_ENDPOINT and SPARQL_QUERY_ENDPOINT
+   exit 1
+fi
+
 cd `dirname $0`
 
-JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java
-
 cd ../drafter
+
 lein test
 lein spec
 env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
