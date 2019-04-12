@@ -13,7 +13,7 @@
 
 (require 'drafter.configuration)
 
-(def profiles [(io/resource "drafter-base-config.edn") (io/resource "drafter-prod-config.edn")])
+(def default-production-config [(io/resource "drafter-base-config.edn") (io/resource "drafter-prod-config.edn")])
 
 (def system nil)
 
@@ -97,14 +97,24 @@
   []
   (.addShutdownHook (Runtime/getRuntime) (Thread. stop-system!)))
 
+(defn resolve-configs
+  "Merges the base config with any supplied config files.  Config files
+  are assumed to be strings with relative file paths to edn/aero files
+  we can read."
+  [cfg-args]
+  (let [profiles (concat [(io/resource "drafter-base-config.edn")]
+                         (map io/file cfg-args))]
+    (println "Using supplied configs " profiles)
+    (map read-system profiles)))
+
 (defn -main [& args]
   (println "Starting Drafter")
   (add-shutdown-hook!)
-  (if-let [config-file (first args)]
-    (start-system! (read-system (io/file config-file)))
+  (if (seq args)
+    (start-system! (apply mm/meta-merge (resolve-configs args)))
     (start-system!
-
-     (apply mm/meta-merge (->> profiles
+     ;; default production config
+     (apply mm/meta-merge (->> default-production-config
                                (remove nil?)
                                (map read-system)))
 
