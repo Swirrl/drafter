@@ -12,8 +12,8 @@ if [ -n "$TRAVIS" ] ; then
 fi
 
 echo Fetching stardog
-curl 'https://raw.githubusercontent.com/Swirrl/stardog/master/consume/setup-stardog?token=AABCpLUdCWZQ-1MW8nm70bQLGqZJfGNeks5csMkIwA%3D%3D' | \
-    env STARDOG_BUILD=stardog-5.2.0-45 \
+curl 'https://raw.githubusercontent.com/Swirrl/stardog/master/consume/setup-stardog' | \
+    env STARDOG_BUILD=stardog-5.2.0-62 \
         CREATE_DB=drafter-test-db \
         START_STARDOG=true \
-        bash ### <--- bash command here runs curled script
+        bash -x ### <--- bash command here runs curled script
