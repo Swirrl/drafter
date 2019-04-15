@@ -2,7 +2,7 @@
 
 if [ -n "$TRAVIS" ] ; then
     echo Setting up travis dependencies...
-    #apt-get update  ## This breaks pip/awscli
+    apt-get update
     apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
     chown -R travis ./travis/*
     chmod +x ./travis/*
