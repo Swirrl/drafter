@@ -5,11 +5,12 @@
             [drafter.backend.common :as bprot :refer [->sesame-repo]]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.spec :as bs]
-            [grafter-2.rdf.protocols :as proto]
+            [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig])
   (:import java.io.Closeable
+           [org.apache.jena.query QueryFactory Syntax]
            org.eclipse.rdf4j.model.impl.URIImpl
            org.eclipse.rdf4j.model.Resource))
 
@@ -17,15 +18,22 @@
   (let [stasher-conn (repo/->connection inner)]
     (reify
       repo/IPrepareQuery
-      (repo/prepare-query* [this sparql-string _]
-        (let [pquery (-> (bprot/prep-and-validate-query stasher-conn sparql-string)
-                         (bprot/apply-restriction restriction))]
-          pquery))
+      (repo/prepare-query* [this sparql-string dataset]
+        (let [query (QueryFactory/create sparql-string Syntax/syntaxSPARQL_11)
+              user-restriction (some-> dataset bprot/dataset->restriction)
+              query-restriction (bprot/query-dataset-restriction query)]
+          (-> stasher-conn
+              (bprot/prep-and-validate-query sparql-string)
+              (bprot/restrict-query user-restriction
+                                    query-restriction
+                                    restriction))))
 
       ;; Currently restricted connections only support querying...
-      proto/ISPARQLable
-      (proto/query-dataset [this sparql-string dataset]
-        (let [pquery (repo/prepare-query* this sparql-string dataset)]
+      pr/ISPARQLable
+      (pr/query-dataset [this sparql-string dataset]
+        (pr/query-dataset this sparql-string dataset {}))
+      (pr/query-dataset [this sparql-string dataset opts]
+        (let [pquery (repo/prepare-query this sparql-string dataset opts)]
           (repo/evaluate pquery)))
 
       Closeable
@@ -34,7 +42,7 @@
 
       ;; For completeness... a to-statements implementation that
       ;; enforces the graph restriction.
-      proto/ITripleReadable
+      pr/ITripleReadable
       (pr/to-statements [this {:keys [:grafter.repository/infer] :or {infer true}}]
         (let [f (fn next-item [i]
                   (when (.hasNext i)

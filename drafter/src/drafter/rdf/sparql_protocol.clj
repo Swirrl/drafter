@@ -22,6 +22,12 @@
            org.eclipse.rdf4j.query.resultio.QueryResultIO
            org.apache.jena.query.QueryParseException))
 
+(defn- parse-reasoning [{params :query-params :as request}]
+  (let [param (or (get params "reasoning") (get params "infer"))]
+    (if (string? param)
+      (Boolean/parseBoolean param)
+      false)))
+
 (defn sparql-prepare-query-handler
   "Returns a ring handler which fetches the query string from an
   incoming request, validates it and prepares it using the given
@@ -31,11 +37,15 @@
   the [:sparql :prepared-query] key for access in downstream
   handlers."
   [executor inner-handler]
-  (fn [request]
+  (fn [{:keys [sparql] :as request}]
     (with-open [conn (repo/->connection executor)]
       (try
-        (let [validated-query-str (bcom/validate-query (get-in request [:sparql :query-string]))
-              pquery (repo/prepare-query conn validated-query-str)]
+        (let [validated-query-str (bcom/validate-query (get sparql :query-string))
+              pquery (repo/prepare-query conn
+                                         validated-query-str
+                                         (bcom/user-dataset sparql))]
+          (when-let [reasoning (parse-reasoning request)]
+            (doto pquery (.setIncludeInferred reasoning)))
           (inner-handler (assoc-in request [:sparql :prepared-query] pquery)))
         (catch QueryParseException ex
           (let [error-message (.getMessage ex)]
@@ -48,8 +58,9 @@
   processing pipeline."
   [pquery inner-handler]
   (fn [request]
+    (when-let [reasoning (parse-reasoning request)]
+      (doto pquery (.setIncludeInferred reasoning)))
     (inner-handler (assoc-in request [:sparql :prepared-query] pquery))))
-
 
 (defn get-sparql-response-content-type [mime-type]
   (case mime-type
@@ -94,10 +105,17 @@
 
 (defn sparql-query-parser-handler [inner-handler]
   (fn [{:keys [request-method body query-params form-params] :as request}]
-    (letfn [(handle [query-string location]
+    (letfn [(handle [query-string default-graph-uri named-graph-uri location]
               (cond
                 (string? query-string)
-                (inner-handler (assoc-in request [:sparql :query-string] query-string))
+                (-> request
+                    (assoc-in [:sparql :query-string] query-string)
+                    (assoc-in [:sparql :default-graph-uri] default-graph-uri)
+                    (assoc-in [:sparql :named-graph-uri] named-graph-uri)
+                    (inner-handler))
+
+                (instance? java.io.InputStream query-string)
+                (handle (slurp query-string) default-graph-uri named-graph-uri location)
 
                 (coll? query-string)
                 (response/unprocessable-entity-response "Exactly one query parameter required")
@@ -105,13 +123,27 @@
                 :else
                 (response/unprocessable-entity-response (str "Expected SPARQL query in " location))))]
       (case request-method
-        :get (handle (get query-params "query") "'query' query string parameter")
+        :get (handle (get query-params "query")
+                     (get query-params "default-graph-uri")
+                     (get query-params "named-graph-uri")
+                     "'query' query string parameter")
         :post (case (request/content-type request)
-                "application/x-www-form-urlencoded" (handle (get form-params "query") "'query' form parameter")
-                "application/sparql-query" (handle body "body")
-                (do
+                "application/x-www-form-urlencoded"
+                (handle (get form-params "query")
+                        (get form-params "default-graph-uri")
+                        (get form-params "named-graph-uri")
+                        "'query' form parameter")
+                "application/sparql-query"
+                (handle body
+                        (get query-params "default-graph-uri")
+                        (get query-params "named-graph-uri")
+                        "body")
+                (let [params (:params request)]
                   (log/warn "Handling SPARQL POST query with missing content type")
-                  (handle (get-in request [:params :query]) "'query' form or query parameter")))
+                  (handle (get params :query)
+                          (get params :default-graph-uri)
+                          (get params :named-graph-uri)
+                          "'query' form or query parameter")))
         (response/method-not-allowed-response request-method)))))
 
 (defn- execute-boolean-query [pquery result-format response-content-type]

@@ -11,17 +11,37 @@
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [schema.core :as sc]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [clojure.set :as set])
   (:import java.io.Closeable
+           [org.apache.jena.query QueryFactory Syntax]
            [org.eclipse.rdf4j.model Resource URI]
            org.eclipse.rdf4j.model.impl.URIImpl))
 
-(defn- prepare-rewrite-query [conn live->draft sparql-string union-with-live?]
-  (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
-        graph-restriction (mgmt/graph-mapping->graph-restriction conn live->draft union-with-live?)
-        pquery (bprot/prep-and-validate-query conn rewritten-query-string)
-        pquery (bprot/apply-restriction pquery graph-restriction)]
-    (rewrite-query-results pquery live->draft)))
+(defn- live->draft-remap-restriction [live->draft restriction]
+  (let [dictionary (into {} (map (fn [[k v]] [(str k) v]) live->draft))
+        lookup (fn [x] (get dictionary (str x) x))]
+    (-> restriction
+        (update :default-graph (partial map lookup))
+        (update :named-graphs (partial map lookup)))))
+
+(defn- prepare-rewrite-query
+  [conn live->draft sparql-string union-with-live? dataset]
+  (let [query (QueryFactory/create sparql-string Syntax/syntaxSPARQL_11)
+        user-restriction (some->> dataset
+                                  (bprot/dataset->restriction)
+                                  (live->draft-remap-restriction live->draft))
+        query-restriction (->> query
+                               (bprot/query-dataset-restriction)
+                               (live->draft-remap-restriction live->draft))
+        rewritten-query (rewrite-sparql-string live->draft sparql-string)
+        graph-restriction (mgmt/graph-mapping->graph-restriction conn
+                                                                 live->draft
+                                                                 union-with-live?)]
+    (-> conn
+        (bprot/prep-and-validate-query rewritten-query)
+        (bprot/restrict-query user-restriction query-restriction graph-restriction)
+        (rewrite-query-results live->draft))))
 
 (defn- build-draftset-connection [{:keys [repo live->draft union-with-live?]}]
   (let [conn (repo/->connection repo)]
@@ -36,8 +56,12 @@
           (rewrite-query-results pquery live->draft)))
 
       repo/IPrepareQuery
-      (repo/prepare-query* [this sparql-string _]
-        (prepare-rewrite-query conn live->draft sparql-string union-with-live?))
+      (repo/prepare-query* [this sparql-string dataset]
+        (prepare-rewrite-query conn
+                               live->draft
+                               sparql-string
+                               union-with-live?
+                               dataset))
 
       ;; TODO fix this interface to work with pull queries.
       proto/ISPARQLable

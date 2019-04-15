@@ -60,7 +60,8 @@
                  [com.sun.mail/javax.mail "1.6.2"]
                  ;;[com.taoensso/tower "2.0.2"]
 
-                 [grafter "2.0.0"]
+                 [grafter "2.0.1"]
+
                  [com.novemberain/pantomime "2.11.0"] ;; mime types
                  [org.eclipse.rdf4j/rdf4j-runtime "2.5.0" :exclusions [ch.qos.logback/logback-classic]]
 
@@ -97,8 +98,6 @@
                  [swirrl/lib-swirrl-server "0.6.3" :exclusions [clout org.clojure/java.classpath]]
                  [wrap-verbs "0.1.1"]]
 
-  ;; Ensure we build the java sub project source code too!
-  :java-source-paths ["src-java/drafter_sparql_repository/src/main/java"]
 
   :resource-paths ["resources"]
   :pedantic :abort

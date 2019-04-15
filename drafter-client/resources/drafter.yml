@@ -545,6 +545,8 @@ paths:
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/union-with-live'
         - $ref: '#/parameters/timeout'
+        - $ref: '#/parameters/default-graph-uri'
+        - $ref: '#/parameters/named-graph-uri'
 
       tags:
         - Querying
@@ -575,6 +577,8 @@ paths:
         - $ref: '#/parameters/post_query'
         - $ref: '#/parameters/union-with-live'
         - $ref: '#/parameters/timeout'
+        - $ref: '#/parameters/default-graph-uri'
+        - $ref: '#/parameters/named-graph-uri'
       tags:
         - Querying
       responses:
@@ -600,6 +604,8 @@ paths:
       parameters:
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/timeout'
+        - $ref: '#/parameters/default-graph-uri'
+        - $ref: '#/parameters/named-graph-uri'
       tags:
         - SPARQL Endpoints
       responses:
@@ -614,6 +620,7 @@ paths:
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
       consumes:
         - application/x-www-form-urlencoded
+        - application/sparql-query
       produces:
         - application/n-triples
         - application/rdf+xml
@@ -623,6 +630,8 @@ paths:
         - text/csv
       parameters:
         - $ref: '#/parameters/post_query'
+        - $ref: '#/parameters/default-graph-uri'
+        - $ref: '#/parameters/named-graph-uri'
       tags:
         - SPARQL Endpoints
       responses:
@@ -765,6 +774,20 @@ parameters:
     description: Request a desired timeout in seconds after which the query/operation will be aborted.  You may be granted less than you ask for.
     required: false
     type: integer
+
+  default-graph-uri:
+    name: default-graph-uri
+    in: query
+    description: Specify RDF default graph(s) to query against
+    required: false
+    type: string
+
+  named-graph-uri:
+    name: named-graph-uri
+    in: query
+    description: Specify RDF named graph(s) to query against
+    required: false
+    type: string
 
 # message:
 #   name: message

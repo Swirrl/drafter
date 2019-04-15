@@ -10,7 +10,8 @@
             [ring.util.response :as ring]
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI
-           [java.util.concurrent CountDownLatch TimeUnit]))
+           [java.util.concurrent CountDownLatch TimeUnit]
+           org.eclipse.rdf4j.model.impl.URIImpl))
 
 (use-fixtures :each tc/with-spec-instrumentation)
 
@@ -52,6 +53,28 @@
     (testing "Valid query"
       (let [req (handler {:sparql {:query-string "SELECT * WHERE { ?s ?p ?o }"}})]
         (is (some? (get-in req [:sparql :prepared-query])))))
+
+    (testing "User restricted (FROM) query: no overrides"
+      (let [qs "SELECT * FROM <http://foo> FROM NAMED <http://baz> WHERE { ?s ?p ?o }"
+            foo "http://foo"
+            baz "http://baz"
+            req (handler {:sparql {:query-string qs}})
+            ds (.getActiveDataset (get-in req [:sparql :prepared-query]))]
+        (is (contains? (.getDefaultGraphs ds) (URIImpl. foo)))
+        (is (contains? (.getNamedGraphs ds) (URIImpl. baz)))))
+
+    (testing "User restricted (FROM) query: protocol overrides query"
+      (let [qs "SELECT * FROM <http://foo> WHERE { ?s ?p ?o }"
+            foo "http://foo"
+            bar "http://bar"
+            baz "http://baz"
+            req (handler {:sparql {:query-string qs
+                                   :default-graph-uri [bar]
+                                   :named-graph-uri [baz]}})
+            ds (.getActiveDataset (get-in req [:sparql :prepared-query]))]
+        (is (contains? (.getDefaultGraphs ds) (URIImpl. bar)))
+        (is (not (contains? (.getDefaultGraphs ds) (URIImpl. foo))))
+        (is (contains? (.getNamedGraphs ds) (URIImpl. baz)))))
 
     (testing "Malformed SPARQL query"
       (let [response (handler {:sparql {:query-string "NOT A SPARQL QUERY"}})]

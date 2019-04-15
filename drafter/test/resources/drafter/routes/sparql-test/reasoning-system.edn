@@ -1,0 +1,6 @@
+#merge [#include "drafter/routes/sparql-test/repo.edn"
+        #include "user-repo.edn"
+        #include "log-system.edn"
+        #include "web.edn"
+        {:drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo
+                                       :fixtures [#resource "drafter/routes/sparql-test/reasoning-start-state.trig"]}}]

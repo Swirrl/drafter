@@ -1,9 +1,12 @@
 (ns drafter.backend.common
   (:require [drafter.backend.draftset.arq :as arq]
             [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.repository :as repo])
+            [grafter-2.rdf4j.repository :as repo]
+            [clojure.set :as set])
   (:import java.net.URI
-           org.eclipse.rdf4j.query.Dataset))
+           org.eclipse.rdf4j.query.Dataset
+           org.apache.jena.query.Query
+           org.apache.jena.sparql.core.DatasetDescription))
 
 (defprotocol SparqlExecutor
   (prepare-query [this sparql-string]))
@@ -95,6 +98,77 @@
         validated-query-string (validate-query sparql-string)]
     (repo/prepare-query conn validated-query-string)))
 
+(defmulti default-graphs class)
+(defmethod default-graphs Dataset [ds] (.getDefaultGraphs ds))
+(defmethod default-graphs DatasetDescription [ds] (.getDefaultGraphURIs ds))
+
+(defmulti named-graphs class)
+(defmethod named-graphs Dataset [ds] (.getNamedGraphs ds))
+(defmethod named-graphs DatasetDescription [ds] (.getNamedGraphURIs ds))
+
+(defn dataset->restriction "
+  ;: Dataset -> {:default-graph (Set String) :named-graphs (Set String)}"
+  [ds]
+  (when ds
+    (let [default-graphs (default-graphs ds)
+          named-graphs (named-graphs ds)]
+      (cond-> {}
+        default-graphs (assoc :default-graph default-graphs)
+        named-graphs (assoc :named-graphs named-graphs)))))
+
+(defn query-dataset-restriction "
+  ;: Query -> {:default-graph (Set String) :named-graphs (Set String)}"
+  [query]
+  (dataset->restriction (.getDatasetDescription query)))
+
+(defn normalize-restriction [graph-restrictions]
+  {:pre [(or (nil? graph-restrictions)
+             (coll? graph-restrictions)
+             (fn? graph-restrictions))]}
+  (when-let [graph-restrictions (get-restrictions graph-restrictions)]
+    (let [stringified-restriction (set (map str graph-restrictions))]
+      {:default-graph stringified-restriction
+       :named-graphs stringified-restriction})))
+
+(defn stringify-restriction [restriction]
+  (cond-> restriction
+    (:default-graph restriction)
+    (update :default-graph (comp set (partial map str)))
+    (:named-graphs restriction)
+    (update :named-graphs (comp set (partial map str)))))
+
+(defn some-restriction [restriction]
+  (when (or (seq (:default-graph restriction))
+            (seq (:named-graphs restriction)))
+    restriction))
+
+(defn restriction-intersection
+  [{default-a :default-graph named-a :named-graphs}
+   {default-b :default-graph named-b :named-graphs}]
+  (let [restricted-graphs (set/intersection (set/union default-a named-a)
+                                            (set/union default-b named-b))]
+    {:default-graph (set/intersection restricted-graphs default-a default-b)
+     :named-graphs (set/intersection restricted-graphs named-a named-b)}))
+
+(defn restrict-query
+  [pquery user-restriction query-dataset-restriction graph-restriction]
+  (letfn [(do-restrict [query restriction]
+            (doto pquery
+              (.setDataset (repo/make-restricted-dataset
+                            :default-graph (:default-graph restriction)
+                            :named-graphs (:named-graphs restriction)))))]
+    (let [graph-restriction (normalize-restriction graph-restriction)]
+      (if-let [restriction (some->> (or (some-restriction user-restriction)
+                                        (some-restriction query-dataset-restriction))
+                             (stringify-restriction)
+                             (restriction-intersection graph-restriction))]
+        (do-restrict pquery restriction)
+        (do-restrict pquery graph-restriction)))))
+
+(defn user-dataset [{:keys [default-graph-uri named-graph-uri] :as sparql}]
+  (when (or (seq default-graph-uri) (seq named-graph-uri))
+    (repo/make-restricted-dataset :default-graph default-graph-uri
+                                  :named-graphs named-graph-uri)))
 
 
 (comment

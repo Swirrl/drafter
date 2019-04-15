@@ -1,0 +1,57 @@
+@prefix : <http://test.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+  :PublicGraph a drafter:ManagedGraph ;
+    drafter:isPublic true .
+}
+
+<http://publishmydata.com/graphs/reasoning-tbox> {
+  :Lifeform            a rdfs:Class .
+  :Animal              a rdfs:Class ; rdfs:subClassOf :Lifeform .
+  :Mammal              a rdfs:Class ; rdfs:subClassOf :Animal .
+  :Cat                 a rdfs:Class ; rdfs:subClassOf :Mammal .
+  :Dog                 a rdfs:Class ; rdfs:subClassOf :Mammal .
+  :Tiger               a rdfs:Class ; rdfs:subClassOf :Cat .
+  :WestHighlandTerrier a rdfs:Class ; rdfs:subClassOf :Dog .
+}
+
+:PublicGraph {
+
+  :Lifeform
+    rdfs:label "Lifeform" ;
+    rdfs:comment "A living thing." .
+
+  :Animal
+    rdfs:label "Animal" ;
+    rdfs:comment "An animal.".
+
+  :Mammal
+    rdfs:label "Mammal" ;
+    rdfs:comment "A mammal." .
+
+  :Cat
+    rdfs:label "Cat" ;
+    rdfs:comment "A cat." .
+
+  :Dog
+    rdfs:label "Dog" ;
+    rdfs:comment "A dog." .
+
+  :Tiger
+    rdfs:label "Tiger" ;
+    rdfs:comment "A tiger." .
+
+  :WestHighlandTerrier
+    rdfs:label "West Highland Terrier" ;
+    rdfs:comment "A west highland terrier." .
+
+  :Tigger a :Tiger .
+
+  :Stevie a :WestHighlandTerrier .
+}

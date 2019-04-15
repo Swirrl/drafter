@@ -1,6 +1,5 @@
 (ns drafter.backend.rdf4j-repo
-  "Thin wrapper over a DrafterSparqlRepository as a configurable
-  integrant component."
+  "Thin wrapper over a SparqlRepository as a configurable integrant component."
   (:require [clojure.spec.alpha :as s]
             [drafter.backend :as backend]
             [clojure.string :as str]
@@ -9,7 +8,7 @@
             [drafter.backend.draftset :as ds]
             [grafter-2.rdf4j.repository.registry :as reg]
             [integrant.core :as ig])
-  (:import drafter.rdf.DrafterSPARQLRepository
+  (:import grafter_2.rdf.SPARQLRepository
            [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
            [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
            [org.eclipse.rdf4j.query.resultio.binary BinaryQueryResultParserFactory]
@@ -33,7 +32,7 @@
   "Creates a new SPARQL repository with the given query and update
   endpoints."
   [query-endpoint update-endpoint]
-  (let [repo (DrafterSPARQLRepository. query-endpoint update-endpoint)]
+  (let [repo (SPARQLRepository. query-endpoint update-endpoint)]
     (.initialize repo)
     (.enableQuadMode repo true)
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
