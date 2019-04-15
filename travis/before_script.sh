@@ -2,6 +2,12 @@
 
 sleep 15
 
-env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java /opt/stardog/stardog/$STARDOG_VERSION/bin/stardog-admin db create -n drafter-test-db -o strict.parsing=false -o query.all.graphs=true -o reasoning.type=none --
+env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java \
+    /opt/stardog/stardog/$STARDOG_VERSION/bin/stardog-admin db create \
+    -n drafter-test-db \
+    -o strict.parsing=false \
+    -o reasoning.schema.graphs='http://publishmydata.com/graphs/reasoning-tbox' \
+    -o query.all.graphs=true \
+    -o reasoning.type=SL --
 
 sleep 10
