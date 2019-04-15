@@ -1,0 +1,1016 @@
+# Swagger API Specification for Drafter
+swagger: '2.0'
+info:
+  title: 'Publish My Data: Drafter API'
+  description: |
+    This document serves as a specification for Drafter's
+    API.  Drafter is a backend service used by Publish My Data to
+    support PMD's publication workflow.  It describes how clients
+    including the PMD application, control data publishing through the
+    use of Draftsets.
+
+    The API described in these documents is for manipulating data at
+    graph-level, and guiding it through the drafting process. It will
+    accept any valid RDF graph contents.
+
+    For display and edit purposes, PublishMyData makes additional
+    assumptions about the contents of graphs used for datasets and
+    vocabularies.
+
+    Future additions to these APIs will provide mechanisms for
+    creating and validating this data conforms to PMD's conventions.
+
+    ## Draftset API Overview
+
+    Draftsets are essentially private working copies, or branches of
+    work, that contain changes to RDF data.  When a user creates a
+    draftset they effectively create a 'virtual copy' of the live
+    sites data in which they can safely make, review and query changes
+    before publishing them to the live site.
+
+    When a user creates a draftset they are given a private endpoint
+    which they can use to insert, remove or query RDF data through
+    standard operations.
+
+    After creating a draftset by `POST`ing to `/draftsets` the client
+    is redirected to a REST resource representing the endpoint.
+
+    Once the client knows the draftsets identity it can access a
+    number of API endpoints to perform specific tasks or actions.
+    These endpoints include:
+
+      - `/query` which is a [SPARQL 1.1](http://www.w3.org/TR/sparql11-protocol/)
+         compliant query endpoint bespoke to the current draftset.  By default the
+         draftset only includes changes which have been made in the
+         draftset, however you can set the optional `union-with-live`
+         query parameter to `true` to also include data from the live
+         sites endpoint.  If `union-with-live` is true, graphs changed
+         in the draftset shadow live graphs of the same name.
+
+      - `/data` which can be used to `POST` (append), `DELETE` or
+        `GET` quads from the draftset.
+
+      - `/submit-to` to relinquish ownership of the drafset and either
+        assign ownership to another user, or make it available to
+        users in a given role. The user which takes ownership of the
+        draftset may depending on their role then choose to make
+        further ammendments, `/publish` or submit the draftset to a
+        new owner.
+
+      - `/publish` which can be used by clients with the `publisher`
+        role to publish a reviewed draftset to the live site.
+
+      - `/claim` which a user must call on Draftset's submitted to
+        them before they can perform any actions upon them.  Claiming
+        a Draftset puts it under the exclusive control of the claiming
+        user.  A list of all Draftsets that the current user can lay
+        claim to is available under the `/claimable` route.  Users who
+        have submitted a Draftset may withdraw it by claiming it back
+        providing it has not yet been claimed by another user.
+
+    In addition to these routes there are routes available to list all
+    Draftset's in the system and access metadata about an individual
+    Draftset.
+
+    ## Long Running Jobs
+
+    Some API actions such as publishing can result in long running
+    batch operations.  In these cases an AsyncJob object is returned.
+    AsyncJob's contain a path to a `finished-job` route that can be
+    polled for notification of the jobs completion.
+
+    Polling this route will result in a HTTP 404 status code until the
+    job is finished, at which point it will return a HTTP 200.  Once a
+    200 is received the application should inspect the returned JSON
+    object to see whether the job completed successfully or resulted
+    in an error.
+
+    The server does not store the set of finished-jobs in long term
+    persistent storage, so the set of finished-jobs may be lost in
+    certain circumstances such as after the service has been
+    restarted.  In order to prevent applications waiting forever for a
+    lost job to finish, applications should remember and compare
+    restart-id's after every poll request.  The server assigns itself
+    a new restart-id whenever it is restarted, so if the restart-id
+    changes between poll cycles applications can know that the job
+    they are awaiting has been lost.
+
+    ## Authentication & Security
+
+    This API is designed to be run over HTTPS/TLS and will use HTTP
+    [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication)
+    (RFC 2617) for authentication.
+
+    For example a user `admin@opendatacommunities.org` could attempt
+    to authenticate every request to the service described here by
+    prefixing the Base64 encoded value of
+    `admin@opendatacommunities.org:yourpmdapikey` with the string
+    `Basic` followed by a space. For example:
+
+    ````
+    Authorization: Basic YWRtaW5Ab3BlbmRhdGFjb21tdW5pdGllcy5vcmc6eW91cnBtZGFwaWtleQ==
+    ````
+
+    ## Roles
+
+    Users in Drafter and PMD are assigned to a role which authorises
+    them to perform various actions associated with the role and all
+    of the roles ranked beneath it.  The roles are currently:
+
+    | rank | role            | Description                                                                          |
+    |------|-----------------|--------------------------------------------------------------------------------------|
+    |    1 | editor          | Can acess the admin panel and create and edit draftsets.                             |
+    |    2 | publisher       | Can do everything an editor can, but also publish to the live site.                  |
+    |    3 | manager         | Can do everything a publisher can, but also manage user accounts (not via this API)  |
+
+
+    Roles are also what users use to exchange Draftsets.  Users submit
+    a Draftset to a role, which puts it in that roles pool of
+    claimable Draftsets.  Draftsets are then only claimable out of the
+    role's pool by users with a role of an equal or higher rank.  In
+    addition to this the user who submitted the draftset to the role
+    can also withdraw it from submission by claiming it back -
+    regarldess of their role's rank.
+
+    Draftsets *must* be claimed before they can be reviewed, published
+    or edited.
+
+  version: 1.0.0
+securityDefinitions:
+  basic-auth:
+    type: basic
+    description: HTTP Basic Authentication
+  jws-auth:
+    type: apiKey
+    name: Authorization
+    in: header
+basePath: /v1
+tags:
+  - name: Draftsets
+    description: The publication lifecycle
+  - name: Updating Data
+    description: Editing Draftset contents
+  - name: Metadata
+    description: Draftset metadata
+  - name: Querying
+    description: Accessing Data in Draftsets
+  - name: Users
+    description: Querying users
+  - name: SPARQL Endpoints
+    description: SPARQL query endpoints
+  - name: Jobs
+    description: Async jobs
+produces:
+  - application/json
+consumes:
+  - application/json
+paths:
+  /draftsets:
+    post:
+      summary: Create a new Draftset
+      tags:
+        - Draftsets
+      description: |
+        Creates a new draftset in the database.
+
+        Optionally accepts query string parameters for a name and a description.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/display-name'
+        - $ref: '#/parameters/draftset-description'
+      responses:
+        '303':
+          description: Upon the creation of a new draftset the caller is redirected to its representation.
+    get:
+      summary: List available Draftsets
+      description: |
+       Lists draftsets visible to the user. The include parameter can
+       be used to filter the result list to just those owned by the
+       current user, or those not owned which can be claimed by the
+       current user. By default all owned and claimable draftsets are
+       returned.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/include'
+      tags:
+        - Draftsets
+      responses:
+        '200':
+          description: An array of Draftsets
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Draftset'
+
+  /draftset/{id}:
+    get:
+      summary: Get information about a Draftset
+      description: |
+        Returns metadata about the draftset.
+
+        NOTE
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+      tags:
+        - Metadata
+      responses:
+        '200':
+          description: The Draftset.
+          schema:
+            $ref: '#/definitions/Draftset'
+    put:
+      summary: Set metadata on Draftset
+      description: |
+        Sets metadata properties on the draftset, allowing updates to
+        the draftsets title and description.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/display-name'
+        - $ref: '#/parameters/draftset-description'
+      tags:
+        - Metadata
+      responses:
+        '200':
+          description: The Draftset.
+          schema:
+            $ref: '#/definitions/Draftset'
+    delete:
+      summary: Delete the Draftset and its data
+      description: Deletes the draftset and its contents.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        #- $ref: '#/parameters/messagenonote'
+      tags:
+        - Draftsets
+      responses:
+        '202':
+          description: |
+            The request to delete the Draftset was accepted.
+            Applications should poll for the completion of the
+            AsyncJob.
+          schema:
+            $ref: '#/definitions/AsyncJob'
+  /draftset/{id}/graph:
+    put:
+      summary: Copy a graph from live into this Draftset
+      description: |
+        Copies the contents of the specified live graph into this
+        Draftset.
+
+        If the specified graph does not exist in live then a 422 error
+        will be returned.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/livegraph'
+      tags:
+        - Updating Data
+      responses:
+        '202':
+          description: The graph was deleted successfully
+          schema:
+            $ref: '#/definitions/AsyncJob'
+    delete:
+      summary: Delete the contents of a graph in this Draftset
+      description: |
+        Schedules the deletion of the specified graph from live and
+        deletes its contents from the Draftset.  At publication time
+        the specified graph will be removed from the live site.
+
+        If you wish to undo changes you have made in a draftset you
+        should not use this route, and should use
+
+        `DELETE /draftset/{id}/changes` instead.
+
+        If the silent is true the request will always complete successfully,
+        otherwise if the specified graph does not exist in live then a 422 error
+        will be returned.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/reqgraph'
+        - $ref: '#/parameters/silent'
+      tags:
+        - Updating Data
+      responses:
+        '200':
+          schema:
+            $ref: '#/definitions/Draftset'
+          description: The graph was deleted successfully
+        '422':
+          description: The graph does not exist in live and the silent is false
+
+  /draftset/{id}/changes:
+    delete:
+      summary: Remove all the changes to a named graph from the Draftset
+      description: |
+        Removes all of the changes to the specified graph from the
+        Draftset.
+
+        This route is different to `DELETE /draftset/{:id}/graph` in
+        that it is about undoing changes you have made and not about
+        scheduling deletions against live.
+
+        This route is equivalent to explicitly deleting all the
+        triples from a named graph within the draftset with `DELETE
+        /draftset/{:id}/data`, the benefit to using this route is that
+        you don\'t need to list all the triples contained within the
+        graph.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/reqgraph'
+      tags:
+        - Updating Data
+      responses:
+        '200':
+          description: |
+            The request to remove the graph and its changes from the
+            Draftset was accepted.  Applications should poll for the
+            completion of the AsyncJob.
+          schema:
+            $ref: '#/definitions/Draftset'
+
+  /draftset/{id}/data:
+    put:
+      summary: Append the supplied RDF data to this Draftset
+      description: |
+        Appends the supplied data to the Draftset identified by this
+        resource.
+
+        If the RDF data is supplied in a quad serialisation then the
+        graph query parameter can be ommited.  If quads are uploaded
+        and a graph parameter is specified the graph parameter will
+        take precedence, causing all quads to be loaded into the same
+        graph.
+
+        If a graph parameter is supplied then
+        the RDF data can be supplied in a triple serialisation.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: "#/parameters/id"
+        - $ref: '#/parameters/rdfdata'
+        - $ref: '#/parameters/graph'
+        #- $ref: '#/parameters/messagenonote'
+      consumes:
+        - application/n-quads
+        - application/trig
+        - application/trix
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+      produces:
+        - application/json
+      tags:
+        - Updating Data
+      responses:
+        '202':
+          description: |
+            The request to append data to the Draftset was accepted.
+            Applications should poll for the completion of the
+            AsyncJob.
+          schema:
+            $ref: '#/definitions/AsyncJob'
+    delete:
+      summary: Remove the supplied RDF data from this Draftset
+      description: |
+        Removes the supplied data from the Draftset identified by this
+        resource.
+
+        If the RDF data is supplied in a quad serialisation then the graph query parameter can be ommited, and the supplied quads will be removed from this Draftset.
+
+        If quads are uploaded and a graph parameter is specified all quads will be treated as if they are triples in the specified graph, and will be removed from it.
+
+        If a graph parameter is supplied then
+        the RDF data can be supplied in a triple serialisation.  The supplied triples will be removed from the Draftset.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: "#/parameters/id"
+        - $ref: '#/parameters/rdfdata'
+        - $ref: '#/parameters/graph'
+        #- $ref: '#/parameters/messagenonote'
+      consumes:
+        - application/n-quads
+        - application/trig
+        - application/trix
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+      produces:
+        - application/json
+      tags:
+        - Updating Data
+      responses:
+        '202':
+          description: |
+            The request to append data to the Draftset was accepted.
+            Applications should poll for the completion of the
+            AsyncJob.
+          schema:
+            $ref: '#/definitions/AsyncJob'
+    get:
+      parameters:
+        - $ref: "#/parameters/id"
+        - $ref: '#/parameters/graph'
+        - $ref: '#/parameters/union-with-live'
+        - $ref: '#/parameters/timeout'
+      summary: Access the quads inside this Draftset
+      description: |
+        Request the contents of this draftset in any supported RDF
+        serialisation.
+
+        If the chosen serialisation is a triple based one then the
+        graph query string parameter must be provided.  If a quad
+        based serialisation is chosen then the graph parameter must be
+        omitted or a 415 error will be returned.
+
+      security:
+        - jws-auth: []
+      produces:
+        - application/n-quads
+        - application/trig
+        - apllication/trix
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+      tags:
+        - Querying
+      responses:
+        '200':
+          description: The Data in the draftset.
+          schema:
+            type: file
+  /draftset/{id}/submit-to:
+    post:
+      summary: Submit a Draftset to a user or role
+      description: |
+        Submits this draftset for review and potential publication.
+        Draftsets are submitted directly to a user, or into a pool for
+        users of a given role.
+
+        Users with a role greater than or equal to the role the
+        draftset was submitted to can then lay claim to it.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/role'
+        - $ref: '#/parameters/submit-user'
+#        - $ref: '#/parameters/message'
+#        - $ref: '#/parameters/note'
+      tags:
+        - Draftsets
+      responses:
+        '200':
+          description: The Draftset was successfully submitted.
+          schema:
+            $ref: '#/definitions/Draftset'
+        '422':
+          description: The submit request could not be processed.
+  /draftset/{id}/claim:
+    put:
+      summary: Claim this draftset as your own
+      description: |
+        Sets the Draftset's `current-owner` to be the same as the user
+        performing this operation.  This is necessary to prevent
+        other's from making changes to the data contained within the
+        Draftset.
+
+        Each role in the system has a pool of 0 or more claimable
+        draftsets associated with it.  Claimable draftsets are
+        draftsets in a pool where the rank of the pools role is less
+        than or equal to the user's role's rank.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        #- $ref: '#/parameters/messagenonote'
+      tags:
+        - Draftsets
+      responses:
+        '200':
+          description: You were successfully set to be the `current-owner` of this draftset.
+          schema:
+            $ref: '#/definitions/Draftset'
+  /draftset/{id}/publish:
+    post:
+      summary: Publish the specified Draftset
+      description: |
+        Requests that this Draftset is published asynchronously to the live site.  If a job is successfully scheduled then an AsyncJob object will be returned.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        #- $ref: '#/parameters/messagenonote'
+      tags:
+        - Draftsets
+      responses:
+        '202':
+          description: The Draftset is successfully scheduled for publication.
+          schema:
+            $ref: '#/definitions/AsyncJob'
+  /draftset/{id}/query:
+    get:
+      summary: Query this Draftset with SPARQL
+      description: |
+        Query this Draftset via the SPARQL query language and protocol.
+
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      security:
+        - jws-auth: []
+      consumes:
+        - application/sparql-query
+      produces:
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+        - application/sparql-results+xml
+        - application/sparql-results+json
+        - text/csv
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/query'
+        - $ref: '#/parameters/union-with-live'
+        - $ref: '#/parameters/timeout'
+
+      tags:
+        - Querying
+      responses:
+        '200':
+          description: The query results returned according to the SPARQL specification.
+          schema:
+            type: file
+    post:
+      summary: Query this Draftset with SPARQL
+      description: |
+        Query this Draftset via the SPARQL query language and protocol.
+
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      security:
+        - jws-auth: []
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+        - application/sparql-results+xml
+        - application/sparql-results+json
+        - text/csv
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/post_query'
+        - $ref: '#/parameters/union-with-live'
+        - $ref: '#/parameters/timeout'
+      tags:
+        - Querying
+      responses:
+        '200':
+          description: The query results returned according to the SPARQL specification.
+          schema:
+            type: file
+  /sparql/live:
+    get:
+      summary: Queries the published data with SPARQL
+      description: |
+        Query the live data via the SPARQL query langauge and protocol.
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+        - application/sparql-results+xml
+        - application/sparql-results+json
+        - text/csv
+      parameters:
+        - $ref: '#/parameters/query'
+        - $ref: '#/parameters/timeout'
+      tags:
+        - SPARQL Endpoints
+      responses:
+        '200':
+          description: The query results returned according to the SPARQL specificiation.
+          schema:
+            type: file
+    post:
+      summary: Queries the published data with SPARQL
+      description: |
+        Query the live data via the SPARQL query langauge and protocol.
+        Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/n-triples
+        - application/rdf+xml
+        - text/turtle
+        - application/sparql-results+xml
+        - application/sparql-results+json
+        - text/csv
+      parameters:
+        - $ref: '#/parameters/post_query'
+      tags:
+        - SPARQL Endpoints
+      responses:
+        '200':
+          description: The query results returned according to the SPARQL specificiation.
+          schema:
+            type: file
+  /users:
+    get:
+      summary: Gets all users
+      description: |
+        Returns a JSON document containing an array of summary
+        documents, one for each known user.
+      security:
+        - jws-auth: []
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Users found.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/User'
+
+  /status/finished-jobs/{jobid}:
+    get:
+      summary: Poll to see if asynchronous job has finished
+      description: |
+        Poll this route until the AsyncJob is finished.  Whilst the
+        job is ongoing this route will return a 404 until it is
+        finished.  When the job finishes, through either successful
+        completion or an error this route will return a 200 with a
+        JSON object indicating the success or failure of the task.
+
+        The server does not store the set of finished-jobs in
+        persistent storage, so in exceptional circumstances the set of
+        finished-jobs may be lost such as after the service has been
+        restarted.
+
+        In order to prevent applications waiting forever for a lost
+        job to finish, applications should remember and compare
+        restart-id's after every poll request.
+
+        The server assigns itself a new unique restart-id when it is
+        started, so if an application detects a change in the
+        restart-id between poll cycles they know that the job they are
+        awaiting has been lost, and that they should propogate an
+        appropriate error.
+
+      parameters:
+        - $ref: "#/parameters/jobid"
+      tags:
+          - Jobs
+      responses:
+        '404':
+          description: The job is not yet finished.
+        '200':
+          description: The job has finished.  To determine whether the job finished successfully or through a failure you will need to inspect the returned JSON object.
+          schema:
+            $ref: '#/definitions/FinishedJob'
+
+  /status/writes-locked:
+    get:
+      summary: Poll to see if the system is accepting writes
+      description: |
+        During a publish operation operations that create writes such
+        as creating a draftset and updating it are temporarily
+        disabled and will cause a 503.
+
+        You can poll this route to see if the application is available
+        for writes.
+
+        This route exists to give users & user interfaces information
+        as to whether the system is available for writes or not.  It
+        is not necessary (or desirable) for applications to check this
+        route before performing an operation.  Any operation that
+        creates writes may 503.
+
+        Returns a boolean true if the system is locked for writes and
+        false if it isn't.'
+      tags:
+          - Jobs
+      responses:
+        '200':
+          description: The request returned the status of the writes lock successfully.
+          schema:
+            $ref: '#/definitions/WritesLocked'
+parameters:
+  id:
+    name: id
+    description: ID of the Draftset
+    in: path
+    required: true
+    type: string
+  display-name:
+    name: display-name
+    description: The name of the Draftset
+    in: query
+    required: false
+    type: string
+  draftset-description:
+    name: description
+    description: A description of the Draftset
+    in: query
+    required: false
+    type: string
+  role:
+    name: role
+    description: The role to submit the draftset to
+    in: query
+    required: false
+    type: string
+    enum:
+      - editor
+      - publisher
+      - manager
+  submit-user:
+    name: user
+    description: The username of the user to submit the draftset to.
+    in: query
+    required: false
+    type: string
+
+  include:
+    name: include
+    in: query
+    description: which visible draftsets to include in the results
+    required: false
+    type: string
+    enum:
+      - owned
+      - claimable
+      - all
+    default: all
+
+  timeout:
+    name: timeout
+    in: query
+    description: Request a desired timeout in seconds after which the query/operation will be aborted.  You may be granted less than you ask for.
+    required: false
+    type: integer
+
+# message:
+#   name: message
+#   description: |
+#     A log message to be associated with the performed action.  The
+#     message parameter differs from the note parameter in that it is
+#     intended for fine grained log and audit trails.
+#   in: query
+#   required: false
+#   type: string
+
+# messagenonote:
+#   name: message
+#   description: |
+#     A log message to be associated with the performed action.
+#   in: query
+#   required: false
+#   type: string
+
+# note:
+#   name: note
+#   description: |
+#     A note to a reviewer / submitter.  This parameter differs from
+#     the message parameter in that notes are meant to enable
+#     communication between reviewers and submitters.
+#   in: query
+#   required: false
+#   type: string
+  jobid:
+    name: jobid
+    description: ID of the Draftset
+    in: path
+    required: true
+    type: string
+  rdfdata:
+    name: data
+    description: |
+      RDF data in a supported serialization format.  If the format is a triple
+      based serialisation then the graph parameter must be specified.
+    in: body
+    required: true
+    schema:
+      type: string
+  graph:
+    name: graph
+    description: |
+      The URI of the named graph that the operation should be
+      performed on.  This is only required if the supplied RDF data is
+      in triples format.  If quads are provided then all the quads are
+      assumed to be in this graph.
+    in: query
+    required: false
+    type: string
+  reqgraph:
+    name: graph
+    description: |
+      The URI of the named graph that the operation should be
+      performed on.
+    in: query
+    required: true
+    type: string
+  livegraph:
+    name: graph
+    description: |
+      The URI of the live graph that the operation should be
+      performed on.
+    in: query
+    required: true
+    type: string
+  query:
+    name: query
+    description: URI Encoded SPARQL Query
+    in: query
+    required: true
+    type: string
+  post_query:
+    name: query
+    description: URI Encoded SPARQL Query in the HTTP body
+    in: formData
+    required: true
+    type: string
+  union-with-live:
+    name: union-with-live
+    description: Whether or not the query should run against the union of this draftset with the live site.
+    in: query
+    required: false
+    type: boolean
+    default: false
+  silent:
+    name: silent
+    in: query
+    required: false
+    type: boolean
+    allowEmptyValue: true
+    default: false
+
+definitions:
+  Graph:
+    type: object
+    description: A graph object
+    properties:
+      status:
+        type: string
+        enum:
+          - created
+          - updated
+          - deleted
+
+  User:
+    type: object
+    required: [username, role]
+    properties:
+      username:
+        type: string
+        description: Username of the user
+      role:
+        type: string
+        description: role of the user
+    example:
+      username: user@example.com
+      role: publisher
+
+  Draftset:
+    type: object
+    required: [id, changes, updated-at, created-at, created-by]
+    properties:
+      id:
+        type: string
+        format: uuid
+        description: 'Unique identifier representing this draftset'
+      created-by:
+        type: string
+        description: The user who created this Draftset
+      changes:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/Graph'
+      display-name:
+        type: string
+        description: Display name of the Draftset
+      current-owner:
+        type: string
+        description: The current owner of this Draftset
+      submitted-by:
+        type: string
+        description: The owner who submitted this Draftset for review
+      claim-role:
+        type: string
+        enum:
+          - editor
+          - publisher
+          - manager
+        description: The required role for users who can claim this Draftset
+      claim-user:
+        type: string
+        description: The user who can claim this Draftset
+      description:
+        type: string
+        description: A description of the Draftset
+      updated-at:
+        type: string
+        format: date-time
+        description: IS0 8601 DateTime representing the time the draftsets metadata was last updated
+      created-at:
+        type: string
+        format: date-time
+        description: IS0 8601 DateTime representing the time the draftset was created
+      # note:
+      #   type: string
+      #   description: |
+      #     A note that can be used by users to communicate the status
+      #     of a submission, why a draftset was returned etc.
+    example:
+      id: de305d54-75b4-431b-adb2-eb6b9e546014
+      changes:
+        'http://opendatacommunities.org/graph/homelessness/households-accommodated/temporary-housing-types': {'status': 'updated'}
+        'http://opendatacommunities.org/data/labour-force/employment-rate/employment-rate-by-age': {'status': 'deleted'}
+      display-name: New Temporary Housing Figures
+      description: Quarterly updates for Q4 2015
+      updated-at: 2016-01-04T13:35:21+00:00
+      created-at: 2016-01-01T13:35:21+00:00
+      current-owner: admin@opendatacommunities.org
+      submitted-by: editor@opendatacommunities.org
+
+  Error:
+    type: object
+    required: [type, error-type, exception]
+    properties:
+      type:
+        type: string
+        enum:
+          - error
+      error-type:
+        type: string
+        description: String representing the class of error that occurred
+      exception:
+        type: object
+        required: [message]
+        properties:
+          message:
+            type: string
+            description: An error message relating to the specific exception
+
+  WritesLocked:
+    type: boolean
+    description: |
+      True when the system is unavailable for write operations, and false
+      when it is accepting them.
+
+  AsyncJob:
+    type: object
+    description: A successfully submitted Asynchronous Job.
+    required: [type, finished-job, restart-id]
+    properties:
+      type:
+        type: string
+        enum:
+          - ok
+          - error
+      finished-job:
+        type: string
+      restart-id:
+        type: string
+    example:
+      type: ok
+      restart-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
+      finished-job: /v1/status/finished-jobs/2c4111e5-a299-4526-8327-bad5996de400
+  FinishedJob:
+    type: object
+    description: An Asynchronous Job that completed without error.
+    required: [type, restart-id]
+    properties:
+      type:
+        type: string
+        enum:
+          - ok
+          - error
+          - not-found
+      restart-id:
+        type: string
+      error-class:
+        type: string
+      message:
+        type: string
+      details:
+        type: object
+    example:
+      type: ok
+      restart-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97

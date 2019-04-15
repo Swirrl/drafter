@@ -1,0 +1,7 @@
+{
+
+ :drafter-client/client {:batch-size 150000
+                         :drafter-uri "http://localhost:3002"
+                         :jws-key "foo"}
+
+ }
