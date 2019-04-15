@@ -17,7 +17,7 @@
             [drafter.stasher.formats :as formats]
             [clojure.spec.gen.alpha :as g])
   (:import java.net.URI
-           (drafter.rdf DrafterSPARQLConnection DrafterSPARQLRepository)
+           (grafter_2.rdf SPARQLConnection SPARQLRepository)
            java.nio.charset.Charset
            org.eclipse.rdf4j.query.impl.BackgroundGraphResult
            (org.eclipse.rdf4j.query Dataset GraphQueryResult QueryLanguage
@@ -595,7 +595,7 @@
 
 
 (defn- stasher-connection [repo httpclient cache {:keys [quad-mode base-uri] :or {quad-mode false} :as opts}]
-  (proxy [DrafterSPARQLConnection] [repo httpclient quad-mode]
+  (proxy [SPARQLConnection] [repo httpclient quad-mode]
 
     (commit []
       (proxy-super commit)
@@ -632,7 +632,7 @@
                             :base-uri (or (:base-uri opts)
                                           "http://publishmydata.com/id/")
                             :state-graph-modified-time (atom (get-state-graph-modified-time)))
-        repo (doto (proxy [DrafterSPARQLRepository] [query-endpoint update-endpoint]
+        repo (doto (proxy [SPARQLRepository] [query-endpoint update-endpoint]
                      (getConnection []
                        (stasher-connection this (.createHTTPClient this) cache updated-opts)))
                (.initialize))]
