@@ -7,20 +7,23 @@ services:
   - mongodb
 env:
   global:
-  - STARDOG_VERSION='stardog-5.2.0'
+    - SPARQL_QUERY_ENDPOINT='http://localhost:5820/drafter-client-test/query'
+    - SPARQL_UPDATE_ENDPOINT='http://localhost:5820/drafter-client-test/update'
+    - DRAFTER_ENDPOINT='http://localhost:3002'
+    - DRAFTER_JWS_SIGNING_KEY=foo
 cache:
   directories:
   - $HOME/.m2
 before_install:
-- "sudo ./travis/install_base.sh"
-- "sudo ./travis/bootstrap_stardog.sh"
-before_script:
-- "./travis/before_script.sh"
+- sudo travis/install_base.sh
+install:
+- cd drafter
+- lein deps
+- cd ../drafter-client
+- lein deps
+- cd ..
 script:
-  - travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
-  - env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein spec
-after_success:
-- env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
+  - "./travis/test-all"
 before_deploy:
 - "./travis/before_deploy.sh"
 deploy:
@@ -29,7 +32,7 @@ deploy:
     secret_access_key:
       secure: BIaToFo+lK7GB+/IQhEAR44Ix18+ykJt+HIR6uxzZi3WRDuAP+JjngPf+A9rwKQ3fooyAgNZLnIp4EP00rpJ+YfAdUeQzxpcJxeMeUgH0hAR7o8udMTujqBLsTjxwI7B8nZGUHpUpVZiAG4SWhgm7QaU/x5/tTSmGk9inO6SJQY=
     bucket: travis-drafter-jars
-    local-dir: dist
+    local-dir: drafter/dist
     upload-dir: travis-$TRAVIS_BRANCH
     region: eu-west-1
     skip_cleanup: true
@@ -38,14 +41,14 @@ deploy:
       all_branches: true
   - provider: releases
     api_key: "$RELEASE_OAUTH_TOKEN"
-    file: "releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
+    file: "drafter/releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
     skip_cleanup: true
     on:
       tags: true
       condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+$
   - provider: releases
     api_key: "$RELEASE_OAUTH_TOKEN"
-    file: "releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
+    file: "drafter/releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
     prerelease: true
     skip_cleanup: true
     on:

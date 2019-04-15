@@ -1,0 +1,9 @@
+language: clojure
+sudo: required
+lein: 2.7.1
+jdk:
+- oraclejdk8
+before_install:
+- ./travis/setup-lein-profiles.sh
+script:
+- lein deploy

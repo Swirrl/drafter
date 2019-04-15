@@ -69,7 +69,7 @@
 
 
  :drafter.feature.draftset.create/handler {:drafter/backend #ig/ref :drafter/backend
-                                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+                                           :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.feature.middleware/wrap-as-draftset-owner {:drafter/backend #ig/ref :drafter/backend
                                                        :wrap-auth #ig/ref :drafter.middleware/wrap-auth}

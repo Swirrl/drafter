@@ -22,8 +22,8 @@
 
                  ]
 
-  :classifiers {:prod :prod
-                :dev :dev}
+  ;; :classifiers {:prod :prod
+  ;;               :dev :dev}
 
   :dependencies [[buddy/buddy-auth "2.1.0"]
                  [buddy/buddy-core "1.5.0"]
@@ -98,8 +98,6 @@
                  [swirrl/lib-swirrl-server "0.6.3" :exclusions [clout org.clojure/java.classpath]]
                  [wrap-verbs "0.1.1"]]
 
-  ;; Ensure we build the java sub project source code too!
-  :java-source-paths ["src-java/drafter_sparql_repository/src/main/java"]
 
   :resource-paths ["resources"]
   :pedantic :abort

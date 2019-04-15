@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+if [ -z "${SPARQL_QUERY_ENDPOINT}" ] && [ -z "${SPARQL_UPDATE_ENDPOINT}" ] ; then
+   echo You must set env vars for SPARQL_UPDATE_ENDPOINT and SPARQL_QUERY_ENDPOINT
+   exit 1
+fi
+
+cd `dirname $0`
+
+cd ../drafter
+
+lein test
+lein spec
+
+cp log-config.edn.example log-config.edn
+
+export DRAFTER_HTTP_PORT=3002
+
+lein run env/dev/resources/drafter-dev-config.edn &
+
+../stardog/bin/stardog-admin db create -n drafter-client-test --
+
+cd ../drafter-client
+
+sleep 20 # give drafter a few seconds to start up
+
+lein test
