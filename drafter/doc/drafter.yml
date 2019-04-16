@@ -167,6 +167,7 @@ consumes:
 paths:
   /draftsets:
     post:
+      operationId: create-draftset
       summary: Create a new Draftset
       tags:
         - Draftsets
@@ -183,6 +184,7 @@ paths:
         '303':
           description: Upon the creation of a new draftset the caller is redirected to its representation.
     get:
+      operationId: get-draftsets
       summary: List available Draftsets
       description: |
        Lists draftsets visible to the user. The include parameter can
@@ -206,6 +208,7 @@ paths:
 
   /draftset/{id}:
     get:
+      operationId: get-draftset
       summary: Get information about a Draftset
       description: |
         Returns metadata about the draftset.
@@ -223,6 +226,7 @@ paths:
           schema:
             $ref: '#/definitions/Draftset'
     put:
+      operationId: put-draftset
       summary: Set metadata on Draftset
       description: |
         Sets metadata properties on the draftset, allowing updates to
@@ -241,6 +245,7 @@ paths:
           schema:
             $ref: '#/definitions/Draftset'
     delete:
+      operationId: delete-draftset
       summary: Delete the Draftset and its data
       description: Deletes the draftset and its contents.
       security:
@@ -260,6 +265,7 @@ paths:
             $ref: '#/definitions/AsyncJob'
   /draftset/{id}/graph:
     put:
+      operationId: put-draftset-graph
       summary: Copy a graph from live into this Draftset
       description: |
         Copies the contents of the specified live graph into this
@@ -276,10 +282,11 @@ paths:
         - Updating Data
       responses:
         '202':
-          description: The graph was deleted successfully
+          description: The graph copy job was queued successfully
           schema:
             $ref: '#/definitions/AsyncJob'
     delete:
+      operationId: delete-draftset-graph
       summary: Delete the contents of a graph in this Draftset
       description: |
         Schedules the deletion of the specified graph from live and
@@ -312,6 +319,7 @@ paths:
 
   /draftset/{id}/changes:
     delete:
+      operationId: delete-draftset-changes
       summary: Remove all the changes to a named graph from the Draftset
       description: |
         Removes all of the changes to the specified graph from the
@@ -344,6 +352,7 @@ paths:
 
   /draftset/{id}/data:
     put:
+      operationId: put-draftset-data
       summary: Append the supplied RDF data to this Draftset
       description: |
         Appends the supplied data to the Draftset identified by this
@@ -384,6 +393,7 @@ paths:
           schema:
             $ref: '#/definitions/AsyncJob'
     delete:
+      operationId: delete-draftset-data
       summary: Remove the supplied RDF data from this Draftset
       description: |
         Removes the supplied data from the Draftset identified by this
@@ -422,6 +432,7 @@ paths:
           schema:
             $ref: '#/definitions/AsyncJob'
     get:
+      operationId: get-draftset-data
       parameters:
         - $ref: "#/parameters/id"
         - $ref: '#/parameters/graph'
@@ -455,6 +466,7 @@ paths:
             type: file
   /draftset/{id}/submit-to:
     post:
+      operationId: submit-draftset-to
       summary: Submit a Draftset to a user or role
       description: |
         Submits this draftset for review and potential publication.
@@ -482,6 +494,7 @@ paths:
           description: The submit request could not be processed.
   /draftset/{id}/claim:
     put:
+      operationId: claim-draftset
       summary: Claim this draftset as your own
       description: |
         Sets the Draftset's `current-owner` to be the same as the user
@@ -507,6 +520,7 @@ paths:
             $ref: '#/definitions/Draftset'
   /draftset/{id}/publish:
     post:
+      operationId: publish-draftset
       summary: Publish the specified Draftset
       description: |
         Requests that this Draftset is published asynchronously to the live site.  If a job is successfully scheduled then an AsyncJob object will be returned.
@@ -524,6 +538,7 @@ paths:
             $ref: '#/definitions/AsyncJob'
   /draftset/{id}/query:
     get:
+      operationId: get-query-draftset
       summary: Query this Draftset with SPARQL
       description: |
         Query this Draftset via the SPARQL query language and protocol.
@@ -545,6 +560,8 @@ paths:
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/union-with-live'
         - $ref: '#/parameters/timeout'
+        - $ref: '#/parameters/default-graph-uri'
+        - $ref: '#/parameters/named-graph-uri'
 
       tags:
         - Querying
@@ -554,6 +571,7 @@ paths:
           schema:
             type: file
     post:
+      operationId: post-query-draftset
       summary: Query this Draftset with SPARQL
       description: |
         Query this Draftset via the SPARQL query language and protocol.
@@ -575,6 +593,8 @@ paths:
         - $ref: '#/parameters/post_query'
         - $ref: '#/parameters/union-with-live'
         - $ref: '#/parameters/timeout'
+        - $ref: '#/parameters/default-graph-uri'
+        - $ref: '#/parameters/named-graph-uri'
       tags:
         - Querying
       responses:
@@ -584,6 +604,7 @@ paths:
             type: file
   /sparql/live:
     get:
+      operationId: get-query-live
       summary: Queries the published data with SPARQL
       description: |
         Query the live data via the SPARQL query langauge and protocol.
@@ -600,6 +621,8 @@ paths:
       parameters:
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/timeout'
+        - $ref: '#/parameters/default-graph-uri'
+        - $ref: '#/parameters/named-graph-uri'
       tags:
         - SPARQL Endpoints
       responses:
@@ -608,12 +631,14 @@ paths:
           schema:
             type: file
     post:
+      operationId: post-query-live
       summary: Queries the published data with SPARQL
       description: |
         Query the live data via the SPARQL query langauge and protocol.
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
       consumes:
         - application/x-www-form-urlencoded
+        - application/sparql-query
       produces:
         - application/n-triples
         - application/rdf+xml
@@ -623,6 +648,8 @@ paths:
         - text/csv
       parameters:
         - $ref: '#/parameters/post_query'
+        - $ref: '#/parameters/default-graph-uri'
+        - $ref: '#/parameters/named-graph-uri'
       tags:
         - SPARQL Endpoints
       responses:
@@ -632,6 +659,7 @@ paths:
             type: file
   /users:
     get:
+      operationId: get-users
       summary: Gets all users
       description: |
         Returns a JSON document containing an array of summary
@@ -648,8 +676,9 @@ paths:
             items:
               $ref: '#/definitions/User'
 
-  /status/finished-jobs/{jobid}:
+  /status/finished-jobs/{job-id}:
     get:
+      operationId: status-job-finished
       summary: Poll to see if asynchronous job has finished
       description: |
         Poll this route until the AsyncJob is finished.  Whilst the
@@ -674,7 +703,7 @@ paths:
         appropriate error.
 
       parameters:
-        - $ref: "#/parameters/jobid"
+        - $ref: "#/parameters/job-id"
       tags:
           - Jobs
       responses:
@@ -687,6 +716,7 @@ paths:
 
   /status/writes-locked:
     get:
+      operationId: status-writes-locked
       summary: Poll to see if the system is accepting writes
       description: |
         During a publish operation operations that create writes such
@@ -766,6 +796,26 @@ parameters:
     required: false
     type: integer
 
+  default-graph-uri:
+    name: default-graph-uri
+    in: query
+    description: Specify RDF default graph(s) to query against
+    required: false
+    type: array
+    collectionFormat: multi
+    items:
+      type: string
+
+  named-graph-uri:
+    name: named-graph-uri
+    in: query
+    description: Specify RDF named graph(s) to query against
+    required: false
+    type: array
+    collectionFormat: multi
+    items:
+      type: string
+
 # message:
 #   name: message
 #   description: |
@@ -793,8 +843,8 @@ parameters:
 #   in: query
 #   required: false
 #   type: string
-  jobid:
-    name: jobid
+  job-id:
+    name: job-id
     description: ID of the Draftset
     in: path
     required: true
