@@ -2,30 +2,22 @@
   :description "Client for the Drafter HTTP API"
   :url "http://github.com/swirrl/drafter-client"
   :source-paths ["src" "generated/src"]
-  :dependencies [[org.clojure/clojure "1.9.0"]
-                 [clj-http "3.9.0"]
+  :dependencies [[buddy/buddy-sign "3.0.0"]
                  [cheshire "5.8.0"]
-                 [org.clojure/tools.logging "0.4.1"]
-                 [integrant "0.6.3"]
-                 [grafter "0.11.2"]
-                 [grafter/vocabularies "0.2.3"]
+                 [clj-http "3.9.0"]
+                 [grafter "2.0.1"]
                  [grafter/url "0.2.5"]
-                 [buddy/buddy-sign "3.0.0"]
+                 [grafter/vocabularies "0.2.6"]
+                 [integrant "0.6.3"]
+                 [martian "0.1.9"]
+                 [martian-clj-http "0.1.9"]
+                 [org.clojure/clojure "1.9.0"]
+                 [org.clojure/tools.logging "0.4.1"]
                  [ring/ring-core "1.6.3"]]
   :profiles
-  {:dev {:dependencies [[clj-http-fake "1.0.3"]
-                        [org.slf4j/slf4j-log4j12 "1.7.25"]
+  {:dev {:dependencies [[environ "1.0.3"]
                         [integrant/repl "0.3.1"]
-                        [environ "1.0.3"]]
+                        [org.slf4j/slf4j-log4j12 "1.7.25"]]
          :source-paths ["env/dev/clj"]
          :resource-paths ["env/dev/resources"]
-         :plugins [[lein-environ "1.0.2"]]}
-   :swagger {:dependencies [[io.swagger/swagger-codegen-cli "2.3.1"]]}
-   :test {}}
-  :aliases {"swagger" ["with-profiles" "swagger"
-                       "run" "-m" "io.swagger.codegen.SwaggerCodegen"
-                       "generate"
-                       "--lang" "clojure"
-                       "--input-spec" "resources/drafter.yml"
-                       "-o" "generated/"
-                       "--additional-properties" "baseNamespace=drafter-swagger-client"]})
+         :plugins [[lein-environ "1.0.2"]]}})
