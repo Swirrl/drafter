@@ -1,26 +1,22 @@
 (ns drafter-client.client
   (:refer-clojure :exclude [name type get])
-  (:require [clojure.tools.logging :as log]
+  (:require [cheshire.core :as json]
             [clojure.spec.alpha :as s]
-            [integrant.core :as ig]
+            [clojure.string :as str]
+            [clojure.tools.logging :as log]
+            [drafter-client.client.auth :as auth]
+            [drafter-client.client.draftset :as draftset]
             [drafter-client.client.impl :refer [->DrafterClient intercept]]
             [drafter-client.client.repo :as repo]
-            [drafter-client.client.draftset :as draftset]
-            [drafter-client.client.auth :as auth]
-            [clojure.string :as str]
-            [cheshire.core :as json]
-            [martian.core :as martian]
-            [martian.clj-http :as martian-http]
-            [martian.encoders :as encoders]
-            [martian.encoding :as encoding]
-            [martian.interceptors :as interceptors]
-            [ring.util.io :refer [piped-input-stream]]
             [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
             [grafter-2.rdf4j.io :as rio]
-            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]])
-  (:import (com.fasterxml.jackson.core JsonParseException)
-           (java.net URI)
-           (clojure.lang IDeref)))
+            [integrant.core :as ig]
+            [martian.clj-http :as martian-http]
+            [martian.core :as martian]
+            [martian.encoders :as encoders]
+            [martian.interceptors :as interceptors]
+            [ring.util.io :refer [piped-input-stream]]))
 
 (alias 'c 'clojure.core)
 
