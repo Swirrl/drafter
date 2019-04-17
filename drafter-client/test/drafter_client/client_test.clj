@@ -233,5 +233,5 @@
     (t/is (nil? (ig/init-key :drafter-client/client {:drafter-uri ""})))
     (t/is (some? (ig/init-key :drafter-client/client
                               {:batch-size 10
-                               :drafter-uri "http://localhost:3001"
+                               :drafter-uri (env :drafter-endpoint)
                                :jws-key ""})))))
