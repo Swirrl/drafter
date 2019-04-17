@@ -1,64 +1,62 @@
 (ns drafter-client.client-test
-  (:require [drafter-client.client :as sut]
-            [drafter-client.client.draftset :as draftset]
-            [grafter.rdf.protocols :as gr-pr]
-            [grafter.rdf.repository :as gr-repo]
+  (:require [clojure.spec.test.alpha :as st]
             [clojure.test :as t]
-            [integrant.core :as ig]
-            [drafter-client.test-util.db :as db-util]
+            [drafter-client.client :as sut]
+            [drafter-client.client.draftset :as draftset]
             [drafter-client.test-util.auth :as auth-util]
+            [drafter-client.test-util.db :as db-util]
             [environ.core :refer [env]]
-            [clojure.string :as str])
-  (:import (java.net URI)))
+            [grafter-2.rdf4j.io :as rio]
+            [grafter-2.rdf4j.repository :as gr-repo]
+            [integrant.core :as ig]
+            [martian.core :as martian])
+  (:import java.net.URI))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setup ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def ^:dynamic *drafter-client*)
-(def ^:dynamic *test-triples*)
+(defn with-spec-instrumentation [f]
+  (try
+    (st/instrument)
+    (f)
+    (finally
+      (st/unstrument))))
 
+(defn db-fixture [f]
+  (let [stardog-query (env :sparql-query-endpoint)
+        stardog-update (env :sparql-update-endpoint)]
+    (assert stardog-query "Set SPARQL_QUERY_ENDPOINT to run these tests.")
+    (assert stardog-update "Set SPARQL_UPDATE_ENDPOINT to run these tests.")
+    (let [stardog-repo (gr-repo/sparql-repo stardog-query stardog-update)]
+      (when-not (Boolean/parseBoolean (env :disable-drafter-cleaning-protection))
+        (db-util/assert-empty stardog-repo))
+      (f)
+      (db-util/drop-all! stardog-repo))))
+
+(defn drafter-client []
+  (let [drafter-endpoint (env :drafter-endpoint)]
+    (assert drafter-endpoint "Set DRAFTER_ENDPOINT to run these tests.")
+    (ig/init-key :drafter-client/client
+                 {:drafter-uri drafter-endpoint
+                  :jws-key (env :drafter-jws-signing-key)
+                  :batch-size 150000})))
+
+(defn test-triples []
+  (let [file "./test/specific_mappingbased_properties_bg.nt"]
+    (rio/statements file)))
 
 (t/use-fixtures :each
   ;; Drop db after tests
-  (fn [test-fn]
-
-    (t/is (env :sparql-query-endpoint)
-          "Set SPARQL_QUERY_ENDPOINT to run these tests.")
-    (t/is (env :sparql-update-endpoint)
-          "Set SPARQL_UPDATE_ENDPOINT to run these tests.")
-    (let [stardog-query (env :sparql-query-endpoint)
-          stardog-update (env :sparql-update-endpoint)
-          stardog-repo (grafter.rdf.repository/sparql-repo stardog-query
-                                                           stardog-update)]
-      (when-not (Boolean/parseBoolean (env :disable-drafter-cleaning-protection))
-        (db-util/assert-empty stardog-repo))
-      (test-fn)
-      (db-util/drop-all! stardog-repo)))
-  ;; Setup drafter client
-  (fn [test-fn]
-    (t/is (env :drafter-endpoint) "Set DRAFTER_ENDPOINT to run these tests.")
-    (let [batch-write-size 150000
-          jws-key (env :drafter-jws-signing-key)
-          drafter-endpoint (URI. (format "%s/v1" (env :drafter-endpoint)))
-          drafter-client (sut/->drafter-client drafter-endpoint
-                                               jws-key
-                                               batch-write-size)]
-      (binding [*drafter-client* drafter-client]
-        (test-fn))))
-  ;; Test triples
-  (fn [test-fn]
-    (let [file "./test/specific_mappingbased_properties_bg.nt"
-          statements (grafter.rdf/statements file)]
-      (binding [*test-triples* statements]
-        (test-fn)))))
+  with-spec-instrumentation
+  db-fixture)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tests ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (t/deftest live-repo-tests
-  (let [client *drafter-client*
+  (let [client (drafter-client)
         repo (sut/->repo client auth-util/system-user sut/live)]
     (t/testing "Live database is empty"
       (with-open [conn (gr-repo/->connection repo)]
@@ -68,7 +66,7 @@
 
 
 (t/deftest draftsets-tests
-  (let [client *drafter-client*
+  (let [client (drafter-client)
         user auth-util/system-user
         name "test-name"
         description "test-description"]
@@ -94,8 +92,8 @@
         (t/is (empty? all-draftsets))))))
 
 (t/deftest adding-to-a-draftset
-  (let [client *drafter-client*
-        triples *test-triples*
+  (let [client (drafter-client)
+        triples (test-triples)
         how-many 5
         user auth-util/system-user
         name "Draftset adding"
@@ -120,8 +118,8 @@
         (t/is (= (set triples) (set triples*)))))))
 
 (t/deftest adding-everything-to-a-draftset
-  (let [client *drafter-client*
-        triples *test-triples*
+  (let [client (drafter-client)
+        triples (test-triples)
         expected-count (count triples)
         user auth-util/system-user
         name "Draftset adding"
@@ -144,8 +142,8 @@
         (t/is (= expected-count (count triples*)))))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
-  (let [client *drafter-client*
-        triples *test-triples*
+  (let [client (drafter-client)
+        triples (test-triples)
         how-many 5
         user auth-util/system-user
         name "Draftset adding"
@@ -168,8 +166,8 @@
         (t/is (= (set (concat quads-1 quads-2)) (set quads*)))))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
-  (let [client *drafter-client*
-        triples *test-triples*
+  (let [client (drafter-client)
+        triples (test-triples)
         how-many 5
         user auth-util/system-user
         name "Draftset adding"
@@ -192,9 +190,9 @@
         (t/is (= (set triples-2) (set triples-2*)))))))
 
 (t/deftest job-status
-  (let [client *drafter-client*
+  (let [client (drafter-client)
         graph (URI. "http://test.graph.com/3")
-        triples *test-triples*
+        triples (test-triples)
         quads (map #(assoc % :c graph) triples)
         user auth-util/system-user
         name "Job status test"
@@ -209,8 +207,8 @@
 
 
 (t/deftest querying
-  (let [client *drafter-client*
-        triples *test-triples*
+  (let [client (drafter-client)
+        triples (test-triples)
         how-many 5
         user auth-util/system-user
         name "Draftset querying"
@@ -233,6 +231,7 @@
     (t/is (nil? (ig/init-key :drafter-client/client {})))
     (t/is (nil? (ig/init-key :drafter-client/client {:jws-key ""})))
     (t/is (nil? (ig/init-key :drafter-client/client {:drafter-uri ""})))
-    (t/is (some? (ig/init-key :drafter-client/client {:batch-size 10
-                                                      :drafter-uri ""
-                                                      :jws-key ""})))))
+    (t/is (some? (ig/init-key :drafter-client/client
+                              {:batch-size 10
+                               :drafter-uri "http://localhost:3001"
+                               :jws-key ""})))))
