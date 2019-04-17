@@ -748,6 +748,7 @@ parameters:
     in: path
     required: true
     type: string
+    format: uuid
   display-name:
     name: display-name
     description: The name of the Draftset
@@ -849,6 +850,7 @@ parameters:
     in: path
     required: true
     type: string
+    format: uuid
   rdfdata:
     name: data
     description: |
@@ -868,6 +870,7 @@ parameters:
     in: query
     required: false
     type: string
+    format: uri
   reqgraph:
     name: graph
     description: |
