@@ -27,5 +27,5 @@
   :ret string?)
 
 (s/fdef repo/make-repo
-  :args (s/cat :client ::client :context ::context :params ::params)
+  :args (s/cat :client ::client :context ::context :user ::user :params ::params)
   :ret (partial instance? org.eclipse.rdf4j.repository.Repository))
