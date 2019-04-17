@@ -676,7 +676,7 @@ paths:
             items:
               $ref: '#/definitions/User'
 
-  /status/finished-jobs/{job-id}:
+  /status/finished-jobs/{jobid}:
     get:
       operationId: status-job-finished
       summary: Poll to see if asynchronous job has finished
@@ -703,7 +703,7 @@ paths:
         appropriate error.
 
       parameters:
-        - $ref: "#/parameters/job-id"
+        - $ref: "#/parameters/jobid"
       tags:
           - Jobs
       responses:
@@ -844,8 +844,8 @@ parameters:
 #   in: query
 #   required: false
 #   type: string
-  job-id:
-    name: job-id
+  jobid:
+    name: jobid
     description: ID of the Draftset
     in: path
     required: true
