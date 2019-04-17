@@ -36,10 +36,9 @@
 (defn drafter-client []
   (let [drafter-endpoint (env :drafter-endpoint)]
     (assert drafter-endpoint "Set DRAFTER_ENDPOINT to run these tests.")
-    (ig/init-key :drafter-client/client
-                 {:drafter-uri drafter-endpoint
-                  :jws-key (env :drafter-jws-signing-key)
-                  :batch-size 150000})))
+    (sut/create drafter-endpoint
+                :jws-key (env :drafter-jws-signing-key)
+                :batch-size 150000)))
 
 (defn test-triples []
   (let [file "./test/specific_mappingbased_properties_bg.nt"]

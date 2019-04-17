@@ -5,7 +5,7 @@
             [grafter-2.rdf4j.repository :as repo]
             [martian.core :as martian]))
 
-(defn make-repo [client context {:keys [user] :as params}]
+(defn make-repo [client context user params]
   (let [params (merge {:query ""} params)
         [endpoint params] (if (draftset/live? context)
                             [:get-query-live params]
