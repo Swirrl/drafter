@@ -8,8 +8,7 @@
             [environ.core :refer [env]]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as gr-repo]
-            [integrant.core :as ig]
-            [martian.core :as martian])
+            [integrant.core :as ig])
   (:import java.net.URI))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
