@@ -183,38 +183,6 @@
 (defmethod ig/init-key ::draftset-set-metadata-handler [_ opts]
   (draftset-set-metadata-handler opts))
 
-(defn draftset-submit-to-handler [{backend :drafter/backend
-                                   user-repo ::user/repo
-                                   :keys [wrap-as-draftset-owner timeout-fn]}]
-  (wrap-as-draftset-owner
-   (fn [{{:keys [user role draftset-id]} :params owner :identity}]
-     (cond
-       (and (some? user) (some? role))
-       (unprocessable-entity-response "Only one of user and role parameters permitted")
-
-       (some? user)
-       (if-let [target-user (user/find-user-by-username user-repo user)]
-         (feat-common/run-sync #(dsops/submit-draftset-to-user! backend draftset-id owner target-user)
-                   #(feat-common/draftset-sync-write-response % backend draftset-id))
-         (unprocessable-entity-response (str "User: " user " not found")))
-
-       (some? role)
-       (let [role-kw (keyword role)]
-         (if (user/is-known-role? role-kw)
-           (feat-common/run-sync #(dsops/submit-draftset-to-role! backend draftset-id owner role-kw)
-                     #(feat-common/draftset-sync-write-response % backend draftset-id))
-           (unprocessable-entity-response (str "Invalid role: " role))))
-
-       :else
-       (unprocessable-entity-response (str "user or role parameter required"))))))
-
-(defmethod ig/pre-init-spec ::draftset-submit-to-handler [_]
-  (s/keys :req [:drafter/backend ::user/repo]
-          :req-un [::wrap-as-draftset-owner]))
-
-(defmethod ig/init-key ::draftset-submit-to-handler [_ opts]
-  (draftset-submit-to-handler opts))
-
 (defn draftset-claim-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
    (feat-middleware/existing-draftset-handler
@@ -240,7 +208,6 @@
 
 (defmethod ig/init-key ::draftset-claim-handler [_ opts]
   (draftset-claim-handler opts))
-
 
 (defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler
