@@ -1,49 +1,124 @@
 (ns drafter.feature.draftset.claim-test
-  (:require [clojure.test :as t]
-            [drafter.test-common :as tc]))
+  (:require [clojure.test :as t :refer [deftest is]]
+            [drafter.test-common :as tc :refer [deftest-system-with-keys]]
+            [drafter.routes.draftsets-api-test :as api]
+            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
+            [drafter.user :as user]
+            [drafter.user.memory-repository :as memrepo]
+            [drafter.feature.draftset.create-test :as ct]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-;; TODO
-
-#_(defn- create-claim-request [draftset-location user]
+(defn- create-claim-request [draftset-location user]
   (tc/with-identity user {:uri (str draftset-location "/claim") :request-method :put}))
 
-#_(defn- claim-draftset-through-api [draftset-location user]
+(defn- claim-draftset-through-api [handler draftset-location user]
   (let [claim-request (create-claim-request draftset-location user)
-        {:keys [body] :as claim-response} (route claim-request)]
-      (tc/assert-is-ok-response claim-response)
-      (tc/assert-schema dset-test/Draftset body)
+        {:keys [body] :as claim-response} (handler claim-request)]
+    (tc/assert-is-ok-response claim-response)
+    (tc/assert-schema api/Draftset body)
       body))
 
-#_(t/deftest get-claimable-draftsets-test
-  (let [ds-names (map #(str "Draftset " %) (range 1 6))
-        [ds1 ds2 ds3 ds4 ds5] (doall (map #(create-draftset-through-api test-editor %) ds-names))]
-    (submit-draftset-to-role-through-api test-editor ds1 :editor)
-    (submit-draftset-to-role-through-api test-editor ds2 :publisher)
-    (submit-draftset-to-role-through-api test-editor ds3 :manager)
-    (submit-draftset-to-user-through-api ds5 test-publisher test-editor)
+(defn- create-submit-to-role-request [user draftset-location role]
+  (tc/with-identity user {:uri (str draftset-location "/submit-to") :request-method :post :params {:role (name role)}}))
 
-    ;;editor should be able to claim all draftsets just submitted as they have not been claimed
-    (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (let [expected-claimable-names (map #(nth ds-names %) [0 1 2 4])
-            claimable-names (map :display-name editor-claimable)]
-        (t/is (= (set expected-claimable-names) (set claimable-names)))))
+(defn- submit-draftset-to-role-through-api [handler user draftset-location role]
+  (let [response (handler (create-submit-to-role-request user draftset-location role))]
+    (tc/assert-is-ok-response response)))
 
-    (let [publisher-claimable (get-claimable-draftsets-through-api test-publisher)]
-      ;;Draftsets 1, 2 and 5 should be on submit to publisher
-      ;;Draftset 3 is in too high a role
-      ;;Draftset 4 is not available
-      (let [claimable-names (map :display-name publisher-claimable)
-            expected-claimable-names (map #(nth ds-names %) [0 1 4])]
-        (t/is (= (set expected-claimable-names) (set claimable-names)))))
+(defn- submit-draftset-to-username-request [draftset-location target-username user]
+  (tc/with-identity user
+    {:uri (str draftset-location "/submit-to") :request-method :post :params {:user target-username}}))
 
-    (doseq [ds [ds1 ds3]]
-      (claim-draftset-through-api ds test-manager))
+(defn- submit-draftset-to-user-request [draftset-location target-user user]
+  (submit-draftset-to-username-request draftset-location (user/username target-user) user))
 
-    (claim-draftset-through-api ds5 test-publisher)
+(defn- submit-draftset-to-user-through-api [handler draftset-location target-user user]
+  (let [request (submit-draftset-to-user-request draftset-location target-user user)
+        response (handler request)]
+    (tc/assert-is-ok-response response)))
 
-    ;;editor should not be able to see ds1, ds3 or ds5 after they have been claimed
-    (let [editor-claimable (get-claimable-draftsets-through-api test-editor)]
-      (t/is (= 1 (count editor-claimable)))
-      (t/is (= (:display-name (first editor-claimable)) (nth ds-names 1))))))
+(tc/deftest-system-with-keys claim-draftset-submitted-to-role
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [{{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))]
+    (submit-draftset-to-role-through-api handler test-editor draftset-location :publisher)
+    (let [{:keys [current-owner] :as ds-info}
+          (claim-draftset-through-api handler draftset-location test-publisher)]
+      (is (= (user/username test-publisher) current-owner)))))
+
+(tc/deftest-system-with-keys claim-draftset-submitted-to-user
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [{{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))]
+    (submit-draftset-to-user-through-api handler draftset-location test-publisher test-editor)
+    (let [{:keys [current-owner claim-user] :as ds-info}
+          (claim-draftset-through-api handler draftset-location test-publisher)]
+      (is (= (user/username test-publisher) current-owner))
+      (is (nil? claim-user)))))
+
+(tc/deftest-system-with-keys claim-draftset-submitted-to-other-user
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [{{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))]
+    (submit-draftset-to-user-through-api handler draftset-location test-publisher test-editor)
+    (let [claim-request (create-claim-request draftset-location test-manager)
+          claim-response (handler claim-request)]
+      (tc/assert-is-forbidden-response claim-response))))
+
+(tc/deftest-system-with-keys claim-draftset-owned-by-self
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [{{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))
+        claim-request (create-claim-request draftset-location test-editor)
+        {:keys [body] :as claim-response} (handler claim-request)]
+    (tc/assert-is-ok-response claim-response)
+    (is (= (user/username test-editor) (:current-owner body)))))
+
+(tc/deftest-system-with-keys claim-unowned-draftset-submitted-by-self
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [{{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))]
+    (submit-draftset-to-role-through-api handler test-editor draftset-location :publisher)
+    (claim-draftset-through-api handler draftset-location test-editor)))
+
+(tc/deftest-system-with-keys claim-owned-by-other-user-draftset-submitted-by-self
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [{{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))]
+    (submit-draftset-to-role-through-api handler test-editor draftset-location :publisher)
+    (claim-draftset-through-api handler draftset-location test-publisher)
+    (let [response (handler (create-claim-request draftset-location test-editor))]
+      (tc/assert-is-forbidden-response response))))
+
+(tc/deftest-system-with-keys claim-draftset-owned-by-other-user
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [{{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))
+        claim-request (create-claim-request draftset-location test-publisher)
+        claim-response (handler claim-request)]
+    (tc/assert-is-forbidden-response claim-response)))
+
+(tc/deftest-system-with-keys claim-draftset-by-user-not-in-role
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter.user/memory-repository]
+  [{handler :drafter.routes/draftsets-api users :drafter.user/memory-repository} "test-system.edn"]
+  (let [other-editor (user/create-user "edtheduck@example.com" :editor (user/get-digest test-password))
+        {{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))]
+    (memrepo/add-user users other-editor)
+    (submit-draftset-to-role-through-api handler test-editor draftset-location :publisher)
+    (let [claim-response (handler (create-claim-request draftset-location other-editor))]
+      (tc/assert-is-forbidden-response claim-response))))
+
+(tc/deftest-system-with-keys claim-non-existent-draftset
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [claim-response (handler (create-claim-request "/v1/draftset/missing" test-publisher))]
+    (tc/assert-is-not-found-response claim-response)))
