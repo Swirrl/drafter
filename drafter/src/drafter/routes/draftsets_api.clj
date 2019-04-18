@@ -215,32 +215,6 @@
 (defmethod ig/init-key ::draftset-submit-to-handler [_ opts]
   (draftset-submit-to-handler opts))
 
-(defn draftset-claim-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (wrap-authenticated
-   (feat-middleware/existing-draftset-handler
-    backend
-    (fn [{{:keys [draftset-id]} :params user :identity}]
-      (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
-        (if (user/can-claim? user ds-info)
-          (feat-common/run-sync #(dsops/claim-draftset! backend draftset-id user)
-                    (fn [result]
-                      (if (jobutil/failed-job-result? result)
-                        (response/api-response 500 result)
-                        (let [[claim-outcome ds-info] (:details result)]
-                          (if (= :ok claim-outcome)
-                            (ring/response ds-info)
-                            (conflict-detected-response "Failed to claim draftset"))))))
-          (forbidden-response "User not in role for draftset claim"))
-        (ring/not-found "Draftset not found"))))))
-
-
-(defmethod ig/pre-init-spec ::draftset-claim-handler [_]
-  (s/keys :req [:drafter/backend]
-          :req-un [::wrap-auth]))
-
-(defmethod ig/init-key ::draftset-claim-handler [_ opts]
-  (draftset-claim-handler opts))
-
 
 (defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler
