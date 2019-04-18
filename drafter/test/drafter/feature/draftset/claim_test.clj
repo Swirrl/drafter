@@ -1,11 +1,13 @@
 (ns drafter.feature.draftset.claim-test
-  (:require [clojure.test :as t :refer [deftest is]]
-            [drafter.test-common :as tc :refer [deftest-system-with-keys]]
+  (:require [clojure.test :as t :refer [is]]
+            [drafter.feature.draftset.create-test :as ct]
+            [drafter.feature.draftset.test-helper :as help]
             [drafter.routes.draftsets-api-test :as api]
-            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
+            [drafter.test-common :as tc]
             [drafter.user :as user]
-            [drafter.user.memory-repository :as memrepo]
-            [drafter.feature.draftset.create-test :as ct]))
+            [drafter.user-test
+             :refer [test-editor test-manager test-password test-publisher]]
+            [drafter.user.memory-repository :as memrepo]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -19,23 +21,8 @@
     (tc/assert-schema api/Draftset body)
       body))
 
-(defn- create-submit-to-role-request [user draftset-location role]
-  (tc/with-identity user {:uri (str draftset-location "/submit-to") :request-method :post :params {:role (name role)}}))
-
 (defn- submit-draftset-to-role-through-api [handler user draftset-location role]
-  (let [response (handler (create-submit-to-role-request user draftset-location role))]
-    (tc/assert-is-ok-response response)))
-
-(defn- submit-draftset-to-username-request [draftset-location target-username user]
-  (tc/with-identity user
-    {:uri (str draftset-location "/submit-to") :request-method :post :params {:user target-username}}))
-
-(defn- submit-draftset-to-user-request [draftset-location target-user user]
-  (submit-draftset-to-username-request draftset-location (user/username target-user) user))
-
-(defn- submit-draftset-to-user-through-api [handler draftset-location target-user user]
-  (let [request (submit-draftset-to-user-request draftset-location target-user user)
-        response (handler request)]
+  (let [response (handler (help/create-submit-to-role-request user draftset-location role))]
     (tc/assert-is-ok-response response)))
 
 (tc/deftest-system-with-keys claim-draftset-submitted-to-role
@@ -53,7 +40,7 @@
   [{handler :drafter.routes/draftsets-api} "test-system.edn"]
   (let [{{draftset-location "Location"} :headers}
         (handler (ct/create-draftset-request test-editor))]
-    (submit-draftset-to-user-through-api handler draftset-location test-publisher test-editor)
+    (help/submit-draftset-to-user-through-api handler draftset-location test-publisher test-editor)
     (let [{:keys [current-owner claim-user] :as ds-info}
           (claim-draftset-through-api handler draftset-location test-publisher)]
       (is (= (user/username test-publisher) current-owner))
@@ -64,7 +51,7 @@
   [{handler :drafter.routes/draftsets-api} "test-system.edn"]
   (let [{{draftset-location "Location"} :headers}
         (handler (ct/create-draftset-request test-editor))]
-    (submit-draftset-to-user-through-api handler draftset-location test-publisher test-editor)
+    (help/submit-draftset-to-user-through-api handler draftset-location test-publisher test-editor)
     (let [claim-request (create-claim-request draftset-location test-manager)
           claim-response (handler claim-request)]
       (tc/assert-is-forbidden-response claim-response))))
