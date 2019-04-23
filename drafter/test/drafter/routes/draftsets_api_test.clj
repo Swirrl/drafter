@@ -25,8 +25,7 @@
             [drafter.feature.draftset.test-helper :as help :refer [Draftset]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            java.net.URI
-           java.time.OffsetDateTime
-           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
+           java.time.OffsetDateTime))
 
 (def ^:private ^:dynamic *route* nil)
 (def ^:private ^:dynamic *user-repo* nil)
