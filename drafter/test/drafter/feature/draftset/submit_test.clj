@@ -1,7 +1,6 @@
 (ns drafter.feature.draftset.submit-test
   (:require [clojure.test :as t :refer [is]]
             [drafter.feature.draftset.test-helper :as help]
-            [drafter.routes.draftsets-api-test :as api]
             [drafter.test-common :as tc]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]))
@@ -37,7 +36,7 @@
             (help/submit-draftset-to-user-request test-publisher test-editor)
             (handler))]
     (tc/assert-is-ok-response submit-response)
-    (tc/assert-schema api/Draftset body)
+    (tc/assert-schema help/Draftset body)
 
     (let [{:keys [current-owner claim-user] :as ds-info} body]
       (is (nil? current-owner))

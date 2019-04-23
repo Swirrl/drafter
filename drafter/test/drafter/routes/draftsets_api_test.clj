@@ -21,7 +21,8 @@
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [grafter-2.rdf4j.formats :as formats]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]])
+            [swirrl-server.async.jobs :refer [finished-jobs]]
+            [drafter.feature.draftset.test-helper :as help :refer [Draftset]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            java.net.URI
            java.time.OffsetDateTime
@@ -93,28 +94,6 @@
   (let [request (statements->append-triples-request user draftset-location triples graph)
         response (route request)]
     (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
-
-(def ^:private DraftsetWithoutTitleOrDescription
-  {:id s/Str
-   :changes {URI {:status (s/enum :created :updated :deleted)}}
-   :created-at OffsetDateTime
-   :updated-at OffsetDateTime
-   :created-by s/Str
-   (s/optional-key :current-owner) s/Str
-   (s/optional-key :claim-role) s/Keyword
-   (s/optional-key :claim-user) s/Str
-   (s/optional-key :submitted-by) s/Str})
-
-(def ^:private DraftsetWithoutDescription
-  (assoc DraftsetWithoutTitleOrDescription :display-name s/Str))
-
-(def ^:private draftset-with-description-info-schema
-  (assoc DraftsetWithoutDescription :description s/Str))
-
-(def Draftset
-  (merge DraftsetWithoutTitleOrDescription
-         {(s/optional-key :description) s/Str
-          (s/optional-key :display-name) s/Str}))
 
 (defn- eval-statement [s]
   (util/map-values str s))
@@ -300,13 +279,13 @@
 (deftest get-empty-draftset-without-title-or-description
   (let [draftset-location (create-draftset-through-api test-editor)
         ds-info (get-draftset-info-through-api draftset-location test-editor)]
-    (tc/assert-schema DraftsetWithoutTitleOrDescription ds-info)))
+    (tc/assert-schema help/DraftsetWithoutTitleOrDescription ds-info)))
 
 (deftest get-empty-draftset-without-description
   (let [display-name "Test title!"
         draftset-location (create-draftset-through-api test-editor display-name)
         ds-info (get-draftset-info-through-api draftset-location test-editor)]
-    (tc/assert-schema DraftsetWithoutDescription ds-info)
+    (tc/assert-schema help/DraftsetWithoutDescription ds-info)
     (is (= display-name (:display-name ds-info)))))
 
 (deftest get-empty-draftset-with-description
@@ -315,7 +294,7 @@
         draftset-location (create-draftset-through-api test-editor display-name description)]
 
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
-      (tc/assert-schema draftset-with-description-info-schema ds-info)
+      (tc/assert-schema help/draftset-with-description-info-schema ds-info)
       (is (= display-name (:display-name ds-info)))
       (is (= description (:description ds-info))))))
 
@@ -327,7 +306,7 @@
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
 
     (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
-      (tc/assert-schema DraftsetWithoutDescription ds-info)
+      (tc/assert-schema help/DraftsetWithoutDescription ds-info)
 
       (is (= display-name (:display-name ds-info)))
       (is (= live-graphs (tc/key-set (:changes ds-info)))))))

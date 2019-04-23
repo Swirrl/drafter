@@ -2,7 +2,6 @@
   (:require [clojure.test :as t :refer [is]]
             [drafter.feature.draftset.create-test :as ct]
             [drafter.feature.draftset.test-helper :as help]
-            [drafter.routes.draftsets-api-test :as api]
             [drafter.test-common :as tc]
             [drafter.user :as user]
             [drafter.user-test
@@ -18,7 +17,7 @@
   (let [claim-request (create-claim-request draftset-location user)
         {:keys [body] :as claim-response} (handler claim-request)]
     (tc/assert-is-ok-response claim-response)
-    (tc/assert-schema api/Draftset body)
+    (tc/assert-schema help/Draftset body)
       body))
 
 (defn- submit-draftset-to-role-through-api [handler user draftset-location role]

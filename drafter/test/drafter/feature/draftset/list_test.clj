@@ -4,7 +4,8 @@
             [drafter.routes.draftsets-api-test :as dset-test]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
-            [drafter.util :as dutil])
+            [drafter.util :as dutil]
+            [drafter.feature.draftset.test-helper :as help])
   (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -23,7 +24,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- assert-visibility [expected-draftset-names {:keys [body] :as response} message]
-  (ok-response->typed-body [dset-test/Draftset] response) ;; check we get our draftset json back in an appropriate HTML response
+  (ok-response->typed-body [help/Draftset] response) ;; check we get our draftset json back in an appropriate HTML response
 
   (let [draftset-names (set (map :display-name body))]
     (t/is (= expected-draftset-names draftset-names)
@@ -66,14 +67,14 @@
                                     (let [request (get-draftsets-request include user)
                                           {:keys [body] :as response} (get-draftsets-handler request)]
 
-                                      (ok-response->typed-body [dset-test/Draftset] response)
+                                      (ok-response->typed-body [help/Draftset] response)
 
                                       body))]
 
     (t/testing "Missing include filter should return all owned and claimable draftsets"
       (let [request (tc/with-identity test-publisher {:uri "/v1/draftsets" :request-method :get})
             response (get-draftsets-handler request)
-            draftsets (ok-response->typed-body [dset-test/Draftset] response)]
+            draftsets (ok-response->typed-body [help/Draftset] response)]
         (t/is (= 2 (count draftsets)))
         (t/is (= #{"owned" "claimable"} (set (map :display-name draftsets))))))
 
