@@ -82,20 +82,6 @@
 (defmethod ig/init-key ::get-draftset-handler [_ opts]
   (get-draftset-handler opts))
 
-(defn delete-draftset-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
-  (log/info "del draftset handler wrapper: " wrap-as-draftset-owner)
-  (wrap-as-draftset-owner
-   (fn [request]
-     (log/info "delete-draftset-handler " request)
-     (let [{{:keys [draftset-id]} :params :as request} request]
-       (submit-async-job! (dsjobs/delete-draftset-job backend draftset-id))))))
-
-(defmethod ig/pre-init-spec ::delete-draftset-handler [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-as-draftset-owner]))
-
-(defmethod ig/init-key ::delete-draftset-handler [_ opts]
-  (delete-draftset-handler opts))
-
 
 (defn draftset-options-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
