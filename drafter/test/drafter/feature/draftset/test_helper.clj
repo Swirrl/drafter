@@ -1,13 +1,14 @@
 (ns drafter.feature.draftset.test-helper
   (:require [drafter.feature.draftset.create-test :as ct]
+            [drafter.responses :refer [unprocessable-entity-response]]
             [drafter.test-common :as tc]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor]]
             [grafter-2.rdf.protocols :refer [add]]
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
-            [schema.core :as s]))
+            [schema.core :as s]
+            [swirrl-server.async.jobs :refer [finished-jobs]]))
 
 (def DraftsetWithoutTitleOrDescription
   {:id s/Str
@@ -83,3 +84,16 @@
   (let [request (statements->append-request user draftset-location quads :nq)
         response (handler request)]
     (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
+
+(defn parse-query-param-flag-handler [flag inner-handler]
+  (fn [{:keys [params] :as request}]
+    (letfn [(update-request [b] (assoc-in request [:params flag] b))]
+      (if-let [value (get params flag)]
+        (if (boolean (re-matches #"(?i)(true|false)" value))
+          (let [ub (Boolean/parseBoolean value)]
+            (inner-handler (update-request ub)))
+          (unprocessable-entity-response (str "Invalid " (name flag) " parameter value - expected true or false")))
+        (inner-handler (update-request false))))))
+
+(defn parse-union-with-live-handler [inner-handler]
+  (parse-query-param-flag-handler :union-with-live inner-handler))

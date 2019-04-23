@@ -99,9 +99,9 @@
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/backend #ig/ref :drafter/backend
                                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-query-handler {:drafter/backend #ig/ref :drafter/backend
-                                                       :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                                       :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.feature.draftset.query/handler {:drafter/backend #ig/ref :drafter/backend
+                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
+                                          :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.routes.draftsets-api/draftset-publish-handler {:drafter/backend #ig/ref :drafter/backend
                                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
@@ -132,7 +132,7 @@
                                 :delete-draftset-changes-handler #ig/ref :drafter.feature.draftset.changes/delete-changes-handler
                                 :put-draftset-data-handler #ig/ref :drafter.feature.draftset-data.append/data-handler
                                 :put-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.append-by-graph/handler
-                                :draftset-query-handler #ig/ref :drafter.routes.draftsets-api/draftset-query-handler
+                                :draftset-query-handler #ig/ref :drafter.feature.draftset.query/handler
                                 :draftset-publish-handler #ig/ref :drafter.routes.draftsets-api/draftset-publish-handler
                                 :draftset-set-metadata-handler #ig/ref :drafter.routes.draftsets-api/draftset-set-metadata-handler
                                 :draftset-submit-to-handler #ig/ref :drafter.feature.draftset.submit/handler

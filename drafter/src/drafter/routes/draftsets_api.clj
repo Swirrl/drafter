@@ -124,22 +124,6 @@
 (defmethod ig/init-key ::draftset-get-data-handler [_ opts]
   (draftset-get-data-handler opts))
 
-(defn draftset-query-handler [{backend :drafter/backend
-                               :keys [wrap-as-draftset-owner timeout-fn]}]
-  (wrap-as-draftset-owner
-   (parse-union-with-live-handler
-    (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
-      (let [executor (backend/endpoint-repo backend draftset-id {:union-with-live? union-with-live})
-            handler (sparql-protocol-handler {:repo executor :timeout-fn timeout-fn})]
-        (handler request))))))
-
-(defmethod ig/pre-init-spec ::draftset-query-handler [_]
-  (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner ::sp/timeout-fn]))
-
-(defmethod ig/init-key ::draftset-query-handler [_ opts]
-  (draftset-query-handler opts))
-
 (defn draftset-publish-handler [{backend :drafter/backend
                                  :keys [wrap-as-draftset-owner timeout-fn]}]
   (wrap-as-draftset-owner
