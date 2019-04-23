@@ -2,7 +2,6 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer [is]]
             [drafter.feature.draftset.create-test :as ct]
-            [drafter.responses :refer [unprocessable-entity-response]]
             [drafter.test-common :as tc]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-publisher]]
