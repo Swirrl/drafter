@@ -1,30 +1,26 @@
 (ns drafter.routes.draftsets-api-test
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
-            [clojure.test :refer :all :as t]
-            [drafter.middleware :as middleware]
+            [clojure.test :as t :refer :all]
+            [drafter.feature.draftset.test-helper :refer :all]
             [drafter.rdf.drafter-ontology
              :refer
              [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.feature.draftset.create-test :as create-test]
             [drafter.rdf.sparql :as sparql]
-            [drafter.routes.draftsets-api :as sut :refer :all]
             [drafter.swagger :as swagger]
             [drafter.test-common :as tc]
-            [drafter.timeouts :as timeouts]
             [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
+            [drafter.user-test
+             :refer
+             [test-editor test-manager test-password test-publisher]]
             [drafter.user.memory-repository :as memrepo]
             [drafter.util :as util]
-            [grafter-2.rdf4j.io :refer [rdf-writer statements]]
-            [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
+            [grafter-2.rdf.protocols :refer [->Quad ->Triple context map->Triple]]
             [grafter-2.rdf4j.formats :as formats]
-            [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
-            [drafter.feature.draftset.test-helper :refer :all])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
-           java.net.URI
+            [grafter-2.rdf4j.io :refer [statements]]
+            [swirrl-server.async.jobs :refer [finished-jobs]])
+  (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.query.QueryResultHandler
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
