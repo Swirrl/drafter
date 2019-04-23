@@ -5,12 +5,12 @@
             [drafter.responses :refer [submit-async-job!]]
             [integrant.core :as ig]))
 
-(defn delete-draftset-handler
+(defn handler
   [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
   (log/info "del draftset handler wrapper: " wrap-as-draftset-owner)
   (wrap-as-draftset-owner
    (fn [request]
-     (log/info "delete-draftset-handler " request)
+     (log/info "drafter.feature.draftset.delete/handler " request)
      (let [{{:keys [draftset-id]} :params :as request} request]
        (submit-async-job! (dsjobs/delete-draftset-job backend draftset-id))))))
 
@@ -18,4 +18,4 @@
   (s/keys :req [:drafter/backend] :req-un [::wrap-as-draftset-owner]))
 
 (defmethod ig/init-key ::handler [_ opts]
-  (delete-draftset-handler opts))
+  (handler opts))
