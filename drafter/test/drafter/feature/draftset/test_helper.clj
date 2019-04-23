@@ -1,16 +1,17 @@
 (ns drafter.feature.draftset.test-helper
-  (:require [drafter.feature.draftset.create-test :as ct]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer [is]]
+            [drafter.feature.draftset.create-test :as ct]
             [drafter.responses :refer [unprocessable-entity-response]]
             [drafter.test-common :as tc]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-publisher]]
+            [drafter.util :as util]
             [grafter-2.rdf.protocols :refer [add]]
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
-            [clojure.java.io :as io]
-            [drafter.util :as util]))
+            [swirrl-server.async.jobs :refer [finished-jobs]]))
 
 (def DraftsetWithoutTitleOrDescription
   {:id s/Str
@@ -112,10 +113,10 @@
     (let [request (append-to-draftset-request user draftset-location fs "application/x-trig")]
       (handler request))))
 
-(defn- create-publish-request [draftset-location user]
+(defn create-publish-request [draftset-location user]
   (tc/with-identity user {:uri (str draftset-location "/publish") :request-method :post}))
 
-(defn- publish-draftset-through-api [handler draftset-location user]
+(defn publish-draftset-through-api [handler draftset-location user]
   (let [publish-request (create-publish-request draftset-location user)
         publish-response (handler publish-request)]
     (tc/await-success finished-jobs (:finished-job (:body publish-response)))))
@@ -130,3 +131,69 @@
 
 (defn eval-statements [ss]
   (map eval-statement ss))
+
+(defn- concrete-statements [source format]
+  (eval-statements (statements source :format format)))
+
+(defn- get-draftset-quads-accept-request [draftset-location user accept union-with-live?-str]
+  (tc/with-identity user
+    {:uri (str draftset-location "/data")
+     :request-method :get
+     :headers {"accept" accept}
+     :params {:union-with-live union-with-live?-str}}))
+
+(defn- get-draftset-quads-request [draftset-location user format union-with-live?-str]
+  (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType (formats/->rdf-format format)) union-with-live?-str))
+
+(defn- get-draftset-quads-through-api
+  ([handler draftset-location user]
+   (get-draftset-quads-through-api draftset-location user "false"))
+  ([handler draftset-location user union-with-live?]
+   (let [data-request (get-draftset-quads-request draftset-location user :nq union-with-live?)
+         data-response (handler data-request)]
+     (tc/assert-is-ok-response data-response)
+     (concrete-statements (:body data-response) :nq))))
+
+;;TODO: Get quads through query of live endpoint? This depends on
+;;'union with live' working correctly
+(defn get-live-quads-through-api [handler]
+  (let [tmp-ds (create-draftset-through-api handler test-editor)]
+    (get-draftset-quads-through-api handler tmp-ds test-editor "true")))
+
+(defn assert-live-quads [handler expected-quads]
+  (let [live-quads (get-live-quads-through-api handler)]
+    (is (= (set (eval-statements expected-quads)) (set live-quads)))))
+
+(defn- await-delete-statements-response [response]
+  (let [job-result (tc/await-success finished-jobs (get-in response [:body :finished-job]))]
+    (get-in job-result [:details :draftset])))
+
+(defn- create-delete-quads-request [user draftset-location input-stream format]
+  (tc/with-identity user {:uri (str draftset-location "/data")
+                          :request-method :delete
+                          :body input-stream
+                          :headers {"content-type" format}}))
+
+(defn- create-delete-statements-request [user draftset-location statements format]
+  (let [input-stream (statements->input-stream statements format)]
+    (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
+
+(defn- create-delete-triples-request [user draftset-location statements graph]
+  (assoc-in (create-delete-statements-request user draftset-location statements :nt)
+            [:params :graph] (str graph)))
+
+(defn delete-triples-through-api [handler user draftset-location triples graph]
+  (-> (create-delete-triples-request user draftset-location triples graph)
+      (handler)
+      (await-delete-statements-response)))
+
+(defn delete-quads-through-api [handler user draftset-location quads]
+  (let [delete-request (create-delete-statements-request user draftset-location quads :nq)
+        delete-response (handler delete-request)]
+    (await-delete-statements-response delete-response)))
+
+(defn delete-draftset-triples-through-api [handler user draftset-location triples graph]
+  (let [delete-request (create-delete-statements-request user draftset-location triples :nt)
+        delete-request (assoc-in delete-request [:params :graph] (str graph))
+        delete-response (handler delete-request)]
+    (await-delete-statements-response delete-response)))
