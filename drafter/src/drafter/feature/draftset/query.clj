@@ -2,7 +2,8 @@
   (:require [clojure.spec.alpha :as s]
             [drafter.backend :as backend]
             [drafter.feature.draftset.test-helper :as help]
-            [drafter.rdf.sparql-protocol :as sp :refer [sparql-protocol-handler]]))
+            [drafter.rdf.sparql-protocol :as sp :refer [sparql-protocol-handler]]
+            [integrant.core :as ig]))
 
 (defn handler
   [{backend :drafter/backend :keys [wrap-as-draftset-owner timeout-fn]}]

@@ -3,12 +3,14 @@
             [drafter.responses :refer [unprocessable-entity-response]]
             [drafter.test-common :as tc]
             [drafter.user :as user]
-            [drafter.user-test :refer [test-editor]]
+            [drafter.user-test :refer [test-editor test-publisher]]
             [grafter-2.rdf.protocols :refer [add]]
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]))
+            [swirrl-server.async.jobs :refer [finished-jobs]]
+            [clojure.java.io :as io]
+            [drafter.util :as util]))
 
 (def DraftsetWithoutTitleOrDescription
   {:id s/Str
@@ -38,7 +40,7 @@
                           :params {:role (name role)}}))
 
 (defn create-draftset-through-api [handler user]
-  (-> test-editor ct/create-draftset-request handler :headers (get "Location")))
+  (-> user ct/create-draftset-request handler :headers (get "Location")))
 
 (defn submit-draftset-to-username-request [draftset-location target-username user]
   (tc/with-identity user {:uri (str draftset-location "/submit-to")
@@ -97,3 +99,34 @@
 
 (defn parse-union-with-live-handler [inner-handler]
   (parse-query-param-flag-handler :union-with-live inner-handler))
+
+(defn append-to-draftset-request [user draftset-location data-stream content-type]
+  (tc/with-identity user
+    {:uri (str draftset-location "/data")
+     :request-method :put
+     :body data-stream
+     :headers {"content-type" content-type}}))
+
+(defn make-append-data-to-draftset-request [handler user draftset-location data-file-path]
+  (with-open [fs (io/input-stream data-file-path)]
+    (let [request (append-to-draftset-request user draftset-location fs "application/x-trig")]
+      (handler request))))
+
+(defn- create-publish-request [draftset-location user]
+  (tc/with-identity user {:uri (str draftset-location "/publish") :request-method :post}))
+
+(defn- publish-draftset-through-api [handler draftset-location user]
+  (let [publish-request (create-publish-request draftset-location user)
+        publish-response (handler publish-request)]
+    (tc/await-success finished-jobs (:finished-job (:body publish-response)))))
+
+(defn publish-quads-through-api [handler quads]
+  (let [draftset-location (create-draftset-through-api handler test-publisher)]
+    (append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
+    (publish-draftset-through-api handler draftset-location test-publisher)))
+
+(defn- eval-statement [s]
+  (util/map-values str s))
+
+(defn eval-statements [ss]
+  (map eval-statement ss))
