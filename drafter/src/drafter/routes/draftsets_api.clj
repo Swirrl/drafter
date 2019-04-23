@@ -43,7 +43,7 @@
           (unprocessable-entity-response (str "Invalid " (name flag) " parameter value - expected true or false")))
         (inner-handler (update-request false))))))
 
-(defn- parse-union-with-live-handler [inner-handler]
+(defn parse-union-with-live-handler [inner-handler]
   (parse-query-param-flag-handler :union-with-live inner-handler))
 
 (defn make-route [method route handler-fn]

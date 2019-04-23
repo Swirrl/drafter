@@ -2,12 +2,14 @@
   (:require [clojure.spec.alpha :as s]
             [drafter.backend :as backend]
             [drafter.feature.draftset.test-helper :as help]
-            [drafter.rdf.sparql-protocol :as sp :refer [sparql-protocol-handler]]))
+            [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
+            [drafter.rdf.sparql-protocol :as sp :refer [sparql-protocol-handler]]
+            [integrant.core :as ig]))
 
 (defn handler
   [{backend :drafter/backend :keys [wrap-as-draftset-owner timeout-fn]}]
   (wrap-as-draftset-owner
-   (help/parse-union-with-live-handler
+   (parse-union-with-live-handler
     (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
       (let [executor (backend/endpoint-repo backend draftset-id {:union-with-live? union-with-live})
             handler (sparql-protocol-handler {:repo executor :timeout-fn timeout-fn})]
