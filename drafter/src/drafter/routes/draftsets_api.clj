@@ -1,7 +1,9 @@
 (ns drafter.routes.draftsets-api
   (:require [clj-logging-config.log4j :as l4j]
             [clojure.spec.alpha :as s]
+            [clojure.tools.logging :as log]
             [compojure.core :as compojure :refer [context routes]]
+            [drafter.backend :as backend]
             [drafter.backend.draftset :as ep]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.common :as feat-common]
@@ -11,10 +13,15 @@
              [negotiate-quads-content-type-handler
               negotiate-triples-content-type-handler]]
             [drafter.rdf.draftset-management.job-util :as jobutil]
-            [drafter.rdf.sparql-protocol :as sp :refer [sparql-execution-handler]]
+            [drafter.rdf.draftset-management.jobs :as dsjobs]
+            [drafter.rdf.sparql-protocol :as sp
+             :refer [sparql-execution-handler sparql-protocol-handler]]
             [drafter.responses
              :refer
-             [forbidden-response unprocessable-entity-response]]
+             [conflict-detected-response
+              forbidden-response
+              submit-async-job!
+              unprocessable-entity-response]]
             [drafter.user :as user]
             [drafter.util :as util]
             [integrant.core :as ig]
