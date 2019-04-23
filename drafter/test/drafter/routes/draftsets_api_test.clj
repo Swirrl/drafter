@@ -583,26 +583,6 @@
           delete-response (route delete-request)]
       (tc/assert-is-unsupported-media-type-response delete-response))))
 
-(deftest delete-non-existent-live-graph-in-draftset
-  (let [draftset-location (create-draftset-through-api test-editor)
-        graph-to-delete "http://live-graph"
-        delete-request (delete-draftset-graph-request test-editor draftset-location "http://live-graph")]
-
-    (testing "silent"
-      (let [delete-request (assoc-in delete-request [:params :silent] "true")
-            delete-response (route delete-request)]
-        (tc/assert-is-ok-response delete-response)))
-
-    (testing "malformed silent flag"
-      (let [delete-request (assoc-in delete-request [:params :silent] "invalid")
-            delete-response (route delete-request)]
-        (tc/assert-is-unprocessable-response delete-response)))
-
-    (testing "not silent"
-      (let [delete-request (delete-draftset-graph-request test-editor draftset-location "http://live-graph")
-            delete-response (route delete-request)]
-        (tc/assert-is-unprocessable-response delete-response)))))
-
 (deftest delete-live-graph-not-in-draftset
   (let [quads (statements "test/resources/test-draftset.trig")
         graph-quads (group-by context quads)
@@ -644,16 +624,6 @@
   (let [request (tc/with-identity test-manager {:uri "/v1/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
         response (route request)]
     (tc/assert-is-not-found-response response)))
-
-(deftest delete-graph-by-non-owner
-
- (let [draftset-location (create-draftset-through-api test-editor)
-        [graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
-    (append-quads-to-draftset-through-api test-editor draftset-location quads)
-
-    (let [delete-request (delete-draftset-graph-request test-publisher draftset-location graph)
-          delete-response (route delete-request)]
-      (tc/assert-is-forbidden-response delete-response))))
 
 (deftest publish-draftset-with-graphs-not-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
