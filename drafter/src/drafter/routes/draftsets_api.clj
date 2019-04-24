@@ -43,7 +43,7 @@
           (unprocessable-entity-response (str "Invalid " (name flag) " parameter value - expected true or false")))
         (inner-handler (update-request false))))))
 
-(defn- parse-union-with-live-handler [inner-handler]
+(defn parse-union-with-live-handler [inner-handler]
   (parse-query-param-flag-handler :union-with-live inner-handler))
 
 (defn make-route [method route handler-fn]
@@ -110,33 +110,6 @@
 
 (defmethod ig/init-key ::draftset-options-handler [_ opts]
   (draftset-options-handler opts))
-
-(defn draftset-get-data-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend
-                                  draftset-query-timeout-fn :timeout-fn}]
-  (wrap-as-draftset-owner
-   (parse-union-with-live-handler
-    (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
-      (let [;;executor (ep/draftset-endpoint {:backend backend :draftset-ref draftset-id :union-with-live? union-with-live})
-            executor (ep/build-draftset-endpoint backend draftset-id union-with-live)
-            is-triples-query? (contains? params :graph)
-            conneg (if is-triples-query?
-                     negotiate-triples-content-type-handler
-                     negotiate-quads-content-type-handler)
-            pquery (if is-triples-query?
-                     (dsops/all-graph-triples-query executor graph)
-                     (dsops/all-quads-query executor))
-            handler (->> sparql-execution-handler
-                         (sp/sparql-timeout-handler draftset-query-timeout-fn)
-                         (conneg)
-                         (sp/sparql-constant-prepared-query-handler pquery))]
-        (handler request))))))
-
-(defmethod ig/pre-init-spec ::draftset-get-data-handler [_]
-  (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner ::sp/timeout-fn]))
-
-(defmethod ig/init-key ::draftset-get-data-handler [_ opts]
-  (draftset-get-data-handler opts))
 
 (defn draftset-query-handler [{backend :drafter/backend
                                :keys [wrap-as-draftset-owner timeout-fn]}]
@@ -240,7 +213,6 @@
 
 (defmethod ig/init-key ::draftset-claim-handler [_ opts]
   (draftset-claim-handler opts))
-
 
 (defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler
