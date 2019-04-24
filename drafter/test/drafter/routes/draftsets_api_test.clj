@@ -736,16 +736,6 @@
           data-response (route data-request)]
       (tc/assert-is-not-acceptable-response data-response))))
 
-(deftest get-draftset-data-for-missing-draftset
-  (let [response (route (tc/with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :get :headers {"accept" "application/n-quads"}}))]
-    (tc/assert-is-not-found-response response)))
-
-(deftest get-draftset-data-for-unowned-draftset
-  (let [draftset-location (create-draftset-through-api test-editor)
-        get-data-request (get-draftset-quads-request draftset-location test-publisher :nq "false")
-        response (route get-data-request)]
-    (tc/assert-is-forbidden-response response)))
-
 (deftest submit-draftset-to-role
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-request (create-submit-to-role-request test-editor draftset-location :publisher)

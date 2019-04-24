@@ -150,7 +150,7 @@
      :headers {"accept" accept}
      :params {:union-with-live union-with-live?-str}}))
 
-(defn- get-draftset-quads-request [draftset-location user format union-with-live?-str]
+(defn get-draftset-quads-request [draftset-location user format union-with-live?-str]
   (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType (formats/->rdf-format format)) union-with-live?-str))
 
 (defn- get-draftset-quads-through-api
