@@ -112,20 +112,6 @@
 (defmethod ig/init-key ::draftset-get-data-handler [_ opts]
   (draftset-get-data-handler opts))
 
-(defn draftset-set-metadata-handler [{backend :drafter/backend
-                                      :keys [wrap-as-draftset-owner timeout-fn]}]
-  (wrap-as-draftset-owner
-   (fn [{{:keys [draftset-id] :as params} :params}]
-     (feat-common/run-sync #(dsops/set-draftset-metadata! backend draftset-id params)
-               #(feat-common/draftset-sync-write-response % backend draftset-id)))))
-
-(defmethod ig/pre-init-spec ::draftset-set-metadata-handler [_]
-  (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner]))
-
-(defmethod ig/init-key ::draftset-set-metadata-handler [_ opts]
-  (draftset-set-metadata-handler opts))
-
 
 (defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler
