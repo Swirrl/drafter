@@ -40,8 +40,16 @@
                           :request-method :post
                           :params {:role (name role)}}))
 
-(defn create-draftset-through-api [handler user]
-  (-> user ct/create-draftset-request handler :headers (get "Location")))
+
+(defn create-draftset-through-api
+  ([handler] (create-draftset-through-api handler test-editor))
+  ([handler user] (create-draftset-through-api handler user nil))
+  ([handler user display-name] (create-draftset-through-api handler user display-name nil))
+  ([handler user display-name description]
+   (let [request (ct/create-draftset-request user display-name description)
+         {:keys [headers] :as response} (handler request)]
+     (ct/assert-is-see-other-response response)
+     (get headers "Location"))))
 
 (defn submit-draftset-to-username-request [draftset-location target-username user]
   (tc/with-identity user {:uri (str draftset-location "/submit-to")

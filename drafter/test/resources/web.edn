@@ -67,8 +67,8 @@
  :drafter.feature.draftset.publish/handler {:drafter/backend #ig/ref :drafter/backend
                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-set-metadata-handler {:drafter/backend #ig/ref :drafter/backend
-                                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+ :drafter.feature.draftset.set-metadata/handler {:drafter/backend #ig/ref :drafter/backend
+                                                 :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.submit/handler {:drafter/backend #ig/ref :drafter/backend
                                            :drafter.user/repo #ig/ref :drafter.user/repo
@@ -94,7 +94,7 @@
                                 :put-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.append-by-graph/handler
                                 :draftset-query-handler #ig/ref :drafter.feature.draftset.query/handler
                                 :draftset-publish-handler #ig/ref :drafter.feature.draftset.publish/handler
-                                :draftset-set-metadata-handler #ig/ref :drafter.routes.draftsets-api/draftset-set-metadata-handler
+                                :draftset-set-metadata-handler #ig/ref :drafter.feature.draftset.set-metadata/handler
                                 :draftset-submit-to-handler #ig/ref :drafter.feature.draftset.submit/handler
                                 :draftset-claim-handler #ig/ref :drafter.feature.draftset.claim/handler}
 

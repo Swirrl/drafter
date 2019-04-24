@@ -746,44 +746,6 @@
         response (route get-data-request)]
     (tc/assert-is-forbidden-response response)))
 
-(defn- create-update-draftset-metadata-request [user draftset-location title description]
-  (tc/with-identity user
-    {:uri draftset-location :request-method :put :params {:display-name title :description description}}))
-
-(defn- update-draftset-metadata-through-api [user draftset-location title description]
-  (let [request (create-update-draftset-metadata-request user draftset-location title description)
-        {:keys [body] :as response} (route request)]
-    (tc/assert-is-ok-response response)
-    (tc/assert-schema Draftset body)
-    body))
-
-(deftest set-draftset-with-existing-title-and-description-metadata
-  (let [draftset-location (create-draftset-through-api test-editor "Test draftset" "Test description")
-        new-title "Updated title"
-        new-description "Updated description"
-        {:keys [display-name description]} (update-draftset-metadata-through-api test-editor draftset-location new-title new-description)]
-    (is (= new-title display-name))
-    (is (= new-description description))))
-
-(deftest set-metadata-for-draftset-with-no-title-or-description
-  (let [draftset-location (create-draftset-through-api)
-        new-title "New title"
-        new-description "New description"
-        {:keys [display-name description]} (update-draftset-metadata-through-api test-editor draftset-location new-title new-description)]
-    (is (= new-title display-name))
-    (is (= new-description description))))
-
-(deftest set-missing-draftset-metadata
-  (let [meta-request (create-update-draftset-metadata-request test-manager "/v1/draftset/missing" "Title!" "Description")
-        meta-response (route meta-request)]
-    (tc/assert-is-not-found-response meta-response)))
-
-(deftest set-metadata-by-non-owner
-  (let [draftset-location (create-draftset-through-api test-editor "Test draftset" "Test description")
-        update-request (create-update-draftset-metadata-request test-publisher draftset-location "New title" "New description")
-        update-response (route update-request)]
-    (tc/assert-is-forbidden-response update-response)))
-
 (deftest submit-draftset-to-role
   (let [draftset-location (create-draftset-through-api test-editor)
         submit-request (create-submit-to-role-request test-editor draftset-location :publisher)
