@@ -64,9 +64,8 @@
  :drafter.feature.draftset.list/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
                                                        :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
- :drafter.routes.draftsets-api/get-draftset-handler {:drafter/backend #ig/ref :drafter/backend
-                                                     :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
-
+ :drafter.feature.draftset.show/handler {:drafter/backend #ig/ref :drafter/backend
+                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.feature.draftset.create/handler {:drafter/backend #ig/ref :drafter/backend
                                            :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
@@ -123,7 +122,7 @@
  :drafter.routes/draftsets-api {:get-users-handler #ig/ref :drafter.feature.users.list/get-users-handler
                                 :get-draftsets-handler #ig/ref :drafter.feature.draftset.list/get-draftsets-handler
                                 :create-draftsets-handler #ig/ref :drafter.feature.draftset.create/handler
-                                :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
+                                :get-draftset-handler #ig/ref :drafter.feature.draftset.show/handler
                                 :delete-draftset-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-handler
                                 :draftset-options-handler #ig/ref :drafter.routes.draftsets-api/draftset-options-handler
                                 :draftset-get-data-handler #ig/ref :drafter.routes.draftsets-api/draftset-get-data-handler
