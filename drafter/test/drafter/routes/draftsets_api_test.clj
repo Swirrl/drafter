@@ -160,15 +160,6 @@
                        :body input-stream
                        :headers {"content-type" format}}))
 
-(defn- get-draftset-info-request [draftset-location user]
-  (tc/with-identity user {:uri draftset-location :request-method :get}))
-
-(defn- get-draftset-info-through-api [draftset-location user]
-  (let [{:keys [body] :as response} (route (get-draftset-info-request draftset-location user))]
-    (tc/assert-is-ok-response response)
-    (tc/assert-schema Draftset body)
-    body))
-
 (defn- delete-draftset-graph-request [user draftset-location graph-to-delete]
   (tc/with-identity user {:uri (str draftset-location "/graph") :request-method :delete :params {:graph (str graph-to-delete)}}))
 
@@ -217,13 +208,6 @@
   (let [live-quads (get-live-quads-through-api)]
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
-(defn- create-submit-to-role-request [user draftset-location role]
-  (tc/with-identity user {:uri (str draftset-location "/submit-to") :request-method :post :params {:role (name role)}}))
-
-(defn- submit-draftset-to-role-through-api [user draftset-location role]
-  (let [response (route (create-submit-to-role-request user draftset-location role))]
-    (tc/assert-is-ok-response response)))
-
 ;; define a local alternative to the route fixture wrapper
 
 
@@ -253,76 +237,7 @@
         response (route request)]
     (tc/assert-is-ok-response response)))
 
-(deftest get-all-draftsets-changes-test
-  (let [grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
-        [graph1 graph1-quads] (first grouped-quads)
-        [graph2 graph2-quads] (second grouped-quads)
-        draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api graph1-quads)
 
-    ;;delete quads from graph1 and insert into graph2
-    (delete-quads-through-api test-editor draftset-location (take 1 graph1-quads))
-    (append-quads-to-draftset-through-api test-editor draftset-location graph2-quads)
-
-    (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
-      (is (= :updated (get-in changes [graph1 :status])))
-      (is (= :created (get-in changes [graph2 :status]))))
-
-    ;;delete graph1
-    (delete-draftset-graph-through-api test-editor draftset-location graph1)
-    (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
-      (is (= :deleted (get-in changes [graph1 :status])))
-      (is (= :created (get-in changes [graph2 :status]))))))
-
-(deftest get-empty-draftset-without-title-or-description
-  (let [draftset-location (create-draftset-through-api test-editor)
-        ds-info (get-draftset-info-through-api draftset-location test-editor)]
-    (tc/assert-schema help/DraftsetWithoutTitleOrDescription ds-info)))
-
-(deftest get-empty-draftset-without-description
-  (let [display-name "Test title!"
-        draftset-location (create-draftset-through-api test-editor display-name)
-        ds-info (get-draftset-info-through-api draftset-location test-editor)]
-    (tc/assert-schema help/DraftsetWithoutDescription ds-info)
-    (is (= display-name (:display-name ds-info)))))
-
-(deftest get-empty-draftset-with-description
-  (let [display-name "Test title!"
-        description "Draftset used in a test"
-        draftset-location (create-draftset-through-api test-editor display-name description)]
-
-    (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
-      (tc/assert-schema help/draftset-with-description-info-schema ds-info)
-      (is (= display-name (:display-name ds-info)))
-      (is (= description (:description ds-info))))))
-
-(deftest get-draftset-containing-data
-  (let [display-name "Test title!"
-        draftset-location (create-draftset-through-api test-editor display-name)
-        quads (statements "test/resources/test-draftset.trig")
-        live-graphs (set (keys (group-by context quads)))]
-    (append-quads-to-draftset-through-api test-editor draftset-location quads)
-
-    (let [ds-info (get-draftset-info-through-api draftset-location test-editor)]
-      (tc/assert-schema help/DraftsetWithoutDescription ds-info)
-
-      (is (= display-name (:display-name ds-info)))
-      (is (= live-graphs (tc/key-set (:changes ds-info)))))))
-
-(deftest get-draftset-request-for-non-existent-draftset
-  (let [response (route (get-draftset-info-request "/v1/draftset/missing" test-publisher))]
-    (tc/assert-is-not-found-response response)))
-
-(deftest get-draftset-available-for-claim
-  (let [draftset-location (create-draftset-through-api test-editor)]
-    (submit-draftset-to-role-through-api test-editor draftset-location :publisher)
-    (let [ds-info (get-draftset-info-through-api draftset-location test-publisher)])))
-
-(deftest get-draftset-for-other-user-test
-  (let [draftset-location (create-draftset-through-api test-editor)
-        get-request (get-draftset-info-request draftset-location test-publisher)
-        get-response (route get-request)]
-    (tc/assert-is-forbidden-response get-response)))
 
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
