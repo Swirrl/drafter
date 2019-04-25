@@ -7,7 +7,7 @@
 
  ;; [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout 30
  ;;                                                              :jws-signing-key "foo"}
- 
+
  ;; :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.draftset/endpoint
  ;;                                                 :endpoint-timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
@@ -19,7 +19,7 @@
 
  [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
                                                               :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
- 
+
  :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.live/endpoint
                                                  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
@@ -38,8 +38,8 @@
  :drafter.routes.draftsets-api/delete-draftset-handler {:drafter/backend #ig/ref :drafter/backend
                                                         :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-options-handler {:drafter/backend #ig/ref :drafter/backend
-                                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.draftset.options/handler {:drafter/backend #ig/ref :drafter/backend
+                                            :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.routes.draftsets-api/draftset-get-data-handler {:drafter/backend #ig/ref :drafter/backend
                                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
@@ -53,7 +53,7 @@
 
  :drafter.feature.draftset.changes/delete-changes-handler {:drafter/backend #ig/ref :drafter/backend
                                                                 :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
- 
+
  :drafter.feature.draftset-data.append/data-handler {:drafter/backend #ig/ref :drafter/backend
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
@@ -79,13 +79,13 @@
 
  :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                                   :drafter.user/repo #ig/ref :drafter.user/repo}
- 
+
  :drafter.routes/draftsets-api {:get-users-handler #ig/ref :drafter.feature.users.list/get-users-handler
                                 :get-draftsets-handler #ig/ref :drafter.feature.draftset.list/get-draftsets-handler
                                 :create-draftsets-handler #ig/ref :drafter.feature.draftset.create/handler
                                 :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
                                 :delete-draftset-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-handler
-                                :draftset-options-handler #ig/ref :drafter.routes.draftsets-api/draftset-options-handler
+                                :draftset-options-handler #ig/ref :drafter.feature.draftset.options/handler
                                 :draftset-get-data-handler #ig/ref :drafter.routes.draftsets-api/draftset-get-data-handler
                                 :delete-draftset-data-handler #ig/ref :drafter.feature.draftset-data.delete/delete-data-handler
                                 :delete-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler
@@ -102,14 +102,14 @@
 
 
 
- 
+
  :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
                        :draftset-api-routes #ig/ref :drafter.routes/draftsets-api
                        }
- 
 
- 
+
+
  :drafter.server/http {:handler #ig/ref :drafter.handler/app
                        :open-browser? false
                        :stacktraces? false
