@@ -53,24 +53,6 @@
                      (ring/redirect-after-post (str version "/draftset/"
                                                     (get-in result [:details :id]))))))))))
 
-(defn get-draftset-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (wrap-authenticated
-   (feat-middleware/existing-draftset-handler
-    backend
-    (fn [{{:keys [draftset-id]} :params user :identity :as request}]
-      (if-let [info (dsops/get-draftset-info backend draftset-id)]
-        (if (user/can-view? user info)
-          (ring/response info)
-          (forbidden-response "Draftset not in accessible state"))
-        (ring/not-found ""))))))
-
-(defmethod ig/pre-init-spec ::get-draftset-handler [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
-
-(defmethod ig/init-key ::get-draftset-handler [_ opts]
-  (get-draftset-handler opts))
-
-
 (defn draftset-options-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
    (feat-middleware/existing-draftset-handler
