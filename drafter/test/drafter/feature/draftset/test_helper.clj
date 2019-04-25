@@ -35,15 +35,11 @@
          {(s/optional-key :description) s/Str
           (s/optional-key :display-name) s/Str}))
 
-(defn parse-query-param-flag-handler [flag inner-handler]
-  (fn [{:keys [params] :as request}]
-    (letfn [(update-request [b] (assoc-in request [:params flag] b))]
-      (if-let [value (get params flag)]
-        (if (boolean (re-matches #"(?i)(true|false)" value))
-          (let [ub (Boolean/parseBoolean value)]
-            (inner-handler (update-request ub)))
-          (unprocessable-entity-response (str "Invalid " (name flag) " parameter value - expected true or false")))
-        (inner-handler (update-request false))))))
+(defn is-client-error-response?
+  "Whether the given ring response map represents a client error."
+  [{:keys [status] :as response}]
+  (and (>= status 400)
+       (< status 500)))
 
 (defn create-submit-to-role-request [user draftset-location role]
   (tc/with-identity user {:uri (str draftset-location "/submit-to")
@@ -84,20 +80,20 @@
     (tc/assert-schema Draftset body)
     body))
 
-(defn- statements->input-stream [statements format]
+(defn statements->input-stream [statements format]
   (let [bos (java.io.ByteArrayOutputStream.)
         serialiser (rdf-writer bos :format format)]
     (add serialiser statements)
     (java.io.ByteArrayInputStream. (.toByteArray bos))))
 
-(defn- append-to-draftset-request [user draftset-location data-stream content-type]
+(defn append-to-draftset-request [user draftset-location data-stream content-type]
   (tc/with-identity user
     {:uri (str draftset-location "/data")
      :request-method :put
      :body data-stream
      :headers {"content-type" content-type}}))
 
-(defn- statements->append-request [user draftset-location statements format]
+(defn statements->append-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)]
     (append-to-draftset-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
 
@@ -119,13 +115,6 @@
 (defn parse-union-with-live-handler [inner-handler]
   (parse-query-param-flag-handler :union-with-live inner-handler))
 
-(defn append-to-draftset-request [user draftset-location data-stream content-type]
-  (tc/with-identity user
-    {:uri (str draftset-location "/data")
-     :request-method :put
-     :body data-stream
-     :headers {"content-type" content-type}}))
-
 (defn make-append-data-to-draftset-request [handler user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
     (let [request (append-to-draftset-request user draftset-location fs "application/x-trig")]
@@ -144,16 +133,16 @@
     (append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
     (publish-draftset-through-api handler draftset-location test-publisher)))
 
-(defn- eval-statement [s]
+(defn eval-statement [s]
   (util/map-values str s))
 
 (defn eval-statements [ss]
   (map eval-statement ss))
 
-(defn- concrete-statements [source format]
+(defn concrete-statements [source format]
   (eval-statements (statements source :format format)))
 
-(defn- get-draftset-quads-accept-request [draftset-location user accept union-with-live?-str]
+(defn get-draftset-quads-accept-request [draftset-location user accept union-with-live?-str]
   (tc/with-identity user
     {:uri (str draftset-location "/data")
      :request-method :get
@@ -163,7 +152,7 @@
 (defn get-draftset-quads-request [draftset-location user format union-with-live?-str]
   (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType (formats/->rdf-format format)) union-with-live?-str))
 
-(defn- get-draftset-quads-through-api
+(defn get-draftset-quads-through-api
   ([handler draftset-location user]
    (get-draftset-quads-through-api draftset-location user "false"))
   ([handler draftset-location user union-with-live?]
@@ -171,6 +160,16 @@
          data-response (handler data-request)]
      (tc/assert-is-ok-response data-response)
      (concrete-statements (:body data-response) :nq))))
+
+(defn get-draftset-graph-triples-through-api [handler draftset-location user graph union-with-live?-str]
+  (let [data-request {:uri            (str draftset-location "/data")
+                      :request-method :get
+                      :headers        {"accept" "application/n-triples"}
+                      :params         {:union-with-live union-with-live?-str :graph (str graph)}}
+        data-request (tc/with-identity user data-request)
+        {:keys [body] :as data-response} (handler data-request)]
+    (tc/assert-is-ok-response data-response)
+    (concrete-statements body :nt)))
 
 ;;TODO: Get quads through query of live endpoint? This depends on
 ;;'union with live' working correctly
@@ -182,21 +181,21 @@
   (let [live-quads (get-live-quads-through-api handler)]
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
-(defn- await-delete-statements-response [response]
+(defn await-delete-statements-response [response]
   (let [job-result (tc/await-success finished-jobs (get-in response [:body :finished-job]))]
     (get-in job-result [:details :draftset])))
 
-(defn- create-delete-quads-request [user draftset-location input-stream format]
+(defn create-delete-quads-request [user draftset-location input-stream format]
   (tc/with-identity user {:uri (str draftset-location "/data")
                           :request-method :delete
                           :body input-stream
                           :headers {"content-type" format}}))
 
-(defn- create-delete-statements-request [user draftset-location statements format]
+(defn create-delete-statements-request [user draftset-location statements format]
   (let [input-stream (statements->input-stream statements format)]
     (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
 
-(defn- create-delete-triples-request [user draftset-location statements graph]
+(defn create-delete-triples-request [user draftset-location statements graph]
   (assoc-in (create-delete-statements-request user draftset-location statements :nt)
             [:params :graph] (str graph)))
 
@@ -224,3 +223,16 @@
     (tc/assert-is-ok-response response)
     (tc/assert-schema Draftset body)
     body))
+
+(defn append-data-to-draftset-through-api [user draftset-location draftset-data-file]
+  (let [append-response (make-append-data-to-draftset-request user draftset-location draftset-data-file)]
+    (tc/await-success finished-jobs (:finished-job (:body append-response)))))
+
+(defn statements->append-triples-request [user draftset-location triples graph]
+  (-> (statements->append-request user draftset-location triples :nt)
+      (assoc-in [:params :graph] (str graph))))
+
+(defn append-triples-to-draftset-through-api [handler user draftset-location triples graph]
+  (let [request (statements->append-triples-request user draftset-location triples graph)
+        response (handler request)]
+    (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
