@@ -3,11 +3,9 @@
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.common :as feat-common]
+            [drafter.feature.draftset.test-helper :as help]
             [drafter.feature.middleware :as feat-middleware]
             [drafter.responses :as drafter-response]
-            [drafter.routes.draftsets-api
-             :refer
-             [parse-query-param-flag-handler]]
             [drafter.util :as util]
             [integrant.core :as ig]
             [ring.util.response :as ring]))
@@ -16,7 +14,7 @@
   "Remove a supplied graph from the draftset."
   [{backend :drafter/backend wrap-as-draftset-owner :wrap-as-draftset-owner}]
   (wrap-as-draftset-owner
-   (parse-query-param-flag-handler
+   (help/parse-query-param-flag-handler
     :silent
     (feat-middleware/parse-graph-param-handler
      true

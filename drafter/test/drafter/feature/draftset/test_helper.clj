@@ -35,6 +35,16 @@
          {(s/optional-key :description) s/Str
           (s/optional-key :display-name) s/Str}))
 
+(defn parse-query-param-flag-handler [flag inner-handler]
+  (fn [{:keys [params] :as request}]
+    (letfn [(update-request [b] (assoc-in request [:params flag] b))]
+      (if-let [value (get params flag)]
+        (if (boolean (re-matches #"(?i)(true|false)" value))
+          (let [ub (Boolean/parseBoolean value)]
+            (inner-handler (update-request ub)))
+          (unprocessable-entity-response (str "Invalid " (name flag) " parameter value - expected true or false")))
+        (inner-handler (update-request false))))))
+
 (defn create-submit-to-role-request [user draftset-location role]
   (tc/with-identity user {:uri (str draftset-location "/submit-to")
                           :request-method :post

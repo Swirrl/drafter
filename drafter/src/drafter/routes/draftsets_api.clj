@@ -21,37 +21,12 @@
             [ring.util.response :as ring]
             [swirrl-server.responses :as response]))
 
-(defn parse-query-param-flag-handler [flag inner-handler]
-  (fn [{:keys [params] :as request}]
-    (letfn [(update-request [b] (assoc-in request [:params flag] b))]
-      (if-let [value (get params flag)]
-        (if (boolean (re-matches #"(?i)(true|false)" value))
-          (let [ub (Boolean/parseBoolean value)]
-            (inner-handler (update-request ub)))
-          (unprocessable-entity-response (str "Invalid " (name flag) " parameter value - expected true or false")))
-        (inner-handler (update-request false))))))
-
-(defn- parse-union-with-live-handler [inner-handler]
-  (parse-query-param-flag-handler :union-with-live inner-handler))
-
 (defn make-route [method route handler-fn]
   (compojure/make-route method route
                         (fn [req]
-                          (l4j/with-logging-context
-                            {:method method
-                             :route route}
+                          (l4j/with-logging-context {:method method
+                                                     :route route}
                             (handler-fn req)))))
-
-(defn create-draftsets-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (let [version "/v1"]
-    (wrap-authenticated
-     (fn [{{:keys [display-name description]} :params user :identity :as request}]
-       (feat-common/run-sync #(dsops/create-draftset! backend user display-name description util/create-uuid util/get-current-time)
-                 (fn [result]
-                   (if (jobutil/failed-job-result? result)
-                     (response/api-response 500 result)
-                     (ring/redirect-after-post (str version "/draftset/"
-                                                    (get-in result [:details :id]))))))))))
 
 (defn draftset-options-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
