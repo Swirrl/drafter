@@ -9,7 +9,7 @@
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(def system "drafter/feature/publish-system.edn")
+(def system "drafter/feature/empty-db-system.edn")
 
 (tc/deftest-system-with-keys publish-draftset-with-graphs-not-in-live
   [:drafter.routes/draftsets-api :drafter/write-scheduler]

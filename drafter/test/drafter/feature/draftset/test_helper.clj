@@ -205,3 +205,12 @@
         delete-request (assoc-in delete-request [:params :graph] (str graph))
         delete-response (handler delete-request)]
     (await-delete-statements-response delete-response)))
+
+(defn get-draftset-info-request [draftset-location user]
+  (tc/with-identity user {:uri draftset-location :request-method :get}))
+
+(defn get-draftset-info-through-api [handler draftset-location user]
+  (let [{:keys [body] :as response} (handler (get-draftset-info-request draftset-location user))]
+    (tc/assert-is-ok-response response)
+    (tc/assert-schema Draftset body)
+    body))

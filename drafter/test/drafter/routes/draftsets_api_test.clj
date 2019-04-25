@@ -238,13 +238,12 @@
     (tc/assert-is-ok-response response)))
 
 
-
 (deftest append-quad-data-with-valid-content-type-to-draftset
   (let [data-file-path "test/resources/test-draftset.trig"
         quads (statements data-file-path)
         draftset-location (create-draftset-through-api test-editor)]
     (append-quads-to-draftset-through-api test-editor draftset-location quads)
-    (let [draftset-graphs (tc/key-set (:changes (get-draftset-info-through-api draftset-location test-editor)))
+    (let [draftset-graphs (tc/key-set (:changes (help/get-draftset-info-through-api route draftset-location test-editor)))
           graph-statements (group-by context quads)]
       (doseq [[live-graph graph-quads] graph-statements]
         (let [graph-triples (get-draftset-graph-triples-through-api draftset-location test-editor live-graph "false")
@@ -651,15 +650,6 @@
           data-response (route data-request)]
       (tc/assert-is-not-acceptable-response data-response))))
 
-(deftest submit-draftset-to-role
-  (let [draftset-location (create-draftset-through-api test-editor)
-        submit-request (create-submit-to-role-request test-editor draftset-location :publisher)
-        {ds-info :body :as submit-response} (route submit-request)]
-    (tc/assert-is-ok-response submit-response)
-    (tc/assert-schema Draftset ds-info)
-
-    (is (= false (contains? ds-info :current-owner))))
-  )
 
 (deftest get-options-test
   (let [draftset-location (create-draftset-through-api test-editor)
@@ -687,7 +677,7 @@
     (publish-quads-through-api quads)
     (delete-draftset-graph-through-api test-editor draftset-location live-graph)
 
-    (let [{:keys [changes]} (get-draftset-info-through-api draftset-location test-editor)]
+    (let [{:keys [changes]} (help/get-draftset-info-through-api route draftset-location test-editor)]
       (is (= #{live-graph} (tc/key-set changes))))
 
     (let [{:keys [changes] :as ds-info} (revert-draftset-graph-changes-through-api draftset-location test-editor live-graph)]
@@ -798,7 +788,7 @@
     (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
           draftset-location (create-draftset-through-api test-editor)]
       (append-quads-to-draftset-through-api test-editor draftset-location quads)
-      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api route draftset-location test-editor)]
         (is (= :created (get-in changes [live-graph :status]))))))
 
   (testing "Quads deleted from live graph"
@@ -807,7 +797,7 @@
       (publish-quads-through-api quads)
       (delete-quads-through-api test-editor draftset-location (take 1 quads))
 
-      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api route draftset-location test-editor)]
         (is (= :updated (get-in changes [live-graph :status]))))))
 
   (testing "Quads added to live graph"
@@ -817,7 +807,7 @@
       (publish-quads-through-api published)
       (append-quads-to-draftset-through-api test-editor draftset-location to-add)
 
-      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api route draftset-location test-editor)]
         (is (= :updated (get-in changes [live-graph :status]))))))
 
   (testing "Graph deleted"
@@ -826,7 +816,7 @@
       (publish-quads-through-api quads)
       (delete-draftset-graph-through-api test-editor draftset-location live-graph)
 
-      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api draftset-location test-editor)]
+      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api route draftset-location test-editor)]
         (is (= :deleted (get-in changes [live-graph :status])))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
