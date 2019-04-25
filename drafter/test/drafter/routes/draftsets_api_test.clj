@@ -129,42 +129,6 @@
         get-response (route get-request)]
     (tc/assert-is-forbidden-response get-response)))
 
-(deftest append-quad-data-with-valid-content-type-to-draftset
-  (let [data-file-path "test/resources/test-draftset.trig"
-        quads (statements data-file-path)
-        draftset-location (create-draftset-through-api route test-editor)]
-    (append-quads-to-draftset-through-api route test-editor draftset-location quads)
-    (let [draftset-graphs (tc/key-set (:changes (get-draftset-info-through-api route draftset-location test-editor)))
-          graph-statements (group-by context quads)]
-      (doseq [[live-graph graph-quads] graph-statements]
-        (let [graph-triples (get-draftset-graph-triples-through-api route draftset-location test-editor live-graph "false")
-              expected-statements (map map->Triple graph-quads)]
-          (is (contains? draftset-graphs live-graph))
-          (is (set expected-statements) (set graph-triples)))))))
-
-(deftest append-quad-data-to-graph-which-exists-in-live
-  (let [quads (statements "test/resources/test-draftset.trig")
-        grouped-quads (group-by context quads)
-        live-quads (map (comp first second) grouped-quads)
-        quads-to-add (rest (second (first grouped-quads)))
-        draftset-location (create-draftset-through-api route test-editor)]
-    (publish-quads-through-api route live-quads)
-    (append-quads-to-draftset-through-api route test-editor draftset-location quads-to-add)
-
-    ;;draftset itself should contain the live quads from the graph
-    ;;added to along with the quads explicitly added. It should
-    ;;not contain any quads from the other live graph.
-    (let [draftset-quads (get-draftset-quads-through-api route draftset-location test-editor "false")
-          expected-quads (eval-statements (second (first grouped-quads)))]
-      (is (= (set expected-quads) (set draftset-quads))))))
-
-(deftest append-triple-data-to-draftset-test
-  (with-open [fs (io/input-stream "test/test-triple.nt")]
-    (let [draftset-location (create-draftset-through-api route test-editor)
-          request (append-to-draftset-request test-editor draftset-location fs "application/n-triples")
-          response (route request)]
-      (is (is-client-error-response? response)))))
-
 (deftest modifying-in-draftset-updates-modified-timestamp-test
   (let [quads (statements "test/resources/test-draftset.trig")
         draftset-location (create-draftset-through-api route test-editor)
@@ -203,42 +167,6 @@
               (is (.isBefore second-timestamp
                              third-timestamp)
                   "Modified time is updated after delete"))))))))
-
-(deftest append-triples-to-graph-which-exists-in-live
-  (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api route test-editor)]
-    (publish-quads-through-api route [(first graph-quads)])
-    (append-triples-to-draftset-through-api route test-editor draftset-location (rest graph-quads) graph)
-
-    (let [draftset-graph-triples (get-draftset-graph-triples-through-api route draftset-location test-editor graph "false")
-          expected-triples (eval-statements (map map->Triple graph-quads))]
-      (is (= (set expected-triples) (set draftset-graph-triples))))))
-
-(deftest append-quad-data-without-content-type-to-draftset
-  (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [draftset-location (create-draftset-through-api route test-editor)
-          request (append-to-draftset-request test-editor draftset-location fs "tmp-content-type")
-          request (update-in request [:headers] dissoc "content-type")
-          response (route request)]
-      (is (is-client-error-response? response)))))
-
-(deftest append-data-to-non-existent-draftset
-  (let [append-response (make-append-data-to-draftset-request route test-publisher "/v1/draftset/missing" "test/resources/test-draftset.trig")]
-    (tc/assert-is-not-found-response append-response)))
-
-(deftest append-quads-by-non-owner
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        quads (statements "test/resources/test-draftset.trig")
-        append-request (statements->append-request test-publisher draftset-location quads :nq)
-        append-response (route append-request)]
-    (tc/assert-is-forbidden-response append-response)))
-
-(deftest append-graph-triples-by-non-owner
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        append-request (statements->append-triples-request test-publisher draftset-location graph-quads graph)
-        append-response (route append-request)]
-    (tc/assert-is-forbidden-response append-response)))
 
 (deftest delete-quads-from-live-graphs-in-draftset
   (let [quads (statements "test/resources/test-draftset.trig")
