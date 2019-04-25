@@ -154,7 +154,7 @@
 
 (defn get-draftset-quads-through-api
   ([handler draftset-location user]
-   (get-draftset-quads-through-api draftset-location user "false"))
+   (get-draftset-quads-through-api handler draftset-location user "false"))
   ([handler draftset-location user union-with-live?]
    (let [data-request (get-draftset-quads-request draftset-location user :nq union-with-live?)
          data-response (handler data-request)]
@@ -224,8 +224,8 @@
     (tc/assert-schema Draftset body)
     body))
 
-(defn append-data-to-draftset-through-api [user draftset-location draftset-data-file]
-  (let [append-response (make-append-data-to-draftset-request user draftset-location draftset-data-file)]
+(defn append-data-to-draftset-through-api [handler user draftset-location draftset-data-file]
+  (let [append-response (make-append-data-to-draftset-request handler user draftset-location draftset-data-file)]
     (tc/await-success finished-jobs (:finished-job (:body append-response)))))
 
 (defn statements->append-triples-request [user draftset-location triples graph]
