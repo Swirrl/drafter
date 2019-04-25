@@ -56,7 +56,7 @@
         {:keys [body] :as claim-response} (handler claim-request)]
     (tc/assert-is-ok-response claim-response)
     (tc/assert-schema Draftset body)
-      body))
+    body))
 
 (deftest get-all-draftsets-changes-test
   (let [grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
