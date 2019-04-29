@@ -1,31 +1,10 @@
 (ns drafter.feature.draftset-data.delete-by-graph-test
-  (:require [clojure.test :as t]
+  (:require [clojure.test :as t :refer :all]
+            [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]
-            [clojure.java.io :as io]
-            [clojure.set :as set]
-            [clojure.test :refer :all :as t]
-            [drafter.middleware :as middleware]
-            [drafter.rdf.drafter-ontology
-             :refer
-             [drafter:DraftGraph drafter:modifiedAt]]
-            [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.feature.draftset.create-test :as create-test]
-            [drafter.rdf.sparql :as sparql]
-            [drafter.routes.draftsets-api :as sut :refer :all]
-            [drafter.swagger :as swagger]
-            [drafter.test-common :as tc]
-            [drafter.timeouts :as timeouts]
-            [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
-            [drafter.user.memory-repository :as memrepo]
-            [drafter.util :as util]
-            [grafter-2.rdf4j.io :refer [rdf-writer statements]]
-            [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
-            [grafter-2.rdf4j.formats :as formats]
-            [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
-            [drafter.feature.draftset.test-helper :as help :refer [Draftset]]
-            ))
+            [drafter.user-test :refer [test-editor test-manager]]
+            [grafter-2.rdf.protocols :refer [context]]
+            [grafter-2.rdf4j.io :refer [statements]]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
