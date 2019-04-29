@@ -8,7 +8,7 @@
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sparql :as sparql]
             [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor test-publisher]]
+            [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [grafter-2.rdf.protocols :refer [->Quad ->Triple context map->Triple]]
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [statements]]
@@ -19,6 +19,34 @@
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system "drafter/feature/empty-db-system.edn")
+
+(defn- create-delete-draftset-request [draftset-location user]
+  (tc/with-identity user
+    {:uri draftset-location :request-method :delete}))
+
+(tc/deftest-system-with-keys delete-draftset-test
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        delete-response (handler (create-delete-draftset-request draftset-location test-editor))]
+    (tc/assert-is-accepted-response delete-response)
+    (tc/await-success finished-jobs (get-in delete-response [:body :finished-job]))
+
+    (let [get-response (handler (tc/with-identity test-editor {:uri draftset-location :request-method :get}))]
+      (tc/assert-is-not-found-response get-response))))
+
+(tc/deftest-system-with-keys delete-non-existent-draftset-test
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [delete-response (handler (create-delete-draftset-request "/v1/draftset/missing" test-publisher))]
+    (tc/assert-is-not-found-response delete-response)))
+
+(tc/deftest-system-with-keys delete-draftset-by-non-owner-test
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        delete-response (handler (create-delete-draftset-request draftset-location test-manager))]
+    (tc/assert-is-forbidden-response delete-response)))
 
 (tc/deftest-system-with-keys delete-non-existent-live-graph-in-draftset
   [:drafter.fixture-data/loader :drafter.routes/draftsets-api]

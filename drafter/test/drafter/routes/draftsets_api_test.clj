@@ -82,28 +82,6 @@
         response (route request)]
     (tc/assert-is-not-found-response response)))
 
-(defn- create-delete-draftset-request [draftset-location user]
-  (tc/with-identity user
-    {:uri draftset-location :request-method :delete}))
-
-(deftest delete-draftset-test
-  (let [draftset-location (create-draftset-through-api test-editor)
-        delete-response (route (create-delete-draftset-request draftset-location test-editor))]
-    (tc/assert-is-accepted-response delete-response)
-    (tc/await-success finished-jobs (get-in delete-response [:body :finished-job]))
-
-    (let [get-response (route (tc/with-identity test-editor {:uri draftset-location :request-method :get}))]
-      (tc/assert-is-not-found-response get-response))))
-
-(deftest delete-non-existent-draftset-test
-  (let [delete-response (route (create-delete-draftset-request "/v1/draftset/missing" test-publisher))]
-    (tc/assert-is-not-found-response delete-response)))
-
-(deftest delete-draftset-by-non-owner-test
-  (let [draftset-location (create-draftset-through-api test-editor)
-        delete-response (route (create-delete-draftset-request draftset-location test-manager))]
-    (tc/assert-is-forbidden-response delete-response)))
-
 (deftest get-draftset-graph-triples-data
   (let [draftset-location (create-draftset-through-api test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
