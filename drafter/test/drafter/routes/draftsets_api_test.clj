@@ -27,48 +27,6 @@
            java.net.URI
            java.time.OffsetDateTime))
 
-(deftest delete-live-graph-not-in-draftset
-  (let [quads (statements "test/resources/test-draftset.trig")
-        graph-quads (group-by context quads)
-        live-graphs (keys graph-quads)
-        graph-to-delete (first live-graphs)
-        draftset-location (create-draftset-through-api test-editor)]
-    (publish-quads-through-api quads)
-    (let [{draftset-graphs :changes} (delete-draftset-graph-through-api test-editor draftset-location graph-to-delete)]
-      (is (= #{graph-to-delete} (set (keys draftset-graphs)))))))
-
-(deftest delete-graph-with-changes-in-draftset
-  (let [draftset-location (create-draftset-through-api test-editor)
-        [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        published-quad (first graph-quads)
-        added-quads (rest graph-quads)]
-    (publish-quads-through-api [published-quad])
-    (append-quads-to-draftset-through-api test-editor draftset-location added-quads)
-
-    (let [{draftset-graphs :changes} (delete-draftset-graph-through-api test-editor draftset-location graph)]
-      (is (= #{graph} (set (keys draftset-graphs)))))))
-
-(deftest delete-graph-only-in-draftset
-  (let [rdf-data-file "test/resources/test-draftset.trig"
-        draftset-location (create-draftset-through-api test-editor)
-        draftset-quads (statements rdf-data-file)
-        grouped-quads (group-by context draftset-quads)
-        [graph _] (first grouped-quads)]
-    (append-data-to-draftset-through-api test-editor draftset-location rdf-data-file)
-
-    (let [{:keys [changes]} (delete-draftset-graph-through-api test-editor draftset-location graph)
-          draftset-graphs (keys changes)
-          remaining-quads (eval-statements (get-draftset-quads-through-api draftset-location test-editor))
-          expected-quads (eval-statements (mapcat second (rest grouped-quads)))
-          expected-graphs (keys grouped-quads)]
-      (is (= (set expected-quads) (set remaining-quads)))
-      (is (= (set expected-graphs) (set draftset-graphs))))))
-
-(deftest delete-graph-request-for-non-existent-draftset
-  (let [request (tc/with-identity test-manager {:uri "/v1/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
-        response (route request)]
-    (tc/assert-is-not-found-response response)))
-
 (deftest get-draftset-graph-triples-data
   (let [draftset-location (create-draftset-through-api test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
