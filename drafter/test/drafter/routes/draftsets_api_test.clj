@@ -956,70 +956,6 @@
   (let [response (route (tc/with-identity test-manager {:uri "/v1/draftset/missing" :request-method :options}))]
     (tc/assert-is-not-found-response response)))
 
-(defn- revert-draftset-graph-changes-request [draftset-location user graph]
-  (tc/with-identity user {:uri (str draftset-location "/changes") :request-method :delete :params {:graph (str graph)}}))
-
-(defn- revert-draftset-graph-changes-through-api [draftset-location user graph]
-  (let [{:keys [body] :as response} (route (revert-draftset-graph-changes-request draftset-location user graph))]
-    (tc/assert-is-ok-response response)
-    (tc/assert-schema Draftset body)
-    body))
-
-(deftest revert-graph-change-in-draftset
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api route test-editor)]
-    (publish-quads-through-api route quads)
-    (delete-draftset-graph-through-api route test-editor draftset-location live-graph)
-
-    (let [{:keys [changes]} (get-draftset-info-through-api route draftset-location test-editor)]
-      (is (= #{live-graph} (tc/key-set changes))))
-
-    (let [{:keys [changes] :as ds-info} (revert-draftset-graph-changes-through-api draftset-location test-editor live-graph)]
-      (is (= #{} (tc/key-set changes))))
-
-    (let [ds-quads (get-draftset-quads-through-api route draftset-location test-editor "true")]
-      (is (= (set (eval-statements quads)) (set ds-quads))))))
-
-(deftest revert-graph-change-in-unowned-draftset
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api route test-editor)]
-    (publish-quads-through-api route quads)
-    (delete-draftset-graph-through-api route test-editor draftset-location live-graph)
-
-    (let [revert-request (revert-draftset-graph-changes-request draftset-location test-publisher live-graph)
-          response (route revert-request)]
-      (tc/assert-is-forbidden-response response))))
-
-(deftest revert-graph-change-in-draftset-unauthorised
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api route test-editor)]
-    (publish-quads-through-api route quads)
-    (delete-draftset-graph-through-api route test-editor draftset-location live-graph)
-
-    (let [revert-request {:uri (str draftset-location "/changes") :request-method :delete :params {:graph live-graph}}
-          response (route revert-request)]
-      (tc/assert-is-unauthorised-response response))))
-
-(deftest revert-non-existent-graph-change-in-draftest
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        revert-request (revert-draftset-graph-changes-request draftset-location test-editor "http://missing")
-        response (route revert-request)]
-    (tc/assert-is-not-found-response response)))
-
-(deftest revert-change-in-non-existent-draftset
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
-    (publish-quads-through-api route quads)
-    (let [revert-request (revert-draftset-graph-changes-request "/v1/draftset/missing" test-manager live-graph)
-          response (route revert-request)]
-      (tc/assert-is-not-found-response response))))
-
-(deftest revert-graph-change-request-without-graph-parameter
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        revert-request (revert-draftset-graph-changes-request draftset-location test-editor "tmp")
-        revert-request (update-in revert-request [:params] dissoc :graph)
-        response (route revert-request)]
-    (tc/assert-is-unprocessable-response response)))
-
 (defn- copy-live-graph-into-draftset-request [draftset-location user live-graph]
   (tc/with-identity
     user
@@ -1077,41 +1013,6 @@
           copy-response (route copy-request)]
       (tc/assert-is-not-found-response copy-response))))
 
-(deftest draftset-graphs-state-test
-  (testing "Graph created"
-    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-          draftset-location (create-draftset-through-api route test-editor)]
-      (append-quads-to-draftset-through-api route test-editor draftset-location quads)
-      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api route draftset-location test-editor)]
-        (is (= :created (get-in changes [live-graph :status]))))))
-
-  (testing "Quads deleted from live graph"
-    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-          draftset-location (create-draftset-through-api route test-editor)]
-      (publish-quads-through-api route quads)
-      (delete-quads-through-api route test-editor draftset-location (take 1 quads))
-
-      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api route draftset-location test-editor)]
-        (is (= :updated (get-in changes [live-graph :status]))))))
-
-  (testing "Quads added to live graph"
-    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-          [published to-add] (split-at 1 quads)
-          draftset-location (create-draftset-through-api route test-editor)]
-      (publish-quads-through-api route published)
-      (append-quads-to-draftset-through-api route test-editor draftset-location to-add)
-
-      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api route draftset-location test-editor)]
-        (is (= :updated (get-in changes [live-graph :status]))))))
-
-  (testing "Graph deleted"
-    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-          draftset-location (create-draftset-through-api route test-editor)]
-      (publish-quads-through-api route quads)
-      (delete-draftset-graph-through-api route test-editor draftset-location live-graph)
-
-      (let [{:keys [changes] :as ds-info} (get-draftset-info-through-api route draftset-location test-editor)]
-        (is (= :deleted (get-in changes [live-graph :status])))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Handler tests
