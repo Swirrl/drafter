@@ -100,7 +100,6 @@
                     "                 <" drafter:modifiedAt ">   ?modified ."
                     "}"))
               (first)
-              (doto prn)
               (:modified)))]
 
     (testing "Publishing some triples sets the modified time"

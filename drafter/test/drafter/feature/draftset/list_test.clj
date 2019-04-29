@@ -1,7 +1,6 @@
 (ns drafter.feature.draftset.list-test
   (:require [clojure.test :as t]
             [drafter.feature.draftset.list :as sut]
-            [drafter.routes.draftsets-api-test :as dset-test]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [drafter.util :as dutil]
