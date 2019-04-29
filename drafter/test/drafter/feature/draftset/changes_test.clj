@@ -150,3 +150,41 @@
         revert-request (update-in revert-request [:params] dissoc :graph)
         response (handler revert-request)]
     (tc/assert-is-unprocessable-response response)))
+
+(tc/deftest-system-with-keys draftset-graphs-state-test
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (testing "Graph created"
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
+      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
+        (is (= :created (get-in changes [live-graph :status]))))))
+
+  (testing "Quads deleted from live graph"
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/publish-quads-through-api handler quads)
+      (help/delete-quads-through-api handler test-editor draftset-location (take 1 quads))
+
+      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
+        (is (= :updated (get-in changes [live-graph :status]))))))
+
+  (testing "Quads added to live graph"
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          [published to-add] (split-at 1 quads)
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/publish-quads-through-api handler published)
+      (help/append-quads-to-draftset-through-api handler test-editor draftset-location to-add)
+
+      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
+        (is (= :updated (get-in changes [live-graph :status]))))))
+
+  (testing "Graph deleted"
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/publish-quads-through-api handler quads)
+      (help/delete-draftset-graph-through-api handler test-editor draftset-location live-graph)
+
+      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
+        (is (= :deleted (get-in changes [live-graph :status])))))))
