@@ -373,19 +373,6 @@
         job-result (tc/await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))
 
-(deftest delete-draftset-data-for-non-existent-draftset
-  (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [delete-request (tc/with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :body fs})
-          delete-response (route delete-request)]
-      (tc/assert-is-not-found-response delete-response))))
-
-(deftest delete-draftset-data-request-with-unknown-content-type
-  (with-open [input-stream (io/input-stream "test/resources/test-draftset.trig")]
-    (let [draftset-location (create-draftset-through-api route test-editor)
-          delete-request (create-delete-quads-request test-editor draftset-location input-stream "application/unknown-quads-format")
-          delete-response (route delete-request)]
-      (tc/assert-is-unsupported-media-type-response delete-response))))
-
 (deftest delete-non-existent-live-graph-in-draftset
   (let [draftset-location (create-draftset-through-api route test-editor)
         graph-to-delete "http://live-graph"
