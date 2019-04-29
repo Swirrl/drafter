@@ -1020,63 +1020,6 @@
         response (route revert-request)]
     (tc/assert-is-unprocessable-response response)))
 
-(defn- copy-live-graph-into-draftset-request [draftset-location user live-graph]
-  (tc/with-identity
-    user
-    {:uri (str draftset-location "/graph") :request-method :put :params {:graph (str live-graph)}}))
-
-(defn- copy-live-graph-into-draftset [draftset-location user live-graph]
-  (let [request (copy-live-graph-into-draftset-request draftset-location user live-graph)
-        response (route request)]
-    (tc/await-success finished-jobs (:finished-job (:body response)))))
-
-(deftest copy-live-graph-into-draftset-test
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api route test-editor)]
-    (publish-quads-through-api route quads)
-    (copy-live-graph-into-draftset draftset-location test-editor live-graph)
-
-    (let [ds-quads (get-draftset-quads-through-api route draftset-location test-editor "false")
-          expected-quads (eval-statements quads)]
-      (is (= (set expected-quads) (set ds-quads))))))
-
-(deftest copy-live-graph-with-existing-draft-into-draftset
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        [published private] (split-at 2 quads)
-        draftset-location (create-draftset-through-api route test-editor)]
-
-    ;;publish some graph quads to live and some others into the draftset
-    (publish-quads-through-api route published)
-    (append-quads-to-draftset-through-api route test-editor draftset-location private)
-
-    ;;copy live graph into draftset
-    (copy-live-graph-into-draftset draftset-location test-editor live-graph)
-
-    ;;draftset graph should contain only the publish quads
-    (let [graph-quads (get-draftset-quads-through-api route draftset-location test-editor "false")]
-      (is (= (set (eval-statements published)) (set graph-quads))))))
-
-(deftest copy-live-graph-into-unowned-draftset
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (create-draftset-through-api route test-editor)]
-    (publish-quads-through-api route quads)
-    (let [copy-request (copy-live-graph-into-draftset-request draftset-location test-publisher live-graph)
-          copy-response (route copy-request)]
-      (tc/assert-is-forbidden-response copy-response))))
-
-(deftest copy-non-existent-live-graph
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        copy-request (copy-live-graph-into-draftset-request draftset-location test-editor "http://missing")
-        copy-response (route copy-request)]
-    (tc/assert-is-unprocessable-response copy-response)))
-
-(deftest copy-live-graph-into-non-existent-draftset
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
-    (publish-quads-through-api route quads)
-    (let [copy-request (copy-live-graph-into-draftset-request "/v1/draftset/missing" test-publisher live-graph)
-          copy-response (route copy-request)]
-      (tc/assert-is-not-found-response copy-response))))
-
 (deftest draftset-graphs-state-test
   (testing "Graph created"
     (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
