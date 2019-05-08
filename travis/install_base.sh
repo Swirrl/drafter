@@ -1,19 +1,21 @@
 #!/bin/bash
 
-if [ -n "$TRAVIS" ] ; then
-    echo Setting up travis dependencies...
-    apt-get update
-    apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
-    chown -R travis ./travis/*
-    chmod +x ./travis/*
-    mkdir -p /etc/leiningen/
-    mv ./travis/profiles.clj /etc/leiningen/profiles.clj
-    export AWS_INSTALL=true ## used to parameterise curl command below...
-fi
+apt-get update
+apt-get install -y git unzip build-essential apache2-utils wget bsdtar python-pip
+chown -R travis ./travis/*
+chmod +x ./travis/*
+mkdir -p /etc/leiningen/
+mv ./travis/profiles.clj /etc/leiningen/profiles.clj
 
-echo Fetching stardog
-curl 'https://raw.githubusercontent.com/Swirrl/stardog/master/consume/setup-stardog' | \
-    env STARDOG_BUILD=stardog-5.2.0-62 \
-        CREATE_DB=drafter-test-db \
-        START_STARDOG=true \
-        bash -x ### <--- bash command here runs curled script
+./travis/install_clojure.sh
+
+# start ssh agent and add key so clojure tools can clone git repos
+ssh-agent
+ssh-add
+
+# install service dependencies
+clojure -M:omni install-dependencies
+
+# start services
+./.omni_cache/install/stardog/install/dev-start.sh
+./.omni_cache/install/mongodb/install/dev-start.sh

@@ -4,7 +4,7 @@ lein: 2.9.1
 jdk:
 - oraclejdk8
 services:
-  - mongodb
+  - docker
 env:
   global:
     - SPARQL_QUERY_ENDPOINT='http://localhost:5820/drafter-client-test/query'
@@ -15,15 +15,12 @@ cache:
   directories:
   - $HOME/.m2
 before_install:
-- sudo travis/install_base.sh
-install:
-- cd drafter
-- lein deps
-- cd ../drafter-client
-- lein deps
-- cd ..
-script:
-  - "./travis/test-all"
+- "sudo ./travis/install_base.sh"
+before_script:
+- "./travis/before_script.sh"
+script: travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
+after_success:
+- env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
 before_deploy:
 - "./travis/before_deploy.sh"
 deploy:
