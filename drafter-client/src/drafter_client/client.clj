@@ -71,13 +71,6 @@
 (defn ->repo [client user context]
   (repo/make-repo client context user {}))
 
-(alter-var-root
- #'clojure.walk/keywordize-keys
- (constantly
-  (fn [m]
-    (let [f (fn [[k v]] (if (string? k) [(keyword k) v] [k v]))]
-      (clojure.walk/postwalk (fn [x] (if (map? x) (into x (map f x)) x)) m)))))
-
 (defn body-for
   ([client route user]
    (body-for client route user {}))
@@ -167,10 +160,11 @@
                         "application/json" jencoder
                         "application/n-quads" (bencoder "application/n-quads")
                         "application/n-triples" (bencoder "application/n-triples"))
-        interceptors (conj martian/default-interceptors
-                           (interceptors/encode-body encoders)
-                           (interceptors/coerce-response encoders)
-                           martian-http/perform-request)]
+        interceptors (vec (concat [i/keywordize-params]
+                                  (rest martian/default-interceptors)
+                                  [(interceptors/encode-body encoders)
+                                   (interceptors/coerce-response encoders)
+                                   martian-http/perform-request]))]
     (log/debugf "Making Drafter client with batch size %d for Drafter: %s"
                 batch-size drafter-uri)
     (when (and drafter-uri jws-key)
