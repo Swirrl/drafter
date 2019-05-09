@@ -2,7 +2,6 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer [is]]
             [drafter.feature.draftset.create-test :as ct]
-            [drafter.responses :refer [unprocessable-entity-response]]
             [drafter.test-common :as tc]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-publisher]]
@@ -11,7 +10,9 @@
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]))
+            [swirrl-server.async.jobs :refer [finished-jobs]]
+            [clojure.java.io :as io]
+            [drafter.util :as util]))
 
 (def DraftsetWithoutTitleOrDescription
   {:id s/Str
@@ -45,7 +46,6 @@
   (tc/with-identity user {:uri (str draftset-location "/submit-to")
                           :request-method :post
                           :params {:role (name role)}}))
-
 
 (defn create-draftset-through-api
   ([handler] (create-draftset-through-api handler test-editor))
