@@ -79,9 +79,9 @@
  :drafter.feature.draftset.options/handler {:drafter/backend #ig/ref :drafter/backend
                                             :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
- :drafter.routes.draftsets-api/draftset-get-data-handler {:drafter/backend #ig/ref :drafter/backend
-                                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                                          :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.feature.draftset-data.show/handler {:drafter/backend #ig/ref :drafter/backend
+                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
+                                              :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/backend #ig/ref :drafter/backend
                                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
@@ -125,7 +125,7 @@
                                 :get-draftset-handler #ig/ref :drafter.feature.draftset.show/handler
                                 :delete-draftset-handler #ig/ref :drafter.feature.draftset.delete/handler
                                 :draftset-options-handler #ig/ref :drafter.feature.draftset.options/handler
-                                :draftset-get-data-handler #ig/ref :drafter.routes.draftsets-api/draftset-get-data-handler
+                                :draftset-get-data-handler #ig/ref :drafter.feature.draftset-data.show/handler
                                 :delete-draftset-data-handler #ig/ref :drafter.feature.draftset-data.delete/delete-data-handler
                                 :delete-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler
                                 :delete-draftset-changes-handler #ig/ref :drafter.feature.draftset.changes/delete-changes-handler
