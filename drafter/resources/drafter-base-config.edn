@@ -113,8 +113,8 @@
                                            :drafter.user/repo #ig/ref :drafter.user/repo
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-claim-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
-                                                       :drafter/backend #ig/ref :drafter/backend}
+ :drafter.feature.draftset.claim/handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                          :drafter/backend #ig/ref :drafter/backend}
 
  #_:drafter.routes.draftsets-api/get-users-handler
  :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
@@ -136,7 +136,7 @@
                                 :draftset-publish-handler #ig/ref :drafter.routes.draftsets-api/draftset-publish-handler
                                 :draftset-set-metadata-handler #ig/ref :drafter.routes.draftsets-api/draftset-set-metadata-handler
                                 :draftset-submit-to-handler #ig/ref :drafter.feature.draftset.submit/handler
-                                :draftset-claim-handler #ig/ref :drafter.routes.draftsets-api/draftset-claim-handler
+                                :draftset-claim-handler #ig/ref :drafter.feature.draftset.claim/handler
                                 }
 
  :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo
