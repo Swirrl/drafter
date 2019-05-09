@@ -60,5 +60,6 @@ deploy:
   - provider: script
     script: clojure -M:omni package -m package/manifest.edn
     skip_cleanup: true
-    all_branches: true
+    on:
+      all_branches: true
     
