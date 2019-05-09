@@ -833,58 +833,6 @@
     (is (= false (contains? ds-info :current-owner))))
   )
 
-(deftest submit-non-existent-draftset-to-role
-  (let [submit-response (route (create-submit-to-role-request test-editor "/v1/draftset/missing" :publisher))]
-    (tc/assert-is-not-found-response submit-response)))
-
-(deftest submit-draftset-to-role-by-non-owner
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        submit-response (route (create-submit-to-role-request test-publisher draftset-location :manager))]
-    (tc/assert-is-forbidden-response submit-response)))
-
-(deftest submit-draftset-to-invalid-role
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        submit-response (route (create-submit-to-role-request test-editor draftset-location :invalid))]
-    (tc/assert-is-unprocessable-response submit-response)))
-
-(deftest submit-draftset-to-user
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        {:keys [body] :as submit-response} (route (submit-draftset-to-user-request draftset-location test-publisher test-editor))]
-    (tc/assert-is-ok-response submit-response)
-    (tc/assert-schema Draftset body)
-
-    (let [{:keys [current-owner claim-user] :as ds-info} body]
-      (is (nil? current-owner))
-      (is (= (user/username test-publisher) claim-user)))))
-
-(deftest submit-draftset-to-user-as-non-owner
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        submit-response (route (submit-draftset-to-user-request draftset-location test-manager test-publisher))]
-    (tc/assert-is-forbidden-response submit-response)))
-
-(deftest submit-non-existent-draftset-to-user
-  (let [submit-response (route (submit-draftset-to-user-request "/v1/draftset/missing" test-publisher test-editor))]
-    (tc/assert-is-not-found-response submit-response)))
-
-(deftest submit-draftset-to-non-existent-user
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        submit-response (route (submit-draftset-to-username-request draftset-location "invalid-user@example.com" test-editor))]
-    (tc/assert-is-unprocessable-response submit-response)))
-
-(deftest submit-draftset-without-user-param
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        submit-request (submit-draftset-to-user-request draftset-location test-publisher test-editor)
-        submit-request (update-in submit-request [:params] dissoc :user)
-        response (route submit-request)]
-    (tc/assert-is-unprocessable-response response)))
-
-(deftest submit-to-with-both-user-and-role-params
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        request (submit-draftset-to-user-request draftset-location test-publisher test-editor)
-        request (assoc-in request [:params :role] "editor")
-        response (route request)]
-    (tc/assert-is-unprocessable-response response)))
-
 (deftest claim-draftset-submitted-to-role
   (let [draftset-location (create-draftset-through-api route test-editor)]
     (submit-draftset-to-role-through-api route test-editor draftset-location :publisher)
