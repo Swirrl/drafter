@@ -4,22 +4,18 @@
             [clojure.tools.logging :as log]
             [compojure.core :as compojure :refer [context routes]]
             [drafter.backend :as backend]
-            [drafter.feature.middleware :as feat-middleware]
             [drafter.backend.draftset :as ep]
             [drafter.backend.draftset.operations :as dsops]
-            [drafter.draftset :as ds]
             [drafter.feature.common :as feat-common]
+            [drafter.feature.middleware :as feat-middleware]
             [drafter.middleware
              :refer
              [negotiate-quads-content-type-handler
               negotiate-triples-content-type-handler]]
             [drafter.rdf.draftset-management.job-util :as jobutil]
             [drafter.rdf.draftset-management.jobs :as dsjobs]
-            [drafter.rdf.sparql-protocol
-             :as
-             sp
-             :refer
-             [sparql-execution-handler sparql-protocol-handler]]
+            [drafter.rdf.sparql-protocol :as sp
+             :refer [sparql-execution-handler sparql-protocol-handler]]
             [drafter.responses
              :refer
              [conflict-detected-response
@@ -28,7 +24,6 @@
               unprocessable-entity-response]]
             [drafter.user :as user]
             [drafter.util :as util]
-            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [ring.util.response :as ring]
             [swirrl-server.responses :as response]))
