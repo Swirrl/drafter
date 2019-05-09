@@ -404,17 +404,6 @@
     (is (= false (contains? ds-info :current-owner))))
   )
 
-(deftest get-options-test
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        options-request (tc/with-identity test-editor {:uri draftset-location :request-method :options})
-        {:keys [body] :as options-response} (route options-request)]
-    (tc/assert-is-ok-response options-response)
-    (is (= #{:edit :delete :submit :claim} (set body)))))
-
-(deftest get-options-for-non-existent-draftset
-  (let [response (route (tc/with-identity test-manager {:uri "/v1/draftset/missing" :request-method :options}))]
-    (tc/assert-is-not-found-response response)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Handler tests

@@ -83,20 +83,6 @@
   (get-draftset-handler opts))
 
 
-(defn draftset-options-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (wrap-authenticated
-   (feat-middleware/existing-draftset-handler
-    backend
-    (fn [{{:keys [draftset-id]} :params user :identity}]
-      (let [permitted (dsops/find-permitted-draftset-operations backend draftset-id user)]
-        (ring/response permitted))))))
-
-(defmethod ig/pre-init-spec ::draftset-options-handler [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
-
-(defmethod ig/init-key ::draftset-options-handler [_ opts]
-  (draftset-options-handler opts))
-
 (defn draftset-get-data-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend
                                   draftset-query-timeout-fn :timeout-fn}]
   (wrap-as-draftset-owner

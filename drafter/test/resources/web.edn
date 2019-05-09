@@ -38,8 +38,8 @@
  :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-options-handler {:drafter/backend #ig/ref :drafter/backend
-                                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.draftset.options/handler {:drafter/backend #ig/ref :drafter/backend
+                                            :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.routes.draftsets-api/draftset-get-data-handler {:drafter/backend #ig/ref :drafter/backend
                                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
@@ -85,7 +85,7 @@
                                 :create-draftsets-handler #ig/ref :drafter.feature.draftset.create/handler
                                 :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
                                 :delete-draftset-handler #ig/ref :drafter.feature.draftset.delete/handler
-                                :draftset-options-handler #ig/ref :drafter.routes.draftsets-api/draftset-options-handler
+                                :draftset-options-handler #ig/ref :drafter.feature.draftset.options/handler
                                 :draftset-get-data-handler #ig/ref :drafter.routes.draftsets-api/draftset-get-data-handler
                                 :delete-draftset-data-handler #ig/ref :drafter.feature.draftset-data.delete/delete-data-handler
                                 :delete-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler
