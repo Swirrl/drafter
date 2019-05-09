@@ -44,17 +44,6 @@
   tc/with-spec-instrumentation)
 
 
-(deftest submit-draftset-to-role
-  (let [draftset-location (create-draftset-through-api route test-editor)
-        submit-request (create-submit-to-role-request test-editor draftset-location :publisher)
-        {ds-info :body :as submit-response} (route submit-request)]
-    (tc/assert-is-ok-response submit-response)
-    (tc/assert-schema Draftset ds-info)
-
-    (is (= false (contains? ds-info :current-owner))))
-  )
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Handler tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

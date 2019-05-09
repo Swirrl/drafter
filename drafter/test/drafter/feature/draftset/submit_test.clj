@@ -83,3 +83,14 @@
         request (assoc-in request [:params :role] "editor")
         response (handler request)]
     (tc/assert-is-unprocessable-response response)))
+
+(tc/deftest-system-with-keys submit-draftset-to-role
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} "test-system.edn"]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        submit-request (help/create-submit-to-role-request test-editor draftset-location :publisher)
+        {ds-info :body :as submit-response} (handler submit-request)]
+    (tc/assert-is-ok-response submit-response)
+    (tc/assert-schema Draftset ds-info)
+
+    (is (= false (contains? ds-info :current-owner)))))
