@@ -58,7 +58,7 @@ deploy:
     on:
       tags: true
   - provider: script
-    script: clojure -M:omni package -m package/manifest.edn
+    script: clojure -M:omni publish -m package/manifest.edn
     skip_cleanup: true
     on:
       all_branches: true
