@@ -229,19 +229,6 @@
         append-response (route append-request)]
     (tc/assert-is-forbidden-response append-response)))
 
-(deftest delete-draftset-data-for-non-existent-draftset
-  (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [delete-request (tc/with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :body fs})
-          delete-response (route delete-request)]
-      (tc/assert-is-not-found-response delete-response))))
-
-(deftest delete-draftset-data-request-with-unknown-content-type
-  (with-open [input-stream (io/input-stream "test/resources/test-draftset.trig")]
-    (let [draftset-location (create-draftset-through-api route test-editor)
-          delete-request (create-delete-quads-request test-editor draftset-location input-stream "application/unknown-quads-format")
-          delete-response (route delete-request)]
-      (tc/assert-is-unsupported-media-type-response delete-response))))
-
 (deftest publish-draftset-with-graphs-not-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
         draftset-location (create-draftset-through-api route test-publisher)]

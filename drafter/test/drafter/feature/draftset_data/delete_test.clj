@@ -1,12 +1,14 @@
 (ns drafter.feature.draftset-data.delete-test
   (:require [clojure.java.io :as io]
+            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [clojure.test :as t]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.draftset-data.append :as append]
             [drafter.feature.draftset-data.delete :as sut]
             [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor]])
+            [drafter.user-test :refer [test-editor]]
+            [drafter.feature.draftset.test-helper :as help])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -30,3 +32,20 @@
       (t/is (.isEqual (delete-time)
                        ts-3)
             "Modified time is updated after delete"))))
+
+(tc/deftest-system-with-keys delete-draftset-data-for-non-existent-draftset
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} system]
+  (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
+    (let [delete-request (tc/with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :body fs})
+          delete-response (handler delete-request)]
+      (tc/assert-is-not-found-response delete-response))))
+
+(tc/deftest-system-with-keys delete-draftset-data-request-with-unknown-content-type
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
+  [{handler :drafter.routes/draftsets-api} system]
+  (with-open [input-stream (io/input-stream "test/resources/test-draftset.trig")]
+    (let [draftset-location (help/create-draftset-through-api handler test-editor)
+          delete-request (help/create-delete-quads-request test-editor draftset-location input-stream "application/unknown-quads-format")
+          delete-response (handler delete-request)]
+      (tc/assert-is-unsupported-media-type-response delete-response))))
