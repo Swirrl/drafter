@@ -41,6 +41,15 @@
                 :jws-key (env :drafter-jws-signing-key)
                 :batch-size 150000)))
 
+(clojure.pprint/pprint
+ (:martian
+  (sut/create (env :drafter-endpoint)
+              :batch-size 150000
+              :token-endpoint "https://dev-kkt-m758.eu.auth0.com/oauth/token"
+              :client-id ""
+              :client-secret ""
+              )))
+
 (defn test-triples []
   (let [file "./test/specific_mappingbased_properties_bg.nt"]
     (rio/statements file)))

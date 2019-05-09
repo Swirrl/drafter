@@ -5,6 +5,7 @@
   :dependencies [[buddy/buddy-sign "3.0.0"]
                  [cheshire "5.8.0"]
                  [clj-http "3.9.0"]
+                 [com.auth0/mvc-auth-commons "1.0.6"]
                  [grafter "2.0.1"]
                  [grafter/url "0.2.5"]
                  [grafter/vocabularies "0.2.6"]

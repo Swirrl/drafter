@@ -16,13 +16,11 @@
             [martian.core :as martian]
             [martian.encoders :as encoders]
             [martian.interceptors :as interceptors]
+            [schema.core :as schema]
+            [ring.util.codec :refer [form-encode form-decode]]
             [ring.util.io :refer [piped-input-stream]]))
 
 (alias 'c 'clojure.core)
-
-(def default-format
-  {:date-format     "yyyy-MM-dd"
-   :datetime-format "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"})
 
 (def live draftset/live)
 
@@ -50,24 +48,6 @@
         id (java.util.UUID/fromString id)]
     (draftset/->draftset id display-name description)))
 
-(defn- json [data]
-  (let [opts {:date-format (:datetime-format default-format)}]
-    (json/generate-string data opts)))
-
-(defn- n*->stream [format n*]
-  (piped-input-stream
-   (fn [output-stream]
-     (pr/add (rio/rdf-writer output-stream :format format) n*))))
-
-(defn- grafter->format-stream [content-type data]
-  (let [format (mimetype->rdf-format content-type)]
-    (n*->stream format data)))
-
-(defn- read-body [content-type body]
-  {:pre [(instance? java.io.InputStream body)]}
-  (let [rdf-format (mimetype->rdf-format content-type)]
-    (rio/statements body :format rdf-format)))
-
 (defn ->repo [client user context]
   (repo/make-repo client context user {}))
 
@@ -75,7 +55,7 @@
   ([client route user]
    (body-for client route user {}))
   ([client route user params]
-   (-> (intercept client (auth/jws-auth client user))
+   (-> (intercept client (auth/auth0 client user))
        (martian/response-for route params)
        (:body))))
 
@@ -103,13 +83,13 @@
   "Append the supplied RDF data to this Draftset"
   ([client user draftset quads]
    (-> client
-       (i/content-type "application/n-quads")
+       (i/set-content-type "application/n-quads")
        (i/get i/put-draftset-data user (draftset/id draftset) quads)
        (->async-job)))
   ([client user draftset graph triples]
    (let [id (draftset/id draftset)]
      (-> client
-         (i/content-type "application/n-triples")
+         (i/set-content-type "application/n-triples")
          (i/get i/put-draftset-data user id triples :graph graph)
          (->async-job)))))
 
@@ -145,40 +125,31 @@
       (job-in-progress? job*) (do (Thread/sleep 500)
                                   ;; Recur with the original
                                   (recur client user job)))))
-
 (defn create
   "Create a Drafter client for `drafter-uri`"
-  [drafter-uri & {:keys [batch-size jws-key version]}]
+  [drafter-uri
+   & {:keys [batch-size version auth0-endpoint client-id client-secret]}]
   (let [version (or version "v1")
         swagger-json "swagger/swagger.json"
-        bencoder (fn [content-type]
-                   {:encode (partial grafter->format-stream content-type)
-                    :decode (partial read-body content-type)
-                    :as :stream})
-        jencoder {:encode json :decode #(encoders/json-decode % keyword)}
-        encoders (assoc (encoders/default-encoders)
-                        "application/json" jencoder
-                        "application/n-quads" (bencoder "application/n-quads")
-                        "application/n-triples" (bencoder "application/n-triples"))
-        interceptors (vec (concat [i/keywordize-params]
-                                  (rest martian/default-interceptors)
-                                  [(interceptors/encode-body encoders)
-                                   (interceptors/coerce-response encoders)
-                                   martian-http/perform-request]))]
+        auth0 (auth/client auth0-endpoint client-id client-secret)]
     (log/debugf "Making Drafter client with batch size %d for Drafter: %s"
                 batch-size drafter-uri)
-    (when (and drafter-uri jws-key)
+    (when (and drafter-uri auth0)
       (-> (format "%s/%s" drafter-uri swagger-json)
-          (martian-http/bootstrap-swagger {:interceptors interceptors})
-          (->DrafterClient jws-key batch-size)))))
+          (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
+          (->DrafterClient batch-size auth0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Integrant ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod ig/init-key :drafter-client/client
-  [_ {:keys [drafter-uri jws-key batch-size]}]
-  (create drafter-uri :jws-key jws-key :batch-size batch-size))
+  [_ {:keys [drafter-uri batch-size auth0-endpoint client-id client-secret]}]
+  (create drafter-uri
+          :batch-size batch-size
+          :auth0-endpoint auth0-endpoint
+          :client-id client-id
+          :client-secret client-secret))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.
@@ -190,7 +161,13 @@
 (s/def ::batch-size pos-int?)
 ;; TODO Find out if we can read this as a URI with integrant
 (s/def ::drafter-uri (s/or :string string? :nil nil?))
-(s/def ::jws-key (s/or :string string? :nil nil?))
+(s/def ::token-endpoint (s/or :string string? :nil nil?))
+(s/def ::client-id (s/or :string string? :nil nil?))
+(s/def ::client-secret (s/or :string string? :nil nil?))
 
 (defmethod ig/pre-init-spec :drafter-client/client [_]
-  (s/keys :req-un [::batch-size ::drafter-uri ::jws-key]))
+  (s/keys :req-un [::batch-size
+                   ::drafter-uri
+                   ::token-endpoint
+                   ::client-id
+                   ::client-secret]))

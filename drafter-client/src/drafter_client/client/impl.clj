@@ -1,12 +1,21 @@
 (ns drafter-client.client.impl
   (:refer-clojure :exclude [get])
-  (:require [clojure.walk :refer [postwalk]]
-            [drafter-client.client.auth :as auth]
-            [martian.core :as martian]))
+  (:require [cheshire.core :as json]
+            [clojure.walk :refer [postwalk]]
+            ;; [drafter-client.client.auth :as auth]
+            [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
+            [grafter-2.rdf4j.io :as rio]
+            [martian.clj-http :as martian-http]
+            [martian.core :as martian]
+            [martian.encoders :as encoders]
+            [martian.interceptors :as interceptors]
+            [ring.util.codec :refer [form-decode form-encode]]
+            [ring.util.io :refer [piped-input-stream]]))
 
-(deftype DrafterClient [martian jws-key batch-size]
+(deftype DrafterClient [martian batch-size auth0]
   ;; Wrap martian in a type so that:
-  ;; a) we don't leak the jws-key
+  ;; a) we don't leak the auth0 client
   ;; b) we don't expose the martian impl to the "system"
   ;; We can still get at the pieces if necessary due to the ILookup impl.
   clojure.lang.ILookup
@@ -14,15 +23,17 @@
   (valAt [this k default]
     (case k
       :martian martian
-      :jws-key jws-key
       :batch-size batch-size
+      :auth0 auth0
       (.valAt martian k default))))
 
 (defn intercept
   {:style/indent :defn}
-  [{:keys [martian jws-key batch-size] :as client} & interceptors]
-  (->DrafterClient
-    (apply update martian :interceptors conj interceptors) jws-key batch-size))
+  [{:keys [martian batch-size auth0] :as client}
+   & interceptors]
+  (->DrafterClient (apply update martian :interceptors conj interceptors)
+                   batch-size
+                   auth0))
 
 (defn claim-draftset
   "Claim this draftset as your own"
@@ -204,7 +215,8 @@
 (defn get
   {:style/indent :defn}
   [client f user & args]
-  (let [client (intercept client (auth/jws-auth client user))]
+  (let [client nil ;(intercept client (auth/auth0 client user))
+        ]
     (:body (apply f client args))))
 
 (defn accept [client content-type]
@@ -213,11 +225,13 @@
      :enter (fn [ctx]
               (assoc-in ctx [:request :headers "Accept"] content-type))}))
 
-(defn content-type [client content-type]
-  (intercept client
-    {:name ::content-type
-     :enter (fn [ctx]
-              (assoc-in ctx [:request :headers "Content-Type"] content-type))}))
+(defn content-type [content-type]
+  {:name ::content-type
+   :enter (fn [ctx]
+            (assoc-in ctx [:request :headers "Content-Type"] content-type))})
+
+(defn set-content-type [client c-type]
+  (intercept client (content-type c-type)))
 
 (defn keywordize-keys
   "Recursively transforms all map keys from strings to keywords."
@@ -234,3 +248,58 @@
 (def keywordize-params
   {:name ::keywordize-params
    :enter (fn [ctx] (update ctx :params keywordize-keys))})
+
+(defn set-redirect-strategy [strategy]
+  {:name ::set-redirect-strategy
+   :enter (fn [ctx] (assoc-in ctx [:request :redirect-strategy] strategy))})
+
+(defn set-max-redirects [n]
+  {:name ::set-max-redirects
+   :enter (fn [ctx] (assoc-in ctx [:request :max-redirects] n))})
+
+(def default-format
+  {:date-format     "yyyy-MM-dd"
+   :datetime-format "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"})
+
+(defn- json [data]
+  (let [opts {:date-format (:datetime-format default-format)}]
+    (json/generate-string data opts)))
+
+(defn- n*->stream [format n*]
+  (piped-input-stream
+   (fn [output-stream]
+     (pr/add (rio/rdf-writer output-stream :format format) n*))))
+
+(defn- grafter->format-stream [content-type data]
+  (let [format (mimetype->rdf-format content-type)]
+    (n*->stream format data)))
+
+(defn- read-body [content-type body]
+  {:pre [(instance? java.io.InputStream body)]}
+  (let [rdf-format (mimetype->rdf-format content-type)]
+    (rio/statements body :format rdf-format)))
+
+(defn n-binary-encoder [content-type]
+  {:encode (partial grafter->format-stream content-type)
+   :decode (partial read-body content-type)
+   :as :stream})
+
+(def json-encoder
+  {:encode json :decode #(encoders/json-decode % keyword)})
+
+(def form-encoder
+  {:encode form-encode :decode form-decode})
+
+(def default-encoders
+  (assoc (encoders/default-encoders)
+         "application/x-www-form-urlencoded" form-encoder
+         "application/json" json-encoder
+         "application/n-quads" (n-binary-encoder "application/n-quads")
+         "application/n-triples" (n-binary-encoder "application/n-triples")))
+
+(def default-interceptors
+  (vec (concat [keywordize-params]
+               (rest martian/default-interceptors)
+               [(interceptors/encode-body default-encoders)
+                (interceptors/coerce-response default-encoders)
+                martian-http/perform-request])))
