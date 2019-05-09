@@ -12,4 +12,4 @@ mkdir -p releases
 cp target/drafter.jar releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar
 
 # setup omni package
-cp target/drafter.jar package/install/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar
+cp target/drafter.jar package/install/drafter-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar

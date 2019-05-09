@@ -1,6 +1,6 @@
 {:omni/package-format "1"
  :omni/package-name "drafter"
- :omni/package-version #join [#env TRAVIS_TAG "-" #env TRAVIS_BUILD_NUMBER]
+ :omni/package-version #join [#env TRAVIS_BRANCH "-" #env TRAVIS_BUILD_NUMBER]
  :omni/dependencies #include "../dependencies.edn"
  :omni/defs {:jar-name #join ["drafter-" #ref [:omni/package-version] ".jar"]}
  :omni/keys {:drafter/http-port {:doc "HTTP port to listen on"
