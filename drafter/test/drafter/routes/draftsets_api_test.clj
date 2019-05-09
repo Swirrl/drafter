@@ -44,45 +44,6 @@
   tc/with-spec-instrumentation)
 
 
-(deftest modifying-in-draftset-updates-modified-timestamp-test
-  (let [quads (statements "test/resources/test-draftset.trig")
-        draftset-location (create-draftset-through-api route test-editor)
-        get-draft-graph-modified-at (fn []
-                                      ;; There is only one draftgraph in this
-                                      ;; test - so we can get away with a bit of
-                                      ;; a sloppy query.
-                                      (-> tc/*test-backend*
-                                          (sparql/eager-query
-                                           (str "SELECT ?modified {"
-                                                "   ?draftgraph a <" drafter:DraftGraph "> ;"
-                                                "                 <" drafter:modifiedAt ">   ?modified ."
-                                                "}"))
-                                          first
-                                          (:modified)))]
-
-    (testing "Publishing some triples sets the modified time"
-      (append-triples-to-draftset-through-api route test-editor draftset-location quads "http://foo/")
-
-      (let [first-timestamp (get-draft-graph-modified-at)]
-        (is (instance? OffsetDateTime first-timestamp))
-
-        (testing "Publishing more triples afterwards updates the modified time"
-
-          (append-triples-to-draftset-through-api route test-editor draftset-location quads "http://foo/")
-          (let [second-timestamp (get-draft-graph-modified-at)]
-            (is (instance? OffsetDateTime second-timestamp))
-
-            (is (.isBefore first-timestamp
-                           second-timestamp)
-                "Modified time is updated after append")
-
-            (delete-triples-through-api route test-editor draftset-location quads "http://foo/")
-            (let [third-timestamp (get-draft-graph-modified-at)]
-
-              (is (.isBefore second-timestamp
-                             third-timestamp)
-                  "Modified time is updated after delete"))))))))
-
 (deftest publish-draftset-with-graphs-not-in-live
   (let [quads (statements "test/resources/test-draftset.trig")
         draftset-location (create-draftset-through-api route test-publisher)]
