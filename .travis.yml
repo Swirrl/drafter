@@ -57,3 +57,7 @@ deploy:
     skip_cleanup: true
     on:
       tags: true
+  - provider: script
+    script: clojure -M:omni package -m package/manifest.edn
+    skip_cleanup: true
+    
