@@ -1,0 +1,6 @@
+#merge [#include "repo.edn"
+        #include "backend.edn"
+        #include "user-repo.edn"
+        #include "log-system.edn"
+        #include "web.edn"
+        {:drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo :fixtures []}}]

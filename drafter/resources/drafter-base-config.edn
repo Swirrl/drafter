@@ -64,9 +64,8 @@
  :drafter.feature.draftset.list/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
                                                        :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
- :drafter.routes.draftsets-api/get-draftset-handler {:drafter/backend #ig/ref :drafter/backend
-                                                     :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
-
+ :drafter.feature.draftset.show/handler {:drafter/backend #ig/ref :drafter/backend
+                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.feature.draftset.create/handler {:drafter/backend #ig/ref :drafter/backend
                                            :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
@@ -74,15 +73,15 @@
  :drafter.feature.middleware/wrap-as-draftset-owner {:drafter/backend #ig/ref :drafter/backend
                                                        :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
- :drafter.routes.draftsets-api/delete-draftset-handler {:drafter/backend #ig/ref :drafter/backend
-                                                        :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+ :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
+                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-options-handler {:drafter/backend #ig/ref :drafter/backend
-                                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.draftset.options/handler {:drafter/backend #ig/ref :drafter/backend
+                                            :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
- :drafter.routes.draftsets-api/draftset-get-data-handler {:drafter/backend #ig/ref :drafter/backend
-                                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                                          :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.feature.draftset-data.show/handler {:drafter/backend #ig/ref :drafter/backend
+                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
+                                              :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/backend #ig/ref :drafter/backend
                                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
@@ -99,22 +98,22 @@
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/backend #ig/ref :drafter/backend
                                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-query-handler {:drafter/backend #ig/ref :drafter/backend
-                                                       :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                                       :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.feature.draftset.query/handler {:drafter/backend #ig/ref :drafter/backend
+                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
+                                          :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
- :drafter.routes.draftsets-api/draftset-publish-handler {:drafter/backend #ig/ref :drafter/backend
-                                                         :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+ :drafter.feature.draftset.publish/handler {:drafter/backend #ig/ref :drafter/backend
+                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-set-metadata-handler {:drafter/backend #ig/ref :drafter/backend
-                                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+ :drafter.feature.draftset.set-metadata/handler {:drafter/backend #ig/ref :drafter/backend
+                                                 :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-submit-to-handler {:drafter/backend #ig/ref :drafter/backend
-                                                           :drafter.user/repo #ig/ref :drafter.user/repo
-                                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+ :drafter.feature.draftset.submit/handler {:drafter/backend #ig/ref :drafter/backend
+                                           :drafter.user/repo #ig/ref :drafter.user/repo
+                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.routes.draftsets-api/draftset-claim-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
-                                                       :drafter/backend #ig/ref :drafter/backend}
+ :drafter.feature.draftset.claim/handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                          :drafter/backend #ig/ref :drafter/backend}
 
  #_:drafter.routes.draftsets-api/get-users-handler
  :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
@@ -123,20 +122,20 @@
  :drafter.routes/draftsets-api {:get-users-handler #ig/ref :drafter.feature.users.list/get-users-handler
                                 :get-draftsets-handler #ig/ref :drafter.feature.draftset.list/get-draftsets-handler
                                 :create-draftsets-handler #ig/ref :drafter.feature.draftset.create/handler
-                                :get-draftset-handler #ig/ref :drafter.routes.draftsets-api/get-draftset-handler
-                                :delete-draftset-handler #ig/ref :drafter.routes.draftsets-api/delete-draftset-handler
-                                :draftset-options-handler #ig/ref :drafter.routes.draftsets-api/draftset-options-handler
-                                :draftset-get-data-handler #ig/ref :drafter.routes.draftsets-api/draftset-get-data-handler
+                                :get-draftset-handler #ig/ref :drafter.feature.draftset.show/handler
+                                :delete-draftset-handler #ig/ref :drafter.feature.draftset.delete/handler
+                                :draftset-options-handler #ig/ref :drafter.feature.draftset.options/handler
+                                :draftset-get-data-handler #ig/ref :drafter.feature.draftset-data.show/handler
                                 :delete-draftset-data-handler #ig/ref :drafter.feature.draftset-data.delete/delete-data-handler
                                 :delete-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler
                                 :delete-draftset-changes-handler #ig/ref :drafter.feature.draftset.changes/delete-changes-handler
                                 :put-draftset-data-handler #ig/ref :drafter.feature.draftset-data.append/data-handler
                                 :put-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.append-by-graph/handler
-                                :draftset-query-handler #ig/ref :drafter.routes.draftsets-api/draftset-query-handler
-                                :draftset-publish-handler #ig/ref :drafter.routes.draftsets-api/draftset-publish-handler
-                                :draftset-set-metadata-handler #ig/ref :drafter.routes.draftsets-api/draftset-set-metadata-handler
-                                :draftset-submit-to-handler #ig/ref :drafter.routes.draftsets-api/draftset-submit-to-handler
-                                :draftset-claim-handler #ig/ref :drafter.routes.draftsets-api/draftset-claim-handler
+                                :draftset-query-handler #ig/ref :drafter.feature.draftset.query/handler
+                                :draftset-publish-handler #ig/ref :drafter.feature.draftset.publish/handler
+                                :draftset-set-metadata-handler #ig/ref :drafter.feature.draftset.set-metadata/handler
+                                :draftset-submit-to-handler #ig/ref :drafter.feature.draftset.submit/handler
+                                :draftset-claim-handler #ig/ref :drafter.feature.draftset.claim/handler
                                 }
 
  :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo
