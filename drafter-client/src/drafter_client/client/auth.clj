@@ -22,7 +22,10 @@
                   {:grant_type schema/Str
                    :client_id schema/Str
                    :client_secret schema/Str
-                   :audience schema/Str}}}
+                   :audience schema/Str
+                   (schema/optional-key :redirect_uri) schema/Str
+                   (schema/optional-key :code) schema/Str
+                   }}}
    {:route-name :authorize
     :path "/authorize"
     :method :get
@@ -73,22 +76,36 @@
     :client-secret (:client-secret auth0)
     :audience "https://drafter.swirrl.com"})
   ([auth0 auth-code redirect-uri]
+   (prn 'here
+        {:grant-type "authorization_code"
+    :code auth-code
+    :client-id (:client-id auth0)
+    :client-secret (:client-secret auth0)
+    :redirect-uri redirect-uri
+    :audience "https://drafter.swirrl.com"
+    }
+        )
    {:grant-type "authorization_code"
     :code auth-code
     :client-id (:client-id auth0)
     :client-secret (:client-secret auth0)
-    :redirect-uri redirect-uri}))
+    :redirect-uri redirect-uri
+    :audience "https://drafter.swirrl.com"
+    }))
 
 (defn- get-auth0-token* [auth0 body]
   (-> auth0
       (intercept (i/content-type "application/x-www-form-urlencoded"))
+      (intercept (i/set-redirect-strategy :none))
       (martian/response-for :oauth-token body)
-      (:body)))
+      ;(:body)
+      ))
 
 (defn get-auth0-token
   ([{:keys [auth0] :as client}]
    (get-auth0-token* auth0 (auth0-body auth0)))
   ([{:keys [auth0] :as client} auth-code]
+   (prn (:redirect-uri auth0))
    (get-auth0-token* auth0 (auth0-body auth0 auth-code (:redirect-uri auth0)))))
 
 ;; (prn
@@ -126,23 +143,25 @@
               ;; :client-secret (:client-secret auth0)
               :redirect-uri (:redirect-uri auth0)
               :scope "openid"
-              ;; :audience "https://drafter.swirrl.com"
+              :audience "https://drafter.swirrl.com"
               :state "12345"}]
     (-> auth0
-        (intercept (i/set-max-redirects 1))
+        (intercept (i/set-max-redirects 2))
         (intercept (i/set-redirect-strategy :graceful))
-        (martian/response-for :authorize body))))
+        (martian/url-for :authorize body))))
 
 (comment
 
   (clojure.pprint/pprint
-  (-> {:auth0 (client "https://dev-kkt-m758.eu.auth0.com"
-                      "LtjAgnccNzv0tM3he7RtDHui1T2w615n"
-                      "ri6t1nVxNAg5ueDz3V4dBX_ucNNBXXKBgCGdo4aYJ_PE9FDFd26BrRu50Xam91P2"
-                      "https://swirrl.com/login"
-                      )}
-      authorize))
+   (-> {:auth0 (client "https://dev-kkt-m758.eu.auth0.com"
+                       "LtjAgnccNzv0tM3he7RtDHui1T2w615n"
+                       "ri6t1nVxNAg5ueDz3V4dBX_ucNNBXXKBgCGdo4aYJ_PE9FDFd26BrRu50Xam91P2"
+                       "https://localhost:3000/login")}
+       (get-auth0-token "QwbbRWmqCnkPCGPF")))
 
   )
+;; https://localhost:3000/login?code=QwbbRWmqCnkPCGPF&state=e5Fo2SB5c1BEVU0zOW0zeFNpU215U2JacXFtbWdmY25Ea3BJUaN0aWTZIDRkWXNRREJEYWlHcFpaQ21qZ1JnOExSQ01DTS1xX250o2NpZNkgTHRqQWduY2NOenYwdE0zaGU3UnRESHVpMVQydzYxNW4
 
 (def jws-auth (fn [& args]))
+
+;; https://dev-kkt-m758.eu.auth0.com/authorize?state=e5Fo2SB5c1BEVU0zOW0zeFNpU215U2JacXFtbWdmY25Ea3BJUaN0aWTZIDRkWXNRREJEYWlHcFpaQ21qZ1JnOExSQ01DTS1xX250o2NpZNkgTHRqQWduY2NOenYwdE0zaGU3UnRESHVpMVQydzYxNW4&client_id=LtjAgnccNzv0tM3he7RtDHui1T2w615n&response_type=code&redirect_uri=https%3A%2F%2Flocalhost%3A3000%2Flogin&audience=https%3A%2F%2Fdrafter.swirrl.com
