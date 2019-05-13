@@ -61,11 +61,16 @@
                           :mode "660"
                           :facet :systemd}
                          {:type :env
-                          :dest-path "config.env"}
+                          :dest-path "dev-settings.env"
+                          :env #{:dev :ci}}
                          {:type :selmer/template
-                          :path "start.sh"
+                          :path "dev-start.sh"
                           :mode "755"
                           :keys [:omni/install-dir]}
+                         {:type :copy
+                          :path "dev-stop.sh"
+                          :mode "755"
+                          :env #{:dev :ci}}
                          {:type :selmer/template
                           :path "log-config.edn.template"
                           :dest-path "log-config.edn"
