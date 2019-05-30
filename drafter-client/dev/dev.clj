@@ -4,6 +4,7 @@
             [clojure.pprint :refer [pprint]]
             [clojure.string :as string]
             [clojure.walk :as walk]
+            [drafter-client.client :as client]
             [drafter-client.client-test :refer [drafter-client]]))
 
 (defn gen-api [client]
@@ -36,5 +37,11 @@
   (gen-api (drafter-client))
 
   (def-api)
+
+
+  (-> "http://localhost:3001"
+      (client/web-client :batch-size 0)
+
+      )
 
   )

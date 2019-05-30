@@ -1,6 +1,6 @@
 (ns drafter.middleware
   (:require [buddy.auth :as auth]
-            [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
+            ;; [buddy.auth.backends.httpbasic :refer [http-basic-backend]]
             [buddy.auth.backends.token :refer [jws-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [buddy.auth.protocols :as authproto]
@@ -11,6 +11,7 @@
             [clojure.string :as string]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
+            [drafter.jwt :as jwt]
             [drafter.rdf.content-negotiation :as conneg]
             [drafter.rdf.sesame :as ses]
             [drafter.requests :as drafter-request]
@@ -23,36 +24,39 @@
             [pantomime.media :refer [media-type-named]]
             [ring.util.request :as request])
   (:import clojure.lang.ExceptionInfo
-           java.io.File))
+           java.io.File
+           com.auth0.jwk.JwkProviderBuilder
+           java.util.Base64
+           java.util.concurrent.TimeUnit))
 
-(defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
-  (log/info "auth user" username password)
-  (if-let [user (user/find-user-by-username user-repo username)]
-    (user/try-authenticate user password)))
+;; (defn- authenticate-user [user-repo request {:keys [username password] :as auth-data}]
+;;   (log/info "auth user" username password)
+;;   (if-let [user (user/find-user-by-username user-repo username)]
+;;     (user/try-authenticate user password)))
 
-(defn- basic-auth-backend [{:as user-repo :keys [realm]}]
-  (let [conf {:realm (or realm "Drafter")
-              :authfn #(authenticate-user user-repo %1 %2)
-              :unauthorized-handler (fn [req err]
-                                      (response/unauthorised-basic-response realm))}]
-    (http-basic-backend conf)))
+;; (defn- basic-auth-backend [{:as user-repo :keys [realm]}]
+;;   (let [conf {:realm (or realm "Drafter")
+;;               :authfn #(authenticate-user user-repo %1 %2)
+;;               :unauthorized-handler (fn [req err]
+;;                                       (response/unauthorised-basic-response realm))}]
+;;     (http-basic-backend conf)))
 
-(defn- jws-auth-backend [token-auth-key]
-  (let [conf {:secret token-auth-key
-              :token-name "Token"
-              :options {:alg :hs256
-                        :iss "publishmydata"
-                        :aud "drafter"}}
-        inner-backend (jws-backend conf)]
-    (reify authproto/IAuthentication
-      (-parse [_ request] (authproto/-parse inner-backend request))
-      (-authenticate [_ request data]
-        (when-let [token (authproto/-authenticate inner-backend request data)]
-          (try
-            (user/validate-token! token)
-            (catch ExceptionInfo ex
-              (log/error ex "Token authentication failed due to an invalid user token")
-              (auth/throw-unauthorized {:message "Invalid token"}))))))))
+;; (defn- jws-auth-backend [token-auth-key]
+;;   (let [conf {:secret token-auth-key
+;;               :token-name "Token"
+;;               :options {:alg :hs256
+;;                         :iss "publishmydata"
+;;                         :aud "drafter"}}
+;;         inner-backend (jws-backend conf)]
+;;     (reify authproto/IAuthentication
+;;       (-parse [_ request] (authproto/-parse inner-backend request))
+;;       (-authenticate [_ request data]
+;;         (when-let [token (authproto/-authenticate inner-backend request data)]
+;;           (try
+;;             (user/validate-token! token)
+;;             (catch ExceptionInfo ex
+;;               (log/error ex "Token authentication failed due to an invalid user token")
+;;               (auth/throw-unauthorized {:message "Invalid token"}))))))))
 
 (defn require-authenticated
   "Requires the incoming request has been authenticated."
@@ -68,35 +72,109 @@
         (datadog/increment! "drafter.requests.unauthorised" 1)
         (auth/throw-unauthorized {:message "Authentication required"})))))
 
-(defn- get-configured-token-auth-backend [config]
-  (if-let [signing-key (:jws-signing-key config)]
-    (jws-auth-backend signing-key)
-    (do
-      (log/warn "No JWS Token signing key configured - token authentication will not be available")
-      (log/warn "To configure JWS Token authentication, specify the jws-signing-key configuration setting")
-      nil)))
+;; (defn- get-configured-token-auth-backend [config]
+;;   (if-let [signing-key (:jws-signing-key config)]
+;;     (jws-auth-backend signing-key)
+;;     (do
+;;       (log/warn "No JWS Token signing key configured - token authentication will not be available")
+;;       (log/warn "To configure JWS Token authentication, specify the jws-signing-key configuration setting")
+;;       nil)))
 
-(defn- get-configured-auth-backends [user-repo config]
-  (let [basic-backend (basic-auth-backend user-repo)
-        jws-backend (get-configured-token-auth-backend config)]
-    (remove nil? [basic-backend jws-backend])))
+;; (defn- get-configured-auth-backends [user-repo config]
+;;   (let [basic-backend (basic-auth-backend user-repo)
+;;         jws-backend (get-configured-token-auth-backend config)]
+;;     (remove nil? [basic-backend jws-backend])))
 
-(defn- wrap-authenticated [auth-backends inner-handler realm]
-  (let [auth-handler (apply wrap-authentication (require-authenticated inner-handler) auth-backends)
-        unauthorised-fn (fn [req err]
-                          (response/unauthorised-basic-response (or realm "Drafter")))]
-    (wrap-authorization auth-handler unauthorised-fn)))
+;; (defn- wrap-authenticated [auth-backends inner-handler realm]
+;;   (let [auth-handler (apply wrap-authentication (require-authenticated inner-handler) auth-backends)
+;;         unauthorised-fn (fn [req err]
+;;                           (response/unauthorised-basic-response (or realm "Drafter")))]
+;;     (wrap-authorization auth-handler unauthorised-fn)))
 
-(defn make-authenticated-wrapper [{:keys [realm] :as user-repo} config]
-  (let [auth-backends (get-configured-auth-backends user-repo config)]
-    (fn [inner-handler]
-      (wrap-authenticated auth-backends inner-handler realm))))
+;; (defn make-authenticated-wrapper [{:keys [realm] :as user-repo} config]
+;;   (let [auth-backends (get-configured-auth-backends user-repo config)]
+;;     (fn [inner-handler]
+;;       (wrap-authenticated auth-backends inner-handler realm))))
+
+(defn normalize-roles [{:keys [payload] :as token}]
+  (let [scopes (map (partial keyword "pmd.role")
+                    (-> payload :scope (string/split #" ")))
+        permissions (map (partial keyword "pmd.role") (:permissions payload))]
+    (assoc token :roles (set (concat scopes permissions)))))
+
+(defn- find-header [request header]
+  (->> (:headers request)
+       (filter (fn [[k v]] (re-matches (re-pattern (str "(?i)" header)) k)))
+       (first)
+       (second)))
+
+(defn- parse-header [request token-name]
+  (some->> (find-header request "authorization")
+           (re-find (re-pattern (str "^" token-name " (.+)$")))
+           (second)))
+
+(defn- access-token-request
+  [request access-token jwk iss aud]
+  (if access-token
+    (let [token (jwt/verify-token jwk iss aud access-token)
+          status (:status token)]
+      (cond-> (assoc request ::authenticated status)
+        (= ::jwt/token-verified status)
+        (assoc ::access-token (normalize-roles token))))
+    request))
+
+(defmethod ig/init-key :drafter.auth/auth0 [_ opts] opts)
+
+(defmethod ig/init-key :drafter.auth.auth0/jwk [_ {:keys [endpoint] :as opts}]
+  (-> (JwkProviderBuilder. endpoint)
+      (.cached 10 24 TimeUnit/HOURS)
+      (.rateLimited 10 1 TimeUnit/MINUTES)
+      (.build)))
+
+(defmethod ig/init-key ::bearer-token
+  [_ {{{:keys [aud iss]} :config} :auth0 :keys [auth0 jwk] :as opts}]
+  (fn [handler]
+    (fn [request]
+      (let [token (parse-header request "Bearer")]
+        (handler (access-token-request request token jwk iss aud))))))
+
+(defmethod ig/init-key ::dev-token
+  [_ opts]
+  (fn [handler]
+    (fn [request]
+      (handler (merge request opts)))))
+
+(defmethod ig/init-key ::token-authentication
+  [_ {:keys [auth0] :as opts}]
+  (fn [handler]
+    (fn [{:keys [::authenticated] :as request}]
+      (case (::authenticated request)
+        ::jwt/token-verified (handler request)
+        ::jwt/token-expired [::response/unauthorized "Token expired."]
+        ::jwt/claim-invalid [::response/unauthorized "Not authenticated."]
+        ::jwt/token-invalid [::response/unauthorized "Not authenticated."]
+        [::response/unauthorized "Not authenticated."]))))
+
+(defn authorized? [{:keys [roles] :as token} role]
+  (contains? roles role))
+
+(defmethod ig/init-key ::authorization [_ _]
+  (fn [role]
+    (fn [handler]
+      (fn [{:keys [::access-token] :as request}]
+        (if (authorized? access-token role)
+          (handler request)
+          [::response/forbidden "Not authorized."])))))
+
+(s/def ::wrap-auth fn?)
+(s/def ::wrap-token fn?)
 
 (defmethod ig/pre-init-spec :drafter.middleware/wrap-auth [_]
-  (s/keys :req [::user/repo]))
+  (s/keys :req-un [::wrap-token ::wrap-auth]))
 
-(defmethod ig/init-key :drafter.middleware/wrap-auth [_ {:keys [::user/repo] :as config}]
-  (make-authenticated-wrapper repo config))
+(defmethod ig/init-key :drafter.middleware/wrap-auth
+  [_ {:keys [wrap-token wrap-auth] :as config}]
+  (comp wrap-token wrap-auth))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]

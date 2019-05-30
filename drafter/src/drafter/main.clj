@@ -40,10 +40,15 @@
     (-> system-config
         aero/read-config)))
 
+(defn- merge-maps [a b]
+  (if (and (map? a) (map? b))
+    (merge a b)
+    b))
+
 (defn- inject-logging [system-config]
   "Add logging to datadog, and add logging and datadog to everything else."
   (merge-with
-   merge
+   merge-maps
    (zipmap (keys (dissoc system-config :drafter/logging :drafter.main/datadog))
            (repeat (merge (when (contains? system-config :drafter/logging)
                             {:logging (ig/->Ref :drafter/logging)})
@@ -58,7 +63,8 @@
   "Initialises the given system map."
   [system-config sys-keys]
   (initialisation-side-effects! system-config)
-  (let [start-keys (or sys-keys (keys system-config))
+  (let [start-keys (or sys-keys
+                       (map key (remove (comp :static meta val) system-config)))
         system-config (inject-logging system-config)]
     (ig/init system-config start-keys)))
 

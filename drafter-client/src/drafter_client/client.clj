@@ -48,67 +48,59 @@
         id (java.util.UUID/fromString id)]
     (draftset/->draftset id display-name description)))
 
-(defn ->repo [client user context]
-  (repo/make-repo client context user {}))
-
-(defn body-for
-  ([client route user]
-   (body-for client route user {}))
-  ([client route user params]
-   (-> (intercept client (auth/auth0 client user))
-       (martian/response-for route params)
-       (:body))))
+(defn ->repo [client access-token context]
+  (repo/make-repo client context access-token {}))
 
 (defn draftsets
   "List available Draftsets"
-  [client user]
-  (->> (i/get client i/get-draftsets user)
+  [client access-token]
+  (->> (i/get client i/get-draftsets access-token)
        (map json-draftset->draftset)))
 
 (defn new-draftset
   "Create a new Draftset"
-  [client user name description]
+  [client access-token name description]
   (-> client
-      (i/get i/create-draftset user :display-name name :description description)
+      (i/get i/create-draftset access-token :display-name name :description description)
       (json-draftset->draftset)))
 
 (defn remove-draftset
   "Delete the Draftset and its data"
-  [client user draftset]
+  [client access-token draftset]
   (-> client
-      (i/get i/delete-draftset user (draftset/id draftset))
+      (i/get i/delete-draftset access-token (draftset/id draftset))
       (->async-job)))
 
 (defn add
   "Append the supplied RDF data to this Draftset"
-  ([client user draftset quads]
+  ([client access-token draftset quads]
    (-> client
        (i/set-content-type "application/n-quads")
-       (i/get i/put-draftset-data user (draftset/id draftset) quads)
+       (i/get i/put-draftset-data access-token (draftset/id draftset) quads)
        (->async-job)))
-  ([client user draftset graph triples]
+  ([client access-token draftset graph triples]
    (let [id (draftset/id draftset)]
      (-> client
          (i/set-content-type "application/n-triples")
-         (i/get i/put-draftset-data user id triples :graph graph)
+         (i/get i/put-draftset-data access-token id triples :graph graph)
          (->async-job)))))
 
 (defn get
   "Access the quads inside this Draftset"
-  ([client user draftset]
+  ([client access-token draftset]
    (-> client
        (i/accept "application/n-quads")
-       (i/get i/get-draftset-data user (draftset/id draftset))))
-  ([client user draftset graph]
+       (i/get i/get-draftset-data access-token (draftset/id draftset))))
+  ([client access-token draftset graph]
    (-> client
        (i/accept "application/n-triples")
-       (i/get i/get-draftset-data user (draftset/id draftset) :graph graph))))
+       (i/get i/get-draftset-data access-token (draftset/id draftset) :graph graph))))
 
 (defn refresh-job
   "Poll to see if asynchronous job has finished"
-  [client user job]
+  [client access-token job]
   (-> client
-      (i/get i/status-job-finished user (:job-id job))
+      (i/get i/status-job-finished access-token (:job-id job))
       (try (catch clojure.lang.ExceptionInfo e
              (let [{:keys [body status]} (ex-data e)]
                (if (= status 404)
@@ -118,15 +110,30 @@
 
 (defn resolve-job
   "Wait until asynchronous `job` has finished"
-  [client user job]
-  (let [job* (refresh-job client user job)]
+  [client access-token job]
+  (let [job* (refresh-job client access-token job)]
     (cond
       (job-complete? job*) ::completed
       (job-in-progress? job*) (do (Thread/sleep 500)
                                   ;; Recur with the original
-                                  (recur client user job)))))
-(defn create
-  "Create a Drafter client for `drafter-uri`"
+                                  (recur client access-token job)))))
+
+(defn web-client
+  "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
+  access-token to each request."
+  [drafter-uri & {:keys [batch-size version]}]
+  (let [version (or version "v1")
+        swagger-json "swagger/swagger.json"]
+    (log/debugf "Making Drafter web-client with batch size %d for Drafter: %s"
+                batch-size drafter-uri)
+    (when drafter-uri
+      (-> (format "%s/%s" drafter-uri swagger-json)
+          (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
+          (->DrafterClient batch-size nil)))))
+
+(defn cli-client
+  "Create a Drafter client for `drafter-uri` that will request tokens from Auth0
+  for the (cli-)client."
   [drafter-uri
    & {:keys [batch-size version auth0-endpoint client-id client-secret]}]
   (let [version (or version "v1")
@@ -145,11 +152,11 @@
 
 (defmethod ig/init-key :drafter-client/client
   [_ {:keys [drafter-uri batch-size auth0-endpoint client-id client-secret]}]
-  (create drafter-uri
-          :batch-size batch-size
-          :auth0-endpoint auth0-endpoint
-          :client-id client-id
-          :client-secret client-secret))
+  (web-client drafter-uri
+              :batch-size batch-size
+              :auth0-endpoint auth0-endpoint
+              :client-id client-id
+              :client-secret client-secret))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.

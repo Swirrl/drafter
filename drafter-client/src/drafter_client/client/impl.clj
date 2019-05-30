@@ -2,7 +2,6 @@
   (:refer-clojure :exclude [get])
   (:require [cheshire.core :as json]
             [clojure.walk :refer [postwalk]]
-            ;; [drafter-client.client.auth :as auth]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
             [grafter-2.rdf4j.io :as rio]
@@ -34,6 +33,14 @@
   (->DrafterClient (apply update martian :interceptors conj interceptors)
                    batch-size
                    auth0))
+
+(defn bearer-token [access-token]
+  (let [token (str "Bearer " access-token)]
+    {:name ::bearer-token
+     :enter #(assoc-in % [:request :headers "Authorization"] token)}))
+
+(defn set-bearer-token [client access-token]
+  (intercept client (bearer-token access-token)))
 
 (defn claim-draftset
   "Claim this draftset as your own"
@@ -214,9 +221,8 @@
 
 (defn get
   {:style/indent :defn}
-  [client f user & args]
-  (let [client nil ;(intercept client (auth/auth0 client user))
-        ]
+  [client f access-token & args]
+  (let [client (set-bearer-token client access-token)]
     (:body (apply f client args))))
 
 (defn accept [client content-type]

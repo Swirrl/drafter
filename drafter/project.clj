@@ -96,7 +96,11 @@
                  [ring/ring-core "1.7.1"]
                  ;;[selmer "0.6.9"]
                  [swirrl/lib-swirrl-server "0.6.3" :exclusions [clout org.clojure/java.classpath]]
-                 [wrap-verbs "0.1.1"]]
+                 [wrap-verbs "0.1.1"]
+
+                 [com.auth0/jwks-rsa "0.8.1"]
+                 [com.auth0/java-jwt "3.8.0"]
+                 ]
 
 
   :resource-paths ["resources"]

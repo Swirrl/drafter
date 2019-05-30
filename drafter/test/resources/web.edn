@@ -1,6 +1,11 @@
 {
- :drafter.middleware/wrap-auth {:drafter.user/repo #ig/ref :drafter.user/repo
-                                :jws-signing-key "foo"}
+ :drafter.middleware/dev-token
+ {:drafter.middleware/access-token {:payload {:permissions ["drafter:admin"]}}
+  :drafter.middleware/id-token {:payload {:name "Swirrly McSwirrlFace"}}}
+
+ :drafter.middleware/wrap-auth {:wrap-token #ig/ref :drafter.middleware/dev-token
+                                :wrap-auth  #ig/ref :drafter.middleware/token-authentication}
+
 
  ;; [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout 30
  ;;                                                          :jws-signing-key "foo"}
