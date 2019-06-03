@@ -22,5 +22,6 @@
                         [com.auth0/java-jwt "3.8.0"]
                         [drafter "local-2.2.x-SNAPSHOT"]]
          :source-paths ["env/dev/clj"]
-         :resource-paths ["env/dev/resources"]
+         :resource-paths ["env/dev/resources"
+                          "../drafter/resources"]
          :plugins [[lein-environ "1.0.2"]]}})

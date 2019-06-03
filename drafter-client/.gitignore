@@ -100,3 +100,6 @@ pom.xml.asc
 
 ### Swagger Codegen ###
 generated/.swagger-codegen
+stasher-cache/
+logs/
+log-config.edn

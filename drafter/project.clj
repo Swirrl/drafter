@@ -36,7 +36,7 @@
 
                  [commons-codec "1.12"]
 
-                 [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
+                 [clj-commons/clj-yaml "0.7.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.5.0"] ;; for validating our Swagger/JSON schemas
 
                  [aero "1.1.3"]

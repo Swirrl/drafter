@@ -21,22 +21,22 @@
 
 (def alg (Algorithm/RSA256 pubkey privkey))
 
-(defn token [iss aud sub]
+(defn token [iss aud sub role]
   (-> (JWT/create)
       (.withIssuer (str iss \/))
       (.withSubject sub)
       (.withAudience (into-array String [aud]))
       (.withExpiresAt (to-date (time/plus (time/now) (time/minutes 10))))
-      (.withClaim "scope" "drafter:editor")
+      (.withClaim "scope" role)
       (.sign alg)))
 
-(def jwt (token "test" "wut" "auth0-user-id"))
+;; (def jwt (token "test" "wut" "auth0-user-id"))
 
-(def jwk
-  (reify JwkProvider
-    (get [_ _]
-      (proxy [Jwk] ["" "" "RSA" "" '() "" '() "" {}]
-        (getPublicKey [] (.getPublic keypair))))))
+;; (def jwk
+;;   (reify JwkProvider
+;;     (get [_ _]
+;;       (proxy [Jwk] ["" "" "RSA" "" '() "" '() "" {}]
+;;         (getPublicKey [] (.getPublic keypair))))))
 
 ;; (Base64/getEncoder (.getEncoded pubkey) "UTF-8")
 
@@ -44,7 +44,7 @@
 
 ;; (verify-token jwk "test" "wut" jwt)
 
-(defmethod ig/init-key :drafter.auth.auth0/jwk [_ {:keys [endpoint] :as opts}]
+(defn mock-jwk []
   (reify JwkProvider
     (get [_ _]
       (proxy [Jwk] ["" "" "RSA" "" '() "" '() "" {}]

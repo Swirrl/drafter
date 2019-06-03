@@ -9,7 +9,7 @@
   (find-user-by-username [this username]
     "Attempts to find a user with the given user name in the
     underlying store. Returns nil if no such user was found.")
-  
+
   (get-all-users [this]
     "Returns all users in this repository"))
 
@@ -22,7 +22,16 @@
 permissions."
       } roles [:editor :publisher :manager :system])
 
-(def role->permission-level (zipmap roles (iterate inc 1))) ;; e.g. {:editor 1, :publisher 2, :manager 3}
+(def ^{:doc "Ordered list of roles from least permissions to greatest
+permissions."
+      } pmd-roles [:pmd.role/drafter:editor
+                   :pmd.role/drafter:publisher
+                   :pmd.role/drafter:manager
+                   :pmd.role/drafter:system])
+
+(def role->permission-level
+  (merge (zipmap roles (iterate inc 1))
+         (zipmap pmd-roles (iterate inc 1)))) ;; e.g. {:editor 1, :publisher 2, :manager 3}
 
 (def username :email)
 (def role :role)

@@ -40,15 +40,15 @@
     (-> system-config
         aero/read-config)))
 
-(defn- merge-maps [a b]
-  (if (and (map? a) (map? b))
-    (merge a b)
-    b))
+;; (defn- merge-maps [a b]
+;;   (if (and (map? a) (map? b))
+;;     (merge a b)
+;;     b))
 
 (defn- inject-logging [system-config]
   "Add logging to datadog, and add logging and datadog to everything else."
   (merge-with
-   merge-maps
+   merge
    (zipmap (keys (dissoc system-config :drafter/logging :drafter.main/datadog))
            (repeat (merge (when (contains? system-config :drafter/logging)
                             {:logging (ig/->Ref :drafter/logging)})

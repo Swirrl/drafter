@@ -1,10 +1,13 @@
 (ns drafter-client.client-test
-  (:require [clojure.spec.test.alpha :as st]
+  (:require [clj-http.client :as http]
+            [clojure.spec.test.alpha :as st]
             [clojure.test :as t]
+            [drafter.main :as main]
             [drafter-client.client :as sut]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.test-util.auth :as auth-util]
             [drafter-client.test-util.db :as db-util]
+            [drafter-client.test-util.jwt :as jwt]
             [environ.core :refer [env]]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as gr-repo]
@@ -15,6 +18,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setup ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Override the :drafter.auth.auth0/jwk init-key otherwise it'll be trying to
+;; contact auth0
+(defmethod ig/init-key :drafter.auth.auth0/jwk [_ {:keys [endpoint] :as opts}]
+  (jwt/mock-jwk))
+
+;; But this is the one that everything should use anyway
+(defmethod ig/init-key :drafter.auth.auth0/mock-jwk [_ {:keys [endpoint] :as opts}]
+  (jwt/mock-jwk))
 
 (defn with-spec-instrumentation [f]
   (try
@@ -33,6 +45,29 @@
         (db-util/assert-empty stardog-repo))
       (f)
       (db-util/drop-all! stardog-repo))))
+
+(defn start-drafter-server []
+  (let [fut (future (main/-main "../drafter/resources/drafter-base-config.edn"
+                                "../drafter/env/dev/resources/drafter-dev-config.edn"
+                                "resources/drafter-mock-middleware.edn"))]
+    (loop []
+      (let [started? (try
+                       (http/get "http://localhost:3001")
+                       true
+                       (catch Exception _ false))]
+        (if started?
+          fut
+          (do
+            (println "Waiting for drafter to start")
+            (Thread/sleep 1000)
+            (recur)))))))
+
+
+(defn drafter-server-fixture [f]
+  (let [fut (start-drafter-server)]
+    (f)
+    (main/stop-system!)
+    (future-cancel fut)))
 
 (defn drafter-client []
   (let [drafter-endpoint (env :drafter-endpoint)]
@@ -55,9 +90,12 @@
     (rio/statements file)))
 
 (t/use-fixtures :each
-  ;; Drop db after tests
   with-spec-instrumentation
+  ;; Drop db after tests
   db-fixture)
+
+(t/use-fixtures :once
+  drafter-server-fixture)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tests ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -75,26 +113,29 @@
 
 (t/deftest draftsets-tests
   (let [client (drafter-client)
-        user auth-util/system-user
+        token (jwt/token (env :auth0-domain)
+                         (env :auth0-aud)
+                         "username@swirrl.com"
+                         "drafter:system")
         name "test-name"
         description "test-description"]
     (t/testing "Assumption test"
-      (let [result (sut/draftsets client user)]
+      (let [result (sut/draftsets client token)]
         (t/is (empty? result) "There should be no drafts")))
     (t/testing "Adding a draft set"
-      (let [result (sut/new-draftset client user name description)]
+      (let [result (sut/new-draftset client token name description)]
         (t/is (= (draftset/name result) name))
         (t/is (= (draftset/description  result) description))))
     (t/testing "Reading back the draftset"
-      (let [result (sut/draftsets client user)]
+      (let [result (sut/draftsets client token)]
         (t/is (= 1 (count result)) "There should be one draft")
         (t/is (= (draftset/name (first result)) name))
         (t/is (= (draftset/description  (first result)) description))))
     (t/testing "Reading back the draftset"
-      (let [[draftset] (sut/draftsets client user)
-            async-delete-result (sut/remove-draftset client user draftset)
-            finished-result (sut/resolve-job client user async-delete-result)
-            all-draftsets (sut/draftsets client user)]
+      (let [[draftset] (sut/draftsets client token)
+            async-delete-result (sut/remove-draftset client token draftset)
+            finished-result (sut/resolve-job client token async-delete-result)
+            all-draftsets (sut/draftsets client token)]
         (t/is (= "ok" (:type async-delete-result)))
         (t/is (= :drafter-client.client/completed finished-result))
         (t/is (empty? all-draftsets))))))

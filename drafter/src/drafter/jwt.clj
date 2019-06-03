@@ -1,5 +1,6 @@
 (ns drafter.jwt
-  (:require [cheshire.core :as json])
+  (:require [cheshire.core :as json]
+            [clojure.tools.logging :as log])
   (:import com.auth0.jwt.algorithms.Algorithm
            [com.auth0.jwt.exceptions InvalidClaimException
             JWTVerificationException TokenExpiredException]

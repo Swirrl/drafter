@@ -116,11 +116,15 @@
 (defn- access-token-request
   [request access-token jwk iss aud]
   (if access-token
-    (let [token (jwt/verify-token jwk iss aud access-token)
+    (let [token (-> jwk
+                    (jwt/verify-token iss aud access-token)
+                    (normalize-roles))
           status (:status token)]
       (cond-> (assoc request ::authenticated status)
         (= ::jwt/token-verified status)
-        (assoc ::access-token (normalize-roles token))))
+        (assoc ::access-token (normalize-roles token)
+               :identity {:email (-> token :payload :sub)
+                          :role (-> token :roles first)})))
     request))
 
 (defmethod ig/init-key :drafter.auth/auth0 [_ opts] opts)
@@ -132,7 +136,7 @@
       (.build)))
 
 (defmethod ig/init-key ::bearer-token
-  [_ {{{:keys [aud iss]} :config} :auth0 :keys [auth0 jwk] :as opts}]
+  [_ {{:keys [aud iss]} :auth0 :keys [auth0 jwk] :as opts}]
   (fn [handler]
     (fn [request]
       (let [token (parse-header request "Bearer")]
@@ -144,16 +148,21 @@
     (fn [request]
       (handler (merge request opts)))))
 
+(defn unauthorized [msg]
+  {:status 401
+   :headers {"Content-Type" "text/plain"}
+   :body msg})
+
 (defmethod ig/init-key ::token-authentication
   [_ {:keys [auth0] :as opts}]
   (fn [handler]
     (fn [{:keys [::authenticated] :as request}]
       (case (::authenticated request)
         ::jwt/token-verified (handler request)
-        ::jwt/token-expired [::response/unauthorized "Token expired."]
-        ::jwt/claim-invalid [::response/unauthorized "Not authenticated."]
-        ::jwt/token-invalid [::response/unauthorized "Not authenticated."]
-        [::response/unauthorized "Not authenticated."]))))
+        ::jwt/token-expired (unauthorized "Token expired.")
+        ::jwt/claim-invalid (unauthorized "Not authenticated.")
+        ::jwt/token-invalid (unauthorized "Not authenticated.")
+        (unauthorized "Not authenticated.")))))
 
 (defn authorized? [{:keys [roles] :as token} role]
   (contains? roles role))
@@ -164,7 +173,7 @@
       (fn [{:keys [::access-token] :as request}]
         (if (authorized? access-token role)
           (handler request)
-          [::response/forbidden "Not authorized."])))))
+          (response/forbidden-response "Not authorized."))))))
 
 (s/def ::wrap-auth fn?)
 (s/def ::wrap-token fn?)
