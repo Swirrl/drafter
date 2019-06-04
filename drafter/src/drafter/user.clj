@@ -59,7 +59,8 @@ permissions."
   (.getSchemeSpecificPart user-uri))
 
 (defn is-known-role? [r]
-  (util/seq-contains? roles r))
+  (or (util/seq-contains? roles r)
+      (util/seq-contains? pmd-roles r)))
 
 (defn- get-valid-email [email]
   (if-let [valid (util/validate-email-address email)]

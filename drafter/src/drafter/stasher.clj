@@ -514,7 +514,6 @@
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
   [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
-  (prn 'query-str query-str)
   (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results

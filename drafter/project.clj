@@ -138,6 +138,7 @@
                                [ring-mock "0.1.5"]
                                [ring/ring-devel "1.7.1" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
                                [eftest "0.5.7"] ;; repl test runner support
+                               [environ "1.0.3"]
                                [org.clojure/test.check "0.9.0"]]
 
                 ;;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]

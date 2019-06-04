@@ -14,6 +14,7 @@
             [drafter.write-scheduler
              :refer
              [global-writes-lock queue-job! start-writer! stop-writer!]]
+            [environ.core :refer [env]]
             [grafter-2.rdf4j.templater :refer [triplify]]
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf4j.repository.registry :as reg]
@@ -25,7 +26,10 @@
             [schema.test :refer [validate-schemas]]
             [swirrl-server.async.jobs :refer [create-job]]
             [clojure.pprint :as pp]
-            [clojure.spec.test.alpha :as st])
+            [clojure.spec.alpha :as sp]
+            [clojure.spec.test.alpha :as st]
+            [clj-time.coerce :refer [to-date]]
+            [clj-time.core :as time])
   (:import grafter_2.rdf.SPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
@@ -39,7 +43,16 @@
            org.apache.http.message.BasicHttpResponse
            org.apache.http.ProtocolVersion
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
-           org.eclipse.rdf4j.rio.trig.TriGParserFactory))
+           org.eclipse.rdf4j.rio.trig.TriGParserFactory
+           com.auth0.jwt.algorithms.Algorithm
+           [com.auth0.jwt.exceptions InvalidClaimException
+            JWTVerificationException TokenExpiredException]
+           [com.auth0.jwk Jwk JwkProvider]
+           com.auth0.jwt.JWT
+           java.security.KeyPairGenerator
+           java.util.Base64
+
+           ))
 
 (defn with-spec-instrumentation [f]
   (try
@@ -84,14 +97,47 @@
       (.next scanner)
       "")))
 
+(defonce keypair
+  (-> (KeyPairGenerator/getInstance "RSA")
+      (doto (.initialize 4096))
+      (.genKeyPair)))
+
+(def pubkey (.getPublic keypair))
+(def privkey (.getPrivate keypair))
+
+(def alg (Algorithm/RSA256 pubkey privkey))
+
+(defn token [iss aud sub role]
+  (-> (JWT/create)
+      (.withIssuer (str iss \/))
+      (.withSubject sub)
+      (.withAudience (into-array String [aud]))
+      (.withExpiresAt (to-date (time/plus (time/now) (time/minutes 10))))
+      (.withClaim "scope" role)
+      (.sign alg)))
+
+(defn mock-jwk []
+  (reify JwkProvider
+    (get [_ _]
+      (proxy [Jwk] ["" "" "RSA" "" '() "" '() "" {}]
+        (getPublicKey [] (.getPublic keypair))))))
+
+(defmethod ig/init-key :drafter.auth.auth0/mock-jwk [_ {:keys [endpoint] :as opts}]
+  (mock-jwk))
+
+(defn user-access-token [user-id scope]
+  (token (env :auth0-domain) (env :auth0-aud) user-id scope))
+
+(defn set-auth-header [request access-token]
+  (assoc-in request [:headers "Authorization"] (str "Bearer " access-token)))
+
 (defn with-identity
   "Sets the given test user as the user on a request"
-  [user request]
-  (let [unencoded-auth (str (user/username user) ":" "password")
-        encoded-auth (util/str->base64 unencoded-auth)]
+  [{:keys [email role] :as user} request]
+  (let [token (user-access-token email (str "drafter" role))]
     (-> request
         (assoc :identity user)
-        (assoc-in [:headers "Authorization"] (str "Basic " encoded-auth)))))
+        (set-auth-header token))))
 
 (defn wait-for-lock-ms [lock period-ms]
   (if (.tryLock lock period-ms (TimeUnit/MILLISECONDS))

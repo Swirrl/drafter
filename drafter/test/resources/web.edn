@@ -17,7 +17,7 @@
  :drafter.middleware/token-authentication {:auth0 #ig/ref :drafter.auth/auth0
                                            :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
 
- :drafter.middleware/wrap-auth {:wrap-token #ig/ref :drafter.middleware/dev-token
+ :drafter.middleware/wrap-auth {:wrap-token #ig/ref :drafter.middleware/bearer-token
                                 :wrap-auth  #ig/ref :drafter.middleware/token-authentication}
 
 

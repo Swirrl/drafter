@@ -30,20 +30,6 @@
       (.withClaim "scope" role)
       (.sign alg)))
 
-;; (def jwt (token "test" "wut" "auth0-user-id"))
-
-;; (def jwk
-;;   (reify JwkProvider
-;;     (get [_ _]
-;;       (proxy [Jwk] ["" "" "RSA" "" '() "" '() "" {}]
-;;         (getPublicKey [] (.getPublic keypair))))))
-
-;; (Base64/getEncoder (.getEncoded pubkey) "UTF-8")
-
-;; (require '[drafter.jwt :refer [verify-token]])
-
-;; (verify-token jwk "test" "wut" jwt)
-
 (defn mock-jwk []
   (reify JwkProvider
     (get [_ _]
