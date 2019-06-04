@@ -73,7 +73,7 @@
   (let [drafter-endpoint (env :drafter-endpoint)]
     (assert drafter-endpoint "Set DRAFTER_ENDPOINT to run these tests.")
     (sut/web-client drafter-endpoint
-                    :jws-key (env :drafter-jws-signing-key)
+                    :auth0-endpoint (env :auth0-domain)
                     :batch-size 150000)))
 
 ;; (clojure.pprint/pprint
@@ -103,7 +103,7 @@
 
 (t/deftest live-repo-tests
   (let [client (drafter-client)
-        repo (sut/->repo client auth-util/system-user sut/live)]
+        repo (sut/->repo client (auth-util/system-token) sut/live)]
     (t/testing "Live database is empty"
       (with-open [conn (gr-repo/->connection repo)]
         (let [result (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
@@ -113,10 +113,7 @@
 
 (t/deftest draftsets-tests
   (let [client (drafter-client)
-        token (jwt/token (env :auth0-domain)
-                         (env :auth0-aud)
-                         "username@swirrl.com"
-                         "drafter:system")
+        token (auth-util/system-token)
         name "test-name"
         description "test-description"]
     (t/testing "Assumption test"
@@ -144,97 +141,97 @@
   (let [client (drafter-client)
         triples (test-triples)
         how-many 5
-        user auth-util/system-user
+        token (auth-util/system-token)
         name "Draftset adding"
         description "Testing adding things, and reading them"
-        draftset (sut/new-draftset client user name description)]
+        draftset (sut/new-draftset client token name description)]
     (t/testing "Adding quads to a draft set"
       (let [graph (URI. "http://test.graph.com/quad-graph")
             quads (map #(assoc % :c graph) triples)
             quads (take how-many quads)
-            job (sut/add client user draftset quads)
+            job (sut/add client token draftset quads)
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job)))
-            quads* (sut/get client user draftset)]
+                       (sut/resolve-job client token job)))
+            quads* (sut/get client token draftset)]
         (t/is (= (set quads) (set quads*)))))
     (t/testing "Adding triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             triples (take how-many triples)
-            job (sut/add client user draftset graph triples)
+            job (sut/add client token draftset graph triples)
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job)))
-            triples* (sut/get client user draftset graph)]
+                       (sut/resolve-job client token job)))
+            triples* (sut/get client token draftset graph)]
         (t/is (= (set triples) (set triples*)))))))
 
 (t/deftest adding-everything-to-a-draftset
   (let [client (drafter-client)
         triples (test-triples)
         expected-count (count triples)
-        user auth-util/system-user
+        token (auth-util/system-token)
         name "Draftset adding"
         description "Testing adding things, and reading them"
-        draftset (sut/new-draftset client user name description)]
+        draftset (sut/new-draftset client token name description)]
     (t/testing "Adding quads to a draft set"
       (let [graph (URI. "http://test.graph.com/quad-graph")
             quads (map #(assoc % :c graph) triples)
-            job (sut/add client user draftset quads)
+            job (sut/add client token draftset quads)
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job)))
-            quads* (sut/get client user draftset)]
+                       (sut/resolve-job client token job)))
+            quads* (sut/get client token draftset)]
         (t/is expected-count (count quads*))))
     (t/testing "Adding triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
-            job (sut/add client user draftset graph triples)
+            job (sut/add client token draftset graph triples)
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job)))
-            triples* (sut/get client user draftset graph)]
+                       (sut/resolve-job client token job)))
+            triples* (sut/get client token draftset graph)]
         (t/is (= expected-count (count triples*)))))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
         triples (test-triples)
         how-many 5
-        user auth-util/system-user
+        token (auth-util/system-token)
         name "Draftset adding"
         description "Testing adding things, and reading them"
-        draftset (sut/new-draftset client user name description)]
+        draftset (sut/new-draftset client token name description)]
     (t/testing "Adding quads to a draft set"
       (let [graph-1 (URI. "http://test.graph.com/quad-graph1")
             quads-1 (map #(assoc % :c graph-1) triples)
             quads-1 (take how-many quads-1)
-            job-1 (sut/add client user draftset quads-1)
+            job-1 (sut/add client token draftset quads-1)
             graph-2 (URI. "http://test.graph.com/quad-graph2")
             quads-2 (map #(assoc % :c graph-2) triples)
             quads-2 (take how-many (drop how-many quads-2))
-            job-2 (sut/add client user draftset quads-2)
+            job-2 (sut/add client token draftset quads-2)
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job-2)))
+                       (sut/resolve-job client token job-2)))
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job-2)))
-            quads* (sut/get client user draftset)]
+                       (sut/resolve-job client token job-2)))
+            quads* (sut/get client token draftset)]
         (t/is (= (set (concat quads-1 quads-2)) (set quads*)))))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
         triples (test-triples)
         how-many 5
-        user auth-util/system-user
+        token (auth-util/system-token)
         name "Draftset adding"
         description "Testing adding things, and reading them"
-        draftset (sut/new-draftset client user name description)]
+        draftset (sut/new-draftset client token name description)]
     (t/testing "Adding triples to a draft set"
       (let [graph-1 (URI. "http://test.graph.com/triple-graph1")
             triples-1 (take how-many triples)
-            job-1 (sut/add client user draftset graph-1 triples-1)
+            job-1 (sut/add client token draftset graph-1 triples-1)
             graph-2 (URI. "http://test.graph.com/triple-graph2")
             triples-2 (take how-many (drop how-many triples))
-            job-2 (sut/add client user draftset graph-2 triples-2)
+            job-2 (sut/add client token draftset graph-2 triples-2)
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job-1)))
+                       (sut/resolve-job client token job-1)))
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job-2)))
-            triples-1* (sut/get client user draftset graph-1)
-            triples-2* (sut/get client user draftset graph-2)]
+                       (sut/resolve-job client token job-2)))
+            triples-1* (sut/get client token draftset graph-1)
+            triples-2* (sut/get client token draftset graph-2)]
         (t/is (= (set triples-1) (set triples-1*)))
         (t/is (= (set triples-2) (set triples-2*)))))))
 
@@ -243,15 +240,15 @@
         graph (URI. "http://test.graph.com/3")
         triples (test-triples)
         quads (map #(assoc % :c graph) triples)
-        user auth-util/system-user
+        token (auth-util/system-token)
         name "Job status test"
         description "Job async response handling tests"
-        draftset (sut/new-draftset client user name description)]
+        draftset (sut/new-draftset client token name description)]
     (t/testing "Adding quads to a draft set"
-      (let [async-job (sut/add client user draftset (take 5 quads))]
+      (let [async-job (sut/add client token draftset (take 5 quads))]
         (t/is (= "ok" (:type async-job)))
         (t/is (not (sut/job-complete? async-job)))
-        (let [job-status (sut/resolve-job client user async-job)]
+        (let [job-status (sut/resolve-job client token async-job)]
           (t/is (= :drafter-client.client/completed job-status)))))))
 
 
@@ -259,28 +256,27 @@
   (let [client (drafter-client)
         triples (test-triples)
         how-many 5
-        user auth-util/system-user
+        token (auth-util/system-token)
         name "Draftset querying"
         description "Testing adding things, and querying them"
-        draftset (sut/new-draftset client user name description)]
+        draftset (sut/new-draftset client token name description)]
     (t/testing "Adding triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph1")
             triples (take how-many triples)
-            job (sut/add client user draftset graph triples)
+            job (sut/add client token draftset graph triples)
             _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client user job)))
-            repo (sut/->repo client user draftset)]
+                       (sut/resolve-job client token job)))
+            repo (sut/->repo client token draftset)]
         (with-open [conn (gr-repo/->connection repo)]
           (let [res (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
             (t/is (true? res))))))))
 
 
 (t/deftest integrant-null-client
-  (t/testing "missing a drafter uri or jws key returns nil client"
+  (t/testing "missing a drafter uri key returns nil client"
     (t/is (nil? (ig/init-key :drafter-client/client {})))
-    (t/is (nil? (ig/init-key :drafter-client/client {:jws-key ""})))
     (t/is (nil? (ig/init-key :drafter-client/client {:drafter-uri ""})))
     (t/is (some? (ig/init-key :drafter-client/client
                               {:batch-size 10
                                :drafter-uri (env :drafter-endpoint)
-                               :jws-key ""})))))
+                               :auth0-endpoint (env :auth0-domain)})))))

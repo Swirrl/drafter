@@ -21,11 +21,12 @@
 (s/def ::role string?)
 (s/def ::email string?)
 (s/def ::user (s/keys :req-un [::role ::email]))
+(s/def ::token string?)
 
-(s/fdef auth/jws-auth-header
-  :args (s/cat :client ::client :user ::user)
-  :ret string?)
+;; (s/fdef auth/jws-auth-header
+;;   :args (s/cat :client ::client :user ::user)
+;;   :ret string?)
 
 (s/fdef repo/make-repo
-  :args (s/cat :client ::client :context ::context :user ::user :params ::params)
+  :args (s/cat :client ::client :context ::context :token ::token :params ::params)
   :ret (partial instance? org.eclipse.rdf4j.repository.Repository))

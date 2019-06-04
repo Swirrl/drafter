@@ -64,5 +64,3 @@
                         (str "Basic "
                              (-> (java.util.Base64/getEncoder)
                                  (.encodeToString bpass)))))}))
-
-(def jws-auth (fn [& args]))

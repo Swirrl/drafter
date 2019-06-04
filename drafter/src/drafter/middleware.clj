@@ -98,7 +98,7 @@
 
 (defn normalize-roles [{:keys [payload] :as token}]
   (let [scopes (map (partial keyword "pmd.role")
-                    (-> payload :scope (string/split #" ")))
+                    (some-> payload :scope (string/split #" ")))
         permissions (map (partial keyword "pmd.role") (:permissions payload))]
     (assoc token :roles (set (concat scopes permissions)))))
 

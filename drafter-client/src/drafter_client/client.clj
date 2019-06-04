@@ -126,7 +126,7 @@
         swagger-json "swagger/swagger.json"]
     (log/debugf "Making Drafter web-client with batch size %d for Drafter: %s"
                 batch-size drafter-uri)
-    (when drafter-uri
+    (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
           (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
           (->DrafterClient batch-size nil)))))
