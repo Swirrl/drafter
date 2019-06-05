@@ -47,27 +47,14 @@
       (db-util/drop-all! stardog-repo))))
 
 (defn start-drafter-server []
-  (let [fut (future (main/-main "../drafter/resources/drafter-base-config.edn"
-                                "../drafter/env/dev/resources/drafter-dev-config.edn"
-                                "resources/drafter-mock-middleware.edn"))]
-    (loop []
-      (let [started? (try
-                       (http/get "http://localhost:3001")
-                       true
-                       (catch Exception _ false))]
-        (if started?
-          fut
-          (do
-            (println "Waiting for drafter to start")
-            (Thread/sleep 1000)
-            (recur)))))))
-
+  (main/-main "../drafter/resources/drafter-base-config.edn"
+              "../drafter/env/dev/resources/drafter-dev-config.edn"
+              "resources/drafter-mock-middleware.edn"))
 
 (defn drafter-server-fixture [f]
-  (let [fut (start-drafter-server)]
-    (f)
-    (main/stop-system!)
-    (future-cancel fut)))
+  (start-drafter-server)
+  (f)
+  (main/stop-system!))
 
 (defn drafter-client []
   (let [drafter-endpoint (env :drafter-endpoint)]

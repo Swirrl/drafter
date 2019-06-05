@@ -19,9 +19,7 @@
   {:dev {:dependencies [[environ "1.0.3"]
                         [integrant/repl "0.3.1"]
                         [org.slf4j/slf4j-log4j12 "1.7.25"]
-                        [com.auth0/java-jwt "3.8.0"]
-                        [drafter "local-2.2.x-SNAPSHOT"]]
-         :source-paths ["env/dev/clj"]
-         :resource-paths ["env/dev/resources"
-                          "../drafter/resources"]
+                        [com.auth0/java-jwt "3.8.0"] ]
+         :source-paths ["env/dev/clj" "../drafter/src"]
+         :resource-paths ["env/dev/resources" "../drafter/resources"]
          :plugins [[lein-environ "1.0.2"]]}})
