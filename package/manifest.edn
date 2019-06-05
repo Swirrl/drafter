@@ -25,7 +25,7 @@
              :drafter/timeout-query-endpoint-draftset {:doc "Query timeout for draftset endpoints"
                                                        :optional true
                                                        :env-var DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET}
-             :drafter/stasher-cache-endabled {:doc "Whether stasher caching is enabled"
+             :drafter/stasher-cache-enabled {:doc "Whether stasher caching is enabled"
                                               :optional true
                                               :env-var STASHER_CACHE_ENABLED}
              :drafter/stasher-cache-dir {:doc "Directory used to write cached results to"
