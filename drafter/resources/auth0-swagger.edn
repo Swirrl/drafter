@@ -1,0 +1,33 @@
+{:paths
+ {(keyword "/oauth/token")
+  {:post {:operationId "oauth-token"
+          :summary "Get a jwt auth token from auth0"
+          :consumes ["application/x-www-form-urlencoded"]
+          :produces ["application/json"]
+          :parameters [{:name "grant_type" :in "body" :type "string"}
+                       {:name "client_id" :in "body" :type "string"}
+                       {:name "client_secret" :in "body" :type "string"}
+                       {:name "audience" :in "body" :type "string"}
+                       {:name "redirect_uri" :in "body" :type "string" :required false}
+                       {:name "code" :in "body" :type "string" :required false}]}}
+
+  (keyword "/authorize")
+  {:get {:operationId "authorize"
+         :summary "Get an auth-code from auth0"
+         :parameters [{:name "response_type" :in "query" :type "string"}
+                      {:name "client_id" :in "query" :type "string"}
+                      {:name "redirect_uri" :in "query" :type "string"}
+                      {:name "audience" :in "query" :type "string" :required false}
+                      {:name "client_secret" :in "query" :type "string" :required false}
+                      {:name "scope" :in "query" :type "string" :required false}
+                      {:name "state" :in "query" :type "string" :required false}]}}
+
+  (keyword "/v2/logout")
+  {:get {:operationId "logout" :summary "Logout from Auth0"}}
+
+  (keyword "/api/v2/users-by-email")
+  {:get {:operationId "users-by-email"
+         :summary "Find Auth0 users by email address"
+         :parametes [{:name "email" :in "query" :type "string" :format "email"}
+                     {:name "fields" :in "query" :type "array" :collectionFormat "csv" :items {:type "string"} :required false}
+                     {:name "include_fields" :in "query" :type "boolean" :required false}]}}}}

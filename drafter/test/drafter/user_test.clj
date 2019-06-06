@@ -9,7 +9,7 @@
 (use-fixtures :each tc/with-spec-instrumentation)
 
 (def test-password "password")
-(def test-editor (create-user "editor@swirrl.com" :editor (get-digest test-password)))
+(def test-editor (create-user "test-editor@swirrl.com" :editor (get-digest test-password)))
 (def test-publisher (create-user "publisher@swirrl.com" :publisher (get-digest test-password)))
 (def test-manager (create-user "manager@swirrl.com" :manager (get-digest test-password)))
 (def test-system (create-user "system@swirrl.com" :system (get-digest test-password)))

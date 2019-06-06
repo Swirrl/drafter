@@ -1,6 +1,6 @@
 #merge [#include "repo.edn"
         #include "backend.edn"
         #include "user-repo.edn"
+        #include "auth0-repo.edn"
         #include "log-system.edn"
         #include "web.edn"]
-
