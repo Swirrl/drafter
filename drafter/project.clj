@@ -36,7 +36,7 @@
 
                  [commons-codec "1.12"]
 
-                 [clj-yaml "0.4.0"] ;; for loading our Swagger schemas
+                 [clj-commons/clj-yaml "0.7.0"] ;; for loading our Swagger schemas
                  [metosin/scjsv "0.5.0"] ;; for validating our Swagger/JSON schemas
 
                  [aero "1.1.3"]
@@ -96,7 +96,11 @@
                  [ring/ring-core "1.7.1"]
                  ;;[selmer "0.6.9"]
                  [swirrl/lib-swirrl-server "0.6.3" :exclusions [clout org.clojure/java.classpath]]
-                 [wrap-verbs "0.1.1"]]
+                 [wrap-verbs "0.1.1"]
+
+                 [com.auth0/jwks-rsa "0.8.1"]
+                 [com.auth0/java-jwt "3.8.0"]
+                 ]
 
 
   :resource-paths ["resources"]
@@ -134,6 +138,7 @@
                                [ring-mock "0.1.5"]
                                [ring/ring-devel "1.7.1" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]]
                                [eftest "0.5.7"] ;; repl test runner support
+                               [environ "1.0.3"]
                                [org.clojure/test.check "0.9.0"]]
 
                 ;;:jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"]
