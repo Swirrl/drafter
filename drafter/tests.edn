@@ -1,7 +1,15 @@
 #kaocha/v1
-{:tests [{:id          :unit
+{:tests [{:id          :auth0
           :test-paths  ["test" "src"]
-          :ns-patterns [".*"]}]
- :reporter [kaocha.report/documentation]
+          :ns-patterns [".*"]
+          :skip-meta   [:basic-auth]
+          :auth-env    :auth0}
+         {:id          :basic-auth
+          :test-paths  ["test" "src"]
+          :ns-patterns [".*"]
+          :skip-meta   [:auth0]
+          :auth-env    :basic-auth}]
  :capture-output? false
+ :plugins [:kaocha.plugin/auth-env-plugin]
+ :reporter [kaocha.report/documentation]
  }
