@@ -2,7 +2,6 @@
   (:require [clojure.spec.alpha :as s]
             [drafter.backend.draftset :as ep]
             [drafter.backend.draftset.operations :as dsops]
-            [drafter.feature.draftset.test-helper :as help]
             [drafter.middleware :as mw]
             [drafter.rdf.sparql-protocol :as sp]
             [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
