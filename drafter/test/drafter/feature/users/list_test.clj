@@ -1,4 +1,4 @@
-(ns drafter.feature.users.list-test
+(ns ^:rest-api drafter.feature.users.list-test
   (:require [clojure.test :as t]
             [drafter.feature.users.list :as sut]
             [drafter.test-common :as tc]

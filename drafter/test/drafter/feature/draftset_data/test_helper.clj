@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset-data.test-helper
+(ns ^:rest-api drafter.feature.draftset-data.test-helper
   (:require [clojure.test :as t]
             [drafter.rdf.drafter-ontology
              :as do

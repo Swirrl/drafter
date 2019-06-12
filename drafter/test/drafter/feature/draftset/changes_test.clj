@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.changes-test
+(ns ^:rest-api drafter.feature.draftset.changes-test
   (:require [clojure.test :as t :refer :all]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as ops]

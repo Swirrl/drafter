@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset-data.append-test
+(ns ^:rest-api drafter.feature.draftset-data.append-test
   (:require [clojure.java.io :as io]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
