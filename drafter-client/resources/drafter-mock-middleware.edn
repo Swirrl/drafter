@@ -1,0 +1,27 @@
+{
+ :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
+ :drafter.auth.auth0/jwk #ig/ref :drafter.auth.auth0/mock-jwk
+
+ :drafter.auth/auth0 {:iss #env AUTH0_DOMAIN
+                      :aud #env AUTH0_AUD
+                      :endpoint #env AUTH0_DOMAIN
+                      :client-id #env AUTH0_CLIENT_ID
+                      :client-secret #env AUTH0_CLIENT_SECRET}
+
+ :drafter.middleware.auth0-auth/dev-token
+ {:drafter.middleware.auth0-auth/access-token {:payload {:permissions ["drafter:admin"]}}
+  :drafter.middleware.auth0-auth/id-token {:payload {:name "Swirrly McSwirrlFace"}}}
+
+ :drafter.middleware.auth0-auth/bearer-token
+ {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+
+ :drafter.middleware.auth0-auth/token-authentication
+ {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+
+ :drafter.middleware.auth0-auth/wrap-auth
+ {:wrap-token #ig/ref :drafter.middleware.auth0-auth/bearer-token
+  :wrap-auth  #ig/ref :drafter.middleware.auth0-auth/token-authentication}
+
+ :drafter.middleware/wrap-auth {:middleware  #ig/ref :drafter.middleware.auth0-auth/wrap-auth}
+
+ }
