@@ -1,0 +1,46 @@
+{:paths ["src" "resources/base"]
+
+ :deps {
+        buddy/buddy-sign {:mvn/version "3.0.0"}
+        cheshire {:mvn/version "5.8.0"}
+        clj-http {:mvn/version "3.9.0"}
+        com.auth0/mvc-auth-commons {:mvn/version "1.0.6"}
+        grafter {:mvn/version "2.0.1"}
+        grafter/url {:mvn/version "0.2.5"}
+        grafter/vocabularies {:mvn/version "0.2.6"}
+        integrant {:mvn/version "0.6.3"}
+        martian {:mvn/version "0.1.10-SNAPSHOT"}
+        martian-clj-http {:mvn/version "0.1.10-SNAPSHOT"}
+        org.clojure/clojure {:mvn/version "1.9.0"}
+        org.clojure/tools.logging {:mvn/version "0.4.1"}
+        ring/ring-core {:mvn/version "1.6.3"}
+        }
+
+ :mvn/repos
+ {"swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"}
+  "swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"}}
+
+ :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
+                 :extra-deps {
+                              lambdaisland/kaocha {:mvn/version "0.0-418"}
+                              environ {:mvn/version "1.0.3"}
+                              integrant/repl {:mvn/version "0.3.1"}
+                              org.slf4j/slf4j-log4j12 {:mvn/version "1.7.25"}
+                              com.auth0/java-jwt {:mvn/version "3.8.0"}
+                              }}
+
+           :test {:extra-paths ["test"
+                                "../drafter/env/dev/clj"
+                                "../drafter/resources"]
+                  :extra-deps {
+                               drafter {:local/root "../drafter"}
+                               lambdaisland/kaocha {:mvn/version "0.0-418"}
+                               environ {:mvn/version "1.0.3"}
+                               integrant/repl {:mvn/version "0.3.1"}
+                               org.slf4j/slf4j-log4j12 {:mvn/version "1.7.25"}
+                               com.auth0/java-jwt {:mvn/version "3.8.0"}
+                               }}
+
+           }
+
+ }
