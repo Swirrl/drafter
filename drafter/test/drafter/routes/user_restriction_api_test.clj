@@ -1,4 +1,4 @@
-(ns drafter.routes.user-restriction-api-test
+(ns ^:rest-api drafter.routes.user-restriction-api-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]

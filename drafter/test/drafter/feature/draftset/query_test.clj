@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.query-test
+(ns ^:rest-api drafter.feature.draftset.query-test
   (:require [clojure.test :as t :refer [is]]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]

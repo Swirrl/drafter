@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.submit-test
+(ns ^:rest-api drafter.feature.draftset.submit-test
   (:require [clojure.test :as t :refer [is]]
             [drafter.feature.draftset.test-helper :as help :refer [Draftset]]
             [drafter.test-common :as tc]

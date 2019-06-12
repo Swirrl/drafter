@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset-data.delete-by-graph-test
+(ns ^:rest-api drafter.feature.draftset-data.delete-by-graph-test
   (:require [clojure.test :as t :refer :all]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]

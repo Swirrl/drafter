@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.delete-test
+(ns ^:rest-api drafter.feature.draftset.delete-test
   (:require [clojure.set :as set]
             [clojure.test :as t :refer [is testing]]
             [drafter.feature.draftset.test-helper :as help]

@@ -1,12 +1,18 @@
 #kaocha/v1
-{:tests [{:id          :auth0
+{:tests [{:id          :non-api
+          :skip-meta   [:rest-api :basic-auth :auth0]
+          :test-paths  ["test" "src"]
+          :ns-patterns [".*"]}
+         {:id          :auth0
           :test-paths  ["test" "src"]
           :ns-patterns [".*"]
+          :focus-meta  [:rest-api]
           :skip-meta   [:basic-auth]
           :auth-env    :auth0}
          {:id          :basic-auth
           :test-paths  ["test" "src"]
           :ns-patterns [".*"]
+          :focus-meta  [:rest-api]
           :skip-meta   [:auth0]
           :auth-env    :basic-auth}]
  :capture-output? false

@@ -1,4 +1,4 @@
-(ns drafter.routes.reasoning-test
+(ns ^:rest-api drafter.routes.reasoning-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
             [clojure.tools.logging :as log]

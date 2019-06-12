@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.create-test
+(ns ^:rest-api drafter.feature.draftset.create-test
   (:require [drafter.feature.draftset.create :as sut]
             [clojure.test :as t])
   (:require [clojure.java.io :as io]
