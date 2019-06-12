@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.publish-test
+(ns ^:rest-api drafter.feature.draftset.publish-test
   (:require [clojure.set :as set]
             [clojure.test :as t :refer :all]
             [drafter.feature.draftset.test-helper :as help]
