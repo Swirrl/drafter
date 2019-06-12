@@ -40,13 +40,30 @@
 
  :drafter/backend {:repo #ig/ref :drafter.stasher/repo}
 
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; Auth
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ :drafter.auth.auth0/jwk {:endpoint #env AUTH0_DOMAIN}
+
+ :drafter.auth/auth0 {:iss #env AUTH0_DOMAIN
+                      :aud #env AUTH0_AUD
+                      :endpoint #env AUTH0_DOMAIN
+                      :client-id #env AUTH0_CLIENT_ID
+                      :client-secret #env AUTH0_CLIENT_SECRET}
+
+ :drafter.middleware/bearer-token {:auth0 #ig/ref :drafter.auth/auth0
+                                   :jwk #ig/ref :drafter.auth.auth0/jwk}
+
+ :drafter.middleware/token-authentication {:auth0 #ig/ref :drafter.auth/auth0
+                                           :jwk #ig/ref :drafter.auth.auth0/jwk}
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Web Middleware
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
- :drafter.middleware/wrap-auth {:drafter.user/repo #ig/ref :drafter.user/repo
-                                :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
+ :drafter.middleware/wrap-auth {:wrap-token #ig/ref :drafter.middleware/bearer-token
+                                :wrap-auth  #ig/ref :drafter.middleware/token-authentication}
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Web handlers
