@@ -8,15 +8,15 @@
   (:import com.auth0.jwk.JwkProviderBuilder
            java.util.concurrent.TimeUnit))
 
-(defn read-keyword [s]
-  (let [k (edn/read-string s)]
-    (when (keyword? k) k)))
+(defn read-role [s]
+  (let [[ns role] (some-> s (string/split #":"))]
+    (when (= ns "drafter") (keyword role))))
 
 (defn normalize-roles [{:keys [payload] :as token}]
   (let [scopes (->> (some-> payload :scope (string/split #" "))
-                    (map read-keyword)
+                    (map read-role)
                     (remove nil?))
-        permissions (remove nil? (map read-keyword (:permissions payload)))]
+        permissions (remove nil? (map read-role (:permissions payload)))]
     (assoc token :roles (set (concat scopes permissions)))))
 
 (defn- find-header [request header]
