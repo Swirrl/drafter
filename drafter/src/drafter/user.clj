@@ -19,8 +19,15 @@
   (throw (ex-info "Config error.  Please use a concrete implementation of the user repo instead." {})))
 
 (def ^{:doc "Ordered list of roles from least permissions to greatest
-permissions."
-      } roles [:editor :publisher :manager :system])
+permissions."}
+  roles [:editor
+         :role.drafter/editor
+         :publisher
+         :role.drafter/publisher
+         :manager
+         :role.drafter/manager
+         :system
+         :role.drafter/system])
 
 (def role->permission-level (zipmap roles (iterate inc 1))) ;; e.g. {:editor 1, :publisher 2, :manager 3}
 
