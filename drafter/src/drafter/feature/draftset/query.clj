@@ -1,7 +1,6 @@
 (ns drafter.feature.draftset.query
   (:require [clojure.spec.alpha :as s]
             [drafter.backend :as backend]
-            [drafter.feature.draftset.test-helper :as help]
             [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
             [drafter.rdf.sparql-protocol :as sp :refer [sparql-protocol-handler]]
             [integrant.core :as ig]))
