@@ -3,14 +3,20 @@
             [clojure.string :as string]
             [swirrl.auth0.jwt :as jwt]
             [drafter.responses :as response]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [clojure.edn :as edn])
   (:import com.auth0.jwk.JwkProviderBuilder
            java.util.concurrent.TimeUnit))
 
+(defn read-keyword [s]
+  (let [k (edn/read-string s)]
+    (when (keyword? k) k)))
+
 (defn normalize-roles [{:keys [payload] :as token}]
-  (let [scopes (map (partial keyword "pmd.role")
-                    (some-> payload :scope (string/split #" ")))
-        permissions (map (partial keyword "pmd.role") (:permissions payload))]
+  (let [scopes (->> (some-> payload :scope (string/split #" "))
+                    (map read-keyword)
+                    (remove nil?))
+        permissions (remove nil? (map read-keyword (:permissions payload)))]
     (assoc token :roles (set (concat scopes permissions)))))
 
 (defn- find-header [request header]
