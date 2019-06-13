@@ -25,3 +25,4 @@ sparql-cache
 tmp
 stasher-cache
 env/dev/drafter-local-config.edn
+.cpcache
