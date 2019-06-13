@@ -120,20 +120,16 @@
 (defn set-auth-header [request access-token]
   (assoc-in request [:headers "Authorization"] (str "Bearer " access-token)))
 
-(defn auth-profile []
-  (or (some-> :auth env keyword) :auth0))
-
 (defn with-identity
   "Sets the given test user as the user on a request"
   [{:keys [email role] :as user} request]
-  ;; TODO: this is a bit gross but :shrug:
-  (prn 'with-identity '*auth-env* *auth-env*)
+  ;; TODO: this is a bit gross but, we need to switch implementation of this
+  ;; mocky thing based on the type of auth provider we're currently testing.
   (case *auth-env*
     :auth0
     (-> request
         (assoc :identity user)
         (set-auth-header (user-access-token email (str "drafter" role))))
-    ;; TODO: decide on role naming ^^
     (let [unencoded-auth (str (user/username user) ":" "password")
           encoded-auth (util/str->base64 unencoded-auth)]
       (-> request
