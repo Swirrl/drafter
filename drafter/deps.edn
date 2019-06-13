@@ -1,10 +1,9 @@
 {:paths ["src" "resources"]
 
- :deps {
-        buddy/buddy-auth {:mvn/version "2.1.0"}
+ :deps {buddy/buddy-auth {:mvn/version "2.1.0"}
         buddy/buddy-core {:mvn/version "1.5.0"}
 
-        org.clojure/clojure {:mvn/version "1.10.1-beta1"}
+        org.clojure/clojure {:mvn/version "1.10.1"}
 
         org.clojure/math.combinatorics {:mvn/version "0.1.4"}
 
@@ -61,7 +60,6 @@
         org.apache.jena/jena-core {:mvn/version "3.10.0" :exclusions [org.slf4j/slf4j-api]}
         org.apache.jena/jena-iri {:mvn/version "3.10.0" :exclusions [org.slf4j/slf4j-api]}
 
-
         org.mindrot/jbcrypt {:mvn/version "0.4"}
 
         org.slf4j/slf4j-log4j12 {:mvn/version "1.7.26" :exclusions [log4j org.slf4j/slf4j-api]}
@@ -91,19 +89,17 @@
 
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
                  :jvm-opts ["-Djava.awt.headless=true" "-XX:-OmitStackTraceInFastThrow"]
-                 :extra-deps {
-                              lambdaisland/kaocha {:mvn/version "0.0-418"}
-                              clojure-csv/clojure-csv {:mvn/version "2.0.2"}
-                              org.clojure/data.json {:mvn/version "0.2.6"}
-                              ring-mock {:mvn/version "0.1.5"}
-                              ring/ring-devel {:mvn/version "1.7.1" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]}
+                 :extra-deps {clojure-csv/clojure-csv {:mvn/version "2.0.2"}
                               eftest {:mvn/version "0.5.7"} ;; repl test runner support
                               environ {:mvn/version "1.0.3"}
+                              lambdaisland/kaocha {:mvn/version "0.0-418"}
+                              org.clojure/data.json {:mvn/version "0.2.6"}
                               org.clojure/test.check {:mvn/version "0.9.0"}
-                              }}
+                              ring-mock {:mvn/version "0.1.5"}
+                              ring/ring-devel {:mvn/version "1.7.1" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]}}}
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}
 
-           }
-
- }
+           :uber {:main-opts ["-m" "mach.pack.alpha.capsule" "target/drafter.jar"
+                              "--application-id" "drafter"
+                              "-m" "drafter.main"]}}}
