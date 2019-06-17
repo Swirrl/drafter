@@ -168,13 +168,13 @@
 (s/def ::batch-size pos-int?)
 ;; TODO Find out if we can read this as a URI with integrant
 (s/def ::drafter-uri (s/or :string string? :nil nil?))
-(s/def ::token-endpoint (s/or :string string? :nil nil?))
+(s/def ::auth0-endpoint (s/or :string string? :nil nil?))
 (s/def ::client-id (s/or :string string? :nil nil?))
 (s/def ::client-secret (s/or :string string? :nil nil?))
 
 (defmethod ig/pre-init-spec :drafter-client/client [_]
   (s/keys :req-un [::batch-size
                    ::drafter-uri
-                   ::token-endpoint
+                   ::auth0-endpoint
                    ::client-id
                    ::client-secret]))
