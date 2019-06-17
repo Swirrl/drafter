@@ -14,8 +14,9 @@
             [integrant.core :as ig])
   (:import java.io.File))
 
-(defmethod ig/init-key :drafter.middleware/wrap-auth [_ opts]
-  (:middleware opts))
+(defmethod ig/init-key :drafter.middleware/wrap-auth
+  [_ {:keys [middleware] :as opts}]
+  (apply comp middleware))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]
