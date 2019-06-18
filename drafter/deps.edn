@@ -88,8 +88,9 @@
  {"swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"}
   "swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"}}
 
+ :jvm-opts ["-Djava.awt.headless=true" "-XX:-OmitStackTraceInFastThrow"]
+
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
-                 :jvm-opts ["-Djava.awt.headless=true" "-XX:-OmitStackTraceInFastThrow"]
                  :extra-deps {clojure-csv/clojure-csv {:mvn/version "2.0.2"}
                               eftest {:mvn/version "0.5.7"} ;; repl test runner support
                               environ {:mvn/version "1.0.3"}
@@ -101,6 +102,19 @@
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}
 
-           :uber {:main-opts ["-m" "mach.pack.alpha.capsule" "target/drafter.jar"
+           :uber {:extra-paths ["env/prod/clj" "env/prod/resources"]
+                  :main-opts ["-m" "mach.pack.alpha.capsule" "target/drafter.jar"
                               "--application-id" "drafter"
-                              "-m" "drafter.main"]}}}
+                              "-m" "drafter.main"]}
+
+           :krunk {:extra-deps {swirrl/krunk {:git/url "git@github.com:Swirrl/krunk.git"
+                                              :sha "dc2666a4550c219a8ce1eea326c82d9871d6908f"}}
+                   :main-opts ["-m" "krunk.deploy"]}
+
+           :pack {:extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
+                                                :sha "81b9e47d992b17aa3e3af1a47aed1f0287ebe9b8"}}}
+
+           :java9 {:jvm-opts ["--add-modules" "java.xml.bind"]}
+
+           :spec {:main-opts ["-m" "drafter.check-specs" "100" "true"]}
+           }}

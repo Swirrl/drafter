@@ -8,6 +8,9 @@ if [ -n "$TRAVIS" ] ; then
     chmod +x ./travis/*
     mkdir -p /etc/leiningen/
     mv ./travis/profiles.clj /etc/leiningen/profiles.clj
+
+    ./travis/install_clojure.sh
+
     export AWS_INSTALL=true ## used to parameterise curl command below...
 fi
 
