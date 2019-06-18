@@ -8,7 +8,7 @@
   (jwt/token (env :auth0-domain)
              (env :auth0-aud)
              "system@swirrl.com"
-             ":role.drafter/system"))
+             "drafter:system"))
 
 (def test-publisher {:email "publisher@swirrl.com" :role "publisher"})
 
@@ -16,4 +16,4 @@
   (jwt/token (env :auth0-domain)
              (env :auth0-aud)
              "publiser@swirrl.com"
-             ":role.drafter/publisher"))
+             "drafter:publisher"))

@@ -4,6 +4,7 @@
             [clojure.test :as t]
             [drafter.main :as main]
             [drafter.middleware.auth0-auth]
+            [drafter.middleware.auth]
             [drafter-client.client :as sut]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.test-util.auth :as auth-util]
@@ -48,8 +49,7 @@
       (db-util/drop-all! stardog-repo))))
 
 (defn start-drafter-server []
-  (main/-main "../drafter/resources/drafter-base-config.edn"
-              "../drafter/env/dev/resources/drafter-dev-config.edn"
+  (main/-main "../drafter/env/dev/resources/drafter-dev-config.edn"
               "resources/drafter-mock-middleware.edn"))
 
 (defn drafter-server-fixture [f]
