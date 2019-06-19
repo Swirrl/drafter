@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -o errexit
+
+mkdir -p target
+
+clojure -A:pack:uber --application-version="$(git describe --always)"
+
+echo Uberjarring complete

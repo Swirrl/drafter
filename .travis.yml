@@ -25,9 +25,11 @@ install:
   - cd ../drafter-client && clojure -A:dev:test -Spath
   - cd ..
 script:
-  - "./travis/test-all"
+  - ./travis/test-all
+after_success:
+  - ./travis/after_success.sh
 before_deploy:
-  - "./travis/before_deploy.sh"
+  - ./travis/before_deploy.sh
 deploy:
   - provider: s3
     access_key_id: AKIAJZVFELTIBDDYV5OQ
