@@ -30,7 +30,9 @@ install:
 before_script:
   - "./travis/before_script.sh"
 script:
-  - "./travis/test-all"
+  - ./travis/test-all
+after_success:
+  - ./travis/after_success.sh
 before_deploy:
   - export TRAVIS_BRANCH=$(echo $TRAVIS_BRANCH | sed -e 's=/=_=g')
   - echo $TRAVIS_BRANCH
