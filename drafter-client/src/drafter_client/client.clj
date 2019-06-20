@@ -152,11 +152,12 @@
 
 (defmethod ig/init-key :drafter-client/client
   [_ {:keys [drafter-uri batch-size auth0-endpoint client-id client-secret]}]
-  (web-client drafter-uri
-              :batch-size batch-size
-              :auth0-endpoint auth0-endpoint
-              :client-id client-id
-              :client-secret client-secret))
+  (when (and drafter-uri auth0-endpoint client-id client-secret)
+    (web-client drafter-uri
+                :batch-size batch-size
+                :auth0-endpoint auth0-endpoint
+                :client-id client-id
+                :client-secret client-secret)))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.
@@ -173,8 +174,8 @@
 (s/def ::client-secret (s/or :string string? :nil nil?))
 
 (defmethod ig/pre-init-spec :drafter-client/client [_]
-  (s/keys :req-un [::batch-size
-                   ::drafter-uri
-                   ::auth0-endpoint
-                   ::client-id
-                   ::client-secret]))
+  (s/nilable (s/keys :req-un [::batch-size
+                              ::drafter-uri
+                              ::auth0-endpoint
+                              ::client-id
+                              ::client-secret])))
