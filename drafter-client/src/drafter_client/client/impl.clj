@@ -222,8 +222,11 @@
 (defn get
   {:style/indent :defn}
   [client f access-token & args]
-  (let [client (set-bearer-token client access-token)]
-    (:body (apply f client args))))
+  (if client
+    (let [client (set-bearer-token client access-token)]
+      (:body (apply f client args)))
+    (throw (ex-info "Trying to make request to drafter with `nil` client."
+                    {:type :no-drafter-client}))))
 
 (defn accept [client content-type]
   (intercept client
