@@ -16,7 +16,7 @@
   (get-all-users [this]
     (throw (UnsupportedOperationException. "Can't list users from Auth0"))))
 
-(derive :drafter.user/auth-repository :drafter.user/repo)
+(derive :drafter.user/auth0-repository :drafter.user/repo)
 
 (defmethod ig/init-key :drafter.user/auth0-repository
   [_ {:keys [auth0] :as opts}]
