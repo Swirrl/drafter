@@ -1,7 +1,7 @@
 #merge [#include "repo.edn"
         #include "backend.edn"
-        #include "user-repo.edn"
-        #include "auth0-repo.edn"
+        #profile {:auth0 #include "auth0-repo.edn"
+                  :basic-auth #include "user-repo.edn"}
         #include "log-system.edn"
         #include "web.edn"
         ]
