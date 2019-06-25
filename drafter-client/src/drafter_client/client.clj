@@ -152,7 +152,7 @@
 
 (defmethod ig/init-key :drafter-client/client
   [_ {:keys [drafter-uri batch-size auth0-endpoint client-id client-secret]}]
-  (when (and drafter-uri auth0-endpoint client-id client-secret)
+  (when (seq drafter-uri)
     (web-client drafter-uri
                 :batch-size batch-size
                 :auth0-endpoint auth0-endpoint

@@ -49,8 +49,7 @@
       (db-util/drop-all! stardog-repo))))
 
 (defn start-drafter-server []
-  (main/-main "../drafter/env/dev/resources/drafter-dev-config.edn"
-              "resources/drafter-mock-middleware.edn"))
+  (main/-main "env/dev/resources/drafter-dev-config.edn"))
 
 (defn drafter-server-fixture [f]
   (try
