@@ -25,8 +25,8 @@ before_install:
   - "sudo ./travis/install_base.sh"
   - "./travis/install_services.sh"
 install:
-  - cd drafter && clojure -A:dev:test -Spath
-  - cd ../drafter-client && lein deps && cd ..
+  - cd drafter && clojure -A:dev:test -Spath && cd ..
+  - cd drafter-client && clojure -A:dev:test -Spath && cd ..
 before_script:
   - "./travis/before_script.sh"
 script:
