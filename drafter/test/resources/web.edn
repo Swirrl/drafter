@@ -19,7 +19,7 @@
  :drafter.middleware.auth0-auth/token-authentication
  {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
 
- :drafter.middleware.basic-auth/wrap-auth
+ :drafter.middleware.auth/wrap-auth
  {:drafter.user/repo #ig/ref :drafter.user/repo :jws-signing-key "foo"}
 
  :drafter.auth/read-role {}
@@ -30,7 +30,7 @@
                                 #ig/ref :swirrl.auth0.middleware/normalize-roles
                                 #ig/ref :drafter.middleware.auth0-auth/identify
                                 #ig/ref :drafter.middleware.auth0-auth/token-authentication]}
-           :basic-auth {:middleware [#ig/ref :drafter.middleware.basic-auth/wrap-auth]}}
+           :basic-auth {:middleware [#ig/ref :drafter.middleware.auth/wrap-auth]}}
 
  ;; [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout 30
  ;;                                                          :jws-signing-key "foo"}

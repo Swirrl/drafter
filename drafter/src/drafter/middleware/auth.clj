@@ -80,8 +80,8 @@
     (fn [inner-handler]
       (wrap-authenticated auth-backends inner-handler realm))))
 
-(defmethod ig/pre-init-spec :drafter.middleware.basic-auth/wrap-auth [_]
+(defmethod ig/pre-init-spec :drafter.middleware.auth/wrap-auth [_]
   (s/keys :req [::user/repo]))
 
-(defmethod ig/init-key :drafter.middleware.basic-auth/wrap-auth [_ {:keys [::user/repo] :as config}]
+(defmethod ig/init-key :drafter.middleware.auth/wrap-auth [_ {:keys [::user/repo] :as config}]
   (make-authenticated-wrapper repo config))

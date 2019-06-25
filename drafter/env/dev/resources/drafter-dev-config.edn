@@ -26,9 +26,6 @@
  :drafter.middleware.auth0-auth/token-authentication
  {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
 
- :drafter.middleware.basic-auth/wrap-auth
- {:drafter.user/repo #ig/ref :drafter.user/repo :jws-signing-key "foo"}
-
  :drafter.auth/read-role {}
  :swirrl.auth0.middleware/normalize-roles {:role-reader #ig/ref :drafter.auth/read-role}
 
