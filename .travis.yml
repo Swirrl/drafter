@@ -1,9 +1,9 @@
-language: clojure
+language: java
 sudo: required
 dist: trusty
 lein: 2.9.1
 jdk:
-  - oraclejdk8
+  - openjdk8
 services:
   - docker
 env:
@@ -12,14 +12,20 @@ env:
     - SPARQL_UPDATE_ENDPOINT='http://localhost:5820/drafter-client-test/update'
     - DRAFTER_ENDPOINT='http://localhost:3002'
     - DRAFTER_JWS_SIGNING_KEY=foo
+    - AUTH0_DOMAIN=https://dev-kkt-m758.eu.auth0.com
+    - AUTH0_AUD=https://pmd
+    - AUTH0_CLIENT_ID=7klE25HUY333vTEx7rM1dmsnO6vHkaSG
+    - AUTH0_CLIENT_SECRET=QYoWNwf11dzWNh6XYd3jH8-j5j8r36UKuoFgrPakE_aw_Gy_EwWSppvqSULRICY4
 cache:
   directories:
-  - $HOME/.m2
+    - $HOME/.m2
+    - .cpcache # tools.deps classpath cache
+    - drafter/.cpcache # tools.deps classpath cache
 before_install:
   - "sudo ./travis/install_base.sh"
   - "./travis/install_services.sh"
 install:
-  - cd drafter && lein deps
+  - cd drafter && clojure -A:dev:test -Spath
   - cd ../drafter-client && lein deps && cd ..
 before_script:
   - "./travis/before_script.sh"
