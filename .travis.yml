@@ -10,7 +10,7 @@ env:
   global:
     - SPARQL_QUERY_ENDPOINT='http://localhost:5820/drafter-client-test/query'
     - SPARQL_UPDATE_ENDPOINT='http://localhost:5820/drafter-client-test/update'
-    - DRAFTER_ENDPOINT='http://localhost:3002'
+    - DRAFTER_ENDPOINT='http://localhost:3001'
     - DRAFTER_JWS_SIGNING_KEY=foo
     - AUTH0_DOMAIN=https://dev-kkt-m758.eu.auth0.com
     - AUTH0_AUD=https://pmd
