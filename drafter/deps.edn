@@ -76,8 +76,8 @@
 
         com.auth0/jwks-rsa {:mvn/version "0.8.1"}
         com.auth0/java-jwt {:mvn/version "3.8.0"}
-        martian {:mvn/version "0.1.10-SNAPSHOT"}
-        martian-clj-http {:mvn/version "0.1.10-SNAPSHOT" :exclusions [clj-http]}
+        martian {:mvn/version "0.1.10"}
+        martian-clj-http {:mvn/version "0.1.10" :exclusions [clj-http]}
         clj-http {:mvn/version "3.10.0"}
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
                       :sha "69cfcf5fb7c0caa9179645d9b17d094030093e4e"
