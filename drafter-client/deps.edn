@@ -9,8 +9,8 @@
         grafter/url {:mvn/version "0.2.5"}
         grafter/vocabularies {:mvn/version "0.2.6"}
         integrant {:mvn/version "0.6.3"}
-        martian {:mvn/version "0.1.10-SNAPSHOT"}
-        martian-clj-http {:mvn/version "0.1.10-SNAPSHOT"}
+        martian {:mvn/version "0.1.10"}
+        martian-clj-http {:mvn/version "0.1.10"}
         org.clojure/clojure {:mvn/version "1.9.0"}
         org.clojure/tools.logging {:mvn/version "0.4.1"}
         ring/ring-core {:mvn/version "1.6.3"}
