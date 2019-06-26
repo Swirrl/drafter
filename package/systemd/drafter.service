@@ -1,0 +1,12 @@
+[Unit]
+Description=Job that runs the drafter service
+
+[Service]
+Type=simple
+UMask=077
+User=drafter
+
+EnvironmentFile={{omni/install-dir}}/drafter-env.list
+ExecStart={{omni/install-dir}}/drafter-start.sh
+
+Restart=on-failure
