@@ -26,6 +26,8 @@ before_script:
 script:
   - "./travis/test-all"
 before_deploy:
+  - export TRAVIS_BRANCH=$(echo $TRAVIS_BRANCH | sed -e 's=/=_=g')
+  - echo $TRAVIS_BRANCH
   - "./travis/before_deploy.sh"
 deploy:
   - provider: s3
