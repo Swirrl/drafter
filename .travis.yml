@@ -15,15 +15,17 @@ cache:
   directories:
   - $HOME/.m2
 before_install:
-- "sudo ./travis/install_base.sh"
-- "./travis/install_services.sh"
+  - "sudo ./travis/install_base.sh"
+  - "./travis/install_services.sh"
+install:
+  - cd drafter && lein deps
+  - cd ../drafter-client && lein deps && cd ..
 before_script:
-- "./travis/before_script.sh"
-script: travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
-after_success:
-- env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
+  - "./travis/before_script.sh"
+script:
+  - "./travis/test-all"
 before_deploy:
-- "./travis/before_deploy.sh"
+  - "./travis/before_deploy.sh"
 deploy:
   - provider: s3
     access_key_id: AKIAJZVFELTIBDDYV5OQ
@@ -62,4 +64,3 @@ deploy:
     skip_cleanup: true
     on:
       all_branches: true
-    
