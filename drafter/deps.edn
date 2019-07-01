@@ -102,7 +102,16 @@
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}
 
-           :uber {:extra-paths ["env/prod/clj" "env/prod/resources"]
+           :aot {:extra-deps {timofreiberg/bultitude {:mvn/version "0.3.0"}
+                              badigeon/badigeon {:git/url "https://github.com/EwenG/badigeon.git"
+                                                 :sha "e7f62a60d8e890fc84a47bcfdd59137e11ff1c95"
+                                                 :tag "0.0.7"}}
+                 :extra-paths ["package" "target/classes"]
+                 :main-opts ["-m" "package"]}
+
+           :prod {:extra-paths ["env/prod/clj" "env/prod/resources"]}
+
+           :uber {:extra-paths ["target/classes" "env/prod/clj" "env/prod/resources"]
                   :main-opts ["-m" "mach.pack.alpha.capsule" "target/drafter.jar"
                               "--application-id" "drafter"
                               "-m" "drafter.main"]}

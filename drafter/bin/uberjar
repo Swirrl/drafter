@@ -2,8 +2,9 @@
 
 set -o errexit
 
-mkdir -p target
+mkdir -p target/classes
 
-clojure -A:pack:uber --application-version="$(git describe --always)"
+clojure -A:aot
+clojure -A:pack:uber -C:aot --application-version="$(git describe --always)"
 
 echo Uberjarring complete
