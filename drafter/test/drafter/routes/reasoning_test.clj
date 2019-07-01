@@ -278,18 +278,18 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
 
       (testing "What users can see before adding quads to draft TBOX"
         (let [q "SELECT ?class { :Nickie a ?class } "]
-          (is (= #{["http://www.w3.org/2002/07/owl#Thing"]}
+          (is (= #{}
                  (liveq q :reasoning true)))
           (is (= #{}
                  (draftq-1 q :reasoning true)))
-          (is (= #{["http://www.w3.org/2002/07/owl#Thing"]}
+          (is (= #{}
                  (draftq-1 q :reasoning true :union-with-live true)))))
 
       (add-to-draft-1!)
 
       (testing "What users can see after adding quads to draft TBOX"
         (let [q "SELECT ?class { :Nickie a ?class } "]
-          (is (= #{["http://www.w3.org/2002/07/owl#Thing"]}
+          (is (= #{}
                  (liveq q :reasoning true)))
           (is (= nickie-hierarchy
                  (draftq-1 q :reasoning true)))
@@ -311,7 +311,7 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
           (let [q "SELECT ?class { :Nickie a ?class }"]
             (is (= nickie-hierarchy
                    (liveq q :reasoning true)))
-            (is (= #{["http://www.w3.org/2002/07/owl#Thing"]}
+            (is (= #{}
                    (draftq-2 q :reasoning true)))
             ;; ^^ This draft has no :Nickie, so nothing returns, other than the
             ;; "Everything is a thing" owl:Thing.
