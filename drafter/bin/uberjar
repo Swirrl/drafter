@@ -5,6 +5,6 @@ set -o errexit
 mkdir -p target/classes
 
 clojure -A:aot
-clojure -A:pack:uber -C:aot --application-version="$(git describe --always)"
+clojure -C:aot:prod -A:pack:uber --application-version="$(git describe --always)" target/drafter.jar
 
 echo Uberjarring complete
