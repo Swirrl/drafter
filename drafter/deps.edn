@@ -102,8 +102,11 @@
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}
 
-           :uber {:extra-paths ["env/prod/clj" "env/prod/resources"]
-                  :main-opts ["-m" "mach.pack.alpha.capsule" "target/drafter.jar"
+           :prod {:extra-paths ["env/prod/clj" "env/prod/resources"]}
+
+           :uber {:extra-paths ["target/classes"]
+                  :main-opts ["-m" "mach.pack.alpha.capsule"
+                              "-e" "env/prod/clj"
                               "--application-id" "drafter"
                               "-m" "drafter.main"]}
 
