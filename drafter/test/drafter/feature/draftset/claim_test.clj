@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.claim-test
+(ns ^:rest-api drafter.feature.draftset.claim-test
   (:require [clojure.test :as t :refer [is]]
             [drafter.feature.draftset.create-test :as ct]
             [drafter.feature.draftset.test-helper :refer [Draftset]]
@@ -107,7 +107,7 @@
         claim-response (handler claim-request)]
     (tc/assert-is-forbidden-response claim-response)))
 
-(tc/deftest-system-with-keys claim-draftset-by-user-not-in-role
+(tc/deftest-system-with-keys ^:basic-auth claim-draftset-by-user-not-in-role
   [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter.user/memory-repository]
   [{handler :drafter.routes/draftsets-api users :drafter.user/memory-repository} "test-system.edn"]
   (let [other-editor (user/create-user "edtheduck@example.com" :editor (user/get-digest test-password))

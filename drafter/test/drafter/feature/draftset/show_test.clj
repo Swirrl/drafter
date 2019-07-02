@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.show-test
+(ns ^:rest-api drafter.feature.draftset.show-test
   (:require [clojure.test :as t :refer [is]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]

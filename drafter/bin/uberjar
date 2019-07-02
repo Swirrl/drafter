@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -o errexit
+
+mkdir -p target/classes
+
+clojure -C:prod -A:pack:uber --application-version="$(git describe --always)" target/drafter.jar
+
+echo Uberjarring complete

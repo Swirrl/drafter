@@ -1,36 +1,38 @@
 (ns drafter.test-common
-  (:require [clojure.java.io :as io]
+  (:require [clj-time.coerce :refer [to-date]]
+            [clj-time.core :as time]
+            [clojure.java.io :as io]
+            [clojure.pprint :as pp]
+            [clojure.spec.test.alpha :as st]
             [clojure.test :refer :all]
-            [drafter.backend.common :refer [stop-backend]]
             [drafter.backend.draftset.draft-management
              :refer
              [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
-            [drafter.configuration :refer [get-configuration]]
-            [drafter.draftset :refer [->draftset-uri]]
             [drafter.main :as main]
             [drafter.rdf.sparql :as sparql]
-            [drafter.user :as user]
             [drafter.util :as util]
-            [drafter.write-scheduler
-             :refer
-             [global-writes-lock queue-job! start-writer! stop-writer!]]
-            [grafter-2.rdf4j.templater :refer [triplify]]
-            [grafter-2.rdf4j.repository :as repo]
+            [drafter.write-scheduler :refer [global-writes-lock queue-job!]]
+            [environ.core :refer [env]]
             [grafter-2.rdf4j.repository.registry :as reg]
+            [grafter-2.rdf4j.templater :refer [triplify]]
             [grafter.url :as url]
             [integrant.core :as ig]
+            [kaocha.plugin.auth-env-plugin :refer [*auth-env*]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
             [schema.core :as s]
-            [schema.test :refer [validate-schemas]]
             [swirrl-server.async.jobs :refer [create-job]]
-            [clojure.pprint :as pp]
-            [clojure.spec.test.alpha :as st])
-  (:import grafter_2.rdf.SPARQLRepository
+            [aero.core :as aero]
+            [drafter.user :as user])
+  (:import [com.auth0.jwk Jwk JwkProvider]
+           com.auth0.jwt.algorithms.Algorithm
+           com.auth0.jwt.JWT
+           grafter_2.rdf.SPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
            java.lang.AutoCloseable
            [java.net InetSocketAddress ServerSocket SocketException URI]
            java.nio.charset.Charset
+           java.security.KeyPairGenerator
            [java.util ArrayList Scanner UUID]
            [java.util.concurrent CountDownLatch TimeUnit]
            [org.apache.http.entity ContentLengthStrategy ContentType StringEntity]
@@ -84,14 +86,56 @@
       (.next scanner)
       "")))
 
+(defonce keypair
+  (-> (KeyPairGenerator/getInstance "RSA")
+      (doto (.initialize 4096))
+      (.genKeyPair)))
+
+(def pubkey (.getPublic keypair))
+(def privkey (.getPrivate keypair))
+
+(def alg (Algorithm/RSA256 pubkey privkey))
+
+(defn token [iss aud sub role]
+  (-> (JWT/create)
+      (.withIssuer (str iss \/))
+      (.withSubject sub)
+      (.withAudience (into-array String [aud]))
+      (.withExpiresAt (to-date (time/plus (time/now) (time/minutes 10))))
+      (.withClaim "scope" role)
+      (.sign alg)))
+
+(defn mock-jwk []
+  (reify JwkProvider
+    (get [_ _]
+      (proxy [Jwk] ["" "" "RSA" "" '() "" '() "" {}]
+        (getPublicKey [] (.getPublic keypair))))))
+
+(defmethod ig/init-key :drafter.auth.auth0/mock-jwk [_ {:keys [endpoint] :as opts}]
+  (mock-jwk))
+
+(defn user-access-token [user-id scope]
+  (token (env :auth0-domain) (env :auth0-aud) user-id scope))
+
+(defn set-auth-header [request access-token]
+  (assoc-in request [:headers "Authorization"] (str "Bearer " access-token)))
+
 (defn with-identity
   "Sets the given test user as the user on a request"
-  [user request]
-  (let [unencoded-auth (str (user/username user) ":" "password")
-        encoded-auth (util/str->base64 unencoded-auth)]
+  [{:keys [email role] :as user} request]
+  ;; TODO: this is a bit gross but, we need to switch implementation of this
+  ;; mocky thing based on the type of auth provider we're currently testing.
+  (case *auth-env*
+    :auth0
     (-> request
         (assoc :identity user)
-        (assoc-in [:headers "Authorization"] (str "Basic " encoded-auth)))))
+        (set-auth-header (user-access-token email (str "drafter" role))))
+    (let [unencoded-auth (str (user/username user) ":" "password")
+          encoded-auth (util/str->base64 unencoded-auth)]
+      (-> request
+          (assoc :identity user)
+          (assoc-in [:headers "Authorization"] (str "Basic " encoded-auth))))))
+
 
 (defn wait-for-lock-ms [lock period-ms]
   (if (.tryLock lock period-ms (TimeUnit/MILLISECONDS))
@@ -105,7 +149,8 @@
    `(with-system nil ~binding-form ~form))
 
   ([start-keys [binding-form system-cfg] form]
-   `(let [system# (main/start-system! (main/read-system (io/resource ~system-cfg)) ~start-keys)
+   `(let [config# (aero/read-config (io/resource ~system-cfg) {:profile *auth-env*})
+          system# (main/start-system! config# ~start-keys)
           ~binding-form system#
           ;; drafter specific gunk that we can ultimately remove
           configured-factories# (reg/registered-parser-factories)]

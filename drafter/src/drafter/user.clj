@@ -20,7 +20,7 @@
 
 (def ^{:doc "Ordered list of roles from least permissions to greatest
 permissions."
-      } roles [:editor :publisher :manager :system])
+       } roles [:editor :publisher :manager :system])
 
 (def role->permission-level (zipmap roles (iterate inc 1))) ;; e.g. {:editor 1, :publisher 2, :manager 3}
 

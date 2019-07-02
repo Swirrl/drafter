@@ -6,4 +6,33 @@
                                           {:username "system@swirrl.com" :password "password" :role :system}]
                                   :realm "Drafter Memory Repo"}
 
+ :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
+
+ :drafter.auth/auth0 {:iss #env AUTH0_DOMAIN
+                      :aud #env AUTH0_AUD
+                      :endpoint #env AUTH0_DOMAIN
+                      :client-id #env AUTH0_CLIENT_ID
+                      :client-secret #env AUTH0_CLIENT_SECRET}
+
+ :swirrl.auth0.middleware/dev-token
+ {:drafter.middleware.auth0-auth/access-token {:payload {:permissions ["drafter:admin"]}}
+  :drafter.middleware.auth0-auth/id-token {:payload {:name "Swirrly McSwirrlFace"}}}
+
+ :swirrl.auth0.middleware/bearer-token
+ {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+
+ :drafter.middleware.auth0-auth/identify {}
+
+ :drafter.middleware.auth0-auth/token-authentication
+ {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+
+ :drafter.auth/read-role {}
+ :swirrl.auth0.middleware/normalize-roles {:role-reader #ig/ref :drafter.auth/read-role}
+
+ :drafter.middleware/wrap-auth
+ {:middleware [#ig/ref :swirrl.auth0.middleware/bearer-token
+               #ig/ref :swirrl.auth0.middleware/normalize-roles
+               #ig/ref :drafter.middleware.auth0-auth/identify
+               #ig/ref :drafter.middleware.auth0-auth/token-authentication]}
+
  }

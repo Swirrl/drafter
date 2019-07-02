@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
-cd `dirname $0`
+cd `dirname $0`/../drafter
 
-cd ../drafter
 mkdir -p dist
-lein uberjar
 
 cp target/drafter.jar dist/drafter-$TRAVIS_BRANCH-latest.jar
 cp target/drafter.jar dist/drafter-private-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER.jar

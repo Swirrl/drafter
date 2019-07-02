@@ -62,3 +62,7 @@
    (check-specs* (if (string? num-tests)
                    (Integer/parseInt num-tests)
                    num-tests))))
+
+(defn -main [& [num-tests command-line?]]
+  (check-specs (some-> num-tests Integer/parseInt)
+               (some-> command-line? Boolean/parseBoolean)))

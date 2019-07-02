@@ -1,0 +1,36 @@
+{:krunk/base-path "."
+
+ :krunk.deploy/repositories
+ {;; Credentials here are provided by the backdoor through via
+  ;; S3-wagon-private and the DefaultAWSProviderChain:
+
+  ;; https://github.com/s3-wagon-private/s3-wagon-private/
+  ;; https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/DefaultAWSCredentialsProviderChain.html
+
+  "swirrl-private-jars-snapshots"
+  {:url "s3p://swirrl-jars/snapshots/"
+   ;;:username #env KRUNK_S3_USER
+   ;;:password #env KRUNK_S3_PASS
+   }
+
+  "swirrl-private-jars-releases"
+  {:url "s3p://swirrl-jars/releases/"
+   ;;:username #env KRUNK_S3_USER
+   ;;:password #env KRUNK_S3_PASS
+   }
+  }
+
+ :krunk.deploy/pom-template {:mvn/artifact-id #arg :artifact-id
+                             :mvn/group-id #arg :group-id
+                             :mvn/version #arg :version
+
+                             :pom-template #file #join [#ref [:krunk/base-path] "/" "template.pom.xml"]}
+
+ :krunk/deploy {:repository-id #arg :repository-id
+                :mvn/artifact-id #arg :artifact-id
+                :mvn/group-id #arg :group-id
+                :mvn/version #arg :version
+                :jar-file #file #arg :jar-file
+                :pom-file #ig/ref :krunk.deploy/pom-template}
+
+}

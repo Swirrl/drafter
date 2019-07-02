@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset.publish-test
+(ns ^:rest-api drafter.feature.draftset.publish-test
   (:require [clojure.set :as set]
             [clojure.test :as t :refer :all]
             [drafter.feature.draftset.test-helper :as help]
@@ -12,7 +12,7 @@
 (def system "drafter/feature/empty-db-system.edn")
 
 (tc/deftest-system-with-keys publish-draftset-with-graphs-not-in-live
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
   [{handler :drafter.routes/draftsets-api} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         draftset-location (help/create-draftset-through-api handler test-publisher)]
@@ -23,7 +23,7 @@
       (is (= (set (help/eval-statements quads)) (set live-quads))))))
 
 (tc/deftest-system-with-keys publish-draftset-with-statements-added-to-graphs-in-live
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
   [{handler :drafter.routes/draftsets-api} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
@@ -39,7 +39,7 @@
       (is (= (set (help/eval-statements quads)) (set after-publish-quads))))))
 
 (tc/deftest-system-with-keys publish-draftset-with-statements-deleted-from-graphs-in-live
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
   [{handler :drafter.routes/draftsets-api} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
@@ -54,7 +54,7 @@
       (is (= (set expected-quads) (set after-publish-quads))))))
 
 (tc/deftest-system-with-keys publish-draftset-with-graph-deleted-from-live
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
   [{handler :drafter.routes/draftsets-api} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
@@ -102,13 +102,13 @@
     (help/assert-live-quads handler graph-quads)))
 
 (tc/deftest-system-with-keys publish-non-existent-draftset
-  [:drafter.routes/draftsets-api]
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
   [{handler :drafter.routes/draftsets-api} system]
   (let [response (handler (tc/with-identity test-publisher {:uri "/v1/draftset/missing/publish" :request-method :post}))]
     (tc/assert-is-not-found-response response)))
 
 (tc/deftest-system-with-keys publish-by-non-publisher-test
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
   [{handler :drafter.routes/draftsets-api} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)]
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location (statements "test/resources/test-draftset.trig"))
@@ -116,7 +116,7 @@
       (tc/assert-is-forbidden-response publish-response))))
 
 (tc/deftest-system-with-keys publish-by-non-owner-test
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
   [{handler :drafter.routes/draftsets-api} system]
   (let [draftset-location (help/create-draftset-through-api handler test-publisher)
         quads (statements "test/resources/test-draftset.trig")]

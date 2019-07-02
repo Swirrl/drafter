@@ -1,4 +1,4 @@
-(ns drafter.feature.draftset-data.show-test
+(ns ^:rest-api drafter.feature.draftset-data.show-test
   (:require [clojure.test :as t :refer :all]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]

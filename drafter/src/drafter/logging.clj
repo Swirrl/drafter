@@ -1,6 +1,7 @@
 (ns drafter.logging
   (:require [clojure.tools.logging :as log]
             [integrant.core :as ig]
+            [clj-logging-config.log4j]
             [clojure.java.io :as io]))
 
 
