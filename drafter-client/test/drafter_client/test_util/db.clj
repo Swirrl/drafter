@@ -1,12 +1,12 @@
 (ns drafter-client.test-util.db
   (:require [clojure.test :as t]
-            [grafter.rdf.repository :as repo]
-            [grafter.rdf.protocols :as pr]))
+            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as pr]))
 
 
 
 (defn- contains-triples-or-quads? [repo]
-  (repo/query repo
+  (repo/query (repo/->connection repo)
               "ASK {
                  SELECT * WHERE {
                    {  ?s ?p ?o }
@@ -17,7 +17,7 @@
               }"))
 
 (defn drop-all! [repo]
-  (grafter.rdf.protocols/update! repo "DROP ALL ;"))
+  (pr/update! (repo/->connection repo) "DROP ALL ;"))
 
 (defn assert-empty [repo]
   (t/is (not (contains-triples-or-quads? repo))

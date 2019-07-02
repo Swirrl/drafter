@@ -1,33 +1,30 @@
 (ns drafter-client.client
   (:refer-clojure :exclude [name type get])
-  (:require [clojure.tools.logging :as log]
+  (:require [cheshire.core :as json]
             [clojure.spec.alpha :as s]
-            [integrant.core :as ig]
-            [drafter-client.client.repo :as repo]
-            [drafter-client.client.swagger :as swagger]
-            [drafter-client.client.draftset :as draftset]
+            [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [drafter-client.client.auth :as auth]
-            [clojure.string :as str])
-  (:import (java.net URI)
-           (clojure.lang IDeref)))
+            [drafter-client.client.draftset :as draftset]
+            [drafter-client.client.impl :as i :refer [->DrafterClient intercept]]
+            [drafter-client.client.repo :as repo]
+            [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
+            [grafter-2.rdf4j.io :as rio]
+            [integrant.core :as ig]
+            [martian.clj-http :as martian-http]
+            [martian.core :as martian]
+            [martian.encoders :as encoders]
+            [martian.interceptors :as interceptors]
+            [ring.util.io :refer [piped-input-stream]]))
+
+(alias 'c 'clojure.core)
+
+(def default-format
+  {:date-format     "yyyy-MM-dd"
+   :datetime-format "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"})
 
 (def live draftset/live)
-
-(defprotocol IDrafterClient
-  (->repo [this user context]
-    "Get a SPARQL repository for the Drafter instance.
-
-     Context can be either `live` or a Draft")
-  (draftsets [this user])
-  (new-draftset [this user name description])
-  (remove-draftset [this user draftset])
-  (add
-    [this user draftset quads]
-    [this user draftset graph triples])
-  (get
-    [this user draftset]
-    [this user draftset graph])
-  (refresh-job [this user job]))
 
 (defrecord AsyncJob [type job-id restart-id])
 
@@ -37,11 +34,7 @@
                        (str/split #"/")
                        last
                        java.util.UUID/fromString)]
-    (->AsyncJob type
-                job-id
-                (java.util.UUID/fromString restart-id))))
-
-
+    (->AsyncJob type job-id (java.util.UUID/fromString restart-id))))
 
 (defn job-complete? [{:keys [type job-id] :as async-job}]
   {:pre [(instance? AsyncJob async-job)]}
@@ -57,46 +50,95 @@
         id (java.util.UUID/fromString id)]
     (draftset/->draftset id display-name description)))
 
-(defrecord DrafterClient [drafter-uri jws-key batch-size]
-  IDrafterClient
-  (->repo [_ user context]
-    (repo/make-repo drafter-uri context jws-key user))
-  (draftsets [_ user]
-    (let [draftsets (swagger/get-draftsets drafter-uri jws-key user)]
-      (map json-draftset->draftset draftsets)))
-  (new-draftset [_ user name description]
-    (-> (swagger/make-draftset drafter-uri jws-key user name description)
-        json-draftset->draftset))
-  (remove-draftset [_ user draftset]
-    (->async-job
-     (swagger/delete-draftset drafter-uri jws-key user (draftset/id draftset))))
-  (add [this user draftset quads]
-    (->async-job
-     (swagger/add-data drafter-uri jws-key user (draftset/id draftset) quads)))
-  (add [this user draftset graph triples]
-    (->async-job
-     (swagger/add-data drafter-uri jws-key user (draftset/id draftset) graph
-                       triples)))
-  (get [this user draftset]
-    (swagger/get-data drafter-uri jws-key user (draftset/id draftset)))
-  (get [this user draftset graph]
-    (swagger/get-data drafter-uri jws-key user (draftset/id draftset) graph))
-  (refresh-job [this user job]
-    (let [job-id (:job-id job)]
-      (->async-job (swagger/get-status drafter-uri jws-key user job-id))))
-  Object
-  (toString [this]
-    (str (dissoc this :jws-key))))
+(defn- json [data]
+  (let [opts {:date-format (:datetime-format default-format)}]
+    (json/generate-string data opts)))
 
-(defn ->drafter-client [drafter-uri jws-key batch-size]
-  {:pre [(instance? URI drafter-uri)
-         (string? jws-key)
-         (pos-int? batch-size)]}
-  (log/debugf "Making Drafter client with batch size %d for Drafter: %s"
-              batch-size drafter-uri)
-  (->DrafterClient drafter-uri jws-key batch-size))
+(defn- n*->stream [format n*]
+  (piped-input-stream
+   (fn [output-stream]
+     (pr/add (rio/rdf-writer output-stream :format format) n*))))
 
-(defn resolve-job [client user job]
+(defn- grafter->format-stream [content-type data]
+  (let [format (mimetype->rdf-format content-type)]
+    (n*->stream format data)))
+
+(defn- read-body [content-type body]
+  {:pre [(instance? java.io.InputStream body)]}
+  (let [rdf-format (mimetype->rdf-format content-type)]
+    (rio/statements body :format rdf-format)))
+
+(defn ->repo [client user context]
+  (repo/make-repo client context user {}))
+
+(defn body-for
+  ([client route user]
+   (body-for client route user {}))
+  ([client route user params]
+   (-> (intercept client (auth/jws-auth client user))
+       (martian/response-for route params)
+       (:body))))
+
+(defn draftsets
+  "List available Draftsets"
+  [client user]
+  (->> (i/get client i/get-draftsets user)
+       (map json-draftset->draftset)))
+
+(defn new-draftset
+  "Create a new Draftset"
+  [client user name description]
+  (-> client
+      (i/get i/create-draftset user :display-name name :description description)
+      (json-draftset->draftset)))
+
+(defn remove-draftset
+  "Delete the Draftset and its data"
+  [client user draftset]
+  (-> client
+      (i/get i/delete-draftset user (draftset/id draftset))
+      (->async-job)))
+
+(defn add
+  "Append the supplied RDF data to this Draftset"
+  ([client user draftset quads]
+   (-> client
+       (i/content-type "application/n-quads")
+       (i/get i/put-draftset-data user (draftset/id draftset) quads)
+       (->async-job)))
+  ([client user draftset graph triples]
+   (let [id (draftset/id draftset)]
+     (-> client
+         (i/content-type "application/n-triples")
+         (i/get i/put-draftset-data user id triples :graph graph)
+         (->async-job)))))
+
+(defn get
+  "Access the quads inside this Draftset"
+  ([client user draftset]
+   (-> client
+       (i/accept "application/n-quads")
+       (i/get i/get-draftset-data user (draftset/id draftset))))
+  ([client user draftset graph]
+   (-> client
+       (i/accept "application/n-triples")
+       (i/get i/get-draftset-data user (draftset/id draftset) :graph graph))))
+
+(defn refresh-job
+  "Poll to see if asynchronous job has finished"
+  [client user job]
+  (-> client
+      (i/get i/status-job-finished user (:job-id job))
+      (try (catch clojure.lang.ExceptionInfo e
+             (let [{:keys [body status]} (ex-data e)]
+               (if (= status 404)
+                 (json/parse-string body keyword)
+                 (throw e)))))
+      (->async-job)))
+
+(defn resolve-job
+  "Wait until asynchronous `job` has finished"
+  [client user job]
   (let [job* (refresh-job client user job)]
     (cond
       (job-complete? job*) ::completed
@@ -104,17 +146,39 @@
                                   ;; Recur with the original
                                   (recur client user job)))))
 
+(defn create
+  "Create a Drafter client for `drafter-uri`"
+  [drafter-uri & {:keys [batch-size jws-key version]}]
+  (let [version (or version "v1")
+        swagger-json "swagger/swagger.json"
+        bencoder (fn [content-type]
+                   {:encode (partial grafter->format-stream content-type)
+                    :decode (partial read-body content-type)
+                    :as :stream})
+        jencoder {:encode json :decode #(encoders/json-decode % keyword)}
+        encoders (assoc (encoders/default-encoders)
+                        "application/json" jencoder
+                        "application/n-quads" (bencoder "application/n-quads")
+                        "application/n-triples" (bencoder "application/n-triples"))
+        interceptors (vec (concat [i/keywordize-params]
+                                  (rest martian/default-interceptors)
+                                  [(interceptors/encode-body encoders)
+                                   (interceptors/coerce-response encoders)
+                                   martian-http/perform-request]))]
+    (log/debugf "Making Drafter client with batch size %d for Drafter: %s"
+                batch-size drafter-uri)
+    (when (and drafter-uri jws-key)
+      (-> (format "%s/%s" drafter-uri swagger-json)
+          (martian-http/bootstrap-swagger {:interceptors interceptors})
+          (->DrafterClient jws-key batch-size)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Integrant ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod ig/init-key :drafter-client/client [_ opts]
-  (let [{:keys [batch-size drafter-uri jws-key]} opts
-        version "v1"]
-    (when (and drafter-uri jws-key)
-      (->drafter-client (URI. (format "%s/%s" drafter-uri version))
-                        jws-key
-                        batch-size))))
+(defmethod ig/init-key :drafter-client/client
+  [_ {:keys [drafter-uri jws-key batch-size]}]
+  (create drafter-uri :jws-key jws-key :batch-size batch-size))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.
