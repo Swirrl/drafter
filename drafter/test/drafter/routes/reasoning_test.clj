@@ -269,32 +269,28 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
 
     (let [draft-1 ":PublicGraph { :Nickie a :WestHighlandTerrier . }"
           [add-to-draft-1! publish-1! draftq-1] (new-draftset api draft-1)
-          nickie-hierarchy #{["http://test.com/WestHighlandTerrier"]
-                             ["http://test.com/Dog"]
-                             ["http://test.com/Animal"]
-                             ["http://test.com/Mammal"]
-                             ["http://test.com/Lifeform"]
-                             ["http://www.w3.org/2002/07/owl#Thing"]}]
+          nickie #{["http://test.com/WestHighlandTerrier"]
+                   ["http://test.com/Dog"]
+                   ["http://test.com/Animal"]
+                   ["http://test.com/Mammal"]
+                   ["http://test.com/Lifeform"]}
+          nickie-hierarchy (conj nickie ["http://www.w3.org/2002/07/owl#Thing"])
+          nickie-included? (partial set/subset? nickie)]
 
       (testing "What users can see before adding quads to draft TBOX"
         (let [q "SELECT ?class { :Nickie a ?class } "]
-          (is (= #{["http://www.w3.org/2002/07/owl#Thing"]}
-                 (liveq q :reasoning true)))
+          (is (not (nickie-included? (liveq q :reasoning true))))
           (is (= #{}
                  (draftq-1 q :reasoning true)))
-          (is (= #{["http://www.w3.org/2002/07/owl#Thing"]}
-                 (draftq-1 q :reasoning true :union-with-live true)))))
+          (is (not (nickie-included? (draftq-1 q :reasoning true :union-with-live true))))))
 
       (add-to-draft-1!)
 
       (testing "What users can see after adding quads to draft TBOX"
         (let [q "SELECT ?class { :Nickie a ?class } "]
-          (is (= #{["http://www.w3.org/2002/07/owl#Thing"]}
-                 (liveq q :reasoning true)))
-          (is (= nickie-hierarchy
-                 (draftq-1 q :reasoning true)))
-          (is (= nickie-hierarchy
-                 (draftq-1 q :reasoning true :union-with-live true)))))
+          (is (not (nickie-included? (liveq q :reasoning true))))
+          (is (nickie-included? (draftq-1 q :reasoning true)))
+          (is (nickie-included? (draftq-1 q :reasoning true :union-with-live true)))))
 
       (publish-1!)
 
@@ -309,14 +305,11 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
           ;; this has been added to is not actually the TBOX, it's a drafter
           ;; temporary uuid graph.
           (let [q "SELECT ?class { :Nickie a ?class }"]
-            (is (= nickie-hierarchy
-                   (liveq q :reasoning true)))
-            (is (= #{["http://www.w3.org/2002/07/owl#Thing"]}
-                   (draftq-2 q :reasoning true)))
+            (is (nickie-included? (liveq q :reasoning true)))
+            (is (not (nickie-included? (draftq-2 q :reasoning true))))
             ;; ^^ This draft has no :Nickie, so nothing returns, other than the
             ;; "Everything is a thing" owl:Thing.
-            (is (= nickie-hierarchy
-                   (draftq-2 q :reasoning true :union-with-live true)))))
+            (is (nickie-included? (draftq-2 q :reasoning true :union-with-live true)))))
 
         (publish-2!)
 
