@@ -12,7 +12,7 @@ A RESTful Clojure web service to support PMD's admin tool in moving data updates
 Drafter uses [aero](https://github.com/juxt/aero) for its configuration. This means it uses environment variables (and/or java properties) to pass configuration
 variables from the environment.
 
-The defaults should work for most cases, but for further details on the options drafter supports you should see the [Configuring Drafter](https://github.com/Swirrl/drafter/blob/master/doc/configuring-drafter.org) page.
+The defaults should work for most cases, but for further details on the options drafter supports you should see the [Configuring Drafter](https://github.com/Swirrl/drafter/blob/master/drafter/doc/configuring-drafter.org) page.
 
  You may also wish to configure drafter logging by putting a
 `log-config.edn` file in drafter's working directory. We provide an
