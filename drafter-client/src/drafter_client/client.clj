@@ -18,7 +18,8 @@
             [martian.interceptors :as interceptors]
             [schema.core :as schema]
             [ring.util.codec :refer [form-encode form-decode]]
-            [ring.util.io :refer [piped-input-stream]]))
+            [ring.util.io :refer [piped-input-stream]])
+  (:import (clojure.lang ExceptionInfo)))
 
 (alias 'c 'clojure.core)
 
@@ -101,7 +102,7 @@
   [client access-token job]
   (-> client
       (i/get i/status-job-finished access-token (:job-id job))
-      (try (catch clojure.lang.ExceptionInfo e
+      (try (catch ExceptionInfo e
              (let [{:keys [body status]} (ex-data e)]
                (if (= status 404)
                  (json/parse-string body keyword)
@@ -151,13 +152,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod ig/init-key :drafter-client/client
-  [_ {:keys [drafter-uri batch-size auth0-endpoint client-id client-secret]}]
+  [ig-key {:keys [drafter-uri batch-size auth0-endpoint client-id client-secret]}]
   (when (seq drafter-uri)
-    (web-client drafter-uri
-                :batch-size batch-size
-                :auth0-endpoint auth0-endpoint
-                :client-id client-id
-                :client-secret client-secret)))
+    (try
+      (web-client drafter-uri
+                  :batch-size batch-size
+                  :auth0-endpoint auth0-endpoint
+                  :client-id client-id
+                  :client-secret client-secret)
+      (catch Throwable t
+        (let [e (Throwable->map t)]
+          (throw
+            (ex-info (str "Failure to init " ig-key "\n"
+                          (:cause e)
+                          "\nCheck that your Drafter Client config is correct.")
+                     e)))))))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.
