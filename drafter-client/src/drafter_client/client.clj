@@ -165,6 +165,7 @@
           (throw
             (ex-info (str "Failure to init " ig-key "\n"
                           (:cause e)
+                          "\nCheck that Drafter is running!"
                           "\nCheck that your Drafter Client config is correct.")
                      e)))))))
 
