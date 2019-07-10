@@ -16,7 +16,7 @@ The defaults should work for most cases, but for further details on the options 
 
  You may also wish to configure drafter logging by putting a
 `log-config.edn` file in drafter's working directory. We provide an
-example file you can modify at [log-config.edn.example](https://github.com/Swirrl/drafter/blob/master/log-config.edn.example).
+example file you can modify at [log-config.edn.example](https://github.com/Swirrl/drafter/blob/master/drafter/log-config.edn.example).
 
 ## API Docs
 
