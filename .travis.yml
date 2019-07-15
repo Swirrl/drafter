@@ -75,3 +75,8 @@ deploy:
     skip_cleanup: true
     on:
       all_branches: true
+  - provider: script
+    script: clojure -M:omni publish -m package/manifest-mongo-auth.edn
+    skip_cleanup: true
+    on:
+      all_branches: true
