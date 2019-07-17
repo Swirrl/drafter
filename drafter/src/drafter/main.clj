@@ -12,7 +12,7 @@
             [integrant.core :as ig]
             [meta-merge.core :as mm]))
 
-(def default-production-config [(io/resource "drafter-base-config.edn") (io/resource "drafter-prod-config.edn")])
+(def base-config (io/resource "drafter-base-config.edn"))
 
 (def system nil)
 
@@ -124,7 +124,7 @@
   are assumed to be strings with relative file paths to edn/aero files
   we can read."
   [cfg-args]
-  (let [profiles (concat [(io/resource "drafter-base-config.edn")]
+  (let [profiles (concat [base-config]
                          (map io/file cfg-args))]
     (println "Using supplied configs " profiles)
     (map read-system profiles)))
@@ -134,10 +134,8 @@
   (add-shutdown-hook!)
   (if (seq args)
     (start-system! (apply mm/meta-merge (resolve-configs args)))
-    (start-system!
-     ;; default production config
-     (apply mm/meta-merge (->> default-production-config
-                               (remove nil?)
-                               (map read-system)))
-
-     )))
+    (binding [*out* *err*]
+      (println "You must provide an integrant file of additional config to start drafter.")
+      (println)
+      (println "e.g. drafter-dev-auth0.edn, drafter-prod-auth0.edn, drafter-dev-basic-auth-memory.edn etc...")
+      (System/exit 1))))
