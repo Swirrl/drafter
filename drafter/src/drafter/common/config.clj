@@ -16,10 +16,3 @@
 
 (defmethod ig/init-key :drafter.common.config/sparql-update-endpoint [_ uri-str]
   (java.net.URI. uri-str))
-
-
-;; TODO: we should probably remove this component now we've moved its
-;; properties :sparql-query-endpoint and :sparql-update-endpoint to
-;; the top-level system.
-(defmethod ig/init-key :drafter.common/config [_ opts]
-  opts)

@@ -3,6 +3,7 @@
   (:require [aero.core :as aero]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [drafter.timeouts :as timeouts]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
             [drafter.common.json-encoders :as enc]
@@ -10,8 +11,6 @@
             [drafter.rdf.writers :as writers]
             [integrant.core :as ig]
             [meta-merge.core :as mm]))
-
-(require 'drafter.configuration)
 
 (def default-production-config [(io/resource "drafter-base-config.edn") (io/resource "drafter-prod-config.edn")])
 
@@ -22,6 +21,27 @@
 
 (defmethod aero/reader 'resource [_ _ value]
   (io/resource value))
+
+;;Reads a timeout setting from the configuration. Timeout configurations
+;;are optional. Returns an exception if the timeout string is invalid.
+(defmethod aero/reader 'timeout
+  [opts tag value]
+  (some-> value (timeouts/try-parse-timeout)))
+
+;;Reads a configuration setting corresponding to a TCP port. If specified the
+;;setting should be a string representation of a number in the valid range for
+;;TCP ports i.e. (0 65536]. Returns an exception if the input is invalid.
+(defmethod aero/reader 'port
+  [opts tag value]
+  (when (some? value)
+    (try
+      (let [port (Long/parseLong value)]
+        (if (and (pos? port) (< port 65536))
+          port
+          (IllegalArgumentException. "Port must be in range (0 65536]")))
+      (catch Exception ex
+        ex))))
+
 
 (defmethod ig/init-key :drafter.main/datadog [k {:keys [statsd-address tags]}]
   (log/info "Initialising datadog")
@@ -36,14 +56,16 @@
 
 (defn read-system [system-config]
   (if (map? system-config)
-    system-config
+    system-config ;; support supplying systems as a literal value for dev/testing
     (-> system-config
         aero/read-config)))
+
+
 
 (defn- inject-logging [system-config]
   "Add logging to datadog, and add logging and datadog to everything else."
   (merge-with
-   merge
+   mm/meta-merge
    (zipmap (keys (dissoc system-config :drafter/logging :drafter.main/datadog))
            (repeat (merge (when (contains? system-config :drafter/logging)
                             {:logging (ig/->Ref :drafter/logging)})

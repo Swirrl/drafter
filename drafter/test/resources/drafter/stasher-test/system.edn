@@ -9,9 +9,12 @@
  :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
                          :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
 
+ :drafter.common.config/sparql-query-endpoint "http://localhost:5820/drafter-test-db/query"
+ :drafter.common.config/sparql-update-endpoint "http://localhost:5820/drafter-test-db/update"
+
  :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/cache
-                        :sparql-query-endpoint #uri #env SPARQL_QUERY_ENDPOINT
-                        :sparql-update-endpoint #uri #env SPARQL_UPDATE_ENDPOINT }
+                        :sparql-query-endpoint #ig/ref :drafter.common.config/sparql-query-endpoint
+                        :sparql-update-endpoint #ig/ref :drafter.common.config/sparql-update-endpoint }
 
  :drafter/logging {:config "./test/resources/log-config.edn"}
 
