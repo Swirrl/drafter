@@ -1,0 +1,20 @@
+#merge [#include "manifest/shared-manifest.edn"
+        {:omni/keys #merge [#include "manifest/shared-keys.edn"
+                            {:drafter/jws-signing-key {:doc "Signing key for JWS tokens"
+                                                       :env-var DRAFTER_JWS_SIGNING_KEY}
+
+                             :drafter/mongo-host {:doc "Hostname for your mongodb of users."
+                                                  :env-var DRAFTER_MONGO_HOST}
+                             :drafter/mongo-port {:doc "Port number for your mongodb."
+                                                  :env-var DRAFTER_MONGO_PORT
+                                                  :default "27017"}
+                             :drafter/mongo-user-collection {:doc "The mongo collection containing your drafter users."
+                                                             :env-var DRAFTER_MONGO_USER_COLLECTION
+                                                             :default "users"
+                                                             }
+
+                             :drafter/user-db-name {:doc "The name of the mongo user database, e.g. 'pmd2'"
+                                                    :env-var DRAFTER_USER_DB_NAME
+                                                    }}]}
+        {:omni/package-name "drafter-pmd3"
+         :omni/dependencies #include "../dependencies-mongo-auth.edn"}]

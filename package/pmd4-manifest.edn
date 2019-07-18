@@ -1,0 +1,14 @@
+#merge [#include "manifest/shared-manifest.edn"
+        {:omni/keys #merge [#include "manifest/shared-keys.edn"
+                            {:drafter/auth0-domain {:doc "URL to the auth0 domain, e.g. https://dev-kkt-m758.eu.auth0.com"
+                                                    :env-var AUTH0_DOMAIN
+                                                    }
+                             :drafter/auth0-aud {:doc "The intended audience of the auth0 token, usually the sites URL.  This is normally a URI, that identifies an arbitrary grouping of services.  The same value needs to be specified in your auth0 admin panel configuration."
+                                                 :env-var AUTH0_AUD}
+                             :drafter/auth0-client-id {:doc "The auth0 client id."
+                                                       :env-var AUTH0_CLIENT}
+                             :drafter/auth0-client-secret {:doc "The auth0 client secret."
+                                                           :env-var AUTH0_CLIENT_SECRET}
+                             }]}
+        {:omni/package-name "drafter-pmd4"
+         :omni/dependencies #include "../dependencies.edn"}]

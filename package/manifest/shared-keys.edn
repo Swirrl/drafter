@@ -1,0 +1,42 @@
+{:drafter/http-port {:doc "HTTP port to listen on"
+                     :env-var DRAFTER_HTTP_PORT
+                     :default 3001
+                     :optional true}
+ :drafter/batched-write-size {:key :drafter/batched-write-size
+                              :doc "Batch size for writing statments to stardog"
+                              :env-var DRAFTER_BATCHED_WRITE_SIZE
+                              :optional true}
+ :drafter/sparql-query-endpoint {:doc "URI of the stardog SPARQL query endpoint"
+                                 :env-var SPARQL_QUERY_ENDPOINT}
+ :drafter/sparql-update-endpoint {:doc "URI of the stardog SPARQL update endpoint"
+                                  :env-var SPARQL_UPDATE_ENDPOINT}
+
+ :drafter/timeout-query-endpoint-live {:doc "Query timeout for the live endpoint"
+                                       :optional true
+                                       :env-var DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE}
+ :drafter/timeout-query-endpoint-draftset {:doc "Query timeout for draftset endpoints"
+                                           :optional true
+                                           :env-var DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET}
+
+ :drafter/stasher-cache-enabled {:doc "Whether stasher caching is enabled"
+                                 :optional true
+                                 :env-var STASHER_CACHE_ENABLED}
+ :drafter/stasher-cache-dir {:doc "Directory used to write cached results to"
+                             :optional true
+                             :env-var STASHER_CACHE_DIR}
+ :drafter/stasher-max-pool-size {:doc "Max thread pool size for stasher"
+                                 :env-var STASHER_MAX_POOL_SIZE
+                                 :optional true}
+ :drafter/stasher-queue-size {:doc "Size of the queue for cache requests"
+                              :env-var STASHER_QUEUE_SIZE
+                              :optional true}
+
+ :drafter/drafter-log-file-path {:doc "Path to the drafter log file"
+                                 :default "drafter.log"}
+ :drafter/sparql-log-file-path {:doc "Path to the sparql log file"
+                                :default "sparql.log"}
+
+ :datadog/statsd-address {:doc "Address of the statsd service"
+                          :env-var DATADOG_STATSD_ADDRESS
+                          :default "localhost:8125"
+                          :optional true}}
