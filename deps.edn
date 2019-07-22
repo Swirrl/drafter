@@ -1,2 +1,2 @@
-{:deps {swirrl/omni {:git/url "git@github.com:Swirrl/omni.git", :sha "5b84de274c0e8873c59593f9ecf05907299ed860"}}
+{:deps {swirrl/omni {:git/url "git@github.com:Swirrl/omni.git", :sha "e9d9215c40dce9d24d635e1f9e0a4e4b385038ae"}}
  :aliases {:omni {:main-opts ["-m" "omni.main"]}}}
