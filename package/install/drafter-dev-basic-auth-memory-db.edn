@@ -1,0 +1,24 @@
+{
+
+ ;; This file is meta-merged from the resource path over
+ ;; drafter-base-config.edn when the system is launched via
+ ;; drafter.main without any extra production overrides.
+ ;;
+ ;; This file is our current default production config, that assumes
+ ;; pre muttnik (PMD3) authentication via basic-auth/jwt with a mongo
+ ;; db of users.
+
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; User Database config
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ :drafter.middleware.auth/wrap-auth {:drafter.user/repo #ig/ref :drafter.user/memory-repository}
+
+ :drafter.middleware/wrap-auth {:middleware [#ig/ref :drafter.middleware.auth/wrap-auth]}
+
+ :drafter.user/memory-repository {:users [{:username "editor@swirrl.com" :password "password" :role :editor}
+                                          {:username "publisher@swirrl.com" :password "password" :role :publisher}
+                                          {:username "manager@swirrl.com" :password "password" :role :manager}
+                                          {:username "system@swirrl.com" :password "password" :role :system}]
+                                  :realm "Drafter Memory Repo"}}
