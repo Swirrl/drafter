@@ -16,7 +16,7 @@
     (finally
       (fs/delete-dir test-path))))
 
-(t/use-fixtures :once with-temp-directory)
+(t/use-fixtures :each with-temp-directory)
 
 (t/deftest cache-key->hashed-key-test
   (t/testing "Same values should generate same hash"
