@@ -74,7 +74,7 @@
 
 (defn- make-blocking-connection [repo idx]
   (future
-    (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }")
+    (repo/query (repo/->connection repo) "SELECT * WHERE { ?s ?p ?o }")
     (keyword (str "future-" idx))))
 
 (deftest connection-timeout
@@ -90,12 +90,13 @@
             (do
               ;;server has accepted max number of connections so next query attempt should see a connection timeout
               (let [rf (future
-                         (sparql/eager-query repo "SELECT * WHERE { ?s ?p ?o }"))]
+                         (repo/query (repo/->connection repo) "SELECT * WHERE { ?s ?p ?o }"))]
                 ;;should be rejected almost immediately
                 (try
                   (.get rf 5000 TimeUnit/MILLISECONDS)
                   (catch ExecutionException ex
-                    (is (instance? QueryInterruptedException (.getCause ex))))
+                    (let [cause (.getCause ex)]
+                      (is (instance? QueryInterruptedException cause))))
                   (catch java.util.concurrent.TimeoutException tex
                     (is (not tex) "Expected query to be rejected due to timeout"))
                   (catch Throwable ex
