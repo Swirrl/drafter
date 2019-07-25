@@ -19,6 +19,12 @@
                                        :mode "644"
                                        :env #{:prod}
                                        }
+                                      {:type :selmer/template
+                                       :path "dev-start-basic-auth.sh"
+                                       :dest-path "dev-start.sh"
+                                       :mode "755"
+                                       :keys [:omni/install-dir]
+                                       :env #{:dev :ci}}
                                       {:type :copy
                                        :path "drafter-dev-auth0.edn"
                                        :mode "644"

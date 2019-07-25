@@ -26,10 +26,6 @@
                          {:type :env
                           :dest-path "dev-settings.env"
                           :env #{:dev :ci}}
-                         {:type :selmer/template
-                          :path "dev-start.sh"
-                          :mode "755"
-                          :keys [:omni/install-dir]}
                          {:type :copy
                           :path "dev-stop.sh"
                           :mode "755"
