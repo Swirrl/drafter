@@ -1,6 +1,5 @@
-{:drafter.common/config {:sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
-                         :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"
-                         }
+{:drafter.common.config/sparql-query-endpoint "http://localhost:5820/drafter-test-db/query"
+ :drafter.common.config/sparql-update-endpoint "http://localhost:5820/drafter-test-db/update"
 
  :drafter.stasher/cache-thread-pool {:core-pool-size 1
                                      :max-pool-size 1
@@ -13,11 +12,12 @@
                          :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
 
 
- :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
-                                :cache #ig/ref :drafter.stasher/cache
-                                :cache? false
-                                }
-                               ^:ref [:drafter.common/config]]
+ :drafter.stasher/repo {:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
+                        :cache #ig/ref :drafter.stasher/cache
+                        :cache? false
+                        :sparql-query-endpoint #ig/ref :drafter.common.config/sparql-query-endpoint
+                        :sparql-update-endpoint #ig/ref :drafter.common.config/sparql-update-endpoint
+                        }
 
 
  ;;;; A repo specifically for the live query endpoint

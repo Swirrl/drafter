@@ -5,6 +5,8 @@
  :swirrl.auth0/client {:endpoint #env AUTH0_DOMAIN
                        :audience "https://dev-kkt-m758.eu.auth0.com/api/v2/"
                        :swagger-json #resource "swirrl/auth0/swagger.json"
+
+                       ;; TODO: We should probably set these ID's and secrets via env vars too
                        :client-id "kXGEqpUE9aWRkMYe67cAxW4fNU2hpiMt"
                        :client-secret "26kt07oo36e8yhmaJoz4OqgXpiMskhtC5BQYzT9v5fQcNXQLi8QKJO9RZD2Bb44N"}
 

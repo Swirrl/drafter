@@ -1,7 +1,8 @@
 {
+ :drafter.common.config/sparql-query-endpoint "http://localhost:5820/drafter-test-db/query"
+ :drafter.common.config/sparql-update-endpoint "http://localhost:5820/drafter-test-db/update"
 
- :drafter.common/config {:sparql-query-endpoint #uri "http://localhost:5820/drafter-test-db/query"
-                         :sparql-update-endpoint #uri "http://localhost:5820/drafter-test-db/update"}
+
 
  :drafter/logging {:config "./test/resources/log-config.edn"}
 
@@ -15,9 +16,10 @@
                                      :keep-alive-time-ms 1000
                                      :queue-size 1}
 
- :drafter.stasher/repo #merge [{:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
-                                :cache #ig/ref :drafter.stasher/cache}
-                               ^:ref [:drafter.common/config]]
+ :drafter.stasher/repo {:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
+                        :cache #ig/ref :drafter.stasher/cache
+                        :sparql-query-endpoint #ig/ref :drafter.common.config/sparql-query-endpoint
+                        :sparql-update-endpoint #ig/ref :drafter.common.config/sparql-update-endpoint}
 
  ;; instantiate/remove test fixture
  :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo

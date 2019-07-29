@@ -194,10 +194,11 @@
           ;; Some tests need to load and parse trig file data
           (reg/register-parser-factory! :construct TriGParserFactory)
           (try
+            (when *test-backend* (sparql/update! *test-backend* "DROP ALL ;"))
+            (when (:drafter.stasher/repo *test-system*) (sparql/update! (:drafter.stasher/repo *test-system*) "DROP ALL ;"))
+
             (test-fn)
             (finally
-              (when *test-backend* (sparql/update! *test-backend* "DROP ALL ;"))
-              (when (:drafter.stasher/repo *test-system*) (sparql/update! (:drafter.stasher/repo *test-system*) "DROP ALL ;"))
               (ig/halt! started-system)
               ;; TODO change to halt system
               ;;(stop-backend backend)

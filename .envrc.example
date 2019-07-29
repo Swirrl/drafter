@@ -1,0 +1,8 @@
+export SPARQL_QUERY_ENDPOINT='http://localhost:5820/drafter-client-test/query'
+export SPARQL_UPDATE_ENDPOINT='http://localhost:5820/drafter-client-test/update'
+export DRAFTER_ENDPOINT='http://localhost:3001'
+export DRAFTER_JWS_SIGNING_KEY=foo
+export AUTH0_DOMAIN=https://dev-kkt-m758.eu.auth0.com
+export AUTH0_AUD=https://pmd
+export AUTH0_CLIENT_ID=7klE25HUY333vTEx7rM1dmsnO6vHkaSG
+export AUTH0_CLIENT_SECRET=QYoWNwf11dzWNh6XYd3jH8-j5j8r36UKuoFgrPakE_aw_Gy_EwWSppvqSULRICY4

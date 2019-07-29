@@ -1,14 +1,18 @@
 * Configuring Drafter
 
-Drafter uses [[https://github.com/juxt/aero][aero]] for its configuration.  This means it uses
-environment variables (and/or java properties) to pass configuration
-variables from the environment. The file system.edn defines all configuration settings,
-along with their types, default values and the locations they are loaded from.
+Drafter uses integrant for its configuration.  To launch drafter you
+must now supply as a command line a file specifying the configuration
+of your authentication mode (and/or) overrides for any other aspects
+of the integrant system.
 
-You can provide an alternative system.edn file at boot by passing the
-file path as drafters first command line argument.  If you do not
-provide a =system.edn= drafter will start up with the default one, which
-can be configured via the environment variables described in this file.
+e.g. you may start it with a command like:
+
+#+BEGIN_EXAMPLE
+$ java -jar ./drafter.jar drafter-dev-basic-auth-memory-db.edn &
+#+END_EXAMPLE
+
+Some working example files to run drafter can be found in the omni
+package at [[../package/install/][../package/install]]
 
 ** Stardog
 
