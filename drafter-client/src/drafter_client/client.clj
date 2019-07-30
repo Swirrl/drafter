@@ -1,25 +1,17 @@
 (ns drafter-client.client
   (:refer-clojure :exclude [name type get])
   (:require [cheshire.core :as json]
+            [clj-time.format :refer [formatters parse]]
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [drafter-client.client.auth :as auth]
             [drafter-client.client.draftset :as draftset]
-            [drafter-client.client.impl :as i :refer [->DrafterClient intercept]]
+            [drafter-client.client.impl :as i :refer [->DrafterClient]]
             [drafter-client.client.repo :as repo]
-            [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
-            [grafter-2.rdf4j.io :as rio]
             [integrant.core :as ig]
-            [martian.clj-http :as martian-http]
-            [martian.core :as martian]
-            [martian.encoders :as encoders]
-            [martian.interceptors :as interceptors]
-            [schema.core :as schema]
-            [ring.util.codec :refer [form-encode form-decode]]
-            [ring.util.io :refer [piped-input-stream]])
-  (:import (clojure.lang ExceptionInfo)))
+            [martian.clj-http :as martian-http])
+  (:import clojure.lang.ExceptionInfo))
 
 (alias 'c 'clojure.core)
 
@@ -49,6 +41,14 @@
         id (java.util.UUID/fromString id)]
     (draftset/->draftset id display-name description)))
 
+(defn- ->draftset [ds]
+  (-> (draftset/map->Draftset ds)
+      (update :id #(java.util.UUID/fromString %))
+      (update :created-at (partial parse (formatters :date-time)))
+      (update :updated-at (partial parse (formatters :date-time)))
+      (assoc :name (:display-name ds))
+      (dissoc :display-name)))
+
 (defn ->repo [client access-token context]
   (repo/make-repo client context access-token {}))
 
@@ -64,6 +64,15 @@
   (-> client
       (i/get i/create-draftset access-token :display-name name :description description)
       (json-draftset->draftset)))
+
+(defn get-draftsets
+  "List available draftsets, optionally `:include` either
+  `#{:all :owned :claimable}`.
+  Returns all propeties."
+  [client access-token & [include]]
+  (let [include (if (keyword include) (c/name include) include)]
+    (->> (i/get client i/get-draftsets access-token :include include)
+         (map ->draftset))))
 
 (defn get-draftset [client access-token id]
   (i/get client i/get-draftset access-token id))
