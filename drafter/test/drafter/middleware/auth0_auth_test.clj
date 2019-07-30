@@ -1,29 +1,29 @@
 (ns ^:auth0 drafter.middleware.auth0-auth-test
-(:require [buddy.auth :as auth]
-          [clojure.java.io :as io]
-          [clojure.test :refer :all]
-          [drafter.middleware :refer :all]
-          [drafter.test-common :as tc]
-          [drafter.user :as user]
-          [drafter.user.memory-repository :as memory-repo]
-          [drafter.util :as util]
-          [environ.core :refer [env]]
-          [grafter-2.rdf4j.formats :as formats]
-          [ring.util.response :refer [response]]
-          [cheshire.core :as json]
-          [clj-time.coerce :refer [to-date]]
-          [clj-time.core :as time]
-          [integrant.core :as ig])
-(:import clojure.lang.ExceptionInfo
-         [java.io ByteArrayInputStream File]
-         org.eclipse.rdf4j.rio.RDFFormat
-         com.auth0.jwt.algorithms.Algorithm
-         [com.auth0.jwt.exceptions InvalidClaimException
-          JWTVerificationException TokenExpiredException]
-         [com.auth0.jwk Jwk JwkProvider]
-         com.auth0.jwt.JWT
-         java.security.KeyPairGenerator
-         java.util.Base64))
+  (:require [buddy.auth :as auth]
+            [clojure.java.io :as io]
+            [clojure.test :refer :all]
+            [drafter.middleware :refer :all]
+            [drafter.test-common :as tc]
+            [drafter.user :as user]
+            [drafter.user.memory-repository :as memory-repo]
+            [drafter.util :as util]
+            [environ.core :refer [env]]
+            [grafter-2.rdf4j.formats :as formats]
+            [ring.util.response :refer [response]]
+            [cheshire.core :as json]
+            [clj-time.coerce :refer [to-date]]
+            [clj-time.core :as time]
+            [integrant.core :as ig])
+  (:import clojure.lang.ExceptionInfo
+           [java.io ByteArrayInputStream File]
+           org.eclipse.rdf4j.rio.RDFFormat
+           com.auth0.jwt.algorithms.Algorithm
+           [com.auth0.jwt.exceptions InvalidClaimException
+            JWTVerificationException TokenExpiredException]
+           [com.auth0.jwk Jwk JwkProvider]
+           com.auth0.jwt.JWT
+           java.security.KeyPairGenerator
+           java.util.Base64))
 
 (use-fixtures :each tc/with-spec-instrumentation)
 

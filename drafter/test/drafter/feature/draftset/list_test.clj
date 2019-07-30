@@ -36,13 +36,18 @@
     (t/is (= 401 (:status (handler (assoc request :headers invalid-password)))))
     (t/is (= 401 (:status (handler (assoc request :headers invalid-user)))))))
 
+(tc/deftest-system-with-keys ^:basic-auth get-draftsets-hander-test+all_basic-auth
+  [:drafter.fixture-data/loader :drafter.feature.draftset.list/get-draftsets-handler]
+  [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/list_test-2.edn"]
+
+  (t/testing "All draftsets"
+    (assert-denies-invalid-login-attempts get-draftsets-handler {:uri "/v1/draftsets" :request-method :get :params {:include :all}})))
+
 (tc/deftest-system-with-keys get-draftsets-hander-test+all
   [:drafter.fixture-data/loader :drafter.feature.draftset.list/get-draftsets-handler]
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/list_test-2.edn"]
 
   (t/testing "All draftsets"
-    (assert-denies-invalid-login-attempts get-draftsets-handler {:uri "/v1/draftsets" :request-method :get :params {:include :all}})
-
     (assert-visibility #{"owned" "publishing"}
                        (get-draftsets-handler (get-draftsets-request :all test-publisher))
                        (str"Expected publisher to see owned and publishing draftsets"))
