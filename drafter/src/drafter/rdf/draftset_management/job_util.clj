@@ -3,7 +3,6 @@
             [cognician.dogstatsd :as datadog]
             [clojure.string :as str]
             [drafter.util :as util]
-            [drafter.write-scheduler :refer [queue-job!]]
             [swirrl-server.async.jobs :as ajobs]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
@@ -42,7 +41,7 @@
   ([job ex]
    (record-job-stats! job :failed)
    (ajobs/job-failed! job ex))
-  
+
   ([job ex details]
    (record-job-stats! job :failed)
    (ajobs/job-failed! job ex details)))
