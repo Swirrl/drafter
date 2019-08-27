@@ -82,6 +82,16 @@
     :display-name name
     :description description))
 
+(defn submit-to-user [client access-token id user]
+  (i/get client i/submit-draftset-to access-token id :name user))
+
+(defn submit-to-role [client access-token id role]
+  (let [role (if (keyword? role) (c/name role) role)]
+    (i/get client i/submit-draftset-to access-token id :role role)))
+
+(defn claim [client access-token id]
+  (i/get client i/claim-draftset access-token id))
+
 (defn remove-draftset
   "Delete the Draftset and its data"
   [client access-token draftset]
