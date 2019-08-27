@@ -48,3 +48,9 @@ The first step is to create a new client by providing the location of a drafter 
     (def c (client/web-client "http://localhost:3002"))
 
 Or, more likely you'll want an integrant component of `:drafter-client/client`
+
+# API
+
+The main API is found in namespace `drafter-client/client`. This is mostly a
+convenience wrapper around the `martian` data API, generated in
+`drafter-client.client/impl`.
