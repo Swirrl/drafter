@@ -113,6 +113,13 @@
          (i/get i/put-draftset-data access-token id triples :graph graph)
          (->async-job)))))
 
+(defn publish
+  "Publish the Draftset to live"
+  [client access-token draftset]
+  (-> client
+      (i/get i/publish-draftset access-token (draftset/id draftset))
+      (->async-job)))
+
 (defn get
   "Access the quads inside this Draftset"
   ([client access-token draftset]

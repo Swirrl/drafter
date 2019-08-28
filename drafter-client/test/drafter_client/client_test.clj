@@ -215,6 +215,28 @@
         (t/is (= (set triples-1) (set triples-1*)))
         (t/is (= (set triples-2) (set triples-2*)))))))
 
+(t/deftest publishing-a-draftset
+  (let [client (drafter-client)
+        triples (test-triples)
+        how-many 5
+        token (auth-util/system-token)
+        name "Draftset publishing"
+        description "Testing adding things, publishing them, and reading them"
+        draftset (sut/new-draftset client token name description)]
+    (t/testing "Publishing a draft set"
+      (let [graph (URI. "http://test.graph.com/quad-graph")
+            quads (map #(assoc % :c graph) triples)
+            quads (take how-many quads)
+            job-1 (sut/add client token draftset quads)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-1)))
+            job-2 (sut/publish client token draftset)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-2)))]
+        (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
+          (let [quads* (map #(assoc % :c graph) (gr-repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))]
+            (t/is (= (set quads) (set quads*)))))))))
+
 (t/deftest job-status
   (let [client (drafter-client)
         graph (URI. "http://test.graph.com/3")
