@@ -99,6 +99,13 @@
       (i/get i/delete-draftset access-token (draftset/id draftset))
       (->async-job)))
 
+(defn load-graph
+  "Load the graph from live into the Draftset"
+  [client access-token draftset graph]
+  (-> client
+      (i/get i/put-draftset-graph access-token (draftset/id draftset) (str graph))
+      (->async-job)))
+
 (defn add
   "Append the supplied RDF data to this Draftset"
   ([client access-token draftset quads]
