@@ -106,6 +106,11 @@
       (i/get i/put-draftset-graph access-token (draftset/id draftset) (str graph))
       (->async-job)))
 
+(defn delete-graph
+  "Schedules the deletion of the graph from live"
+  [client access-token draftset graph]
+  (i/get client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
+
 (defn add
   "Append the supplied RDF data to this Draftset"
   ([client access-token draftset quads]
