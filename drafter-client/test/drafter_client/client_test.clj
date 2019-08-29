@@ -215,6 +215,88 @@
         (t/is (= (set triples-1) (set triples-1*)))
         (t/is (= (set triples-2) (set triples-2*)))))))
 
+(t/deftest publishing-a-draftset
+  (let [client (drafter-client)
+        triples (test-triples)
+        how-many 5
+        token (auth-util/system-token)
+        name "Draftset publishing"
+        description "Testing adding things, publishing them, and reading them"
+        draftset (sut/new-draftset client token name description)]
+    (t/testing "Publishing a draft set"
+      (let [graph (URI. "http://test.graph.com/quad-graph")
+            quads (map #(assoc % :c graph) triples)
+            quads (take how-many quads)
+            job-1 (sut/add client token draftset quads)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-1)))
+            job-2 (sut/publish client token draftset)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-2)))]
+        (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
+          (let [quads* (map #(assoc % :c graph) (gr-repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))]
+            (t/is (= (set quads) (set quads*)))))))))
+
+(t/deftest loading-a-graph-into-a-draftset
+  (let [client (drafter-client)
+        triples (test-triples)
+        how-many 5
+        token (auth-util/system-token)
+        name "Loading a graph into a draftset"
+        description "Testing loading a graph into a draftset"
+        draftset-1 (sut/new-draftset client token name description)]
+    (t/testing "Publishing a draft set"
+      (let [graph (URI. "http://test.graph.com/quad-graph")
+            quads (map #(assoc % :c graph) triples)
+            quads (take how-many quads)
+            job-1 (sut/add client token draftset-1 quads)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-1)))
+            job-2 (sut/publish client token draftset-1)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-2)))
+            draftset-2 (sut/new-draftset client token name description)
+            job-3 (sut/load-graph client token draftset-2 graph)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-3)))
+            quads* (sut/get client token draftset-2)]
+        (t/is (= (set quads) (set quads*)))))))
+
+(t/deftest deleting-a-graph-from-a-draftset
+  (let [client (drafter-client)
+        triples (test-triples)
+        how-many 5
+        token (auth-util/system-token)
+        name "Draftset deleting"
+        description "Testing deleting a graph from a draftset"
+        draftset-1 (sut/new-draftset client token name description)]
+    (t/testing "Deleting graph from live"
+      (let [graph-1 (URI. "http://test.graph.com/triple-graph1")
+            triples-1 (take how-many triples)
+            job-1 (sut/add client token draftset-1 graph-1 triples-1)
+            graph-2 (URI. "http://test.graph.com/triple-graph2")
+            triples-2 (take how-many (drop how-many triples))
+            job-2 (sut/add client token draftset-1 graph-2 triples-2)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-1)))
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-2)))
+            job-3 (sut/publish client token draftset-1)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-3)))
+            draftset-2 (sut/new-draftset client token name description)
+            _ (sut/delete-graph client token draftset-2 graph-1)
+            job-4 (sut/publish client token draftset-2)
+            _ (t/is (= :drafter-client.client/completed
+                       (sut/resolve-job client token job-4)))]
+        (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
+          (let [query (format "CONSTRUCT { ?s ?p ?o } WHERE { graph <%s> { ?s ?p ?o } }" (str graph-1))
+                triples-1* (gr-repo/query conn query)]
+            (t/is (empty? triples-1*)))
+          (let [query (format "CONSTRUCT { ?s ?p ?o } WHERE { graph <%s> { ?s ?p ?o } }" (str graph-2))
+                triples-2* (gr-repo/query conn query)]
+            (t/is (= (set triples-2) (set triples-2*)))))))))
+
 (t/deftest job-status
   (let [client (drafter-client)
         graph (URI. "http://test.graph.com/3")

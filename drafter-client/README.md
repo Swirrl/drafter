@@ -22,6 +22,7 @@ stardog-admin db create \
 export SPARQL_QUERY_ENDPOINT=http://localhost:5820/drafter-client-test/query
 export SPARQL_UPDATE_ENDPOINT=http://localhost:5820/drafter-client-test/update
 export DRAFTER_ENDPOINT=http://localhost:3001
+export AUTH0_AUD=https://pmd
 ```
 
 3. Ensure you have a `log-config.edn` in the directory you're running the tests
