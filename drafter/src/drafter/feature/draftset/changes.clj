@@ -11,7 +11,7 @@
             [drafter.rdf.draftset-management.job-util :as jobutil]
             [integrant.core :as ig]
             [ring.util.response :as ring]
-            [swirrl-server.responses :as response]
+            [drafter.async.responses :as response]
             [drafter.requests :as req]))
 
 (defn revert-graph-changes!

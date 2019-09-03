@@ -9,9 +9,8 @@ More localised errors are probably better handled within specific routes, as
 these handlers dispatched indiscriminantly on anything bubbling up from the call
 stack of any route - hence you may need to be careful about being
 overly-specific in your interpretation of the error."
-  (:require [swirrl-server
-             [errors :refer [encode-error]]
-             [responses :as r]]))
+  (:require [drafter.async.responses :as r]
+            [swirrl-server.errors :refer [encode-error]]))
 
 (defmethod encode-error org.eclipse.rdf4j.query.QueryEvaluationException [ex]
   ;; This exception should also be caught in specific routes concerned with

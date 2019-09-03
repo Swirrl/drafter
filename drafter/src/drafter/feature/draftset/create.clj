@@ -6,7 +6,7 @@
             [drafter.rdf.draftset-management.job-util :as jobutil]
             [drafter.util :as util]
             [ring.util.response :as ring]
-            [swirrl-server.responses :as response]
+            [drafter.async.responses :as response]
             [drafter.requests :as req]))
 
 (defn create-draftsets-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]

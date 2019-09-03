@@ -5,7 +5,6 @@
             [clojure.tools.logging :as log]
             [drafter.async.responses :as r]
             [drafter.async.spec :as spec]
-            [swirrl-server.util :refer [try-parse-uuid]]
             [integrant.core :as ig]
             [clj-time.coerce :refer [to-date from-long]]
             [clj-time.core :as time]
@@ -14,9 +13,6 @@
            (clojure.lang ExceptionInfo)
            (org.apache.log4j MDC)))
 
-;; old job (defrecord Job [id priority time function value-p])
-
-;; TODO: will a job always have a user? a draftset? a graph? a name?
 (defrecord Job [id
                 user-id
                 status
@@ -62,7 +58,7 @@
    (wrap-auth
     (routes
      (GET "/jobs/:id" [id]
-          (or (when-let [job (some-> id try-parse-uuid get-job)]
+          (or (when-let [job (some-> id r/try-parse-uuid get-job)]
                 (r/json-response 200 (job-response job)))
               not-found))
      (GET "/jobs" []
@@ -71,7 +67,7 @@
                                       (-> jobs :pending deref vals)
                                       (-> jobs :complete deref vals)))))
      (GET "/finished-jobs/:id" [id]
-          (or (when-let [job (some-> id try-parse-uuid complete-job :value-p deref)]
+          (or (when-let [job (some-> id r/try-parse-uuid complete-job :value-p deref)]
                 (r/json-response 200 (assoc job :restart-id r/restart-id)))
               (r/job-not-finished-response r/restart-id)))))))
 
@@ -96,10 +92,8 @@
   :ret ::spec/job)
 
 (defn create-job
-  ;;  create-job : UUID -> Priority -> JobFn -> Job
   ([user-id priority f]
    (create-job user-id nil priority f))
-  ;;  create-job : UUID -> UUID -> Priority -> JobFn -> Job
   ([user-id draftset-id priority f]
    (let [id (UUID/randomUUID)]
      (->Job id
@@ -113,7 +107,6 @@
             (wrap-logging-context f)
             (promise)))))
 
-;; submit-async-job! : Job -> IO Boolean
 (defn submit-async-job!
   "Submits an async job and returns `true` if the job was submitted
   successfully"

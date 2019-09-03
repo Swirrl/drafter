@@ -9,8 +9,9 @@
            [drafter.draftset DraftsetId]))
 
 (defn promise? [x]
-  ;; TODO: Is there not a better way to tell if something is a promise?
-  (.startsWith (.getName (class x)) "clojure.core$promise$reify__"))
+  (and (instance? clojure.lang.IPending x)
+       (instance? clojure.lang.IBlockingDeref x)
+       (instance? clojure.lang.IFn x)))
 
 (def email-string?
   (s/with-gen (s/and string? #(string/includes? % "@"))

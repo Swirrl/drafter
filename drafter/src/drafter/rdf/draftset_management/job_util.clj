@@ -37,7 +37,7 @@
   (datadog/increment! (util/statsd-name "drafter.job." (:priority job) suffix) 1))
 
 (defn job-failed!
-  "Wrap swirrl-server.async.jobs/job-failed! with a datadog counter."
+  "Wrap drafter.async.jobs/job-failed! with a datadog counter."
   ([job ex]
    (record-job-stats! job :failed)
    (ajobs/job-failed! job ex))
@@ -47,7 +47,7 @@
    (ajobs/job-failed! job ex details)))
 
 (defn job-succeeded!
-  "Wrap swirrl-server.async.jobs/job-succeeded! with a datadog counter."
+  "Wrap drafter.async.jobs/job-succeeded! with a datadog counter."
   ([job]
    (record-job-stats! job :succeeded)
    (ajobs/job-succeeded! job))

@@ -10,7 +10,7 @@
             [drafter.user :as user]
             [integrant.core :as ig]
             [ring.util.response :as ring]
-            [swirrl-server.responses :as response]
+            [drafter.async.responses :as response]
             [ring.util.request :as request]))
 
 (defn- respond [result]

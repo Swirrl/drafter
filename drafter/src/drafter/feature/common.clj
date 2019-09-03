@@ -3,12 +3,12 @@
             [drafter.rdf.draftset-management.job-util :as jobutil]
             [drafter.responses :as response]
             [ring.util.response :as ring]
-            [swirrl-server.responses :as ss-response]
+            [drafter.async.responses :as r]
             [drafter.async.jobs :as ajobs]))
 
 (defn draftset-sync-write-response [result backend draftset-id]
   (if (jobutil/failed-job-result? result)
-    (ss-response/api-response 500 result)
+    (r/api-response 500 result)
     (ring/response (dsops/get-draftset-info backend draftset-id))))
 
 (defn- as-sync-write-job [user-id draftset-id f]

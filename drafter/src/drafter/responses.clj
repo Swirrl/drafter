@@ -4,9 +4,8 @@
             [drafter.rdf.draftset-management.job-util :refer [failed-job-result?]]
             [drafter.write-scheduler :as writes :refer [exec-sync-job!]]
             [drafter.async.jobs :as jobs]
-            [drafter.async.responses :refer [submitted-job-response]]
-            [swirrl-server.errors :refer [encode-error]]
-            [swirrl-server.responses :as r]))
+            [drafter.async.responses :as r :refer [submitted-job-response]]
+            [swirrl-server.errors :refer [encode-error]]))
 
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))

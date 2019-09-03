@@ -26,7 +26,7 @@
             [drafter.util :as util]
             [integrant.core :as ig]
             [ring.util.response :as ring]
-            [swirrl-server.responses :as response]
+            [drafter.async.responses :as response]
             [drafter.requests :as req]))
 
 (defn parse-query-param-flag-handler [flag inner-handler]
