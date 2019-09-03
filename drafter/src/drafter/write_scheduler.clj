@@ -14,7 +14,7 @@
             [cognician.dogstatsd :as datadog]
             [clojure.tools.logging :as log]
             [drafter.util :refer [log-time-taken]]
-            [swirrl-server.async.jobs :refer [job-failed!]]
+            [drafter.async.jobs :refer [job-failed!]]
             [integrant.core :as ig]
             [swirrl-server.errors :refer [ex-swirrl]])
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
@@ -27,8 +27,8 @@
 (def compare-jobs (comparator
                    (fn [job1 job2]
                      (let [ordering priority-levels-map
-                           {type1 :priority time1 :time} job1
-                           {type2 :priority time2 :time} job2]
+                           {type1 :priority time1 :start-time} job1
+                           {type2 :priority time2 :start-time} job2]
 
                        (= -1 (compare [(ordering type1) time1]
                                       [(ordering type2) time2]))))))
