@@ -1,9 +1,7 @@
 (ns drafter.routes.status
-  (:require [compojure.core :refer [GET routes]]
-            [swirrl-server.async.status-routes :as st]))
+  (:require [compojure.core :refer [GET routes]]))
 
-(defn status-routes [writes-lock finished-jobs restart-id]
+(defn status-routes [writes-lock]
   (routes
    (GET "/writes-locked" []
-        (str (.isLocked writes-lock)))
-   (st/status-routes finished-jobs restart-id)))
+        (str (.isLocked writes-lock)))))
