@@ -4,14 +4,19 @@
             [drafter.responses :refer [forbidden-response submit-async-job!]]
             [drafter.user :as user]
             [drafter.util :as util]
-            [integrant.core :as ig]))
+            [integrant.core :as ig]
+            [drafter.requests :as req]))
 
 (defn handler
   [{backend :drafter/backend :keys [wrap-as-draftset-owner timeout-fn]}]
   (wrap-as-draftset-owner
-   (fn [{{:keys [draftset-id]} :params user :identity}]
+   (fn [{{:keys [draftset-id]} :params user :identity :as request}]
      (if (user/has-role? user :publisher)
-       (submit-async-job! (dsjobs/publish-draftset-job backend draftset-id util/get-current-time))
+       (submit-async-job!
+        (dsjobs/publish-draftset-job backend
+                                     (req/user-id request)
+                                     draftset-id
+                                     util/get-current-time))
        (forbidden-response "You require the publisher role to perform this action")))))
 
 (defmethod ig/pre-init-spec ::handler [_]

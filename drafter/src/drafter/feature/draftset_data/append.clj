@@ -15,7 +15,8 @@
             [drafter.write-scheduler :as writes]
             [grafter-2.rdf.protocols :as pr]
             [integrant.core :as ig]
-            [swirrl-server.async.jobs :as ajobs]))
+            [drafter.async.jobs :as ajobs]
+            [drafter.requests :as req]))
 
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."
@@ -67,22 +68,42 @@
     :copy-graph
     (copy-graph-for-append* state draftset-ref backend live->draft quad-batches job)))
 
-(defn- append-quads-to-draftset-job [backend draftset-ref quads clock-fn]
+(defn- append-quads-to-draftset-job
+  [backend user-id draftset-ref quads clock-fn]
   (let [backend (:repo backend)]
-    (ajobs/create-job :background-write
-                      (fn [job]
-                        (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
-                              quad-batches (util/batch-partition-by quads pr/context jobs/batched-write-size)
-                              now (clock-fn)]
-                          (append-draftset-quads backend draftset-ref graph-map quad-batches {:op :append :job-started-at now} job))))))
+    (jobs/make-job user-id
+                   (ds/->draftset-id draftset-ref)
+                   :background-write
+                   [job]
+                   (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
+                         quad-batches (util/batch-partition-by quads
+                                                               pr/context
+                                                               jobs/batched-write-size)
+                         now (clock-fn)]
+                     (append-draftset-quads backend
+                                            draftset-ref
+                                            graph-map
+                                            quad-batches
+                                            {:op :append :job-started-at now}
+                                            job)))))
 
-(defn append-data-to-draftset-job [backend draftset-ref tempfile rdf-format clock-fn]
-  (append-quads-to-draftset-job backend draftset-ref (dses/read-statements tempfile rdf-format) clock-fn))
+(defn append-data-to-draftset-job
+  [backend user-id draftset-ref tempfile rdf-format clock-fn]
+  (append-quads-to-draftset-job backend
+                                user-id
+                                draftset-ref
+                                (dses/read-statements tempfile rdf-format)
+                                clock-fn))
 
-(defn append-triples-to-draftset-job [backend draftset-ref tempfile rdf-format graph clock-fn]
+(defn append-triples-to-draftset-job
+  [backend user-id draftset-ref tempfile rdf-format graph clock-fn]
   (let [triples (dses/read-statements tempfile rdf-format)
         quads (map (comp pr/map->Quad #(assoc % :c graph)) triples)]
-    (append-quads-to-draftset-job backend draftset-ref quads clock-fn)))
+    (append-quads-to-draftset-job backend
+                                  user-id
+                                  draftset-ref
+                                  quads
+                                  clock-fn)))
 
 (defn data-handler
   "Ring handler to append data into a draftset."
@@ -94,11 +115,24 @@
       (fn [{{draftset-id :draftset-id
             rdf-format :rdf-format
             graph :graph} :params body :body :as request}]
-        (if (is-quads-format? rdf-format)
-          (let [append-job (append-data-to-draftset-job backend draftset-id body rdf-format util/get-current-time)]
-            (response/submit-async-job! append-job))
-          (let [append-job (append-triples-to-draftset-job backend draftset-id body rdf-format graph util/get-current-time)]
-            (response/submit-async-job! append-job)))))))))
+        (let [user-id (req/user-id request)
+              ds-id (:id draftset-id)]
+          (if (is-quads-format? rdf-format)
+            (let [append-job (append-data-to-draftset-job backend
+                                                          user-id
+                                                          ds-id
+                                                          body
+                                                          rdf-format
+                                                          util/get-current-time)]
+              (response/submit-async-job! append-job))
+            (let [append-job (append-triples-to-draftset-job backend
+                                                             user-id
+                                                             ds-id
+                                                             body
+                                                             rdf-format
+                                                             graph
+                                                             util/get-current-time)]
+              (response/submit-async-job! append-job))))))))))
 
 (defmethod ig/pre-init-spec ::data-handler [_]
   (s/keys :req [:drafter/backend]

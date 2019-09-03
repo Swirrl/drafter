@@ -11,7 +11,8 @@
             [drafter.rdf.draftset-management.job-util :as jobutil]
             [integrant.core :as ig]
             [ring.util.response :as ring]
-            [swirrl-server.responses :as response]))
+            [swirrl-server.responses :as response]
+            [drafter.requests :as req]))
 
 (defn revert-graph-changes!
   "Reverts the changes made to a live graph inside the given
@@ -29,14 +30,17 @@
   (wrap-as-draftset-owner
    (middleware/parse-graph-param-handler
     true
-    (fn [{{:keys [draftset-id graph]} :params}]
-      (feat-common/run-sync #(revert-graph-changes! backend draftset-id graph)
-                (fn [result]
-                  (if (jobutil/failed-job-result? result)
-                    (response/api-response 500 result)
-                    (if (= :reverted (:details result))
-                      (ring/response (dsops/get-draftset-info backend draftset-id))
-                      (ring/not-found "")))))))))
+    (fn [{{:keys [draftset-id graph]} :params :as request}]
+      (feat-common/run-sync
+       (req/user-id request)
+       draftset-id
+       #(revert-graph-changes! backend draftset-id graph)
+       (fn [result]
+         (if (jobutil/failed-job-result? result)
+           (response/api-response 500 result)
+           (if (= :reverted (:details result))
+             (ring/response (dsops/get-draftset-info backend draftset-id))
+             (ring/not-found "")))))))))
 
 (defmethod ig/pre-init-spec ::delete-changes-handler [_]
   (s/keys :req [:drafter/backend]

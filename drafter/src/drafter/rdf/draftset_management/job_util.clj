@@ -3,7 +3,7 @@
             [cognician.dogstatsd :as datadog]
             [clojure.string :as str]
             [drafter.util :as util]
-            [swirrl-server.async.jobs :as ajobs]))
+            [drafter.async.jobs :as ajobs]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:
