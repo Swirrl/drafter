@@ -11,6 +11,8 @@
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
+(def dummy "dummy@user.com")
+
 (defn- get-graph-triples [backend graph-uri]
   (let [results (sparql/eager-query backend (tc/select-all-in-graph graph-uri))]
     (map (fn [{:keys [s p o]}] (->Triple s p o)) results)))
@@ -22,7 +24,11 @@
   (let [draftset-id (dsops/create-draftset! backend test-editor)
         live-triples (tc/test-triples (URI. "http://test-subject"))
         live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples (constantly #inst "2015"))
-        {:keys [value-p] :as copy-job} (append-graph/copy-live-graph-into-draftset-job backend draftset-id live-graph-uri)]
+        {:keys [value-p] :as copy-job} (append-graph/copy-live-graph-into-draftset-job
+                                        backend
+                                        dummy
+                                        draftset-id
+                                        live-graph-uri)]
     (scheduler/queue-job! copy-job)
 
     @value-p
@@ -38,7 +44,11 @@
         live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples (constantly #inst "2015"))
         initial-draft-triples (tc/test-triples (URI. "http://temp-subject"))
         draft-graph-uri (tc/import-data-to-draft! backend live-graph-uri initial-draft-triples draftset-id (constantly #inst "2016"))
-        {:keys [value-p] :as copy-job} (append-graph/copy-live-graph-into-draftset-job backend draftset-id live-graph-uri)]
+        {:keys [value-p] :as copy-job} (append-graph/copy-live-graph-into-draftset-job
+                                        backend
+                                        dummy
+                                        draftset-id
+                                        live-graph-uri)]
 
     (scheduler/queue-job! copy-job)
     @value-p

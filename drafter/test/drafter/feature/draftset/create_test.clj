@@ -20,8 +20,7 @@
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [statements rdf-writer]]
-            [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]))
+            [schema.core :as s]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 

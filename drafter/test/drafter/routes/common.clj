@@ -3,8 +3,7 @@
             [drafter.user-test :refer [test-editor]]
             [grafter-2.rdf.protocols :refer [add]]
             [grafter-2.rdf4j.formats :as formats]
-            [grafter-2.rdf4j.io :refer [rdf-writer statements]]
-            [swirrl-server.async.jobs :refer [finished-jobs]])
+            [grafter-2.rdf4j.io :refer [rdf-writer statements]])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 (def default-sparql-query {:request-method :get :headers {"accept" "text/csv"}})
@@ -54,7 +53,7 @@
 (defn append-quads-to-draftset-through-api [api user draftset-location quads]
   (let [request (statements->append-request user draftset-location quads :nq)
         response (api request)]
-    (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
+    (tc/await-success (get-in response [:body :finished-job]))))
 
 (defn publish-draftset [api user draftset-location]
   (let [content-type (.getDefaultMIMEType (formats/->rdf-format :nq))
@@ -62,4 +61,4 @@
                   {:uri (str draftset-location "/publish")
                    :request-method :post})
         response (api request)]
-    (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
+    (tc/await-success (get-in response [:body :finished-job]))))

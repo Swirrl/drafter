@@ -17,6 +17,8 @@
 
 (def system "drafter/feature/empty-db-system.edn")
 
+(def dummy "dummy@user.com")
+
 (tc/deftest-system-with-keys delete-draftset-data-test
   [:drafter/backend :drafter/write-scheduler :drafter.fixture-data/loader]
   [{:keys [:drafter/backend]} system]
@@ -25,9 +27,19 @@
         delete-time (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
         ds (dsops/create-draftset! backend test-editor)]
 
-    (th/apply-job! (append/append-triples-to-draftset-job backend ds (io/file "./test/test-triple.nt") RDFFormat/NTRIPLES (URI. "http://foo/graph") initial-time))
+    (th/apply-job! (append/append-triples-to-draftset-job backend
+                                                          dummy
+                                                          ds
+                                                          (io/file "./test/test-triple.nt")
+                                                          RDFFormat/NTRIPLES
+                                                          (URI. "http://foo/graph") initial-time))
 
-    (th/apply-job! (sut/delete-triples-from-draftset-job backend ds (URI. "http://foo/graph") (io/file "./test/test-triple-2.nt") RDFFormat/NTRIPLES delete-time))
+    (th/apply-job! (sut/delete-triples-from-draftset-job backend
+                                                         dummy
+                                                         ds
+                                                         (URI. "http://foo/graph")
+                                                         (io/file "./test/test-triple-2.nt")
+                                                         RDFFormat/NTRIPLES delete-time))
     (let [ts-3 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
       (t/is (.isEqual (delete-time)
                        ts-3)

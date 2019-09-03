@@ -11,8 +11,7 @@
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [grafter-2.rdf.protocols :refer [->Quad ->Triple context map->Triple]]
             [grafter-2.rdf4j.formats :as formats]
-            [grafter-2.rdf4j.io :refer [statements]]
-            [swirrl-server.async.jobs :refer [finished-jobs]])
+            [grafter-2.rdf4j.io :refer [statements]])
   (:import java.net.URI
            java.time.OffsetDateTime))
 
@@ -30,7 +29,7 @@
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         delete-response (handler (create-delete-draftset-request draftset-location test-editor))]
     (tc/assert-is-accepted-response delete-response)
-    (tc/await-success finished-jobs (get-in delete-response [:body :finished-job]))
+    (tc/await-success (get-in delete-response [:body :finished-job]))
 
     (let [get-response (handler (tc/with-identity test-editor {:uri draftset-location :request-method :get}))]
       (tc/assert-is-not-found-response get-response))))
@@ -191,7 +190,7 @@
         body (tc/string->input-stream "NOT NQUADS")
         delete-request (help/create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :nq)))
         delete-response (handler delete-request)
-        job-result (tc/await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
+        job-result (tc/await-completion (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))
 
 (tc/deftest-system-with-keys delete-triples-from-graph-in-live
@@ -277,5 +276,5 @@
         delete-request (help/create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :ttl)))
         delete-request (assoc-in delete-request [:params :graph] "http://test-graph")
         delete-response (handler delete-request)
-        job-result (tc/await-completion finished-jobs (get-in delete-response [:body :finished-job]))]
+        job-result (tc/await-completion (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))

@@ -9,7 +9,6 @@
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
             [clojure.string :as string]
             [clojure-csv.core :as csv]
             [drafter.routes.common
