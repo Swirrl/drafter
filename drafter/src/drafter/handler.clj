@@ -21,7 +21,6 @@
             [ring.middleware.file-info :refer [wrap-file-info]]
             [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware.verbs :refer [wrap-verbs]]
-            [swirrl-server.async.jobs :refer [finished-jobs restart-id]]
             [swirrl-server.errors :refer [wrap-encode-errors]]
             [swirrl-server.middleware.log-request :refer [log-request]]))
 
@@ -47,16 +46,16 @@
 (defn- build-handler
   [{backend :repo
     live-sparql-route :live-sparql-query-route
-    draftset-api-routes :draftset-api-routes}]
+    draftset-api-routes :draftset-api-routes
+    jobs-status-routes :jobs-status-routes}]
   (wrap-handler (app-handler
                  ;; add your application routes here
                  (-> []
                      (add-route (pages-routes))
                      (add-route draftset-api-routes)
                      (add-route live-sparql-route)
-                     (add-route (context "/v1/status" []
-                                         (status-routes global-writes-lock finished-jobs restart-id)))
-
+                     (add-route (context "/v1/status" [] (status-routes global-writes-lock)))
+                     (add-route jobs-status-routes)
                      (add-routes (denv/env-specific-routes backend))
                      (add-route app-routes))
 
