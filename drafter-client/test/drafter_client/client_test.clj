@@ -1,7 +1,7 @@
 (ns drafter-client.client-test
   (:require [clj-http.client :as http]
             [clojure.spec.test.alpha :as st]
-            [clojure.test :as t]
+            [clojure.test :as t :refer [deftest is]]
             [drafter.main :as main]
             [drafter.middleware.auth0-auth]
             [drafter.middleware.auth]
@@ -307,12 +307,21 @@
         description "Job async response handling tests"
         draftset (sut/new-draftset client token name description)]
     (t/testing "Adding quads to a draft set"
-      (let [async-job (sut/add client token draftset (take 5 quads))]
-        (t/is (= "ok" (:type async-job)))
-        (t/is (not (sut/job-complete? async-job)))
-        (let [job-status (sut/resolve-job client token async-job)]
-          (t/is (= :drafter-client.client/completed job-status)))))))
-
+      (let [async-job (sut/add client token draftset (take 5 quads))
+            id (:job-id async-job)
+            known-job (sut/job client token id)]
+        (is known-job)
+        (is (= :pending (:status known-job)))
+        (is (contains? (set (map :id (sut/jobs client token)))
+                       (:id known-job)))
+        (is (= "ok" (:type async-job)))
+        (is (not (sut/job-complete? async-job)))
+        (let [job-status (sut/resolve-job client token async-job)
+              known-job' (sut/job client token id)]
+          (is known-job')
+          (is (= :complete (:status known-job')))
+          (is (contains? (set (sut/jobs client token)) known-job'))
+          (is (= :drafter-client.client/completed job-status)))))))
 
 (t/deftest querying
   (let [client (drafter-client)

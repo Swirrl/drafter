@@ -2,6 +2,8 @@
   (:require [clojure.spec.alpha :as s]
             [clojure.test.check.generators :as gen]
             [clojure.string :as string]
+            [clj-time.coerce :refer [from-long]]
+            [clj-time.format :refer [formatters parse unparse]]
             [drafter.draftset :as ds])
   (:import [java.util UUID]
            [drafter.draftset DraftsetId]))
@@ -25,14 +27,19 @@
   (s/with-gen (s/and (partial instance? DraftsetId) (s/keys :req-un [::ds/id]))
     (fn [] (gen/fmap (comp ds/->DraftsetId str) (s/gen uuid?)))))
 
+(def date-time-string?
+  (s/with-gen (s/and string? #(parse (formatters :date-time) %))
+    (fn [] (gen/fmap (comp (partial unparse (formatters :date-time)) from-long)
+                    (s/gen int?)))))
+
 (s/def ::id uuid?)
 (s/def ::user-id email-string?)
 (s/def ::status #{:pending :complete})
 (s/def ::priority #{:batch-write :background-write :blocking-write :publish-write})
 (s/def :internal-job/start-time int?)
 (s/def :internal-job/finish-time (s/nilable int?))
-(s/def :api-job/start-time inst?)
-(s/def :api-job/finish-time (s/nilable inst?))
+(s/def :api-job/start-time date-time-string?)
+(s/def :api-job/finish-time (s/nilable date-time-string?))
 (s/def ::draftset-id (s/nilable draftset-id?))
 (s/def ::draft-graph-id (s/nilable uuid-string?))
 (s/def ::function (s/with-gen fn? (fn [] (gen/elements [identity]))))

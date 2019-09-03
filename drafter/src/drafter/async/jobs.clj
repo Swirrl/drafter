@@ -8,7 +8,8 @@
             [swirrl-server.util :refer [try-parse-uuid]]
             [integrant.core :as ig]
             [clj-time.coerce :refer [to-date from-long]]
-            [clj-time.core :as time])
+            [clj-time.core :as time]
+            [clj-time.format :refer [formatters unparse]])
   (:import (java.util UUID)
            (clojure.lang ExceptionInfo)
            (org.apache.log4j MDC)))
@@ -44,7 +45,7 @@
    :body "Job not found."})
 
 (defn timestamp-response [x]
-  (some-> x from-long to-date))
+  (some->> x from-long (unparse (formatters :date-time))))
 
 (s/fdef job-response :args (s/cat :job ::spec/job) :ret ::spec/api-job)
 

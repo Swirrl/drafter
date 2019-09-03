@@ -678,7 +678,7 @@ paths:
 
   /status/jobs/{jobid}:
     get:
-      operationId: get-jobs
+      operationId: get-job
       summary: Get metadata about a specific Job
       description: |
         Whether pending or complete, get information about the current state of
