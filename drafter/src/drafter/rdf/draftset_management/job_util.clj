@@ -73,9 +73,13 @@
   [{:keys [type] :as result}]
   (= :error type))
 
-(defmacro make-job [write-priority [job :as args] & forms]
-  `(ajobs/create-job ~write-priority
-               (fn [~job]
-                 (datadog/measure! (util/statsd-name "drafter.job" ~write-priority "time") {}
-                  (with-job-exception-handling ~job
-                    ~@forms)))))
+(defmacro make-job
+  [user-id draftset-id write-priority [job :as args] & forms]
+  `(ajobs/create-job
+    ~user-id
+    ~draftset-id
+    ~write-priority
+    (fn [~job]
+      (datadog/measure!
+       (util/statsd-name "drafter.job" ~write-priority "time") {}
+       (with-job-exception-handling ~job ~@forms)))))
