@@ -20,15 +20,12 @@
 
 
 (defn copy-live-graph-into-draftset-job [backend user-id draftset-ref live-graph]
-  (jobs/make-job
-   user-id
-   (ds/->draftset-id draftset-ref)
-   :background-write [job]
-   (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph util/get-current-time)]
-     (ds-data-common/lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
-     (jobs/job-succeeded! job))))
-
-
+  (let [ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id 'copy-live-graph-into-draftset ds-id :background-write
+      (fn [job]
+        (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph util/get-current-time)]
+          (ds-data-common/lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
+          (jobs/job-succeeded! job))))))
 
 (defn- required-live-graph-param-handler [backend inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
@@ -48,7 +45,7 @@
             (copy-live-graph-into-draftset-job (req/user-id request)
                                                draftset-id
                                                graph)
-            submit-async-job!))))))
+            (submit-async-job!)))))))
 
 (defmethod ig/pre-init-spec ::handler [_]
   (s/keys :req [:drafter/backend]

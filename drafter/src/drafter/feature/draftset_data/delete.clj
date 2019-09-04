@@ -75,28 +75,24 @@
 
 (defn delete-quads-from-draftset-job
   [backend user-id draftset-ref serialised rdf-format clock-fn]
-  (let [backend (:repo backend)]
-    (jobs/make-job
-     user-id
-     (ds/->draftset-id draftset-ref)
-     :background-write
-     [job]
-     (let [quads (read-statements serialised rdf-format)
-           graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-       (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn)))))
+  (let [backend (:repo backend)
+        ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id 'delete-quads-from-draftset ds-id :background-write
+      (fn [job]
+        (let [quads (read-statements serialised rdf-format)
+              graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
+          (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn))))))
 
 (defn delete-triples-from-draftset-job
   [backend user-id draftset-ref graph serialised rdf-format clock-fn]
-  (let [backend (:repo backend)]
-    (jobs/make-job
-     user-id
-     (ds/->draftset-id draftset-ref)
-     :background-write
-     [job]
-     (let [triples (read-statements serialised rdf-format)
-           quads (map #(util/make-quad-statement % graph) triples)
-           graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-       (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn)))))
+  (let [backend (:repo backend)
+        ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id 'delete-triples-from-draftset ds-id :background-write
+      (fn [job]
+        (let [triples (read-statements serialised rdf-format)
+              quads (map #(util/make-quad-statement % graph) triples)
+              graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
+          (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn))))))
 
 (defn delete-draftset-data-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
   (wrap-as-draftset-owner

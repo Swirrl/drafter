@@ -24,6 +24,7 @@
      (fn [{{:keys [draftset-id graph silent]} :params :as request}]
        (if (mgmt/is-graph-managed? backend graph)
          (feat-common/run-sync (req/user-id request)
+                               'delete-draftset-graph
                                draftset-id
                                #(dsops/delete-draftset-graph! backend draftset-id graph util/get-current-time)
                                #(feat-common/draftset-sync-write-response % backend draftset-id))

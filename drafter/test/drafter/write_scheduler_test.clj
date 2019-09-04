@@ -18,10 +18,10 @@
 (def mock-user-id "dummy@user.com")
 
 (defn mock-job [id type submit-time]
-  (->Job id mock-user-id nil type submit-time nil nil nil t (promise)))
+  (->Job id mock-user-id 'test-job nil type submit-time nil nil nil t (promise)))
 
 (defn const-job [priority ret]
-  (create-job mock-user-id priority (fn [job] (job-succeeded! job ret))))
+  (create-job mock-user-id 'test-job priority (fn [job] (job-succeeded! job ret))))
 
 (deftest job-sort-order-test
   (let [unordered-jobs [(mock-job 4 :publish-write 2)

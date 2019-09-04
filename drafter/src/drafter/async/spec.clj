@@ -35,6 +35,7 @@
 
 (s/def ::id uuid?)
 (s/def ::user-id email-string?)
+(s/def ::operation symbol?)
 (s/def ::status #{:pending :complete})
 (s/def ::priority #{:batch-write :background-write :blocking-write :publish-write})
 (s/def :internal-job/start-time int?)
@@ -47,13 +48,13 @@
 (s/def ::value-p (s/with-gen promise? (fn [] (gen/elements [(promise)]))))
 
 (s/def ::job
-  (s/keys :req-un [::id ::user-id ::status ::priority :internal-job/start-time
-                   :internal-job/finish-time ::draftset-id ::draft-graph-id
-                   ::function ::value-p]))
+  (s/keys :req-un [::id ::user-id ::operation ::status ::priority
+                   :internal-job/start-time :internal-job/finish-time
+                   ::draftset-id ::draft-graph-id ::function ::value-p]))
 
 (s/def ::api-job
-  (s/keys :req-un [::id ::user-id ::status ::priority :api-job/start-time
-                   :api-job/finish-time]
+  (s/keys :req-un [::id ::user-id ::operation ::status ::priority
+                   :api-job/start-time :api-job/finish-time]
           :opt-un [::draftset-id ::draft-graph-id]))
 
 (s/def :failed-job-result/type #{:error})

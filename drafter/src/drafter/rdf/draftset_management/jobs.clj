@@ -18,12 +18,11 @@
            org.eclipse.rdf4j.model.Resource))
 
 (defn delete-draftset-job [backend user-id draftset-ref]
-  (jobs/make-job
-   user-id
-   (ds/->draftset-id draftset-ref)
-   :background-write [job]
-   (do (ops/delete-draftset! backend draftset-ref)
-       (jobs/job-succeeded! job))))
+  (let [ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id 'delete-draftset ds-id :background-write
+      (fn [job]
+        (ops/delete-draftset! backend draftset-ref)
+        (jobs/job-succeeded! job)))))
 
 ;; (defn touch-graph-in-draftset [draftset-ref draft-graph-uri modified-at]
 ;;   (let [update-str (str (mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at) " ; "
@@ -41,13 +40,12 @@
   ;; TODO combine these into a single job as priorities have now
   ;; changed how these will be applied.
 
-  (jobs/make-job
-   user-id
-   (ds/->draftset-id draftset-ref)
-   :publish-write [job]
-   (try
-     (ops/publish-draftset-graphs! backend draftset-ref clock-fn)
-     (ops/delete-draftset-statements! backend draftset-ref)
-     (jobs/job-succeeded! job)
-     (catch Exception ex
-       (jobs/job-failed! job ex)))))
+  (let [ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id 'publish-draftset ds-id :publish-write
+      (fn [job]
+        (try
+          (ops/publish-draftset-graphs! backend draftset-ref clock-fn)
+          (ops/delete-draftset-statements! backend draftset-ref)
+          (jobs/job-succeeded! job)
+          (catch Exception ex
+            (jobs/job-failed! job ex)))))))

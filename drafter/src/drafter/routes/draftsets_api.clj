@@ -50,56 +50,6 @@
                              :route route}
                             (handler-fn req)))))
 
-(defn create-draftsets-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (let [version "/v1"]
-    (wrap-authenticated
-     (fn [{{:keys [display-name description]} :params user :identity :as request}]
-       (feat-common/run-sync
-        (req/user-id request)
-        nil ; draftset doesn't exist yet
-        #(dsops/create-draftset! backend user display-name description util/create-uuid util/get-current-time)
-        (fn [result]
-          (if (jobutil/failed-job-result? result)
-            (response/api-response 500 result)
-            (ring/redirect-after-post (str version "/draftset/"
-                                           (get-in result [:details :id]))))))))))
-
-
-(defn draftset-publish-handler [{backend :drafter/backend
-                                 :keys [wrap-as-draftset-owner timeout-fn]}]
-  (wrap-as-draftset-owner
-   (fn [{{:keys [draftset-id]} :params user :identity :as request}]
-     (if (user/has-role? user :publisher)
-       (submit-async-job! (dsjobs/publish-draftset-job backend
-                                                       (req/user-id request)
-                                                       draftset-id
-                                                       util/get-current-time))
-       (forbidden-response "You require the publisher role to perform this action")))))
-
-(defmethod ig/pre-init-spec ::draftset-publish-handler [_]
-  (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner]))
-
-(defmethod ig/init-key ::draftset-publish-handler [_ opts]
-  (draftset-publish-handler opts))
-
-(defn draftset-set-metadata-handler [{backend :drafter/backend
-                                      :keys [wrap-as-draftset-owner timeout-fn]}]
-  (wrap-as-draftset-owner
-   (fn [{{:keys [draftset-id] :as params} :params :as request}]
-     (feat-common/run-sync
-      (req/user-id request)
-      draftset-id
-      #(dsops/set-draftset-metadata! backend draftset-id params)
-      #(feat-common/draftset-sync-write-response % backend draftset-id)))))
-
-(defmethod ig/pre-init-spec ::draftset-set-metadata-handler [_]
-  (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner]))
-
-(defmethod ig/init-key ::draftset-set-metadata-handler [_ opts]
-  (draftset-set-metadata-handler opts))
-
 (defn draftset-api-routes [{:keys [get-users-handler
                                    get-draftsets-handler
                                    get-draftset-handler

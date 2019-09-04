@@ -15,6 +15,7 @@
      (fn [{{:keys [display-name description]} :params user :identity :as request}]
        (feat-common/run-sync
         (req/user-id request)
+        'create-draftset
         nil ; because we're creating the draftset here
         #(dsops/create-draftset! backend user display-name description util/create-uuid util/get-current-time)
         (fn [result]

@@ -11,6 +11,7 @@
   (if-let [target-user (user/find-user-by-username repo user)]
     (feat-common/run-sync
      (:email owner)
+     'submit-draftset-to-user
      draftset-id
      #(dsops/submit-draftset-to-user! backend draftset-id owner target-user)
      #(feat-common/draftset-sync-write-response % backend draftset-id))
@@ -22,6 +23,7 @@
     (if (user/is-known-role? role-kw)
       (feat-common/run-sync
        (:email owner)
+       'submit-draftset-to-role
        draftset-id
        #(dsops/submit-draftset-to-role! backend draftset-id owner role-kw)
        #(feat-common/draftset-sync-write-response % backend draftset-id))

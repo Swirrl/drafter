@@ -61,25 +61,25 @@
   (when-let [configured-batch-size (:batched-write-size config)]
     (alter-var-root #'batched-write-size (constantly configured-batch-size))))
 
-(defmacro with-job-exception-handling [job & forms]
-  `(try
-     ~@forms
-     (catch Throwable ext#
-       (log/warn ext# "Error whilst executing job")
-       (ajobs/job-failed! ~job ext#))))
-
 (defn failed-job-result?
   "Indicates whether the given result object is a failed job result."
   [{:keys [type] :as result}]
   (= :error type))
 
-(defmacro make-job
-  [user-id draftset-id write-priority [job :as args] & forms]
-  `(ajobs/create-job
-    ~user-id
-    ~draftset-id
-    ~write-priority
-    (fn [~job]
-      (datadog/measure!
-       (util/statsd-name "drafter.job" ~write-priority "time") {}
-       (with-job-exception-handling ~job ~@forms)))))
+(defn make-job
+  {:style/indent :defn}
+  [user-id operation draftset-id write-priority job-fn]
+  (ajobs/create-job
+   user-id
+   operation
+   draftset-id
+   write-priority
+   (fn [job]
+     (datadog/measure!
+      (util/statsd-name "drafter.job" operation write-priority "time")
+      {}
+      (try
+        (job-fn job)
+        (catch Throwable t
+          (log/warn t "Error whilst executing job")
+          (ajobs/job-failed! job t)))))))

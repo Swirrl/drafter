@@ -11,6 +11,7 @@
    (fn [{{:keys [draftset-id] :as params} :params :as request}]
      (feat-common/run-sync
       (req/user-id request)
+      'set-draftset-metadata
       draftset-id
       #(dsops/set-draftset-metadata! backend draftset-id params)
       #(feat-common/draftset-sync-write-response % backend draftset-id)))))

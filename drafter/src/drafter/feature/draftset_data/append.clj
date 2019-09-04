@@ -69,28 +69,28 @@
     (copy-graph-for-append* state draftset-ref backend live->draft quad-batches job)))
 
 (defn- append-quads-to-draftset-job
-  [backend user-id draftset-ref quads clock-fn]
-  (let [backend (:repo backend)]
-    (jobs/make-job user-id
-                   (ds/->draftset-id draftset-ref)
-                   :background-write
-                   [job]
-                   (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
-                         quad-batches (util/batch-partition-by quads
-                                                               pr/context
-                                                               jobs/batched-write-size)
-                         now (clock-fn)]
-                     (append-draftset-quads backend
-                                            draftset-ref
-                                            graph-map
-                                            quad-batches
-                                            {:op :append :job-started-at now}
-                                            job)))))
+  [backend user-id operation draftset-ref quads clock-fn]
+  (let [backend (:repo backend)
+        ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id operation ds-id :background-write
+      (fn [job]
+        (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
+              quad-batches (util/batch-partition-by quads
+                                                    pr/context
+                                                    jobs/batched-write-size)
+              now (clock-fn)]
+          (append-draftset-quads backend
+                                 draftset-ref
+                                 graph-map
+                                 quad-batches
+                                 {:op :append :job-started-at now}
+                                 job))))))
 
 (defn append-data-to-draftset-job
   [backend user-id draftset-ref tempfile rdf-format clock-fn]
   (append-quads-to-draftset-job backend
                                 user-id
+                                'append-quads-to-draftset
                                 draftset-ref
                                 (dses/read-statements tempfile rdf-format)
                                 clock-fn))
@@ -101,6 +101,7 @@
         quads (map (comp pr/map->Quad #(assoc % :c graph)) triples)]
     (append-quads-to-draftset-job backend
                                   user-id
+                                  'append-triples-to-draftset
                                   draftset-ref
                                   quads
                                   clock-fn)))

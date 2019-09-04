@@ -1089,6 +1089,8 @@ definitions:
       user-id:
         type: string
         format: uuid
+      operation:
+        type: string
       status:
         type: string
       priority:
@@ -1110,6 +1112,7 @@ definitions:
     example:
       id: a1b26596-2dca-4e52-883c-7fdcb8b4be97
       user-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
+      operation: publish-draft
       status: pending
       priority: background-write
       start-time: "2016-01-01T13:35:21+00:00"
