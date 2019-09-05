@@ -1,6 +1,5 @@
 (ns drafter-client.client.auth
   (:require [clj-time.coerce :refer [to-date]]
-            [clj-time.core :as time]
             [clj-time.format :refer [formatter parse]]
             [drafter-client.client.impl :as i]
             [ring.util.codec :refer [form-encode]]
@@ -23,7 +22,7 @@
                    :client_secret schema/Str
                    :audience schema/Str}}}])
 
-(deftype Auth0Client [martian client-id client-secret]
+(deftype Auth0Client [martian client-id client-secret audience]
   clojure.lang.ILookup
   (valAt [this k] (.valAt this k nil))
   (valAt [this k default]
@@ -31,24 +30,26 @@
       :martian martian
       :client-id client-id
       :client-secret client-secret
+      :audience audience
       (.valAt martian k default))))
 
-(defn client [endpoint client-id client-secret]
+(defn client [endpoint client-id client-secret audience]
   (let [api (martian/bootstrap endpoint auth0-routes {:interceptors i/default-interceptors})]
-    (->Auth0Client api client-id client-secret)))
+    (->Auth0Client api client-id client-secret audience)))
 
 (defn intercept
   {:style/indent :defn}
-  [{:keys [martian client-id client-secret]} & interceptors]
+  [{:keys [martian client-id client-secret audience]} & interceptors]
   (->Auth0Client (apply update martian :interceptors conj interceptors)
                  client-id
-                 client-secret))
+                 client-secret
+                 audience))
 
 (defn get-client-id-token [{:keys [auth0] :as client}]
   (let [body {:grant-type "client_credentials"
               :client-id (:client-id auth0)
               :client-secret (:client-secret auth0)
-              :audience "https://drafter.swirrl.com"}]
+              :audience (:audience auth0)}]
     (-> auth0
         (intercept (i/content-type "application/x-www-form-urlencoded"))
         (intercept (i/set-redirect-strategy :none))

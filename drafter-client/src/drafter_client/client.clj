@@ -182,10 +182,10 @@
   "Create a Drafter client for `drafter-uri` that will request tokens from Auth0
   for the (cli-)client."
   [drafter-uri
-   & {:keys [batch-size version auth0-endpoint client-id client-secret]}]
+   & {:keys [batch-size version auth0-endpoint client-id client-secret audience]}]
   (let [version (or version "v1")
         swagger-json "swagger/swagger.json"
-        auth0 (auth/client auth0-endpoint client-id client-secret)]
+        auth0 (auth/client auth0-endpoint client-id client-secret audience)]
     (log/debugf "Making Drafter client with batch size %d for Drafter: %s"
                 batch-size drafter-uri)
     (when (and drafter-uri auth0)
