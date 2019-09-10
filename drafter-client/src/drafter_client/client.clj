@@ -79,8 +79,8 @@
 
 (defn edit-draftset [client access-token id name description]
   (i/get client i/put-draftset access-token id
-    :display-name name
-    :description description))
+         :display-name name
+         :description description))
 
 (defn submit-to-user [client access-token id user]
   (i/get client i/submit-draftset-to access-token id :name user))
@@ -125,6 +125,19 @@
          (i/get i/put-draftset-data access-token id triples :graph graph)
          (->async-job)))))
 
+(defn add-in-batches
+  "Append the supplied RDF data to this Draftset in batches"
+  ([{:keys [batch-size] :as client} access-token draftset quads]
+   (->> quads
+        (partition-all batch-size)
+        (map (fn [quad-batch] (add client access-token draftset quad-batch)))
+        doall))
+  ([{:keys [batch-size] :as client} access-token draftset graph triples]
+   (->> triples
+        (partition-all batch-size)
+        (map (fn [triple-batch] (add client access-token draftset graph triple-batch)))
+        doall)))
+
 (defn publish
   "Publish the Draftset to live"
   [client access-token draftset]
@@ -164,6 +177,11 @@
       (job-in-progress? job*) (do (Thread/sleep 500)
                                   ;; Recur with the original
                                   (recur client access-token job)))))
+
+(defn resolve-jobs
+  "Wait until all of the asynchronous `jobs` have finished"
+  [client access-token jobs]
+  (map (fn [job] (resolve-job client access-token job)) jobs))
 
 (defn web-client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
