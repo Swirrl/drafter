@@ -86,7 +86,7 @@
       (with-open [server (tc/latched-http-server test-port connection-latch release-latch (tc/get-spo-http-response))]
         (let [blocked-connections (doall (map #(make-blocking-connection repo %) (range 1 (inc max-connections))))]
           ;;wait for max number of connections to be accepted by the server
-          (if (.await connection-latch 10000 TimeUnit/MILLISECONDS)
+          (if (.await connection-latch 20000 TimeUnit/MILLISECONDS)
             (do
               ;;server has accepted max number of connections so next query attempt should see a connection timeout
               (let [rf (future
