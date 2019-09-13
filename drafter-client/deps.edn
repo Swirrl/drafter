@@ -4,7 +4,6 @@
         buddy/buddy-sign {:mvn/version "3.0.0"}
         cheshire {:mvn/version "5.8.0"}
         clj-http {:mvn/version "3.9.0"}
-        com.auth0/mvc-auth-commons {:mvn/version "1.0.6"}
         grafter {:mvn/version "2.0.1"}
         grafter/url {:mvn/version "0.2.5"}
         grafter/vocabularies {:mvn/version "0.2.6"}
