@@ -5,7 +5,7 @@
             [clojure.spec.alpha :as s]
             [drafter.async.spec :as async]
             [clj-time.core :as time]
-            [clojure.test.check.generators :as gen])
+            [clojure.spec.gen.alpha :as gen])
   (:import [java.util UUID]))
 
 (defonce restart-id (UUID/randomUUID))

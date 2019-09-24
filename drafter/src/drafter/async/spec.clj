@@ -1,6 +1,6 @@
 (ns drafter.async.spec
   (:require [clojure.spec.alpha :as s]
-            [clojure.test.check.generators :as gen]
+            [clojure.spec.gen.alpha :as gen]
             [clojure.string :as string]
             [clj-time.coerce :refer [from-long]]
             [clj-time.format :refer [formatters parse unparse]]
