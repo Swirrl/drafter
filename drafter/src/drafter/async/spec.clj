@@ -16,7 +16,7 @@
 (def email-string?
   (s/with-gen (s/and string? #(string/includes? % "@"))
     (fn [] (gen/fmap (fn [[a b]] (str a "@" b ".com"))
-                    (gen/tuple gen/string-ascii gen/string-ascii)))))
+                    (gen/tuple (gen/string-ascii) (gen/string-ascii))))))
 
 (def uuid-string?
   (s/with-gen (s/and string? #(try (UUID/fromString %) (catch Throwable _)))
