@@ -26,14 +26,14 @@
                 value-p])
 
 (defonce jobs
-  {:pending  (ref {})
-   :complete (ref {})})
+  (atom {:pending  {}
+         :complete {}}))
 
 (defn complete-job [id]
-  (some-> jobs :complete deref (get id)))
+  (some-> jobs deref :complete (get id)))
 
 (defn get-job [id]
-  (or (some-> jobs :pending  deref (get id))
+  (or (some-> jobs deref :pending (get id))
       (complete-job id)))
 
 (def not-found
@@ -65,8 +65,8 @@
      (GET "/jobs" []
           (r/json-response 200 (mapv job-response
                                      (concat
-                                      (-> jobs :pending deref vals)
-                                      (-> jobs :complete deref vals)))))
+                                      (-> jobs deref :pending vals)
+                                      (-> jobs deref :complete vals)))))
      (GET "/finished-jobs/:id" [id]
           (or (when-let [job (some-> id r/try-parse-uuid complete-job :value-p deref)]
                 (r/json-response 200 (assoc job :restart-id r/restart-id)))
@@ -115,7 +115,7 @@
   "Submits an async job and returns `true` if the job was submitted
   successfully"
   [job]
-  (dosync (alter (:pending jobs) assoc (:id job) job))
+  (swap! jobs assoc-in [:pending (:id job)] job)
   true)
 
 (defn job-completed?
@@ -138,9 +138,10 @@
   (let [job' (assoc job
                     :status :complete
                     :finish-time (System/currentTimeMillis))]
-    (dosync
-     (alter (:pending jobs) dissoc job-id)
-     (alter (:complete jobs) assoc job-id job')))
+    (swap! jobs (fn [jobs]
+                  (-> jobs
+                      (update :pending dissoc job-id)
+                      (update :complete assoc job-id job')))))
   result)
 
 (defn- failed-job-result [ex details]

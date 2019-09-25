@@ -8,14 +8,13 @@
             [drafter.async.responses :as r]
             [clj-time.coerce :refer [from-date]]
             [clj-time.core :as time]
-            [drafter.user-test :refer [test-editor]])
+            [drafter.user-test :refer [test-editor]]
+            [cheshire.core :as json])
   (:import clojure.lang.ExceptionInfo
            java.util.UUID))
 
 (defn clear-jobs-fixture [f]
-  (dosync
-   (ref-set (:pending jobs/jobs) {})
-   (ref-set (:complete jobs/jobs) {}))
+  (reset! jobs/jobs {:pending {} :complete {}})
   (f))
 
 (use-fixtures :each clear-jobs-fixture tc/with-spec-instrumentation)
