@@ -79,7 +79,8 @@
       (testing "with other details"
         (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))
               details {:other :info}]
-          (jobs/job-failed! job ex details))))))
+          (jobs/job-failed! job ex details)
+          (assert-failure-result job msg ExceptionInfo details))))))
 
 (deftest job-succeeded-test
   (testing "With details"
@@ -213,9 +214,10 @@
       (let [msg "job failed"
             {:keys [id value-p] :as job} (create-failed-job (RuntimeException. msg))
             {:keys [body status]}
-            (handler (tc/with-identity test-editor (request :get (finished-job-path job))))]
-        (is (= 200 status)
-            (= msg (get-in body ["exception" "message"])))))
+            (handler (tc/with-identity test-editor (request :get (finished-job-path job))))
+            body (json/parse-string (json/generate-string body))]
+        (is (= 200 status))
+        (is (= msg (get-in body ["exception" "message"])))))
 
     (testing "with an unknown job"
       (let [job-path (finished-job-id-path (UUID/randomUUID))
