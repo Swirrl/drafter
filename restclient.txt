@@ -186,3 +186,18 @@ SELECT ?t WHERE {
     ?type rdfs:label ?name
   }
 }
+
+# Jobs status API
+GET http://localhost:3001/v1/status/jobs
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+
+# Job status API
+GET http://localhost:3001/v1/status/jobs/randomuuid
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+
+# Finished jobs status API
+GET http://localhost:3001/v1/status/finished-jobs/randomuuid
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0

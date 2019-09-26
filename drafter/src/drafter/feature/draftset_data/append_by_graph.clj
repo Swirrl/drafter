@@ -7,7 +7,9 @@
             [drafter.responses :as response :refer [submit-async-job!]]
             [drafter.util :as util]
             [integrant.core :as ig]
-            [drafter.feature.draftset-data.common :as ds-data-common]))
+            [drafter.feature.draftset-data.common :as ds-data-common]
+            [drafter.draftset :as ds]
+            [drafter.requests :as req]))
 
 (defn create-or-empty-draft-graph-for [backend draftset-ref live-graph clock-fn]
   (if-let [draft-graph-uri (ops/find-draftset-draft-graph backend draftset-ref live-graph)]
@@ -17,13 +19,13 @@
     (mgmt/create-draft-graph! backend live-graph draftset-ref clock-fn)))
 
 
-(defn copy-live-graph-into-draftset-job [backend draftset-ref live-graph]
-  (jobs/make-job :background-write [job]
-                 (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph util/get-current-time)]
-                   (ds-data-common/lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
-                   (jobs/job-succeeded! job))))
-
-
+(defn copy-live-graph-into-draftset-job [backend user-id draftset-ref live-graph]
+  (let [ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id 'copy-live-graph-into-draftset ds-id :background-write
+      (fn [job]
+        (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph util/get-current-time)]
+          (ds-data-common/lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
+          (jobs/job-succeeded! job))))))
 
 (defn- required-live-graph-param-handler [backend inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
@@ -35,11 +37,15 @@
                                    :keys [wrap-as-draftset-owner]}]
   (letfn [(required-live-graph-param [handler]
             (middleware/parse-graph-param-handler true (required-live-graph-param-handler backend handler)))]
-    
+
     (wrap-as-draftset-owner
      (required-live-graph-param
-      (fn [{{:keys [draftset-id graph]} :params}]
-        (submit-async-job! (copy-live-graph-into-draftset-job backend draftset-id graph)))))))
+      (fn [{{:keys [draftset-id graph]} :params :as request}]
+        (-> backend
+            (copy-live-graph-into-draftset-job (req/user-id request)
+                                               draftset-id
+                                               graph)
+            (submit-async-job!)))))))
 
 (defmethod ig/pre-init-spec ::handler [_]
   (s/keys :req [:drafter/backend]

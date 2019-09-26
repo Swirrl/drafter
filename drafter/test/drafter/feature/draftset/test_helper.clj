@@ -10,7 +10,7 @@
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
+            [drafter.async.jobs :as async]
             [clojure.java.io :as io]
             [drafter.util :as util]))
 
@@ -104,7 +104,7 @@
 (defn append-quads-to-draftset-through-api [handler user draftset-location quads]
   (let [request (statements->append-request user draftset-location quads :nq)
         response (handler request)]
-    (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
+    (tc/await-success (get-in response [:body :finished-job]))))
 
 (defn make-append-data-to-draftset-request [handler user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
@@ -117,7 +117,7 @@
 (defn publish-draftset-through-api [handler draftset-location user]
   (let [publish-request (create-publish-request draftset-location user)
         publish-response (handler publish-request)]
-    (tc/await-success finished-jobs (:finished-job (:body publish-response)))))
+    (tc/await-success (:finished-job (:body publish-response)))))
 
 (defn publish-quads-through-api [handler quads]
   (let [draftset-location (create-draftset-through-api handler test-publisher)]
@@ -173,7 +173,7 @@
     (is (= (set (eval-statements expected-quads)) (set live-quads)))))
 
 (defn await-delete-statements-response [response]
-  (let [job-result (tc/await-success finished-jobs (get-in response [:body :finished-job]))]
+  (let [job-result (tc/await-success (get-in response [:body :finished-job]))]
     (get-in job-result [:details :draftset])))
 
 (defn create-delete-quads-request [user draftset-location input-stream format]
@@ -217,7 +217,7 @@
 
 (defn append-data-to-draftset-through-api [handler user draftset-location draftset-data-file]
   (let [append-response (make-append-data-to-draftset-request handler user draftset-location draftset-data-file)]
-    (tc/await-success finished-jobs (:finished-job (:body append-response)))))
+    (tc/await-success (:finished-job (:body append-response)))))
 
 (defn statements->append-triples-request [user draftset-location triples graph]
   (-> (statements->append-request user draftset-location triples :nt)
@@ -226,4 +226,4 @@
 (defn append-triples-to-draftset-through-api [handler user draftset-location triples graph]
   (let [request (statements->append-triples-request user draftset-location triples graph)
         response (handler request)]
-    (tc/await-success finished-jobs (get-in response [:body :finished-job]))))
+    (tc/await-success (get-in response [:body :finished-job]))))

@@ -21,7 +21,7 @@
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
             [schema.core :as s]
-            [swirrl-server.async.jobs :refer [create-job]]
+            [drafter.async.jobs :as async :refer [create-job]]
             [aero.core :as aero]
             [drafter.user :as user])
   (:import [com.auth0.jwk Jwk JwkProvider]
@@ -289,28 +289,27 @@
 
   If the job doesn't appear before timeout time has passed an
   exception is raised."
-  ([state-atom path] (await-completion state-atom path default-timeout))
-  ([state-atom path timeout]
+  ([path] (await-completion path default-timeout))
+  ([path timeout]
    (let [start (System/currentTimeMillis)]
-     (loop [state-atom state-atom
-            guid (job-path->job-id path)]
-       (if-let [value (@state-atom guid)]
-         @value
+     (loop [guid (job-path->job-id path)]
+       (if-let [job (async/complete-job guid)]
+         @(:value-p job)
          (if (> (System/currentTimeMillis) (+ start (or timeout default-timeout) ))
            (throw (RuntimeException. "Timed out awaiting test value"))
            (do
              (Thread/sleep 5)
-             (recur state-atom guid))))))))
+             (recur guid))))))))
 
-(defmacro await-success
+(defn await-success
   "Waits for the job with the given path to be present in the given
   job state atom and then asserts the job succeeded. Returns the job
   result map."
-  [state-atom job-path]
-  `(let [job-result# (await-completion ~state-atom ~job-path)]
-     (is (= :ok (:type job-result#))
-         (str "job failed: " (pr-str job-result#)))
-     job-result#))
+  [job-path]
+  (let [job-result (await-completion job-path)]
+    (is (= :ok (:type job-result))
+        (str "job failed: " (pr-str job-result)))
+    job-result))
 
 (defn empty-spo-json-body []
   (let [baos (ByteArrayOutputStream. 1024)

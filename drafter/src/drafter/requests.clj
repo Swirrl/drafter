@@ -10,3 +10,7 @@
   [request]
   (get-in request [:params :query]))
 
+(defn user-id
+  "Returns the user-id for a request"
+  [request]
+  (get-in request [:identity :email]))

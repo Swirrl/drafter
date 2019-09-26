@@ -4,8 +4,7 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-publisher]]
             [grafter-2.rdf.protocols :refer [context]]
-            [grafter-2.rdf4j.io :refer [statements]]
-            [swirrl-server.async.jobs :refer [finished-jobs]]))
+            [grafter-2.rdf4j.io :refer [statements]]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -19,7 +18,7 @@
 (defn- copy-live-graph-into-draftset [handler draftset-location user live-graph]
   (let [request (copy-live-graph-into-draftset-request draftset-location user live-graph)
         response (handler request)]
-    (tc/await-success finished-jobs (:finished-job (:body response)))))
+    (tc/await-success (:finished-job (:body response)))))
 
 (tc/deftest-system-with-keys copy-live-graph-into-draftset-test
   [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]

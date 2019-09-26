@@ -11,20 +11,34 @@
             [drafter-client.client.repo :as repo]
             [integrant.core :as ig]
             [martian.clj-http :as martian-http])
-  (:import clojure.lang.ExceptionInfo))
+  (:import clojure.lang.ExceptionInfo
+           java.util.UUID))
 
 (alias 'c 'clojure.core)
 
 (def live draftset/live)
 
+(defn uuid [s]
+  (some-> s UUID/fromString (try (catch Throwable _))))
+
+(defn date-time [s]
+  (some->> s (parse (formatters :date-time))))
+
+(defn ->job [m]
+  (-> m
+      (update :id uuid)
+      (update :status keyword)
+      (update :priority keyword)
+      (update :start-time date-time)
+      (update :finish-time date-time)
+      (update :draftset-id (comp uuid :id))
+      (update :draft-graph-id uuid)))
+
 (defrecord AsyncJob [type job-id restart-id])
 
 (defn- ->async-job [{:keys [type finished-job restart-id] :as rsp}]
   {:post [type restart-id]}
-  (let [job-id (some-> finished-job
-                       (str/split #"/")
-                       last
-                       java.util.UUID/fromString)]
+  (let [job-id (some-> finished-job (str/split #"/") last uuid)]
     (->AsyncJob type job-id (java.util.UUID/fromString restart-id))))
 
 (defn job-complete? [{:keys [type job-id] :as async-job}]
@@ -38,14 +52,14 @@
 
 (defn- json-draftset->draftset [ds]
   (let [{:keys [id display-name description]} ds
-        id (java.util.UUID/fromString id)]
+        id (uuid id)]
     (draftset/->draftset id display-name description)))
 
 (defn- ->draftset [ds]
   (-> (draftset/map->Draftset ds)
-      (update :id #(java.util.UUID/fromString %))
-      (update :created-at (partial parse (formatters :date-time)))
-      (update :updated-at (partial parse (formatters :date-time)))
+      (update :id uuid)
+      (update :created-at date-time)
+      (update :updated-at date-time)
       (assoc :name (:display-name ds))
       (dissoc :display-name)))
 
@@ -155,6 +169,13 @@
    (-> client
        (i/accept "application/n-triples")
        (i/get i/get-draftset-data access-token (draftset/id draftset) :graph graph))))
+
+
+(defn job [client access-token id]
+  (->job (i/get client i/get-job access-token id)))
+
+(defn jobs [client access-token]
+  (map ->job (i/get client i/get-jobs access-token)))
 
 (defn refresh-job
   "Poll to see if asynchronous job has finished"

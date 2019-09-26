@@ -5,7 +5,7 @@
              [write-scheduler :refer :all]]
             [drafter.test-helpers.lock-manager :as lm]
             [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.jobs :refer [->Job create-job job-succeeded!]]
+            [drafter.async.jobs :refer [->Job create-job job-succeeded!]]
             [drafter.test-common :as tc]))
 
 (use-fixtures :each validate-schemas
@@ -15,11 +15,13 @@
   "Just a dummy function"
   [])
 
+(def mock-user-id "dummy@user.com")
+
 (defn mock-job [id type submit-time]
-  (->Job id type submit-time t (promise)))
+  (->Job id mock-user-id 'test-job nil type submit-time nil nil nil t (promise)))
 
 (defn const-job [priority ret]
-  (create-job priority (fn [job] (job-succeeded! job ret))))
+  (create-job mock-user-id 'test-job priority (fn [job] (job-succeeded! job ret))))
 
 (deftest job-sort-order-test
   (let [unordered-jobs [(mock-job 4 :publish-write 2)

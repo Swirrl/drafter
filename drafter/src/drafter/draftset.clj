@@ -18,12 +18,6 @@
   (->draftset-id [this]
     (last (url/path-segments this))))
 
-(extend-type String
-  DraftsetRef
-  (->draftset-uri [this] (url/->java-uri (ont/draftset-id->uri this)))
-  (->draftset-id [this]
-    this))
-
 ;; TODO consider removing DraftsetURI/DraftsetRef records they could probably just just be Draftset
 (defrecord DraftsetURI [uri]
   url/IURIable
@@ -42,6 +36,11 @@
 
   Object
   (toString [this] id))
+
+(extend-type String
+  DraftsetRef
+  (->draftset-uri [this] (url/->java-uri (ont/draftset-id->uri this)))
+  (->draftset-id [this] (->DraftsetId this)))
 
 (extend-type DraftsetURI
   DraftsetRef

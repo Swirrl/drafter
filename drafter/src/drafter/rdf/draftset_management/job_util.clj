@@ -3,8 +3,7 @@
             [cognician.dogstatsd :as datadog]
             [clojure.string :as str]
             [drafter.util :as util]
-            [drafter.write-scheduler :refer [queue-job!]]
-            [swirrl-server.async.jobs :as ajobs]))
+            [drafter.async.jobs :as ajobs]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:
@@ -38,17 +37,17 @@
   (datadog/increment! (util/statsd-name "drafter.job." (:priority job) suffix) 1))
 
 (defn job-failed!
-  "Wrap swirrl-server.async.jobs/job-failed! with a datadog counter."
+  "Wrap drafter.async.jobs/job-failed! with a datadog counter."
   ([job ex]
    (record-job-stats! job :failed)
    (ajobs/job-failed! job ex))
-  
+
   ([job ex details]
    (record-job-stats! job :failed)
    (ajobs/job-failed! job ex details)))
 
 (defn job-succeeded!
-  "Wrap swirrl-server.async.jobs/job-succeeded! with a datadog counter."
+  "Wrap drafter.async.jobs/job-succeeded! with a datadog counter."
   ([job]
    (record-job-stats! job :succeeded)
    (ajobs/job-succeeded! job))
@@ -62,21 +61,25 @@
   (when-let [configured-batch-size (:batched-write-size config)]
     (alter-var-root #'batched-write-size (constantly configured-batch-size))))
 
-(defmacro with-job-exception-handling [job & forms]
-  `(try
-     ~@forms
-     (catch Throwable ext#
-       (log/warn ext# "Error whilst executing job")
-       (ajobs/job-failed! ~job ext#))))
-
 (defn failed-job-result?
   "Indicates whether the given result object is a failed job result."
   [{:keys [type] :as result}]
   (= :error type))
 
-(defmacro make-job [write-priority [job :as args] & forms]
-  `(ajobs/create-job ~write-priority
-               (fn [~job]
-                 (datadog/measure! (util/statsd-name "drafter.job" ~write-priority "time") {}
-                  (with-job-exception-handling ~job
-                    ~@forms)))))
+(defn make-job
+  {:style/indent :defn}
+  [user-id operation draftset-id write-priority job-fn]
+  (ajobs/create-job
+   user-id
+   operation
+   draftset-id
+   write-priority
+   (fn [job]
+     (datadog/measure!
+      (util/statsd-name "drafter.job" operation write-priority "time")
+      {}
+      (try
+        (job-fn job)
+        (catch Throwable t
+          (log/warn t "Error whilst executing job")
+          (ajobs/job-failed! job t)))))))

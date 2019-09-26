@@ -21,7 +21,8 @@
             [grafter-2.rdf4j.io :refer [quad->backend-quad]]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
-            [swirrl-server.async.jobs :as ajobs])
+            [drafter.async.jobs :as ajobs]
+            [drafter.requests :as req])
   (:import org.eclipse.rdf4j.model.Resource))
 
 (defn- delete-quads-from-draftset [backend quad-batches draftset-ref live->draft {:keys [op job-started-at] :as state} job]
@@ -72,23 +73,26 @@
 
 
 
-(defn delete-quads-from-draftset-job [backend draftset-ref serialised rdf-format clock-fn]
-  (let [backend (:repo backend)]
-    (jobs/make-job :background-write [job]
-                   (let [;;backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
-                         quads (read-statements serialised rdf-format)
-                         graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-                     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn)))))
+(defn delete-quads-from-draftset-job
+  [backend user-id draftset-ref serialised rdf-format clock-fn]
+  (let [backend (:repo backend)
+        ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id 'delete-quads-from-draftset ds-id :background-write
+      (fn [job]
+        (let [quads (read-statements serialised rdf-format)
+              graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
+          (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn))))))
 
-(defn delete-triples-from-draftset-job [backend draftset-ref graph serialised rdf-format clock-fn]
-  (let [backend (:repo backend)]
-    (jobs/make-job :background-write [job]
-                   (let [;;backend (ep/draftset-endpoint {:backend backend :draftset-ref draftset-ref :union-with-live? false})
-                         triples (read-statements serialised rdf-format)
-                         quads (map #(util/make-quad-statement % graph) triples)
-                         graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-                     (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn)))))
-
+(defn delete-triples-from-draftset-job
+  [backend user-id draftset-ref graph serialised rdf-format clock-fn]
+  (let [backend (:repo backend)
+        ds-id (ds/->draftset-id draftset-ref)]
+    (jobs/make-job user-id 'delete-triples-from-draftset ds-id :background-write
+      (fn [job]
+        (let [triples (read-statements serialised rdf-format)
+              quads (map #(util/make-quad-statement % graph) triples)
+              graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
+          (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn))))))
 
 (defn delete-draftset-data-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
   (wrap-as-draftset-owner
@@ -98,9 +102,21 @@
       (fn [{{draftset-id :draftset-id
             graph :graph
             rdf-format :rdf-format} :params body :body :as request}]
-        (let [delete-job (if (is-quads-format? rdf-format)
-                           (delete-quads-from-draftset-job backend draftset-id body rdf-format util/get-current-time)
-                           (delete-triples-from-draftset-job backend draftset-id graph body rdf-format util/get-current-time))]
+        (let [user-id (req/user-id request)
+              delete-job (if (is-quads-format? rdf-format)
+                           (delete-quads-from-draftset-job backend
+                                                           user-id
+                                                           draftset-id
+                                                           body
+                                                           rdf-format
+                                                           util/get-current-time)
+                           (delete-triples-from-draftset-job backend
+                                                             user-id
+                                                             draftset-id
+                                                             graph
+                                                             body
+                                                             rdf-format
+                                                             util/get-current-time))]
           (response/submit-async-job! delete-job))))))))
 
 (defmethod ig/pre-init-spec ::delete-data-handler [_]

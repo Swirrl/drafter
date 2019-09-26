@@ -108,6 +108,18 @@
   [client & {:keys [include] :as opts}]
   (martian/response-for client :get-draftsets (merge {} opts)))
 
+(defn get-job
+  "Get metadata about a specific Job"
+  #:drafter-client.client.impl{:generated true}
+  [client jobid]
+  (martian/response-for client :get-job {:jobid jobid}))
+
+(defn get-jobs
+  "Get a list of all jobs currently known"
+  #:drafter-client.client.impl{:generated true}
+  [client & opts]
+  (martian/response-for client :get-jobs (merge {} opts)))
+
 (defn get-query-draftset
   "Query this Draftset with SPARQL"
   #:drafter-client.client.impl{:generated true}

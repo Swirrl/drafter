@@ -20,8 +20,7 @@
             [grafter-2.rdf4j.io :refer [quad->backend-quad rdf-writer]]
             [grafter-2.rdf4j.repository :as repo]
             [grafter.url :as url]
-            [grafter.vocabularies.rdf :refer :all]
-            [swirrl-server.async.jobs :as ajobs])
+            [grafter.vocabularies.rdf :refer :all])
   (:import java.io.StringWriter
            [java.util Date]
            org.eclipse.rdf4j.model.impl.ContextStatementImpl

@@ -2,10 +2,10 @@
   (:require [clojure.string :refer [upper-case]]
             [clojure.tools.logging :as log]
             [drafter.rdf.draftset-management.job-util :refer [failed-job-result?]]
-            [drafter.write-scheduler :refer [exec-sync-job! queue-job!]]
-            [swirrl-server.async.status-routes :refer [submitted-job-response]]
-            [swirrl-server.errors :refer [encode-error]]
-            [swirrl-server.responses :as r]))
+            [drafter.write-scheduler :as writes :refer [exec-sync-job!]]
+            [drafter.async.jobs :as jobs]
+            [drafter.async.responses :as r :refer [submitted-job-response]]
+            [swirrl-server.errors :refer [encode-error]]))
 
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
@@ -66,5 +66,6 @@
   result of the submit operation."
   [job]
   (log/info "Submitting async job: " job)
-  (queue-job! job)
+  (writes/queue-job! job)
+  (jobs/submit-async-job! job)
   (submitted-job-response "/v1" job))

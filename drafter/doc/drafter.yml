@@ -676,6 +676,40 @@ paths:
             items:
               $ref: '#/definitions/User'
 
+  /status/jobs/{jobid}:
+    get:
+      operationId: get-job
+      summary: Get metadata about a specific Job
+      description: |
+        Whether pending or complete, get information about the current state of
+        the specified Job.
+      parameters:
+        - $ref: "#/parameters/jobid"
+      tags:
+          - Jobs
+      responses:
+        '200':
+          description: The job requested
+          schema:
+            $ref: '#/definitions/Job'
+
+  /status/jobs:
+    get:
+      operationId: get-jobs
+      summary: Get a list of all jobs currently known
+      description: |
+        A list of all jobs submitted to the application since the application
+        started. Held in memory, not persisted.
+      tags:
+          - Jobs
+      responses:
+        '200':
+          description: The list of Job s that are known by the application.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Job'
+
   /status/finished-jobs/{jobid}:
     get:
       operationId: status-job-finished
@@ -1045,6 +1079,44 @@ definitions:
       type: ok
       restart-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
       finished-job: /v1/status/finished-jobs/2c4111e5-a299-4526-8327-bad5996de400
+  Job:
+    type: object
+    description: A Job.
+    required: [id, user-id, status, priority, start-time]
+    properties:
+      id:
+        type: string
+      user-id:
+        type: string
+        format: uuid
+      operation:
+        type: string
+      status:
+        type: string
+      priority:
+        type: string
+      start-time:
+        type: string
+        format: date-time
+        description: IS0 8601 DateTime representing the time the job was TODO ???
+      finish-time:
+        type: string
+        format: date-time
+        description: IS0 8601 DateTime representing the time the job was TODO ???
+      draftset-id:
+        type: string
+        format: uuid
+      draft-graph-id:
+        type: string
+        format: uuid
+    example:
+      id: a1b26596-2dca-4e52-883c-7fdcb8b4be97
+      user-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
+      operation: publish-draft
+      status: pending
+      priority: background-write
+      start-time: "2016-01-01T13:35:21+00:00"
+      draftset-id: c1b26596-2dca-4e52-883c-7fdcb8b4be97
   FinishedJob:
     type: object
     description: An Asynchronous Job that completed without error.

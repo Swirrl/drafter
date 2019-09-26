@@ -2,7 +2,6 @@
   (:require [clojure.test :as t :refer [is]]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
-            [swirrl-server.async.jobs :refer [finished-jobs]]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [drafter.feature.draftset.test-helper :as help]
@@ -49,7 +48,7 @@
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
         append-response (help/make-append-data-to-draftset-request handler test-editor draftset-location draftset-data-file)]
-    (tc/await-success finished-jobs (:finished-job (:body append-response)) )
+    (tc/await-success (:finished-job (:body append-response)) )
     (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
           query-request (create-query-request test-editor draftset-location query "application/n-triples")
           query-response (handler query-request)

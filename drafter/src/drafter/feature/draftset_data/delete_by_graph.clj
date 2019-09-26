@@ -10,7 +10,8 @@
              [parse-query-param-flag-handler]]
             [drafter.util :as util]
             [integrant.core :as ig]
-            [ring.util.response :as ring]))
+            [ring.util.response :as ring]
+            [drafter.requests :as req]))
 
 (defn remove-graph-from-draftset-handler
   "Remove a supplied graph from the draftset."
@@ -22,7 +23,10 @@
      true
      (fn [{{:keys [draftset-id graph silent]} :params :as request}]
        (if (mgmt/is-graph-managed? backend graph)
-         (feat-common/run-sync #(dsops/delete-draftset-graph! backend draftset-id graph util/get-current-time)
+         (feat-common/run-sync (req/user-id request)
+                               'delete-draftset-graph
+                               draftset-id
+                               #(dsops/delete-draftset-graph! backend draftset-id graph util/get-current-time)
                                #(feat-common/draftset-sync-write-response % backend draftset-id))
          (if silent
            (ring/response (dsops/get-draftset-info backend draftset-id))

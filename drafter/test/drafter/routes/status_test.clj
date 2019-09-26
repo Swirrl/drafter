@@ -30,19 +30,11 @@
 
 (deftest writes-lock-test
   (let [lock (ReentrantLock.)
-        status-route (status-routes lock no-finished-jobs restart-id)]
+        status-route (status-routes lock)]
 
     (testing "GET /writes-locked"
       (testing "when unlocked"
         (is-unlocked (status-route (request :get "/writes-locked")))
         (testing "when locked"
           (.lock lock)
-          (is-locked (status-route (request :get "/writes-locked"))))))
-
-    (testing "GET /status"
-      (testing "when not found"
-        (let [response (status-route (request :get "/finished-jobs/00000000-0000-0000-0000-000000000000"))]
-          (is (= restart-id
-                 (get-in response [:body :restart-id])))
-          (is (s/validate JobNotFinishedResponse
-                          response)))))))
+          (is-locked (status-route (request :get "/writes-locked"))))))))

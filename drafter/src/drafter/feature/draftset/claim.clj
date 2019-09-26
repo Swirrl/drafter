@@ -4,12 +4,14 @@
             [drafter.feature.common :as feat-common]
             [drafter.feature.middleware :as feat-middleware]
             [drafter.rdf.draftset-management.job-util :as jobutil]
+            [drafter.requests :as req]
             [drafter.responses
              :refer [conflict-detected-response forbidden-response]]
             [drafter.user :as user]
             [integrant.core :as ig]
             [ring.util.response :as ring]
-            [swirrl-server.responses :as response]))
+            [drafter.async.responses :as response]
+            [ring.util.request :as request]))
 
 (defn- respond [result]
   (if (jobutil/failed-job-result? result)
@@ -20,10 +22,13 @@
         (conflict-detected-response "Failed to claim draftset")))))
 
 (defn- handler*
-  [backend {{:keys [draftset-id]} :params user :identity}]
+  [backend {{:keys [draftset-id]} :params user :identity :as request}]
   (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
     (if (user/can-claim? user ds-info)
-      (feat-common/run-sync #(dsops/claim-draftset! backend draftset-id user)
+      (feat-common/run-sync (req/user-id request)
+                            'claim-draftset
+                            draftset-id
+                            #(dsops/claim-draftset! backend draftset-id user)
                             respond)
       (forbidden-response "User not in role for draftset claim"))
     (ring/not-found "Draftset not found")))
