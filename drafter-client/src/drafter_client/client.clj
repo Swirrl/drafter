@@ -275,6 +275,25 @@
   ;; for?
   )
 
+(defmethod ig/init-key :drafter-client.client/client-id-client
+  [ig-key {:keys [drafter-uri] :as opts}]
+  (when (seq drafter-uri)
+    (try
+      (cli-client drafter-uri
+                  :batch-size (:batch-size opts)
+                  :auth0-endpoint (:auth0-endpoint opts)
+                  :client-id (:client-id opts)
+                  :client-secret (:client-secret opts)
+                  :audience (:audience opts))
+      (catch Throwable t
+        (let [e (Throwable->map t)]
+          (throw
+            (ex-info (str "Failure to init " ig-key "\n"
+                          (:cause e)
+                          "\nCheck that Drafter is running!"
+                          "\nCheck that your Drafter Client config is correct.")
+                     e)))))))
+
 (s/def ::batch-size pos-int?)
 ;; TODO Find out if we can read this as a URI with integrant
 (s/def ::drafter-uri (s/or :string string? :nil nil?))
