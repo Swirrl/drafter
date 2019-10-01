@@ -125,6 +125,20 @@
   [client access-token draftset graph]
   (i/get client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
 
+(defn delete-quads
+  [client access-token draftset quads]
+  (-> client
+      (i/set-content-type "application/n-quads")
+      (i/get i/delete-draftset-data access-token (draftset/id draftset) quads)
+      (->async-job)))
+
+(defn delete-triples
+  [client access-token draftset graph triples]
+  (-> client
+      (i/set-content-type "application/n-triples")
+      (i/get i/delete-draftset-data access-token (draftset/id draftset) triples :graph graph)
+      (->async-job)))
+
 (defn add
   "Append the supplied RDF data to this Draftset"
   ([client access-token draftset quads]
