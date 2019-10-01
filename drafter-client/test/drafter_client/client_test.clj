@@ -14,7 +14,9 @@
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as gr-repo]
             [integrant.core :as ig]
-            [martian.core :as martian])
+            [martian.core :as martian]
+            [clojure.java.io :as io]
+            [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -48,8 +50,12 @@
       (f)
       (db-util/drop-all! stardog-repo))))
 
+(defn resfile [filename]
+  (or (some-> filename io/resource io/file .getCanonicalPath)
+      (throw (Exception. (format "Cannot find %s on resource path" filename)))))
+
 (defn start-drafter-server []
-  (main/-main "env/dev/resources/drafter-dev-config.edn"))
+  (main/-main (resfile "drafter-client-test-config.edn")))
 
 (defn drafter-server-fixture [f]
   (try
@@ -66,7 +72,7 @@
                     :batch-size 150000)))
 
 (defn test-triples []
-  (let [file "./test/specific_mappingbased_properties_bg.nt"]
+  (let [file (resfile "specific_mappingbased_properties_bg.nt")]
     (rio/statements file)))
 
 (t/use-fixtures :each
