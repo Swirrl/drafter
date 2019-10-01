@@ -4,7 +4,7 @@
         buddy/buddy-sign {:mvn/version "3.0.0"}
         cheshire {:mvn/version "5.8.0"}
         clj-http {:mvn/version "3.9.0"}
-        grafter {:mvn/version "2.0.1"}
+        grafter {:mvn/version "2.1.2"}
         grafter/url {:mvn/version "0.2.5"}
         grafter/vocabularies {:mvn/version "0.2.6"}
         integrant {:mvn/version "0.6.3"}
@@ -14,6 +14,8 @@
         org.clojure/tools.logging {:mvn/version "0.4.1"}
         ring/ring-core {:mvn/version "1.6.3"}
         clj-time {:mvn/version "0.15.1"}
+        grafter.db {:mvn/version "0.8.5"}
+        com.cemerick/url {:mvn/version "0.1.1"}
         }
 
  :mvn/repos
@@ -30,10 +32,7 @@
                               }}
 
            :test {:extra-paths ["test"]
-                  :extra-deps {drafter {:local/root "../drafter"
-                                        ;; Should we use local root? So that we're always
-                                        ;; running the latest drafter?
-                                        }
+                  :extra-deps {drafter {:local/root "../drafter"}
                                org.clojure/test.check {:mvn/version "0.9.0"}
                                lambdaisland/kaocha {:mvn/version "0.0-418"}
                                environ {:mvn/version "1.0.3"}
