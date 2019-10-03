@@ -5,7 +5,7 @@
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [drafter-client.client.auth :as auth]
+            [swirrl.auth0.client :as auth]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.client.impl :as i :refer [->DrafterClient]]
             [drafter-client.client.repo :as repo]
@@ -296,14 +296,10 @@
 
 (s/def ::batch-size pos-int?)
 ;; TODO Find out if we can read this as a URI with integrant
-(s/def ::drafter-uri (s/or :string string? :nil nil?))
-(s/def ::auth0-endpoint (s/or :string string? :nil nil?))
-(s/def ::client-id (s/or :string string? :nil nil?))
-(s/def ::client-secret (s/or :string string? :nil nil?))
+(s/def ::drafter-uri (s/nilable string?))
+(s/def ::version (s/nilable pos-int?))
+(s/def ::auth0 auth/client?)
 
 (defmethod ig/pre-init-spec :drafter-client/client [_]
-  (s/nilable (s/keys :req-un [::batch-size
-                              ::drafter-uri
-                              ::auth0-endpoint
-                              ::client-id
-                              ::client-secret])))
+  (s/nilable (s/keys :req-un [::batch-size ::drafter-uri]
+                     :opt-un [::auth0 ::version])))
