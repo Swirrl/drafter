@@ -218,30 +218,15 @@
   [client access-token jobs]
   (map (fn [job] (resolve-job client access-token job)) jobs))
 
-(defn web-client
+(defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
-  [drafter-uri & {:keys [batch-size version]}]
+  [drafter-uri & {:keys [batch-size version auth0]}]
   (let [version (or version "v1")
         swagger-json "swagger/swagger.json"]
-    (log/debugf "Making Drafter web-client with batch size %d for Drafter: %s"
-                batch-size drafter-uri)
-    (when (seq drafter-uri)
-      (-> (format "%s/%s" drafter-uri swagger-json)
-          (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
-          (->DrafterClient batch-size nil)))))
-
-(defn cli-client
-  "Create a Drafter client for `drafter-uri` that will request tokens from Auth0
-  for the (cli-)client."
-  [drafter-uri
-   & {:keys [batch-size version auth0-endpoint client-id client-secret audience]}]
-  (let [version (or version "v1")
-        swagger-json "swagger/swagger.json"
-        auth0 (auth/client auth0-endpoint client-id client-secret audience)]
     (log/debugf "Making Drafter client with batch size %d for Drafter: %s"
                 batch-size drafter-uri)
-    (when (and drafter-uri auth0)
+    (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
           (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
           (->DrafterClient batch-size auth0)))))
@@ -251,22 +236,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod ig/init-key :drafter-client/client
-  [ig-key {:keys [drafter-uri batch-size auth0-endpoint client-id client-secret]}]
+  [ig-key {:keys [drafter-uri batch-size version auth0]}]
   (when (seq drafter-uri)
     (try
-      (web-client drafter-uri
-                  :batch-size batch-size
-                  :auth0-endpoint auth0-endpoint
-                  :client-id client-id
-                  :client-secret client-secret)
+      (client drafter-uri :batch-size batch-size :version version :auth0 auth0)
       (catch Throwable t
         (let [e (Throwable->map t)]
           (throw
-            (ex-info (str "Failure to init " ig-key "\n"
-                          (:cause e)
-                          "\nCheck that Drafter is running!"
-                          "\nCheck that your Drafter Client config is correct.")
-                     e)))))))
+           (ex-info (str "Failure to init " ig-key "\n"
+                         (:cause e)
+                         "\nCheck that Drafter is running!"
+                         "\nCheck that your Drafter Client config is correct.")
+                    e)))))))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.
@@ -274,25 +255,6 @@
   ;; TOOD Will there be anything running in the background that we should wait
   ;; for?
   )
-
-(defmethod ig/init-key :drafter-client.client/client-id-client
-  [ig-key {:keys [drafter-uri] :as opts}]
-  (when (seq drafter-uri)
-    (try
-      (cli-client drafter-uri
-                  :batch-size (:batch-size opts)
-                  :auth0-endpoint (:auth0-endpoint opts)
-                  :client-id (:client-id opts)
-                  :client-secret (:client-secret opts)
-                  :audience (:audience opts))
-      (catch Throwable t
-        (let [e (Throwable->map t)]
-          (throw
-            (ex-info (str "Failure to init " ig-key "\n"
-                          (:cause e)
-                          "\nCheck that Drafter is running!"
-                          "\nCheck that your Drafter Client config is correct.")
-                     e)))))))
 
 (s/def ::batch-size pos-int?)
 ;; TODO Find out if we can read this as a URI with integrant

@@ -67,9 +67,9 @@
 (defn drafter-client []
   (let [drafter-endpoint (env :drafter-endpoint)]
     (assert drafter-endpoint "Set DRAFTER_ENDPOINT to run these tests.")
-    (sut/web-client drafter-endpoint
-                    :auth0-endpoint (env :auth0-domain)
-                    :batch-size 150000)))
+    (sut/client drafter-endpoint
+                :auth0-endpoint (env :auth0-domain)
+                :batch-size 150000)))
 
 (defn test-triples []
   (let [file (resfile "specific_mappingbased_properties_bg.nt")]
