@@ -30,7 +30,8 @@
       (unprocessable-entity-response (str "Invalid role: " role)))))
 
 (defn handler
-  [{:keys [:drafter/backend ::user/repo wrap-as-draftset-owner timeout-fn]}]
+  [{:keys [:drafter/backend :drafter.user/repo
+           wrap-as-draftset-owner timeout-fn]}]
   (wrap-as-draftset-owner
    (fn [{{:keys [user role draftset-id]} :params owner :identity}]
      (cond
