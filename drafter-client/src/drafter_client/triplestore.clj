@@ -235,9 +235,10 @@
 (ns-unmap *ns* 'map->DrafterRepository)
 
 
-(deftype DrafterTriplestore [repository]
+(deftype DrafterTriplestore [-conn repository]
   ToConnection
-  (->connection [this] (repo/->connection repository))
+  (->connection [this]
+    (or @-conn (repo/->connection repository)))
 
   EvaluationMethod
   (evaluation-method [this]
@@ -248,6 +249,23 @@
   (query-cache [_]
     ;; nope
     nil)
+
+  pr/ITransactable
+  (begin [this]
+    (let [conn (repo/->connection repository)]
+      (pr/begin conn)
+      (reset! -conn conn)))
+
+  (commit [this]
+    (pr/commit @-conn)
+    (.close @-conn)
+    (reset! -conn nil))
+
+  (rollback [_]
+    (when @-conn
+      (pr/rollback @-conn)
+      (.close @-conn))
+    (reset! -conn nil))
 
   pr/ITripleWriteable
   (pr/add-statement [this statement]
@@ -271,7 +289,7 @@
     (DrafterRepository. client token context repo)))
 
 (defn triplestore [repository]
-  (DrafterTriplestore. repository))
+  (DrafterTriplestore. (atom nil) repository))
 
 (defn auth-code-triplestore [client token context]
   (-> (repository client token context)
