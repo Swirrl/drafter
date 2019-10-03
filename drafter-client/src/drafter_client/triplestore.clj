@@ -114,7 +114,9 @@
       (if (not (instance? IStatement triples))
         (when (seq triples)
           (let [quads (map ->quad triples)]
-            (client/add client token tx quads)))
+            (->> quads
+                 (client/add client token tx)
+                 (client/resolve-job client token))))
         (pr/add-statement this triples)))
     this)
 
@@ -123,7 +125,9 @@
       (if (not (instance? IStatement triples))
         (when (seq triples)
           (let [quads (map ->quad triples)]
-            (client/add client token tx graph quads)))
+            (->> quads
+                 (client/add client token tx graph)
+                 (client/resolve-job client token))))
         (pr/add-statement this graph triples)))
     this)
 
@@ -156,7 +160,9 @@
       (if (not (instance? IStatement quads))
         (when (seq quads)
           (let [quads (map ->quad quads)]
-            (client/delete-quads client token tx quads)))
+            (->> quads
+                 (client/delete-quads client token tx)
+                 (client/resolve-job client token))))
         (pr/delete-statement this quads))))
 
   (delete [this graph triples]
@@ -164,7 +170,9 @@
       (if (not (instance? IStatement triples))
         (when (seq triples)
           (let [quads (map ->quad triples)]
-            (client/delete-triples client token tx graph quads)))
+            (->> quads
+                 (client/delete-triples client token tx graph)
+                 (client/resolve-job client token))))
         (pr/delete-statement this graph triples))))
 
   IGraphDrop
