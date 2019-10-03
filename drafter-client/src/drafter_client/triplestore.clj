@@ -295,26 +295,26 @@
   (-> (repository client token context)
       (triplestore)))
 
-(defn client-id-triplestore [client]
+(defn m2m-triplestore [client]
   (let [token (:access_token (auth/get-client-id-token client))
         context draftset/live]
     (-> (repository client token context)
         (triplestore))))
 
-(defn mock-client-id-triplestore [client mock-token]
+(defn mock-m2m-triplestore [client mock-token]
   (let [context draftset/live]
     (-> (repository client mock-token context)
         (triplestore))))
 
-(defmethod ig/init-key :drafter-client.client.repo/auth-code-triplestore
+(defmethod ig/init-key :drafter-client.triplestore/auth-code-triplestore
   [_ {:keys [client]}]
   (fn [token draft]
     (auth-code-triplestore client token draft)))
 
-(defmethod ig/init-key :drafter-client.client.repo/client-id-triplestore
+(defmethod ig/init-key :drafter-client.triplestore/m2m-triplestore
   [_ {:keys [client]}]
-  (client-id-triplestore client))
+  (m2m-triplestore client))
 
-(defmethod ig/init-key :drafter-client.client.repo/mock-client-id-triplestore
+(defmethod ig/init-key :drafter-client.triplestore/mock-m2m-triplestore
   [_ {:keys [client token]}]
-  (mock-client-id-triplestore client token))
+  (mock-m2m-triplestore client token))
