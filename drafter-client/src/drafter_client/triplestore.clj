@@ -236,9 +236,15 @@
 
 
 (deftype DrafterTriplestore [-conn repository]
+
+  Closeable
+  (close [_]
+    (some-> @-conn .close)
+    (reset! -conn nil))
+
   ToConnection
   (->connection [this]
-    (or @-conn (repo/->connection repository)))
+    (or @-conn (reset! -conn (repo/->connection repository))))
 
   EvaluationMethod
   (evaluation-method [this]
@@ -252,9 +258,8 @@
 
   pr/ITransactable
   (begin [this]
-    (let [conn (repo/->connection repository)]
-      (pr/begin conn)
-      (reset! -conn conn)))
+    (let [conn (repo/->connection this)]
+      (pr/begin conn)))
 
   (commit [this]
     (pr/commit @-conn)
@@ -318,3 +323,15 @@
 (defmethod ig/init-key :drafter-client.triplestore/mock-m2m-triplestore
   [_ {:keys [client token]}]
   (mock-m2m-triplestore client token))
+
+(defmethod ig/halt-key! :drafter-client.triplestore/auth-code-triplestore
+  [_ triplestore]
+  (some-> triplestore .close))
+
+(defmethod ig/halt-key! :drafter-client.triplestore/m2m-triplestore
+  [_ triplestore]
+  (some-> triplestore .close))
+
+(defmethod ig/halt-key! :drafter-client.triplestore/mock-m2m-triplestore
+  [_ triplestore]
+  (some-> triplestore .close))
