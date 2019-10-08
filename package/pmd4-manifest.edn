@@ -29,6 +29,11 @@
                                        :env #{:dev :ci}
                                        }
                                       {:type :copy
+                                       :path "drafter-dev-auth0-mock.edn"
+                                       :mode "644"
+                                       :env #{:dev :ci}
+                                       }
+                                      {:type :copy
                                        :path "drafter-dev-basic-auth-memory-db.edn"
                                        :mode "644"
                                        :env #{:dev :ci}

@@ -7,3 +7,10 @@ if [ -f $PID_FILE ]; then
   kill $(cat $PID_FILE)
   rm $PID_FILE
 fi
+
+PID_FILE="${SCRIPT_DIR}/drafter-mock.pid"
+
+if [ -f $PID_FILE ]; then
+  kill $(cat $PID_FILE)
+  rm $PID_FILE
+fi
