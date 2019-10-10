@@ -5,7 +5,7 @@
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [drafter-client.client.auth :as auth]
+            [swirrl.auth0.client :as auth]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.client.impl :as i :refer [->DrafterClient]]
             [drafter-client.client.repo :as repo]
@@ -125,6 +125,20 @@
   [client access-token draftset graph]
   (i/get client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
 
+(defn delete-quads
+  [client access-token draftset quads]
+  (-> client
+      (i/set-content-type "application/n-quads")
+      (i/get i/delete-draftset-data access-token (draftset/id draftset) quads)
+      (->async-job)))
+
+(defn delete-triples
+  [client access-token draftset graph triples]
+  (-> client
+      (i/set-content-type "application/n-triples")
+      (i/get i/delete-draftset-data access-token (draftset/id draftset) triples :graph graph)
+      (->async-job)))
+
 (defn add
   "Append the supplied RDF data to this Draftset"
   ([client access-token draftset quads]
@@ -204,30 +218,15 @@
   [client access-token jobs]
   (map (fn [job] (resolve-job client access-token job)) jobs))
 
-(defn web-client
+(defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
-  [drafter-uri & {:keys [batch-size version]}]
+  [drafter-uri & {:keys [batch-size version auth0]}]
   (let [version (or version "v1")
         swagger-json "swagger/swagger.json"]
-    (log/debugf "Making Drafter web-client with batch size %d for Drafter: %s"
-                batch-size drafter-uri)
-    (when (seq drafter-uri)
-      (-> (format "%s/%s" drafter-uri swagger-json)
-          (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
-          (->DrafterClient batch-size nil)))))
-
-(defn cli-client
-  "Create a Drafter client for `drafter-uri` that will request tokens from Auth0
-  for the (cli-)client."
-  [drafter-uri
-   & {:keys [batch-size version auth0-endpoint client-id client-secret audience]}]
-  (let [version (or version "v1")
-        swagger-json "swagger/swagger.json"
-        auth0 (auth/client auth0-endpoint client-id client-secret audience)]
     (log/debugf "Making Drafter client with batch size %d for Drafter: %s"
                 batch-size drafter-uri)
-    (when (and drafter-uri auth0)
+    (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
           (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
           (->DrafterClient batch-size auth0)))))
@@ -237,22 +236,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod ig/init-key :drafter-client/client
-  [ig-key {:keys [drafter-uri batch-size auth0-endpoint client-id client-secret]}]
+  [ig-key {:keys [drafter-uri batch-size version auth0]}]
   (when (seq drafter-uri)
     (try
-      (web-client drafter-uri
-                  :batch-size batch-size
-                  :auth0-endpoint auth0-endpoint
-                  :client-id client-id
-                  :client-secret client-secret)
+      (client drafter-uri :batch-size batch-size :version version :auth0 auth0)
       (catch Throwable t
         (let [e (Throwable->map t)]
           (throw
-            (ex-info (str "Failure to init " ig-key "\n"
-                          (:cause e)
-                          "\nCheck that Drafter is running!"
-                          "\nCheck that your Drafter Client config is correct.")
-                     e)))))))
+           (ex-info (str "Failure to init " ig-key "\n"
+                         (:cause e)
+                         "\nCheck that Drafter is running!"
+                         "\nCheck that your Drafter Client config is correct.")
+                    e)))))))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.
@@ -263,14 +258,10 @@
 
 (s/def ::batch-size pos-int?)
 ;; TODO Find out if we can read this as a URI with integrant
-(s/def ::drafter-uri (s/or :string string? :nil nil?))
-(s/def ::auth0-endpoint (s/or :string string? :nil nil?))
-(s/def ::client-id (s/or :string string? :nil nil?))
-(s/def ::client-secret (s/or :string string? :nil nil?))
+(s/def ::drafter-uri (s/nilable string?))
+(s/def ::version (s/nilable pos-int?))
+(s/def ::auth0 auth/client?)
 
 (defmethod ig/pre-init-spec :drafter-client/client [_]
-  (s/nilable (s/keys :req-un [::batch-size
-                              ::drafter-uri
-                              ::auth0-endpoint
-                              ::client-id
-                              ::client-secret])))
+  (s/nilable (s/keys :req-un [::batch-size ::drafter-uri]
+                     :opt-un [::auth0 ::version])))
