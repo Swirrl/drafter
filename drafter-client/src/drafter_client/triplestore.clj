@@ -326,7 +326,8 @@
 
 (defmethod ig/halt-key! :drafter-client.triplestore/auth-code-triplestore
   [_ triplestore]
-  (some-> triplestore .close))
+  ;; this is a function so can't really have any open connections
+  )
 
 (defmethod ig/halt-key! :drafter-client.triplestore/m2m-triplestore
   [_ triplestore]
