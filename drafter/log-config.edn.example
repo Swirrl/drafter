@@ -10,7 +10,7 @@
                     (.setMaxBackupIndex max-backups))]
 
   (clj-logging-config.log4j/set-loggers!
-       ["org.openrdf" "drafter" "swirrl-server"]
+       ["org.openrdf" "drafter" "swirrl-server" "swirrl.auth0"]
        {:name "drafter"
         :level :info
         :out drafter-log}

@@ -80,8 +80,7 @@
         martian-clj-http {:mvn/version "0.1.10" :exclusions [clj-http]}
         clj-http {:mvn/version "3.10.0"}
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
-                      :sha "a123871641ebc0d868a6dcd72afe0afb19a9cafc"
-                      }
+                      :sha "29a8ced9943a5cc6e20c14202c123a3f970b18f5"}
         }
 
  :mvn/repos
