@@ -128,20 +128,30 @@
   [job child-fn]
   (assoc job :function child-fn :start-time (System/currentTimeMillis)))
 
-(defn- complete-job!
-  "Adds the job to the state map of finished-jobs and delivers the
-  supplied result to the jobs promise, which will cause blocking jobs
-  to unblock, and give job consumers the ability to receive the
-  value."
-  [{job-id :id promis :value-p :as job} result]
-  (deliver promis result)
+(defn- job-pending? [job]
+  (-> jobs deref :pending (contains? (:id job))))
+
+(defn- complete-pending-job!
+  "Move a job in the pending list into the complete list, adding :complete
+  and :finish-time metadata."
+  [{job-id :id :as job}]
   (let [job' (assoc job
                     :status :complete
                     :finish-time (System/currentTimeMillis))]
     (swap! jobs (fn [jobs]
                   (-> jobs
                       (update :pending dissoc job-id)
-                      (update :complete assoc job-id job')))))
+                      (update :complete assoc job-id job'))))))
+
+(defn- complete-job!
+  "Adds the job to the state map of finished-jobs and delivers the
+  supplied result to the jobs promise, which will cause blocking jobs
+  to unblock, and give job consumers the ability to receive the
+  value."
+  [{promis :value-p :as job} result]
+  (deliver promis result)
+  (when (job-pending? job)
+    (complete-pending-job! job))
   result)
 
 (defn- failed-job-result [ex details]

@@ -9,7 +9,8 @@
             [clj-time.coerce :refer [from-date]]
             [clj-time.core :as time]
             [drafter.user-test :refer [test-editor]]
-            [cheshire.core :as json])
+            [cheshire.core :as json]
+            [drafter.feature.common :as feat-common])
   (:import clojure.lang.ExceptionInfo
            java.util.UUID))
 
@@ -107,6 +108,7 @@
 
 (defn create-failed-job [ex]
   (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))]
+    (jobs/submit-async-job! job)
     (#'jobs/complete-job! job {:type :error :exception ex})
     job))
 
@@ -185,7 +187,14 @@
             (handler (tc/with-identity test-editor (request :get path)))]
         (is (= 200 status))
         (is (job=response job (first body)))
-        (is (= :pending (:status (first body))))))))
+        (is (= :pending (:status (first body))))))
+
+    (testing "Synchronous jobs do not show up in :complete jobs"
+      (let [job (feat-common/run-sync dummy 'test-sync-job nil (constantly nil))]
+        (let [{:keys [body status] :as response}
+              (handler (tc/with-identity test-editor (request :get path)))]
+          (is (= 200 status))
+          (is (empty? (filter (fn [{:keys [id]}] (= id (:id job))) body))))))))
 
 (tc/deftest-system-with-keys finished-jobs-test
   [:drafter.routes/jobs-status]
