@@ -28,10 +28,15 @@
 (defmethod ig/init-key :drafter.middleware.auth0-auth/identify [_ _]
   (fn [handler]
     (fn [{:keys [:swirrl.auth0/access-token] :as request}]
-      (let [{:keys [roles]} access-token]
-        (-> request
-            (assoc :identity {:email (email access-token) :role (first roles)})
-            (handler))))))
+      (if-let [{:keys [roles]} access-token]
+        (let [email' (email access-token)
+              role   (first roles)]
+          (if (and email' role)
+            (-> request
+                (assoc :identity {:email email' :role role})
+                (handler))
+            (response/forbidden-response "Not authorized.")))
+        (unauthorized "Not authenticated.")))))
 
 (defmethod ig/init-key :drafter.middleware.auth0-auth/token-authentication
   [_ {:keys [auth0] :as opts}]
