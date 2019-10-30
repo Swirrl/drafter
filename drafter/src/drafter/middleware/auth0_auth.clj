@@ -3,10 +3,12 @@
             [clojure.string :as string]
             [drafter.responses :as response]
             [integrant.core :as ig]
-            [swirrl.auth0.jwt :as jwt]))
+            [swirrl.auth0.jwt :as jwt]
+            [drafter.user :as user]
+            [clojure.set :as set]))
 
-(defn authorized? [{:keys [roles] :as token} role]
-  (contains? roles role))
+(defn authorized? [{:keys [roles] :as token}]
+  (boolean (seq (set/intersection roles (set user/roles)))))
 
 (defn unauthorized [msg]
   {:status 401
@@ -50,12 +52,11 @@
         (unauthorized "Not authenticated.")))))
 
 (defmethod ig/init-key :drafter.middleware.auth0-auth/authorization [_ _]
-  (fn [role]
-    (fn [handler]
-      (fn [{:keys [:swirrl.auth0/access-token] :as request}]
-        (if (authorized? access-token role)
-          (handler request)
-          (response/forbidden-response "Not authorized."))))))
+  (fn [handler]
+    (fn [{:keys [:swirrl.auth0/access-token] :as request}]
+      (if (authorized? access-token)
+        (handler request)
+        (response/forbidden-response "Not authorized.")))))
 
 (s/def ::wrap-auth fn?)
 (s/def ::wrap-token fn?)
