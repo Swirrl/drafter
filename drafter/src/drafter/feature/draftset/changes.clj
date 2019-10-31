@@ -32,6 +32,7 @@
     true
     (fn [{{:keys [draftset-id graph]} :params :as request}]
       (feat-common/run-sync
+       backend
        (req/user-id request)
        'delete-draftset-changes
        draftset-id

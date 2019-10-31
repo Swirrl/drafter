@@ -22,6 +22,7 @@
                 finish-time
                 draftset-id
                 draft-graph-id
+                metadata
                 function
                 value-p])
 
@@ -46,12 +47,15 @@
 
 (s/fdef job-response :args (s/cat :job ::spec/job) :ret ::spec/api-job)
 
-(defn job-response [job]
+(defn job-response [{:keys [value-p] :as job}]
   (-> job
       (select-keys [:id :user-id :operation :status :priority :start-time
-                    :finish-time :draftset-id :draft-graph-id])
+                    :finish-time :draftset-id :draft-graph-id :metadata])
       (update :start-time timestamp-response)
-      (update :finish-time timestamp-response)))
+      (update :finish-time timestamp-response)
+      (cond-> (and (= :complete (:status job))
+                   (= :error (:type @value-p)))
+        (assoc :error @value-p))))
 
 (defmethod ig/init-key :drafter.routes/jobs-status [_ {:keys [wrap-auth]}]
   (context
@@ -91,6 +95,12 @@
                             :operation ::spec/operation
                             :draftset-id (s/nilable ::spec/draftset-id)
                             :priority ::spec/priority
+                            :f ::spec/function)
+              :ary-6 (s/cat :user-id ::spec/user-id
+                            :operation ::spec/operation
+                            :draftset-id (s/nilable ::spec/draftset-id)
+                            :metadata ::spec/metadata
+                            :priority ::spec/priority
                             :f ::spec/function))
   :ret ::spec/job)
 
@@ -98,6 +108,8 @@
   ([user-id operation priority f]
    (create-job user-id operation nil priority f))
   ([user-id operation draftset-id priority f]
+   (create-job user-id operation draftset-id nil priority f))
+  ([user-id operation draftset-id metadata priority f]
    (let [id (UUID/randomUUID)]
      (->Job id
             user-id
@@ -108,6 +120,7 @@
             nil
             draftset-id
             nil
+            metadata
             (wrap-logging-context f)
             (promise)))))
 

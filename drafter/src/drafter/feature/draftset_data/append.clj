@@ -72,7 +72,7 @@
   [backend user-id operation draftset-ref quads clock-fn]
   (let [backend (:repo backend)
         ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job user-id operation ds-id :background-write
+    (jobs/make-job backend user-id operation ds-id :background-write
       (fn [job]
         (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
               quad-batches (util/batch-partition-by quads

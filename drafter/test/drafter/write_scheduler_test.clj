@@ -18,7 +18,7 @@
 (def mock-user-id "dummy@user.com")
 
 (defn mock-job [id type submit-time]
-  (->Job id mock-user-id 'test-job nil type submit-time nil nil nil t (promise)))
+  (->Job id mock-user-id 'test-job nil type submit-time nil nil nil nil t (promise)))
 
 (defn const-job [priority ret]
   (create-job mock-user-id 'test-job priority (fn [job] (job-succeeded! job ret))))

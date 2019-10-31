@@ -21,7 +21,7 @@
 
 (defn copy-live-graph-into-draftset-job [backend user-id draftset-ref live-graph]
   (let [ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job user-id 'copy-live-graph-into-draftset ds-id :background-write
+    (jobs/make-job backend user-id 'copy-live-graph-into-draftset ds-id :background-write
       (fn [job]
         (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph util/get-current-time)]
           (ds-data-common/lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})

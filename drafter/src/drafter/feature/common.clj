@@ -11,16 +11,16 @@
     (r/api-response 500 result)
     (ring/response (dsops/get-draftset-info backend draftset-id))))
 
-(defn- as-sync-write-job [user-id operation draftset-id f]
-  (jobutil/make-job user-id operation draftset-id :blocking-write
+(defn- as-sync-write-job [backend user-id operation draftset-id f]
+  (jobutil/make-job backend user-id operation draftset-id :blocking-write
     (fn [job]
       (let [result (f)]
         (ajobs/job-succeeded! job result)))))
 
 (defn run-sync
-  ([user-id operation draftset-id api-call-fn]
+  ([backend user-id operation draftset-id api-call-fn]
    (response/run-sync-job!
-    (as-sync-write-job user-id operation draftset-id api-call-fn)))
-  ([user-id operation draftset-id api-call-fn resp-fn]
+    (as-sync-write-job backend user-id operation draftset-id api-call-fn)))
+  ([backend user-id operation draftset-id api-call-fn resp-fn]
    (response/run-sync-job!
-    (as-sync-write-job user-id operation draftset-id api-call-fn) resp-fn)))
+    (as-sync-write-job backend user-id operation draftset-id api-call-fn) resp-fn)))

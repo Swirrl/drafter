@@ -1,33 +1,20 @@
 (ns drafter.backend.draftset.operations
   (:require [clojure.string :as string]
-            [drafter.backend.draftset.draft-management
-             :as
-             mgmt
-             :refer
-             [to-quads with-state-graph]]
-            [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
+            [drafter.backend.draftset.draft-management :as mgmt
+             :refer [to-quads with-state-graph]]
             [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.rdf.sesame :refer [read-statements]]
             [drafter.rdf.sparql :as sparql]
             [drafter.user :as user]
             [drafter.util :as util]
-            [drafter.write-scheduler :as writes]
-            [grafter-2.rdf.protocols :as rdf :refer [map->Quad map->Triple context]]
-            [grafter-2.rdf4j.repository :refer [prepare-query]]
-            [grafter-2.rdf4j.formats :as formats]
-            [grafter-2.rdf4j.io :refer [quad->backend-quad rdf-writer]]
-            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as rdf]
+            [grafter-2.rdf4j.repository :as repo :refer [prepare-query]]
             [grafter.url :as url]
             [grafter.vocabularies.rdf :refer :all])
-  (:import java.io.StringWriter
-           [java.util Date]
-           org.eclipse.rdf4j.model.impl.ContextStatementImpl
-           org.eclipse.rdf4j.model.Resource
-           [org.eclipse.rdf4j.query GraphQuery TupleQueryResultHandler TupleQueryResult]
-           [org.eclipse.rdf4j.rio RDFHandler RDFWriter]
-           org.eclipse.rdf4j.queryrender.RenderUtils))
+  (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
+           [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler]
+           org.eclipse.rdf4j.queryrender.RenderUtils
+           org.eclipse.rdf4j.rio.RDFHandler))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri

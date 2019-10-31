@@ -77,7 +77,7 @@
   [backend user-id draftset-ref serialised rdf-format clock-fn]
   (let [backend (:repo backend)
         ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job user-id 'delete-quads-from-draftset ds-id :background-write
+    (jobs/make-job backend user-id 'delete-quads-from-draftset ds-id :background-write
       (fn [job]
         (let [quads (read-statements serialised rdf-format)
               graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
@@ -87,7 +87,7 @@
   [backend user-id draftset-ref graph serialised rdf-format clock-fn]
   (let [backend (:repo backend)
         ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job user-id 'delete-triples-from-draftset ds-id :background-write
+    (jobs/make-job backend user-id 'delete-triples-from-draftset ds-id :background-write
       (fn [job]
         (let [triples (read-statements serialised rdf-format)
               quads (map #(util/make-quad-statement % graph) triples)

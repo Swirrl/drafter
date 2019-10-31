@@ -14,6 +14,7 @@
     (wrap-authenticated
      (fn [{{:keys [display-name description]} :params user :identity :as request}]
        (feat-common/run-sync
+        backend
         (req/user-id request)
         'create-draftset
         nil ; because we're creating the draftset here

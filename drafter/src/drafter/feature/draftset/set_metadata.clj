@@ -10,6 +10,7 @@
   (wrap-as-draftset-owner
    (fn [{{:keys [draftset-id] :as params} :params :as request}]
      (feat-common/run-sync
+      backend
       (req/user-id request)
       'set-draftset-metadata
       draftset-id

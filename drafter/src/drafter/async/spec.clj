@@ -44,18 +44,22 @@
 (s/def :api-job/finish-time (s/nilable date-time-string?))
 (s/def ::draftset-id (s/nilable draftset-id?))
 (s/def ::draft-graph-id (s/nilable uuid-string?))
+(s/def ::metadata (s/nilable (s/with-gen map? (fn [] (gen/elements [{}])))))
 (s/def ::function (s/with-gen fn? (fn [] (gen/elements [identity]))))
-(s/def ::value-p (s/with-gen promise? (fn [] (gen/elements [(promise)]))))
+(s/def ::value-p (s/with-gen promise? (fn [] (let [p (promise)]
+                                              (deliver p {})
+                                              (s/gen #{p})))))
 
 (s/def ::job
   (s/keys :req-un [::id ::user-id ::operation ::status ::priority
                    :internal-job/start-time :internal-job/finish-time
-                   ::draftset-id ::draft-graph-id ::function ::value-p]))
+                   ::draftset-id ::draft-graph-id ::metadata
+                   ::function ::value-p]))
 
 (s/def ::api-job
   (s/keys :req-un [::id ::user-id ::operation ::status ::priority
                    :api-job/start-time :api-job/finish-time]
-          :opt-un [::draftset-id ::draft-graph-id]))
+          :opt-un [::draftset-id ::draft-graph-id ::metadata]))
 
 (s/def :failed-job-result/type #{:error})
 (s/def :success-job-result/type #{:ok})
