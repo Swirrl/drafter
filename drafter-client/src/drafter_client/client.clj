@@ -216,7 +216,7 @@
 (defn resolve-jobs
   "Wait until all of the asynchronous `jobs` have finished"
   [client access-token jobs]
-  (map (fn [job] (resolve-job client access-token job)) jobs))
+  (doall (map (fn [job] (resolve-job client access-token job)) jobs)))
 
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
