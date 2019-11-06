@@ -10,16 +10,23 @@
             [clojure.java.io :as io]
             [meta-merge.core :as mm]))
 
-(def profiles [(io/resource "drafter-base-config.edn") (io/resource "drafter-dev-config.edn") (io/resource "drafter-local-config.edn")])
+(def dev-config
+  {:mock  (io/resource "drafter-dev-config.edn")
+   :auth0 (io/resource "drafter-dev-auth0.edn")})
+
+(defn profiles [auth-type]
+  [(io/resource "drafter-base-config.edn")
+   (dev-config auth-type)
+   (io/resource "drafter-local-config.edn")])
 
 (defn stub-fdefs [set-of-syms]
   (st/instrument set-of-syms {:stub set-of-syms}))
 
 (defn start-system!
   ([] (start-system! {:instrument? true}))
-  ([{:keys [instrument?] :as opts}]
+  ([{:keys [instrument? auth-type] :or {auth-type :auth0} :as opts}]
 
-   (main/start-system! (apply mm/meta-merge (->> profiles
+   (main/start-system! (apply mm/meta-merge (->> (profiles auth-type)
                                                  (remove nil?)
                                                  (map main/read-system))))
    (when instrument?
