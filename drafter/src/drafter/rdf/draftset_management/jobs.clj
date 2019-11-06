@@ -19,7 +19,7 @@
 
 (defn delete-draftset-job [backend user-id draftset-ref]
   (let [ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job user-id 'delete-draftset ds-id :background-write
+    (jobs/make-job backend user-id 'delete-draftset ds-id :background-write
       (fn [job]
         (ops/delete-draftset! backend draftset-ref)
         (jobs/job-succeeded! job)))))
@@ -41,7 +41,7 @@
   ;; changed how these will be applied.
 
   (let [ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job user-id 'publish-draftset ds-id :publish-write
+    (jobs/make-job backend user-id 'publish-draftset ds-id :publish-write
       (fn [job]
         (try
           (ops/publish-draftset-graphs! backend draftset-ref clock-fn)

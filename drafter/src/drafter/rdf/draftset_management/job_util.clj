@@ -3,7 +3,8 @@
             [cognician.dogstatsd :as datadog]
             [clojure.string :as str]
             [drafter.util :as util]
-            [drafter.async.jobs :as ajobs]))
+            [drafter.async.jobs :as ajobs]
+            [drafter.backend.draftset.operations :as dsops]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:
@@ -68,18 +69,20 @@
 
 (defn make-job
   {:style/indent :defn}
-  [user-id operation draftset-id write-priority job-fn]
-  (ajobs/create-job
-   user-id
-   operation
-   draftset-id
-   write-priority
-   (fn [job]
-     (datadog/measure!
-      (util/statsd-name "drafter.job" operation write-priority "time")
-      {}
-      (try
-        (job-fn job)
-        (catch Throwable t
-          (log/warn t "Error whilst executing job")
-          (ajobs/job-failed! job t)))))))
+  [backend user-id operation draftset-id write-priority job-fn]
+  (let [ds-meta (some->> draftset-id (dsops/get-draftset-info backend))]
+    (ajobs/create-job
+     user-id
+     operation
+     draftset-id
+     {:draftset ds-meta}
+     write-priority
+     (fn [job]
+       (datadog/measure!
+        (util/statsd-name "drafter.job" operation write-priority "time")
+        {}
+        (try
+          (job-fn job)
+          (catch Throwable t
+            (log/warn t "Error whilst executing job")
+            (ajobs/job-failed! job t))))))))

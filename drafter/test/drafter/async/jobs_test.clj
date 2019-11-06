@@ -171,7 +171,8 @@
 
 (tc/deftest-system-with-keys jobs-list-status-test
   [:drafter.routes/jobs-status]
-  [{handler :drafter.routes/jobs-status :as sys} system]
+  [{handler :drafter.routes/jobs-status
+    backend :drafter/backend :as sys} system]
   (let [job (jobs/create-job dummy 'test-job :batch-write (constantly nil))
         path "/v1/status/jobs"]
 
@@ -190,7 +191,7 @@
         (is (= :pending (:status (first body))))))
 
     (testing "Synchronous jobs do not show up in :complete jobs"
-      (let [job (feat-common/run-sync dummy 'test-sync-job nil (constantly nil))]
+      (let [job (feat-common/run-sync backend dummy 'test-sync-job nil (constantly nil))]
         (let [{:keys [body status] :as response}
               (handler (tc/with-identity test-editor (request :get path)))]
           (is (= 200 status))

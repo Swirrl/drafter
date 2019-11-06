@@ -10,6 +10,7 @@
   [backend repo user draftset-id owner]
   (if-let [target-user (user/find-user-by-username repo user)]
     (feat-common/run-sync
+     backend
      (:email owner)
      'submit-draftset-to-user
      draftset-id
@@ -22,6 +23,7 @@
   (let [role-kw (keyword role)]
     (if (user/is-known-role? role-kw)
       (feat-common/run-sync
+       backend
        (:email owner)
        'submit-draftset-to-role
        draftset-id

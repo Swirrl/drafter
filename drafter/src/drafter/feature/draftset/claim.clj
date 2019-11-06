@@ -25,7 +25,8 @@
   [backend {{:keys [draftset-id]} :params user :identity :as request}]
   (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
     (if (user/can-claim? user ds-info)
-      (feat-common/run-sync (req/user-id request)
+      (feat-common/run-sync backend
+                            (req/user-id request)
                             'claim-draftset
                             draftset-id
                             #(dsops/claim-draftset! backend draftset-id user)
