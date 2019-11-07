@@ -89,7 +89,7 @@
          (map ->draftset))))
 
 (defn get-draftset [client access-token id]
-  (i/get client i/get-draftset access-token id))
+  (->draftset (i/get client i/get-draftset access-token id)))
 
 (defn edit-draftset [client access-token id name description]
   (i/get client i/put-draftset access-token id
