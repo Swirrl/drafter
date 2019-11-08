@@ -1,6 +1,6 @@
 * Configuring Drafter
 
-Drafter uses integrant for its configuration.  It contains a partial base [configuration](/drafter/resources/drafter-base-config.edn) inside its jar, and expects additional configuration to provided as EDN files via its command line.
+Drafter uses integrant for its configuration.  It contains a partial base [[configuration][/drafter/resources/drafter-base-config.edn]] inside its jar, and expects additional configuration to provided as EDN files via its command line.
 
 These files will then be merged ontop of the internal base configuration in order (left to right).
 
