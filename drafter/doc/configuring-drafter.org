@@ -36,7 +36,7 @@ Or you might start it in auth0 mode with a file of endpoint overrides to overrid
 $ java -jar ./drafter.jar drafter-prod-auth0.edn endpoint.edn &
 #+END_EXAMPLE
 
-Some working example files to run drafter can be found in the omni configuration at [[../../package/install/][../../package/install]]
+Some working example files to run drafter can be found in the omni configuration at [[../../package/install/][../../package/install]].  If you've used omni to install these files you may find them already installed and located in your projects =.omni_cache=.
 
 * Legacy config documentation
 
