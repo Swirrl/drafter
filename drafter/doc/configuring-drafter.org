@@ -16,7 +16,7 @@ These partial configurations typically support:
 2. Basic auth authentication with an in memory db (useful for dev) e.g. [[../../package/install/drafter-dev-basic-auth-memory-db.edn][drafter-dev-basic-auth-memory-db.edn]]
 3. Basic auth authentication with a mongo user database (pmd 3 legacy) e.g. [[../../package/install/drafter-prod-pmd3-auth.edn][drafter-prod-pmd3-auth.edn]]
 
-Additionally some of the integrant keys defined in [[/drafter/resources/drafter-base-config.edn][drafter-base-config.edn]] expect to receive their values via environment variables.  Using environment variables allows several processes to share the same value, which can be useful to ensure all processes in development are speaking to the same database etc.  The most important configuration items configured this way are `SPARQL_QUERY_ENDPOINT` and `SPARQL_UPDATE_ENDPOINT`.  Though it is now possible to override these values by providing the overrides in one of the edn files of configuration overrides.
+Additionally some of the integrant keys defined in [[/drafter/resources/drafter-base-config.edn][drafter-base-config.edn]] expect to receive their values via environment variables.  Using environment variables allows several processes to share the same value, which can be useful to ensure all processes in development are speaking to the same database etc.  The most important configuration items configured this way are =SPARQL_QUERY_ENDPOINT= and =SPARQL_UPDATE_ENDPOINT=.  Though it is now possible to override these values by providing the overrides in one of the edn files of configuration overrides.
 
 ** Launching drafter
 
