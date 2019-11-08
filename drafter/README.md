@@ -46,14 +46,12 @@ For tests that aren't driving the REST-API (and therefore don't require authenti
 
 ## Configuring Drafter
 
-Drafter uses [aero](https://github.com/juxt/aero) for its configuration. This means it uses environment variables (and/or java properties) to pass configuration
-variables from the environment.
+You will need to configure drafter before using it.
 
-The defaults should work for most cases, but for further details on the options drafter supports you should see the [Configuring Drafter](https://github.com/Swirrl/drafter/blob/master/drafter/doc/configuring-drafter.org) page.
+Drafter uses [aero](https://github.com/juxt/aero) for its configuration. It is configurable in a variety of ways, through EDN configuration profiles supplied via the command line, environment variables (and/or java properties).
 
- You may also wish to configure drafter logging by putting a
-`log-config.edn` file in drafter's working directory. We provide an
-example file you can modify at [log-config.edn.example](https://github.com/Swirrl/drafter/blob/master/drafter/log-config.edn.example).
+See the [Configuring Drafter](https://github.com/Swirrl/drafter/blob/master/drafter/doc/configuring-drafter.org) document for more information.
+
 
 ## API Docs
 

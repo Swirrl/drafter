@@ -38,6 +38,11 @@ $ java -jar ./drafter.jar drafter-prod-auth0.edn endpoint.edn &
 
 Some working example files to run drafter can be found in the omni configuration at [[../../package/install/][../../package/install]].  If you've used omni to install these files you may find them already installed and located in your projects =.omni_cache=.
 
+* Logging
+
+You may also wish to configure drafter logging by putting
+=log-config.edn= file in drafter's working directory. We provide an
+example file you can modify at [[log-config.edn.example][/drafter/log-config.edn.example]]
 
 
 * Env vars
