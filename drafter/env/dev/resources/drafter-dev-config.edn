@@ -26,6 +26,8 @@
  :drafter.middleware.auth0-auth/token-authentication
  {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
 
+ :drafter.middleware.auth0-auth/authorization {}
+
  :drafter.auth/read-role {}
  :swirrl.auth0.middleware/normalize-roles {:role-reader #ig/ref :drafter.auth/read-role}
 
