@@ -6,13 +6,13 @@ These files will then be merged ontop of the internal base configuration in orde
 
 This allows drafter configuration to be split up into profiles.
 
-Most notably drafters base configuration is only a partial configuration.  Which means it won't start without some extra required configuration that is used to specify the authentication method & user database.
+Most notably drafters base configuration is only a partial configuration.  Crucially it is missing how authentication and users should be managed.  
 
-We typically provide this extra configuration on the command line as an extra file of integrant keys.
+We typically provide this REQUIRED extra configuration on the command line as an extra file of integrant keys.
 
-These partial configurations typically support:
+These partial configurations / profiles typically support:
 
-1. auth0 authentication in pmd 4 and newer apps DEFRA's DRL app, e.g. [[../../package/install/drafter-dev-auth0.edn][drafter-dev-auth0.edn]]
+1. auth0 authentication (used in pmd 4 and newer apps e.g. DEFRA's DRL app), e.g. [[../../package/install/drafter-dev-auth0.edn][drafter-dev-auth0.edn]]
 2. Basic auth authentication with an in memory db (useful for dev) e.g. [[../../package/install/drafter-dev-basic-auth-memory-db.edn][drafter-dev-basic-auth-memory-db.edn]]
 3. Basic auth authentication with a mongo user database (pmd 3 legacy) e.g. [[../../package/install/drafter-prod-pmd3-auth.edn][drafter-prod-pmd3-auth.edn]]
 
