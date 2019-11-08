@@ -4,9 +4,9 @@ Drafter uses integrant for its configuration.  It contains a partial base [[/dra
 
 These files will then be merged ontop of the internal base configuration in order (left to right).
 
-This allows drafter configuration to be split up into profiles.  
+This allows drafter configuration to be split up into profiles.
 
-Most notably drafters base configuration is only a partial configuration.  Which means it won't start without some extra required configuration that is used to specify the authentication method & user database.  
+Most notably drafters base configuration is only a partial configuration.  Which means it won't start without some extra required configuration that is used to specify the authentication method & user database.
 
 We typically provide this extra configuration on the command line as an extra file of integrant keys.
 
@@ -20,8 +20,8 @@ Additionally some of the integrant keys defined in [[/drafter/resources/drafter-
 
 ** Launching drafter
 
-To launch drafter you must now supply as a command line a file specifying 
-the configuration of your authentication mode (and/or) overrides for any 
+To launch drafter you must now supply as a command line a file specifying
+the configuration of your authentication mode (and/or) overrides for any
 other aspects of the integrant system.
 
 e.g. you may start it with a command like:
@@ -38,23 +38,11 @@ $ java -jar ./drafter.jar drafter-prod-auth0.edn endpoint.edn &
 
 Some working example files to run drafter can be found in the omni configuration at [[../../package/install/][../../package/install]].  If you've used omni to install these files you may find them already installed and located in your projects =.omni_cache=.
 
-* Legacy config documentation
 
-Below is some legacy documentation on configuring drafter.  It may still be useful; though the canonical source should currently be the edn files of config [[../../package/install/][../../package/install/]]
 
-** Stardog
+* Env vars
 
-Drafter uses stardog for storing RDF data and accesses a remote Stardog instance through a Sesame SPARQL
-repository. The location of the query and update endpoints for the Stardog database to use must be configured.
-
-#+BEGIN_EXAMPLE
-SPARQL_QUERY_ENDPOINT         REQUIRED http://$STARDOG_PORT_5820_TCP_ADDR:5820/${DATABASE_NAME:-pmd-data}/query
-SPARQL_UPDATE_ENDPOINT        REQUIRED http://$STARDOG_PORT_5820_TCP_ADDR:5820/${DATABASE_NAME:-pmd-data}/update
-#+END_EXAMPLE
-
-** Common configuration
-
-Configuration properties summary:
+The base EDN file allows the following environment variables to be overriden
 
 | Env Var                                 | Required | Default    | Description                                          |
 |-----------------------------------------+----------+------------+------------------------------------------------------|
@@ -64,6 +52,24 @@ Configuration properties summary:
 | DRAFTER_BATCHED_WRITE_SIZE              | No       | 10000      | Max size of write batches in triples                 |
 | DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE     | No       | 30 seconds | Live endpoint max query timeout                      |
 | DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET | No       | 30 seconds | Draftset endpoint max query timeout                  |
+
+=DRAFTER_BATCHED_WRITE_SIZE=
+
+Due to the limitations of the sesame SPARQL repository, large append or delete jobs must split the incoming data into batches
+to be applied sequentially to the stardog database. The size of these batches can be configured - note that out-of-memory
+errors can occur if the value is set too high.
+
+** AUTH0 Profile
+
+If running in a PMD4 configuration you may want to set some of the
+auth0 configuration through environment variables.  Consult the EDN
+file for the specific =#env= readers to use.
+
+** Mongo Profile
+
+If running drafter in PMD3 legacy mode you may configure the mongo
+users profile with the following env vars:
+
 | DRAFTER_USER_DB_NAME                    | Yes      |            | Specific user database in mongo backend user server  |
 | DRAFTER_MONGO_USER_COLLECTION           | No       | users      | The collection in mongo backend that holds the users |
 | DRAFTER_MONGO_HOST                      | Yes      |            | Hostname for backend mongo service                   |
@@ -71,96 +77,7 @@ Configuration properties summary:
 | DRAFTER_JWS_SIGNING_KEY                 | Yes      |            | Shared token for JWT signing                         |
 
 
-
-*** Batch size
-
-=DRAFTER_BATCHED_WRITE_SIZE=
-Due to the limitations of the sesame SPARQL repository, large append or delete jobs must split the incoming data into batches
-to be applied sequentially to the stardog database. The size of these batches can be configured - note that out-of-memory
-errors can occur if the value is set too high.
-
-** Examples
-
-Some examples of supplying these properties are provided below:
-
-As environment variables via a built application jar:
-
-#+BEGIN_SRC shell
-env DRAFTER_HTTP_PORT=3050 SPARQL_QUERY_ENDPOINT=http://localhost:5820/drafter-db/sparql/query SPARQL_UPDATE_ENDPOINT=http://localhost:5820/drafter-db/sparql/update java -jar target/drafter-0.1.0-SNAPSHOT-standalone.jar
-#+END_SRC
-
-** Configuring Timeouts
-
-SPARQL queries may require a long time to be evaluated, so to maintain the
-availability of the server, each SPARQL endpoint can be configured with a query
-timeout. If the query timeout is exceeded during query execution, it will be
-cancelled by the server. There are two types of query endpoint - live and draftset
-and the query timeouts can be configured by the following environment variables:
-
-#+BEGIN_EXAMPLE
-DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
-DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
-#+END_EXAMPLE
-
-The corresponding values should be the query timeout period in seconds.
-
-By default, endpoints have a query timeout of 30 seconds.
-
-** Users Database
-
-The type of user repository to use is configured by specifying the namespace containing the repository
-definition.
-
-*** Mongo
-
-A repository which looks up users in a mongo db instance is defined in the `drafter.user.mongo` namespace:
-
-=DRAFTER_USER_REPO_NS=drafter.user.mongo=
-
-The name of the database containing the user collection must be specified:
-
-=DRAFTER_USER_DB_NAME=pmd2_development=
-
-The name of the user collection within the database can also be specified:
-
-=DRAFTER_MONGO_USER_COLLECTION=publish_my_data_users=
-
-If not specified the default collection name of 'users' will be used.
-
-The location of the mongo database can also be specified as a host/port pair:
-
-=DRAFTER_MONGO_HOST=mongoserver=
-=DRAFTER_MONGO_PORT=8080=
-
-if either the host or port is specified, both are required. If neither is specified the host will default to
-=localhost= and the port to 27017 (the default mongo port).
-
-*** In-memory
-
-To use the in-memory user repository set the namespace to =drafter.user.memory-repository=:
-
-=DRAFTER_USER_REPO_NS=drafter.user.memory-repository=
-
-The memory repository loads its users from a =test-users.edn= file in the working directory so this must exist.
-
-** User Token Signing Key
-
-Drafter can be configured to authenticated users from a JSON Web Signing (JWS) token in the incoming request.
-This token must be signed using the configured HMAC-SHA-256 key. This key should be specified by the
-DRAFTER_JWS_SIGNING_KEY environment variable:
-
-#+BEGIN_SRC shell :exports code
-DRAFTER_JWS_SIGNING_KEY=secretkey
-#+END_SRC
-
-If the =DRAFTER_JWS_SIGNING_KEY= environment variable is not present, JWS token authentication will not be
-available.
-
-The signing key is also used to sign max-query-timeout parameters within SPARQL query requests allowing
-privileged clients to override the endpoint maximum query timeout. If the signing key is not configured,
-these parameters will be ignored and no clients will be allows to override query timeouts.
-
-** System Properties
+* System Properties
 
 The following JVM system properties can be set to configure various
 aspects of drafter.  This is not necessarily an exhaustive list:
@@ -168,3 +85,9 @@ aspects of drafter.  This is not necessarily an exhaustive list:
 | Property            | Default Value | Description                                                                                                                                                                |
 |---------------------+---------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | http.maxConnections | 20?           | The maximum number of HTTP connections allowed inside Apache HTTP Client instances.  Use this to configure the connection pool size inside our Sesame SPARQLRepository, if using drafter against a remote store. |
+
+* Legacy config documentation
+
+Legacy documentation on environment variables etc may be found [[legacy-config-docs.org][here]].
+It may still be useful, if you're looking still looking to set an
+environment variable.
