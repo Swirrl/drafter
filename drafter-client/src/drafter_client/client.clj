@@ -97,7 +97,7 @@
          :description description))
 
 (defn submit-to-user [client access-token id user]
-  (i/get client i/submit-draftset-to access-token id :name user))
+  (i/get client i/submit-draftset-to access-token id :user user))
 
 (defn submit-to-role [client access-token id role]
   (let [role (if (keyword? role) (c/name role) role)]
