@@ -21,6 +21,9 @@
 (defn uuid [s]
   (some-> s UUID/fromString (try (catch Throwable _))))
 
+(defn exception? [v]
+  (instance? Exception v))
+
 (defn date-time [s]
   (some->> s (parse (formatters :date-time))))
 
@@ -34,21 +37,34 @@
       (update :draftset-id (comp uuid :id))
       (update :draft-graph-id uuid)))
 
-(defrecord AsyncJob [type job-id restart-id])
+(defrecord AsyncJob [job-id restart-id])
 
-(defn- ->async-job [{:keys [type finished-job restart-id] :as rsp}]
-  {:post [type restart-id]}
-  (let [job-id (some-> finished-job (str/split #"/") last uuid)]
-    (->AsyncJob type job-id (java.util.UUID/fromString restart-id))))
+(defn- ->async-job [{:keys [finished-job restart-id] :as rsp}]
+  (let [job-id (-> finished-job (str/split #"/") last uuid)]
+    (->AsyncJob job-id (java.util.UUID/fromString restart-id))))
 
-(defn job-complete? [{:keys [type job-id] :as async-job}]
-  {:pre [(instance? AsyncJob async-job)]}
-  (and (nil? job-id)
-       (= "ok" type)))
+(defn job-succeeded? [{:keys [type] :as job-state}]
+  (= "ok" type))
 
-(defn job-in-progress? [{:keys [type job-id] :as async-job}]
-  {:pre [(instance? AsyncJob async-job)]}
+(defn job-failed? [{:keys [type] :as job-state}]
+  (= "error" type))
+
+(defn job-complete? [job-state]
+  (or (job-succeeded? job-state)
+      (job-failed? job-state)))
+
+(defn job-in-progress? [{:keys [type] :as job-state}]
   (= "not-found" type))
+
+(defn drafter-restarted?
+  "Whether drafter restarted between two polled states of a job."
+  [job state]
+  {:pre [(some? (:restart-id job))
+         (some? (:restart-id state))]}
+  (not= (:restart-id job) (:restart-id state)))
+
+(defn- job-details [job-state]
+  (:details job-state))
 
 (defn- json-draftset->draftset [ds]
   (let [{:keys [id display-name description]} ds
@@ -191,32 +207,93 @@
 (defn jobs [client access-token]
   (map ->job (i/get client i/get-jobs access-token)))
 
-(defn refresh-job
+(defn- parse-not-found-body
+  "Parses the HTTP body from a not-found job state response"
+  [body]
+  (let [m (json/parse-string body keyword)]
+    (update m :restart-id uuid)))
+
+(defn- refresh-job
   "Poll to see if asynchronous job has finished"
+  [client access-token {:keys [job-id] :as job}]
+  {:pre [(some? job-id)]}
+  (try
+    (i/get client i/status-job-finished access-token job-id)
+    (catch ExceptionInfo e
+      (let [{:keys [body status]} (ex-data e)]
+        (if (= status 404)
+          (parse-not-found-body body)
+          (throw e))))))
+
+(def job-failure-result? exception?)
+
+(defn job-status [job job-state]
+  (let [info {:job job :state job-state}]
+    (cond
+      (job-succeeded? job-state) (job-details job-state)
+      (job-failed? job-state) (ex-info "Job failed" info)
+      (drafter-restarted? job job-state) (ex-info "Drafter restarted while waiting for job" info)
+      (job-in-progress? job-state) ::pending
+      :else (ex-info "Unknown job state" info))))
+
+(defn wait-result!
+  "Waits for an async job to complete and returns the result map if it succeeded
+   or an exception representing the failure otherwise."
   [client access-token job]
-  (-> client
-      (i/get i/status-job-finished access-token (:job-id job))
-      (try (catch ExceptionInfo e
-             (let [{:keys [body status]} (ex-data e)]
-               (if (= status 404)
-                 (json/parse-string body keyword)
-                 (throw e)))))
-      (->async-job)))
+  (let [state (refresh-job client access-token job)
+        status (job-status job state)]
+    (if (= ::pending status)
+      (do (Thread/sleep 500)
+          (recur client access-token job))
+      status)))
+
+(defn wait-results!
+  "Waits for a sequence of jobs to complete and returns a sequence of results in corresponding order.
+   If a job succeeded, the result will be a result map, otherwise an exception indiciating the reason
+   for the failure."
+  [client access-token jobs]
+  (mapv #(wait-result! client access-token %) jobs))
+
+(defn wait!
+  "Waits for the specified job to complete. Returns the result of the job if successful or
+  throws an exception if the job failed"
+  [client access-token job]
+  (let [result (wait-result! client access-token job)]
+    (if (exception? result)
+      (throw result)
+      result)))
+
+(defn wait-nil!
+  "Waits for a job to complete and returns nil if successful, otherwise throws an exception"
+  [client access-token job]
+  (wait! client access-token job)
+  nil)
+
+(defn wait-all!
+  "Waits for the specified jobs to complete. Returns a sequence of the complete job results in the
+   corresponding order of the jobs in the source sequence if they all completed successfully, or
+   throws an exception if any of the jobs failed."
+  [client access-token jobs]
+  (let [results (wait-results! client access-token jobs)
+        failures (filter exception? results)
+        succeeded (remove exception? results)]
+    (if (seq failures)
+      (throw (ex-info "One or more jobs failed" {:failed    failures
+                                                 :succeeded succeeded}))
+      succeeded)))
 
 (defn resolve-job
   "Wait until asynchronous `job` has finished"
+  {:deprecated "Use wait!, wait-nil! or wait-result! instead"}
   [client access-token job]
-  (let [job* (refresh-job client access-token job)]
-    (cond
-      (job-complete? job*) ::completed
-      (job-in-progress? job*) (do (Thread/sleep 500)
-                                  ;; Recur with the original
-                                  (recur client access-token job)))))
+  (wait-result! client access-token job)
+  ::completed)
 
 (defn resolve-jobs
   "Wait until all of the asynchronous `jobs` have finished"
+  {:deprecated "Use wait-all! or wait-results! instead"}
   [client access-token jobs]
-  (doall (map (fn [job] (resolve-job client access-token job)) jobs)))
+  (mapv (fn [job] (resolve-job client access-token job)) jobs))
 
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an

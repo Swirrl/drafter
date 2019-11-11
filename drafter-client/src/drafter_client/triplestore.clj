@@ -39,9 +39,9 @@
 
 (defn- ensure-complete
   ([message result]
-   (ensure-complete result message {}))
+   (ensure-complete message {} result))
   ([message map result]
-   (when-not (= ::client/completed result)
+   (when (client/job-failure-result? result)
      (throw (ex-info message {:data map :result result})))))
 
 (defprotocol IGraphDrop
@@ -84,7 +84,7 @@
     (let [tx @transaction]
       (->> tx
            (client/publish client token)
-           (client/resolve-job client token)
+           (client/wait-result! client token)
            (ensure-complete "Unable to `commit` transaction" {:transaction tx})))
     (reset! transaction nil))
 
@@ -92,7 +92,7 @@
     (when-let [tx @transaction]
       (->> tx
            (client/remove-draftset client token)
-           (client/resolve-job client token)
+           (client/wait-result! client token)
            (ensure-complete "Unable to `rollback` transaction" {:transaction tx}))
       (reset! transaction nil)))
 
@@ -101,13 +101,13 @@
     (with-ensure-draftset-tx [tx this]
       (->> [(->quad statement)]
            (client/add client token tx)
-           (client/resolve-job client token))))
+           (client/wait-nil! client token))))
 
   (pr/add-statement [this graph statement]
     (with-ensure-draftset-tx [tx this]
       (->> [(->quad statement)]
            (client/add client token tx graph)
-           (client/resolve-job client token))))
+           (client/wait-nil! client token))))
 
   (pr/add [this triples]
     (with-ensure-draftset-tx [tx this]
@@ -116,7 +116,7 @@
           (let [quads (map ->quad triples)]
             (->> quads
                  (client/add client token tx)
-                 (client/resolve-job client token))))
+                 (client/wait-nil! client token))))
         (pr/add-statement this triples)))
     this)
 
@@ -127,7 +127,7 @@
           (let [quads (map ->quad triples)]
             (->> quads
                  (client/add client token tx graph)
-                 (client/resolve-job client token))))
+                 (client/wait-nil! client token))))
         (pr/add-statement this graph triples)))
     this)
 
@@ -147,13 +147,13 @@
     (with-ensure-draftset-tx [tx this]
       (->> [(->quad statement)]
            (client/delete-quads client token tx)
-           (client/resolve-job client token))))
+           (client/wait-nil! client token))))
 
   (delete-statement [this graph statement]
     (with-ensure-draftset-tx [tx this]
       (->> [(->quad statement)]
            (client/delete-triples client token tx graph)
-           (client/resolve-job client token))))
+           (client/wait-nil! client token))))
 
   (delete [this quads]
     (with-ensure-draftset-tx [tx this]
@@ -162,7 +162,7 @@
           (let [quads (map ->quad quads)]
             (->> quads
                  (client/delete-quads client token tx)
-                 (client/resolve-job client token))))
+                 (client/wait-nil! client token))))
         (pr/delete-statement this quads))))
 
   (delete [this graph triples]
@@ -172,7 +172,7 @@
           (let [quads (map ->quad triples)]
             (->> quads
                  (client/delete-triples client token tx graph)
-                 (client/resolve-job client token))))
+                 (client/wait-nil! client token))))
         (pr/delete-statement this graph triples))))
 
   IGraphDrop
