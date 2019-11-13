@@ -142,9 +142,8 @@
         (t/is (= (draftset/name (first result)) name))
         (t/is (= (draftset/description  (first result)) description))))
     (t/testing "Reading back the draftset"
-      (let [[draftset] (sut/draftsets client token)
-            delete-job (sut/remove-draftset client token draftset)]
-        (sut/wait! client token delete-job)
+      (let [[draftset] (sut/draftsets client token)]
+        (sut/remove-draftset-sync client token draftset)
         (let [all-draftsets (sut/draftsets client token)]
           (t/is (empty? all-draftsets)))))))
 
@@ -157,8 +156,7 @@
     (t/testing "Adding triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             draftset (sut/new-draftset client token name description)
-            job (sut/add client token draftset graph triples)
-            _ (sut/wait! client token job)
+            _ (sut/add-sync client token draftset graph triples)
             triples* (sut/get client token draftset graph)]
         (t/is (= (set triples) (set triples*)))))
 
@@ -166,8 +164,7 @@
       (let [graph (URI. "http://test.graph.com/vanilla-quad-graph")
             draftset (sut/new-draftset client token name description)
             quads (map #(assoc % :c graph) (drop 97 triples))
-            job (sut/add client token draftset quads)
-            _ (sut/wait! client token job)
+            _ (sut/add-sync client token draftset quads)
             quads* (sut/get client token draftset)]
         (t/is (= (set quads) (set quads*)))))
 
@@ -177,8 +174,7 @@
             __ (pr/add (rio/rdf-writer baos :format :nt) triples)
             bais (java.io.ByteArrayInputStream. (.toByteArray baos))
             draftset (sut/new-draftset client token name description)
-            job (sut/add client token draftset graph bais)
-            _ (sut/wait! client token job)
+            _ (sut/add-sync client token draftset graph bais)
             quads (sut/get client token draftset)]
         (t/is (= (set (map #(assoc % :c graph) triples))
                  (set quads)))))
@@ -190,16 +186,14 @@
             __ (pr/add (rio/rdf-writer baos :format :nq) quads)
             bais (java.io.ByteArrayInputStream. (.toByteArray baos))
             draftset (sut/new-draftset client token name description)
-            job (sut/add client token draftset bais)
-            _ (sut/wait! client token job)
+            _ (sut/add-sync client token draftset bais)
             quads* (sut/get client token draftset)]
         (t/is (= (set quads) (set quads*)))))
 
     (t/testing "Adding .nt file of triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             draftset (sut/new-draftset client token name description)
-            job (sut/add client token draftset graph (io/file (res-file triples-nt-filename)))
-            _ (sut/wait! client token job)
+            _ (sut/add-sync client token draftset graph (io/file (res-file triples-nt-filename)))
             triples* (sut/get client token draftset)]
         (t/is (= 2252 (count triples*)))
         (t/is (= (set (map #(assoc % :c graph) (test-triples)))
@@ -210,8 +204,7 @@
       (let [graph (URI. "http://test.graph.com/rdf-graph")
             file (res-file "resources/rdf-syntax-ns.ttl")
             draftset (sut/new-draftset client token name description)
-            job (sut/add client token draftset graph (io/file file))
-            _ (sut/wait! client token job)
+            _ (sut/add-sync client token draftset graph (io/file file))
             triples* (sut/get client token draftset)]
         (t/is (= 102 (count triples*)))
         (t/is (= (set (map #(assoc % :c graph) (rio/statements file)))
@@ -236,12 +229,11 @@
       (let [graph-1 (URI. "http://test.graph.com/quad-graph1")
             quads-1 (map #(assoc % :c graph-1) triples)
             quads-1 (take how-many quads-1)
-            job-1 (sut/add client token draftset quads-1)
+            _ (sut/add-sync client token draftset quads-1)
             graph-2 (URI. "http://test.graph.com/quad-graph2")
             quads-2 (map #(assoc % :c graph-2) triples)
             quads-2 (take how-many (drop how-many quads-2))
-            job-2 (sut/add client token draftset quads-2)
-            _ (sut/wait-all! client token [job-1 job-2])
+            _ (sut/add-sync client token draftset quads-2)
             quads* (sut/get client token draftset)]
         (t/is (= (set (concat quads-1 quads-2)) (set quads*)))))))
 
@@ -256,11 +248,10 @@
     (t/testing "Adding triples to a draft set"
       (let [graph-1 (URI. "http://test.graph.com/triple-graph1")
             triples-1 (take how-many triples)
-            job-1 (sut/add client token draftset graph-1 triples-1)
+            _ (sut/add-sync client token draftset graph-1 triples-1)
             graph-2 (URI. "http://test.graph.com/triple-graph2")
             triples-2 (take how-many (drop how-many triples))
-            job-2 (sut/add client token draftset graph-2 triples-2)
-            _ (sut/wait-all! client token [job-1 job-2])
+            _ (sut/add-sync client token draftset graph-2 triples-2)
             triples-1* (sut/get client token draftset graph-1)
             triples-2* (sut/get client token draftset graph-2)]
         (t/is (= (set triples-1) (set triples-1*)))
@@ -277,11 +268,9 @@
     (t/testing "Publishing a draft set"
       (let [graph (URI. "http://test.graph.com/quad-graph")
             quads (map #(assoc % :c graph) triples)
-            quads (take how-many quads)
-            job-1 (sut/add client token draftset quads)
-            _ (sut/wait! client token job-1)
-            job-2 (sut/publish client token draftset)
-            _ (sut/wait! client token job-2)]
+            quads (take how-many quads)]
+        (sut/add-sync client token draftset quads)
+        (sut/publish-sync client token draftset)
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
           (let [quads* (map #(assoc % :c graph) (gr-repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))]
             (t/is (= (set quads) (set quads*)))))))))
@@ -298,10 +287,8 @@
       (let [graph (URI. "http://test.graph.com/quad-graph")
             quads (map #(assoc % :c graph) triples)
             quads (take how-many quads)
-            job-1 (sut/add client token draftset-1 quads)
-            _ (sut/wait! client token job-1)
-            job-2 (sut/publish client token draftset-1)
-            _ (sut/wait! client token job-2)
+            _ (sut/add-sync client token draftset-1 quads)
+            _ (sut/publish-sync client token draftset-1)
             draftset-2 (sut/new-draftset client token name description)
             job-3 (sut/load-graph client token draftset-2 graph)
             _ (sut/wait! client token job-3)
@@ -319,17 +306,16 @@
     (t/testing "Deleting graph from live"
       (let [graph-1 (URI. "http://test.graph.com/triple-graph1")
             triples-1 (take how-many triples)
-            job-1 (sut/add client token draftset-1 graph-1 triples-1)
             graph-2 (URI. "http://test.graph.com/triple-graph2")
-            triples-2 (take how-many (drop how-many triples))
-            job-2 (sut/add client token draftset-1 graph-2 triples-2)
-            _ (sut/wait-all! client token [job-1 job-2])
-            job-3 (sut/publish client token draftset-1)
-            _ (sut/wait! client token job-3)
-            draftset-2 (sut/new-draftset client token name description)
-            _ (sut/delete-graph client token draftset-2 graph-1)
-            job-4 (sut/publish client token draftset-2)
-            _ (sut/wait! client token job-4)]
+            triples-2 (take how-many (drop how-many triples))]
+        (sut/add-sync client token draftset-1 graph-1 triples-1)
+        (sut/add-sync client token draftset-1 graph-2 triples-2)
+        (sut/publish-sync client token draftset-1)
+
+        (let [draftset-2 (sut/new-draftset client token name description)]
+          (sut/delete-graph client token draftset-2 graph-1)
+          (sut/publish-sync client token draftset-2))
+
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
           (let [query (format "CONSTRUCT { ?s ?p ?o } WHERE { graph <%s> { ?s ?p ?o } }" (str graph-1))
                 triples-1* (gr-repo/query conn query)]
@@ -355,8 +341,8 @@
         (is (= :pending (:status known-job)))
         (is (contains? (set (map :id (sut/jobs client token)))
                        (:id known-job)))
-        (let [_ (sut/wait! client token async-job)
-              known-job' (sut/job client token id)]
+        (sut/wait! client token async-job)
+        (let [known-job' (sut/job client token id)]
           (is known-job')
           (is (= :complete (:status known-job')))
           (is (contains? (set (sut/jobs client token)) known-job')))))))
@@ -372,9 +358,8 @@
     (t/testing "Adding triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph1")
             triples (take how-many triples)
-            job (sut/add client token draftset graph triples)
-            _ (sut/wait! client token job)
             repo (sut/->repo client token draftset)]
+        (sut/add-sync client token draftset graph triples)
         (with-open [conn (gr-repo/->connection repo)]
           (let [res (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
             (t/is (true? res))))))))
