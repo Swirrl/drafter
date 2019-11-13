@@ -26,6 +26,10 @@
                 function
                 value-p])
 
+(def allowed-queue-keys
+  #{:id :user-id :operation :status :priority :start-time :finish-time
+    :draftset-id :draft-graph-id :metadata :value-p})
+
 (defonce jobs
   (atom {:pending  {}
          :complete {}}))
@@ -128,7 +132,8 @@
   "Submits an async job and returns `true` if the job was submitted
   successfully"
   [job]
-  (swap! jobs assoc-in [:pending (:id job)] job)
+  (let [job' (select-keys job allowed-queue-keys)]
+    (swap! jobs assoc-in [:pending (:id job')] job'))
   true)
 
 (defn job-completed?

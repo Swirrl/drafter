@@ -54,7 +54,7 @@
   (s/keys :req-un [::id ::user-id ::operation ::status ::priority
                    :internal-job/start-time :internal-job/finish-time
                    ::draftset-id ::draft-graph-id ::metadata
-                   ::function ::value-p]))
+                   ::value-p]))
 
 (s/def ::api-job
   (s/keys :req-un [::id ::user-id ::operation ::status ::priority
