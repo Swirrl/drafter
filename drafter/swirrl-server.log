@@ -1,0 +1,59 @@
+2019-09-24 13:47:26,620 INFO                  main                           :: Stopping Drafter
+2019-09-24 13:48:27,130 INFO                   log                           :: Logging initialized @6674ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-09-24 13:48:27,681 INFO                  main                           :: Stopping Drafter
+2019-09-24 13:49:09,351 INFO                   log                           :: Logging initialized @6652ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-09-24 13:49:10,878 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-09-24 13:49:10,898 INFO     AbstractConnector                           :: Started ServerConnector@1e5ba462{HTTP/1.1,[http/1.1]}{0.0.0.0:3003}
+2019-09-24 13:49:10,898 INFO                Server                           :: Started @8201ms
+2019-09-24 13:49:12,909 INFO     AbstractConnector                           :: Stopped ServerConnector@1e5ba462{HTTP/1.1,[http/1.1]}{0.0.0.0:3003}
+2019-11-13 11:26:12,530 INFO                  main                           :: Stopping Drafter
+2019-11-13 11:26:32,986 INFO                   log                           :: Logging initialized @7489ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 11:26:33,676 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 11:26:33,696 INFO     AbstractConnector                           :: Started ServerConnector@6510d718{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:26:33,696 INFO                Server                           :: Started @8200ms
+2019-11-13 11:29:10,738 INFO     AbstractConnector                           :: Stopped ServerConnector@6510d718{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:29:52,277 INFO                   log                           :: Logging initialized @8059ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 11:29:52,995 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 11:29:53,016 INFO     AbstractConnector                           :: Started ServerConnector@48fbdad6{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:29:53,016 INFO                Server                           :: Started @8800ms
+2019-11-13 11:41:52,674 INFO     AbstractConnector                           :: Stopped ServerConnector@48fbdad6{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:42:20,273 INFO                   log                           :: Logging initialized @7444ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 11:42:20,963 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 11:42:20,986 INFO     AbstractConnector                           :: Started ServerConnector@15317dc9{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:42:20,987 INFO                Server                           :: Started @8159ms
+2019-11-13 11:44:13,782 INFO     AbstractConnector                           :: Stopped ServerConnector@15317dc9{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:44:49,819 INFO                   log                           :: Logging initialized @8873ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 11:44:50,591 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 11:44:50,612 INFO     AbstractConnector                           :: Started ServerConnector@48fbdad6{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:44:50,612 INFO                Server                           :: Started @9668ms
+2019-11-13 11:47:14,880 INFO     AbstractConnector                           :: Stopped ServerConnector@48fbdad6{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:47:42,045 INFO                   log                           :: Logging initialized @7469ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 11:47:42,736 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 11:47:42,757 INFO     AbstractConnector                           :: Started ServerConnector@6038ed66{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:47:42,758 INFO                Server                           :: Started @8183ms
+2019-11-13 11:52:59,073 INFO     AbstractConnector                           :: Stopped ServerConnector@6038ed66{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:53:31,328 INFO                   log                           :: Logging initialized @7789ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 11:53:32,002 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 11:53:32,025 INFO     AbstractConnector                           :: Started ServerConnector@6e0d9d4a{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:53:32,026 INFO                Server                           :: Started @8488ms
+2019-11-13 11:55:42,213 INFO     AbstractConnector                           :: Stopped ServerConnector@6e0d9d4a{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:56:42,681 INFO                   log                           :: Logging initialized @8243ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 11:56:43,439 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 11:56:43,460 INFO     AbstractConnector                           :: Started ServerConnector@73ab9ed1{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 11:56:43,461 INFO                Server                           :: Started @9024ms
+2019-11-13 11:58:57,384 INFO     AbstractConnector                           :: Stopped ServerConnector@73ab9ed1{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 12:00:50,185 INFO                   log                           :: Logging initialized @9122ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 12:00:50,902 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 12:00:50,923 INFO     AbstractConnector                           :: Started ServerConnector@6f8f5d72{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 12:00:50,923 INFO                Server                           :: Started @9861ms
+2019-11-13 12:05:21,857 INFO     AbstractConnector                           :: Stopped ServerConnector@6f8f5d72{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 12:05:52,047 INFO                   log                           :: Logging initialized @8513ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 12:05:52,731 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 12:05:52,752 INFO     AbstractConnector                           :: Started ServerConnector@6510d718{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 12:05:52,752 INFO                Server                           :: Started @9219ms
+2019-11-13 12:07:47,580 INFO     AbstractConnector                           :: Stopped ServerConnector@6510d718{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 12:12:56,609 INFO                   log                           :: Logging initialized @10283ms to org.eclipse.jetty.util.log.Slf4jLog
+2019-11-13 12:12:57,419 INFO                Server                           :: jetty-9.4.12.v20180830; built: 2018-08-30T13:59:14.071Z; git: 27208684755d94a92186989f695db2d7b21ebc51; jvm 1.8.0_222-ga
+2019-11-13 12:12:57,446 INFO     AbstractConnector                           :: Started ServerConnector@6510d718{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
+2019-11-13 12:12:57,446 INFO                Server                           :: Started @11122ms
+2019-11-13 12:23:41,621 INFO     AbstractConnector                           :: Stopped ServerConnector@6510d718{HTTP/1.1,[http/1.1]}{0.0.0.0:3002}
