@@ -81,6 +81,17 @@
   (let [file (res-file triples-nt-filename)]
     (rio/statements file)))
 
+(defn infinite-test-triples
+  "Generate an infinite amount of test triples.  Take the amount you
+  need!"
+  [graph]
+  (->> (range)
+       (map (fn [i]
+              (pr/->Quad (URI. (str "http://s/" i))
+                         (URI. (str "http://p/" i))
+                         i
+                         graph)))))
+
 (t/use-fixtures :each
   with-spec-instrumentation
   ;; Drop db after tests
@@ -121,8 +132,8 @@
     (t/testing "Live database is empty"
       (with-open [conn (gr-repo/->connection repo)]
         (let [result (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
-          (t/is (false? result)
-                "I really expected the database to be empty"))))))
+          (is (false? result)
+              "I really expected the database to be empty"))))))
 
 (t/deftest draftsets-tests
   (let [client (drafter-client)
@@ -131,16 +142,16 @@
         description "test-description"]
     (t/testing "Assumption test"
       (let [result (sut/draftsets client token)]
-        (t/is (empty? result) "There should be no drafts")))
+        (is (empty? result) "There should be no drafts")))
     (t/testing "Adding a draft set"
       (let [result (sut/new-draftset client token name description)]
-        (t/is (= (draftset/name result) name))
-        (t/is (= (draftset/description  result) description))))
+        (is (= (draftset/name result) name))
+        (is (= (draftset/description  result) description))))
     (t/testing "Reading back the draftset"
       (let [result (sut/draftsets client token)]
-        (t/is (= 1 (count result)) "There should be one draft")
-        (t/is (= (draftset/name (first result)) name))
-        (t/is (= (draftset/description  (first result)) description))))
+        (is (= 1 (count result)) "There should be one draft")
+        (is (= (draftset/name (first result)) name))
+        (is (= (draftset/description  (first result)) description))))
     (t/testing "Reading back the draftset"
       (let [[draftset] (sut/draftsets client token)]
         (sut/remove-draftset-sync client token draftset)
@@ -250,7 +261,7 @@
             quads-2 (take how-many (drop how-many quads-2))
             _ (sut/add-sync client token draftset quads-2)
             quads* (sut/get client token draftset)]
-        (t/is (= (set (concat quads-1 quads-2)) (set quads*)))))))
+        (is (= (set (concat quads-1 quads-2)) (set quads*)))))))
 
 (t/deftest adding-triples-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
@@ -269,8 +280,8 @@
             _ (sut/add-sync client token draftset graph-2 triples-2)
             triples-1* (sut/get client token draftset graph-1)
             triples-2* (sut/get client token draftset graph-2)]
-        (t/is (= (set triples-1) (set triples-1*)))
-        (t/is (= (set triples-2) (set triples-2*)))))))
+        (is (= (set triples-1) (set triples-1*)))
+        (is (= (set triples-2) (set triples-2*)))))))
 
 (t/deftest publishing-a-draftset
   (let [client (drafter-client)
@@ -288,7 +299,7 @@
         (sut/publish-sync client token draftset)
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
           (let [quads* (map #(assoc % :c graph) (gr-repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))]
-            (t/is (= (set quads) (set quads*)))))))))
+            (is (= (set quads) (set quads*)))))))))
 
 (t/deftest loading-a-graph-into-a-draftset
   (let [client (drafter-client)
@@ -308,7 +319,7 @@
             job-3 (sut/load-graph client token draftset-2 graph)
             _ (sut/wait! client token job-3)
             quads* (sut/get client token draftset-2)]
-        (t/is (= (set quads) (set quads*)))))))
+        (is (= (set quads) (set quads*)))))))
 
 (t/deftest deleting-a-graph-from-a-draftset
   (let [client (drafter-client)
@@ -334,10 +345,10 @@
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
           (let [query (format "CONSTRUCT { ?s ?p ?o } WHERE { graph <%s> { ?s ?p ?o } }" (str graph-1))
                 triples-1* (gr-repo/query conn query)]
-            (t/is (empty? triples-1*)))
+            (is (empty? triples-1*)))
           (let [query (format "CONSTRUCT { ?s ?p ?o } WHERE { graph <%s> { ?s ?p ?o } }" (str graph-2))
                 triples-2* (gr-repo/query conn query)]
-            (t/is (= (set triples-2) (set triples-2*)))))))))
+            (is (= (set triples-2) (set triples-2*)))))))))
 
 (t/deftest job-status
   (let [client (drafter-client)
@@ -377,13 +388,31 @@
         (sut/add-sync client token draftset graph triples)
         (with-open [conn (gr-repo/->connection repo)]
           (let [res (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
-            (t/is (true? res))))))))
+            (is (true? res))))))))
 
 (t/deftest integrant-null-client
   (t/testing "missing a drafter uri key returns nil client"
-    (t/is (nil? (ig/init-key :drafter-client/client {})))
-    (t/is (nil? (ig/init-key :drafter-client/client {:drafter-uri ""})))
-    (t/is (some? (ig/init-key :drafter-client/client
-                              {:batch-size 10
-                               :drafter-uri (env :drafter-endpoint)
-                               :auth0-endpoint (env :auth0-domain)})))))
+    (is (nil? (ig/init-key :drafter-client/client {})))
+    (is (nil? (ig/init-key :drafter-client/client {:drafter-uri ""})))
+    (is (some? (ig/init-key :drafter-client/client
+                            {:batch-size 10
+                             :drafter-uri (env :drafter-endpoint)
+                             :auth0-endpoint (env :auth0-domain)})))))
+
+(t/deftest writes-locked?-test
+  (let [client (drafter-client)
+        quads (infinite-test-triples (URI. "http://test.graph.com/quad-graph"))
+        how-many 1000 ;; NOTE: this needs to be enough that the write lock
+                      ;; engages long enough to test writes-locked?
+        token (auth-util/system-token)
+        name "Draftset publishing"
+        description "Testing adding things, publishing them, and reading them"
+        draftset-1 (sut/new-draftset client token name description)]
+    (t/testing "That writes-locked? returns correct value"
+      (is (false? (sut/writes-locked? client token)))
+      (let [quads (take how-many quads)
+            job-1 (sut/add-sync client token draftset-1 quads)
+            job-2 (sut/publish client token draftset-1)]
+        (is (true? (sut/writes-locked? client token)))
+        (is (= :drafter-client.client/completed
+               (sut/resolve-job client token job-2)))))))
