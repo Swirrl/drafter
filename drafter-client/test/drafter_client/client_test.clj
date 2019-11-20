@@ -17,7 +17,8 @@
             [martian.core :as martian]
             [clojure.java.io :as io]
             [grafter-2.rdf.protocols :as pr])
-  (:import java.net.URI))
+  (:import java.net.URI
+           [java.util UUID]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setup ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -39,16 +40,19 @@
     (finally
       (st/unstrument))))
 
-(defn db-fixture [f]
+(defn- get-stardog-repo []
   (let [stardog-query (env :sparql-query-endpoint)
         stardog-update (env :sparql-update-endpoint)]
     (assert stardog-query "Set SPARQL_QUERY_ENDPOINT to run these tests.")
     (assert stardog-update "Set SPARQL_UPDATE_ENDPOINT to run these tests.")
-    (let [stardog-repo (gr-repo/sparql-repo stardog-query stardog-update)]
-      (when-not (Boolean/parseBoolean (env :disable-drafter-cleaning-protection))
-        (db-util/assert-empty stardog-repo))
-      (f)
-      (db-util/drop-all! stardog-repo))))
+    (gr-repo/sparql-repo "http://localhost:5820/drafter-client-test/query" "http://localhost:5820/drafter-client-test/update")))
+
+(defn db-fixture [f]
+  (let [stardog-repo (get-stardog-repo)]
+    (when-not (Boolean/parseBoolean (env :disable-drafter-cleaning-protection))
+      (db-util/assert-empty stardog-repo))
+    (f)
+    (db-util/drop-all! stardog-repo)))
 
 (defn resfile [filename]
   (or (some-> filename io/resource io/file .getCanonicalPath)
@@ -87,6 +91,28 @@
 ;; Tests ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(t/deftest job-status-test
+  (let [job-id (UUID/randomUUID)
+        restart-id (UUID/randomUUID)
+        job (sut/->AsyncJob job-id restart-id)]
+    (t/testing "Job succeeded"
+      (let [details {:some "details"}
+            state {:type "ok" :details details}
+            status (sut/job-status job state)]
+        (is (= details status))))
+    (t/testing "Job failed"
+      (let [details {:some "details"}
+            state {:type "error" :message ":(" :error-class "java.lang.Exception" :details details}
+            status (sut/job-status job state)]
+        (is (sut/job-failure-result? status))))
+    (t/testing "In progress"
+      (let [state {:type "not-found" :restart-id restart-id}]
+        (is (= ::sut/pending (sut/job-status job state)))))
+    (t/testing "Drafter restart"
+      (let [state {:type "not-found" :restart-id (UUID/randomUUID)}
+            status (sut/job-status job state)]
+        (is (sut/job-failure-result? status))))))
+
 (t/deftest live-repo-tests
   (let [client (drafter-client)
         repo (sut/->repo client (auth-util/system-token) sut/live)]
@@ -95,7 +121,6 @@
         (let [result (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
           (t/is (false? result)
                 "I really expected the database to be empty"))))))
-
 
 (t/deftest draftsets-tests
   (let [client (drafter-client)
@@ -116,12 +141,10 @@
         (t/is (= (draftset/description  (first result)) description))))
     (t/testing "Reading back the draftset"
       (let [[draftset] (sut/draftsets client token)
-            async-delete-result (sut/remove-draftset client token draftset)
-            finished-result (sut/resolve-job client token async-delete-result)
-            all-draftsets (sut/draftsets client token)]
-        (t/is (= "ok" (:type async-delete-result)))
-        (t/is (= :drafter-client.client/completed finished-result))
-        (t/is (empty? all-draftsets))))))
+            delete-job (sut/remove-draftset client token draftset)]
+        (sut/wait! client token delete-job)
+        (let [all-draftsets (sut/draftsets client token)]
+          (t/is (empty? all-draftsets)))))))
 
 (t/deftest adding-to-a-draftset
   (let [client (drafter-client)
@@ -136,16 +159,14 @@
             quads (map #(assoc % :c graph) triples)
             quads (take how-many quads)
             job (sut/add client token draftset quads)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job)))
+            _ (sut/wait! client token job)
             quads* (sut/get client token draftset)]
         (t/is (= (set quads) (set quads*)))))
     (t/testing "Adding triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             triples (take how-many triples)
             job (sut/add client token draftset graph triples)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job)))
+            _ (sut/wait! client token job)
             triples* (sut/get client token draftset graph)]
         (t/is (= (set triples) (set triples*)))))))
 
@@ -161,15 +182,13 @@
       (let [graph (URI. "http://test.graph.com/quad-graph")
             quads (map #(assoc % :c graph) triples)
             job (sut/add client token draftset quads)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job)))
+            _ (sut/wait! client token job)
             quads* (sut/get client token draftset)]
         (t/is expected-count (count quads*))))
     (t/testing "Adding triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             job (sut/add client token draftset graph triples)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job)))
+            _ (sut/wait! client token job)
             triples* (sut/get client token draftset graph)]
         (t/is (= expected-count (count triples*)))))))
 
@@ -190,10 +209,7 @@
             quads-2 (map #(assoc % :c graph-2) triples)
             quads-2 (take how-many (drop how-many quads-2))
             job-2 (sut/add client token draftset quads-2)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-2)))
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-2)))
+            _ (sut/wait-all! client token [job-1 job-2])
             quads* (sut/get client token draftset)]
         (t/is (= (set (concat quads-1 quads-2)) (set quads*)))))))
 
@@ -212,10 +228,7 @@
             graph-2 (URI. "http://test.graph.com/triple-graph2")
             triples-2 (take how-many (drop how-many triples))
             job-2 (sut/add client token draftset graph-2 triples-2)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-1)))
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-2)))
+            _ (sut/wait-all! client token [job-1 job-2])
             triples-1* (sut/get client token draftset graph-1)
             triples-2* (sut/get client token draftset graph-2)]
         (t/is (= (set triples-1) (set triples-1*)))
@@ -234,11 +247,9 @@
             quads (map #(assoc % :c graph) triples)
             quads (take how-many quads)
             job-1 (sut/add client token draftset quads)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-1)))
+            _ (sut/wait! client token job-1)
             job-2 (sut/publish client token draftset)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-2)))]
+            _ (sut/wait! client token job-2)]
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
           (let [quads* (map #(assoc % :c graph) (gr-repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))]
             (t/is (= (set quads) (set quads*)))))))))
@@ -256,15 +267,12 @@
             quads (map #(assoc % :c graph) triples)
             quads (take how-many quads)
             job-1 (sut/add client token draftset-1 quads)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-1)))
+            _ (sut/wait! client token job-1)
             job-2 (sut/publish client token draftset-1)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-2)))
+            _ (sut/wait! client token job-2)
             draftset-2 (sut/new-draftset client token name description)
             job-3 (sut/load-graph client token draftset-2 graph)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-3)))
+            _ (sut/wait! client token job-3)
             quads* (sut/get client token draftset-2)]
         (t/is (= (set quads) (set quads*)))))))
 
@@ -283,18 +291,13 @@
             graph-2 (URI. "http://test.graph.com/triple-graph2")
             triples-2 (take how-many (drop how-many triples))
             job-2 (sut/add client token draftset-1 graph-2 triples-2)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-1)))
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-2)))
+            _ (sut/wait-all! client token [job-1 job-2])
             job-3 (sut/publish client token draftset-1)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-3)))
+            _ (sut/wait! client token job-3)
             draftset-2 (sut/new-draftset client token name description)
             _ (sut/delete-graph client token draftset-2 graph-1)
             job-4 (sut/publish client token draftset-2)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job-4)))]
+            _ (sut/wait! client token job-4)]
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
           (let [query (format "CONSTRUCT { ?s ?p ?o } WHERE { graph <%s> { ?s ?p ?o } }" (str graph-1))
                 triples-1* (gr-repo/query conn query)]
@@ -320,14 +323,11 @@
         (is (= :pending (:status known-job)))
         (is (contains? (set (map :id (sut/jobs client token)))
                        (:id known-job)))
-        (is (= "ok" (:type async-job)))
-        (is (not (sut/job-complete? async-job)))
-        (let [job-status (sut/resolve-job client token async-job)
+        (let [_ (sut/wait! client token async-job)
               known-job' (sut/job client token id)]
           (is known-job')
           (is (= :complete (:status known-job')))
-          (is (contains? (set (sut/jobs client token)) known-job'))
-          (is (= :drafter-client.client/completed job-status)))))))
+          (is (contains? (set (sut/jobs client token)) known-job')))))))
 
 (t/deftest querying
   (let [client (drafter-client)
@@ -341,13 +341,11 @@
       (let [graph (URI. "http://test.graph.com/triple-graph1")
             triples (take how-many triples)
             job (sut/add client token draftset graph triples)
-            _ (t/is (= :drafter-client.client/completed
-                       (sut/resolve-job client token job)))
+            _ (sut/wait! client token job)
             repo (sut/->repo client token draftset)]
         (with-open [conn (gr-repo/->connection repo)]
           (let [res (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
             (t/is (true? res))))))))
-
 
 (t/deftest integrant-null-client
   (t/testing "missing a drafter uri key returns nil client"

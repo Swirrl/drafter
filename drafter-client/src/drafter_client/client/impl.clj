@@ -1,6 +1,7 @@
 (ns drafter-client.client.impl
   (:refer-clojure :exclude [get])
   (:require [cheshire.core :as json]
+            [clojure.spec.alpha :as s]
             [clojure.walk :refer [postwalk]]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
@@ -25,6 +26,9 @@
       :batch-size batch-size
       :auth0 auth0
       (.valAt martian k default))))
+
+(s/def ::DrafterClient #(instance? DrafterClient %))
+(s/def ::AccessToken string?)
 
 (defn intercept
   {:style/indent :defn}
