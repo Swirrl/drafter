@@ -6,12 +6,14 @@
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
             [grafter-2.rdf4j.io :as rio]
+            [clj-http.client :as http]
             [martian.clj-http :as martian-http]
             [martian.core :as martian]
             [martian.encoders :as encoders]
             [martian.interceptors :as interceptors]
             [ring.util.codec :refer [form-decode form-encode]]
-            [ring.util.io :refer [piped-input-stream]]))
+            [ring.util.io :refer [piped-input-stream]])
+  (:import (java.io InputStream File)))
 
 (deftype DrafterClient [martian batch-size auth0]
   ;; Wrap martian in a type so that:
@@ -196,14 +198,33 @@
   [client id & {:keys [display-name description] :as opts}]
   (martian/response-for client :put-draftset (merge {:id id} opts)))
 
-(defn put-draftset-data
-  "Append the supplied RDF data to this Draftset"
-  #:drafter-client.client.impl{:generated true}
-  [client id data & {:keys [graph] :as opts}]
-  (martian/response-for
-   client
-   :put-draftset-data
-   (merge {:id id :data data} opts)))
+(defn n*->stream [format n*]
+  (piped-input-stream
+    (fn [output-stream]
+      (pr/add (rio/rdf-writer output-stream :format format) n*))))
+
+(defn grafter->format-stream [content-type data]
+  (let [format (mimetype->rdf-format content-type)]
+    (n*->stream format data)))
+
+(defn append-via-http-stream
+  "Write statements (quads, triples, File, InputStream) to a URL, as a
+  an input stream by virtue of an HTTP PUT"
+  [access-token url statements & {:keys [graph format] :as _opts}]
+  (let [input-stream (if (some #(instance? % statements) [InputStream File])
+                       statements
+                       (grafter->format-stream format statements))
+        headers {:Content-Type format
+                 :Accept "application/json"
+                 :Authorization (str "Bearer " access-token)}
+        request {:url url
+                 :query-params (when graph {:graph (.toString graph)})
+                 :method :put
+                 :body input-stream
+                 :headers headers
+                 :as :json}
+        {:keys [body] :as _resp} (http/request request)]
+    body))
 
 (defn put-draftset-graph
   "Copy a graph from live into this Draftset"
@@ -289,15 +310,6 @@
 (defn- json [data]
   (let [opts {:date-format (:datetime-format default-format)}]
     (json/generate-string data opts)))
-
-(defn- n*->stream [format n*]
-  (piped-input-stream
-   (fn [output-stream]
-     (pr/add (rio/rdf-writer output-stream :format format) n*))))
-
-(defn- grafter->format-stream [content-type data]
-  (let [format (mimetype->rdf-format content-type)]
-    (n*->stream format data)))
 
 (defn- read-body [content-type body]
   {:pre [(instance? java.io.InputStream body)]}
