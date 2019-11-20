@@ -10,7 +10,8 @@
             [drafter-client.client.impl :as i :refer [->DrafterClient]]
             [drafter-client.client.repo :as repo]
             [integrant.core :as ig]
-            [martian.clj-http :as martian-http])
+            [martian.clj-http :as martian-http]
+            [martian.core :as martian])
   (:import clojure.lang.ExceptionInfo
            java.util.UUID))
 
@@ -195,17 +196,21 @@
       (->async-job)))
 
 (defn add
-  "Append the supplied RDF data to this Draftset"
+  "Append the supplied RDF statements to this Draftset.
+  'statements' can be a sequence of quads or triples; a File; or InputStream"
   ([client access-token draftset quads]
-   (-> client
-       (i/set-content-type "application/n-quads")
-       (i/get i/put-draftset-data access-token (draftset/id draftset) quads)
-       (->async-job)))
+   (add client access-token draftset nil quads))
   ([client access-token draftset graph triples]
-   (let [id (draftset/id draftset)]
-     (-> client
-         (i/set-content-type "application/n-triples")
-         (i/get i/put-draftset-data access-token id triples :graph graph)
+   (let [url (martian/url-for client
+                              :put-draftset-data
+                              {:id (draftset/id draftset)})
+         format* (or (when graph "application/n-triples")
+                     "application/n-quads")]
+     (-> (i/append-via-http-stream access-token
+                                   url
+                                   triples
+                                   :graph graph
+                                   :format format*)
          (->async-job)))))
 
 (defn add-in-batches

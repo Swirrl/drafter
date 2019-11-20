@@ -26,7 +26,7 @@
       (.withIssuer (str iss \/))
       (.withSubject sub)
       (.withAudience (into-array String [aud]))
-      (.withExpiresAt (to-date (time/plus (time/now) (time/minutes 10))))
+      (.withExpiresAt (to-date (time/plus (time/now) (time/minutes 30))))
       (.withClaim "scope" role)
       (.sign alg)))
 

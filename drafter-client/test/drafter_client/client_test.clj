@@ -16,7 +16,8 @@
             [integrant.core :as ig]
             [martian.core :as martian]
             [clojure.java.io :as io]
-            [grafter-2.rdf.protocols :as pr])
+            [grafter-2.rdf.protocols :as pr]
+            [drafter-client.client.impl :as i])
   (:import java.net.URI
            [java.util UUID]))
 
@@ -148,49 +149,56 @@
 
 (t/deftest adding-to-a-draftset
   (let [client (drafter-client)
-        triples (test-triples)
-        how-many 5
         token (auth-util/system-token)
         name "Draftset adding"
         description "Testing adding things, and reading them"
-        draftset (sut/new-draftset client token name description)]
+        triples (test-triples)]
+    (t/testing "Adding triples to a draft set"
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            draftset (sut/new-draftset client token name description)
+            job (sut/add client token draftset graph triples)
+            _ (sut/wait! client token job)
+            triples* (sut/get client token draftset graph)]
+        (t/is (= (set triples) (set triples*)))))
+
     (t/testing "Adding quads to a draft set"
-      (let [graph (URI. "http://test.graph.com/quad-graph")
-            quads (map #(assoc % :c graph) triples)
-            quads (take how-many quads)
+      (let [graph (URI. "http://test.graph.com/vanilla-quad-graph")
+            draftset (sut/new-draftset client token name description)
+            quads (map #(assoc % :c graph) (drop 97 triples))
             job (sut/add client token draftset quads)
             _ (sut/wait! client token job)
             quads* (sut/get client token draftset)]
         (t/is (= (set quads) (set quads*)))))
-    (t/testing "Adding triples to a draft set"
-      (let [graph (URI. "http://test.graph.com/triple-graph")
-            triples (take how-many triples)
-            job (sut/add client token draftset graph triples)
-            _ (sut/wait! client token job)
-            triples* (sut/get client token draftset graph)]
-        (t/is (= (set triples) (set triples*)))))))
 
-(t/deftest adding-everything-to-a-draftset
-  (let [client (drafter-client)
-        triples (test-triples)
-        expected-count (count triples)
-        token (auth-util/system-token)
-        name "Draftset adding"
-        description "Testing adding things, and reading them"
-        draftset (sut/new-draftset client token name description)]
-    (t/testing "Adding quads to a draft set"
-      (let [graph (URI. "http://test.graph.com/quad-graph")
+    (t/testing "Adding input-stream of triples to a draft set"
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            in (i/n*->stream :nt triples)
+            draftset (sut/new-draftset client token name description)
+            job (sut/add client token draftset graph in)
+            _ (sut/wait! client token job)
+            quads (sut/get client token draftset)]
+        (t/is (= (set (map #(assoc % :c graph) triples))
+                 (set quads)))))
+
+    (t/testing "Adding input-stream of quads to a draft set"
+      (let [graph (URI. "http://test.graph.com/sexy-stream-of-quads-graph")
             quads (map #(assoc % :c graph) triples)
-            job (sut/add client token draftset quads)
+            in (i/n*->stream :nq quads)
+            draftset (sut/new-draftset client token name description)
+            job (sut/add client token draftset in)
             _ (sut/wait! client token job)
             quads* (sut/get client token draftset)]
-        (t/is expected-count (count quads*))))
-    (t/testing "Adding triples to a draft set"
+        (t/is (= (set quads) (set quads*)))))
+
+    (t/testing "Adding file of triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
-            job (sut/add client token draftset graph triples)
+            draftset (sut/new-draftset client token name description)
+            job (sut/add client token draftset graph (io/file (resfile "specific_mappingbased_properties_bg.nt")))
             _ (sut/wait! client token job)
-            triples* (sut/get client token draftset graph)]
-        (t/is (= expected-count (count triples*)))))))
+            triples* (sut/get client token draftset)]
+        (t/is (= 2252 (count triples*)))
+        (t/is (= (set (map #(assoc % :c graph) (test-triples)))
+                 (set triples*)))))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
@@ -213,7 +221,7 @@
             quads* (sut/get client token draftset)]
         (t/is (= (set (concat quads-1 quads-2)) (set quads*)))))))
 
-(t/deftest adding-quads-to-multiple-graphs-in-a-draftset
+(t/deftest adding-triples-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
         triples (test-triples)
         how-many 5
