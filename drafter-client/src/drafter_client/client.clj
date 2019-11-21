@@ -1,6 +1,7 @@
 (ns drafter-client.client
   (:refer-clojure :exclude [name type get])
   (:require [cheshire.core :as json]
+            [grafter-2.rdf4j.formats :refer [filename->rdf-format]]
             [clj-time.format :refer [formatters parse]]
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
@@ -13,7 +14,8 @@
             [martian.clj-http :as martian-http]
             [martian.core :as martian])
   (:import clojure.lang.ExceptionInfo
-           java.util.UUID))
+           java.util.UUID
+           (java.io File)))
 
 (alias 'c 'clojure.core)
 
@@ -204,13 +206,17 @@
    (let [url (martian/url-for client
                               :put-draftset-data
                               {:id (draftset/id draftset)})
-         format* (or (when graph "application/n-triples")
-                     "application/n-quads")]
+         format (or (when (instance? File triples)
+                      (some-> (.getPath triples)
+                              (filename->rdf-format)
+                              (.getDefaultMIMEType)))
+                    (when graph "application/n-triples")
+                    "application/n-quads")]
      (-> (i/append-via-http-stream access-token
                                    url
                                    triples
                                    :graph graph
-                                   :format format*)
+                                   :format format)
          (->async-job)))))
 
 (defn add-in-batches
