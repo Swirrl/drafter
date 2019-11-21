@@ -55,12 +55,12 @@
     (f)
     (db-util/drop-all! stardog-repo)))
 
-(defn resfile [filename]
+(defn res-file [filename]
   (or (some-> filename io/resource io/file .getCanonicalPath)
       (throw (Exception. (format "Cannot find %s on resource path" filename)))))
 
 (defn start-drafter-server []
-  (main/-main (resfile "drafter-client-test-config.edn")))
+  (main/-main (res-file "drafter-client-test-config.edn")))
 
 (defn drafter-server-fixture [f]
   (try
@@ -76,8 +76,10 @@
                 :auth0-endpoint (env :auth0-domain)
                 :batch-size 150000)))
 
+(def triples-nt-filename "resources/specific_mappingbased_properties_bg.nt")
+
 (defn test-triples []
-  (let [file (resfile "specific_mappingbased_properties_bg.nt")]
+  (let [file (res-file triples-nt-filename)]
     (rio/statements file)))
 
 (t/use-fixtures :each
@@ -190,14 +192,26 @@
             quads* (sut/get client token draftset)]
         (t/is (= (set quads) (set quads*)))))
 
-    (t/testing "Adding file of triples to a draft set"
+    (t/testing "Adding .nt file of triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             draftset (sut/new-draftset client token name description)
-            job (sut/add client token draftset graph (io/file (resfile "specific_mappingbased_properties_bg.nt")))
+            job (sut/add client token draftset graph (io/file (res-file triples-nt-filename)))
             _ (sut/wait! client token job)
             triples* (sut/get client token draftset)]
         (t/is (= 2252 (count triples*)))
         (t/is (= (set (map #(assoc % :c graph) (test-triples)))
+                 (set triples*)))))
+
+    (t/testing "Adding .ttl file of statements to a draft set"
+      ;; check that the correct mime-type for the file is sent to Drafter
+      (let [graph (URI. "http://test.graph.com/rdf-graph")
+            file (res-file "resources/rdf-syntax-ns.ttl")
+            draftset (sut/new-draftset client token name description)
+            job (sut/add client token draftset graph (io/file file))
+            _ (sut/wait! client token job)
+            triples* (sut/get client token draftset)]
+        (t/is (= 102 (count triples*)))
+        (t/is (= (set (map #(assoc % :c graph) (rio/statements file)))
                  (set triples*)))))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
