@@ -220,7 +220,7 @@
   [access-token url statements & {:keys [graph format] :as _opts}]
   (let [[input-stream worker]
         (if (some #(instance? % statements) [InputStream File])
-          statements
+          [statements]
           (grafter->format-stream format statements))
         headers {:Content-Type format
                  :Accept "application/json"
@@ -232,7 +232,7 @@
                  :headers headers
                  :as :json}
         {:keys [body] :as _resp} (http/request request)]
-    @worker
+    (when worker @worker)
     body))
 
 (defn put-draftset-graph
