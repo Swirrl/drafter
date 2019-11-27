@@ -1,0 +1,6 @@
+{
+ :drafter.stasher/repo {;; Switch stasher caching off.  This is
+                        ;; advisable in dev environments.
+                        :cache? false}
+
+ }
