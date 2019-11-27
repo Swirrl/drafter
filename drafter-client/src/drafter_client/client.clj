@@ -428,3 +428,28 @@
 (defmethod ig/pre-init-spec :drafter-client/client [_]
   (s/nilable (s/keys :req-un [::batch-size ::drafter-uri]
                      :opt-un [::auth0 ::version])))
+
+(defn- sync-body [fn-sym arg-list]
+  `(let [job# (~fn-sym ~@arg-list)]
+     (wait! ~(first arg-list) ~(second arg-list) job#)))
+
+(defmacro gensync
+  "Macro which defines a synchronous version of the specified async client function. The async function
+   should have at least two parameters where the first is the drafter client and the second the access
+   token to use. The resulting function for an async fuction 'operation' is called 'operation-sync'"
+  [fn-sym]
+  (let [sync-fn (symbol (str fn-sym "-sync"))
+        {:keys [arglists] :as fn-meta} (meta (ns-resolve *ns* fn-sym))
+        doc (str "Synchronous version of " fn-sym " i.e. calls " fn-sym " and waits for the resulting job to complete")]
+    (if (= 1 (count arglists))
+      (let [arg-list (first arglists)]
+        `(defn ~sync-fn ~doc ~arg-list ~(sync-body fn-sym arg-list)))
+      (let [arities (map (fn [arg-list] (list arg-list (sync-body fn-sym arg-list))) arglists)]
+        `(defn ~sync-fn ~doc ~@arities)))))
+
+(gensync remove-draftset)
+(gensync load-graph)
+(gensync delete-quads)
+(gensync delete-triples)
+(gensync add)
+(gensync publish)
