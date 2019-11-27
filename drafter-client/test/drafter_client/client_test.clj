@@ -1,7 +1,7 @@
 (ns drafter-client.client-test
   (:require [clj-http.client :as http]
             [clojure.spec.test.alpha :as st]
-            [clojure.test :as t :refer [deftest is]]
+            [clojure.test :as t :refer :all]
             [drafter.main :as main]
             [drafter.middleware.auth0-auth]
             [drafter.middleware.auth]
@@ -14,12 +14,11 @@
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as gr-repo]
             [integrant.core :as ig]
-            [martian.core :as martian]
             [clojure.java.io :as io]
-            [grafter-2.rdf.protocols :as pr]
-            [drafter-client.client.impl :as i])
+            [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI
-           [java.util UUID]))
+           [java.util UUID]
+           (java.util.concurrent ExecutionException)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setup ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -174,9 +173,11 @@
 
     (t/testing "Adding input-stream of triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
-            in (i/n*->stream :nt triples)
+            baos (java.io.ByteArrayOutputStream. 8192)
+            __ (pr/add (rio/rdf-writer baos :format :nt) triples)
+            bais (java.io.ByteArrayInputStream. (.toByteArray baos))
             draftset (sut/new-draftset client token name description)
-            job (sut/add client token draftset graph in)
+            job (sut/add client token draftset graph bais)
             _ (sut/wait! client token job)
             quads (sut/get client token draftset)]
         (t/is (= (set (map #(assoc % :c graph) triples))
@@ -185,9 +186,11 @@
     (t/testing "Adding input-stream of quads to a draft set"
       (let [graph (URI. "http://test.graph.com/sexy-stream-of-quads-graph")
             quads (map #(assoc % :c graph) triples)
-            in (i/n*->stream :nq quads)
+            baos (java.io.ByteArrayOutputStream. 8192)
+            __ (pr/add (rio/rdf-writer baos :format :nq) quads)
+            bais (java.io.ByteArrayInputStream. (.toByteArray baos))
             draftset (sut/new-draftset client token name description)
-            job (sut/add client token draftset in)
+            job (sut/add client token draftset bais)
             _ (sut/wait! client token job)
             quads* (sut/get client token draftset)]
         (t/is (= (set quads) (set quads*)))))
@@ -212,7 +215,14 @@
             triples* (sut/get client token draftset)]
         (t/is (= 102 (count triples*)))
         (t/is (= (set (map #(assoc % :c graph) (rio/statements file)))
-                 (set triples*)))))))
+                 (set triples*)))))
+
+    (t/testing "Adding invalid quads to a draft set"
+      (let [draftset (sut/new-draftset client token name description)
+            quads [(pr/->Quad "some" :invalid "quad" nil)
+                   (pr/->Quad (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o") nil)]]
+        (is (thrown-with-msg? ExecutionException #"It looks like you have an incorrect data type inside a quad"
+                              (sut/add client token draftset quads)))))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)

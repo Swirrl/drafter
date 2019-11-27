@@ -11,9 +11,8 @@
             [martian.core :as martian]
             [martian.encoders :as encoders]
             [martian.interceptors :as interceptors]
-            [ring.util.codec :refer [form-decode form-encode]]
-            [ring.util.io :refer [piped-input-stream]])
-  (:import (java.io InputStream File)))
+            [ring.util.codec :refer [form-decode form-encode]])
+  (:import (java.io InputStream File PipedInputStream PipedOutputStream)))
 
 (deftype DrafterClient [martian batch-size auth0]
   ;; Wrap martian in a type so that:
@@ -198,6 +197,14 @@
   [client id & {:keys [display-name description] :as opts}]
   (martian/response-for client :put-draftset (merge {:id id} opts)))
 
+
+(defn piped-input-stream [func]
+  (let [input  (PipedInputStream.)
+        output (PipedOutputStream.)
+        _      (.connect input output)
+        worker (future (try (func output) (finally (.close output))))]
+    [input worker]))
+
 (defn n*->stream [format n*]
   (piped-input-stream
     (fn [output-stream]
@@ -211,9 +218,10 @@
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
   [access-token url statements & {:keys [graph format] :as _opts}]
-  (let [input-stream (if (some #(instance? % statements) [InputStream File])
-                       statements
-                       (grafter->format-stream format statements))
+  (let [[input-stream worker]
+        (if (some #(instance? % statements) [InputStream File])
+          [statements]
+          (grafter->format-stream format statements))
         headers {:Content-Type format
                  :Accept "application/json"
                  :Authorization (str "Bearer " access-token)}
@@ -224,6 +232,7 @@
                  :headers headers
                  :as :json}
         {:keys [body] :as _resp} (http/request request)]
+    (when worker @worker)
     body))
 
 (defn put-draftset-graph
@@ -333,6 +342,13 @@
          "application/json" json-encoder
          "application/n-quads" (n-binary-encoder "application/n-quads")
          "application/n-triples" (n-binary-encoder "application/n-triples")))
+
+(def perform-request
+  {:name ::perform-request
+   :leave (fn [{:keys [request worker] :as ctx}]
+            (let [response (http/request request)]
+              @worker
+              (assoc ctx :response response)))})
 
 (def default-interceptors
   (vec (concat [keywordize-params]
