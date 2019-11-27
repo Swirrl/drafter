@@ -1,5 +1,6 @@
 #merge [#include "repo.edn"
         #include "backend.edn"
+        #include "swirrl-auth0.edn"
         #include "user-repo.edn"
         #include "log-system.edn"
         #include "web.edn"

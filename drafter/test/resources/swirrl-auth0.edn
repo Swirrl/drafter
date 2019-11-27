@@ -1,0 +1,7 @@
+{:swirrl.auth0/client {:endpoint #env AUTH0_DOMAIN
+                       :iss #env AUTH0_DOMAIN
+                       :aud #env AUTH0_AUD
+                       :api #join [#env AUTH0_DOMAIN "/api/v2/"]
+                       :swagger-json #resource "swirrl/auth0/swagger.json"
+                       :client-id #env AUTH0_CLIENT_ID
+                       :client-secret #env AUTH0_CLIENT_SECRET}}

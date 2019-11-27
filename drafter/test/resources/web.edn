@@ -1,19 +1,12 @@
 {
  :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
 
- :drafter.auth/auth0 {:iss #env AUTH0_DOMAIN
-                      :aud #env AUTH0_AUD
-                      :endpoint #env AUTH0_DOMAIN
-                      :client-id #env AUTH0_CLIENT_ID
-                      :client-secret #env AUTH0_CLIENT_SECRET}
-
  :swirrl.auth0.middleware/bearer-token
- {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+ {:auth0 #ig/ref :swirrl.auth0/client :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
 
  :drafter.middleware.auth0-auth/identify {}
 
- :drafter.middleware.auth0-auth/token-authentication
- {:auth0 #ig/ref :drafter.auth/auth0 :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+ :drafter.middleware.auth0-auth/token-authentication {}
 
  :drafter.middleware.auth0-auth/authorization {}
 
