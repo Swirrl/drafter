@@ -203,7 +203,8 @@
         output (PipedOutputStream.)
         _      (.connect input output)
         worker (future (try (func output) (finally (.close output))))]
-    [input worker]))
+    {:input input
+     :worker worker}))
 
 (defn n*->stream [format n*]
   (piped-input-stream
@@ -218,9 +219,9 @@
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
   [access-token url statements & {:keys [graph format] :as _opts}]
-  (let [[input-stream worker]
+  (let [{input-stream :input worker :worker}
         (if (some #(instance? % statements) [InputStream File])
-          [statements]
+          {:input statements}
           (grafter->format-stream format statements))
         headers {:Content-Type format
                  :Accept "application/json"
@@ -345,9 +346,12 @@
 
 (def perform-request
   {:name ::perform-request
-   :leave (fn [{:keys [request worker] :as ctx}]
-            (let [response (http/request request)]
-              @worker
+   :leave (fn [{:keys [request] :as ctx}]
+            (let [{input-stream :input worker :worker} (:body request)
+                  response (if input-stream
+                             (-> (assoc request :body input-stream) http/request)
+                             (http/request request))]
+              (when worker @worker)
               (assoc ctx :response response)))})
 
 (def default-interceptors
@@ -355,4 +359,4 @@
                (rest martian/default-interceptors)
                [(interceptors/encode-body default-encoders)
                 (interceptors/coerce-response default-encoders)
-                martian-http/perform-request])))
+                perform-request])))
