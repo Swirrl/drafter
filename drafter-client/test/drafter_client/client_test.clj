@@ -217,6 +217,21 @@
         (is (thrown-with-msg? ExecutionException #"It looks like you have an incorrect data type inside a quad"
                               (sut/add client token draftset quads)))))))
 
+(t/deftest deleting-from-a-draftset
+  (let [client (drafter-client)
+        token (auth-util/system-token)]
+    (t/testing "Adding triples to a draft set"
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            draftset (sut/new-draftset client token "my name" "my description")
+            original-triples [(pr/->Triple (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o"))
+                              (pr/->Triple (URI. "http://y.com/s") (URI. "http://y.com/p") (URI. "http://y.com/o"))]
+            to-delete [(pr/->Triple (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o"))]
+            expected-triples [(pr/->Triple (URI. "http://y.com/s") (URI. "http://y.com/p") (URI. "http://y.com/o"))]
+            _ (sut/add-sync client token draftset graph original-triples)
+            _ (sut/delete-triples-sync client token draftset graph to-delete)
+            triples* (sut/get client token draftset graph)]
+        (t/is (= (set expected-triples) (set triples*)))))))
+
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
         triples (test-triples)
