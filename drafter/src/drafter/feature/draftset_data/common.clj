@@ -44,11 +44,11 @@
   "Calls mgmt/copy-graph to copy a live graph into the draftset, but
   does so with the writes lock engaged.  This allows us to fail
   concurrent sync-writes fast."
-  [backend live-graph-uri draft-graph-uri opts]
-  (writes/with-lock :copy-graph
+  [resources live-graph-uri draft-graph-uri opts]
+  (writes/with-lock (:global-writes-lock resources) :copy-graph
     ;; Execute the graph copy inside the write-lock so we can
     ;; fail :blocking-write operations if they are waiting longer than
     ;; their timeout period for us to release it.  These writes would
     ;; likely be blocked inside the database anyway, so this way we
     ;; can fail them fast when they are run behind a long running op.
-    (mgmt/copy-graph backend live-graph-uri draft-graph-uri opts)))
+    (mgmt/copy-graph (:backend resources) live-graph-uri draft-graph-uri opts)))

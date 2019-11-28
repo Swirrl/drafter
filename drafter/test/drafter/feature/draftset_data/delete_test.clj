@@ -20,21 +20,22 @@
 (def dummy "dummy@user.com")
 
 (tc/deftest-system-with-keys delete-draftset-data-test
-  [:drafter/backend :drafter/write-scheduler :drafter.fixture-data/loader]
-  [{:keys [:drafter/backend]} system]
+  [:drafter/backend :drafter/global-writes-lock :drafter/write-scheduler :drafter.fixture-data/loader]
+  [{:keys [:drafter/backend :drafter/global-writes-lock]} system]
   (let [initial-time (constantly (OffsetDateTime/parse "2017-01-01T01:01:01Z"))
         update-time (constantly (OffsetDateTime/parse "2018-01-01T01:01:01Z"))
         delete-time (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
-        ds (dsops/create-draftset! backend test-editor)]
+        ds (dsops/create-draftset! backend test-editor)
+        resources {:backend backend :global-writes-lock global-writes-lock}]
 
-    (th/apply-job! (append/append-triples-to-draftset-job backend
+    (th/apply-job! (append/append-triples-to-draftset-job resources
                                                           dummy
                                                           ds
                                                           (io/file "./test/test-triple.nt")
                                                           RDFFormat/NTRIPLES
                                                           (URI. "http://foo/graph") initial-time))
 
-    (th/apply-job! (sut/delete-triples-from-draftset-job backend
+    (th/apply-job! (sut/delete-triples-from-draftset-job resources
                                                          dummy
                                                          ds
                                                          (URI. "http://foo/graph")

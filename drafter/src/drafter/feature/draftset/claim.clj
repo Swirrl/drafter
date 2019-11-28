@@ -22,10 +22,11 @@
         (conflict-detected-response "Failed to claim draftset")))))
 
 (defn- handler*
-  [backend {{:keys [draftset-id]} :params user :identity :as request}]
+  [{:keys [backend] :as resources}
+   {{:keys [draftset-id]} :params user :identity :as request}]
   (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
     (if (user/can-claim? user ds-info)
-      (feat-common/run-sync backend
+      (feat-common/run-sync resources
                             (req/user-id request)
                             'claim-draftset
                             draftset-id
@@ -34,15 +35,17 @@
       (forbidden-response "User not in role for draftset claim"))
     (ring/not-found "Draftset not found")))
 
-(defn handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (let [inner-handler (partial handler* backend)]
+(defn handler [{wrap-authenticated :wrap-auth
+                :keys [:drafter/backend :drafter/global-writes-lock]}]
+  (let [resources {:backend backend :global-writes-lock global-writes-lock}
+        inner-handler (partial handler* resources)]
     (-> backend
         (feat-middleware/existing-draftset-handler inner-handler)
         (wrap-authenticated))))
 
-(defmethod ig/pre-init-spec ::handler [_]
-  (s/keys :req [:drafter/backend]
+(defmethod ig/pre-init-spec :drafter.feature.draftset.claim/handler [_]
+  (s/keys :req [:drafter/backend :drafter/global-writes-lock]
           :req-un [::wrap-auth]))
 
-(defmethod ig/init-key ::handler [_ opts]
+(defmethod ig/init-key :drafter.feature.draftset.claim/handler [_ opts]
   (handler opts))

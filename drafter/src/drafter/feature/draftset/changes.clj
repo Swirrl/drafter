@@ -26,13 +26,14 @@
       :reverted)
     :not-found))
 
-(defn delete-draftset-changes-handler [{backend :drafter/backend wrap-as-draftset-owner :wrap-as-draftset-owner}]
+(defn delete-draftset-changes-handler
+  [{:keys [:drafter/backend :drafter/global-writes-lock wrap-as-draftset-owner]}]
   (wrap-as-draftset-owner
    (middleware/parse-graph-param-handler
     true
     (fn [{{:keys [draftset-id graph]} :params :as request}]
       (feat-common/run-sync
-       backend
+       {:backend backend :global-writes-lock global-writes-lock}
        (req/user-id request)
        'delete-draftset-changes
        draftset-id
@@ -44,9 +45,9 @@
              (ring/response (dsops/get-draftset-info backend draftset-id))
              (ring/not-found "")))))))))
 
-(defmethod ig/pre-init-spec ::delete-changes-handler [_]
-  (s/keys :req [:drafter/backend]
+(defmethod ig/pre-init-spec :drafter.feature.draftset.changes/delete-changes-handler [_]
+  (s/keys :req [:drafter/backend :drafter/global-writes-lock]
           :req-un [::wrap-as-draftset-owner]))
 
-(defmethod ig/init-key ::delete-changes-handler [_ opts]
+(defmethod ig/init-key :drafter.feature.draftset.changes/delete-changes-handler [_ opts]
   (delete-draftset-changes-handler opts))

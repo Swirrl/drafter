@@ -11,45 +11,47 @@
             [drafter.draftset :as ds]
             [drafter.requests :as req]))
 
-(defn create-or-empty-draft-graph-for [backend draftset-ref live-graph clock-fn]
-  (if-let [draft-graph-uri (ops/find-draftset-draft-graph backend draftset-ref live-graph)]
+(defn create-or-empty-draft-graph-for [repo draftset-ref live-graph clock-fn]
+  (if-let [draft-graph-uri (ops/find-draftset-draft-graph repo draftset-ref live-graph)]
     (do
-      (mgmt/delete-graph-contents! backend draft-graph-uri (clock-fn))
+      (mgmt/delete-graph-contents! repo draft-graph-uri (clock-fn))
       draft-graph-uri)
-    (mgmt/create-draft-graph! backend live-graph draftset-ref clock-fn)))
+    (mgmt/create-draft-graph! repo live-graph draftset-ref clock-fn)))
 
-
-(defn copy-live-graph-into-draftset-job [backend user-id draftset-ref live-graph]
-  (let [ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job backend user-id 'copy-live-graph-into-draftset ds-id :background-write
+(defn copy-live-graph-into-draftset-job
+  [resources user-id draftset-ref live-graph]
+  (let [ds-id (ds/->draftset-id draftset-ref)
+        repo (-> resources :backend :repo)]
+    (jobs/make-job repo user-id 'copy-live-graph-into-draftset ds-id :background-write
       (fn [job]
-        (let [draft-graph-uri (create-or-empty-draft-graph-for backend draftset-ref live-graph util/get-current-time)]
-          (ds-data-common/lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
+        (let [draft-graph-uri (create-or-empty-draft-graph-for repo draftset-ref live-graph util/get-current-time)]
+          (ds-data-common/lock-writes-and-copy-graph resources live-graph draft-graph-uri {:silent true})
           (jobs/job-succeeded! job))))))
 
-(defn- required-live-graph-param-handler [backend inner-handler]
+(defn- required-live-graph-param-handler [repo inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
-    (if (mgmt/is-graph-live? backend graph)
+    (if (mgmt/is-graph-live? repo graph)
       (inner-handler request)
       (response/unprocessable-entity-response (str "Graph not found in live")))))
 
-(defn put-draftset-graph-handler [{backend :drafter/backend
-                                   :keys [wrap-as-draftset-owner]}]
+(defn put-draftset-graph-handler
+  [{:keys [:drafter/backend :drafter/global-writes-lock wrap-as-draftset-owner]}]
   (letfn [(required-live-graph-param [handler]
-            (middleware/parse-graph-param-handler true (required-live-graph-param-handler backend handler)))]
-
+            (middleware/parse-graph-param-handler
+             true
+             (required-live-graph-param-handler (:repo backend) handler)))]
     (wrap-as-draftset-owner
      (required-live-graph-param
       (fn [{{:keys [draftset-id graph]} :params :as request}]
-        (-> backend
+        (-> {:backend backend :global-writes-lock global-writes-lock}
             (copy-live-graph-into-draftset-job (req/user-id request)
                                                draftset-id
                                                graph)
             (submit-async-job!)))))))
 
-(defmethod ig/pre-init-spec ::handler [_]
-  (s/keys :req [:drafter/backend]
+(defmethod ig/pre-init-spec :drafter.feature.draftset-data.append-by-graph/handler [_]
+  (s/keys :req [:drafter/backend :drafter/global-writes-lock]
           :req-un [::wrap-as-draftset-owner]))
 
-(defmethod ig/init-key ::handler [_ opts]
+(defmethod ig/init-key :drafter.feature.draftset-data.append-by-graph/handler [_ opts]
   (put-draftset-graph-handler opts))

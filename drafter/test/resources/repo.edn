@@ -23,10 +23,12 @@
  :drafter.backend.live/endpoint {:repo #ig/ref :drafter.stasher/repo}
 
  :drafter/backend {:repo #ig/ref :drafter.stasher/repo}
+ :drafter/global-writes-lock {:fairness true :time 10 :unit :seconds}
 
  :drafter.backend.draftset/endpoint {:repo #ig/ref :drafter.stasher/repo}
 
 
- :drafter/write-scheduler {:port #long #or [#port #env DRAFTER_HTTP_PORT 3003]}
+ :drafter/write-scheduler {:port #long #or [#port #env DRAFTER_HTTP_PORT 3003]
+                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock}
 
  }

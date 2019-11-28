@@ -238,7 +238,7 @@
       (is (= expected-quads quads-after-delete)))))
 
 (tc/deftest-system-with-keys delete-all-triples-from-graph
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler :drafter/global-writes-lock]
   [{handler :drafter.routes/draftsets-api} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
