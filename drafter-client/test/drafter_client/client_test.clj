@@ -220,7 +220,7 @@
 (t/deftest deleting-from-a-draftset
   (let [client (drafter-client)
         token (auth-util/system-token)]
-    (t/testing "Adding triples to a draft set"
+    (t/testing "Deleting triples from a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             draftset (sut/new-draftset client token "my name" "my description")
             original-triples [(pr/->Triple (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o"))
