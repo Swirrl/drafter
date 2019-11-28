@@ -33,4 +33,9 @@
                                        :mode "644"
                                        :env #{:dev :ci}
                                        }
+                                      {:type :copy
+                                       :path "stasher-off.edn"
+                                       :mode "644"
+                                       :env #{:dev :ci}
+                                       }
                                       ]}}]

@@ -33,6 +33,10 @@
                                       {:type :copy
                                        :path "drafter-dev-basic-auth-memory-db.edn"
                                        :mode "644"
+                                       :env #{:dev :ci}}
+                                      {:type :copy
+                                       :path "stasher-off.edn"
+                                       :mode "644"
                                        :env #{:dev :ci}}]}
 
               :omni/package-name "drafter-pmd3"
