@@ -34,30 +34,38 @@
 
     (is (= [0 1 2 3 4] (map :id ordered-jobs)))))
 
+(def system "drafter/feature/empty-db-system.edn")
 
-(deftest run-sync-job!-test
-  (testing "run-sync-job!"
-    (testing "when global-writes-lock is unlocked"
-      (let [response (resp/run-sync-job! (const-job :blocking-write :done))]
-        (is (= 200 (:status response))
-            "Job returns 200")
-        (is (= :done (get-in response [:body :details :details]))
-            "Job executes and returns its value")))
+(tc/deftest-system-with-keys run-sync-job!-test
+  [:drafter/global-writes-lock]
+  [{:keys [:drafter/global-writes-lock]} system]
+  (let []
+    (testing "run-sync-job!"
+      (testing "when global-writes-lock is unlocked"
+        (let [response (resp/run-sync-job! global-writes-lock
+                                           (const-job :blocking-write :done))]
+          (is (= 200 (:status response))
+              "Job returns 200")
+          (is (= :done (get-in response [:body :details :details]))
+              "Job executes and returns its value")))
 
-    (testing "when global-writes-lock is locked"
-      (let [lock-mgr (lm/build-lock-manager global-writes-lock)]
-        (try
-          (lm/take-lock! lock-mgr)
+     (testing "when global-writes-lock is locked"
+       (let [lock-mgr (lm/build-lock-manager (:lock global-writes-lock))]
+         (try
+           (lm/take-lock! lock-mgr)
 
-          (is (thrown? clojure.lang.ExceptionInfo
-                       (resp/run-sync-job! (const-job :blocking-write :done)))
-              "Waits a short while for lock, and raises an error when it can't acquire it.")
+           (is (thrown? clojure.lang.ExceptionInfo
+                        (resp/run-sync-job! global-writes-lock
+                                            (const-job :blocking-write :done)))
+               "Waits a short while for lock, and raises an error when it can't acquire it.")
 
-          (finally
-            ;; clean up lock state for next tests
-            (lm/release-lock! lock-mgr)))))))
+           (finally
+             ;; clean up lock state for next tests
+             (lm/release-lock! lock-mgr))))))))
 
-(deftest submit-async-job!-test-1
+(tc/deftest-system-with-keys submit-async-job!-test-1
+  [:drafter/global-writes-lock]
+  [{:keys [:drafter/global-writes-lock]} system]
   (testing "submit-async-job!"
     (testing "when submitting :background-write's"
       (testing "when global-writes-lock is unlocked"
@@ -68,7 +76,7 @@
               "Job executes and returns its value")))
 
       (testing "when global-writes-lock is locked"
-        (let [lock-mgr (lm/build-lock-manager global-writes-lock)]
+        (let [lock-mgr (lm/build-lock-manager (:lock global-writes-lock))]
           (try
             (lm/take-lock! lock-mgr)
 
@@ -83,7 +91,9 @@
               ;; clean up lock state for next tests
               (lm/release-lock! lock-mgr))))))))
 
-(deftest submit-async-job!-test-2
+(tc/deftest-system-with-keys submit-async-job!-test-2
+  [:drafter/global-writes-lock]
+  [{:keys [:drafter/global-writes-lock]} system]
   (testing "when submitting :publish-write's"
     (testing "when global-writes-lock is unlocked"
       (let [response (resp/submit-async-job! (const-job :publish-write :done))]
@@ -93,7 +103,7 @@
             "Job executes and returns its value")))
 
     (testing "when global-writes-lock is locked"
-      (let [lock-mgr (lm/build-lock-manager global-writes-lock)]
+      (let [lock-mgr (lm/build-lock-manager (:lock global-writes-lock))]
         (try
           (lm/take-lock! lock-mgr)
 

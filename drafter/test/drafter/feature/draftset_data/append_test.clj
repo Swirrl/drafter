@@ -21,12 +21,13 @@
 (def dummy "dummy@user.com")
 
 (tc/deftest-system append-data-to-draftset-job-test
-  [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]
+  [{:keys [:drafter/backend :drafter/global-writes-lock]} "drafter/rdf/draftset-management/jobs.edn"]
   (let [initial-time (constantly (OffsetDateTime/parse "2017-01-01T01:01:01Z"))
         update-time  (constantly (OffsetDateTime/parse "2018-01-01T01:01:01Z") )
         delete-time  (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
-        ds (dsops/create-draftset! backend test-editor)]
-    (th/apply-job! (sut/append-triples-to-draftset-job backend
+        ds (dsops/create-draftset! backend test-editor)
+        resources {:backend backend :global-writes-lock global-writes-lock}]
+    (th/apply-job! (sut/append-triples-to-draftset-job resources
                                                        dummy
                                                        ds
                                                        (io/file "./test/test-triple.nt")
@@ -36,7 +37,7 @@
     (let [ts-1 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
       (t/is (= (.toEpochSecond (initial-time))
                (.toEpochSecond ts-1)))
-      (th/apply-job! (sut/append-triples-to-draftset-job backend
+      (th/apply-job! (sut/append-triples-to-draftset-job resources
                                                          dummy
                                                          ds
                                                          (io/file "./test/test-triple-2.nt")

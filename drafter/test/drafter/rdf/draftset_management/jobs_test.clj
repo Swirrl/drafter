@@ -20,12 +20,13 @@
 
 (tc/deftest-system copy-live-graph-into-draftset-test
   ;; TODO port to use a test fixture
-  [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]
-  (let [draftset-id (dsops/create-draftset! backend test-editor)
+  [{:keys [:drafter/backend :drafter/global-writes-lock]} "drafter/rdf/draftset-management/jobs.edn"]
+  (let [resources {:backend backend :global-writes-lock global-writes-lock}
+        draftset-id (dsops/create-draftset! backend test-editor)
         live-triples (tc/test-triples (URI. "http://test-subject"))
         live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples (constantly #inst "2015"))
         {:keys [value-p] :as copy-job} (append-graph/copy-live-graph-into-draftset-job
-                                        backend
+                                        resources
                                         dummy
                                         draftset-id
                                         live-graph-uri)]
@@ -38,14 +39,15 @@
       (t/is (= (set live-triples) (set draft-triples))))))
 
 (tc/deftest-system copy-live-graph-into-existing-draft-graph-in-draftset-test
-  [{:keys [:drafter/backend]} "drafter/rdf/draftset-management/jobs.edn"]
-  (let [draftset-id (dsops/create-draftset! backend test-editor)
+  [{:keys [:drafter/backend :drafter/global-writes-lock]} "drafter/rdf/draftset-management/jobs.edn"]
+  (let [resources {:backend backend :global-writes-lock global-writes-lock}
+        draftset-id (dsops/create-draftset! backend test-editor)
         live-triples (tc/test-triples (URI. "http://test-subject"))
         live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples (constantly #inst "2015"))
         initial-draft-triples (tc/test-triples (URI. "http://temp-subject"))
         draft-graph-uri (tc/import-data-to-draft! backend live-graph-uri initial-draft-triples draftset-id (constantly #inst "2016"))
         {:keys [value-p] :as copy-job} (append-graph/copy-live-graph-into-draftset-job
-                                        backend
+                                        resources
                                         dummy
                                         draftset-id
                                         live-graph-uri)]

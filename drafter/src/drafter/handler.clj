@@ -13,8 +13,7 @@
             [drafter.timeouts :as timeouts]
             [drafter.util :refer [conj-if set-var-root!]]
             [drafter.write-scheduler
-             :refer
-             [global-writes-lock start-writer! stop-writer!]]
+             :refer [start-writer! stop-writer!]]
             [integrant.core :as ig]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.defaults :refer [api-defaults]]
@@ -47,7 +46,8 @@
   [{backend :repo
     live-sparql-route :live-sparql-query-route
     draftset-api-routes :draftset-api-routes
-    jobs-status-routes :jobs-status-routes}]
+    jobs-status-routes :jobs-status-routes
+    global-writes-lock :drafter/global-writes-lock}]
   (wrap-handler (app-handler
                  ;; add your application routes here
                  (-> []

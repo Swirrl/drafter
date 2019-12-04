@@ -44,8 +44,8 @@
     (r/api-response 500 result)
     (r/api-response 200 result)))
 
-;; run-sync-job! :: Job -> RingResponse
-;; run-sync-job! :: Job -> (ApiResponse -> RingResponse) -> RingResponse
+;; run-sync-job! :: WriteLock -> Job -> RingResponse
+;; run-sync-job! :: WriteLock -> Job -> (ApiResponse -> RingResponse) -> RingResponse
 (defn run-sync-job!
   "Runs a sync job, blocks waiting for it to complete and returns a
   ring response using the given handler function. The handler function
@@ -53,11 +53,12 @@
   ring result map. If no handler is provided, the default job handler
   is used. If the job could not be queued, then a 503 'unavailable'
   response is returned."
-  ([job] (run-sync-job! job default-job-result-handler))
-  ([job resp-fn]
+  ([global-writes-lock job]
+   (run-sync-job! global-writes-lock job default-job-result-handler))
+  ([global-writes-lock job resp-fn]
    (log/info "Submitting sync job: " job)
    (try
-     (let [job-result (exec-sync-job! job)]
+     (let [job-result (exec-sync-job! global-writes-lock job)]
        (resp-fn job-result)))))
 
 ;; submit-async-job! :: Job -> RingResponse

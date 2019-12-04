@@ -18,9 +18,9 @@
         (ajobs/job-succeeded! job result)))))
 
 (defn run-sync
-  ([backend user-id operation draftset-id api-call-fn]
-   (response/run-sync-job!
+  ([{:keys [backend global-writes-lock]} user-id operation draftset-id api-call-fn]
+   (response/run-sync-job! global-writes-lock
     (as-sync-write-job backend user-id operation draftset-id api-call-fn)))
-  ([backend user-id operation draftset-id api-call-fn resp-fn]
-   (response/run-sync-job!
+  ([{:keys [backend global-writes-lock]} user-id operation draftset-id api-call-fn resp-fn]
+   (response/run-sync-job! global-writes-lock
     (as-sync-write-job backend user-id operation draftset-id api-call-fn) resp-fn)))

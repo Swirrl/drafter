@@ -11,7 +11,7 @@
             [drafter.main :as main]
             [drafter.rdf.sparql :as sparql]
             [drafter.util :as util]
-            [drafter.write-scheduler :refer [global-writes-lock queue-job!]]
+            [drafter.write-scheduler :refer [queue-job!]]
             [environ.core :refer [env]]
             [grafter-2.rdf4j.repository.registry :as reg]
             [grafter-2.rdf4j.templater :refer [triplify]]
@@ -226,7 +226,7 @@
        (migrate-graphs-to-live! db [draft-graph-uri] clock-fn))
      live-graph-uri))
 
-(defn during-exclusive-write-f [f]
+(defn during-exclusive-write-f [global-writes-lock f]
   (let [p (promise)
         latch (CountDownLatch. 1)
         exclusive-job (create-job :publish-write
@@ -251,8 +251,8 @@
         ;; wait a short time for the lock to be released
         (wait-for-lock-ms global-writes-lock 200)))))
 
-(defmacro during-exclusive-write [& forms]
-  `(during-exclusive-write-f (fn [] ~@forms)))
+(defmacro during-exclusive-write [global-writes-lock & forms]
+  `(during-exclusive-write-f ~global-writes-lock (fn [] ~@forms)))
 
 (defmacro throws-exception?
   "Test that the form raises an exception, will cause a test failure if it doesn't.

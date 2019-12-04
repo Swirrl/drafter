@@ -16,7 +16,9 @@
             [drafter.util :refer [log-time-taken]]
             [drafter.async.jobs :refer [job-failed!]]
             [integrant.core :as ig]
-            [swirrl-server.errors :refer [ex-swirrl]])
+            [swirrl-server.errors :refer [ex-swirrl]]
+            [clojure.string :as string]
+            [clojure.spec.alpha :as s])
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
            java.util.concurrent.atomic.AtomicBoolean
            java.util.concurrent.locks.ReentrantLock
@@ -33,13 +35,22 @@
                        (= -1 (compare [(ordering type1) time1]
                                       [(ordering type2) time2]))))))
 
-(def fairness
-  "Set to true for a fair lock policy, false for unfair.  See
-  ReentrantLock javadocs for details."
-  true)
+(def timeunit
+  {:days TimeUnit/DAYS
+   :hours TimeUnit/DAYS
+   :milliseconds TimeUnit/MILLISECONDS
+   :minutes TimeUnit/MINUTES
+   ;; :μs TimeUnit/MICROSECONDS ; included for completeness
+   ;; :ns TimeUnit/NANOSECONDS  ; we're never going to use this, but they're
+   :seconds TimeUnit/SECONDS})
 
-;; TODO integrantify
-(def global-writes-lock (ReentrantLock. fairness))
+(defmethod ig/init-key :drafter/global-writes-lock
+  [_ {:keys [fairness time unit]}]
+  ;; Set `fairness` to true for a fair lock policy, false for unfair.  See
+  ;; ReentrantLock javadocs for details.
+  {:lock (ReentrantLock. fairness)
+   :time time
+   :unit (timeunit unit)})
 
 (defonce ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
@@ -49,10 +60,10 @@
   Requests to take the lock will wait forever for the lock to be
   released.  After the forms have executed the lock is guaranteed to
   be released."
-  [operation-type & forms]
+  [global-writes-lock operation-type & forms]
   `(let [start-time# (System/currentTimeMillis)]
      (log/debug "Locking for" ~operation-type)
-     (.lock global-writes-lock)
+     (.lock (:lock ~global-writes-lock))
      (try
        (log/info "Acquired lock for " ~operation-type)
        ~@forms
@@ -60,7 +71,7 @@
          (let [end-time# (System/currentTimeMillis)]
            (datadog/histogram! "drafter.writes_locked" (- end-time# start-time#)))
          (log/info "Releasing lock for" ~operation-type)
-         (.unlock global-writes-lock)))))
+         (.unlock (:lock ~global-writes-lock))))))
 
 ;;queue-job :: Job -> ()
 (defn queue-job!
@@ -81,33 +92,37 @@
     (datadog/gauge! "drafter.jobs_queue_size" (inc (.size writes-queue)))
     (.add writes-queue job)))
 
-;;await-sync-job! :: Job -> ApiResponse
+;; exec-sync-job! :: Job -> ApiResponse
 (defn exec-sync-job!
   "Executes a sync job waits for it to complete. Returns the result of
   the job execution.  Sync jobs skip the queue entirely and just run
   on the calling thread.  They do however check the writes-lock and
   will 503 if it's locked."
-  [{job-function :function :keys [value-p priority] :as job}]
+  [{:keys [lock time unit] :as opts}
+   {job-function :function :keys [priority] :as job}]
   {:pre [(= :blocking-write priority)]}
 
   ;; Try the lock & wait up to 10 seconds for it to let us in.  If it
   ;; doesn't raise an error.  This ensure's :blocking-write's
   ;; pass/fail within an acceptable time, and that only one writer is
   ;; writing to the database at a time.
-  (if (.tryLock global-writes-lock 10 TimeUnit/SECONDS)
+  (if (.tryLock lock)
     ;; if we get the lock run the job immediately
     (try
       (job-function job)
       (finally
-        (.unlock global-writes-lock)))
-    (throw (ex-swirrl :writes-temporarily-disabled "Write operations are temporarily unavailable, due to other large write operations.  Please try again later."))))
+        (.unlock lock)))
+    (throw
+     (ex-swirrl :writes-temporarily-disabled
+                "Write operations are temporarily unavailable, due to other
+                 large write operations.  Please try again later."))))
 
 (defn- write-loop
   "Start the write loop running.  Note this function does not return
   and is supposed to be run asynchronously on a future or thread.
 
   Users should normally use start-writer! to set this running."
-  [flag]
+  [global-writes-lock flag]
   (log/debug "Writer started waiting for tasks")
   (loop []
     (when (.get flag)
@@ -128,7 +143,7 @@
               (if (= :publish-write priority)
                 ;; If we're a publish operation we take the lock to
                 ;; ensure nobody else can write to the database.
-                (with-lock :publish-write
+                (with-lock global-writes-lock :publish-write
                   (task-f! job))
                 (task-f! job)))
 
@@ -139,9 +154,9 @@
       (log/debug "Writer waiting for tasks")
       (recur))))
 
-(defn start-writer! []
+(defn start-writer! [global-writes-lock]
   (let [flag (AtomicBoolean. true)
-        ^Runnable writer #(write-loop flag)
+        ^Runnable writer #(write-loop global-writes-lock flag)
         t (Thread. writer "Drafter write-loop thread")]
     (.start t)
     {:should-continue flag :thread t}))
@@ -151,8 +166,11 @@
   (.join thread))
 
 
+(defmethod ig/pre-init-spec :drafter/write-scheduler [_]
+  (s/keys :req [:drafter/global-writes-lock]))
+
 (defmethod ig/init-key :drafter/write-scheduler [_ opts]
-  (start-writer!))
+  (start-writer! (:drafter/global-writes-lock opts)))
 
 (defmethod ig/halt-key! :drafter/write-scheduler [_ writer]
   (stop-writer! writer))

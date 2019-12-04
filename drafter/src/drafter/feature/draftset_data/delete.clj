@@ -25,103 +25,104 @@
             [drafter.requests :as req])
   (:import org.eclipse.rdf4j.model.Resource))
 
-(defn- delete-quads-from-draftset [backend quad-batches draftset-ref live->draft {:keys [op job-started-at] :as state} job]
-  (case op
-    :delete
-    (if-let [batch (first quad-batches)]
-      (let [live-graph (context (first batch))]
-        (if (mgmt/is-graph-managed? backend live-graph)
-          (if-let [draft-graph-uri (get live->draft live-graph)]
-            (do
-              (with-open [conn (repo/->connection (->sesame-repo backend))]
-                (touch-graph-in-draftset! conn draftset-ref draft-graph-uri job-started-at)
-                (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
-                      sesame-statements (map quad->backend-quad rewritten-statements)
-                      graph-array (into-array Resource (map util/uri->sesame-uri (vals live->draft)))]
-                  (.remove conn sesame-statements graph-array)))
-              (let [next-job (ajobs/create-child-job
-                              job
-                              (partial delete-quads-from-draftset backend (rest quad-batches) draftset-ref live->draft state))]
-                (writes/queue-job! next-job)))
-            ;;NOTE: Do this immediately as we haven't done any real work yet
-            (recur backend quad-batches draftset-ref live->draft (merge state {:op :copy-graph :live-graph live-graph}) job))
-          ;;live graph does not exist so do not create a draft graph
-          ;;NOTE: This is the same behaviour as deleting a live graph
-          ;;which does not exist in live
-          (recur backend (rest quad-batches) draftset-ref live->draft state job)))
-      (let [draftset-info (ops/get-draftset-info backend draftset-ref)]
-        (ajobs/job-succeeded! job {:draftset draftset-info})))
+(defn- delete-quads-from-draftset
+  [resources quad-batches draftset-ref live->draft {:keys [op job-started-at] :as state} job]
+  (let [repo (-> resources :backend :repo)]
+    (case op
+      :delete
+      (if-let [batch (first quad-batches)]
+        (let [live-graph (context (first batch))]
+          (if (mgmt/is-graph-managed? repo live-graph)
+            (if-let [draft-graph-uri (get live->draft live-graph)]
+              (do
+                (with-open [conn (repo/->connection (->sesame-repo repo))]
+                  (touch-graph-in-draftset! conn draftset-ref draft-graph-uri job-started-at)
+                  (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
+                        sesame-statements (map quad->backend-quad rewritten-statements)
+                        graph-array (into-array Resource (map util/uri->sesame-uri (vals live->draft)))]
+                    (.remove conn sesame-statements graph-array)))
+                (let [next-job (ajobs/create-child-job
+                                job
+                                (partial delete-quads-from-draftset resources (rest quad-batches) draftset-ref live->draft state))]
+                  (writes/queue-job! next-job)))
+              ;;NOTE: Do this immediately as we haven't done any real work yet
+              (recur resources quad-batches draftset-ref live->draft (merge state {:op :copy-graph :live-graph live-graph}) job))
+            ;;live graph does not exist so do not create a draft graph
+            ;;NOTE: This is the same behaviour as deleting a live graph
+            ;;which does not exist in live
+            (recur resources (rest quad-batches) draftset-ref live->draft state job)))
+        (let [draftset-info (ops/get-draftset-info repo draftset-ref)]
+          (ajobs/job-succeeded! job {:draftset draftset-info})))
 
-    :copy-graph
-    (let [{:keys [live-graph]} state
-          ds-uri (str (ds/->draftset-uri draftset-ref))
-          {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph live->draft ds-uri)]
+      :copy-graph
+      (let [{:keys [live-graph]} state
+            ds-uri (str (ds/->draftset-uri draftset-ref))
+            {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for repo live-graph live->draft ds-uri)]
 
-      (ds-data-common/lock-writes-and-copy-graph backend live-graph draft-graph-uri {:silent true})
-      ;; Now resume appending the batch
-      (recur backend
-             quad-batches
-             draftset-ref
-             (assoc live->draft live-graph draft-graph-uri)
-             (merge state {:op :delete})
-             job))))
+        (ds-data-common/lock-writes-and-copy-graph resources live-graph draft-graph-uri {:silent true})
+        ;; Now resume appending the batch
+        (recur resources
+               quad-batches
+               draftset-ref
+               (assoc live->draft live-graph draft-graph-uri)
+               (merge state {:op :delete})
+               job)))))
 
-(defn batch-and-delete-quads-from-draftset [backend quads draftset-ref live->draft job clock-fn]
+(defn batch-and-delete-quads-from-draftset [resources quads draftset-ref live->draft job clock-fn]
   (let [quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
         now (clock-fn)]
-    (delete-quads-from-draftset backend quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
-
-
+    (delete-quads-from-draftset resources quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
 
 (defn delete-quads-from-draftset-job
-  [backend user-id draftset-ref serialised rdf-format clock-fn]
-  (let [backend (:repo backend)
+  [resources user-id draftset-ref serialised rdf-format clock-fn]
+  (let [repo (-> resources :backend :repo)
         ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job backend user-id 'delete-quads-from-draftset ds-id :background-write
+    (jobs/make-job repo user-id 'delete-quads-from-draftset ds-id :background-write
       (fn [job]
         (let [quads (read-statements serialised rdf-format)
-              graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-          (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn))))))
+              graph-mapping (ops/get-draftset-graph-mapping repo draftset-ref)]
+          (batch-and-delete-quads-from-draftset resources quads draftset-ref graph-mapping job clock-fn))))))
 
 (defn delete-triples-from-draftset-job
-  [backend user-id draftset-ref graph serialised rdf-format clock-fn]
-  (let [backend (:repo backend)
+  [resources user-id draftset-ref graph serialised rdf-format clock-fn]
+  (let [repo (-> resources :backend :repo)
         ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job backend user-id 'delete-triples-from-draftset ds-id :background-write
+    (jobs/make-job repo user-id 'delete-triples-from-draftset ds-id :background-write
       (fn [job]
         (let [triples (read-statements serialised rdf-format)
               quads (map #(util/make-quad-statement % graph) triples)
-              graph-mapping (ops/get-draftset-graph-mapping backend draftset-ref)]
-          (batch-and-delete-quads-from-draftset backend quads draftset-ref graph-mapping job clock-fn))))))
+              graph-mapping (ops/get-draftset-graph-mapping repo draftset-ref)]
+          (batch-and-delete-quads-from-draftset resources quads draftset-ref graph-mapping job clock-fn))))))
 
-(defn delete-draftset-data-handler [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
-  (wrap-as-draftset-owner
-   (require-rdf-content-type
-    (deset-middleware/require-graph-for-triples-rdf-format
-     (temp-file-body
-      (fn [{{draftset-id :draftset-id
-            graph :graph
-            rdf-format :rdf-format} :params body :body :as request}]
-        (let [user-id (req/user-id request)
-              delete-job (if (is-quads-format? rdf-format)
-                           (delete-quads-from-draftset-job backend
-                                                           user-id
-                                                           draftset-id
-                                                           body
-                                                           rdf-format
-                                                           util/get-current-time)
-                           (delete-triples-from-draftset-job backend
+(defn delete-draftset-data-handler
+  [{:keys [wrap-as-draftset-owner :drafter/backend :drafter/global-writes-lock]}]
+  (let [resources {:backend backend :global-writes-lock global-writes-lock}]
+    (-> (fn [{{:keys [draftset-id graph rdf-format]} :params body :body :as request}]
+          (let [user-id (req/user-id request)
+                delete-job (if (is-quads-format? rdf-format)
+                             (delete-quads-from-draftset-job resources
                                                              user-id
                                                              draftset-id
-                                                             graph
                                                              body
                                                              rdf-format
-                                                             util/get-current-time))]
-          (response/submit-async-job! delete-job))))))))
+                                                             util/get-current-time)
+                             (delete-triples-from-draftset-job resources
+                                                               user-id
+                                                               draftset-id
+                                                               graph
+                                                               body
+                                                               rdf-format
+                                                               util/get-current-time))]
+            (response/submit-async-job! delete-job)))
+        temp-file-body
+        deset-middleware/require-graph-for-triples-rdf-format
+        require-rdf-content-type
+        wrap-as-draftset-owner)))
 
-(defmethod ig/pre-init-spec ::delete-data-handler [_]
-  (s/keys :req [:drafter/backend]
+(defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete/delete-data-handler [_]
+  (s/keys :req [:drafter/backend
+                :drafter/global-writes-lock]
           :req-un [::wrap-as-draftset-owner]))
 
-(defmethod ig/init-key ::delete-data-handler [_ opts]
+(defmethod ig/init-key :drafter.feature.draftset-data.delete/delete-data-handler [_ opts]
   (delete-draftset-data-handler opts))

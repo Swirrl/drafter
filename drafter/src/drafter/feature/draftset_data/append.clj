@@ -31,47 +31,50 @@
 (declare append-draftset-quads)
 
 (defn- append-draftset-quads*
-  [quad-batches live->draft backend job-started-at job draftset-ref state]
-  (if-let [batch (first quad-batches)]
-    (let [{:keys [graph-uri triples]} (ds-data-common/quad-batch->graph-triples batch)]
-      (if-let [draft-graph-uri (get live->draft graph-uri)]
-        (do
-          (append-data-batch! backend draft-graph-uri triples)
-          (ds-data-common/touch-graph-in-draftset! backend draftset-ref draft-graph-uri job-started-at)
+  [quad-batches live->draft resources job-started-at job draftset-ref state]
+  (let [repo (-> resources :backend :repo)]
+    (if-let [batch (first quad-batches)]
+      (let [{:keys [graph-uri triples]} (ds-data-common/quad-batch->graph-triples batch)]
+        (if-let [draft-graph-uri (get live->draft graph-uri)]
+          (do
+            (append-data-batch! repo draft-graph-uri triples)
+            (ds-data-common/touch-graph-in-draftset! repo draftset-ref draft-graph-uri job-started-at)
 
-          (let [next-job (ajobs/create-child-job
-                          job
-                          (partial append-draftset-quads backend draftset-ref live->draft (rest quad-batches) (merge state {:op :append})))]
-            (writes/queue-job! next-job)))
-        ;;NOTE: do this immediately instead of scheduling a
-        ;;continuation since we haven't done any real work yet
-        (append-draftset-quads backend draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-    (ajobs/job-succeeded! job)))
+            (let [next-job (ajobs/create-child-job
+                            job
+                            (partial append-draftset-quads resources draftset-ref live->draft (rest quad-batches) (merge state {:op :append})))]
+              (writes/queue-job! next-job)))
+          ;;NOTE: do this immediately instead of scheduling a
+          ;;continuation since we haven't done any real work yet
+          (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
+      (ajobs/job-succeeded! job))))
 
 
 (defn- copy-graph-for-append*
-  [state draftset-ref backend live->draft quad-batches job]
+  [state draftset-ref resources live->draft quad-batches job]
   (let [live-graph-uri (:graph state)
         ds-uri (str (ds/->draftset-uri draftset-ref))
-        {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for backend live-graph-uri live->draft ds-uri)]
+        repo (-> resources :backend :repo)
+        {:keys [draft-graph-uri graph-map]}
+        (mgmt/ensure-draft-exists-for repo live-graph-uri live->draft ds-uri)]
 
-    (ds-data-common/lock-writes-and-copy-graph backend live-graph-uri draft-graph-uri {:silent true})
+    (ds-data-common/lock-writes-and-copy-graph resources live-graph-uri draft-graph-uri {:silent true})
     ;; Now resume appending the batch
-    (append-draftset-quads backend draftset-ref graph-map quad-batches (merge state {:op :append}) job)))
+    (append-draftset-quads resources draftset-ref graph-map quad-batches (merge state {:op :append}) job)))
 
+(defn- append-draftset-quads
+  [resources draftset-ref live->draft quad-batches state job]
+  (let [{:keys [op job-started-at]} state]
+    (case op
+      :append
+      (append-draftset-quads* quad-batches live->draft resources job-started-at job draftset-ref state)
 
-(defn- append-draftset-quads [backend draftset-ref live->draft quad-batches {:keys [op job-started-at] :as state} job]
-  (case op
-    :append
-    (append-draftset-quads* quad-batches live->draft backend job-started-at job draftset-ref state)
-
-    :copy-graph
-    (copy-graph-for-append* state draftset-ref backend live->draft quad-batches job)))
+      :copy-graph
+      (copy-graph-for-append* state draftset-ref resources live->draft quad-batches job))))
 
 (defn- append-quads-to-draftset-job
-  [backend user-id operation draftset-ref quads clock-fn]
-  (let [backend (:repo backend)
-        ds-id (ds/->draftset-id draftset-ref)]
+  [{:keys [backend] :as resources} user-id operation draftset-ref quads clock-fn]
+  (let [ds-id (ds/->draftset-id draftset-ref)]
     (jobs/make-job backend user-id operation ds-id :background-write
       (fn [job]
         (let [graph-map (ops/get-draftset-graph-mapping backend draftset-ref)
@@ -79,7 +82,7 @@
                                                     pr/context
                                                     jobs/batched-write-size)
               now (clock-fn)]
-          (append-draftset-quads backend
+          (append-draftset-quads resources
                                  draftset-ref
                                  graph-map
                                  quad-batches
@@ -87,8 +90,8 @@
                                  job))))))
 
 (defn append-data-to-draftset-job
-  [backend user-id draftset-ref tempfile rdf-format clock-fn]
-  (append-quads-to-draftset-job backend
+  [resources user-id draftset-ref tempfile rdf-format clock-fn]
+  (append-quads-to-draftset-job resources
                                 user-id
                                 'append-quads-to-draftset
                                 draftset-ref
@@ -96,10 +99,10 @@
                                 clock-fn))
 
 (defn append-triples-to-draftset-job
-  [backend user-id draftset-ref tempfile rdf-format graph clock-fn]
+  [resources user-id draftset-ref tempfile rdf-format graph clock-fn]
   (let [triples (dses/read-statements tempfile rdf-format)
         quads (map (comp pr/map->Quad #(assoc % :c graph)) triples)]
-    (append-quads-to-draftset-job backend
+    (append-quads-to-draftset-job resources
                                   user-id
                                   'append-triples-to-draftset
                                   draftset-ref
@@ -108,35 +111,36 @@
 
 (defn data-handler
   "Ring handler to append data into a draftset."
-  [{backend :drafter/backend wrap-as-draftset-owner :wrap-as-draftset-owner}]
-  (wrap-as-draftset-owner
-   (require-rdf-content-type
-    (dset-middleware/require-graph-for-triples-rdf-format
-     (temp-file-body
-      (fn [{{draftset-id :draftset-id
-            rdf-format :rdf-format
-            graph :graph} :params body :body :as request}]
-        (let [user-id (req/user-id request)
-              ds-id (:id draftset-id)]
-          (if (is-quads-format? rdf-format)
-            (let [append-job (append-data-to-draftset-job backend
-                                                          user-id
-                                                          ds-id
-                                                          body
-                                                          rdf-format
-                                                          util/get-current-time)]
-              (response/submit-async-job! append-job))
-            (let [append-job (append-triples-to-draftset-job backend
-                                                             user-id
-                                                             ds-id
-                                                             body
-                                                             rdf-format
-                                                             graph
-                                                             util/get-current-time)]
-              (response/submit-async-job! append-job))))))))))
+  [{:keys [:drafter/backend :drafter/global-writes-lock wrap-as-draftset-owner] :as opts}]
+  (let [resources {:backend backend :global-writes-lock global-writes-lock}]
+    (wrap-as-draftset-owner
+     (require-rdf-content-type
+      (dset-middleware/require-graph-for-triples-rdf-format
+       (temp-file-body
+        (fn [{{draftset-id :draftset-id
+              rdf-format :rdf-format
+              graph :graph} :params body :body :as request}]
+          (let [user-id (req/user-id request)
+                ds-id (:id draftset-id)]
+            (if (is-quads-format? rdf-format)
+              (let [append-job (append-data-to-draftset-job resources
+                                                            user-id
+                                                            ds-id
+                                                            body
+                                                            rdf-format
+                                                            util/get-current-time)]
+                (response/submit-async-job! append-job))
+              (let [append-job (append-triples-to-draftset-job resources
+                                                               user-id
+                                                               ds-id
+                                                               body
+                                                               rdf-format
+                                                               graph
+                                                               util/get-current-time)]
+                (response/submit-async-job! append-job)))))))))))
 
 (defmethod ig/pre-init-spec ::data-handler [_]
-  (s/keys :req [:drafter/backend]
+  (s/keys :req [:drafter/backend :drafter/global-writes-lock]
           :req-un [::wrap-as-draftset-owner]))
 
 (defmethod ig/init-key ::data-handler [_ opts]

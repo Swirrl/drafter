@@ -170,9 +170,10 @@
         (is (= {:type :ok :restart-id r/restart-id} body))))))
 
 (tc/deftest-system-with-keys jobs-list-status-test
-  [:drafter.routes/jobs-status]
+  [:drafter.routes/jobs-status :drafter/global-writes-lock]
   [{handler :drafter.routes/jobs-status
-    backend :drafter/backend :as sys} system]
+    backend :drafter/backend
+    global-writes-lock :drafter/global-writes-lock :as sys} system]
   (let [job (jobs/create-job dummy 'test-job :batch-write (constantly nil))
         path "/v1/status/jobs"]
 
@@ -191,7 +192,9 @@
         (is (= :pending (:status (first body))))))
 
     (testing "Synchronous jobs do not show up in :complete jobs"
-      (let [job (feat-common/run-sync backend dummy 'test-sync-job nil (constantly nil))]
+      (let [job (feat-common/run-sync {:backend backend
+                                       :global-writes-lock global-writes-lock}
+                                      dummy 'test-sync-job nil (constantly nil))]
         (let [{:keys [body status] :as response}
               (handler (tc/with-identity test-editor (request :get path)))]
           (is (= 200 status))

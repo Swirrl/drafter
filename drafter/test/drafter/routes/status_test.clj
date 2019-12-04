@@ -30,7 +30,7 @@
 
 (deftest writes-lock-test
   (let [lock (ReentrantLock.)
-        status-route (status-routes lock)]
+        status-route (status-routes {:lock lock})]
 
     (testing "GET /writes-locked"
       (testing "when unlocked"

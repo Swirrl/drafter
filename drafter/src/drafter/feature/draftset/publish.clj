@@ -19,9 +19,9 @@
                                      util/get-current-time))
        (forbidden-response "You require the publisher role to perform this action")))))
 
-(defmethod ig/pre-init-spec ::handler [_]
+(defmethod ig/pre-init-spec :drafter.feature.draftset.publish/handler [_]
   (s/keys :req [:drafter/backend]
           :req-un [::wrap-as-draftset-owner]))
 
-(defmethod ig/init-key ::handler [_ opts]
+(defmethod ig/init-key :drafter.feature.draftset.publish/handler [_ opts]
   (handler opts))

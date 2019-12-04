@@ -55,12 +55,14 @@
 
 
  :drafter.feature.draftset.create/handler {:drafter/backend #ig/ref :drafter/backend
-                                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                           :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.feature.middleware/wrap-as-draftset-owner {:drafter/backend #ig/ref :drafter/backend
                                                        :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
+                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.options/handler {:drafter/backend #ig/ref :drafter/backend
@@ -71,19 +73,24 @@
                                               :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/backend #ig/ref :drafter/backend
-                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+                                                            :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler {:drafter/backend #ig/ref :drafter/backend
-                                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+                                                                      :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.changes/delete-changes-handler {:drafter/backend #ig/ref :drafter/backend
-                                                                :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+                                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append/data-handler {:drafter/backend #ig/ref :drafter/backend
+                                                     :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/backend #ig/ref :drafter/backend
-                                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+                                                         :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                                         :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.query/handler {:drafter/backend #ig/ref :drafter/backend
                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
@@ -93,13 +100,16 @@
                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.set-metadata/handler {:drafter/backend #ig/ref :drafter/backend
+                                                 :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
                                                  :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.submit/handler {:drafter/backend #ig/ref :drafter/backend
+                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
                                            :drafter.user/repo #ig/ref :drafter.user/repo
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.claim/handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                          :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
                                           :drafter/backend #ig/ref :drafter/backend}
 
  :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
@@ -133,7 +143,7 @@
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
                        :draftset-api-routes #ig/ref :drafter.routes/draftsets-api
                        :jobs-status-routes #ig/ref :drafter.routes/jobs-status
-                       }
+                       :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock}
 
 
 

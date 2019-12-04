@@ -9,12 +9,14 @@
             [drafter.async.responses :as response]
             [drafter.requests :as req]))
 
-(defn create-draftsets-handler [{wrap-authenticated :wrap-auth backend :drafter/backend}]
+(defn create-draftsets-handler
+  [{wrap-authenticated :wrap-auth
+    :keys [:drafter/backend :drafter/global-writes-lock]}]
   (let [version "/v1"]
     (wrap-authenticated
      (fn [{{:keys [display-name description]} :params user :identity :as request}]
        (feat-common/run-sync
-        backend
+        {:backend backend :global-writes-lock global-writes-lock}
         (req/user-id request)
         'create-draftset
         nil ; because we're creating the draftset here
@@ -27,8 +29,9 @@
 
 (s/def ::wrap-auth fn?)
 
-(defmethod ig/pre-init-spec ::handler [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
+(defmethod ig/pre-init-spec :drafter.feature.draftset.create/handler [_]
+  (s/keys :req [:drafter/backend :drafter/global-writes-lock]
+          :req-un [::wrap-auth]))
 
 (defmethod ig/init-key ::handler [_ opts]
   (create-draftsets-handler opts))
