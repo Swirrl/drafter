@@ -140,11 +140,12 @@
 (defn get-draftsets
   "List available draftsets, optionally `:include` either
   `#{:all :owned :claimable}`.
-  Returns all propeties."
+  Returns all properties."
   [client access-token & [include]]
-  (let [include (if (keyword include) (c/name include) include)]
-    (->> (i/get client i/get-draftsets access-token :include include)
-         (map ->draftset))))
+  (let [get-draftsets (partial i/get client i/get-draftsets access-token)
+        include (if (keyword include) (c/name include) include)
+        response (if include (get-draftsets :include include) (get-draftsets))]
+    (map ->draftset response)))
 
 (defn get-draftset [client access-token id]
   (->draftset (i/get client i/get-draftset access-token id)))
