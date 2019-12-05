@@ -16,7 +16,8 @@
             [integrant.core :as ig]
             [clojure.java.io :as io]
             [grafter-2.rdf.protocols :as pr])
-  (:import java.net.URI
+  (:import clojure.lang.ExceptionInfo
+           java.net.URI
            [java.util UUID]
            (java.util.concurrent ExecutionException)))
 
@@ -389,6 +390,34 @@
         (with-open [conn (gr-repo/->connection repo)]
           (let [res (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
             (is (true? res))))))))
+
+(defn test-client-job-timeout [client]
+  (testing "remove-draftset-sync times out"
+    (let [token (auth-util/system-token)
+          name "Draftset querying"
+          desc "Testing adding things, and querying them"
+          draftset (sut/new-draftset client token name desc)]
+      (is
+       (try
+         (sut/remove-draftset-sync client token draftset)
+         false
+         (catch ExceptionInfo e
+           (= (sut/job-timeout-exception? e))))))))
+
+(deftest client-job-timeout-test
+  (let [job-timeout -1]
+    ;;  ^^ this is a bit of a hack as we never expect a timeout to be negative
+    ;; but seeing as the timeout will always happen when timeout <= 0 then we
+    ;; can use this to simulate a timeout without having to get drafter to hang
+    ;; for a bit.
+    (testing "with-job-timeout applies job-timeout to existing client"
+      (test-client-job-timeout  (sut/with-job-timeout (drafter-client) job-timeout)))
+    (testing "client with :job-timeout opt applies timeout to new client"
+      (test-client-job-timeout (ig/init-key :drafter-client/client
+                                            {:drafter-uri (env :drafter-endpoint)
+                                             :auth0-endpoint (env :auth0-domain)
+                                             :batch-size 150000
+                                             :job-timeout job-timeout})))))
 
 (t/deftest integrant-null-client
   (t/testing "missing a drafter uri key returns nil client"
