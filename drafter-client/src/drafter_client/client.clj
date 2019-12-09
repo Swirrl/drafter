@@ -317,7 +317,7 @@
           status (job-status job state)
           wait 500]
       (cond (>= waited (:job-timeout client))
-            (throw (job-timeout-exception job))
+            (job-timeout-exception job)
             (= ::pending status)
             (do (Thread/sleep wait) (recur (+ waited wait)))
             :else
