@@ -310,7 +310,7 @@
 
 (defn wait-result!
   "Waits for an async job to complete and returns the result map if it succeeded
-   or an exception representing the failure otherwise."
+   or, returns an exception representing the failure otherwise."
   [client access-token job]
   (loop [waited 0]
     (let [state (refresh-job client access-token job)
