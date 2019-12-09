@@ -382,6 +382,11 @@
   [client access-token jobs]
   (mapv (fn [job] (resolve-job client access-token job)) jobs))
 
+(defn writes-locked? [client access-token]
+  (-> client
+      (i/get i/status-writes-locked access-token)
+      (Boolean/parseBoolean)))
+
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
