@@ -1,5 +1,4 @@
 (ns drafter-client.client.impl
-  (:refer-clojure :exclude [get])
   (:require [cheshire.core :as json]
             [clojure.spec.alpha :as s]
             [clojure.walk :refer [postwalk]]
@@ -268,7 +267,7 @@
    :submit-draftset-to
    (merge {:id id} opts)))
 
-(defn get
+(defn request
   {:style/indent :defn}
   [client f access-token & args]
   (if client
