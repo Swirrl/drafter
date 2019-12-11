@@ -70,3 +70,30 @@
     (let [delete-request (help/delete-draftset-graph-request test-publisher draftset-location graph)
           delete-response (handler delete-request)]
       (tc/assert-is-forbidden-response delete-response))))
+
+(tc/deftest-system-with-keys delete-live-graph-async-test
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [quads (statements "test/resources/test-draftset.trig")
+        graph-quads (group-by context quads)
+        live-graphs (keys graph-quads)
+        graph-to-delete (first live-graphs)
+        draftset-location (help/create-draftset-through-api handler test-editor)]
+    (help/publish-quads-through-api handler quads)
+    (let [request (-> (help/delete-draftset-graph-request test-editor
+                                                          draftset-location
+                                                          graph-to-delete)
+                      (assoc-in [:headers "perform-async"] "true"))
+          {:keys [status body] :as _job-response} (handler request)
+          ds-response (->> {:request-method :get :uri draftset-location}
+                           (tc/with-identity test-editor)
+                           (handler))]
+
+      ;; did we get a job back?
+      (is (= 202 status))
+      (is (contains? body :finished-job))
+      (is (= :ok (:type body)))
+
+      ;; did the job delete the graph?
+      (is (= 200 (:status ds-response)))
+      (is (= :deleted (get-in ds-response [:body :changes graph-to-delete :status]))))))

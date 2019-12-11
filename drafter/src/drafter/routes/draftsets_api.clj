@@ -59,6 +59,7 @@
                                    draftset-get-data-handler
                                    delete-draftset-data-handler
                                    delete-draftset-graph-handler
+                                   delete-draftset-graph-async-handler
                                    delete-draftset-changes-handler
                                    put-draftset-data-handler
                                    put-draftset-graph-handler
