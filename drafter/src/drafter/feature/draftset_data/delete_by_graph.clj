@@ -14,7 +14,8 @@
             [drafter.requests :as req]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.responses :as response]
-            [drafter.async.jobs :as ajobs]))
+            [drafter.async.jobs :as ajobs]
+            [clojure.set :as set]))
 
 (defn sync-job [{:keys [backend] :as resources}]
   (fn [draftset-id graph user-id]
@@ -37,24 +38,26 @@
               (ajobs/job-succeeded! job result))))
         (response/submit-async-job!))))
 
-(defn request-handler [{:keys [backend job-handler] :as resources}]
-  (fn [{{:keys [draftset-id graph silent]} :params :as request}]
-    (if (mgmt/is-graph-managed? backend graph)
-      (job-handler draftset-id graph (req/user-id request))
-      (if silent
-        (ring/response (dsops/get-draftset-info backend draftset-id))
-        (drafter-response/unprocessable-entity-response (str "Graph not found"))))))
+(defn request-handler
+  [{:keys [:drafter/backend sync-job-handler async-job-handler] :as _resources}]
+  (fn [{{:keys [draftset-id graph silent]} :params
+       {:strs [perform-async] :or {perform-async "false"}} :headers
+       :as request}]
+    (let [perform-async? (Boolean/parseBoolean perform-async)
+          job-handler (if perform-async? async-job-handler sync-job-handler)]
+      (if (mgmt/is-graph-managed? backend graph)
+        (job-handler draftset-id graph (req/user-id request))
+        (if silent
+          (ring/response (dsops/get-draftset-info backend draftset-id))
+          (drafter-response/unprocessable-entity-response (str "Graph not found")))))))
 
 (defn remove-graph-from-draftset-handler
   "Remove a supplied graph from the draftset."
-  [{:keys [:drafter/backend wrap-as-draftset-owner job-handler]}]
-  (let [handler (request-handler {:backend backend :job-handler job-handler})]
-    (wrap-as-draftset-owner
-     (parse-query-param-flag-handler
-      :silent
-      (feat-middleware/parse-graph-param-handler true handler)))))
-
-(s/def ::job-handler fn?)
+  [{:keys [wrap-as-draftset-owner] :as resources}]
+  (wrap-as-draftset-owner
+   (parse-query-param-flag-handler
+    :silent
+    (feat-middleware/parse-graph-param-handler true (request-handler resources)))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete-by-graph/sync-job-handler [_]
   (s/keys :req-un [::backend ::global-writes-lock]))
@@ -70,16 +73,12 @@
   [_ {:keys [backend] :as resources}]
   (async-job resources))
 
+(s/def ::sync-job-handler fn?)
+(s/def ::async-job-handler fn?)
+
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler [_]
   (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner ::job-handler]))
+          :req-un [::wrap-as-draftset-owner ::sync-job-handler ::async-job-handler]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler [_ opts]
-  (remove-graph-from-draftset-handler opts))
-
-(defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete-by-graph/remove-graph-async-handler [_]
-  (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner ::job-handler]))
-
-(defmethod ig/init-key :drafter.feature.draftset-data.delete-by-graph/remove-graph-async-handler [_ opts]
   (remove-graph-from-draftset-handler opts))
