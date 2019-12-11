@@ -302,16 +302,26 @@
   :args (s/cat :job ::AsyncJob :job-state ::JobState)
   :ret (s/or :result ::JobResult :pending #{::pending}))
 
+(defn job-timeout-exception [job]
+  (ex-info "Timed out waiting for job to finish" {:type ::job-timeout :job job}))
+
+(defn job-timeout-exception? [e]
+  (-> e ex-data :type (= ::job-timeout)))
+
 (defn wait-result!
   "Waits for an async job to complete and returns the result map if it succeeded
-   or an exception representing the failure otherwise."
+   or, returns an exception representing the failure otherwise."
   [client access-token job]
-  (let [state (refresh-job client access-token job)
-        status (job-status job state)]
-    (if (= ::pending status)
-      (do (Thread/sleep 500)
-          (recur client access-token job))
-      status)))
+  (loop [waited 0]
+    (let [state (refresh-job client access-token job)
+          status (job-status job state)
+          wait 500]
+      (cond (>= waited (:job-timeout client))
+            (job-timeout-exception job)
+            (= ::pending status)
+            (do (Thread/sleep wait) (recur (+ waited wait)))
+            :else
+            status))))
 
 (s/fdef wait-result!
   :args (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
@@ -387,36 +397,44 @@
       (i/get i/status-writes-locked access-token)
       (Boolean/parseBoolean)))
 
+(defn with-job-timeout [client job-timeout]
+  (->DrafterClient (:martian client)
+                   (assoc (:opts client) :job-timeout job-timeout)
+                   (:auth0 client)))
+
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
-  [drafter-uri & {:keys [batch-size version auth0]}]
+  [drafter-uri & {:keys [batch-size version auth0 job-timeout] :as opts}]
   (let [version (or version "v1")
-        swagger-json "swagger/swagger.json"]
+        swagger-json "swagger/swagger.json"
+        job-timeout (or job-timeout ##Inf)
+        opts (-> opts (assoc :job-timeout job-timeout) (dissoc :auth0))]
     (log/debugf "Making Drafter client with batch size %d for Drafter: %s"
                 batch-size drafter-uri)
     (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
           (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
-          (->DrafterClient batch-size auth0)))))
+          (->DrafterClient opts auth0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Integrant ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod ig/init-key :drafter-client/client
-  [ig-key {:keys [drafter-uri batch-size version auth0]}]
+  [ig-key {:keys [drafter-uri] :as opts}]
   (when (seq drafter-uri)
-    (try
-      (client drafter-uri :batch-size batch-size :version version :auth0 auth0)
-      (catch Throwable t
-        (let [e (Throwable->map t)]
-          (throw
-           (ex-info (str "Failure to init " ig-key "\n"
-                         (:cause e)
-                         "\nCheck that Drafter is running!"
-                         "\nCheck that your Drafter Client config is correct.")
-                    e)))))))
+    (let [opts (apply concat (dissoc opts :drafter-uri))]
+      (try
+       (apply client drafter-uri opts)
+       (catch Throwable t
+         (let [e (Throwable->map t)]
+           (throw
+            (ex-info (str "Failure to init " ig-key "\n"
+                          (:cause e)
+                          "\nCheck that Drafter is running!"
+                          "\nCheck that your Drafter Client config is correct.")
+                     e))))))))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.

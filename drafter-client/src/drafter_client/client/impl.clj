@@ -14,7 +14,9 @@
             [ring.util.codec :refer [form-decode form-encode]])
   (:import (java.io InputStream File PipedInputStream PipedOutputStream)))
 
-(deftype DrafterClient [martian batch-size auth0]
+(alias 'c 'clojure.core)
+
+(deftype DrafterClient [martian opts auth0]
   ;; Wrap martian in a type so that:
   ;; a) we don't leak the auth0 client
   ;; b) we don't expose the martian impl to the "system"
@@ -24,19 +26,19 @@
   (valAt [this k default]
     (case k
       :martian martian
-      :batch-size batch-size
       :auth0 auth0
-      (.valAt martian k default))))
+      (or (c/get opts k)
+          (.valAt martian k default)))))
 
 (s/def ::DrafterClient #(instance? DrafterClient %))
 (s/def ::AccessToken string?)
 
 (defn intercept
   {:style/indent :defn}
-  [{:keys [martian batch-size auth0] :as client}
+  [{:keys [martian opts auth0] :as client}
    & interceptors]
   (->DrafterClient (apply update martian :interceptors conj interceptors)
-                   batch-size
+                   opts
                    auth0))
 
 (defn bearer-token [access-token]
