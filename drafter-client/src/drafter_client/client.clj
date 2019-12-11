@@ -127,14 +127,14 @@
 (defn draftsets
   "List available Draftsets"
   [client access-token]
-  (->> (i/get client i/get-draftsets access-token)
+  (->> (i/request client i/get-draftsets access-token)
        (map json-draftset->draftset)))
 
 (defn new-draftset
   "Create a new Draftset"
   [client access-token name description]
   (-> client
-      (i/get i/create-draftset access-token :display-name name :description description)
+      (i/request i/create-draftset access-token :display-name name :description description)
       (json-draftset->draftset)))
 
 (defn get-draftsets
@@ -142,60 +142,60 @@
   `#{:all :owned :claimable}`.
   Returns all properties."
   [client access-token & [include]]
-  (let [get-draftsets (partial i/get client i/get-draftsets access-token)
+  (let [get-draftsets (partial i/request client i/get-draftsets access-token)
         include (if (keyword include) (c/name include) include)
         response (if include (get-draftsets :include include) (get-draftsets))]
     (map ->draftset response)))
 
 (defn get-draftset [client access-token id]
-  (->draftset (i/get client i/get-draftset access-token id)))
+  (->draftset (i/request client i/get-draftset access-token id)))
 
 (defn edit-draftset [client access-token id name description]
-  (i/get client i/put-draftset access-token id
+  (i/request client i/put-draftset access-token id
          :display-name name
          :description description))
 
 (defn submit-to-user [client access-token id user]
-  (i/get client i/submit-draftset-to access-token id :user user))
+  (i/request client i/submit-draftset-to access-token id :user user))
 
 (defn submit-to-role [client access-token id role]
   (let [role (if (keyword? role) (c/name role) role)]
-    (i/get client i/submit-draftset-to access-token id :role role)))
+    (i/request client i/submit-draftset-to access-token id :role role)))
 
 (defn claim [client access-token id]
-  (i/get client i/claim-draftset access-token id))
+  (i/request client i/claim-draftset access-token id))
 
 (defn remove-draftset
   "Delete the Draftset and its data"
   [client access-token draftset]
   (-> client
-      (i/get i/delete-draftset access-token (draftset/id draftset))
+      (i/request i/delete-draftset access-token (draftset/id draftset))
       (->async-job)))
 
 (defn load-graph
   "Load the graph from live into the Draftset"
   [client access-token draftset graph]
   (-> client
-      (i/get i/put-draftset-graph access-token (draftset/id draftset) (str graph))
+      (i/request i/put-draftset-graph access-token (draftset/id draftset) (str graph))
       (->async-job)))
 
 (defn delete-graph
   "Schedules the deletion of the graph from live"
   [client access-token draftset graph]
-  (i/get client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
+  (i/request client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
 
 (defn delete-quads
   [client access-token draftset quads]
   (-> client
       (i/set-content-type "application/n-quads")
-      (i/get i/delete-draftset-data access-token (draftset/id draftset) quads)
+      (i/request i/delete-draftset-data access-token (draftset/id draftset) quads)
       (->async-job)))
 
 (defn delete-triples
   [client access-token draftset graph triples]
   (-> client
       (i/set-content-type "application/n-triples")
-      (i/get i/delete-draftset-data access-token (draftset/id draftset) triples :graph graph)
+      (i/request i/delete-draftset-data access-token (draftset/id draftset) triples :graph graph)
       (->async-job)))
 
 (defn add
@@ -237,7 +237,7 @@
   "Publish the Draftset to live"
   [client access-token draftset]
   (-> client
-      (i/get i/publish-draftset access-token (draftset/id draftset))
+      (i/request i/publish-draftset access-token (draftset/id draftset))
       (->async-job)))
 
 (defn get
@@ -245,17 +245,17 @@
   ([client access-token draftset]
    (-> client
        (i/accept "application/n-quads")
-       (i/get i/get-draftset-data access-token (draftset/id draftset))))
+       (i/request i/get-draftset-data access-token (draftset/id draftset))))
   ([client access-token draftset graph]
    (-> client
        (i/accept "application/n-triples")
-       (i/get i/get-draftset-data access-token (draftset/id draftset) :graph graph))))
+       (i/request i/get-draftset-data access-token (draftset/id draftset) :graph graph))))
 
 (defn job [client access-token id]
-  (->job (i/get client i/get-job access-token id)))
+  (->job (i/request client i/get-job access-token id)))
 
 (defn jobs [client access-token]
-  (map ->job (i/get client i/get-jobs access-token)))
+  (map ->job (i/request client i/get-jobs access-token)))
 
 (defn- parse-not-found-body
   "Parses the HTTP body from a not-found job state response"
@@ -269,7 +269,7 @@
   "Poll to get the latest state of a job"
   [client access-token {:keys [job-id] :as job}]
   (try
-    (i/get client i/status-job-finished access-token job-id)
+    (i/request client i/status-job-finished access-token job-id)
     (catch ExceptionInfo e
       (let [{:keys [body status]} (ex-data e)]
         (if (= status 404)
@@ -384,7 +384,7 @@
 
 (defn writes-locked? [client access-token]
   (-> client
-      (i/get i/status-writes-locked access-token)
+      (i/request i/status-writes-locked access-token)
       (Boolean/parseBoolean)))
 
 (defn client
