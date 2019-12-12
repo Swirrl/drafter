@@ -179,6 +179,12 @@
       (i/request i/put-draftset-graph access-token (draftset/id draftset) (str graph))
       (->async-job)))
 
+(defn delete-draftset-changes
+  "Remove all changes from the named graph"
+  [client access-token draftset graph]
+  (i/request client i/delete-draftset-changes access-token
+             (draftset/id draftset) (str graph)))
+
 (defn delete-graph
   "Schedules the deletion of the graph from live"
   [client access-token draftset graph]
