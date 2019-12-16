@@ -364,6 +364,16 @@
         (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
         (is (= "Custom job title" (-> job :metadata :title)))))))
 
+(t/deftest deleting-a-draftset
+  (testing "Deleting a draftset with metadata"
+    (let [client (drafter-client)
+          token (auth-util/system-token)
+          draftset (sut/new-draftset client token "Test" "Delete me")
+          result (sut/remove-draftset client token draftset {:title "Custom job title"})
+          job (sut/job client token (:job-id result))]
+      (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+      (is (= "Custom job title" (-> job :metadata :title))))))
+
 (t/deftest deleting-a-graph-from-a-draftset
   (let [client (drafter-client)
         triples (test-triples)

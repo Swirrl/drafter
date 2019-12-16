@@ -252,6 +252,7 @@ paths:
         - jws-auth: []
       parameters:
         - $ref: '#/parameters/id'
+        - $ref: '#/parameters/metadata'
         #- $ref: '#/parameters/messagenonote'
       tags:
         - Draftsets

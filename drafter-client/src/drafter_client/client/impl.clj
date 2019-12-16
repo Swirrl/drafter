@@ -64,8 +64,11 @@
 (defn delete-draftset
   "Delete the Draftset and its data"
   #:drafter-client.client.impl{:generated true}
-  [client id]
-  (martian/response-for client :delete-draftset {:id id}))
+  [client id metadata]
+  (martian/response-for client
+                        :delete-draftset
+                        (cond-> {:id id}
+                                metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn delete-draftset-changes
   "Remove all the changes to a named graph from the Draftset"

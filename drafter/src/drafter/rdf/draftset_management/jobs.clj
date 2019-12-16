@@ -7,16 +7,14 @@
             [drafter.rdf.sesame :refer [read-statements]]
             [grafter-2.rdf.protocols :as rdf :refer [context map->Quad]]
             [grafter-2.rdf4j.io :refer [quad->backend-quad]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
-            [martian.encoders :as enc])
-  (:import java.util.Date
-           org.eclipse.rdf4j.model.Resource))
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]]))
 
-(defn delete-draftset-job [backend user-id draftset-ref]
-  (let [ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job backend user-id 'delete-draftset ds-id :background-write
+(defn delete-draftset-job [backend user-id {:keys [draftset-id metadata]}]
+  (let [ds-id (ds/->draftset-id draftset-id)
+        meta (jobs/job-metadata backend ds-id 'delete-draftset metadata)]
+    (jobs/make-job backend user-id meta ds-id :background-write
       (fn [job]
-        (ops/delete-draftset! backend draftset-ref)
+        (ops/delete-draftset! backend draftset-id)
         (jobs/job-succeeded! job)))))
 
 ;; (defn touch-graph-in-draftset [draftset-ref draft-graph-uri modified-at]
