@@ -10,7 +10,8 @@
             [martian.core :as martian]
             [martian.encoders :as encoders]
             [martian.interceptors :as interceptors]
-            [ring.util.codec :refer [form-decode form-encode]])
+            [ring.util.codec :refer [form-decode form-encode]]
+            [martian.encoders :as enc])
   (:import (java.io InputStream File PipedInputStream PipedOutputStream)))
 
 (alias 'c 'clojure.core)
@@ -189,15 +190,17 @@
 (defn publish-draftset
   "Publish the specified Draftset"
   #:drafter-client.client.impl{:generated true}
-  [client id]
-  (martian/response-for client :publish-draftset {:id id}))
+  [client id metadata]
+  (martian/response-for client
+                        :publish-draftset
+                        (cond-> {:id id}
+                                metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn put-draftset
   "Set metadata on Draftset"
   #:drafter-client.client.impl{:generated true}
   [client id & {:keys [display-name description] :as opts}]
   (martian/response-for client :put-draftset (merge {:id id} opts)))
-
 
 (defn piped-input-stream [func]
   (let [input  (PipedInputStream.)

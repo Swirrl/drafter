@@ -69,17 +69,18 @@
 
 (defn make-job
   {:style/indent :defn}
-  [backend user-id operation draftset-id write-priority job-fn]
-  (let [ds-meta (some->> draftset-id (dsops/get-draftset-info backend))]
+  [backend user-id metadata draftset-id write-priority job-fn]
+  (let [ds-meta (some->> draftset-id (dsops/get-draftset-info backend))
+        meta (if (map? metadata) metadata {:operation metadata})]
     (ajobs/create-job
      user-id
-     operation
+     'operation
      draftset-id
-     {:draftset ds-meta}
+     (merge {:draftset ds-meta} meta)
      write-priority
      (fn [job]
        (datadog/measure!
-        (util/statsd-name "drafter.job" operation write-priority "time")
+        (util/statsd-name "drafter.job" (:operation meta) write-priority "time")
         {}
         (try
           (job-fn job)

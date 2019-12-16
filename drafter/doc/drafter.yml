@@ -528,6 +528,7 @@ paths:
         - jws-auth: []
       parameters:
         - $ref: '#/parameters/id'
+        - $ref: '#/parameters/metadata'
         #- $ref: '#/parameters/messagenonote'
       tags:
         - Draftsets
@@ -947,6 +948,12 @@ parameters:
     type: boolean
     allowEmptyValue: true
     default: false
+  metadata:
+    name: metadata
+    description: Arbitrary metadata from the client to store on an async job (as an object encoded as json)
+    in: query
+    required: false
+    type: string
 
 definitions:
   Graph:
@@ -1098,17 +1105,20 @@ definitions:
       start-time:
         type: string
         format: date-time
-        description: IS0 8601 DateTime representing the time the job was TODO ???
+        description: IS0 8601 DateTime representing the time the job was started
       finish-time:
         type: string
         format: date-time
-        description: IS0 8601 DateTime representing the time the job was TODO ???
+        description: IS0 8601 DateTime representing the time the job finished
       draftset-id:
         type: string
         format: uuid
       draft-graph-id:
         type: string
         format: uuid
+      metadata:
+        type: object
+
     example:
       id: a1b26596-2dca-4e52-883c-7fdcb8b4be97
       user-id: b1b26596-2dca-4e52-883c-7fdcb8b4be97
@@ -1117,6 +1127,8 @@ definitions:
       priority: background-write
       start-time: "2016-01-01T13:35:21+00:00"
       draftset-id: c1b26596-2dca-4e52-883c-7fdcb8b4be97
+      metadata: {title: "Publishing Q2 update"}
+
   FinishedJob:
     type: object
     description: An Asynchronous Job that completed without error.

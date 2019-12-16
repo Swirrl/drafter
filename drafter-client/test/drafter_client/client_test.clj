@@ -302,6 +302,28 @@
           (let [quads* (map #(assoc % :c graph) (gr-repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))]
             (is (= (set quads) (set quads*)))))))))
 
+(t/deftest publishing-with-metadata
+  (let [client (drafter-client)
+        triples (test-triples)
+        how-many 5
+        token (auth-util/system-token)
+        name "Draftset publishing"
+        description "Testing adding things, publishing them, and reading them"
+        draftset (sut/new-draftset client token name description)]
+    (t/testing "Publishing a draft set"
+      (let [graph (URI. "http://test.graph.com/quad-graph")
+            quads (map #(assoc % :c graph) triples)
+            quads (take how-many quads)]
+        (sut/add-sync client token draftset quads)
+
+        (let [result (sut/publish client token draftset {:title "Custom job title"
+                                                         :multiword-key "Key"
+                                                         :$-9%&*-> "weird key"})
+              job (sut/job client token (:job-id result))]
+          (is (= #{:title :draftset :operation :multiword-key :$-9%&*->}
+                 (-> job :metadata keys set)))
+          (is (= "Custom job title" (-> job :metadata :title))))))))
+
 (t/deftest loading-a-graph-into-a-draftset
   (let [client (drafter-client)
         triples (test-triples)

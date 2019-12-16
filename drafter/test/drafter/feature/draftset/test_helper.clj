@@ -111,8 +111,13 @@
     (let [request (append-to-draftset-request user draftset-location fs "application/x-trig")]
       (handler request))))
 
-(defn create-publish-request [draftset-location user]
-  (tc/with-identity user {:uri (str draftset-location "/publish") :request-method :post}))
+(defn create-publish-request
+  ([draftset-location user]
+   (create-publish-request draftset-location user nil))
+  ([draftset-location user metadata]
+   (tc/with-identity user {:uri (str draftset-location "/publish")
+                           :request-method :post
+                           :params (if metadata {:metadata metadata} {})})))
 
 (defn publish-draftset-through-api [handler draftset-location user]
   (let [publish-request (create-publish-request draftset-location user)

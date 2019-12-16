@@ -10,12 +10,12 @@
 (defn handler
   [{backend :drafter/backend :keys [wrap-as-draftset-owner timeout-fn]}]
   (wrap-as-draftset-owner
-   (fn [{{:keys [draftset-id]} :params user :identity :as request}]
+   (fn [{params :params user :identity :as request}]
      (if (user/has-role? user :publisher)
        (submit-async-job!
         (dsjobs/publish-draftset-job backend
                                      (req/user-id request)
-                                     draftset-id
+                                     params
                                      util/get-current-time))
        (forbidden-response "You require the publisher role to perform this action")))))
 

@@ -1,19 +1,14 @@
 (ns drafter.rdf.draftset-management.jobs
   (:require [drafter.backend.common :refer :all]
-            [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as ops]
             [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
             [drafter.draftset :as ds]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sesame :refer [read-statements]]
-            [drafter.rdf.sparql :as sparql]
-            [drafter.util :as util]
-            [drafter.write-scheduler :as writes]
             [grafter-2.rdf.protocols :as rdf :refer [context map->Quad]]
             [grafter-2.rdf4j.io :refer [quad->backend-quad]]
-            [grafter-2.rdf4j.repository :as repo]
             [grafter.vocabularies.dcterms :refer [dcterms:modified]]
-            [drafter.async.jobs :as ajobs])
+            [martian.encoders :as enc])
   (:import java.util.Date
            org.eclipse.rdf4j.model.Resource))
 
@@ -36,16 +31,18 @@
 (defn publish-draftset-job
   "Return a job that publishes the graphs in a draftset to live and
   then deletes the draftset."
-  [backend user-id draftset-ref clock-fn]
+  [backend user-id {:keys [draftset-id metadata] :as params} clock-fn]
   ;; TODO combine these into a single job as priorities have now
   ;; changed how these will be applied.
 
-  (let [ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job backend user-id 'publish-draftset ds-id :publish-write
+  (let [ds-id (ds/->draftset-id draftset-id)
+        meta (merge {:operation 'publish-draftset}
+                    (enc/json-decode metadata keyword))]
+    (jobs/make-job backend user-id meta ds-id :publish-write
       (fn [job]
         (try
-          (ops/publish-draftset-graphs! backend draftset-ref clock-fn)
-          (ops/delete-draftset-statements! backend draftset-ref)
+          (ops/publish-draftset-graphs! backend draftset-id clock-fn)
+          (ops/delete-draftset-statements! backend draftset-id)
           (jobs/job-succeeded! job)
           (catch Exception ex
             (jobs/job-failed! job ex)))))))
