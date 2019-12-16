@@ -2,12 +2,10 @@
   (:require [compojure.core :refer [context GET routes]]
             [clojure.spec.alpha :as s]
             [clj-logging-config.log4j :as l4j]
-            [clojure.tools.logging :as log]
             [drafter.async.responses :as r]
             [drafter.async.spec :as spec]
             [integrant.core :as ig]
             [clj-time.coerce :refer [to-date from-long]]
-            [clj-time.core :as time]
             [clj-time.format :refer [formatters unparse]])
   (:import (java.util UUID)
            (clojure.lang ExceptionInfo)

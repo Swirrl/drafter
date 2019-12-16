@@ -344,6 +344,26 @@
             quads* (sut/get client token draftset-2)]
         (is (= (set quads) (set quads*)))))))
 
+(t/deftest loading-a-graph-into-a-draftset-with-metadata
+  (let [client (drafter-client)
+        triples (test-triples)
+        how-many 5
+        token (auth-util/system-token)
+        name "Loading a graph into a draftset"
+        description "Testing loading a graph into a draftset"
+        draftset-1 (sut/new-draftset client token name description)]
+    (t/testing "Publishing a draft set"
+      (let [graph (URI. "http://test.graph.com/quad-graph")
+            quads (map #(assoc % :c graph) triples)
+            quads (take how-many quads)
+            _ (sut/add-sync client token draftset-1 quads)
+            _ (sut/publish-sync client token draftset-1)
+            draftset-2 (sut/new-draftset client token name description)
+            result (sut/load-graph client token draftset-2 graph {:title "Custom job title"})
+            job (sut/job client token (:job-id result))]
+        (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+        (is (= "Custom job title" (-> job :metadata :title)))))))
+
 (t/deftest deleting-a-graph-from-a-draftset
   (let [client (drafter-client)
         triples (test-triples)

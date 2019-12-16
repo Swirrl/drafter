@@ -243,11 +243,12 @@
 (defn put-draftset-graph
   "Copy a graph from live into this Draftset"
   #:drafter-client.client.impl{:generated true}
-  [client id graph]
+  [client id graph metadata]
   (martian/response-for
    client
    :put-draftset-graph
-   {:id id :graph graph}))
+   (cond-> {:id id :graph graph}
+           metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn status-job-finished
   "Poll to see if asynchronous job has finished"

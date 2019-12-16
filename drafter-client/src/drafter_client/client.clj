@@ -174,10 +174,12 @@
 
 (defn load-graph
   "Load the graph from live into the Draftset"
-  [client access-token draftset graph]
-  (-> client
-      (i/request i/put-draftset-graph access-token (draftset/id draftset) (str graph))
-      (->async-job)))
+  ([client access-token draftset graph]
+   (load-graph client access-token draftset graph nil))
+  ([client access-token draftset graph metadata]
+   (-> client
+       (i/request i/put-draftset-graph access-token (draftset/id draftset) (str graph) metadata)
+       (->async-job))))
 
 (defn delete-graph
   "Schedules the deletion of the graph from live"

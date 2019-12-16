@@ -31,13 +31,12 @@
 (defn publish-draftset-job
   "Return a job that publishes the graphs in a draftset to live and
   then deletes the draftset."
-  [backend user-id {:keys [draftset-id metadata] :as params} clock-fn]
+  [backend user-id {:keys [draftset-id metadata]} clock-fn]
   ;; TODO combine these into a single job as priorities have now
   ;; changed how these will be applied.
 
   (let [ds-id (ds/->draftset-id draftset-id)
-        meta (merge {:operation 'publish-draftset}
-                    (enc/json-decode metadata keyword))]
+        meta (jobs/job-metadata backend ds-id 'publish-draftset metadata)]
     (jobs/make-job backend user-id meta ds-id :publish-write
       (fn [job]
         (try

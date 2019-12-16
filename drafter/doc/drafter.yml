@@ -278,6 +278,7 @@ paths:
       parameters:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/livegraph'
+        - $ref: '#/parameters/metadata'
       tags:
         - Updating Data
       responses:
