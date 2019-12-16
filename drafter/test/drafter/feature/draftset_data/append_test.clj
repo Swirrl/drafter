@@ -9,7 +9,8 @@
             [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]]
-            [drafter.feature.draftset.test-helper :as help])
+            [drafter.feature.draftset.test-helper :as help]
+            [drafter.async.jobs :as async])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -29,20 +30,20 @@
         resources {:backend backend :global-writes-lock global-writes-lock}]
     (th/apply-job! (sut/append-triples-to-draftset-job resources
                                                        dummy
-                                                       ds
                                                        (io/file "./test/test-triple.nt")
-                                                       RDFFormat/NTRIPLES
-                                                       (URI. "http://foo/graph")
+                                                       {:rdf-format RDFFormat/NTRIPLES
+                                                        :graph (URI. "http://foo/graph")
+                                                        :draftset-id ds}
                                                        initial-time))
     (let [ts-1 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
       (t/is (= (.toEpochSecond (initial-time))
                (.toEpochSecond ts-1)))
       (th/apply-job! (sut/append-triples-to-draftset-job resources
                                                          dummy
-                                                         ds
                                                          (io/file "./test/test-triple-2.nt")
-                                                         RDFFormat/NTRIPLES
-                                                         (URI. "http://foo/graph")
+                                                         {:rdf-format RDFFormat/NTRIPLES
+                                                          :graph (URI. "http://foo/graph")
+                                                          :draftset-id ds}
                                                          update-time))
       (let [ts-2 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
         (t/is (= (.toEpochSecond (update-time))
@@ -70,6 +71,23 @@
           (is (contains? draftset-graphs live-graph))
           (is (set expected-statements) (set graph-triples)))))))
 
+(tc/deftest-system-with-keys append-quad-data-with-metadata
+  [:drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [data-file-path "test/resources/test-draftset.trig"
+        quads (statements data-file-path)
+        draftset-location (help/create-draftset-through-api handler test-editor)
+        request (help/statements->append-request test-editor
+                                                 draftset-location
+                                                 quads
+                                                 {:metadata {:title "Custom job title"} :format :nq})
+        response (handler request)]
+    (tc/await-success (get-in response [:body :finished-job]))
+
+    (let [job (-> response :body :finished-job tc/job-path->job-id async/complete-job)]
+      (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+      (is (= "Custom job title" (-> job :metadata :title))))))
+
 (tc/deftest-system-with-keys append-quad-data-to-graph-which-exists-in-live
   [:drafter.routes/draftsets-api :drafter/write-scheduler]
   [{handler :drafter.routes/draftsets-api} system]
@@ -96,6 +114,23 @@
           request (help/append-to-draftset-request test-editor draftset-location fs "application/n-triples")
           response (handler request)]
       (is (help/is-client-error-response? response)))))
+
+(tc/deftest-system-with-keys append-triple-data-with-metadata
+  [:drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        triples (statements "test/test-triple.nt")
+        request (help/statements->append-triples-request test-editor
+                                                         draftset-location
+                                                         triples
+                                                         {:metadata {:title "Custom job title"}
+                                                          :graph "http://graph-uri"})
+        response (handler request)]
+    (tc/await-success (get-in response [:body :finished-job]))
+
+    (let [job (-> response :body :finished-job tc/job-path->job-id async/complete-job)]
+      (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+      (is (= "Custom job title" (-> job :metadata :title))))))
 
 (tc/deftest-system-with-keys append-triples-to-graph-which-exists-in-live
   [:drafter.routes/draftsets-api :drafter/write-scheduler]
@@ -130,7 +165,7 @@
   [{handler :drafter.routes/draftsets-api} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         quads (statements "test/resources/test-draftset.trig")
-        append-request (help/statements->append-request test-publisher draftset-location quads :nq)
+        append-request (help/statements->append-request test-publisher draftset-location quads {:format :nq})
         append-response (handler append-request)]
     (tc/assert-is-forbidden-response append-response)))
 
@@ -139,6 +174,6 @@
   [{handler :drafter.routes/draftsets-api} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        append-request (help/statements->append-triples-request test-publisher draftset-location graph-quads graph)
+        append-request (help/statements->append-triples-request test-publisher draftset-location graph-quads {:graph graph})
         append-response (handler append-request)]
     (tc/assert-is-forbidden-response append-response)))

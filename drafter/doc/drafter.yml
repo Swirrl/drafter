@@ -374,6 +374,7 @@ paths:
         - $ref: "#/parameters/id"
         - $ref: '#/parameters/rdfdata'
         - $ref: '#/parameters/graph'
+        - $ref: '#/parameters/metadata'
         #- $ref: '#/parameters/messagenonote'
       consumes:
         - application/n-quads

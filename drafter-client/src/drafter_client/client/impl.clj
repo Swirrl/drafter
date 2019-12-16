@@ -225,7 +225,7 @@
 (defn append-via-http-stream
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
-  [access-token url statements & {:keys [graph format] :as _opts}]
+  [access-token url statements & {:keys [graph format metadata] :as _opts}]
   (let [{input-stream :input worker :worker}
         (if (some #(instance? % statements) [InputStream File])
           {:input statements}
@@ -233,8 +233,11 @@
         headers {:Content-Type format
                  :Accept "application/json"
                  :Authorization (str "Bearer " access-token)}
+        params (cond-> nil
+                       graph (merge {:graph (.toString graph)})
+                       metadata (merge {:metadata (enc/json-encode metadata)}))
         request {:url url
-                 :query-params (when graph {:graph (.toString graph)})
+                 :query-params params
                  :method :put
                  :body input-stream
                  :headers headers

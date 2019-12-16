@@ -205,6 +205,7 @@
 (defn add
   "Append the supplied RDF statements to this Draftset.
   'statements' can be a sequence of quads or triples; a File; or InputStream"
+  {:deprecated "Use add-data instead"}
   ([client access-token draftset quads]
    (add client access-token draftset nil quads))
   ([client access-token draftset graph triples]
@@ -222,6 +223,32 @@
                                    triples
                                    :graph graph
                                    :format format)
+         (->async-job)))))
+
+(defn add-data
+  "Append the supplied RDF statements to this Draftset.
+  - `statements` can be a sequence of quads or triples, a File, or an InputStream
+  - `opts` is a map of optional arguments, which may include:
+    - `graph`: required if the statements are triples
+    - `metadata`: a map with arbitrary keys that will be included on the job for future reference"
+  ([client access-token draftset statements]
+   (add-data client access-token draftset statements {}))
+  ([client access-token draftset statements opts]
+   (let [url (martian/url-for client
+                              :put-draftset-data
+                              {:id (draftset/id draftset)})
+         format (or (when (instance? File statements)
+                      (some-> (.getPath statements)
+                              (filename->rdf-format)
+                              (.getDefaultMIMEType)))
+                    (when (:graph opts) "application/n-triples")
+                    "application/n-quads")]
+     (-> (i/append-via-http-stream access-token
+                                   url
+                                   statements
+                                   :graph (:graph opts)
+                                   :format format
+                                   :metadata (:metadata opts))
          (->async-job)))))
 
 (defn add-in-batches
@@ -482,4 +509,5 @@
 (gensync delete-quads)
 (gensync delete-triples)
 (gensync add)
+(gensync add-data)
 (gensync publish)

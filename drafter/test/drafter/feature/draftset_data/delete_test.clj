@@ -30,10 +30,11 @@
 
     (th/apply-job! (append/append-triples-to-draftset-job resources
                                                           dummy
-                                                          ds
                                                           (io/file "./test/test-triple.nt")
-                                                          RDFFormat/NTRIPLES
-                                                          (URI. "http://foo/graph") initial-time))
+                                                          {:rdf-format RDFFormat/NTRIPLES
+                                                           :graph (URI. "http://foo/graph")
+                                                           :draftset-id ds}
+                                                          initial-time))
 
     (th/apply-job! (sut/delete-triples-from-draftset-job resources
                                                          dummy

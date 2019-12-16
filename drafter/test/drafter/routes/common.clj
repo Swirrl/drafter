@@ -48,10 +48,10 @@
     (append-to-draftset-request user
                                 draftset-location
                                 input-stream
-                                (.getDefaultMIMEType (formats/->rdf-format format)))))
+                                {:format (.getDefaultMIMEType (formats/->rdf-format format))})))
 
 (defn append-quads-to-draftset-through-api [api user draftset-location quads]
-  (let [request (statements->append-request user draftset-location quads :nq)
+  (let [request (statements->append-request user draftset-location quads {:format :nq})
         response (api request)]
     (tc/await-success (get-in response [:body :finished-job]))))
 

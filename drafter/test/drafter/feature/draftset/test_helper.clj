@@ -12,7 +12,8 @@
             [schema.core :as s]
             [drafter.async.jobs :as async]
             [clojure.java.io :as io]
-            [drafter.util :as util]))
+            [drafter.util :as util]
+            [martian.encoders :as enc]))
 
 (def DraftsetWithoutTitleOrDescription
   {:id s/Str
@@ -90,19 +91,24 @@
     (add serialiser statements)
     (java.io.ByteArrayInputStream. (.toByteArray bos))))
 
-(defn append-to-draftset-request [user draftset-location data-stream content-type]
+(defn append-to-draftset-request [user draftset-location data-stream opts]
   (tc/with-identity user
-    {:uri (str draftset-location "/data")
-     :request-method :put
-     :body data-stream
-     :headers {"content-type" content-type}}))
+                    (cond-> {:uri (str draftset-location "/data")
+                             :request-method :put
+                             :body data-stream
+                             :headers {"content-type" (:content-type opts)}}
+                            (:metadata opts) (merge {:params {:metadata (enc/json-encode (:metadata opts))}}))))
 
-(defn statements->append-request [user draftset-location statements format]
-  (let [input-stream (statements->input-stream statements format)]
-    (append-to-draftset-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
+(defn statements->append-request [user draftset-location statements opts]
+  (let [input-stream (statements->input-stream statements (:format opts))]
+    (append-to-draftset-request user
+                                draftset-location
+                                input-stream
+                                (assoc opts :content-type
+                                            (.getDefaultMIMEType (formats/->rdf-format (:format opts)))))))
 
 (defn append-quads-to-draftset-through-api [handler user draftset-location quads]
-  (let [request (statements->append-request user draftset-location quads :nq)
+  (let [request (statements->append-request user draftset-location quads {:format :nq})
         response (handler request)]
     (tc/await-success (get-in response [:body :finished-job]))))
 
@@ -224,11 +230,11 @@
   (let [append-response (make-append-data-to-draftset-request handler user draftset-location draftset-data-file)]
     (tc/await-success (:finished-job (:body append-response)))))
 
-(defn statements->append-triples-request [user draftset-location triples graph]
-  (-> (statements->append-request user draftset-location triples :nt)
-      (assoc-in [:params :graph] (str graph))))
+(defn statements->append-triples-request [user draftset-location triples opts]
+  (-> (statements->append-request user draftset-location triples (merge opts {:format :nt}))
+      (assoc-in [:params :graph] (str (:graph opts)))))
 
 (defn append-triples-to-draftset-through-api [handler user draftset-location triples graph]
-  (let [request (statements->append-triples-request user draftset-location triples graph)
+  (let [request (statements->append-triples-request user draftset-location triples {:graph graph})
         response (handler request)]
     (tc/await-success (get-in response [:body :finished-job]))))
