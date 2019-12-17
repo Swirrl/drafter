@@ -82,11 +82,12 @@
 (defn delete-draftset-data
   "Remove the supplied RDF data from this Draftset"
   #:drafter-client.client.impl{:generated true}
-  [client id data & {:keys [graph] :as opts}]
+  [client id data & {:keys [metadata] :as opts}]
   (martian/response-for
    client
    :delete-draftset-data
-   (merge {:id id :data data} opts)))
+   (cond-> (merge opts {:id id :data data})
+           metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn delete-draftset-graph
   "Delete the contents of a graph in this Draftset"

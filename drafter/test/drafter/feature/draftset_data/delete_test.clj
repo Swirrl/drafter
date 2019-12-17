@@ -8,7 +8,10 @@
             [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]]
-            [drafter.feature.draftset.test-helper :as help])
+            [drafter.feature.draftset.test-helper :as help]
+            [grafter-2.rdf4j.io :as gio]
+            [drafter.async.jobs :as async]
+            [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -38,10 +41,11 @@
 
     (th/apply-job! (sut/delete-triples-from-draftset-job resources
                                                          dummy
-                                                         ds
-                                                         (URI. "http://foo/graph")
                                                          (io/file "./test/test-triple-2.nt")
-                                                         RDFFormat/NTRIPLES delete-time))
+                                                         {:draftset-id ds
+                                                          :graph (URI. "http://foo/graph")
+                                                          :format RDFFormat/NTRIPLES}
+                                                          delete-time))
     (let [ts-3 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
       (t/is (.isEqual (delete-time)
                        ts-3)
@@ -60,6 +64,44 @@
   [{handler :drafter.routes/draftsets-api} system]
   (with-open [input-stream (io/input-stream "test/resources/test-draftset.trig")]
     (let [draftset-location (help/create-draftset-through-api handler test-editor)
-          delete-request (help/create-delete-quads-request test-editor draftset-location input-stream "application/unknown-quads-format")
+          delete-request (help/create-delete-quads-request test-editor
+                                                           draftset-location
+                                                           input-stream
+                                                           {:content-type "application/unknown-quads-format"})
           delete-response (handler delete-request)]
       (tc/assert-is-unsupported-media-type-response delete-response))))
+
+(tc/deftest-system-with-keys delete-draftset-data-with-metadata-test
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [quads-path "test/resources/test-draftset.trig"
+        triples-path "./test/test-triple.nt"
+        draftset-location (help/create-draftset-through-api handler test-editor)]
+
+    (t/testing "Deleting quads with metadata"
+      (let [quads (gio/statements quads-path)
+            delete-request (help/create-delete-statements-request test-editor
+                                                                  draftset-location
+                                                                  quads
+                                                                  {:format :trig
+                                                                   :metadata {:title "Custom job title"}})
+            delete-response (handler delete-request)]
+        (tc/await-success (get-in delete-response [:body :finished-job]))
+
+        (let [job (-> delete-response :body :finished-job tc/job-path->job-id async/complete-job)]
+          (t/is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+          (t/is (= "Custom job title" (-> job :metadata :title))))))
+
+    (t/testing "Deleting triples with metadata"
+      (let [triples (gio/statements triples-path)
+            delete-request (help/create-delete-triples-request test-editor
+                                                               draftset-location
+                                                               triples
+                                                               {:graph (URI. "http://graph-uri")
+                                                                :metadata {:title "Custom job title"}})
+            delete-response (handler delete-request)]
+        (tc/await-success (get-in delete-response [:body :finished-job]))
+
+        (let [job (-> delete-response :body :finished-job tc/job-path->job-id async/complete-job)]
+          (t/is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+          (t/is (= "Custom job title" (-> job :metadata :title))))))))

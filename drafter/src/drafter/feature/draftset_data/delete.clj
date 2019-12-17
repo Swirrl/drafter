@@ -74,44 +74,43 @@
     (delete-quads-from-draftset resources quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
 
 (defn delete-quads-from-draftset-job
-  [resources user-id draftset-ref serialised rdf-format clock-fn]
+  [resources user-id serialised {:keys [draftset-id rdf-format metadata]} clock-fn]
   (let [repo (-> resources :backend :repo)
-        ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job repo user-id 'delete-quads-from-draftset ds-id :background-write
+        ds-id (ds/->draftset-id draftset-id)
+        meta (jobs/job-metadata repo ds-id 'delete-quads-from-draftset metadata)]
+    (jobs/make-job repo user-id meta ds-id :background-write
       (fn [job]
         (let [quads (read-statements serialised rdf-format)
-              graph-mapping (ops/get-draftset-graph-mapping repo draftset-ref)]
-          (batch-and-delete-quads-from-draftset resources quads draftset-ref graph-mapping job clock-fn))))))
+              graph-mapping (ops/get-draftset-graph-mapping repo draftset-id)]
+          (batch-and-delete-quads-from-draftset resources quads draftset-id graph-mapping job clock-fn))))))
 
 (defn delete-triples-from-draftset-job
-  [resources user-id draftset-ref graph serialised rdf-format clock-fn]
+  [resources user-id serialised {:keys [draftset-id graph rdf-format metadata]} clock-fn]
   (let [repo (-> resources :backend :repo)
-        ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job repo user-id 'delete-triples-from-draftset ds-id :background-write
+        ds-id (ds/->draftset-id draftset-id)
+        meta (jobs/job-metadata repo draftset-id 'delete-triples-from-draftset metadata)]
+    (jobs/make-job repo user-id meta ds-id :background-write
       (fn [job]
         (let [triples (read-statements serialised rdf-format)
               quads (map #(util/make-quad-statement % graph) triples)
-              graph-mapping (ops/get-draftset-graph-mapping repo draftset-ref)]
-          (batch-and-delete-quads-from-draftset resources quads draftset-ref graph-mapping job clock-fn))))))
+              graph-mapping (ops/get-draftset-graph-mapping repo draftset-id)]
+          (batch-and-delete-quads-from-draftset resources quads draftset-id graph-mapping job clock-fn))))))
 
 (defn delete-draftset-data-handler
   [{:keys [wrap-as-draftset-owner :drafter/backend :drafter/global-writes-lock]}]
   (let [resources {:backend backend :global-writes-lock global-writes-lock}]
-    (-> (fn [{{:keys [draftset-id graph rdf-format]} :params body :body :as request}]
+    (-> (fn [{{:keys [rdf-format] :as params} :params body :body :as request}]
           (let [user-id (req/user-id request)
                 delete-job (if (is-quads-format? rdf-format)
                              (delete-quads-from-draftset-job resources
                                                              user-id
-                                                             draftset-id
                                                              body
-                                                             rdf-format
+                                                             params
                                                              util/get-current-time)
                              (delete-triples-from-draftset-job resources
                                                                user-id
-                                                               draftset-id
-                                                               graph
                                                                body
-                                                               rdf-format
+                                                               params
                                                                util/get-current-time))]
             (response/submit-async-job! delete-job)))
         temp-file-body

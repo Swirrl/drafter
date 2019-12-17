@@ -91,21 +91,21 @@
     (add serialiser statements)
     (java.io.ByteArrayInputStream. (.toByteArray bos))))
 
-(defn append-to-draftset-request [user draftset-location data-stream opts]
+(defn append-to-draftset-request [user draftset-location data-stream {:keys [content-type metadata]}]
   (tc/with-identity user
                     (cond-> {:uri (str draftset-location "/data")
                              :request-method :put
                              :body data-stream
-                             :headers {"content-type" (:content-type opts)}}
-                            (:metadata opts) (merge {:params {:metadata (enc/json-encode (:metadata opts))}}))))
+                             :headers {"content-type" content-type}}
+                            metadata (merge {:params {:metadata (enc/json-encode metadata)}}))))
 
-(defn statements->append-request [user draftset-location statements opts]
-  (let [input-stream (statements->input-stream statements (:format opts))]
+(defn statements->append-request [user draftset-location statements {:keys [format] :as opts}]
+  (let [input-stream (statements->input-stream statements format)]
     (append-to-draftset-request user
                                 draftset-location
                                 input-stream
                                 (assoc opts :content-type
-                                            (.getDefaultMIMEType (formats/->rdf-format (:format opts)))))))
+                                            (.getDefaultMIMEType (formats/->rdf-format format))))))
 
 (defn append-quads-to-draftset-through-api [handler user draftset-location quads]
   (let [request (statements->append-request user draftset-location quads {:format :nq})
@@ -114,7 +114,7 @@
 
 (defn make-append-data-to-draftset-request [handler user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
-    (let [request (append-to-draftset-request user draftset-location fs "application/x-trig")]
+    (let [request (append-to-draftset-request user draftset-location fs {:content-type "application/x-trig"})]
       (handler request))))
 
 (defn create-publish-request
@@ -187,18 +187,23 @@
   (let [job-result (tc/await-success (get-in response [:body :finished-job]))]
     (get-in job-result [:details :draftset])))
 
-(defn create-delete-quads-request [user draftset-location input-stream format]
-  (tc/with-identity user {:uri (str draftset-location "/data")
-                          :request-method :delete
-                          :body input-stream
-                          :headers {"content-type" format}}))
+(defn create-delete-quads-request [user draftset-location input-stream {:keys [content-type metadata]}]
+  (tc/with-identity user (cond-> {:uri (str draftset-location "/data")
+                                  :request-method :delete
+                                  :body input-stream
+                                  :headers {"content-type" content-type}}
+                                 metadata (merge {:params {:metadata (enc/json-encode metadata)}}))))
 
-(defn create-delete-statements-request [user draftset-location statements format]
+(defn create-delete-statements-request [user draftset-location statements {:keys [format] :as opts}]
   (let [input-stream (statements->input-stream statements format)]
-    (create-delete-quads-request user draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format format)))))
+    (create-delete-quads-request user
+                                 draftset-location
+                                 input-stream
+                                 (assoc opts :content-type
+                                             (.getDefaultMIMEType (formats/->rdf-format format))))))
 
-(defn create-delete-triples-request [user draftset-location statements graph]
-  (assoc-in (create-delete-statements-request user draftset-location statements :nt)
+(defn create-delete-triples-request [user draftset-location statements {:keys [graph] :as opts}]
+  (assoc-in (create-delete-statements-request user draftset-location statements (merge {:format :nt} opts))
             [:params :graph] (str graph)))
 
 (defn delete-triples-through-api [handler user draftset-location triples graph]
@@ -207,12 +212,13 @@
       (await-delete-statements-response)))
 
 (defn delete-quads-through-api [handler user draftset-location quads]
-  (let [delete-request (create-delete-statements-request user draftset-location quads :nq)
+  (let [delete-request (create-delete-statements-request user draftset-location quads {:format :nq})
         delete-response (handler delete-request)]
     (await-delete-statements-response delete-response)))
 
 (defn delete-draftset-triples-through-api [handler user draftset-location triples graph]
-  (let [delete-request (create-delete-statements-request user draftset-location triples :nt)
+  (let [delete-request (create-delete-statements-request user draftset-location triples {:format :nt
+                                                                                         :graph graph})
         delete-request (assoc-in delete-request [:params :graph] (str graph))
         delete-response (handler delete-request)]
     (await-delete-statements-response delete-response)))
@@ -230,9 +236,9 @@
   (let [append-response (make-append-data-to-draftset-request handler user draftset-location draftset-data-file)]
     (tc/await-success (:finished-job (:body append-response)))))
 
-(defn statements->append-triples-request [user draftset-location triples opts]
+(defn statements->append-triples-request [user draftset-location triples {:keys [graph] :as opts}]
   (-> (statements->append-request user draftset-location triples (merge opts {:format :nt}))
-      (assoc-in [:params :graph] (str (:graph opts)))))
+      (assoc-in [:params :graph] (str graph))))
 
 (defn append-triples-to-draftset-through-api [handler user draftset-location triples graph]
   (let [request (statements->append-triples-request user draftset-location triples {:graph graph})

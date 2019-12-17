@@ -207,7 +207,10 @@
   [{handler :drafter.routes/draftsets-api} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         body (tc/string->input-stream "NOT NQUADS")
-        delete-request (help/create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :nq)))
+        delete-request (help/create-delete-quads-request test-editor
+                                                         draftset-location
+                                                         body
+                                                         {:content-type (.getDefaultMIMEType (formats/->rdf-format :nq))})
         delete-response (handler delete-request)
         job-result (tc/await-completion (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))
@@ -283,7 +286,10 @@
     (help/append-data-to-draftset-through-api handler test-editor draftset-location "test/resources/test-draftset.trig")
 
     (with-open [input-stream (help/statements->input-stream (take 2 draftset-quads) :nt)]
-      (let [delete-request (help/create-delete-quads-request test-editor draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format :nt)))
+      (let [delete-request (help/create-delete-quads-request test-editor
+                                                             draftset-location
+                                                             input-stream
+                                                             {:content-type (.getDefaultMIMEType (formats/->rdf-format :nt))})
             delete-response (handler delete-request)]
         (tc/assert-is-unprocessable-response delete-response)))))
 
@@ -292,7 +298,10 @@
   [{handler :drafter.routes/draftsets-api} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         body (tc/string->input-stream "NOT TURTLE")
-        delete-request (help/create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :ttl)))
+        delete-request (help/create-delete-quads-request test-editor
+                                                         draftset-location
+                                                         body
+                                                         {:content-type (.getDefaultMIMEType (formats/->rdf-format :ttl))})
         delete-request (assoc-in delete-request [:params :graph] "http://test-graph")
         delete-response (handler delete-request)
         job-result (tc/await-completion (get-in delete-response [:body :finished-job]))]
