@@ -28,8 +28,8 @@
         {:keys [value-p] :as copy-job} (append-graph/copy-live-graph-into-draftset-job
                                         resources
                                         dummy
-                                        draftset-id
-                                        live-graph-uri)]
+                                        {:draftset-id draftset-id
+                                         :graph live-graph-uri})]
     (scheduler/queue-job! copy-job)
 
     @value-p
@@ -49,8 +49,8 @@
         {:keys [value-p] :as copy-job} (append-graph/copy-live-graph-into-draftset-job
                                         resources
                                         dummy
-                                        draftset-id
-                                        live-graph-uri)]
+                                        {:draftset-id draftset-id
+                                         :graph live-graph-uri})]
 
     (scheduler/queue-job! copy-job)
     @value-p

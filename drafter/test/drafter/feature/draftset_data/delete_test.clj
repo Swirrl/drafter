@@ -31,21 +31,21 @@
         ds (dsops/create-draftset! backend test-editor)
         resources {:backend backend :global-writes-lock global-writes-lock}]
 
-    (th/apply-job! (append/append-triples-to-draftset-job resources
-                                                          dummy
-                                                          (io/file "./test/test-triple.nt")
-                                                          {:rdf-format RDFFormat/NTRIPLES
-                                                           :graph (URI. "http://foo/graph")
-                                                           :draftset-id ds}
-                                                          initial-time))
+    (th/apply-job! (append/append-data-to-draftset-job (io/file "./test/test-triple.nt")
+                                                       resources
+                                                       dummy
+                                                       {:rdf-format RDFFormat/NTRIPLES
+                                                        :graph (URI. "http://foo/graph")
+                                                        :draftset-id ds}
+                                                       initial-time))
 
-    (th/apply-job! (sut/delete-triples-from-draftset-job resources
-                                                         dummy
-                                                         (io/file "./test/test-triple-2.nt")
-                                                         {:draftset-id ds
-                                                          :graph (URI. "http://foo/graph")
-                                                          :format RDFFormat/NTRIPLES}
-                                                          delete-time))
+    (th/apply-job! (sut/delete-data-from-draftset-job (io/file "./test/test-triple-2.nt")
+                                                      dummy
+                                                      resources
+                                                      {:draftset-id ds
+                                                       :graph (URI. "http://foo/graph")
+                                                       :rdf-format RDFFormat/NTRIPLES}
+                                                      delete-time))
     (let [ts-3 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
       (t/is (.isEqual (delete-time)
                        ts-3)

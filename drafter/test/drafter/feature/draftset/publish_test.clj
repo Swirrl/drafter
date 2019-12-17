@@ -24,8 +24,7 @@
     (let [live-quads (help/get-live-quads-through-api handler)]
       (is (= (set (help/eval-statements quads)) (set live-quads))))))
 
-(tc/deftest-system-with-keys
-  publish-with-metadata-on-job
+(tc/deftest-system-with-keys publish-with-metadata-on-job
   [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
   [{handler :drafter.routes/draftsets-api} system]
   (let [quads (statements "test/resources/test-draftset.trig")

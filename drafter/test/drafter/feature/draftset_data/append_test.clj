@@ -28,9 +28,9 @@
         delete-time  (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
         ds (dsops/create-draftset! backend test-editor)
         resources {:backend backend :global-writes-lock global-writes-lock}]
-    (th/apply-job! (sut/append-triples-to-draftset-job resources
-                                                       dummy
-                                                       (io/file "./test/test-triple.nt")
+    (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple.nt")
+                                                    resources
+                                                    dummy
                                                        {:rdf-format RDFFormat/NTRIPLES
                                                         :graph (URI. "http://foo/graph")
                                                         :draftset-id ds}
@@ -38,13 +38,13 @@
     (let [ts-1 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
       (t/is (= (.toEpochSecond (initial-time))
                (.toEpochSecond ts-1)))
-      (th/apply-job! (sut/append-triples-to-draftset-job resources
-                                                         dummy
-                                                         (io/file "./test/test-triple-2.nt")
-                                                         {:rdf-format RDFFormat/NTRIPLES
-                                                          :graph (URI. "http://foo/graph")
-                                                          :draftset-id ds}
-                                                         update-time))
+      (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple-2.nt")
+                                                      resources
+                                                      dummy
+                                                      {:rdf-format RDFFormat/NTRIPLES
+                                                       :graph (URI. "http://foo/graph")
+                                                       :draftset-id ds}
+                                                      update-time))
       (let [ts-2 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
         (t/is (= (.toEpochSecond (update-time))
                  (.toEpochSecond ts-2))

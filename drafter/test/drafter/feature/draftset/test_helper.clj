@@ -207,7 +207,7 @@
             [:params :graph] (str graph)))
 
 (defn delete-triples-through-api [handler user draftset-location triples graph]
-  (-> (create-delete-triples-request user draftset-location triples graph)
+  (-> (create-delete-triples-request user draftset-location triples {:graph graph})
       (handler)
       (await-delete-statements-response)))
 

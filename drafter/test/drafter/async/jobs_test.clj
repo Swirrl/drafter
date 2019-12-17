@@ -7,7 +7,6 @@
             [drafter.async.jobs :as jobs]
             [drafter.async.responses :as r]
             [clj-time.coerce :refer [from-date]]
-            [clj-time.core :as time]
             [drafter.user-test :refer [test-editor]]
             [cheshire.core :as json]
             [drafter.feature.common :as feat-common])
@@ -25,7 +24,7 @@
 (deftest create-child-job-test
   (let [parent-fn #(println "parent")
         child-fn #(println "second")
-        parent-job (jobs/create-job dummy 'test-job :batch-write parent-fn)]
+        parent-job (jobs/create-job dummy {:operation 'test-job} :batch-write parent-fn)]
     (Thread/sleep 100)
     (let [child-job (jobs/create-child-job parent-job child-fn)]
       (is (= child-fn (:function child-job)) "Failed to update job function")
@@ -44,11 +43,11 @@
 
 (deftest job-completed?-test
   (testing "Completed"
-    (let [{:keys [value-p] :as job} (jobs/create-job dummy 'test-job :batch-write (fn []))]
+    (let [{:keys [value-p] :as job} (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
       (deliver value-p "completed")
       (is (= true (jobs/job-completed? job)))))
   (testing "Not completed"
-    (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))]
+    (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
       (is (= false (jobs/job-completed? job))))))
 
 (deftest job-failed-test
@@ -56,12 +55,12 @@
     (let [msg "Failed :("
           ex (IllegalArgumentException. msg)]
       (testing "without details"
-        (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))]
+        (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
           (jobs/job-failed! job ex)
           (assert-failure-result job msg IllegalArgumentException nil)))
 
       (testing "with details"
-        (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))
+        (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))
               details {:more :info}]
           (jobs/job-failed! job ex details)
           (assert-failure-result job msg IllegalArgumentException details)))))
@@ -72,19 +71,19 @@
           ex (ex-info msg ex-details)]
 
       (testing "without details"
-        (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))]
+        (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
           (jobs/job-failed! job ex)
           (assert-failure-result job msg ExceptionInfo ex-details)))
 
       (testing "with other details"
-        (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))
+        (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))
               details {:other :info}]
           (jobs/job-failed! job ex details)
           (assert-failure-result job msg ExceptionInfo details))))))
 
 (deftest job-succeeded-test
   (testing "With details"
-    (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))
+    (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))
           details {:foo :bar}]
       (jobs/job-succeeded! job details)
       (let [result (get-job-result job)]
@@ -92,7 +91,7 @@
         (is (= details (:details result))))))
 
   (testing "Without details"
-    (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))]
+    (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
       (jobs/job-succeeded! job)
       (let [result (get-job-result job)]
         (is (s/valid? ::spec/success-job-result result))
@@ -101,13 +100,13 @@
 (def job-return-value {:type :ok})
 
 (defn create-finished-job []
-  (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))]
+  (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
     (jobs/submit-async-job! job)
     (#'jobs/complete-job! job job-return-value)
     job))
 
 (defn create-failed-job [ex]
-  (let [job (jobs/create-job dummy 'test-job :batch-write (fn []))]
+  (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
     (jobs/submit-async-job! job)
     (#'jobs/complete-job! job {:type :error :exception ex})
     job))
@@ -121,7 +120,7 @@
 
 
 (deftest submitted-job-response-test
-  (let [job (jobs/create-job dummy 'test-job :batch-write (fn [j]))
+  (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn [j]))
         response (r/submitted-job-response job)]
     (is (s/valid? :submitted-job/response response))))
 
@@ -137,7 +136,7 @@
 (tc/deftest-system-with-keys job-status-test
   [:drafter.routes/jobs-status]
   [{handler :drafter.routes/jobs-status :as sys} system]
-  (let [job (jobs/create-job dummy 'test-job :batch-write (constantly nil))
+  (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (constantly nil))
         path (str "/v1/status/jobs/" (:id job))]
 
     (jobs/submit-async-job! job)
@@ -174,7 +173,7 @@
   [{handler :drafter.routes/jobs-status
     backend :drafter/backend
     global-writes-lock :drafter/global-writes-lock :as sys} system]
-  (let [job (jobs/create-job dummy 'test-job :batch-write (constantly nil))
+  (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (constantly nil))
         path "/v1/status/jobs"]
 
     (testing "Without auth, 401"
@@ -206,7 +205,7 @@
   (testing "GET /finished-jobs"
     (testing "with a valid finished job"
 
-      (let [job (jobs/create-job dummy 'test-job :batch-write (constantly nil))
+      (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (constantly nil))
             _ (jobs/submit-async-job! job)
             _ (jobs/job-succeeded! job)
             job-path (finished-job-path job)

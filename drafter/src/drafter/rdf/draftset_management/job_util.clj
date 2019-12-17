@@ -75,21 +75,17 @@
 
 (defn make-job
   {:style/indent :defn}
-  [backend user-id metadata draftset-id write-priority job-fn]
-  (let [#_ds-meta #_(some->> draftset-id (dsops/get-draftset-info backend))
-        meta (if (map? metadata) metadata {:operation metadata})]
-    (ajobs/create-job
-     user-id
-     'operation
-     draftset-id
-     meta
-     write-priority
-     (fn [job]
-       (datadog/measure!
-        (util/statsd-name "drafter.job" (:operation meta) write-priority "time")
+  [user-id write-priority metadata job-fn]
+  (ajobs/create-job
+    user-id
+    metadata
+    write-priority
+    (fn [job]
+      (datadog/measure!
+        (util/statsd-name "drafter.job" (:operation metadata) write-priority "time")
         {}
         (try
           (job-fn job)
           (catch Throwable t
             (log/warn t "Error whilst executing job")
-            (ajobs/job-failed! job t))))))))
+            (ajobs/job-failed! job t)))))))

@@ -10,12 +10,12 @@
             [grafter.vocabularies.dcterms :refer [dcterms:modified]]))
 
 (defn delete-draftset-job [backend user-id {:keys [draftset-id metadata]}]
-  (let [ds-id (ds/->draftset-id draftset-id)
-        meta (jobs/job-metadata backend ds-id 'delete-draftset metadata)]
-    (jobs/make-job backend user-id meta ds-id :background-write
-      (fn [job]
-        (ops/delete-draftset! backend draftset-id)
-        (jobs/job-succeeded! job)))))
+  (jobs/make-job user-id
+                 :background-write
+                 (jobs/job-metadata backend draftset-id 'delete-draftset metadata)
+                 (fn [job]
+                   (ops/delete-draftset! backend draftset-id)
+                   (jobs/job-succeeded! job))))
 
 ;; (defn touch-graph-in-draftset [draftset-ref draft-graph-uri modified-at]
 ;;   (let [update-str (str (mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at) " ; "
@@ -33,13 +33,13 @@
   ;; TODO combine these into a single job as priorities have now
   ;; changed how these will be applied.
 
-  (let [ds-id (ds/->draftset-id draftset-id)
-        meta (jobs/job-metadata backend ds-id 'publish-draftset metadata)]
-    (jobs/make-job backend user-id meta ds-id :publish-write
-      (fn [job]
-        (try
-          (ops/publish-draftset-graphs! backend draftset-id clock-fn)
-          (ops/delete-draftset-statements! backend draftset-id)
-          (jobs/job-succeeded! job)
-          (catch Exception ex
-            (jobs/job-failed! job ex)))))))
+  (jobs/make-job user-id
+                 :publish-write
+                 (jobs/job-metadata backend draftset-id 'publish-draftset metadata)
+                 (fn [job]
+                   (try
+                     (ops/publish-draftset-graphs! backend draftset-id clock-fn)
+                     (ops/delete-draftset-statements! backend draftset-id)
+                     (jobs/job-succeeded! job)
+                     (catch Exception ex
+                       (jobs/job-failed! job ex))))))

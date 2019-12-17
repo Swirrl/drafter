@@ -8,7 +8,7 @@
             [drafter.requests :as req]))
 
 (defn handler
-  [{backend :drafter/backend :keys [wrap-as-draftset-owner timeout-fn]}]
+  [{backend :drafter/backend :keys [wrap-as-draftset-owner]}]
   (wrap-as-draftset-owner
    (fn [{params :params user :identity :as request}]
      (if (user/has-role? user :publisher)

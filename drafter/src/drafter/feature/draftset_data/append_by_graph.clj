@@ -20,17 +20,14 @@
 
 (defn copy-live-graph-into-draftset-job
   [resources user-id {:keys [draftset-id graph metadata]}]
-  (let [ds-id (ds/->draftset-id draftset-id)
-        repo (-> resources :backend :repo)]
-    (jobs/make-job repo
-                   user-id
-                   (jobs/job-metadata repo ds-id 'copy-live-graph-into-draftset metadata)
-                   ds-id
+  (let [repo (-> resources :backend :repo)]
+    (jobs/make-job user-id
                    :background-write
-      (fn [job]
-        (let [draft-graph-uri (create-or-empty-draft-graph-for repo draftset-id graph util/get-current-time)]
-          (ds-data-common/lock-writes-and-copy-graph resources graph draft-graph-uri {:silent true})
-          (jobs/job-succeeded! job))))))
+                   (jobs/job-metadata repo draftset-id 'copy-live-graph-into-draftset metadata)
+                   (fn [job]
+                     (let [draft-graph-uri (create-or-empty-draft-graph-for repo draftset-id graph util/get-current-time)]
+                       (ds-data-common/lock-writes-and-copy-graph resources graph draft-graph-uri {:silent true})
+                       (jobs/job-succeeded! job))))))
 
 (defn- required-live-graph-param-handler [repo inner-handler]
   (fn [{{:keys [graph]} :params :as request}]

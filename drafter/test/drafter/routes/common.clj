@@ -36,19 +36,19 @@
     (add serialiser statements)
     (ByteArrayInputStream. (.toByteArray bos))))
 
-(defn- append-to-draftset-request [user draftset-location data-stream content-type]
+(defn- append-to-draftset-request [user draftset-location data-stream {:keys [content-type]}]
   (tc/with-identity user
     {:uri (str draftset-location "/data")
      :request-method :put
      :body data-stream
      :headers {"content-type" content-type}}))
 
-(defn- statements->append-request [user draftset-location statements format]
+(defn- statements->append-request [user draftset-location statements {:keys [format]}]
   (let [input-stream (statements->input-stream statements format)]
     (append-to-draftset-request user
                                 draftset-location
                                 input-stream
-                                {:format (.getDefaultMIMEType (formats/->rdf-format format))})))
+                                {:content-type (.getDefaultMIMEType (formats/->rdf-format format))})))
 
 (defn append-quads-to-draftset-through-api [api user draftset-location quads]
   (let [request (statements->append-request user draftset-location quads {:format :nq})
@@ -56,8 +56,7 @@
     (tc/await-success (get-in response [:body :finished-job]))))
 
 (defn publish-draftset [api user draftset-location]
-  (let [content-type (.getDefaultMIMEType (formats/->rdf-format :nq))
-        request (tc/with-identity user
+  (let [request (tc/with-identity user
                   {:uri (str draftset-location "/publish")
                    :request-method :post})
         response (api request)]
