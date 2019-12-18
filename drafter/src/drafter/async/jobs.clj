@@ -6,7 +6,8 @@
             [drafter.async.spec :as spec]
             [integrant.core :as ig]
             [clj-time.coerce :refer [to-date from-long]]
-            [clj-time.format :refer [formatters unparse]])
+            [clj-time.format :refer [formatters unparse]]
+            [drafter.draftset :as ds])
   (:import (java.util UUID)
            (clojure.lang ExceptionInfo)
            (org.apache.log4j MDC)))
@@ -103,7 +104,7 @@
            priority
            (System/currentTimeMillis)
            nil
-           (:draftset-id metadata)
+           (when-let [id (-> metadata :draftset :id)] (ds/->DraftsetId id))
            nil
            metadata
            (wrap-logging-context f)
