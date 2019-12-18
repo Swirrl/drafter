@@ -21,7 +21,7 @@
 (s/def ::role string?)
 (s/def ::email string?)
 (s/def ::user (s/keys :req-un [::role ::email]))
-(s/def ::token string?)
+(s/def ::token (s/nilable string?)) ;; nil implies live
 
 
 (s/fdef repo/make-repo
