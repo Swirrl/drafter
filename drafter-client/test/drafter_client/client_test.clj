@@ -263,7 +263,16 @@
                                                                 :metadata {:title "Custom job title"}})
             job (sut/job client token (:job-id result))]
         (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
-        (is (= "Custom job title" (-> job :metadata :title)))))))
+        (is (= "Custom job title" (-> job :metadata :title)))
+        ;; wait for this so it doesn't interfere with subsequent tests
+        (sut/wait! client token result)))
+
+    (t/testing "it silently ignores metadata that's not an object"
+      (let [draftset (sut/new-draftset client token name description)
+            result (sut/add-data client token draftset triples {:graph (URI. "http//graph-name")
+                                                                :metadata "not an object"})
+            job (sut/job client token (:job-id result))]
+        (is (= #{:draftset :operation} (-> job :metadata keys set)))))))
 
 (t/deftest deleting-from-a-draftset
   (let [client (drafter-client)
@@ -361,12 +370,12 @@
         how-many 5
         token (auth-util/system-token)
         name "Draftset publishing"
-        description "Testing adding things, publishing them, and reading them"
-        draftset (sut/new-draftset client token name description)]
+        description "Testing adding things, publishing them, and reading them"]
     (t/testing "Publishing a draft set"
       (let [graph (URI. "http://test.graph.com/quad-graph")
             quads (map #(assoc % :c graph) triples)
-            quads (take how-many quads)]
+            quads (take how-many quads)
+            draftset (sut/new-draftset client token name description)]
         (sut/add-sync client token draftset quads)
 
         (let [result (sut/publish client token draftset {:title "Custom job title"

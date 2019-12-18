@@ -68,9 +68,13 @@
   [{:keys [type] :as result}]
   (= :error type))
 
+(defn- get-user-metadata [request-metadata]
+  (let [meta (enc/json-decode request-metadata keyword)]
+    (when (map? meta) meta)))
+
 (defn job-metadata [backend draftset-id operation request-metadata]
   (let [ds-meta (some->> draftset-id (dsops/get-draftset-info backend))
-        user-meta (enc/json-decode request-metadata keyword)]
+        user-meta (get-user-metadata request-metadata)]
     (merge {:draftset ds-meta :operation operation} user-meta)))
 
 (defn make-job
