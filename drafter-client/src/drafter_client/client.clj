@@ -1,7 +1,6 @@
 (ns drafter-client.client
   (:refer-clojure :exclude [name type get])
   (:require [cheshire.core :as json]
-            [grafter-2.rdf4j.formats :refer [filename->rdf-format]]
             [clj-time.format :refer [formatters parse]]
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
@@ -211,29 +210,6 @@
                   :metadata metadata)
        (->async-job))))
 
-(defn add
-  "Append the supplied RDF statements to this Draftset.
-  'statements' can be a sequence of quads or triples; a File; or InputStream"
-  {:deprecated "Use add-data instead"}
-  ([client access-token draftset quads]
-   (add client access-token draftset nil quads))
-  ([client access-token draftset graph triples]
-   (let [url (martian/url-for client
-                              :put-draftset-data
-                              {:id (draftset/id draftset)})
-         format (or (when (instance? File triples)
-                      (some-> (.getPath triples)
-                              (filename->rdf-format)
-                              (.getDefaultMIMEType)))
-                    (when graph "application/n-triples")
-                    "application/n-quads")]
-     (-> (i/append-via-http-stream access-token
-                                   url
-                                   triples
-                                   :graph graph
-                                   :format format)
-         (->async-job)))))
-
 (defn add-data
   "Append the supplied RDF statements to this Draftset.
   - `statements` can be a sequence of quads or triples, a File, or an InputStream
@@ -246,12 +222,7 @@
    (let [url (martian/url-for client
                               :put-draftset-data
                               {:id (draftset/id draftset)})
-         format (or (when (instance? File statements)
-                      (some-> (.getPath statements)
-                              (filename->rdf-format)
-                              (.getDefaultMIMEType)))
-                    (when (:graph opts) "application/n-triples")
-                    "application/n-quads")]
+         format (i/get-format statements opts)]
      (-> (i/append-via-http-stream access-token
                                    url
                                    statements
@@ -260,8 +231,18 @@
                                    :metadata (:metadata opts))
          (->async-job)))))
 
+(defn add
+  "Append the supplied RDF statements to this Draftset.
+  'statements' can be a sequence of quads or triples; a File; or InputStream"
+  {:deprecated "Use add-data instead"}
+  ([client access-token draftset quads]
+   (add-data client access-token draftset quads))
+  ([client access-token draftset graph triples]
+   (add-data client access-token draftset triples {:graph graph})))
+
 (defn add-in-batches
   "Append the supplied RDF data to this Draftset in batches"
+  {:deprecated "Use add-data instead. It can handle streaming arbitrarily large files directly to drafter."}
   ([{:keys [batch-size] :as client} access-token draftset quads]
    (->> quads
         (partition-all batch-size)

@@ -3,10 +3,10 @@
             [clojure.spec.alpha :as s]
             [clojure.walk :refer [postwalk]]
             [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
+            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format
+                                             filename->rdf-format]]
             [grafter-2.rdf4j.io :as rio]
             [clj-http.client :as http]
-            [martian.clj-http :as martian-http]
             [martian.core :as martian]
             [martian.encoders :as encoders]
             [martian.interceptors :as interceptors]
@@ -80,7 +80,8 @@
    {:id id :graph graph}))
 
 (defn delete-draftset-data
-  "Remove the supplied RDF data from this Draftset"
+  "Remove the supplied RDF data from this Draftset. Opts may include `graph` if the statements
+  to be deleted are triples and `metadata`, which will be stored on the job for future reference."
   #:drafter-client.client.impl{:generated true}
   [client id data & {:keys [metadata] :as opts}]
   (martian/response-for
@@ -372,3 +373,11 @@
                [(interceptors/encode-body default-encoders)
                 (interceptors/coerce-response default-encoders)
                 perform-request])))
+
+(defn get-format [statements {:keys [graph]}]
+  (or (when (instance? File statements)
+        (some-> (.getPath statements)
+                (filename->rdf-format)
+                (.getDefaultMIMEType)))
+      (when graph "application/n-triples")
+      "application/n-quads"))
