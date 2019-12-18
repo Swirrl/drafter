@@ -105,7 +105,7 @@
                                   (assoc :params graph-params))
             add-first-response (handler add-first-request)
             ;; Syncing here to ensure the setup add is fully added
-            _ (sync! status add-first-response)
+            _ (is (= (-> status (sync! add-first-response) :body :status) :complete))
             delete-request (-> test-editor
                                (help/create-delete-quads-request draftset-location
                                                                  del-triples-2
@@ -122,11 +122,11 @@
                             (assoc :params graph-params))
             add-response (handler add-request)
             ;; Syncing here to ensure added triples are fully processed
-            _ (sync! status add-response)
+            _ (is (= (-> status (sync! add-response) :body :status) :complete))
             triples (read-statements add-triples-2 n-triples)
             quads (->> triples (map #(assoc % :c (URI. graph))) set)
             ;; Make sure delete has finished before checking what's been stored
-            _ (sync! status delete-response)
+            _ (is (= (-> status (sync! delete-response) :body :status) :complete))
             stored-quads (-> test-editor
                              (tc/with-identity {:uri (str draftset-location "/data")
                                                 :request-method :get
@@ -136,4 +136,5 @@
                              (:body)
                              (read-statements n-quads)
                              (set))]
+        (is (= 13 (count stored-quads)))
         (is (= quads stored-quads))))))
