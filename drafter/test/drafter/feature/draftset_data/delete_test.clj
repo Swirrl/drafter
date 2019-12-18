@@ -1,14 +1,18 @@
 (ns ^:rest-api drafter.feature.draftset-data.delete-test
   (:require [clojure.java.io :as io]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
-            [clojure.test :as t]
+            [clojure.test :as t :refer [is]]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.draftset-data.append :as append]
             [drafter.feature.draftset-data.delete :as sut]
             [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]]
-            [drafter.feature.draftset.test-helper :as help])
+            [drafter.feature.draftset.test-helper :as help]
+            [drafter.rdf.sesame :refer [is-quads-format? read-statements]]
+            [ring.mock.request :as req]
+            [clojure.string :as string]
+            [drafter.async.responses :as r])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -62,3 +66,74 @@
           delete-request (help/create-delete-quads-request test-editor draftset-location input-stream "application/unknown-quads-format")
           delete-response (handler delete-request)]
       (tc/assert-is-unsupported-media-type-response delete-response))))
+
+(defn sync! [handler response]
+  (if (= (:status response) 202)
+    (let [job-path (-> response :body :finished-job)
+         job-id (-> job-path (string/split #"/") last r/try-parse-uuid)]
+     (loop []
+       (let [r (handler (tc/with-identity test-editor
+                          (req/request :get (str "/v1/status/jobs/" job-id))))]
+         (if (-> r :body :status (= :pending))
+           (do
+             (Thread/sleep 500)
+             (recur))
+           r))))
+    (throw (ex-info "Unexpected response"
+                    {:type :unexpected-response :response response}))))
+
+(tc/deftest-system-with-keys update-delete-then-add-test
+  [:drafter.fixture-data/loader :drafter/write-scheduler
+   :drafter.routes/draftsets-api :drafter.routes/jobs-status]
+  [{handler :drafter.routes/draftsets-api
+    status  :drafter.routes/jobs-status} system]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        graph "http://test"
+        graph-params {:graph graph}
+        del-resource (io/resource "update-del-triples.rdf")
+        add-resource (io/resource "update-add-triples.rdf")
+        n-triples "application/n-triples"
+        n-quads "application/n-quads"]
+    (with-open [del-triples-1 (io/input-stream del-resource)
+                del-triples-2 (io/input-stream del-resource)
+                add-triples-1 (io/input-stream add-resource)
+                add-triples-2 (io/input-stream add-resource)]
+      (let [add-first-request (-> test-editor
+                                  (help/append-to-draftset-request draftset-location
+                                                                   del-triples-1
+                                                                   n-triples)
+                                  (assoc :params graph-params))
+            add-first-response (handler add-first-request)
+            ;; Syncing here to ensure the setup add is fully added
+            _ (sync! status add-first-response)
+            delete-request (-> test-editor
+                               (help/create-delete-quads-request draftset-location
+                                                                 del-triples-2
+                                                                 n-triples)
+                               (assoc :params graph-params))
+            delete-response (handler delete-request)
+            ;; Not syncing here to test potential inconsistency - if we do
+            ;; actually sync here, test passes
+            ;; _ (sync! status delete-response)
+            add-request (-> (help/append-to-draftset-request test-editor
+                                                             draftset-location
+                                                             add-triples-1
+                                                             n-triples)
+                            (assoc :params graph-params))
+            add-response (handler add-request)
+            ;; Syncing here to ensure added triples are fully processed
+            _ (sync! status add-response)
+            triples (read-statements add-triples-2 n-triples)
+            quads (->> triples (map #(assoc % :c (URI. graph))) set)
+            ;; Make sure delete has finished before checking what's been stored
+            _ (sync! status delete-response)
+            stored-quads (-> test-editor
+                             (tc/with-identity {:uri (str draftset-location "/data")
+                                                :request-method :get
+                                                :headers {"accept" n-quads}
+                                                :params {:union-with-live "false"}})
+                             (handler)
+                             (:body)
+                             (read-statements n-quads)
+                             (set))]
+        (is (= quads stored-quads))))))

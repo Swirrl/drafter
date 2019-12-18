@@ -1,0 +1,13 @@
+<http://muttnik.gov/data/crimes-record> <http://purl.org/dc/terms/modified> "2019-12-17T16:03:04.011Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+<http://muttnik.gov/data/crimes-ds> <http://www.w3.org/ns/dcat#keyword> "crimes" .
+<http://muttnik.gov/data/crimes-ds> <http://www.w3.org/ns/dcat#keyword> "test" .
+<http://muttnik.gov/data/crimes-ds> <http://www.w3.org/2000/01/rdf-schema#label> "A New Title" .
+<http://muttnik.gov/data/crimes-ds> <http://purl.org/dc/terms/title> "A New Title" .
+<http://muttnik.gov/data/crimes-ds> <http://www.w3.org/2000/01/rdf-schema#comment> "Longer description but still pretty short. Duis autem vel eum iriure dolor in hendrerit in\r\n    vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan\r\n    et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi." .
+<http://muttnik.gov/data/crimes-ds> <http://publishmydata.com/pmdcat#markdownDescription> "Crimes of the century."^^<https://www.w3.org/ns/iana/media-types/text/markdown#Resource> .
+<http://muttnik.gov/data/crimes-ds> <http://purl.org/dc/terms/description> "Crimes of the century." .
+<http://muttnik.gov/data/crimes-ds> <http://www.w3.org/ns/dcat#contactPoint> <mailto:hello@swirrl.com> .
+<http://muttnik.gov/data/crimes-ds> <http://purl.org/dc/terms/publisher> <http://muttnik.gov/organisation/muttnik> .
+<http://muttnik.gov/data/crimes-ds> <http://purl.org/dc/terms/creator> <http://muttnik.gov/organisation/muttnik> .
+<http://muttnik.gov/data/crimes-ds> <http://purl.org/dc/terms/contributor> <http://muttnik.gov/organisation/muttnik> .
+<http://muttnik.gov/data/crimes-ds> <http://purl.org/dc/terms/license> <http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/> .
