@@ -268,11 +268,13 @@
         (sut/wait! client token result)))
 
     (t/testing "it silently ignores metadata that's not an object"
-      (let [draftset (sut/new-draftset client token name description)
-            result (sut/add-data client token draftset triples {:graph (URI. "http//graph-name")
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            draftset (sut/new-draftset client token name description)
+            result (sut/add-data client token draftset triples {:graph graph
                                                                 :metadata "not an object"})
             job (sut/job client token (:job-id result))]
-        (is (= #{:draftset :operation} (-> job :metadata keys set)))))))
+        (is (= #{:draftset :operation} (-> job :metadata keys set)))
+        (sut/wait! client token result)))))
 
 (t/deftest deleting-from-a-draftset
   (let [client (drafter-client)
@@ -294,7 +296,8 @@
       (let [result (sut/delete-triples client token draftset graph [y-triple] {:title "Custom job title"})
             job (sut/job client token (:job-id result))]
         (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
-        (is (= "Custom job title" (-> job :metadata :title)))))
+        (is (= "Custom job title" (-> job :metadata :title)))
+        (sut/wait! client token result)))
 
     (t/testing "Deleting quads with metadata"
       (let [quad (pr/->Quad (URI. "http://x.com/s")
@@ -304,7 +307,8 @@
             result (sut/delete-quads client token draftset [quad] {:title "Custom job title"})
             job (sut/job client token (:job-id result))]
         (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
-        (is (= "Custom job title" (-> job :metadata :title)))))))
+        (is (= "Custom job title" (-> job :metadata :title)))
+        (sut/wait! client token result)))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
@@ -384,7 +388,8 @@
               job (sut/job client token (:job-id result))]
           (is (= #{:title :draftset :operation :multiword-key :$-9%&*->}
                  (-> job :metadata keys set)))
-          (is (= "Custom job title" (-> job :metadata :title))))))))
+          (is (= "Custom job title" (-> job :metadata :title)))
+          (sut/wait! client token result))))))
 
 (t/deftest loading-a-graph-into-a-draftset
   (let [client (drafter-client)
@@ -424,7 +429,8 @@
             result (sut/load-graph client token draftset-2 graph {:title "Custom job title"})
             job (sut/job client token (:job-id result))]
         (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
-        (is (= "Custom job title" (-> job :metadata :title)))))))
+        (is (= "Custom job title" (-> job :metadata :title)))
+        (sut/wait! client token result)))))
 
 (t/deftest deleting-a-draftset
   (testing "Deleting a draftset with metadata"
@@ -434,7 +440,8 @@
           result (sut/remove-draftset client token draftset {:title "Custom job title"})
           job (sut/job client token (:job-id result))]
       (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
-      (is (= "Custom job title" (-> job :metadata :title))))))
+      (is (= "Custom job title" (-> job :metadata :title)))
+      (sut/wait! client token result))))
 
 (t/deftest deleting-a-graph-from-a-draftset
   (let [client (drafter-client)
