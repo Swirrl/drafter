@@ -9,10 +9,10 @@
             [drafter.responses :as response]
             [drafter.util :as util]
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
-            [pantomime.media :refer [media-type-named]]
             [ring.util.request :as request]
             [integrant.core :as ig])
-  (:import java.io.File))
+  (:import java.io.File
+           (org.apache.tika.mime MediaType)))
 
 (defmethod ig/init-key :drafter.middleware/wrap-auth
   [_ {:keys [middleware] :as opts}]
@@ -65,6 +65,10 @@
                   (log/warn "Handling SPARQL POST query with missing content type")
                   (handle (get-in request [:params :query]) "'query' form or query parameter")))
         (response/method-not-allowed-response request-method)))))
+
+(defn media-type-named
+  [^String name]
+  (MediaType/parse name))
 
 (defn require-content-type
   "Wraps a ring handler in one which requires the incoming request has
