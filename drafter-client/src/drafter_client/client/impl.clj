@@ -63,8 +63,7 @@
 
 (defn delete-draftset
   "Delete the Draftset and its data"
-  #:drafter-client.client.impl{:generated true}
-  [client id metadata]
+  [client id & {:keys [metadata]}]
   (martian/response-for client
                         :delete-draftset
                         (cond-> {:id id}
@@ -82,7 +81,6 @@
 (defn delete-draftset-data
   "Remove the supplied RDF data from this Draftset. Opts may include `graph` if the statements
   to be deleted are triples and `metadata`, which will be stored on the job for future reference."
-  #:drafter-client.client.impl{:generated true}
   [client id data & {:keys [metadata] :as opts}]
   (martian/response-for
    client
@@ -194,8 +192,7 @@
 
 (defn publish-draftset
   "Publish the specified Draftset"
-  #:drafter-client.client.impl{:generated true}
-  [client id metadata]
+  [client id & {:keys [metadata]}]
   (martian/response-for client
                         :publish-draftset
                         (cond-> {:id id}
@@ -250,8 +247,7 @@
 
 (defn put-draftset-graph
   "Copy a graph from live into this Draftset"
-  #:drafter-client.client.impl{:generated true}
-  [client id graph metadata]
+  [client id graph & {:keys [metadata]}]
   (martian/response-for
    client
    :put-draftset-graph
@@ -374,7 +370,7 @@
                 (interceptors/coerce-response default-encoders)
                 perform-request])))
 
-(defn get-format [statements {:keys [graph]}]
+(defn get-format [statements graph]
   (or (when (instance? File statements)
         (some-> (.getPath statements)
                 (filename->rdf-format)
