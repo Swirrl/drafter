@@ -136,6 +136,28 @@
           (is (false? result)
               "I really expected the database to be empty"))))))
 
+(t/deftest draftset-repo-test
+  (t/testing "Constructing a queryable draftset repo from"
+    (let [client (drafter-client)
+          token (auth-util/system-token)
+          draftset (sut/new-draftset client token "the-draftset-name" "The description")]
+
+      (t/testing "a draftset object"
+        (let [repo (sut/->repo client token draftset)]
+
+          (t/testing "Draftset database is empty"
+            (with-open [conn (gr-repo/->connection repo)]
+              (let [result (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
+                (is (false? result)
+                    "I really expected the database to be empty"))))))
+
+      (t/testing "a UUID"
+        (let [another-repo (sut/->repo client token (draftset/id draftset))]
+              (with-open [conn (gr-repo/->connection another-repo)]
+                (let [result (gr-repo/query conn "ASK WHERE { ?s ?p ?o }")]
+                  (is (false? result)
+                      "I really expected the database to be empty"))))))))
+
 (t/deftest draftsets-tests
   (let [client (drafter-client)
         token (auth-util/system-token)

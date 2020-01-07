@@ -34,3 +34,9 @@
   [context]
   (or (live? context)
       (draftset? context)))
+
+;; Ensure that UUID's are also usable
+(extend-protocol IDraftsetId
+  java.util.UUID
+  (id [this]
+    this))
