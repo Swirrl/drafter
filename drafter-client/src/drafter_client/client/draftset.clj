@@ -30,8 +30,9 @@
 (defn live? [context]
   (= ::live context))
 
-(defn draft? [context]
+(defn draftset? [context]
   (satisfies? IDraftsetId context))
+
 (defn drafter-endpoint?
   "Predicate for testing if the given value is a value representing a
   drafter endpoint.  Currently returns true either draftset? or
