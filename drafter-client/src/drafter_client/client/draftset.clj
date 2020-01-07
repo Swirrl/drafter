@@ -26,3 +26,10 @@
 
 (defn draft? [context]
   (instance? Draftset context))
+(defn drafter-endpoint?
+  "Predicate for testing if the given value is a value representing a
+  drafter endpoint.  Currently returns true either draftset? or
+  live?."
+  [context]
+  (or (live? context)
+      (draftset? context)))

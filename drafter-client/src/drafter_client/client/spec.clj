@@ -14,7 +14,7 @@
 (s/def ::api (s/merge ::m/martian (s/keys :req-un [::jws-key])))
 (s/def ::client (partial instance? drafter_client.client.impl.DrafterClient))
 
-(s/def ::context (s/or :live draftset/live? :draft draftset/draft?))
+(s/def ::context draftset/drafter-endpoint?)
 
 (s/def ::params (s/map-of keyword? any?))
 
