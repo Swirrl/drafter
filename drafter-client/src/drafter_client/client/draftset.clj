@@ -4,15 +4,21 @@
 
 (def live ::live)
 
-(defprotocol IDraftset
-  (id [this])
-  (name [this])
+(defprotocol IDraftsetId
+  (id [this]))
+
+(defprotocol IDraftsetName
+  (name [this]))
+
+(defprotocol IDraftsetDescription
   (description [this]))
 
 (defrecord Draftset [id name description]
-  IDraftset
+  IDraftsetId
   (id [this] id)
+  IDraftsetName
   (name [this] name)
+  IDraftsetDescription
   (description [this] description))
 
 (defn ->draftset
@@ -25,7 +31,7 @@
   (= ::live context))
 
 (defn draft? [context]
-  (instance? Draftset context))
+  (satisfies? IDraftsetId context))
 (defn drafter-endpoint?
   "Predicate for testing if the given value is a value representing a
   drafter endpoint.  Currently returns true either draftset? or
