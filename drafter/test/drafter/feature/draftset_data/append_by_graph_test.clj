@@ -4,16 +4,24 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-publisher]]
             [grafter-2.rdf.protocols :refer [context]]
-            [grafter-2.rdf4j.io :refer [statements]]))
+            [grafter-2.rdf4j.io :refer [statements]]
+            [martian.encoders :as enc]
+            [drafter.async.jobs :as async]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system "drafter/feature/empty-db-system.edn")
 
-(defn- copy-live-graph-into-draftset-request [draftset-location user live-graph]
-  (tc/with-identity
-    user
-    {:uri (str draftset-location "/graph") :request-method :put :params {:graph (str live-graph)}}))
+(defn- copy-live-graph-into-draftset-request
+  ([draftset-location user live-graph]
+   (copy-live-graph-into-draftset-request draftset-location user live-graph nil))
+  ([draftset-location user live-graph metadata]
+   (tc/with-identity
+     user
+     {:uri (str draftset-location "/graph")
+      :request-method :put
+      :params (cond-> {:graph (str live-graph)}
+                      metadata (merge {:metadata metadata}))})))
 
 (defn- copy-live-graph-into-draftset [handler draftset-location user live-graph]
   (let [request (copy-live-graph-into-draftset-request draftset-location user live-graph)
@@ -31,6 +39,25 @@
     (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "false")
           expected-quads (help/eval-statements quads)]
       (is (= (set expected-quads) (set ds-quads))))))
+
+(tc/deftest-system-with-keys copy-draft-with-metadata-test
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+        draftset-location (help/create-draftset-through-api handler test-editor)]
+    (help/publish-quads-through-api handler quads)
+    (copy-live-graph-into-draftset handler draftset-location test-editor live-graph)
+
+    (let [request (copy-live-graph-into-draftset-request draftset-location
+                                                         test-editor
+                                                         live-graph
+                                                         (enc/json-encode {:title "Custom job title"}))
+          response (handler request)]
+      (tc/await-success (:finished-job (:body response)))
+
+      (let [job (-> response :body :finished-job tc/job-path->job-id async/complete-job)]
+        (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+        (is (= "Custom job title" (-> job :metadata :title)))))))
 
 (tc/deftest-system-with-keys copy-live-graph-with-existing-draft-into-draftset
   [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]

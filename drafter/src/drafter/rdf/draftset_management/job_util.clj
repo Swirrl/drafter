@@ -4,7 +4,8 @@
             [clojure.string :as str]
             [drafter.util :as util]
             [drafter.async.jobs :as ajobs]
-            [drafter.backend.draftset.operations :as dsops]))
+            [drafter.backend.draftset.operations :as dsops]
+            [martian.encoders :as enc]))
 
 ;; The following times were taken on stardog 4.1.2, in order to determine a better
 ;; batched write size.  The tests were performed with the dataset:
@@ -67,22 +68,28 @@
   [{:keys [type] :as result}]
   (= :error type))
 
+(defn- get-user-metadata [request-metadata]
+  (let [meta (enc/json-decode request-metadata keyword)]
+    (when (map? meta) meta)))
+
+(defn job-metadata [backend draftset-id operation request-metadata]
+  (let [ds-meta (some->> draftset-id (dsops/get-draftset-info backend))
+        user-meta (get-user-metadata request-metadata)]
+    (merge {:draftset ds-meta :operation operation} user-meta)))
+
 (defn make-job
   {:style/indent :defn}
-  [backend user-id operation draftset-id write-priority job-fn]
-  (let [ds-meta (some->> draftset-id (dsops/get-draftset-info backend))]
-    (ajobs/create-job
-     user-id
-     operation
-     draftset-id
-     {:draftset ds-meta}
-     write-priority
-     (fn [job]
-       (datadog/measure!
-        (util/statsd-name "drafter.job" operation write-priority "time")
+  [user-id write-priority metadata job-fn]
+  (ajobs/create-job
+    user-id
+    metadata
+    write-priority
+    (fn [job]
+      (datadog/measure!
+        (util/statsd-name "drafter.job" (:operation metadata) write-priority "time")
         {}
         (try
           (job-fn job)
           (catch Throwable t
             (log/warn t "Error whilst executing job")
-            (ajobs/job-failed! job t))))))))
+            (ajobs/job-failed! job t)))))))

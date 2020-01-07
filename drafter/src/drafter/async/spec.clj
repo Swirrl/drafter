@@ -51,13 +51,13 @@
                                               (s/gen #{p})))))
 
 (s/def ::job
-  (s/keys :req-un [::id ::user-id ::operation ::status ::priority
+  (s/keys :req-un [::id ::user-id ::status ::priority
                    :internal-job/start-time :internal-job/finish-time
                    ::draftset-id ::draft-graph-id ::metadata
                    ::value-p]))
 
 (s/def ::api-job
-  (s/keys :req-un [::id ::user-id ::operation ::status ::priority
+  (s/keys :req-un [::id ::user-id ::status ::priority
                    :api-job/start-time :api-job/finish-time]
           :opt-un [::draftset-id ::draft-graph-id ::metadata]))
 

@@ -19,14 +19,15 @@
     (mgmt/create-draft-graph! repo live-graph draftset-ref clock-fn)))
 
 (defn copy-live-graph-into-draftset-job
-  [resources user-id draftset-ref live-graph]
-  (let [ds-id (ds/->draftset-id draftset-ref)
-        repo (-> resources :backend :repo)]
-    (jobs/make-job repo user-id 'copy-live-graph-into-draftset ds-id :background-write
-      (fn [job]
-        (let [draft-graph-uri (create-or-empty-draft-graph-for repo draftset-ref live-graph util/get-current-time)]
-          (ds-data-common/lock-writes-and-copy-graph resources live-graph draft-graph-uri {:silent true})
-          (jobs/job-succeeded! job))))))
+  [resources user-id {:keys [draftset-id graph metadata]}]
+  (let [repo (-> resources :backend :repo)]
+    (jobs/make-job user-id
+                   :background-write
+                   (jobs/job-metadata repo draftset-id 'copy-live-graph-into-draftset metadata)
+                   (fn [job]
+                     (let [draft-graph-uri (create-or-empty-draft-graph-for repo draftset-id graph util/get-current-time)]
+                       (ds-data-common/lock-writes-and-copy-graph resources graph draft-graph-uri {:silent true})
+                       (jobs/job-succeeded! job))))))
 
 (defn- required-live-graph-param-handler [repo inner-handler]
   (fn [{{:keys [graph]} :params :as request}]
@@ -42,11 +43,9 @@
              (required-live-graph-param-handler (:repo backend) handler)))]
     (wrap-as-draftset-owner
      (required-live-graph-param
-      (fn [{{:keys [draftset-id graph]} :params :as request}]
+      (fn [{:keys [params] :as request}]
         (-> {:backend backend :global-writes-lock global-writes-lock}
-            (copy-live-graph-into-draftset-job (req/user-id request)
-                                               draftset-id
-                                               graph)
+            (copy-live-graph-into-draftset-job (req/user-id request) params)
             (submit-async-job!)))))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.append-by-graph/handler [_]

@@ -11,7 +11,9 @@
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [grafter-2.rdf.protocols :refer [->Quad ->Triple context map->Triple]]
             [grafter-2.rdf4j.formats :as formats]
-            [grafter-2.rdf4j.io :refer [statements]])
+            [grafter-2.rdf4j.io :refer [statements]]
+            [drafter.async.jobs :as async]
+            [martian.encoders :as enc])
   (:import java.net.URI
            java.time.OffsetDateTime))
 
@@ -19,9 +21,14 @@
 
 (def system "drafter/feature/empty-db-system.edn")
 
-(defn- create-delete-draftset-request [draftset-location user]
-  (tc/with-identity user
-    {:uri draftset-location :request-method :delete}))
+(defn- create-delete-draftset-request
+  ([draftset-location user]
+   (create-delete-draftset-request draftset-location user nil))
+  ([draftset-location user metadata]
+   (tc/with-identity user
+                     (cond-> {:uri draftset-location
+                              :request-method :delete}
+                             metadata (merge {:params {:metadata (enc/json-encode metadata)}})))))
 
 (tc/deftest-system-with-keys delete-draftset-test
   [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
@@ -33,6 +40,18 @@
 
     (let [get-response (handler (tc/with-identity test-editor {:uri draftset-location :request-method :get}))]
       (tc/assert-is-not-found-response get-response))))
+
+(tc/deftest-system-with-keys delete-draftset-with-metadata-test
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        delete-request (create-delete-draftset-request draftset-location test-editor {:title "Deleting draftset"})
+        delete-response (handler delete-request)]
+    (tc/await-success (:finished-job (:body delete-response)))
+
+    (let [job (-> delete-response :body :finished-job tc/job-path->job-id async/complete-job)]
+      (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+      (is (= "Deleting draftset" (-> job :metadata :title))))))
 
 (tc/deftest-system-with-keys delete-non-existent-draftset-test
   [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
@@ -188,7 +207,10 @@
   [{handler :drafter.routes/draftsets-api} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         body (tc/string->input-stream "NOT NQUADS")
-        delete-request (help/create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :nq)))
+        delete-request (help/create-delete-quads-request test-editor
+                                                         draftset-location
+                                                         body
+                                                         {:content-type (.getDefaultMIMEType (formats/->rdf-format :nq))})
         delete-response (handler delete-request)
         job-result (tc/await-completion (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))
@@ -264,7 +286,10 @@
     (help/append-data-to-draftset-through-api handler test-editor draftset-location "test/resources/test-draftset.trig")
 
     (with-open [input-stream (help/statements->input-stream (take 2 draftset-quads) :nt)]
-      (let [delete-request (help/create-delete-quads-request test-editor draftset-location input-stream (.getDefaultMIMEType (formats/->rdf-format :nt)))
+      (let [delete-request (help/create-delete-quads-request test-editor
+                                                             draftset-location
+                                                             input-stream
+                                                             {:content-type (.getDefaultMIMEType (formats/->rdf-format :nt))})
             delete-response (handler delete-request)]
         (tc/assert-is-unprocessable-response delete-response)))))
 
@@ -273,7 +298,10 @@
   [{handler :drafter.routes/draftsets-api} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         body (tc/string->input-stream "NOT TURTLE")
-        delete-request (help/create-delete-quads-request test-editor draftset-location body (.getDefaultMIMEType (formats/->rdf-format :ttl)))
+        delete-request (help/create-delete-quads-request test-editor
+                                                         draftset-location
+                                                         body
+                                                         {:content-type (.getDefaultMIMEType (formats/->rdf-format :ttl))})
         delete-request (assoc-in delete-request [:params :graph] "http://test-graph")
         delete-response (handler delete-request)
         job-result (tc/await-completion (get-in delete-response [:body :finished-job]))]

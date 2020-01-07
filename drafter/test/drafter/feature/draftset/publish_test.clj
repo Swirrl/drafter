@@ -5,7 +5,9 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [grafter-2.rdf.protocols :refer [context]]
-            [grafter-2.rdf4j.io :refer [statements]]))
+            [grafter-2.rdf4j.io :refer [statements]]
+            [drafter.async.jobs :as async]
+            [martian.encoders :as enc]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -21,6 +23,23 @@
 
     (let [live-quads (help/get-live-quads-through-api handler)]
       (is (= (set (help/eval-statements quads)) (set live-quads))))))
+
+(tc/deftest-system-with-keys publish-with-metadata-on-job
+  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
+  [{handler :drafter.routes/draftsets-api} system]
+  (let [quads (statements "test/resources/test-draftset.trig")
+        draftset-location (help/create-draftset-through-api handler test-publisher)]
+    (help/append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
+
+    (let [publish-request (help/create-publish-request draftset-location
+                                                       test-publisher
+                                                       (enc/json-encode {:title "Custom job title"}))
+          publish-response (handler publish-request)]
+      (tc/await-success (:finished-job (:body publish-response)))
+
+      (let [job (-> publish-response :body :finished-job tc/job-path->job-id async/complete-job)]
+        (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+        (is (= "Custom job title" (-> job :metadata :title)))))))
 
 (tc/deftest-system-with-keys publish-draftset-with-statements-added-to-graphs-in-live
   [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]

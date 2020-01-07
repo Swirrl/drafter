@@ -3,14 +3,15 @@
             [clojure.spec.alpha :as s]
             [clojure.walk :refer [postwalk]]
             [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
+            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format
+                                             filename->rdf-format]]
             [grafter-2.rdf4j.io :as rio]
             [clj-http.client :as http]
-            [martian.clj-http :as martian-http]
             [martian.core :as martian]
             [martian.encoders :as encoders]
             [martian.interceptors :as interceptors]
-            [ring.util.codec :refer [form-decode form-encode]])
+            [ring.util.codec :refer [form-decode form-encode]]
+            [martian.encoders :as enc])
   (:import (java.io InputStream File PipedInputStream PipedOutputStream)))
 
 (alias 'c 'clojure.core)
@@ -62,9 +63,11 @@
 
 (defn delete-draftset
   "Delete the Draftset and its data"
-  #:drafter-client.client.impl{:generated true}
-  [client id]
-  (martian/response-for client :delete-draftset {:id id}))
+  [client id & {:keys [metadata]}]
+  (martian/response-for client
+                        :delete-draftset
+                        (cond-> {:id id}
+                                metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn delete-draftset-changes
   "Remove all the changes to a named graph from the Draftset"
@@ -76,13 +79,14 @@
    {:id id :graph graph}))
 
 (defn delete-draftset-data
-  "Remove the supplied RDF data from this Draftset"
-  #:drafter-client.client.impl{:generated true}
-  [client id data & {:keys [graph] :as opts}]
+  "Remove the supplied RDF data from this Draftset. Opts may include `graph` if the statements
+  to be deleted are triples and `metadata`, which will be stored on the job for future reference."
+  [client id data & {:keys [metadata] :as opts}]
   (martian/response-for
    client
    :delete-draftset-data
-   (merge {:id id :data data} opts)))
+   (cond-> (merge opts {:id id :data data})
+           metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn delete-draftset-graph
   "Delete the contents of a graph in this Draftset"
@@ -188,16 +192,17 @@
 
 (defn publish-draftset
   "Publish the specified Draftset"
-  #:drafter-client.client.impl{:generated true}
-  [client id]
-  (martian/response-for client :publish-draftset {:id id}))
+  [client id & {:keys [metadata]}]
+  (martian/response-for client
+                        :publish-draftset
+                        (cond-> {:id id}
+                                metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn put-draftset
   "Set metadata on Draftset"
   #:drafter-client.client.impl{:generated true}
   [client id & {:keys [display-name description] :as opts}]
   (martian/response-for client :put-draftset (merge {:id id} opts)))
-
 
 (defn piped-input-stream [func]
   (let [input  (PipedInputStream.)
@@ -219,7 +224,7 @@
 (defn append-via-http-stream
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
-  [access-token url statements & {:keys [graph format] :as _opts}]
+  [access-token url statements & {:keys [graph format metadata] :as _opts}]
   (let [{input-stream :input worker :worker}
         (if (some #(instance? % statements) [InputStream File])
           {:input statements}
@@ -227,8 +232,11 @@
         headers {:Content-Type format
                  :Accept "application/json"
                  :Authorization (str "Bearer " access-token)}
+        params (cond-> nil
+                       graph (merge {:graph (.toString graph)})
+                       metadata (merge {:metadata (enc/json-encode metadata)}))
         request {:url url
-                 :query-params (when graph {:graph (.toString graph)})
+                 :query-params params
                  :method :put
                  :body input-stream
                  :headers headers
@@ -239,12 +247,12 @@
 
 (defn put-draftset-graph
   "Copy a graph from live into this Draftset"
-  #:drafter-client.client.impl{:generated true}
-  [client id graph]
+  [client id graph & {:keys [metadata]}]
   (martian/response-for
    client
    :put-draftset-graph
-   {:id id :graph graph}))
+   (cond-> {:id id :graph graph}
+           metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn status-job-finished
   "Poll to see if asynchronous job has finished"
@@ -361,3 +369,11 @@
                [(interceptors/encode-body default-encoders)
                 (interceptors/coerce-response default-encoders)
                 perform-request])))
+
+(defn get-format [statements graph]
+  (or (when (instance? File statements)
+        (some-> (.getPath statements)
+                (filename->rdf-format)
+                (.getDefaultMIMEType)))
+      (when graph "application/n-triples")
+      "application/n-quads"))

@@ -229,10 +229,9 @@
 (defn during-exclusive-write-f [global-writes-lock f]
   (let [p (promise)
         latch (CountDownLatch. 1)
-        exclusive-job (create-job :publish-write
-                                  (fn [j]
-                                    (.countDown latch)
-                                    @p))]
+        exclusive-job (create-job nil  {} :publish-write (fn [j]
+                                                           (.countDown latch)
+                                                           @p))]
 
     ;; submit exclusive job which should prevent updates from being
     ;; scheduled

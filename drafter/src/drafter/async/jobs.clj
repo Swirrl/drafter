@@ -2,20 +2,18 @@
   (:require [compojure.core :refer [context GET routes]]
             [clojure.spec.alpha :as s]
             [clj-logging-config.log4j :as l4j]
-            [clojure.tools.logging :as log]
             [drafter.async.responses :as r]
             [drafter.async.spec :as spec]
             [integrant.core :as ig]
             [clj-time.coerce :refer [to-date from-long]]
-            [clj-time.core :as time]
-            [clj-time.format :refer [formatters unparse]])
+            [clj-time.format :refer [formatters unparse]]
+            [drafter.draftset :as ds])
   (:import (java.util UUID)
            (clojure.lang ExceptionInfo)
            (org.apache.log4j MDC)))
 
 (defrecord Job [id
                 user-id
-                operation
                 status
                 priority
                 start-time
@@ -27,7 +25,7 @@
                 value-p])
 
 (def allowed-queue-keys
-  #{:id :user-id :operation :status :priority :start-time :finish-time
+  #{:id :user-id :status :priority :start-time :finish-time
     :draftset-id :draft-graph-id :metadata :value-p})
 
 (defonce jobs
@@ -53,7 +51,7 @@
 
 (defn job-response [{:keys [value-p] :as job}]
   (-> job
-      (select-keys [:id :user-id :operation :status :priority :start-time
+      (select-keys [:id :user-id :status :priority :start-time
                     :finish-time :draftset-id :draft-graph-id :metadata])
       (update :start-time timestamp-response)
       (update :finish-time timestamp-response)
@@ -91,42 +89,26 @@
 
 
 (s/fdef create-job
-  :args (s/or :ary-4 (s/cat :user-id ::spec/user-id
-                            :operation ::spec/operation
-                            :priority ::spec/priority
-                            :f ::spec/function)
-              :ary-5 (s/cat :user-id ::spec/user-id
-                            :operation ::spec/operation
-                            :draftset-id (s/nilable ::spec/draftset-id)
-                            :priority ::spec/priority
-                            :f ::spec/function)
-              :ary-6 (s/cat :user-id ::spec/user-id
-                            :operation ::spec/operation
-                            :draftset-id (s/nilable ::spec/draftset-id)
-                            :metadata ::spec/metadata
-                            :priority ::spec/priority
-                            :f ::spec/function))
+  :args (s/cat :user-id ::spec/user-id
+               :metadata ::spec/metadata
+               :priority ::spec/priority
+               :f ::spec/function)
   :ret ::spec/job)
 
 (defn create-job
-  ([user-id operation priority f]
-   (create-job user-id operation nil priority f))
-  ([user-id operation draftset-id priority f]
-   (create-job user-id operation draftset-id nil priority f))
-  ([user-id operation draftset-id metadata priority f]
-   (let [id (UUID/randomUUID)]
-     (->Job id
-            user-id
-            operation
-            :pending
-            priority
-            (System/currentTimeMillis)
-            nil
-            draftset-id
-            nil
-            metadata
-            (wrap-logging-context f)
-            (promise)))))
+  [user-id metadata priority f]
+  (let [id (UUID/randomUUID)]
+    (->Job id
+           user-id
+           :pending
+           priority
+           (System/currentTimeMillis)
+           nil
+           (when-let [id (-> metadata :draftset :id)] (ds/->DraftsetId id))
+           nil
+           metadata
+           (wrap-logging-context f)
+           (promise))))
 
 (defn submit-async-job!
   "Submits an async job and returns `true` if the job was submitted

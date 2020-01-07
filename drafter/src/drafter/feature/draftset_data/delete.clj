@@ -73,46 +73,34 @@
         now (clock-fn)]
     (delete-quads-from-draftset resources quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
 
-(defn delete-quads-from-draftset-job
-  [resources user-id draftset-ref serialised rdf-format clock-fn]
-  (let [repo (-> resources :backend :repo)
-        ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job repo user-id 'delete-quads-from-draftset ds-id :background-write
-      (fn [job]
-        (let [quads (read-statements serialised rdf-format)
-              graph-mapping (ops/get-draftset-graph-mapping repo draftset-ref)]
-          (batch-and-delete-quads-from-draftset resources quads draftset-ref graph-mapping job clock-fn))))))
+(defn- get-quads [serialised {:keys [rdf-format graph]}]
+  (let [statements (read-statements serialised rdf-format)]
+    (if (is-quads-format? rdf-format)
+      statements
+      (map #(util/make-quad-statement % graph) statements))))
 
-(defn delete-triples-from-draftset-job
-  [resources user-id draftset-ref graph serialised rdf-format clock-fn]
-  (let [repo (-> resources :backend :repo)
-        ds-id (ds/->draftset-id draftset-ref)]
-    (jobs/make-job repo user-id 'delete-triples-from-draftset ds-id :background-write
-      (fn [job]
-        (let [triples (read-statements serialised rdf-format)
-              quads (map #(util/make-quad-statement % graph) triples)
-              graph-mapping (ops/get-draftset-graph-mapping repo draftset-ref)]
-          (batch-and-delete-quads-from-draftset resources quads draftset-ref graph-mapping job clock-fn))))))
+(defn delete-data-from-draftset-job
+  [serialised user-id resources {:keys [draftset-id metadata] :as params} clock-fn]
+  (let [repo (-> resources :backend :repo)]
+    (jobs/make-job user-id
+                   :background-write
+                   (jobs/job-metadata repo draftset-id 'delete-data-from-draftset metadata)
+                   (fn [job]
+                     (let [quads (get-quads serialised params)
+                           graph-mapping (ops/get-draftset-graph-mapping repo draftset-id)]
+                       (batch-and-delete-quads-from-draftset resources
+                                                             quads
+                                                             draftset-id
+                                                             graph-mapping
+                                                             job
+                                                             clock-fn))))))
 
 (defn delete-draftset-data-handler
   [{:keys [wrap-as-draftset-owner :drafter/backend :drafter/global-writes-lock]}]
   (let [resources {:backend backend :global-writes-lock global-writes-lock}]
-    (-> (fn [{{:keys [draftset-id graph rdf-format]} :params body :body :as request}]
+    (-> (fn [{:keys [params body] :as request}]
           (let [user-id (req/user-id request)
-                delete-job (if (is-quads-format? rdf-format)
-                             (delete-quads-from-draftset-job resources
-                                                             user-id
-                                                             draftset-id
-                                                             body
-                                                             rdf-format
-                                                             util/get-current-time)
-                             (delete-triples-from-draftset-job resources
-                                                               user-id
-                                                               draftset-id
-                                                               graph
-                                                               body
-                                                               rdf-format
-                                                               util/get-current-time))]
+                delete-job (delete-data-from-draftset-job body user-id resources params util/get-current-time)]
             (response/submit-async-job! delete-job)))
         temp-file-body
         deset-middleware/require-graph-for-triples-rdf-format

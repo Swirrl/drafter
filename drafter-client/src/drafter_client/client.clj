@@ -1,7 +1,6 @@
 (ns drafter-client.client
   (:refer-clojure :exclude [name type get])
   (:require [cheshire.core :as json]
-            [grafter-2.rdf4j.formats :refer [filename->rdf-format]]
             [clj-time.format :refer [formatters parse]]
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
@@ -167,16 +166,20 @@
 
 (defn remove-draftset
   "Delete the Draftset and its data"
-  [client access-token draftset]
+  [client access-token draftset & {:keys [metadata]}]
   (-> client
-      (i/request i/delete-draftset access-token (draftset/id draftset))
+      (i/request i/delete-draftset access-token (draftset/id draftset) :metadata metadata)
       (->async-job)))
 
 (defn load-graph
   "Load the graph from live into the Draftset"
-  [client access-token draftset graph]
+  [client access-token draftset graph & {:keys [metadata]}]
   (-> client
-      (i/request i/put-draftset-graph access-token (draftset/id draftset) (str graph))
+      (i/request i/put-draftset-graph
+                 access-token
+                 (draftset/id draftset)
+                 (str graph)
+                 :metadata metadata)
       (->async-job)))
 
 (defn delete-graph
@@ -185,43 +188,55 @@
   (i/request client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
 
 (defn delete-quads
-  [client access-token draftset quads]
+  [client access-token draftset quads & {:keys [metadata]}]
   (-> client
       (i/set-content-type "application/n-quads")
-      (i/request i/delete-draftset-data access-token (draftset/id draftset) quads)
+      (i/request i/delete-draftset-data access-token (draftset/id draftset) quads :metadata metadata)
       (->async-job)))
 
 (defn delete-triples
-  [client access-token draftset graph triples]
+  [client access-token draftset graph triples & {:keys [metadata]}]
   (-> client
       (i/set-content-type "application/n-triples")
-      (i/request i/delete-draftset-data access-token (draftset/id draftset) triples :graph graph)
+      (i/request i/delete-draftset-data
+                 access-token
+                 (draftset/id draftset)
+                 triples
+                 :graph graph
+                 :metadata metadata)
       (->async-job)))
+
+(defn add-data
+  "Append the supplied RDF statements to this Draftset.
+  - `statements` can be a sequence of quads or triples, a File, or an InputStream
+  - `opts` is a map of optional arguments, which may include:
+    - `graph`: required if the statements are triples
+    - `metadata`: a map with arbitrary keys that will be included on the job for future reference"
+  [client access-token draftset statements & {:keys [graph metadata]}]
+  (let [url (martian/url-for client
+                             :put-draftset-data
+                             {:id (draftset/id draftset)})
+        format (i/get-format statements graph)]
+    (-> (i/append-via-http-stream access-token
+                                  url
+                                  statements
+                                  :graph graph
+                                  :format format
+                                  :metadata metadata)
+        (->async-job))))
 
 (defn add
   "Append the supplied RDF statements to this Draftset.
   'statements' can be a sequence of quads or triples; a File; or InputStream"
+  {:deprecated "Use add-data instead"}
   ([client access-token draftset quads]
-   (add client access-token draftset nil quads))
+   (add-data client access-token draftset quads))
   ([client access-token draftset graph triples]
-   (let [url (martian/url-for client
-                              :put-draftset-data
-                              {:id (draftset/id draftset)})
-         format (or (when (instance? File triples)
-                      (some-> (.getPath triples)
-                              (filename->rdf-format)
-                              (.getDefaultMIMEType)))
-                    (when graph "application/n-triples")
-                    "application/n-quads")]
-     (-> (i/append-via-http-stream access-token
-                                   url
-                                   triples
-                                   :graph graph
-                                   :format format)
-         (->async-job)))))
+   (add-data client access-token draftset triples :graph graph)))
 
 (defn add-in-batches
   "Append the supplied RDF data to this Draftset in batches"
+  {:deprecated "Use add-data instead. It can handle streaming arbitrarily large files directly to drafter."}
   ([{:keys [batch-size] :as client} access-token draftset quads]
    (->> quads
         (partition-all batch-size)
@@ -235,9 +250,9 @@
 
 (defn publish
   "Publish the Draftset to live"
-  [client access-token draftset]
+  [client access-token draftset & {:keys [metadata]}]
   (-> client
-      (i/request i/publish-draftset access-token (draftset/id draftset))
+      (i/request i/publish-draftset access-token (draftset/id draftset) :metadata metadata)
       (->async-job)))
 
 (defn get
@@ -439,7 +454,7 @@
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.
   ;; TODO Anything to do here?
-  ;; TOOD Will there be anything running in the background that we should wait
+  ;; TODO Will there be anything running in the background that we should wait
   ;; for?
   )
 
@@ -457,18 +472,32 @@
   `(let [job# (~fn-sym ~@arg-list)]
      (wait! ~(first arg-list) ~(second arg-list) job#)))
 
+(defn- build-args [arg-list]
+  (let [rest-index (.indexOf arg-list '&)]
+    (if (not= rest-index -1)
+      (->> rest-index
+           (subvec arg-list)
+           last
+           :keys
+           (mapcat (fn [key] [(keyword key) key]))
+           (into (subvec arg-list 0 rest-index)))
+      arg-list)))
+
 (defmacro gensync
   "Macro which defines a synchronous version of the specified async client function. The async function
    should have at least two parameters where the first is the drafter client and the second the access
-   token to use. The resulting function for an async fuction 'operation' is called 'operation-sync'"
+   token to use. The resulting function for an async function 'operation' is called 'operation-sync'"
   [fn-sym]
   (let [sync-fn (symbol (str fn-sym "-sync"))
         {:keys [arglists] :as fn-meta} (meta (ns-resolve *ns* fn-sym))
         doc (str "Synchronous version of " fn-sym " i.e. calls " fn-sym " and waits for the resulting job to complete")]
     (if (= 1 (count arglists))
-      (let [arg-list (first arglists)]
-        `(defn ~sync-fn ~doc ~arg-list ~(sync-body fn-sym arg-list)))
-      (let [arities (map (fn [arg-list] (list arg-list (sync-body fn-sym arg-list))) arglists)]
+      (let [arg-list (first arglists)
+            args (build-args arg-list)]
+        `(defn ~sync-fn ~doc ~arg-list ~(sync-body fn-sym args)))
+      (let [arities (map (fn [arg-list]
+                           (list arg-list (sync-body fn-sym (build-args arg-list))))
+                         arglists)]
         `(defn ~sync-fn ~doc ~@arities)))))
 
 (gensync remove-draftset)
@@ -476,4 +505,5 @@
 (gensync delete-quads)
 (gensync delete-triples)
 (gensync add)
+(gensync add-data)
 (gensync publish)

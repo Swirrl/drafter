@@ -10,12 +10,11 @@
   [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
   (log/info "del draftset handler wrapper: " wrap-as-draftset-owner)
   (wrap-as-draftset-owner
-   (fn [request]
+   (fn [{:keys [params] :as request}]
      (log/info "drafter.feature.draftset.delete/handler " request)
-     (let [{{:keys [draftset-id]} :params :as request} request]
-       (submit-async-job! (dsjobs/delete-draftset-job backend
-                                                      (req/user-id request)
-                                                      draftset-id))))))
+     (submit-async-job! (dsjobs/delete-draftset-job backend
+                                                    (req/user-id request)
+                                                    params)))))
 
 (defmethod ig/pre-init-spec ::handler [_]
   (s/keys :req [:drafter/backend] :req-un [::wrap-as-draftset-owner]))

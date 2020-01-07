@@ -1,6 +1,5 @@
 (ns drafter-client.client-test
-  (:require [clj-http.client :as http]
-            [clojure.spec.test.alpha :as st]
+  (:require [clojure.spec.test.alpha :as st]
             [clojure.test :as t :refer :all]
             [drafter.main :as main]
             [drafter.middleware.auth0-auth]
@@ -227,22 +226,87 @@
             quads [(pr/->Quad "some" :invalid "quad" nil)
                    (pr/->Quad (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o") nil)]]
         (is (thrown-with-msg? ExecutionException #"It looks like you have an incorrect data type inside a quad"
-                              (sut/add client token draftset quads)))))))
+                              (sut/add client token draftset quads)))))
+
+    (t/testing "Adding triples to a draft set"
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            draftset (sut/new-draftset client token name description)
+            _ (sut/add-sync client token draftset graph triples)
+            triples* (sut/get client token draftset graph)]
+        (t/is (= (set triples) (set triples*)))))))
+
+(deftest adding-with-add-data
+  (let [client (drafter-client)
+        token (auth-util/system-token)
+        name "Draftset adding"
+        description "Testing adding things, and reading them"
+        triples (test-triples)]
+    (t/testing "Adding triples to a draft set"
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            draftset (sut/new-draftset client token name description)
+            _ (sut/add-data-sync client token draftset triples :graph graph)
+            triples* (sut/get client token draftset graph)]
+        (t/is (= (set triples) (set triples*)))))
+
+    (t/testing "Adding quads to a draft set"
+      (let [graph (URI. "http://test.graph.com/vanilla-quad-graph")
+            draftset (sut/new-draftset client token name description)
+            quads (map #(assoc % :c graph) (drop 97 triples))
+            _ (sut/add-data-sync client token draftset quads)
+            quads* (sut/get client token draftset)]
+        (t/is (= (set quads) (set quads*)))))
+
+    (testing "Custom metadata gets passed on to job"
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            draftset (sut/new-draftset client token name description)
+            result (sut/add-data client token draftset triples :graph graph :metadata {:title "Custom job title"})
+            job (sut/job client token (:job-id result))]
+        (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+        (is (= "Custom job title" (-> job :metadata :title)))
+        ;; wait for this so it doesn't interfere with subsequent tests
+        (sut/wait! client token result)))
+
+    (t/testing "it silently ignores metadata that's not an object"
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            draftset (sut/new-draftset client token name description)
+            result (sut/add-data client token draftset triples :graph graph :metadata "not an object")
+            job (sut/job client token (:job-id result))]
+        (is (= #{:draftset :operation} (-> job :metadata keys set)))
+        (sut/wait! client token result)))))
 
 (t/deftest deleting-from-a-draftset
   (let [client (drafter-client)
-        token (auth-util/system-token)]
+        token (auth-util/system-token)
+        draftset (sut/new-draftset client token "my name" "my description")
+        x-triple (pr/->Triple (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o"))
+        y-triple (pr/->Triple (URI. "http://y.com/s") (URI. "http://y.com/p") (URI. "http://y.com/o"))
+        graph (URI. "http://test.graph.com/triple-graph")]
     (t/testing "Deleting triples from a draft set"
-      (let [graph (URI. "http://test.graph.com/triple-graph")
-            draftset (sut/new-draftset client token "my name" "my description")
-            original-triples [(pr/->Triple (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o"))
-                              (pr/->Triple (URI. "http://y.com/s") (URI. "http://y.com/p") (URI. "http://y.com/o"))]
-            to-delete [(pr/->Triple (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o"))]
-            expected-triples [(pr/->Triple (URI. "http://y.com/s") (URI. "http://y.com/p") (URI. "http://y.com/o"))]
+      (let [original-triples [x-triple y-triple]
+            to-delete [x-triple]
+            expected-triples [y-triple]
             _ (sut/add-sync client token draftset graph original-triples)
             _ (sut/delete-triples-sync client token draftset graph to-delete)
             triples* (sut/get client token draftset graph)]
-        (t/is (= (set expected-triples) (set triples*)))))))
+        (t/is (= (set expected-triples) (set triples*)))))
+
+    (t/testing "Deleting triples with metadata"
+      (let [result (sut/delete-triples client token draftset graph [y-triple] :metadata {:title "Custom job title"})
+            job (sut/job client token (:job-id result))]
+        (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+        (is (= "Custom job title" (-> job :metadata :title)))
+        (sut/wait! client token result)))
+
+    (t/testing "Deleting quads with metadata"
+      (let [quad (pr/->Quad (URI. "http://x.com/s")
+                            (URI. "http://x.com/p")
+                            (URI. "http://x.com/o")
+                            (URI. "http://x.com/g"))
+            result (sut/delete-quads client token draftset [quad] :metadata {:title "Custom job title"})
+            job (sut/job client token (:job-id result))]
+        (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+        (is (= "Custom job title" (-> job :metadata :title)))
+        (sut/wait! client token result)))))
 
 (t/deftest adding-quads-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
@@ -302,6 +366,29 @@
           (let [quads* (map #(assoc % :c graph) (gr-repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))]
             (is (= (set quads) (set quads*)))))))))
 
+(t/deftest publishing-with-metadata
+  (let [client (drafter-client)
+        triples (test-triples)
+        how-many 5
+        token (auth-util/system-token)
+        name "Draftset publishing"
+        description "Testing adding things, publishing them, and reading them"]
+    (t/testing "Publishing a draft set"
+      (let [graph (URI. "http://test.graph.com/quad-graph")
+            quads (map #(assoc % :c graph) triples)
+            quads (take how-many quads)
+            draftset (sut/new-draftset client token name description)]
+        (sut/add-sync client token draftset quads)
+
+        (let [result (sut/publish client token draftset :metadata {:title "Custom job title"
+                                                                   :multiword-key "Key"
+                                                                   :$-9%&*-> "weird key"})
+              job (sut/job client token (:job-id result))]
+          (is (= #{:title :draftset :operation :multiword-key :$-9%&*->}
+                 (-> job :metadata keys set)))
+          (is (= "Custom job title" (-> job :metadata :title)))
+          (sut/wait! client token result))))))
+
 (t/deftest loading-a-graph-into-a-draftset
   (let [client (drafter-client)
         triples (test-triples)
@@ -321,6 +408,38 @@
             _ (sut/wait! client token job-3)
             quads* (sut/get client token draftset-2)]
         (is (= (set quads) (set quads*)))))))
+
+(t/deftest loading-a-graph-into-a-draftset-with-metadata
+  (let [client (drafter-client)
+        triples (test-triples)
+        how-many 5
+        token (auth-util/system-token)
+        name "Loading a graph into a draftset"
+        description "Testing loading a graph into a draftset"
+        draftset-1 (sut/new-draftset client token name description)]
+    (t/testing "Publishing a draft set"
+      (let [graph (URI. "http://test.graph.com/quad-graph")
+            quads (map #(assoc % :c graph) triples)
+            quads (take how-many quads)
+            _ (sut/add-sync client token draftset-1 quads)
+            _ (sut/publish-sync client token draftset-1)
+            draftset-2 (sut/new-draftset client token name description)
+            result (sut/load-graph client token draftset-2 graph :metadata {:title "Custom job title"})
+            job (sut/job client token (:job-id result))]
+        (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+        (is (= "Custom job title" (-> job :metadata :title)))
+        (sut/wait! client token result)))))
+
+(t/deftest deleting-a-draftset
+  (testing "Deleting a draftset with metadata"
+    (let [client (drafter-client)
+          token (auth-util/system-token)
+          draftset (sut/new-draftset client token "Test" "Delete me")
+          result (sut/remove-draftset client token draftset :metadata {:title "Custom job title"})
+          job (sut/job client token (:job-id result))]
+      (is (= #{:title :draftset :operation} (-> job :metadata keys set)))
+      (is (= "Custom job title" (-> job :metadata :title)))
+      (sut/wait! client token result))))
 
 (t/deftest deleting-a-graph-from-a-draftset
   (let [client (drafter-client)
