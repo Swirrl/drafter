@@ -111,7 +111,7 @@
 (defn- json-draftset->draftset [ds]
   (let [{:keys [id display-name description]} ds
         id (uuid id)]
-    (draftset/->draftset id display-name description)))
+    (draftset/->Draftset id display-name description)))
 
 (defn- ->draftset [ds]
   (-> (draftset/map->Draftset ds)

@@ -21,12 +21,6 @@
   IDraftsetDescription
   (description [this] description))
 
-(defn ->draftset
-  ([] (->draftset (UUID/randomUUID) nil nil))
-  ([name] (->draftset (UUID/randomUUID) name nil))
-  ([name description] (->draftset (UUID/randomUUID) name description))
-  ([id name description] (->Draftset id name description)))
-
 (defn live? [context]
   (= ::live context))
 
