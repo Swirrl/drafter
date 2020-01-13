@@ -124,8 +124,10 @@
 (defn ->repo [client access-token context]
   (repo/make-repo client context access-token {}))
 
-(defn draftsets
-  "List available Draftsets"
+(defn ^:deprecated draftsets
+  "DEPRECATED: Use get-draftsets instead.
+
+  List available Draftsets."
   [client access-token]
   (->> (i/request client i/get-draftsets access-token)
        (map json-draftset->draftset)))
