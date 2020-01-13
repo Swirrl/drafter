@@ -166,21 +166,25 @@
 
 (defn remove-draftset
   "Delete the Draftset and its data"
-  [client access-token draftset & {:keys [metadata]}]
-  (-> client
-      (i/request i/delete-draftset access-token (draftset/id draftset) :metadata metadata)
-      (->async-job)))
+  ([client access-token draftset]
+   (remove-draftset client access-token draftset {}))
+  ([client access-token draftset {:keys [metadata]}]
+   (-> client
+       (i/request i/delete-draftset access-token (draftset/id draftset) {:metadata metadata})
+       (->async-job))))
 
 (defn load-graph
   "Load the graph from live into the Draftset"
-  [client access-token draftset graph & {:keys [metadata]}]
-  (-> client
-      (i/request i/put-draftset-graph
-                 access-token
-                 (draftset/id draftset)
-                 (str graph)
-                 :metadata metadata)
-      (->async-job)))
+  ([client access-token draftset graph]
+   (load-graph client access-token draftset graph {}))
+  ([client access-token draftset graph {:keys [metadata]}]
+   (-> client
+       (i/request i/put-draftset-graph
+                  access-token
+                  (draftset/id draftset)
+                  (str graph)
+                  {:metadata metadata})
+       (->async-job))))
 
 (defn delete-graph
   "Schedules the deletion of the graph from live"
@@ -188,23 +192,27 @@
   (i/request client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
 
 (defn delete-quads
-  [client access-token draftset quads & {:keys [metadata]}]
-  (-> client
-      (i/set-content-type "application/n-quads")
-      (i/request i/delete-draftset-data access-token (draftset/id draftset) quads :metadata metadata)
-      (->async-job)))
+  ([client access-token draftset quads]
+   (delete-quads client access-token draftset quads {}))
+  ([client access-token draftset quads {:keys [metadata]}]
+   (-> client
+       (i/set-content-type "application/n-quads")
+       (i/request i/delete-draftset-data access-token (draftset/id draftset) quads {:metadata metadata})
+       (->async-job))))
 
 (defn delete-triples
-  [client access-token draftset graph triples & {:keys [metadata]}]
-  (-> client
-      (i/set-content-type "application/n-triples")
-      (i/request i/delete-draftset-data
-                 access-token
-                 (draftset/id draftset)
-                 triples
-                 :graph graph
-                 :metadata metadata)
-      (->async-job)))
+  ([client access-token draftset graph triples]
+   (delete-triples client access-token draftset graph triples {}))
+  ([client access-token draftset graph triples {:keys [metadata]}]
+   (-> client
+       (i/set-content-type "application/n-triples")
+       (i/request i/delete-draftset-data
+                  access-token
+                  (draftset/id draftset)
+                  triples
+                  {:graph graph
+                   :metadata metadata})
+       (->async-job))))
 
 (defn add-data
   "Append the supplied RDF statements to this Draftset.
@@ -212,18 +220,18 @@
   - `opts` is a map of optional arguments, which may include:
     - `graph`: required if the statements are triples
     - `metadata`: a map with arbitrary keys that will be included on the job for future reference"
-  [client access-token draftset statements & {:keys [graph metadata]}]
-  (let [url (martian/url-for client
-                             :put-draftset-data
-                             {:id (draftset/id draftset)})
-        format (i/get-format statements graph)]
-    (-> (i/append-via-http-stream access-token
-                                  url
-                                  statements
-                                  :graph graph
-                                  :format format
-                                  :metadata metadata)
-        (->async-job))))
+  ([client access-token draftset statements]
+   (add-data client access-token draftset statements {}))
+  ([client access-token draftset statements opts]
+   (let [url (martian/url-for client
+                              :put-draftset-data
+                              {:id (draftset/id draftset)})
+         format (i/get-format statements (opts :graph))]
+     (-> (i/append-via-http-stream access-token
+                                   url
+                                   statements
+                                   (assoc opts :format format))
+         (->async-job)))))
 
 (defn add
   "Append the supplied RDF statements to this Draftset.
@@ -232,7 +240,7 @@
   ([client access-token draftset quads]
    (add-data client access-token draftset quads))
   ([client access-token draftset graph triples]
-   (add-data client access-token draftset triples :graph graph)))
+   (add-data client access-token draftset triples {:graph graph})))
 
 (defn add-in-batches
   "Append the supplied RDF data to this Draftset in batches"
@@ -250,10 +258,12 @@
 
 (defn publish
   "Publish the Draftset to live"
-  [client access-token draftset & {:keys [metadata]}]
-  (-> client
-      (i/request i/publish-draftset access-token (draftset/id draftset) :metadata metadata)
-      (->async-job)))
+  ([client access-token draftset]
+   (publish client access-token draftset {}))
+  ([client access-token draftset {:keys [metadata]}]
+   (-> client
+       (i/request i/publish-draftset access-token (draftset/id draftset) {:metadata metadata})
+       (->async-job))))
 
 (defn get
   "Access the quads inside this Draftset"

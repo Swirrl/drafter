@@ -63,7 +63,7 @@
 
 (defn delete-draftset
   "Delete the Draftset and its data"
-  [client id & {:keys [metadata]}]
+  [client id {:keys [metadata]}]
   (martian/response-for client
                         :delete-draftset
                         (cond-> {:id id}
@@ -81,7 +81,7 @@
 (defn delete-draftset-data
   "Remove the supplied RDF data from this Draftset. Opts may include `graph` if the statements
   to be deleted are triples and `metadata`, which will be stored on the job for future reference."
-  [client id data & {:keys [metadata] :as opts}]
+  [client id data {:keys [metadata] :as opts}]
   (martian/response-for
    client
    :delete-draftset-data
@@ -192,7 +192,7 @@
 
 (defn publish-draftset
   "Publish the specified Draftset"
-  [client id & {:keys [metadata]}]
+  [client id {:keys [metadata]}]
   (martian/response-for client
                         :publish-draftset
                         (cond-> {:id id}
@@ -224,7 +224,7 @@
 (defn append-via-http-stream
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
-  [access-token url statements & {:keys [graph format metadata] :as _opts}]
+  [access-token url statements {:keys [graph format metadata] :as opts}]
   (let [{input-stream :input worker :worker}
         (if (some #(instance? % statements) [InputStream File])
           {:input statements}
@@ -247,7 +247,7 @@
 
 (defn put-draftset-graph
   "Copy a graph from live into this Draftset"
-  [client id graph & {:keys [metadata]}]
+  [client id graph {:keys [metadata]}]
   (martian/response-for
    client
    :put-draftset-graph
