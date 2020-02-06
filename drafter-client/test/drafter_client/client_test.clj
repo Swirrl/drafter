@@ -5,6 +5,7 @@
             [drafter.middleware.auth0-auth]
             [drafter.middleware.auth]
             [drafter-client.client :as sut]
+            [drafter-client.client-spec :as spec]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.test-util.auth :as auth-util]
             [drafter-client.test-util.db :as db-util]
@@ -14,7 +15,9 @@
             [grafter-2.rdf4j.repository :as gr-repo]
             [integrant.core :as ig]
             [clojure.java.io :as io]
-            [grafter-2.rdf.protocols :as pr])
+            [grafter-2.rdf.protocols :as pr]
+            [clojure.spec.alpha :as s]
+            [clj-time.core :as time])
   (:import clojure.lang.ExceptionInfo
            java.net.URI
            [java.util UUID]
@@ -37,6 +40,9 @@
   (try
     (st/instrument)
     (f)
+    (catch Throwable e
+      (prn e)
+      (throw e))
     (finally
       (st/unstrument))))
 
@@ -100,6 +106,15 @@
 (t/use-fixtures :once
   drafter-server-fixture)
 
+(defn mock-job-with-kvs [& kvs]
+  (let [job {:id (UUID/randomUUID)
+             :user-id "abc@def.ghi"
+             :status :pending
+             :priority :batch-write
+             :start-time (time/now)
+             :finish-time (time/now)}]
+    (apply assoc job kvs)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tests ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -109,22 +124,19 @@
         restart-id (UUID/randomUUID)
         job (sut/->AsyncJob job-id restart-id)]
     (t/testing "Job succeeded"
-      (let [details {:some "details"}
-            state {:type "ok" :details details}
+      (let [state (mock-job-with-kvs :status :complete)
             status (sut/job-status job state)]
-        (is (= details status))))
+        (is (= state status))))
     (t/testing "Job failed"
       (let [details {:some "details"}
-            state {:type "error" :message ":(" :error-class "java.lang.Exception" :details details}
+            state (mock-job-with-kvs
+                   :status :complete
+                   :error {:message ":(" :error-class "java.lang.Exception" :details details})
             status (sut/job-status job state)]
         (is (sut/job-failure-result? status))))
     (t/testing "In progress"
-      (let [state {:type "not-found" :restart-id restart-id}]
-        (is (= ::sut/pending (sut/job-status job state)))))
-    (t/testing "Drafter restart"
-      (let [state {:type "not-found" :restart-id (UUID/randomUUID)}
-            status (sut/job-status job state)]
-        (is (sut/job-failure-result? status))))))
+      (let [state (mock-job-with-kvs :status :pending)]
+        (is (= ::sut/pending (sut/job-status job state)))))))
 
 (t/deftest live-repo-tests
   (let [client (drafter-client)
@@ -565,3 +577,32 @@
         (is (true? (sut/writes-locked? client token)))
         (is (= :drafter-client.client/completed
                (sut/resolve-job client token job-2)))))))
+
+(deftest wait-result!-test
+  (let [client (drafter-client)
+        quads (infinite-test-triples (URI. "http://test.graph.com/quad-graph"))
+        how-many 1000
+        token (auth-util/system-token)
+        name "Draftset publishing"
+        description "Testing adding things, publishing them, and reading them"
+        draftset-1 (sut/new-draftset client token name description)
+        quads (take how-many quads)]
+    (t/testing "That wait-result! returns the :complete job"
+      (let [job-1 (sut/add-data client token draftset-1 quads)
+            res-1 (sut/wait-result! client token job-1)]
+        (is (= (:job-id job-1) (:id res-1)))
+        (is (= :complete (:status res-1)))))
+
+    (t/testing "That wait-result! returns the job-timeout-exception"
+      (let [client (sut/with-job-timeout client -1)
+            job-1 (sut/add-data client token draftset-1 quads)
+            res-1 (sut/wait-result! client token job-1)]
+        (is (sut/job-timeout-exception? res-1))))
+
+    (t/testing "That wait-result! returns the job-not-found-exception"
+      (let [job-id (UUID/randomUUID)
+            job-1 (sut/->AsyncJob job-id (UUID/randomUUID))
+            res-1 (sut/wait-result! client token job-1)]
+        (is (instance? ExceptionInfo res-1))
+        (is (= (:job-id (ex-data res-1)) job-id))
+        (is (= (.getMessage res-1) "Job not found"))))))

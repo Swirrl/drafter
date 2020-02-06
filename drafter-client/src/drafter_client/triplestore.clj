@@ -300,15 +300,19 @@
   (-> (repository client token context)
       (triplestore)))
 
-(defn m2m-triplestore [client]
+(defn m2m-triplestore [client job-timeout]
   (let [token (:access_token (auth/get-client-id-token client))
         context draftset/live]
-    (-> (repository client token context)
+    (-> client
+        (client/with-job-timeout job-timeout)
+        (repository token context)
         (triplestore))))
 
-(defn mock-m2m-triplestore [client mock-token]
+(defn mock-m2m-triplestore [client mock-token job-timeout]
   (let [context draftset/live]
-    (-> (repository client mock-token context)
+    (-> client
+        (client/with-job-timeout job-timeout)
+        (repository mock-token context)
         (triplestore))))
 
 (defmethod ig/init-key :drafter-client.triplestore/auth-code-triplestore
@@ -317,12 +321,12 @@
     (auth-code-triplestore client token draft)))
 
 (defmethod ig/init-key :drafter-client.triplestore/m2m-triplestore
-  [_ {:keys [client]}]
-  (m2m-triplestore client))
+  [_ {:keys [client job-timeout] :or {job-timeout ##Inf}}]
+  (m2m-triplestore client job-timeout))
 
 (defmethod ig/init-key :drafter-client.triplestore/mock-m2m-triplestore
-  [_ {:keys [client token]}]
-  (mock-m2m-triplestore client token))
+  [_ {:keys [client token job-timeout] :or {job-timeout ##Inf}}]
+  (mock-m2m-triplestore client token job-timeout))
 
 (defmethod ig/halt-key! :drafter-client.triplestore/auth-code-triplestore
   [_ triplestore]
