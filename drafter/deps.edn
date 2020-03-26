@@ -84,8 +84,8 @@
         }
 
  :mvn/repos
- {"swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"}
-  "swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"}}
+ {"swirrl-jars-releases" {:url "s3://swirrl-jars/releases/"}
+  "swirrl-jars-snapshots" {:url "s3://swirrl-jars/snapshots/"}}
 
  :jvm-opts ["-Djava.awt.headless=true" "-XX:-OmitStackTraceInFastThrow"]
 

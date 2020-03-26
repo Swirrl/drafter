@@ -23,8 +23,8 @@
         }
 
  :mvn/repos
- {"swirrl-jars-releases" {:url "s3p://swirrl-jars/releases/"}
-  "swirrl-jars-snapshots" {:url "s3p://swirrl-jars/snapshots/"}}
+ {"swirrl-jars-releases" {:url "s3://swirrl-jars/releases/"}
+  "swirrl-jars-snapshots" {:url "s3://swirrl-jars/snapshots/"}}
 
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
                  :extra-deps {
