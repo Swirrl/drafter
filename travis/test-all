@@ -16,10 +16,10 @@ cd ../drafter
 
 clojure -A:dev:spec
 
-cp log-config.edn.example log-config.edn
+cp -n log-config.edn.example log-config.edn
 
 cd ../drafter-client
 
-cp ../drafter/log-config.edn.example log-config.edn
+cp -n ../drafter/log-config.edn.example log-config.edn
 
 ./bin/kaocha --fail-fast
