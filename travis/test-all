@@ -12,14 +12,15 @@ cd `dirname $0`
 
 cd ../drafter
 
+[ -f log-config.edn ] || cp log-config.edn.example log-config.edn2
+
 ./bin/kaocha --reporter documentation --fail-fast
 
 clojure -A:dev:spec
 
-cp log-config.edn.example log-config.edn
 
 cd ../drafter-client
 
-cp ../drafter/log-config.edn.example log-config.edn
+[ -f log-config.edn ] || cp ../drafter/log-config.edn.example log-config.edn
 
 ./bin/kaocha --fail-fast
