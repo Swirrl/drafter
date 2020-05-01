@@ -313,37 +313,51 @@
 (defn wait-results!
   "Waits for a sequence of jobs to complete and returns a sequence of results in corresponding order.
    If a job succeeded, the result will be a result map, otherwise an exception indiciating the reason
-   for the failure."
-  [client access-token jobs]
-  (mapv #(wait-result! client access-token %) jobs))
+   for the failure.
+
+  Takes the same opts as wait-result!"
+  ([client access-token jobs] (wait-results! client access-token jobs (wait-opts client)))
+  ([client access-token jobs opts]
+   (mapv #(wait-result! client access-token % opts) jobs)))
 
 (defn wait!
   "Waits for the specified job to complete. Returns the result of the job if successful or
-  throws an exception if the job failed"
-  [client access-token job]
-  (let [result (wait-result! client access-token job)]
-    (if (exception? result)
-      (throw result)
-      result)))
+  throws an exception if the job failed.
+
+  Takes the same opts as wait-result!"
+  ([client access-token job] (wait! client access-token job (wait-opts client)))
+  ([client access-token job opts]
+   (let [result (wait-result! client access-token job opts)]
+     (if (exception? result)
+       (throw result)
+       result))))
 
 (defn wait-nil!
-  "Waits for a job to complete and returns nil if successful, otherwise throws an exception"
-  [client access-token job]
-  (wait! client access-token job)
-  nil)
+  "Waits for a job to complete and returns nil if successful, otherwise throws an exception
+
+  Takes the same opts as wait-result!"
+  ([client access-token job]
+   (wait-nil! client access-token job (wait-opts client)))
+  ([client access-token job opts]
+   (wait! client access-token job opts)
+   nil))
 
 (defn wait-all!
   "Waits for the specified jobs to complete. Returns a sequence of the complete job results in the
    corresponding order of the jobs in the source sequence if they all completed successfully, or
-   throws an exception if any of the jobs failed."
-  [client access-token jobs]
-  (let [results (wait-results! client access-token jobs)
-        failures (filter exception? results)
-        succeeded (remove exception? results)]
-    (if (seq failures)
-      (throw (ex-info "One or more jobs failed" {:failed    failures
-                                                 :succeeded succeeded}))
-      succeeded)))
+   throws an exception if any of the jobs failed.
+
+  Takes the same opts as wait-result!"
+  ([client access-token jobs]
+   (wait-all! client access-token jobs (wait-opts client)))
+  ([client access-token jobs opts]
+   (let [results (wait-results! client access-token jobs opts)
+         failures (filter exception? results)
+         succeeded (remove exception? results)]
+     (if (seq failures)
+       (throw (ex-info "One or more jobs failed" {:failed    failures
+                                                  :succeeded succeeded}))
+       succeeded))))
 
 (defn resolve-job
   "Wait until asynchronous `job` has finished"
@@ -363,7 +377,9 @@
       (i/request i/status-writes-locked access-token)
       (Boolean/parseBoolean)))
 
-(defn with-job-timeout [client job-timeout]
+(defn with-job-timeout
+  "Return a client with the speified job timeout set.  The job timeout will be raised"
+  [client job-timeout]
   (->DrafterClient (:martian client)
                    (assoc (:opts client) :job-timeout job-timeout)
                    (:auth0 client)))
