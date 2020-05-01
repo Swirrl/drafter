@@ -280,21 +280,35 @@
 (defn job-timeout-exception? [e]
   (-> e ex-data :type (= ::job-timeout)))
 
+(defn- wait-opts [client]
+  {:job-timeout (or (:job-timeout client) ##Inf)})
+
 (defn wait-result!
-  "Waits for an async job to complete and returns the result map if it succeeded
-   or, returns an exception representing the failure otherwise."
-  [client access-token job]
-  (loop [waited 0]
-    (if-let [state (refresh-job client access-token job)]
-      (let [status (job-status job state)
-            wait 500]
-        (cond (>= waited (:job-timeout client))
-              (job-timeout-exception job)
-              (= ::pending status)
-              (do (Thread/sleep wait) (recur (+ waited wait)))
-              :else
-              status))
-      (ex-info "Job not found" job))))
+  "Waits for an async job to complete and returns the result map if it
+  succeeded or, returns an exception representing the failure
+  otherwise.
+
+  If a :job-timeout option is provided in opts (or set via
+  a :job-timeout key on the client) then this call will raise
+  a ::job-timeout exception if the job does not finish before the
+  timeout.
+
+  NOTE: That if a job does timeout, the timeout only occurs client
+  side and the job itself will be left running against drafter."
+  ([client access-token job]
+   (wait-result! client access-token job (wait-opts client)))
+  ([client access-token job {:keys [timeout]}]
+   (loop [waited 0]
+     (if-let [state (refresh-job client access-token job)]
+       (let [status (job-status job state)
+             wait 500]
+         (cond (>= waited timeout)
+               (job-timeout-exception job)
+               (= ::pending status)
+               (do (Thread/sleep wait) (recur (+ waited wait)))
+               :else
+               status))
+       (ex-info "Job not found" job)))))
 
 (defn wait-results!
   "Waits for a sequence of jobs to complete and returns a sequence of results in corresponding order.
