@@ -297,12 +297,12 @@
   side and the job itself will be left running against drafter."
   ([client access-token job]
    (wait-result! client access-token job (wait-opts client)))
-  ([client access-token job {:keys [timeout]}]
+  ([client access-token job {:keys [job-timeout]}]
    (loop [waited 0]
      (if-let [state (refresh-job client access-token job)]
        (let [status (job-status job state)
              wait 500]
-         (cond (>= waited timeout)
+         (cond (>= waited job-timeout)
                (job-timeout-exception job)
                (= ::pending status)
                (do (Thread/sleep wait) (recur (+ waited wait)))

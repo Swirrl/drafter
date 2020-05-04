@@ -594,16 +594,42 @@
         (is (= (:job-id job-1) (:id res-1)))
         (is (= :complete (:status res-1)))))
 
-    (t/testing "That wait-result! returns the job-timeout-exception"
-      (let [client (sut/with-job-timeout client -1)
-            job-1 (sut/add-data client token draftset-1 quads)
-            res-1 (sut/wait-result! client token job-1)]
-        (is (sut/job-timeout-exception? res-1))))
+    (t/testing "With timeouts"
+      (let [timeout -1]
+        (letfn [(wait-for-drafter-finish [job]
+                  ;; As the job timeouts are a client side only feature
+                  ;; to allow control to return and continue in the
+                  ;; caller, they do not stop the underlying drafter
+                  ;; job.  Hence after raising a client side timeout,
+                  ;; this test needs to wait for drafter to finish
+                  ;; processing the initial call to sut/add-data, in
+                  ;; order to guarantee that the test data tear-down
+                  ;; happens after we've added the data.
+                  (sut/wait-result! (sut/with-job-timeout client ##Inf) token job))]
+          (t/testing "set on client"
+            (let [timeout-client (sut/with-job-timeout client timeout)]
+              (t/testing "returns a job-timeout-exception"
+                (let [job (sut/add-data client token draftset-1 quads)
+                      res-1 (sut/wait-result! timeout-client token job)]
+                  (is (sut/job-timeout-exception? res-1))
+                  ;; wait-for-drafter-finish is only required because this test
+                  ;; raises a timeout exception.
+                  (wait-for-drafter-finish job)))))
+
+          (t/testing "passed as a parameter"
+            (t/testing "returns a job-timeout-exception"
+              (let [job (sut/add-data client token draftset-1 quads)
+                    res-1 (sut/wait-result! client token job {:job-timeout timeout})]
+
+                (is (sut/job-timeout-exception? res-1))
+                ;; wait-for-drafter-finish is only required because this test
+                ;; raises a timeout exception.
+                (wait-for-drafter-finish job)))))))
 
     (t/testing "That wait-result! returns the job-not-found-exception"
       (let [job-id (UUID/randomUUID)
-            job-1 (sut/->AsyncJob job-id (UUID/randomUUID))
-            res-1 (sut/wait-result! client token job-1)]
+            job (sut/->AsyncJob job-id (UUID/randomUUID))
+            res-1 (sut/wait-result! client token job)]
         (is (instance? ExceptionInfo res-1))
         (is (= (:job-id (ex-data res-1)) job-id))
         (is (= (.getMessage res-1) "Job not found"))))))
