@@ -115,23 +115,37 @@
  :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                                   :drafter.user/repo #ig/ref :drafter.user/repo}
 
- :drafter.routes/draftsets-api {:get-users-handler #ig/ref :drafter.feature.users.list/get-users-handler
-                                :get-draftsets-handler #ig/ref :drafter.feature.draftset.list/get-draftsets-handler
-                                :create-draftsets-handler #ig/ref :drafter.feature.draftset.create/handler
-                                :get-draftset-handler #ig/ref :drafter.feature.draftset.show/handler
-                                :delete-draftset-handler #ig/ref :drafter.feature.draftset.delete/handler
-                                :draftset-options-handler #ig/ref :drafter.feature.draftset.options/handler
-                                :draftset-get-data-handler #ig/ref :drafter.feature.draftset-data.show/handler
-                                :delete-draftset-data-handler #ig/ref :drafter.feature.draftset-data.delete/delete-data-handler
-                                :delete-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler
-                                :delete-draftset-changes-handler #ig/ref :drafter.feature.draftset.changes/delete-changes-handler
-                                :put-draftset-data-handler #ig/ref :drafter.feature.draftset-data.append/data-handler
-                                :put-draftset-graph-handler #ig/ref :drafter.feature.draftset-data.append-by-graph/handler
-                                :draftset-query-handler #ig/ref :drafter.feature.draftset.query/handler
-                                :draftset-publish-handler #ig/ref :drafter.feature.draftset.publish/handler
-                                :draftset-set-metadata-handler #ig/ref :drafter.feature.draftset.set-metadata/handler
-                                :draftset-submit-to-handler #ig/ref :drafter.feature.draftset.submit/handler
-                                :draftset-claim-handler #ig/ref :drafter.feature.draftset.claim/handler}
+ [:drafter/routes :draftset/api] {:context "/v1"
+                                  :routes [[:get "/users" #ig/ref :drafter.feature.users.list/get-users-handler]
+
+                                           [:get "/draftsets" #ig/ref :drafter.feature.draftset.list/get-draftsets-handler]
+                                           [:post "/draftsets" #ig/ref :drafter.feature.draftset.create/handler]
+
+                                           [:get "/draftset/:id" #ig/ref :drafter.feature.draftset.show/handler]
+                                           [:delete "/draftset/:id" #ig/ref :drafter.feature.draftset.delete/handler]
+                                           [:options "/draftset/:id" #ig/ref :drafter.feature.draftset.options/handler]
+
+                                           [:get "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.show/handler]
+                                           [:delete "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.delete/delete-data-handler]
+
+                                           [:delete "/draftset/:id/graph" #ig/ref :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler]
+                                           [:delete "/draftset/:id/changes" #ig/ref :drafter.feature.draftset.changes/delete-changes-handler]
+
+
+                                           [:put "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.append/data-handler]
+                                           [:put "/draftset/:id/graph" #ig/ref :drafter.feature.draftset-data.append-by-graph/handler]
+                                           [nil "/draftset/:id/query" #ig/ref :drafter.feature.draftset.query/handler]
+
+                                           [:post "/draftset/:id/publish" #ig/ref :drafter.feature.draftset.publish/handler]
+                                           [:put "/draftset/:id" #ig/ref :drafter.feature.draftset.set-metadata/handler]
+                                           [:post "/draftset/:id/submit-to" #ig/ref :drafter.feature.draftset.submit/handler]
+                                           [:put "/draftset/:id/claim" #ig/ref :drafter.feature.draftset.claim/handler]
+
+                                           ;; TODO new handler....
+                                           ;;[:get "/endpoint/live" #ig/ref :drafter.feature.endpoint.show/handler]
+                                           ]
+
+                                  }
 
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -141,7 +155,7 @@
 
  :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
-                       :draftset-api-routes #ig/ref :drafter.routes/draftsets-api
+                       :draftset-api-routes #ig/ref [:drafter/routes :draftset/api]
                        :jobs-status-routes #ig/ref :drafter.routes/jobs-status
                        :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock}
 

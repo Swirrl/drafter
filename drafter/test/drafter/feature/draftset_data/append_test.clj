@@ -17,7 +17,7 @@
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(def system "test-system.edn")
+(def system-config "test-system.edn")
 
 (def dummy "dummy@user.com")
 
@@ -56,10 +56,13 @@
                    (.toEpochSecond ts-3))
                 "Modified time is updated after delete"))))))
 
+(def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler])
+
 (tc/deftest-system-with-keys append-quad-data-with-valid-content-type-to-draftset
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [data-file-path "test/resources/test-draftset.trig"
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        data-file-path "test/resources/test-draftset.trig"
         quads (statements data-file-path)
         draftset-location (help/create-draftset-through-api handler test-editor)]
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
@@ -72,9 +75,10 @@
           (is (set expected-statements) (set graph-triples)))))))
 
 (tc/deftest-system-with-keys append-quad-data-with-metadata
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [data-file-path "test/resources/test-draftset.trig"
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        data-file-path "test/resources/test-draftset.trig"
         quads (statements data-file-path)
         draftset-location (help/create-draftset-through-api handler test-editor)
         request (help/statements->append-request test-editor
@@ -89,9 +93,10 @@
       (is (= "Custom job title" (-> job :metadata :title))))))
 
 (tc/deftest-system-with-keys append-quad-data-to-graph-which-exists-in-live
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [quads (statements "test/resources/test-draftset.trig")
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
         live-quads (map (comp first second) grouped-quads)
         quads-to-add (rest (second (first grouped-quads)))
@@ -107,18 +112,20 @@
       (is (= (set expected-quads) (set draftset-quads))))))
 
 (tc/deftest-system-with-keys append-triple-data-to-draftset-test
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [system system-config]
   (with-open [fs (io/input-stream "test/test-triple.nt")]
-    (let [draftset-location (help/create-draftset-through-api handler test-editor)
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-editor)
           request (help/append-to-draftset-request test-editor draftset-location fs "application/n-triples")
           response (handler request)]
       (is (help/is-client-error-response? response)))))
 
 (tc/deftest-system-with-keys append-triple-data-with-metadata
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         triples (statements "test/test-triple.nt")
         request (help/statements->append-triples-request test-editor
                                                          draftset-location
@@ -133,9 +140,10 @@
       (is (= "Custom job title" (-> job :metadata :title))))))
 
 (tc/deftest-system-with-keys append-triples-to-graph-which-exists-in-live
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [[graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         draftset-location (help/create-draftset-through-api handler test-editor)]
     (help/publish-quads-through-api handler [(first graph-quads)])
     (help/append-triples-to-draftset-through-api handler test-editor draftset-location (rest graph-quads) graph)
@@ -145,34 +153,38 @@
       (is (= (set expected-triples) (set draftset-graph-triples))))))
 
 (tc/deftest-system-with-keys append-quad-data-without-content-type-to-draftset
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [system system-config]
   (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [draftset-location (help/create-draftset-through-api handler test-editor)
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-editor)
           request (help/append-to-draftset-request test-editor draftset-location fs "tmp-content-type")
           request (update-in request [:headers] dissoc "content-type")
           response (handler request)]
       (is (help/is-client-error-response? response)))))
 
 (tc/deftest-system-with-keys append-data-to-non-existent-draftset
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [append-response (help/make-append-data-to-draftset-request handler test-publisher "/v1/draftset/missing" "test/resources/test-draftset.trig")]
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        append-response (help/make-append-data-to-draftset-request handler test-publisher "/v1/draftset/missing" "test/resources/test-draftset.trig")]
     (tc/assert-is-not-found-response append-response)))
 
 (tc/deftest-system-with-keys append-quads-by-non-owner
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         quads (statements "test/resources/test-draftset.trig")
         append-request (help/statements->append-request test-publisher draftset-location quads {:format :nq})
         append-response (handler append-request)]
     (tc/assert-is-forbidden-response append-response)))
 
 (tc/deftest-system-with-keys append-graph-triples-by-non-owner
-  [:drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         append-request (help/statements->append-triples-request test-publisher draftset-location graph-quads {:graph graph})
         append-response (handler append-request)]

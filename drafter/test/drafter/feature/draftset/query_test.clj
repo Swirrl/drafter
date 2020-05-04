@@ -11,7 +11,7 @@
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(def system "drafter/feature/empty-db-system.edn")
+(def system-config "drafter/feature/empty-db-system.edn")
 
 (defn- result-set-handler [result-state]
   (reify QueryResultHandler
@@ -43,9 +43,10 @@
       @result-state)))
 
 (tc/deftest-system-with-keys query-draftset-with-data
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
         append-response (help/make-append-data-to-draftset-request handler test-editor draftset-location draftset-data-file)]
     (tc/await-success (:finished-job (:body append-response)) )
@@ -59,9 +60,10 @@
       (is (= expected-triples response-triples)))))
 
 (tc/deftest-system-with-keys query-draftset-not-unioned-with-live-with-published-statements
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
         [live-graph live-quads] (first grouped-quads)
         [ds-live-graph ds-quads] (second grouped-quads)
         draftset-location (help/create-draftset-through-api handler test-editor)]
@@ -73,18 +75,20 @@
       (is (= (set expected-quads) (set results))))))
 
 (tc/deftest-system-with-keys query-draftset-with-malformed-union-with-live
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         q "SELECT * WHERE { ?s ?p ?o }"
         request (create-query-request test-editor draftset-location q "application/sparql-results+json" :union-with-live? "notbool")
         response (handler request)]
     (tc/assert-is-unprocessable-response response)))
 
 (tc/deftest-system-with-keys query-draftset-unioned-with-live
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [test-quads (statements "test/resources/test-draftset.trig")
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        test-quads (statements "test/resources/test-draftset.trig")
         grouped-test-quads (group-by context test-quads)
         [live-graph live-quads] (first grouped-test-quads)
         [ds-live-graph draftset-quads] (second grouped-test-quads)
@@ -106,32 +110,36 @@
         (is (= expected-quads @result-state))))))
 
 (tc/deftest-system-with-keys query-non-existent-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [request (create-query-request test-editor "/v1/draftset/missing" "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        request (create-query-request test-editor "/v1/draftset/missing" "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
         response (handler request)]
     (tc/assert-is-not-found-response response)))
 
 (tc/deftest-system-with-keys query-draftset-request-with-missing-query-parameter
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         response (handler (tc/with-identity test-editor {:uri (str draftset-location "/query") :request-method :post}))]
     (tc/assert-is-unprocessable-response response)))
 
 (tc/deftest-system-with-keys query-draftset-request-with-invalid-http-method
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         query-request (create-query-request test-editor draftset-location "SELECT * WHERE { ?s ?p ?o }" "text/plain")
         query-request (assoc query-request :request-method :put)
         response (handler query-request)]
     (tc/assert-is-method-not-allowed-response response)))
 
 (tc/deftest-system-with-keys query-draftset-by-non-owner
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         query-request (create-query-request test-publisher draftset-location "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
         query-response (handler query-request)]
     (tc/assert-is-forbidden-response query-response)))

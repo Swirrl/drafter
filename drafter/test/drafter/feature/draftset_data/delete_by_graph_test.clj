@@ -10,9 +10,11 @@
 
 (def system "drafter/feature/empty-db-system.edn")
 
+(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
+
 (tc/deftest-system-with-keys delete-live-graph-not-in-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         graph-quads (group-by context quads)
         live-graphs (keys graph-quads)
@@ -23,8 +25,8 @@
       (is (= #{graph-to-delete} (set (keys draftset-graphs)))))))
 
 (tc/deftest-system-with-keys delete-graph-with-changes-in-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         published-quad (first graph-quads)
@@ -36,8 +38,8 @@
       (is (= #{graph} (set (keys draftset-graphs)))))))
 
 (tc/deftest-system-with-keys delete-graph-only-in-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [rdf-data-file "test/resources/test-draftset.trig"
         draftset-location (help/create-draftset-through-api handler test-editor)
         draftset-quads (statements rdf-data-file)
@@ -54,15 +56,15 @@
       (is (= (set expected-graphs) (set draftset-graphs))))))
 
 (tc/deftest-system-with-keys delete-graph-request-for-non-existent-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [request (tc/with-identity test-manager {:uri "/v1/draftset/missing/graph" :request-method :delete :params {:graph "http://some-graph"}})
         response (handler request)]
     (tc/assert-is-not-found-response response)))
 
 (tc/deftest-system-with-keys delete-graph-by-non-owner
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
  (let [draftset-location (help/create-draftset-through-api handler test-editor)
        [graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)

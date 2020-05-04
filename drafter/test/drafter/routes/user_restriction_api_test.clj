@@ -100,10 +100,10 @@
 
 (deftest-system draftset-sparql-user-restrictions-test
   [{endpoint :drafter.routes.draftsets-api/draftset-query-handler
-    api :drafter.routes/draftsets-api
     :keys [drafter.stasher/repo] :as system}
    system-config]
-  (let [req (create-test/create-draftset-request test-editor nil nil)
+  (let [api (get system [:drafter/routes :draftset/api])
+        req (create-test/create-draftset-request test-editor nil nil)
         draftset (-> req api :headers (get "Location"))
         quads (statements "test/resources/drafter/routes/sparql-test/graph-restriction-additions.trig")]
     (letfn [(run-query [q & kwargs]
@@ -351,10 +351,10 @@
 
 (deftest-system draft-from-and-from-named-interaction-test
   [{endpoint :drafter.routes.draftsets-api/draftset-query-handler
-    api :drafter.routes/draftsets-api
     :keys [drafter.stasher/repo] :as system}
    system-config]
-  (let [req (create-test/create-draftset-request test-editor nil nil)
+  (let [api (get system [:drafter/routes :draftset/api])
+        req (create-test/create-draftset-request test-editor nil nil)
         draftset (-> req api :headers (get "Location"))
         quads (statements "test/resources/drafter/routes/sparql-test/graph-restriction-additions.trig")]
     (append-quads-to-draftset-through-api api test-editor draftset quads)

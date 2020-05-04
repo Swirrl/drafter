@@ -30,9 +30,11 @@
                               :request-method :delete}
                              metadata (merge {:params {:metadata (enc/json-encode metadata)}})))))
 
+(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
+
 (tc/deftest-system-with-keys delete-draftset-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         delete-response (handler (create-delete-draftset-request draftset-location test-editor))]
     (tc/assert-is-accepted-response delete-response)
@@ -42,8 +44,8 @@
       (tc/assert-is-not-found-response get-response))))
 
 (tc/deftest-system-with-keys delete-draftset-with-metadata-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         delete-request (create-delete-draftset-request draftset-location test-editor {:title "Deleting draftset"})
         delete-response (handler delete-request)]
@@ -54,21 +56,21 @@
       (is (= "Deleting draftset" (-> job :metadata :title))))))
 
 (tc/deftest-system-with-keys delete-non-existent-draftset-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [delete-response (handler (create-delete-draftset-request "/v1/draftset/missing" test-publisher))]
     (tc/assert-is-not-found-response delete-response)))
 
 (tc/deftest-system-with-keys delete-draftset-by-non-owner-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
+  [:drafter.fixture-data/loader :drafter/routes :draftset/api]
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         delete-response (handler (create-delete-draftset-request draftset-location test-manager))]
     (tc/assert-is-forbidden-response delete-response)))
 
 (tc/deftest-system-with-keys delete-non-existent-live-graph-in-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
+  [:drafter.fixture-data/loader :drafter/routes :draftset/api]
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         graph-to-delete "http://live-graph"
         delete-request (help/delete-draftset-graph-request test-editor draftset-location "http://live-graph")]
@@ -90,8 +92,8 @@
 
 
 (tc/deftest-system-with-keys delete-graph-by-non-owner
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
 
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         [graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
@@ -102,8 +104,8 @@
       (tc/assert-is-forbidden-response delete-response))))
 
 (tc/deftest-system-with-keys modifying-in-draftset-updates-modified-timestamp-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler :drafter.stasher/repo]
-  [{handler :drafter.routes/draftsets-api repo :drafter.stasher/repo} system]
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.stasher/repo]
+  [{handler [:drafter/routes :draftset/api] repo :drafter.stasher/repo} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         draftset-location (help/create-draftset-through-api handler test-editor)
         get-draft-graph-modified-at
@@ -144,8 +146,8 @@
                   "Modified time is updated after delete"))))))))
 
 (tc/deftest-system-with-keys delete-quads-from-live-graphs-in-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
         to-delete (map (comp first second) grouped-quads)
@@ -161,8 +163,8 @@
       (is (= (set expected-quads) (set draftset-quads))))))
 
 (tc/deftest-system-with-keys delete-quads-from-graph-not-in-live
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         to-delete [(->Quad (URI. "http://s1") (URI. "http://p1") (URI. "http://o1") (URI. "http://missing-graph1"))
                    (->Quad (URI. "http://s2") (URI. "http://p2") (URI. "http://o2") (URI. "http://missing-graph2"))]
@@ -170,8 +172,8 @@
     (is (empty? (keys (:changes draftset-info))))))
 
 (tc/deftest-system-with-keys delete-quads-only-in-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         draftset-quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context draftset-quads)]
@@ -188,8 +190,8 @@
       (is (= (set expected-quads) (set actual-quads))))))
 
 (tc/deftest-system-with-keys delete-all-quads-from-draftset-graph
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         initial-statements (statements "test/resources/test-draftset.trig")
         grouped-statements (group-by context initial-statements)
@@ -203,8 +205,8 @@
       (is (= expected-graphs draftset-graphs)))))
 
 (tc/deftest-system-with-keys delete-quads-with-malformed-body
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         body (tc/string->input-stream "NOT NQUADS")
         delete-request (help/create-delete-quads-request test-editor
@@ -216,8 +218,8 @@
     (is (jobs/failed-job-result? job-result))))
 
 (tc/deftest-system-with-keys delete-triples-from-graph-in-live
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
         [live-graph graph-quads] (first grouped-quads)
@@ -231,8 +233,8 @@
       (is (= (set expected-quads) (set draftset-quads))))))
 
 (tc/deftest-system-with-keys delete-triples-from-graph-not-in-live
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         to-delete [(->Triple (URI. "http://s1") (URI. "http://p1") (URI. "http://o1"))
                    (->Triple (URI. "http://s2") (URI. "http://p2") (URI. "http://o2"))]
@@ -244,8 +246,8 @@
     (is (empty? draftset-quads))))
 
 (tc/deftest-system-with-keys delete-graph-triples-only-in-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         draftset-quads (set (statements "test/resources/test-draftset.trig"))
         [graph graph-quads] (first (group-by context draftset-quads))
@@ -260,8 +262,8 @@
       (is (= expected-quads quads-after-delete)))))
 
 (tc/deftest-system-with-keys delete-all-triples-from-graph
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler :drafter/global-writes-lock]
-  [{handler :drafter.routes/draftsets-api} system]
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler :drafter/global-writes-lock]
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         grouped-quads (group-by context quads)
         [graph graph-quads] (first grouped-quads)
@@ -279,8 +281,8 @@
       (is (empty? draftset-quads)))))
 
 (tc/deftest-system-with-keys delete-draftset-triples-request-without-graph-parameter
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         draftset-quads (statements "test/resources/test-draftset.trig")]
     (help/append-data-to-draftset-through-api handler test-editor draftset-location "test/resources/test-draftset.trig")
@@ -294,8 +296,8 @@
         (tc/assert-is-unprocessable-response delete-response)))))
 
 (tc/deftest-system-with-keys delete-triples-with-malformed-body
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         body (tc/string->input-stream "NOT TURTLE")
         delete-request (help/create-delete-quads-request test-editor

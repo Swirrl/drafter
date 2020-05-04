@@ -8,7 +8,9 @@
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(def system "drafter/feature/empty-db-system.edn")
+(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
+
+(def system-config "drafter/feature/empty-db-system.edn")
 
 (defn- create-submit-to-role-request [user draftset-location role]
   (tc/with-identity user {:uri (str draftset-location "/submit-to") :request-method :post :params {:role (name role)}}))
@@ -18,9 +20,10 @@
     (tc/assert-is-ok-response response)))
 
 (tc/deftest-system-with-keys get-all-draftsets-changes-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        grouped-quads (group-by context (statements "test/resources/test-draftset.trig"))
         [graph1 graph1-quads] (first grouped-quads)
         [graph2 graph2-quads] (second grouped-quads)
         draftset-location (help/create-draftset-through-api handler test-editor)]
@@ -41,25 +44,28 @@
       (is (= :created (get-in changes [graph2 :status]))))))
 
 (tc/deftest-system-with-keys get-empty-draftset-without-title-or-description
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
     (tc/assert-schema help/DraftsetWithoutTitleOrDescription ds-info)))
 
 (tc/deftest-system-with-keys get-empty-draftset-without-description
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [display-name "Test title!"
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        display-name "Test title!"
         draftset-location (help/create-draftset-through-api handler test-editor display-name)
         ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
     (tc/assert-schema help/DraftsetWithoutDescription ds-info)
     (is (= display-name (:display-name ds-info)))))
 
 (tc/deftest-system-with-keys get-empty-draftset-with-description
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [display-name "Test title!"
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        display-name "Test title!"
         description "Draftset used in a test"
         draftset-location (help/create-draftset-through-api handler test-editor display-name description)]
 
@@ -69,9 +75,10 @@
       (is (= description (:description ds-info))))))
 
 (tc/deftest-system-with-keys get-draftset-containing-data
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [display-name "Test title!"
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        display-name "Test title!"
         draftset-location (help/create-draftset-through-api handler test-editor display-name)
         quads (statements "test/resources/test-draftset.trig")
         live-graphs (set (keys (group-by context quads)))]
@@ -84,22 +91,25 @@
       (is (= live-graphs (tc/key-set (:changes ds-info)))))))
 
 (tc/deftest-system-with-keys get-draftset-request-for-non-existent-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [response (handler (help/get-draftset-info-request "/v1/draftset/missing" test-publisher))]
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        response (handler (help/get-draftset-info-request "/v1/draftset/missing" test-publisher))]
     (tc/assert-is-not-found-response response)))
 
 (tc/deftest-system-with-keys get-draftset-available-for-claim
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)]
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)]
     (submit-draftset-to-role-through-api handler test-editor draftset-location :publisher)
     (let [ds-info (help/get-draftset-info-through-api handler draftset-location test-publisher)])))
 
 (tc/deftest-system-with-keys get-draftset-for-other-user-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         get-request (help/get-draftset-info-request draftset-location test-publisher)
         get-response (handler get-request)]
     (tc/assert-is-forbidden-response get-response)))
