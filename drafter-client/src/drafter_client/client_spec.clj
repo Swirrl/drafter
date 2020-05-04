@@ -47,7 +47,7 @@
 
 (s/fdef client/refresh-job
   :args (s/cat :client any? :access-token any? :job ::AsyncJob)
-  :ret ::job)
+  :ret (s/nilable ::job))
 
 (s/def ::JobSucceededResult (s/nilable map?))
 (s/def ::JobFailedResult client/exception?)
@@ -55,7 +55,7 @@
 
 (s/fdef client/job-status
   :args (s/cat :job ::AsyncJob :job-state ::job)
-  :ret (s/or :result ::JobResult :pending #{::pending}))
+  :ret (s/or :result ::JobResult :pending #{::client/pending}))
 
 (s/def ::wait-opts (s/nilable (s/keys :opt [::job-timeout])))
 
