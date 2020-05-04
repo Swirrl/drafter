@@ -65,7 +65,8 @@
       (throw (Exception. (format "Cannot find %s on resource path" filename)))))
 
 (defn start-drafter-server []
-  (main/-main (res-file "drafter-client-test-config.edn")))
+  (main/-main (res-file "drafter-client-test-config.edn")
+              (res-file "stasher-off.edn")))
 
 (defn drafter-server-fixture [f]
   (try
