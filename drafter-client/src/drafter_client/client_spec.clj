@@ -31,6 +31,8 @@
 (s/def ::restart-id uuid?)
 (s/def ::message string?)
 (s/def ::error-class string?)
+(s/def ::job-timeout (s/or :finite integer?
+                           :infinite #{##Inf}))
 
 (s/def ::AsyncJob (s/and #(instance? AsyncJob %)
                          (s/keys :req-un [::job-id ::restart-id])))
@@ -55,8 +57,11 @@
   :args (s/cat :job ::AsyncJob :job-state ::job)
   :ret (s/or :result ::JobResult :pending #{::pending}))
 
+(s/def ::wait-opts (s/nilable (s/keys :opt [::job-timeout])))
+
 (s/fdef client/wait-result!
-  :args (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
+  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
+               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob :opts ::wait-opts))
   :ret ::JobResult)
 
 (s/fdef client/wait-results!
@@ -64,14 +69,17 @@
   :ret (s/coll-of ::JobResult))
 
 (s/fdef client/wait!
-  :args (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
+  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
+               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob :opts ::wait-opts))
   :ret ::JobSucceededResult)
 
 (s/fdef client/wait-nil!
-  :args (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
+  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
+               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob :opts ::wait-opts))
   :ret nil?)
 
 (s/fdef client/wait-all!
-  :args (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :jobs (s/coll-of ::AsyncJob))
+  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :jobs (s/coll-of ::AsyncJob))
+               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :jobs (s/coll-of ::AsyncJob) :opts ::wait-opts))
   :ret (s/coll-of ::JobSucceededResult)
   :fn (fn [{ret :ret {jobs :jobs} :args}] (= (count ret) (count jobs))))

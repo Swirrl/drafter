@@ -10,6 +10,16 @@ fi
 
 cd `dirname $0`
 
+## TEST DRAFTER CLIENT (against Drafter)
+
+cd ../drafter-client
+
+[ -f log-config.edn ] || cp ../drafter/log-config.edn.example log-config.edn
+
+./bin/kaocha --fail-fast
+
+## TEST DRAFTER
+
 cd ../drafter
 
 [ -f log-config.edn ] || cp log-config.edn.example log-config.edn2
@@ -17,10 +27,3 @@ cd ../drafter
 ./bin/kaocha --reporter documentation --fail-fast
 
 clojure -A:dev:spec
-
-
-cd ../drafter-client
-
-[ -f log-config.edn ] || cp ../drafter/log-config.edn.example log-config.edn
-
-./bin/kaocha --fail-fast
