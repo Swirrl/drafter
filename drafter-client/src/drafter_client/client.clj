@@ -251,7 +251,12 @@
   (map ->job (i/request client i/get-jobs access-token)))
 
 (defn- refresh-job
-  "Poll to get the latest state of a job"
+  "Poll to get the latest state of a job.
+
+  Either returns the corresponding async-job object, or nil indicating
+  the job wasn't found.
+
+  HTTP protocol errors will cause this function to raise an exception."
   [client access-token {:keys [job-id] :as async-job}]
   (try
     (job client access-token job-id)

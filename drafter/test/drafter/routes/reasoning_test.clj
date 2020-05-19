@@ -126,9 +126,9 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
 
 
 (deftest-system draftset-sparql-reasoning-test
-  [{api :drafter.routes/draftsets-api :as system}
-   system-config]
-  (let [draft-1 "tbox: { :Whippet a rdfs:Class ; rdfs:subClassOf :Dog . }"
+  [system system-config]
+  (let [api (get system [:drafter/routes :draftset/api])
+        draft-1 "tbox: { :Whippet a rdfs:Class ; rdfs:subClassOf :Dog . }"
         [add-to-draft-1! publish-1! draftq-1] (new-draftset api draft-1)
         draft-2 ":PublicGraph {
                    :Whippet
@@ -190,9 +190,9 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
                (draftq-2 dog-no-label-q :union-with-live true :reasoning true)))))))
 
 (deftest-system draftset-get-data-reasoning-test
-  [{api :drafter.routes/draftsets-api :as system}
-   system-config]
-  (let [draft-1 "tbox: { :Whippet a rdfs:Class ; rdfs:subClassOf :Dog . }"
+  [system system-config]
+  (let [api (get system [:drafter/routes :draftset/api])
+        draft-1 "tbox: { :Whippet a rdfs:Class ; rdfs:subClassOf :Dog . }"
         [add-to-draft-1! publish-1! _ get-data-1] (new-draftset api draft-1)
         draft-2 ":PublicGraph {
                    :Whippet
@@ -258,64 +258,64 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
                (get-data-2 :union-with-live true :reasoning true)))))))
 
 (deftest-system draftset-non-leaky-tbox-test
-  [{live :drafter.routes.sparql/live-sparql-query-route
-    api :drafter.routes/draftsets-api :as system}
+  [{live :drafter.routes.sparql/live-sparql-query-route :as system}
    system-config]
-  (letfn [(process [xs] (map #(string/split % #",") xs))
-          (liveq [q & kwargs]
-            (let [request (apply live-query (str q-prefixes q) kwargs)]
-              (-> request live :body io/reader line-seq rest process set)))]
+  (let [api (get system [:drafter/routes :draftset/api])]
+    (letfn [(process [xs] (map #(string/split % #",") xs))
+            (liveq [q & kwargs]
+              (let [request (apply live-query (str q-prefixes q) kwargs)]
+                (-> request live :body io/reader line-seq rest process set)))]
 
-    (let [draft-1 ":PublicGraph { :Nickie a :WestHighlandTerrier . }"
-          [add-to-draft-1! publish-1! draftq-1] (new-draftset api draft-1)
-          nickie #{["http://test.com/WestHighlandTerrier"]
-                   ["http://test.com/Dog"]
-                   ["http://test.com/Animal"]
-                   ["http://test.com/Mammal"]
-                   ["http://test.com/Lifeform"]}
-          nickie-hierarchy (conj nickie ["http://www.w3.org/2002/07/owl#Thing"])
-          nickie-included? (partial set/subset? nickie)]
+      (let [draft-1 ":PublicGraph { :Nickie a :WestHighlandTerrier . }"
+            [add-to-draft-1! publish-1! draftq-1] (new-draftset api draft-1)
+            nickie #{["http://test.com/WestHighlandTerrier"]
+                     ["http://test.com/Dog"]
+                     ["http://test.com/Animal"]
+                     ["http://test.com/Mammal"]
+                     ["http://test.com/Lifeform"]}
+            nickie-hierarchy (conj nickie ["http://www.w3.org/2002/07/owl#Thing"])
+            nickie-included? (partial set/subset? nickie)]
 
-      (testing "What users can see before adding quads to draft TBOX"
-        (let [q "SELECT ?class { :Nickie a ?class } "]
-          (is (not (nickie-included? (liveq q :reasoning true))))
-          (is (= #{}
-                 (draftq-1 q :reasoning true)))
-          (is (not (nickie-included? (draftq-1 q :reasoning true :union-with-live true))))))
+        (testing "What users can see before adding quads to draft TBOX"
+          (let [q "SELECT ?class { :Nickie a ?class } "]
+            (is (not (nickie-included? (liveq q :reasoning true))))
+            (is (= #{}
+                   (draftq-1 q :reasoning true)))
+            (is (not (nickie-included? (draftq-1 q :reasoning true :union-with-live true))))))
 
-      (add-to-draft-1!)
-
-      (testing "What users can see after adding quads to draft TBOX"
-        (let [q "SELECT ?class { :Nickie a ?class } "]
-          (is (not (nickie-included? (liveq q :reasoning true))))
-          (is (nickie-included? (draftq-1 q :reasoning true)))
-          (is (nickie-included? (draftq-1 q :reasoning true :union-with-live true)))))
-
-      (publish-1!)
-
-      (let [draft-2 "tbox: { :WestHighlandTerrier a rdfs:Class; rdfs:subClassOf :RodentHunter . }"
-            [add-to-draft-2! publish-2! draftq-2] (new-draftset api draft-2)]
-
-        (add-to-draft-2!)
+        (add-to-draft-1!)
 
         (testing "What users can see after adding quads to draft TBOX"
-          ;; ["http://test.com/RodentHunter"]
-          ;; ^^ should not be visible in the hierarchy yet because the graph
-          ;; this has been added to is not actually the TBOX, it's a drafter
-          ;; temporary uuid graph.
-          (let [q "SELECT ?class { :Nickie a ?class }"]
-            (is (nickie-included? (liveq q :reasoning true)))
-            (is (not (nickie-included? (draftq-2 q :reasoning true))))
-            ;; ^^ This draft has no :Nickie, so nothing returns, other than the
-            ;; "Everything is a thing" owl:Thing.
-            (is (nickie-included? (draftq-2 q :reasoning true :union-with-live true)))))
+          (let [q "SELECT ?class { :Nickie a ?class } "]
+            (is (not (nickie-included? (liveq q :reasoning true))))
+            (is (nickie-included? (draftq-1 q :reasoning true)))
+            (is (nickie-included? (draftq-1 q :reasoning true :union-with-live true)))))
 
-        (publish-2!)
+        (publish-1!)
 
-        (testing "What users can see after publishing quads to TBOX"
-          ;; ["http://test.com/RodentHunter"]
-          ;; ^^ should be visible now in the hierarchy because it's been added
-          ;; to the real TBOX graph.
-          (let [q "SELECT ?class { :Nickie a ?class }"]
-            (is (= (conj nickie-hierarchy ["http://test.com/RodentHunter"])
-                   (liveq q :reasoning true)))))))))
+        (let [draft-2 "tbox: { :WestHighlandTerrier a rdfs:Class; rdfs:subClassOf :RodentHunter . }"
+              [add-to-draft-2! publish-2! draftq-2] (new-draftset api draft-2)]
+
+          (add-to-draft-2!)
+
+          (testing "What users can see after adding quads to draft TBOX"
+            ;; ["http://test.com/RodentHunter"]
+            ;; ^^ should not be visible in the hierarchy yet because the graph
+            ;; this has been added to is not actually the TBOX, it's a drafter
+            ;; temporary uuid graph.
+            (let [q "SELECT ?class { :Nickie a ?class }"]
+              (is (nickie-included? (liveq q :reasoning true)))
+              (is (not (nickie-included? (draftq-2 q :reasoning true))))
+              ;; ^^ This draft has no :Nickie, so nothing returns, other than the
+              ;; "Everything is a thing" owl:Thing.
+              (is (nickie-included? (draftq-2 q :reasoning true :union-with-live true)))))
+
+          (publish-2!)
+
+          (testing "What users can see after publishing quads to TBOX"
+            ;; ["http://test.com/RodentHunter"]
+            ;; ^^ should be visible now in the hierarchy because it's been added
+            ;; to the real TBOX graph.
+            (let [q "SELECT ?class { :Nickie a ?class }"]
+              (is (= (conj nickie-hierarchy ["http://test.com/RodentHunter"])
+                     (liveq q :reasoning true))))))))))

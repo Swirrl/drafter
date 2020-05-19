@@ -91,9 +91,8 @@
 
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
                  :extra-deps {clojure-csv/clojure-csv {:mvn/version "2.0.2"}
-                              eftest {:mvn/version "0.5.7"} ;; repl test runner support
                               environ {:mvn/version "1.0.3"}
-                              lambdaisland/kaocha {:mvn/version "0.0-418"}
+                              lambdaisland/kaocha {:mvn/version "1.0.629"}
                               org.clojure/data.json {:mvn/version "0.2.6"}
                               org.clojure/test.check {:mvn/version "0.9.0"}
                               ring-mock {:mvn/version "0.1.5"}

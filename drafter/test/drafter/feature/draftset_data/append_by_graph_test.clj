@@ -10,7 +10,9 @@
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(def system "drafter/feature/empty-db-system.edn")
+(def system-config "drafter/feature/empty-db-system.edn")
+
+(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
 
 (defn- copy-live-graph-into-draftset-request
   ([draftset-location user live-graph]
@@ -29,9 +31,10 @@
     (tc/await-success (:finished-job (:body response)))))
 
 (tc/deftest-system-with-keys copy-live-graph-into-draftset-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        [live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         draftset-location (help/create-draftset-through-api handler test-editor)]
     (help/publish-quads-through-api handler quads)
     (copy-live-graph-into-draftset handler draftset-location test-editor live-graph)
@@ -41,9 +44,10 @@
       (is (= (set expected-quads) (set ds-quads))))))
 
 (tc/deftest-system-with-keys copy-draft-with-metadata-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        [live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         draftset-location (help/create-draftset-through-api handler test-editor)]
     (help/publish-quads-through-api handler quads)
     (copy-live-graph-into-draftset handler draftset-location test-editor live-graph)
@@ -60,9 +64,10 @@
         (is (= "Custom job title" (-> job :metadata :title)))))))
 
 (tc/deftest-system-with-keys copy-live-graph-with-existing-draft-into-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        [live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         [published private] (split-at 2 quads)
         draftset-location (help/create-draftset-through-api handler test-editor)]
 
@@ -78,9 +83,10 @@
       (is (= (set (help/eval-statements published)) (set graph-quads))))))
 
 (tc/deftest-system-with-keys copy-live-graph-into-unowned-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        [live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
         draftset-location (help/create-draftset-through-api handler test-editor)]
     (help/publish-quads-through-api handler quads)
     (let [copy-request (copy-live-graph-into-draftset-request draftset-location test-publisher live-graph)
@@ -88,17 +94,19 @@
       (tc/assert-is-forbidden-response copy-response))))
 
 (tc/deftest-system-with-keys copy-non-existent-live-graph
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
         copy-request (copy-live-graph-into-draftset-request draftset-location test-editor "http://missing")
         copy-response (handler copy-request)]
     (tc/assert-is-unprocessable-response copy-response)))
 
 (tc/deftest-system-with-keys copy-live-graph-into-non-existent-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        [live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))]
     (help/publish-quads-through-api handler quads)
     (let [copy-request (copy-live-graph-into-draftset-request "/v1/draftset/missing" test-publisher live-graph)
           copy-response (handler copy-request)]

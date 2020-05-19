@@ -18,13 +18,13 @@
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(def system "drafter/feature/empty-db-system.edn")
+(def system-config "drafter/feature/empty-db-system.edn")
 
 (def dummy "dummy@user.com")
 
 (tc/deftest-system-with-keys delete-draftset-data-test
   [:drafter/backend :drafter/global-writes-lock :drafter/write-scheduler :drafter.fixture-data/loader]
-  [{:keys [:drafter/backend :drafter/global-writes-lock]} system]
+  [{:keys [:drafter/backend :drafter/global-writes-lock]} system-config]
   (let [initial-time (constantly (OffsetDateTime/parse "2017-01-01T01:01:01Z"))
         update-time (constantly (OffsetDateTime/parse "2018-01-01T01:01:01Z"))
         delete-time (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
@@ -52,29 +52,33 @@
             "Modified time is updated after delete"))))
 
 (tc/deftest-system-with-keys delete-draftset-data-for-non-existent-draftset
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
-  (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
-    (let [delete-request (tc/with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :body fs})
-          delete-response (handler delete-request)]
-      (tc/assert-is-not-found-response delete-response))))
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])]
+    (with-open [fs (io/input-stream "test/resources/test-draftset.trig")]
+      (let [delete-request (tc/with-identity test-manager {:uri "/v1/draftset/missing/data" :request-method :delete :body fs})
+            delete-response (handler delete-request)]
+        (tc/assert-is-not-found-response delete-response)))))
 
 (tc/deftest-system-with-keys delete-draftset-data-request-with-unknown-content-type
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api]
-  [{handler :drafter.routes/draftsets-api} system]
-  (with-open [input-stream (io/input-stream "test/resources/test-draftset.trig")]
-    (let [draftset-location (help/create-draftset-through-api handler test-editor)
-          delete-request (help/create-delete-quads-request test-editor
-                                                           draftset-location
-                                                           input-stream
-                                                           {:content-type "application/unknown-quads-format"})
-          delete-response (handler delete-request)]
-      (tc/assert-is-unsupported-media-type-response delete-response))))
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])]
+    (with-open [input-stream (io/input-stream "test/resources/test-draftset.trig")]
+      (let [draftset-location (help/create-draftset-through-api handler test-editor)
+            delete-request (help/create-delete-quads-request test-editor
+                                                             draftset-location
+                                                             input-stream
+                                                             {:content-type "application/unknown-quads-format"})
+            delete-response (handler delete-request)]
+        (tc/assert-is-unsupported-media-type-response delete-response)))))
 
 (tc/deftest-system-with-keys delete-draftset-data-with-metadata-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
-  (let [quads-path "test/resources/test-draftset.trig"
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+  [system system-config]
+
+  (let [handler (get system [:drafter/routes :draftset/api])
+        quads-path "test/resources/test-draftset.trig"
         triples-path "./test/test-triple.nt"
         draftset-location (help/create-draftset-through-api handler test-editor)]
 

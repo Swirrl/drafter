@@ -4,7 +4,7 @@
             [clojure.spec.alpha :as s]
             [drafter.check-specs :refer [check-specs]]
             [drafter.main :as main :refer [system stop-system!]]
-            [eftest.runner :as eftest]
+            [kaocha.repl :as test]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [clojure.java.io :as io]
@@ -32,9 +32,6 @@
    (when instrument?
      (st/instrument))))
 
-(defn run-tests []
-  (eftest/run-tests (eftest/find-tests "test") {:multithread? false}))
-
 (do (println)
     (println "   ___           _____         ")
     (println "  / _ \\_______ _/ _/ /____ ____")
@@ -48,7 +45,8 @@
     (println)
     (println "(start-system!)")
     (println "(stop-system!)")
-    (println "(run-tests)")
+    (println)
+    (println "(test/run-all)")
     (println)
     (println "(check-specs 100)"))
 
