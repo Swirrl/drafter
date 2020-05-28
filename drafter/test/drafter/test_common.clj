@@ -28,7 +28,7 @@
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT
            grafter_2.rdf.SPARQLRepository
-           [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter]
+           [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter File]
            java.lang.AutoCloseable
            [java.net InetSocketAddress ServerSocket SocketException URI]
            java.nio.charset.Charset
@@ -41,7 +41,8 @@
            org.apache.http.message.BasicHttpResponse
            org.apache.http.ProtocolVersion
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
-           org.eclipse.rdf4j.rio.trig.TriGParserFactory))
+           org.eclipse.rdf4j.rio.trig.TriGParserFactory
+           [java.util.zip GZIPOutputStream]))
 
 (defn with-spec-instrumentation [f]
   (try
@@ -488,3 +489,21 @@
 
 (defn string->input-stream [s]
   (ByteArrayInputStream. (.getBytes s)))
+
+(defmacro with-temp-file
+  "Creates a temp file with the given file name prefix and suffix and executes
+   body wit the resulting File object bound to the name specified by binding"
+  [prefix suffix binding & body]
+  `(let [~binding (File/createTempFile ~prefix ~suffix)]
+     (try
+       ~@body
+       (finally (.delete ~binding)))))
+
+(defn ->gzip-input-stream
+  "Writes source gzip-compressed to an in-memory buffer and returns an
+   input stream"
+  [source]
+  (let [baos (ByteArrayOutputStream.)]
+    (with-open [gzos (GZIPOutputStream. baos)]
+      (io/copy source gzos))
+    (ByteArrayInputStream. (.toByteArray baos))))

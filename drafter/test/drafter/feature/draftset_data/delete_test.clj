@@ -11,7 +11,9 @@
             [drafter.feature.draftset.test-helper :as help]
             [grafter-2.rdf4j.io :as gio]
             [drafter.async.jobs :as async]
-            [grafter-2.rdf.protocols :as pr])
+            [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.formats :as formats]
+            [clojure.set :as set])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -73,10 +75,34 @@
             delete-response (handler delete-request)]
         (tc/assert-is-unsupported-media-type-response delete-response)))))
 
+(tc/deftest-system-with-keys
+  delete-gzipped-draftset-data-test
+  [:drafter.fixture-data/loader :drafter/write-scheduler [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        data-file-path "test/resources/test-draftset.trig"
+        quads (gio/statements data-file-path)
+        draftset-location (help/create-draftset-through-api handler test-editor)]
+    (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
+
+    (let [quads-to-delete (map (fn [kvp] (first (val kvp))) (group-by :c quads))
+          fmt (formats/->rdf-format :nq)
+          ss (help/statements->gzipped-input-stream quads-to-delete fmt)
+          delete-request (help/create-delete-quads-request test-editor
+                                                           draftset-location
+                                                           ss
+                                                           {:content-type (.getDefaultMIMEType fmt)})
+          delete-request (assoc-in delete-request [:headers "content-encoding"] "gzip")
+          delete-response (handler delete-request)]
+      (tc/await-success (get-in delete-response [:body :finished-job]))
+
+      (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor)
+            expected (help/eval-statements (set/difference (set quads) (set quads-to-delete)))]
+        (t/is (= (set expected) (set ds-quads)))))))
+
 (tc/deftest-system-with-keys delete-draftset-data-with-metadata-test
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
   [system system-config]
-
   (let [handler (get system [:drafter/routes :draftset/api])
         quads-path "test/resources/test-draftset.trig"
         triples-path "./test/test-triple.nt"
