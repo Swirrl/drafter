@@ -8,11 +8,14 @@
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [clojure.java.io :as io]
-            [meta-merge.core :as mm]))
+            [meta-merge.core :as mm]
+            [drafter.test-common] ;; for :mock profile
+            ))
 
 (def dev-config
   {:mock  (io/resource "drafter-dev-config.edn")
-   :auth0 (io/resource "drafter-dev-auth0.edn")})
+   :auth0 (io/resource "drafter-dev-auth0.edn")
+   :basic (io/resource "drafter-basic-dev-config.edn")})
 
 (defn profiles [auth-type]
   [(io/resource "drafter-base-config.edn")
@@ -43,7 +46,9 @@
     (println)
     (println "REPL Commands: ")
     (println)
-    (println "(start-system!)")
+    (println "(start-system!)                     ;; for auth0 system")
+    (println "(start-system! {:auth-type :mock})  ;; for a mock auth0 system")
+    (println "(start-system! {:auth-type :basic}) ;; for a dev system with basic auth & sample users (works with swagger ui)")
     (println "(stop-system!)")
     (println)
     (println "(test/run-all)")
