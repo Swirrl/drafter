@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/Swirrl/drafter.svg?token=y3gyrk97wD6tMnq8KpEi&branch=master)](https://travis-ci.com/Swirrl/drafter)
+
 # Drafter & Drafter Client
 
 This repo contains both the Drafter Server and a version locked
