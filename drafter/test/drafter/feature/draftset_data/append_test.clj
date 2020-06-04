@@ -10,7 +10,8 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]]
             [drafter.feature.draftset.test-helper :as help]
-            [drafter.async.jobs :as async])
+            [drafter.async.jobs :as async]
+            [grafter-2.rdf4j.formats :as formats])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -73,6 +74,26 @@
               expected-statements (map map->Triple graph-quads)]
           (is (contains? draftset-graphs live-graph))
           (is (set expected-statements) (set graph-triples)))))))
+
+(tc/deftest-system-with-keys append-gzipped-quad-data-to-draftset
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        data-file-path "test/resources/test-draftset.trig"
+        data-file (io/file data-file-path)
+        draftset-location (help/create-draftset-through-api handler test-editor)
+        ss (tc/->gzip-input-stream data-file)
+        content-type (.getDefaultMIMEType (formats/->rdf-format data-file))
+        append-request (help/append-to-draftset-request test-editor
+                                                        draftset-location
+                                                        ss
+                                                        {:content-type content-type})
+        append-request (assoc-in append-request [:headers "content-encoding"] "gzip")
+        append-response (handler append-request)]
+    (tc/await-success (get-in append-response [:body :finished-job]))
+
+    (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor)]
+      (is (= (set (help/eval-statements (statements data-file))) (set ds-quads))))))
 
 (tc/deftest-system-with-keys append-quad-data-with-metadata
   keys-for-test

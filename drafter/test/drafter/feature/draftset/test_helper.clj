@@ -13,7 +13,9 @@
             [drafter.async.jobs :as async]
             [clojure.java.io :as io]
             [drafter.util :as util]
-            [martian.encoders :as enc]))
+            [martian.encoders :as enc])
+  (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
+           [java.util.zip GZIPOutputStream]))
 
 (def DraftsetWithoutTitleOrDescription
   {:id s/Str
@@ -86,10 +88,16 @@
     body))
 
 (defn statements->input-stream [statements format]
-  (let [bos (java.io.ByteArrayOutputStream.)
+  (let [bos (ByteArrayOutputStream.)
         serialiser (rdf-writer bos :format format)]
     (add serialiser statements)
-    (java.io.ByteArrayInputStream. (.toByteArray bos))))
+    (ByteArrayInputStream. (.toByteArray bos))))
+
+(defn statements->gzipped-input-stream [statements format]
+  (let [baos (ByteArrayOutputStream.)]
+    (with-open [gzos (GZIPOutputStream. baos)]
+      (add (rdf-writer gzos :format format) statements))
+    (ByteArrayInputStream. (.toByteArray baos))))
 
 (defn append-to-draftset-request [user draftset-location data-stream {:keys [content-type metadata]}]
   (tc/with-identity user

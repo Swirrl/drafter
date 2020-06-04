@@ -12,7 +12,8 @@
             [ring.util.request :as request]
             [integrant.core :as ig])
   (:import java.io.File
-           (org.apache.tika.mime MediaType)))
+           (org.apache.tika.mime MediaType)
+           (java.util.zip GZIPInputStream)))
 
 (defmethod ig/init-key :drafter.middleware/wrap-auth
   [_ {:keys [middleware] :as opts}]
@@ -102,6 +103,31 @@
                                                                   :rdf-content-type content-type})]
            (inner-handler modified-request))
          (response/unsupported-media-type-response  (str "Unsupported media type: " content-type)))))))
+
+(defn- header-matches? [^String candidate ^String header]
+  (.equalsIgnoreCase candidate header))
+
+(defn- is-gzipped-entity?
+  "Whether the input request has a GZIP-compressed request body"
+  [{:keys [body headers] :as request}]
+  (let [encoding (get headers "content-encoding")]
+    (and (some? body)
+         (some? encoding)
+         (boolean (some #(header-matches? % encoding) ["gzip" "x-gzip"])))))
+
+(defn- inflate-gzipped-body
+  [request]
+  (if (is-gzipped-entity? request)
+    (update request :body #(GZIPInputStream. (io/input-stream %)))
+    request))
+
+(defn inflate-gzipped
+  "Wraps a handler with one that replaces the request body with an inflating input
+  stream for the GZIP-compressed entity on the incoming request. Uncompressed bodies
+  are not modified."
+  [inner-handler]
+  (fn [request]
+    (inner-handler (inflate-gzipped-body request))))
 
 (defn temp-file-body
   "Wraps a handler with one that writes the incoming body to a temp

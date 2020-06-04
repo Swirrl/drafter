@@ -11,7 +11,7 @@
              :refer
              [touch-graph-in-draftset!]]
             [drafter.feature.draftset-data.middleware :as deset-middleware]
-            [drafter.middleware :refer [require-rdf-content-type temp-file-body]]
+            [drafter.middleware :refer [require-rdf-content-type temp-file-body inflate-gzipped]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sesame :refer [is-quads-format? read-statements]]
             [drafter.responses :as response]
@@ -102,6 +102,7 @@
           (let [user-id (req/user-id request)
                 delete-job (delete-data-from-draftset-job body user-id resources params util/get-current-time)]
             (response/submit-async-job! delete-job)))
+        inflate-gzipped
         temp-file-body
         deset-middleware/require-graph-for-triples-rdf-format
         require-rdf-content-type

@@ -368,6 +368,9 @@ paths:
 
         If a graph parameter is supplied then
         the RDF data can be supplied in a triple serialisation.
+
+        The RDF data to add can be gzip-compressed - in this case the
+        Content-Encoding header should be set to gzip on the request.
       security:
         - jws-auth: []
       parameters:
@@ -375,6 +378,7 @@ paths:
         - $ref: '#/parameters/rdfdata'
         - $ref: '#/parameters/graph'
         - $ref: '#/parameters/metadata'
+        - $ref: '#/parameters/encoding'
         #- $ref: '#/parameters/messagenonote'
       consumes:
         - application/n-quads
@@ -408,6 +412,8 @@ paths:
 
         If a graph parameter is supplied then
         the RDF data can be supplied in a triple serialisation.  The supplied triples will be removed from the Draftset.
+
+        The RDF data to delete can be gzip-compressed - in this case the Content-Encoding header should be set to gzip on the request.
       security:
         - jws-auth: []
       parameters:
@@ -415,6 +421,7 @@ paths:
         - $ref: '#/parameters/rdfdata'
         - $ref: '#/parameters/graph'
         - $ref: '#/parameters/metadata'
+        - $ref: '#/parameters/encoding'
         #- $ref: '#/parameters/messagenonote'
       consumes:
         - application/n-quads
@@ -958,6 +965,15 @@ parameters:
     in: query
     required: false
     type: string
+  encoding:
+    name: Content-Encoding
+    in: header
+    description: Indicates the request body is gzip-compressed
+    required: false
+    type: string
+    enum:
+      - gzip
+      - x-gzip
 
 definitions:
   Graph:

@@ -6,7 +6,8 @@
             [grafter-2.rdf4j.formats :as formats]
             [ring.util.response :refer [response]])
   (:import [java.io ByteArrayInputStream File]
-           org.eclipse.rdf4j.rio.RDFFormat))
+           org.eclipse.rdf4j.rio.RDFFormat
+           [java.util.zip GZIPOutputStream]))
 
 (use-fixtures :each tc/with-spec-instrumentation)
 
@@ -99,6 +100,43 @@
 
   (testing "With malformed content type"
     (assert-unprocessable-with-malformed-content-type (require-rdf-content-type ok-handler))))
+
+(defn- inflates-gzipped? [encoding]
+  (tc/with-temp-file "drafter-test" ".txt.gz"
+    temp-file
+    (let [uncompressed-body "The quick brown fox jumped over the lazy dog"
+          test-handler (inflate-gzipped (fn [request]
+                                          (with-open [is (:body request)]
+                                            (slurp is))))
+          req {:headers {"content-type" "text/plain"
+                         "content-encoding" encoding}
+               :body    temp-file}]
+      (with-open [os (GZIPOutputStream. (io/output-stream temp-file))]
+        (spit os uncompressed-body))
+      (= uncompressed-body (test-handler req)))))
+
+(defn- keeps-ungzipped? [headers]
+  (tc/with-temp-file "drafter-test" ".txt"
+    temp-file
+    (let [uncompressed-body "The quick brown fox jumped over the lazy dog"
+          test-handler (inflate-gzipped (fn [request] (:body request)))
+          request {:headers headers :body temp-file}]
+      (spit temp-file uncompressed-body)
+      (= temp-file (test-handler request)))))
+
+(deftest inflate-gzipped-test
+  (testing "Compressed"
+    (are [content-encoding] (= true (inflates-gzipped? content-encoding))
+      "gzip"
+      "x-gzip"
+      "GZip"
+      "X-GZIP"))
+
+  (testing "Uncompressed"
+    (are [headers] (= true (keeps-ungzipped? headers))
+      {}
+      {"content-type" "text/plain"
+       "content-encoding" "compress"})))
 
 (deftest temp-file-body-test
   (testing "Creates file"

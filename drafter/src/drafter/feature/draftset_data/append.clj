@@ -6,7 +6,7 @@
             [drafter.draftset :as ds]
             [drafter.feature.draftset-data.common :as ds-data-common]
             [drafter.feature.draftset-data.middleware :as dset-middleware]
-            [drafter.middleware :refer [require-rdf-content-type temp-file-body]]
+            [drafter.middleware :refer [require-rdf-content-type temp-file-body inflate-gzipped]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sesame :as dses :refer [is-quads-format?]]
             [drafter.rdf.sparql :as sparql]
@@ -103,10 +103,11 @@
      (require-rdf-content-type
       (dset-middleware/require-graph-for-triples-rdf-format
        (temp-file-body
-        (fn [{:keys [params body] :as request}]
-          (let [user-id (req/user-id request)]
-            (let [append-job (append-data-to-draftset-job body resources user-id params util/get-current-time)]
-              (response/submit-async-job! append-job))))))))))
+         (inflate-gzipped
+           (fn [{:keys [params body] :as request}]
+             (let [user-id (req/user-id request)]
+               (let [append-job (append-data-to-draftset-job body resources user-id params util/get-current-time)]
+                 (response/submit-async-job! append-job)))))))))))
 
 (defmethod ig/pre-init-spec ::data-handler [_]
   (s/keys :req [:drafter/backend :drafter/global-writes-lock]
