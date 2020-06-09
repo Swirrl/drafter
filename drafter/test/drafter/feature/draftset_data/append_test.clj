@@ -261,31 +261,39 @@
   (let [handler (get system [:drafter/routes :draftset/api])
         live    (:drafter.routes.sparql/live-sparql-query-route system)
         draftset-location (help/create-draftset-through-api handler test-publisher)
-        graph (URI. (str "http://live-graph/" (UUID/randomUUID)))
-        quad-1 (->Quad graph
+        live-graph-uri (URI. (str "http://live-graph/" (UUID/randomUUID)))
+        quad-1 (->Quad live-graph-uri
                        (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
                        (URI. "http://example.org/animals/kitten")
-                       graph)
-        quads [quad-1]
+                       live-graph-uri)
+        quad-2 (->Quad (URI. "http://uri-1")
+                       (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
+                       live-graph-uri
+                       live-graph-uri)
+        quads [quad-1 quad-2]
         append-request (help/statements->append-triples-request test-publisher
                                                                 draftset-location
                                                                 quads
-                                                                {:graph graph})
+                                                                {:graph live-graph-uri})
         append-response (handler append-request)
         endpoint (:drafter.common.config/sparql-query-endpoint system)]
     (tc/await-success (get-in append-response [:body :finished-job]))
     (with-open [conn (repo/->connection (repo/sparql-repo endpoint))]
       (let [draft-graph-q (-> "SELECT ?o WHERE { GRAPH ?g { <%s> <http://publishmydata.com/def/drafter/hasDraft> ?o } }"
-                              (format graph))
+                              (format live-graph-uri))
             draft-graph-uri (:o (first (repo/query conn draft-graph-q)))]
         (testing "The graph in ?s position has been rewritten"
 
           (is (->> draft-graph-uri
                    (format "ASK { <%s> ?p <http://example.org/animals/kitten> }")
+                   (repo/query conn)))
+
+          (is (->> draft-graph-uri
+                   (format "ASK { <http://uri-1> ?p <%s> }")
                    (repo/query conn))))
 
         (testing "We can still query for the live graph URI in ?s position"
-          (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" graph)
+          (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" live-graph-uri)
                 req (tc/with-identity test-publisher
                       {:uri (str draftset-location "/query")
                        :request-method :post
@@ -295,11 +303,29 @@
                 res (handler req)]
             (is (= true (:boolean (json/parse-string (:body res) keyword))))))
 
+        (testing "When deleting a triple, it's gone"
+          (help/delete-quads-through-api handler
+                                         test-publisher
+                                         draftset-location
+                                         [quad-2])
+
+          ;; Triple is not present with draft-graph uri in ?o position
+          (is (false? (->> draft-graph-uri
+                           (format "ASK { <http://uri-1> ?p <%s> }")
+                           (repo/query conn))))
+
+          ;; Triple is not present with live-graph uri in ?o position
+          (is (false? (->> live-graph-uri
+                           (format "ASK { <http://uri-1> ?p <%s> }")
+                           (repo/query conn))))
+
+          )
+
         (testing "When publishing, draft-graph-uris are written back"
           (help/publish-draftset-through-api handler draftset-location test-publisher)
 
           ;; triple is back with the live graph in ?s position
-          (is (->> graph
+          (is (->> live-graph-uri
                    (format "ASK { <%s> ?p <http://example.org/animals/kitten> }")
                    (repo/query conn)))
 
@@ -309,11 +335,29 @@
                            (repo/query conn))))
 
           ;; and we can query it from the live endpoint
-          (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" graph)
+          (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" live-graph-uri)
                 req {:uri "/v1/sparql/live"
                      :request-method :post
                      :headers {"accept" "application/sparql-results+json"
                                "content-type" "application/sparql-query"}
                      :body (java.io.ByteArrayInputStream. (.getBytes q))}
                 res (live req)]
-            (is (= true (:boolean (json/parse-string (:body res) keyword))))))))))
+            (is (true? (:boolean (json/parse-string (:body res) keyword))))))
+
+        (testing "After publish, triple deleted from draft is not present"
+          ;; Triple is not in stardog
+          (is (false? (->> live-graph-uri
+                           (format "ASK { <http://uri-1> ?p <%s> }")
+                           (repo/query conn))))
+
+          ;; And can't be accessed in the live drafter endpoint
+          (let [q (format "ASK { <http://uri-1> ?p <%s> }" live-graph-uri)
+                req {:uri "/v1/sparql/live"
+                     :request-method :post
+                     :headers {"accept" "application/sparql-results+json"
+                               "content-type" "application/sparql-query"}
+                     :body (java.io.ByteArrayInputStream. (.getBytes q))}
+                res (live req)]
+            (is (false? (:boolean (json/parse-string (:body res) keyword)))))
+          )
+        ))))
