@@ -270,14 +270,14 @@
                        (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
                        live-graph-uri
                        live-graph-uri)
-        quads [quad-1 quad-2]
-        append-request (help/statements->append-triples-request test-publisher
-                                                                draftset-location
-                                                                quads
-                                                                {:graph live-graph-uri})
-        append-response (handler append-request)
+        live-graph-uri-2 (URI. (str "http://live-graph/" (UUID/randomUUID)))
+        quad-3 (->Quad live-graph-uri-2
+                       (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
+                       (URI. "http://uri-2")
+                       live-graph-uri-2)
+        quads [quad-1 quad-2 quad-3]
         endpoint (:drafter.common.config/sparql-query-endpoint system)]
-    (tc/await-success (get-in append-response [:body :finished-job]))
+    (help/append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
     (with-open [conn (repo/->connection (repo/sparql-repo endpoint))]
       (let [draft-graph-q (-> "SELECT ?o WHERE { GRAPH ?g { <%s> <http://publishmydata.com/def/drafter/hasDraft> ?o } }"
                               (format live-graph-uri))
@@ -319,7 +319,18 @@
                            (format "ASK { <http://uri-1> ?p <%s> }")
                            (repo/query conn))))
 
-          )
+          (help/delete-quads-through-api handler
+                                         test-publisher
+                                         draftset-location
+                                         [quad-3])
+
+          ;; Triple is not present in draftset quads
+          (is (not (some #(= (:o quad-3) (:o %))
+                         (help/get-draftset-quads-through-api handler draftset-location test-publisher)))))
+
+        (testing "Graph metadata reports graph deleted where last triple is deleted"
+          (is (= :deleted (get-in (help/get-draftset-info-through-api handler draftset-location test-publisher)
+                                  [:changes live-graph-uri-2 :status]))))
 
         (testing "When publishing, draft-graph-uris are written back"
           (help/publish-draftset-through-api handler draftset-location test-publisher)
@@ -358,6 +369,4 @@
                                "content-type" "application/sparql-query"}
                      :body (java.io.ByteArrayInputStream. (.getBytes q))}
                 res (live req)]
-            (is (false? (:boolean (json/parse-string (:body res) keyword)))))
-          )
-        ))))
+            (is (false? (:boolean (json/parse-string (:body res) keyword))))))))))
