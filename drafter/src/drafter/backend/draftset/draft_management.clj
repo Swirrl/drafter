@@ -443,6 +443,23 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
+(defn fixup-publish-query [draft-graph-uri live-graph-uri]
+  (format "
+DELETE { GRAPH ?live { ?draft ?p ?o } }
+INSERT { GRAPH ?live { ?live  ?p ?o } }
+WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } ?draft ?p ?o } ;
+
+DELETE { GRAPH ?live { ?s ?draft ?o } }
+INSERT { GRAPH ?live { ?s ?live  ?o } }
+WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } ?s ?draft ?o } ;
+
+DELETE { GRAPH ?live { ?s ?p ?draft } }
+INSERT { GRAPH ?live { ?s ?p ?live  } }
+WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } ?s ?p ?draft }"
+          draft-graph-uri live-graph-uri
+          draft-graph-uri live-graph-uri
+          draft-graph-uri live-graph-uri))
+
 (defn migrate-graphs-to-live! [repo graphs clock-fn]
   "Migrates a collection of draft graphs to live through a single
   compound SPARQL update statement. Explicit UPDATE statements do not
@@ -450,8 +467,15 @@
   (log/info "Starting make-live for graphs " graphs)
   (when (seq graphs)
     (let [transaction-started-at (clock-fn)
-          graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at)) graphs)
-          update-str (util/make-compound-sparql-query graph-migrate-queries)]
+          graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at))
+                                        graphs)
+          fixup-q (->> graphs
+                       (mapv (juxt identity (partial lookup-live-graph repo)))
+                       (map (fn [[k v]] (fixup-publish-query k v)))
+                       (util/make-compound-sparql-query))
+          update-str (str (util/make-compound-sparql-query graph-migrate-queries)
+                          ";\n"
+                          fixup-q)]
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
 
