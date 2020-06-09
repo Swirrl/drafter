@@ -217,40 +217,66 @@
 
 (tc/deftest-system-with-keys append-draft-graph-in-non-graph-position-rewrite-test
   (conj keys-for-test
-       :drafter.backend.live/endpoint
-       :drafter.common.config/sparql-query-endpoint)
+        :drafter.routes.sparql/live-sparql-query-route
+        :drafter.backend.live/endpoint
+        :drafter.common.config/sparql-query-endpoint)
   [system system-config]
   (let [handler (get system [:drafter/routes :draftset/api])
-        draftset-location (help/create-draftset-through-api handler test-editor)
+        live    (:drafter.routes.sparql/live-sparql-query-route system)
+        draftset-location (help/create-draftset-through-api handler test-publisher)
         graph (URI. (str "http://live-graph/" (UUID/randomUUID)))
         quad-1 (->Quad graph
                        (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
                        (URI. "http://example.org/animals/kitten")
                        graph)
         quads [quad-1]
-        append-request (help/statements->append-triples-request test-editor
+        append-request (help/statements->append-triples-request test-publisher
                                                                 draftset-location
                                                                 quads
                                                                 {:graph graph})
         append-response (handler append-request)
         endpoint (:drafter.common.config/sparql-query-endpoint system)]
     (tc/await-success (get-in append-response [:body :finished-job]))
-    (testing "The graph in ?s position has been rewritten"
-      (with-open [conn (repo/->connection (repo/sparql-repo endpoint))]
-        (let [draft-graph-q (-> "SELECT ?o WHERE { GRAPH ?g { <%s> <http://publishmydata.com/def/drafter/hasDraft> ?o } }"
-                                (format graph))
-              draft-graph-uri (:o (first (repo/query conn draft-graph-q)))]
+    (with-open [conn (repo/->connection (repo/sparql-repo endpoint))]
+      (let [draft-graph-q (-> "SELECT ?o WHERE { GRAPH ?g { <%s> <http://publishmydata.com/def/drafter/hasDraft> ?o } }"
+                              (format graph))
+            draft-graph-uri (:o (first (repo/query conn draft-graph-q)))]
+        (testing "The graph in ?s position has been rewritten"
+
           (is (->> draft-graph-uri
                    (format "ASK { <%s> ?p <http://example.org/animals/kitten> }")
-                   (repo/query conn))))))
+                   (repo/query conn))))
 
-    (testing "We can still query for the live graph URI in ?s position"
-      (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" graph)
-            req (tc/with-identity test-editor
-                  {:uri (str draftset-location "/query")
-                   :request-method :post
-                   :headers {"accept" "application/sparql-results+json"
-                             "content-type" "application/sparql-query"}
-                   :body (java.io.ByteArrayInputStream. (.getBytes q))})
-            res (handler req)]
-        (is (= true (:boolean (json/parse-string (:body res) keyword))))))))
+        (testing "We can still query for the live graph URI in ?s position"
+          (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" graph)
+                req (tc/with-identity test-publisher
+                      {:uri (str draftset-location "/query")
+                       :request-method :post
+                       :headers {"accept" "application/sparql-results+json"
+                                 "content-type" "application/sparql-query"}
+                       :body (java.io.ByteArrayInputStream. (.getBytes q))})
+                res (handler req)]
+            (is (= true (:boolean (json/parse-string (:body res) keyword))))))
+
+        (testing "When publishing, draft-graph-uris are written back"
+          (help/publish-draftset-through-api handler draftset-location test-publisher)
+
+          ;; triple is back with the live graph in ?s position
+          (is (->> graph
+                   (format "ASK { <%s> ?p <http://example.org/animals/kitten> }")
+                   (repo/query conn)))
+
+          ;; and the draft graph is not in thes ?s position
+          (is (false? (->> draft-graph-uri
+                           (format "ASK { <%s> ?p ?o }")
+                           (repo/query conn))))
+
+          ;; and we can query it from the live endpoint
+          (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" graph)
+                req {:uri "/v1/sparql/live"
+                     :request-method :post
+                     :headers {"accept" "application/sparql-results+json"
+                               "content-type" "application/sparql-query"}
+                     :body (java.io.ByteArrayInputStream. (.getBytes q))}
+                res (live req)]
+            (is (= true (:boolean (json/parse-string (:body res) keyword))))))))))
