@@ -315,4 +315,11 @@
       (testing "After publish triple copied from live, then deleted, is gone"
         (is (false? (->> (format "ASK { GRAPH <%s> { ?s ?p ?o } }"
                                  draft-graph-to-copy-uri)
-                         (repo/query conn))))))))
+                         (repo/query conn)))))
+
+      (testing "After publish, triple copied from live, then deleted, is rewritten back to live"
+          (let [[{:keys [s o]}] (->> live-graph-uri-2
+                                  (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
+                                  (repo/query conn))]
+         (is (= graph-to-copy-uri s))
+         (is (= live-graph-uri-2 o)))))))
