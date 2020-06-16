@@ -38,7 +38,6 @@
         (if-let [draft-graph-uri (get live->draft graph-uri)]
           (do
             (append-data-batch! repo draft-graph-uri triples)
-            (mgmt/fixup-rewrite! repo (vals live->draft) live->draft)
             (ds-data-common/touch-graph-in-draftset! repo draftset-ref draft-graph-uri job-started-at)
 
             (let [next-job (ajobs/create-child-job
@@ -48,7 +47,9 @@
           ;;NOTE: do this immediately instead of scheduling a
           ;;continuation since we haven't done any real work yet
           (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-      (ajobs/job-succeeded! job))))
+      (do
+        (mgmt/fixup-rewrite! repo (vals live->draft) live->draft)
+        (ajobs/job-succeeded! job)))))
 
 
 (defn- copy-graph-for-append*
