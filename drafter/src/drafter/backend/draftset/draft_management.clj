@@ -442,22 +442,44 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
-(defn fixup-publish-query [draft-graph-uri live-graph-uri]
+(defn fixup-rewrite-q [in-graph-uri graph-a-uri graph-b-uri]
   (format "
-DELETE { GRAPH ?live { ?draft ?p ?o } }
-INSERT { GRAPH ?live { ?live  ?p ?o } }
-WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } ?draft ?p ?o } ;
+DELETE { GRAPH ?g { ?a ?p ?o } }
+INSERT { GRAPH ?g { ?b ?p ?o } }
+WHERE  { VALUES (?g ?a ?b) { (
+  <%s>
+  <%s>
+  <%s>
+) } GRAPH ?g { ?a ?p ?o } } ;
 
-DELETE { GRAPH ?live { ?s ?draft ?o } }
-INSERT { GRAPH ?live { ?s ?live  ?o } }
-WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } ?s ?draft ?o } ;
+DELETE { GRAPH ?g { ?s ?a ?o } }
+INSERT { GRAPH ?g { ?s ?b ?o } }
+WHERE  { VALUES (?g ?a ?b) { (
+  <%s>
+  <%s>
+  <%s>
+) } GRAPH ?g { ?s ?a ?o } } ;
 
-DELETE { GRAPH ?live { ?s ?p ?draft } }
-INSERT { GRAPH ?live { ?s ?p ?live  } }
-WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } ?s ?p ?draft }"
-          draft-graph-uri live-graph-uri
-          draft-graph-uri live-graph-uri
-          draft-graph-uri live-graph-uri))
+DELETE { GRAPH ?g { ?s ?p ?a } }
+INSERT { GRAPH ?g { ?s ?p ?b } }
+WHERE  { VALUES (?g ?a ?b) { (
+  <%s>
+  <%s>
+  <%s>
+) } GRAPH ?g { ?s ?p ?a } }"
+          in-graph-uri graph-a-uri graph-b-uri
+          in-graph-uri graph-a-uri graph-b-uri
+          in-graph-uri graph-a-uri graph-b-uri))
+
+(defn fixup-compound-q [in-graph-uris mapping]
+  (util/make-compound-sparql-query
+   (for [in-graph in-graph-uris
+         [a b] mapping]
+     (fixup-rewrite-q in-graph a b))))
+
+(defn fixup-rewrite! [db in-graph-uris mapping]
+  (let [compound-q (fixup-compound-q in-graph-uris mapping)]
+    (sparql/update! db compound-q)))
 
 (defn migrate-graphs-to-live! [repo graphs clock-fn]
   "Migrates a collection of draft graphs to live through a single
@@ -470,7 +492,7 @@ WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } ?s ?p ?draft }"
                                         graphs)
           fixup-q (->> graphs
                        (mapv (juxt identity (partial lookup-live-graph repo)))
-                       (map (fn [[k v]] (fixup-publish-query k v)))
+                       (map (fn [[k v]] (fixup-rewrite-q v k v)))
                        (util/make-compound-sparql-query))
           update-str (str (util/make-compound-sparql-query graph-migrate-queries)
                           ";\n"
