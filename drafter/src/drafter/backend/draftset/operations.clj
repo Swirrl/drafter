@@ -280,10 +280,14 @@
   modified-time-fn - A 0-arg function that returns the modified-time."
   [db draftset-ref graph-uri modified-time-fn]
   (when (mgmt/is-graph-managed? db graph-uri)
-    (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
+    (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)
+          reverse-map   (map (fn [[k v]] [v k]) (select-keys graph-mapping [graph-uri]))]
       (if-let [draft-graph-uri (get graph-mapping graph-uri)]
         (let [modified-at (modified-time-fn)]
           (mgmt/delete-graph-contents! db draft-graph-uri modified-at)
+          (mgmt/fixup-rewrite! db
+                               (vals (dissoc graph-mapping graph-uri))
+                               reverse-map)
           draft-graph-uri)
         (mgmt/create-draft-graph! db graph-uri draftset-ref modified-time-fn)))))
 
