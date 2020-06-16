@@ -28,26 +28,6 @@
     ;;true for all current backends.
     (sparql/add conn graph-uri triple-batch)))
 
-(defn fixup-query [draft-graph-uri live-graph-uri]
-  (format "
-DELETE { GRAPH ?draft { ?live  ?p ?o } }
-INSERT { GRAPH ?draft { ?draft ?p ?o } }
-WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } GRAPH ?draft { ?live ?p ?o } } ;
-
-DELETE { GRAPH ?draft { ?s ?live  ?o } }
-INSERT { GRAPH ?draft { ?s ?draft ?o } }
-WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } GRAPH ?draft { ?s ?live ?o } } ;
-
-DELETE { GRAPH ?draft { ?s ?p ?live  } }
-INSERT { GRAPH ?draft { ?s ?p ?draft } }
-WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } GRAPH ?draft { ?s ?p ?live } }"
-          draft-graph-uri live-graph-uri
-          draft-graph-uri live-graph-uri
-          draft-graph-uri live-graph-uri))
-
-(defn fixup-triple-draft-graph [conn draft-graph-uri live-graph-uri]
-  (sparql/update! conn (fixup-query draft-graph-uri live-graph-uri)))
-
 (declare append-draftset-quads)
 
 (defn- append-draftset-quads*
@@ -58,7 +38,7 @@ WHERE  { VALUES (?draft ?live) { (<%s> <%s>) } GRAPH ?draft { ?s ?p ?live } }"
         (if-let [draft-graph-uri (get live->draft graph-uri)]
           (do
             (append-data-batch! repo draft-graph-uri triples)
-            (fixup-triple-draft-graph repo draft-graph-uri graph-uri)
+            (mgmt/fixup-rewrite! repo (vals live->draft) live->draft)
             (ds-data-common/touch-graph-in-draftset! repo draftset-ref draft-graph-uri job-started-at)
 
             (let [next-job (ajobs/create-child-job
