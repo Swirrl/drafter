@@ -40,7 +40,8 @@
                   (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
                         sesame-statements (map quad->backend-quad rewritten-statements)
                         graph-array (into-array Resource (map util/uri->sesame-uri (vals live->draft)))]
-                    (.remove conn sesame-statements graph-array)))
+                    (.remove conn sesame-statements graph-array)
+                    (mgmt/fixup-rewrite! conn (vals live->draft) {draft-graph-uri live-graph})))
                 (let [next-job (ajobs/create-child-job
                                 job
                                 (partial delete-quads-from-draftset resources (rest quad-batches) draftset-ref live->draft state))]
