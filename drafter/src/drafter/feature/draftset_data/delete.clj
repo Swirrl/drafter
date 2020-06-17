@@ -40,8 +40,7 @@
                   (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
                         sesame-statements (map quad->backend-quad rewritten-statements)
                         graph-array (into-array Resource (map util/uri->sesame-uri (vals live->draft)))]
-                    (.remove conn sesame-statements graph-array)
-                    (mgmt/fixup-rewrite! conn (vals live->draft) {draft-graph-uri live-graph})))
+                    (.remove conn sesame-statements graph-array)))
                 (let [next-job (ajobs/create-child-job
                                 job
                                 (partial delete-quads-from-draftset resources (rest quad-batches) draftset-ref live->draft state))]
@@ -52,7 +51,14 @@
             ;;NOTE: This is the same behaviour as deleting a live graph
             ;;which does not exist in live
             (recur resources (rest quad-batches) draftset-ref live->draft state job)))
-        (let [draftset-info (ops/get-draftset-info repo draftset-ref)]
+        (let [draftset-info (ops/get-draftset-info repo draftset-ref)
+              rewrite-map (->> (:changes draftset-info)
+                               (keep (fn [[uri {:keys [status]}]]
+                                       (when (= :deleted status)
+                                         [(live->draft uri) uri]))))]
+          (when (seq rewrite-map)
+            (with-open [conn (repo/->connection repo)]
+              (mgmt/fixup-rewrite! conn (vals live->draft) rewrite-map)))
           (ajobs/job-succeeded! job {:draftset draftset-info})))
 
       :copy-graph
