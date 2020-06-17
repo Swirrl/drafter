@@ -490,13 +490,10 @@ WHERE  { VALUES (?g ?a ?b) { (
     (let [transaction-started-at (clock-fn)
           graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at))
                                         graphs)
-          fixup-q (->> graphs
-                       (mapv (juxt identity (partial lookup-live-graph repo)))
-                       (map (fn [[k v]] (fixup-rewrite-q v k v)))
-                       (util/make-compound-sparql-query))
-          update-str (str (util/make-compound-sparql-query graph-migrate-queries)
-                          ";\n"
-                          fixup-q)]
+          rewrite-graphs (map (juxt identity (partial lookup-live-graph repo)) graphs)
+          fixup-q (fixup-compound-q graphs rewrite-graphs)
+          update-str (util/make-compound-sparql-query
+                      (cons fixup-q graph-migrate-queries))]
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
 
