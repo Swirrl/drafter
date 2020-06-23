@@ -4,7 +4,7 @@
             [drafter.backend.draftset.operations :as ops]
             [drafter.draftset :as ds]
             [drafter.feature.draftset.changes :as sut]
-            [drafter.feature.draftset.test-helper :as help :refer [Draftset]]
+            [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
@@ -23,7 +23,7 @@
 (defn- revert-draftset-graph-changes-through-api [handler draftset-location user graph]
   (let [{:keys [body] :as response} (handler (revert-draftset-graph-changes-request draftset-location user graph))]
     (tc/assert-is-ok-response response)
-    (tc/assert-schema Draftset body)
+    (tc/assert-spec ::ds/Draftset body)
     body))
 
 (tc/deftest-system-with-keys revert-changes-from-graph-only-in-draftset

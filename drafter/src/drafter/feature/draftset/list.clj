@@ -1,5 +1,5 @@
 (ns drafter.feature.draftset.list
-  (:require [drafter.middleware :refer [optional-enum-param]]
+  (:require [drafter.middleware :refer [include-endpoints-param]]
             [ring.util.response :as ring]
             [drafter.backend.draftset.operations :as dsops]
             [clojure.spec.alpha :as s]
@@ -58,17 +58,19 @@
 (defn get-draftsets-owned-by [repo user]
   (dsops/get-all-draftsets-by repo [(user-is-owner-clause user)]))
 
+(defn get-draftsets [backend user include]
+  (case include
+    :all (get-all-draftsets-info backend user)
+    :claimable (get-draftsets-claimable-by backend user)
+    :owned (get-draftsets-owned-by backend user)))
+
 (defn get-draftsets-handler
   ":get /draftsets"
   [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
-   (optional-enum-param
-    :include #{:all :owned :claimable} :all
-    (fn [{user :identity {:keys [include]} :params :as request}]
-      (case include
-        :all (ring/response (get-all-draftsets-info backend user))
-        :claimable (ring/response (get-draftsets-claimable-by backend user))
-        :owned (ring/response (get-draftsets-owned-by backend user)))))))
+    (include-endpoints-param
+      (fn [{user :identity {:keys [include]} :params :as request}]
+        (ring/response (get-draftsets backend user include))))))
 
 (defmethod ig/pre-init-spec ::get-draftsets-handler [_]
   (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))

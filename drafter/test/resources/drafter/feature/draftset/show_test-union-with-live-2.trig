@@ -9,11 +9,17 @@
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
 
+<http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public rdf:type drafter:Endpoint ;
+                   dcterms:modified "2020-07-03T11:43:02.373Z"^^xsd:dateTime ;
+                   dcterms:issued "2020-06-23T12:25:12.264Z"^^xsd:dateTime .
+}
+
 <http://publishmydata.com/graphs/drafter/drafts> {
 
-draftset:32159abf-d2ca-4f8b-8cc0-9609704c2553 a drafter:DraftSet ;
-	dcterms:modified "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
-	dcterms:created "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
+draftset:42e5f192-7edf-4e1b-bfce-73c114fa9481 a drafter:DraftSet ;
+	dcterms:modified "2020-07-02T13:08:47.143Z"^^xsd:dateTime ;
+	dcterms:created "2020-06-27T16:15:27.523Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	drafter:hasOwner <mailto:editor@swirrl.com> ;
 	rdfs:label "editing" .

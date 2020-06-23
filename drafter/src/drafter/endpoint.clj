@@ -1,0 +1,31 @@
+(ns drafter.endpoint
+  (:require [clojure.spec.alpha :as s]
+            [grafter-2.rdf.protocols :refer [->Quad ->Triple context map->Triple]]
+            [drafter.rdf.drafter-ontology :refer :all]
+            [grafter.vocabularies.dcterms :refer :all]
+            [grafter.vocabularies.rdf :refer :all])
+  (:import [java.time OffsetDateTime]
+           [java.net URI]))
+
+(defn date-time? [v]
+  (instance? OffsetDateTime v))
+
+(s/def ::URI #(instance? URI %))
+
+(s/def ::id any?)
+(s/def ::type #{"Draftset" "Endpoint"})
+(s/def ::created-at date-time?)
+(s/def ::updated-at date-time?)
+
+(s/def ::Endpoint (s/keys :req-un [::id ::type ::created-at ::updated-at]))
+(s/def ::DraftsetEndpoint (s/keys :req-un [:draftset/id :draftset/type ::created-at ::updated-at]))
+
+(def includes #{:all :owned :claimable})
+
+(defn public
+  "Creates a public endpoint map with the created and modified dates. Uses the current
+   time for these values if not specified."
+  ([] (public (OffsetDateTime/now)))
+  ([created] (public created created))
+  ([created modified]
+   {:id "public" :type "Endpoint" :created-at created :updated-at modified}))

@@ -1,0 +1,17 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+DELETE {
+  GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public dcterms:modified ?pem .
+  }
+} INSERT {
+  GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public dcterms:modified ?updated .
+  }
+} WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public dcterms:modified ?pem .
+  }
+  BIND(NOW() AS ?updated)
+}

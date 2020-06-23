@@ -1,10 +1,14 @@
 (ns ^:rest-api drafter.feature.draftset.show-test
   (:require [clojure.test :as t :refer [is]]
+            [drafter.draftset :as ds]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [drafter.test-common :as tc]
-            [drafter.feature.draftset.test-helper :as help]))
+            [drafter.feature.draftset.test-helper :as help]
+            [drafter.fixture-data :as fd]
+            [clojure.java.io :as io])
+  (:import (java.time OffsetDateTime)))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -49,7 +53,8 @@
   (let [handler (get system [:drafter/routes :draftset/api])
         draftset-location (help/create-draftset-through-api handler test-editor)
         ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
-    (tc/assert-schema help/DraftsetWithoutTitleOrDescription ds-info)))
+    (tc/deny-spec ::ds/HasDescription ds-info)
+    (tc/deny-spec ::ds/HasDisplayName ds-info)))
 
 (tc/deftest-system-with-keys get-empty-draftset-without-description
   keys-for-test
@@ -58,7 +63,7 @@
         display-name "Test title!"
         draftset-location (help/create-draftset-through-api handler test-editor display-name)
         ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
-    (tc/assert-schema help/DraftsetWithoutDescription ds-info)
+    (tc/deny-spec ::ds/HasDescription ds-info)
     (is (= display-name (:display-name ds-info)))))
 
 (tc/deftest-system-with-keys get-empty-draftset-with-description
@@ -70,7 +75,7 @@
         draftset-location (help/create-draftset-through-api handler test-editor display-name description)]
 
     (let [ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
-      (tc/assert-schema help/draftset-with-description-info-schema ds-info)
+      (tc/assert-spec ::ds/HasDescription ds-info)
       (is (= display-name (:display-name ds-info)))
       (is (= description (:description ds-info))))))
 
@@ -85,10 +90,38 @@
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
 
     (let [ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
-      (tc/assert-schema help/DraftsetWithoutDescription ds-info)
+      (tc/deny-spec ::ds/HasDescription ds-info)
 
       (is (= display-name (:display-name ds-info)))
       (is (= live-graphs (tc/key-set (:changes ds-info)))))))
+
+(t/deftest get-draftset-union-with-live
+  (t/testing "public endpoint modified earlier"
+    (tc/with-system keys-for-test [system system-config]
+                    (let [repo (:drafter/backend system)
+                          handler (get system [:drafter/routes :draftset/api])
+                          fixture-resources [(io/resource "drafter/feature/draftset/show_test-union-with-live-1.trig")]
+                          request (help/get-draftset-info-request "/v1/draftset/e2607255-96f7-4687-b365-b1efe9b6ace9" test-editor)
+                          request (assoc-in request [:params :union-with-live] "true")]
+                      (fd/load-fixture! {:repo repo :fixtures fixture-resources :format :trig})
+                      (let [{:keys [body] :as response} (handler request)]
+                        (tc/assert-is-ok-response response)
+                        (tc/assert-spec ::ds/OwnedDraftset body)
+                        (is (= (OffsetDateTime/parse "2020-07-03T10:03:58.994Z") (:updated-at body)))))))
+
+  (t/testing "public endpoint modified after"
+    (tc/with-system
+      keys-for-test [system system-config]
+      (let [repo (:drafter/backend system)
+            handler (get system [:drafter/routes :draftset/api])
+            fixture-resources [(io/resource "drafter/feature/draftset/show_test-union-with-live-2.trig")]
+            request (help/get-draftset-info-request "/v1/draftset/42e5f192-7edf-4e1b-bfce-73c114fa9481" test-editor)
+            request (assoc-in request [:params :union-with-live] "true")]
+        (fd/load-fixture! {:repo repo :fixtures fixture-resources :format :trig})
+        (let [{:keys [body] :as response} (handler request)]
+          (tc/assert-is-ok-response response)
+          (tc/assert-spec ::ds/OwnedDraftset body)
+          (is (= (OffsetDateTime/parse "2020-07-03T11:43:02.373Z") (:updated-at body))))))))
 
 (tc/deftest-system-with-keys get-draftset-request-for-non-existent-draftset
   keys-for-test

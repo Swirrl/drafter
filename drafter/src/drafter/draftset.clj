@@ -2,9 +2,10 @@
   "In memory clojure representations of Draftset objects and functions
   to operate on them."
   (:require [drafter.util :as util]
-            [schema.core :as s]
+            [clojure.spec.alpha :as s]
             [drafter.rdf.drafter-ontology :as ont]
-            [grafter.url :as url])
+            [grafter.url :as url]
+            [drafter.endpoint :as ep])
   (:import java.net.URI
            [java.util Date UUID]))
 
@@ -49,47 +50,50 @@
     (let [relative (.relativize ont/draftset-uri uri)]
       (->DraftsetId (str relative)))))
 
-(def ^:private email-schema (s/pred util/validate-email-address))
+(s/def ::EmailAddress util/validate-email-address)
+(s/def ::status #{:created :updated :deleted})
+(s/def ::changes (s/map-of ::ep/URI (s/keys :req-un [::status])))
+(s/def ::created-by ::EmailAddress)
+(s/def ::display-name string?)
+(s/def ::description string?)
+(s/def ::submitted-by ::EmailAddress)
+(s/def ::current-owner ::EmailAddress)
+(s/def ::claim-user string?)
+(s/def ::claim-role keyword?)
 
-(def ^:private SchemaCommon
-  {:id (s/protocol DraftsetRef)
-   :changes {URI {:status (s/enum :created :updated :deleted)}}
-   :created-by email-schema
-   :created-at Date
-   :updated-at Date
-   (s/optional-key :display-name) s/Str
-   (s/optional-key :description) s/Str
-   (s/optional-key :submitted-by) email-schema})
+(s/def ::HasDescription (s/keys :req-un [::description]))
+(s/def ::HasDisplayName (s/keys :req-un [::display-name]))
+(s/def ::DraftsetCommon (s/merge ::ep/Endpoint
+                                 (s/keys :req-un [::changes ::created-by]
+                                         :opt-un [::display-name ::description ::submitted-by])))
+(s/def ::OwnedDraftset (s/merge ::DraftsetCommon (s/keys :req-un [::current-owner])))
+(s/def ::SubmittedToRole (s/keys :req-un [::claim-role]))
+(s/def ::SubmittedToUser (s/keys :req-un [::claim-user]))
+(s/def ::SubmittedDraftset (s/and ::DraftsetCommon (s/or :role ::SubmittedToRole :user ::SubmittedToUser)))
+(s/def ::Draftset (s/or :owned ::OwnedDraftset :submitted ::SubmittedDraftset))
 
-(def OwnedDraftset
-  (merge SchemaCommon
-         {:current-owner email-schema}))
-
-(def SubmittedDraftset
-  (merge SchemaCommon
-         {(s/optional-key :claim-user) s/Str
-          (s/optional-key :claim-role) s/Keyword}))
-
-(def Draftset (s/either OwnedDraftset SubmittedDraftset))
-
-;; NOTE: this is currently only Used only by tests
+;; NOTE: this is currently only used only by tests
 ;;
 ;; TODO: Make the application use this function when loading a
 ;; draftset out of the database, and validate it conforms to our
 ;; in-memory/json schema.
-(s/defn create-draftset :- Draftset
-  ([creator :- email-schema]
-   {:id (->DraftsetId (str (UUID/randomUUID)))
-    :created-by creator
-    :created-at (Date.)
-    :current-owner creator})
-  ([creator :- email-schema
-    display-name :- s/Str]
+(defn create-draftset
+  ([creator]
+   (let [created-at (Date.)]
+     {:id (->DraftsetId (str (UUID/randomUUID)))
+      :type "Draftset"
+      :created-by creator
+      :created-at created-at
+      :modified-at created-at
+      :current-owner creator}))
+  ([creator display-name]
    (assoc (create-draftset creator) :display-name display-name))
-  ([creator :- email-schema
-    display-name :- s/Str
-    description :- s/Str]
+  ([creator display-name description]
    (assoc (create-draftset creator display-name) :description description)))
+
+(s/fdef create-draftset
+        :args (s/cat :creator ::EmailAddress :display-name (s/? string?) :description (s/? string?))
+  :ret ::OwnedDraftset)
 
 (defn- submit [draftset submitter role-or-user-key role-or-user-value]
   (-> draftset
@@ -109,7 +113,6 @@
   (-> draftset
       (dissoc :submission)
       (assoc :current-owner claimant)))
-
 
 ;; NOTE: This var is currently unreferenced, we should probably try
 ;; and use it - tying it into either a SPEC/validation or something.

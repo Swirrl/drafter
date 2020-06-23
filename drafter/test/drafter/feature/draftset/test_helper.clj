@@ -9,35 +9,13 @@
             [grafter-2.rdf.protocols :refer [add]]
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
-            [schema.core :as s]
-            [drafter.async.jobs :as async]
+            [drafter.draftset :as ds]
+            [drafter.endpoint :as ep]
             [clojure.java.io :as io]
             [drafter.util :as util]
             [martian.encoders :as enc])
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
            [java.util.zip GZIPOutputStream]))
-
-(def DraftsetWithoutTitleOrDescription
-  {:id s/Str
-   :changes {java.net.URI {:status (s/enum :created :updated :deleted)}}
-   :created-at java.time.OffsetDateTime
-   :updated-at java.time.OffsetDateTime
-   :created-by s/Str
-   (s/optional-key :current-owner) s/Str
-   (s/optional-key :claim-role) s/Keyword
-   (s/optional-key :claim-user) s/Str
-   (s/optional-key :submitted-by) s/Str})
-
-(def DraftsetWithoutDescription
-  (assoc DraftsetWithoutTitleOrDescription :display-name s/Str))
-
-(def draftset-with-description-info-schema
-  (assoc DraftsetWithoutDescription :description s/Str))
-
-(def Draftset
-  (merge DraftsetWithoutTitleOrDescription
-         {(s/optional-key :description) s/Str
-          (s/optional-key :display-name) s/Str}))
 
 (defn is-client-error-response?
   "Whether the given ring response map represents a client error."
@@ -84,7 +62,7 @@
   (let [delete-graph-request (delete-draftset-graph-request user draftset-location graph-to-delete)
         {:keys [body] :as delete-graph-response} (handler delete-graph-request)]
     (tc/assert-is-ok-response delete-graph-response)
-    (tc/assert-schema Draftset body)
+    (tc/assert-spec ::ds/Draftset body)
     body))
 
 (defn statements->input-stream [statements format]
@@ -142,6 +120,19 @@
   (let [draftset-location (create-draftset-through-api handler test-publisher)]
     (append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
     (publish-draftset-through-api handler draftset-location test-publisher)))
+
+(defn request-public-endpoint-through-api
+  "Submits a request for the public endpoint to a handler and returns the response"
+  [handler]
+  (handler {:uri "/v1/endpoint/public" :request-method :get}))
+
+(defn get-public-endpoint-through-api
+  "Submits a request for the public endpoint and returns the endpoint"
+  [handler]
+  (let [{:keys [body] :as response} (request-public-endpoint-through-api handler)]
+    (tc/assert-is-ok-response response)
+    (tc/assert-spec ::ep/Endpoint body)
+    (:body response)))
 
 (defn eval-statement [s]
   (util/map-values str s))
@@ -237,7 +228,7 @@
 (defn get-draftset-info-through-api [handler draftset-location user]
   (let [{:keys [body] :as response} (handler (get-draftset-info-request draftset-location user))]
     (tc/assert-is-ok-response response)
-    (tc/assert-schema Draftset body)
+    (tc/assert-spec ::ds/Draftset body)
     body))
 
 (defn append-data-to-draftset-through-api [handler user draftset-location draftset-data-file]

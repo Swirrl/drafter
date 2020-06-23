@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [clojure.pprint :as pp]
             [clojure.spec.test.alpha :as st]
+            [clojure.spec.alpha :as sp]
             [clojure.test :refer :all]
             [drafter.backend.draftset.draft-management
              :refer
@@ -42,7 +43,8 @@
            org.apache.http.ProtocolVersion
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
            org.eclipse.rdf4j.rio.trig.TriGParserFactory
-           [java.util.zip GZIPOutputStream]))
+           [java.util.zip GZIPOutputStream]
+           (java.time.temporal Temporal)))
 
 (defn with-spec-instrumentation [f]
   (try
@@ -446,6 +448,12 @@
   (let [errors (s/check schema value)]
     (is (not errors) errors)))
 
+(defn assert-spec [spec x]
+  (is (nil? (sp/explain-data spec x))))
+
+(defn deny-spec [spec x]
+  (is (some? (sp/explain-data spec x))))
+
 (def ring-response-schema
   {:status s/Int
    :headers {s/Str s/Str}
@@ -507,3 +515,8 @@
     (with-open [gzos (GZIPOutputStream. baos)]
       (io/copy source gzos))
     (ByteArrayInputStream. (.toByteArray baos))))
+
+(defn equal-up-to
+  "Returns whether two Temporal instances are within the specified interval of each other"
+  [^Temporal t1 ^Temporal t2 limit units]
+  (< (.until t1 t2 units) limit))

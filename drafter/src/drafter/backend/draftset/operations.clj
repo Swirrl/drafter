@@ -4,13 +4,15 @@
              :refer [to-quads with-state-graph]]
             [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.rdf.sparql :as sparql]
             [drafter.user :as user]
             [drafter.util :as util]
             [grafter-2.rdf.protocols :as rdf]
             [grafter-2.rdf4j.repository :as repo :refer [prepare-query]]
             [grafter.url :as url]
-            [grafter.vocabularies.rdf :refer :all])
+            [grafter.vocabularies.rdf :refer :all]
+            [clojure.java.io :as io])
   (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
            [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler]
            org.eclipse.rdf4j.queryrender.RenderUtils
@@ -211,6 +213,7 @@
 
 (defn- draftset-properties-result->properties [draftset-ref {:keys [created title description creator owner role claimuser submitter modified] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
+                         :type "Draftset"
                          :created-at created
                          :created-by (user/uri->username creator)
                          :updated-at modified}
@@ -478,6 +481,15 @@
   (let [q (find-draftset-draft-graph-query draftset-ref live-graph)
         [result] (sparql/eager-query backend q)]
     (:dg result)))
+
+(defn- update-public-endpoint-modified-at-query []
+  (slurp (io/resource "drafter/backend/draftset/operations/update-public-endpoint-modified-at.sparql")))
+
+(defn update-public-endpoint-modified-at!
+  "Updates the "
+  [backend]
+  (let [q (update-public-endpoint-modified-at-query)]
+    (sparql/update! backend q)))
 
 (defn publish-draftset-graphs! [backend draftset-ref clock-fn]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]

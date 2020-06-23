@@ -7,10 +7,12 @@
             [drafter.rdf.content-negotiation :as conneg]
             [drafter.requests :as drafter-request]
             [drafter.responses :as response]
+            [drafter.endpoint :as ep]
             [drafter.util :as util]
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
             [ring.util.request :as request]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [buddy.auth.http :as http])
   (:import java.io.File
            (org.apache.tika.mime MediaType)
            (java.util.zip GZIPInputStream)))
@@ -44,6 +46,12 @@
             (invoke-inner kw-val)
             (response/unprocessable-entity-response (str "Invalid value for parameter " (name param-name) ": " val))))
         (invoke-inner default)))))
+
+(defn include-endpoints-param
+  [inner-handler]
+  (optional-enum-param
+    :include ep/includes :all
+    inner-handler))
 
 (defn sparql-query-parser-handler [inner-handler]
   (fn [{:keys [request-method body query-params form-params] :as request}]
@@ -168,6 +176,18 @@
   (fn [req]
     (datadog/increment! "drafter.requests.total" 1)
     (handler req)))
+
+(defn maybe-authenticated
+  "Returns a handler which optionally allows the incoming request to be authenticated.
+   If an Authorization header exists on incoming requests it will be authenticated as normal
+   before being passed to the inner handler. If no such header exists the inner handler will
+   be executed directly. Handlers are required to handle cases where a user does and does not
+   exist in the incoming request map."
+  [wrap-authenticated handler]
+  (fn [request]
+    (if-let [_ (http/-get-header request "authorization")]
+      ((wrap-authenticated handler) request)
+      (handler request))))
 
 (defn wrap-request-timer [handler]
   (fn [req]

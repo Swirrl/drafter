@@ -1,29 +1,31 @@
 (ns ^:rest-api drafter.feature.draftset.list-test
   (:require [clojure.test :as t]
             [drafter.feature.draftset.list :as sut]
-            [drafter.feature.draftset.test-helper :refer [Draftset]]
+            [drafter.draftset :as ds]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
-            [drafter.util :as dutil])
+            [drafter.util :as dutil]
+            [clojure.spec.alpha :as s])
   (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(defn ok-response->typed-body [schema {:keys [body] :as response}]
+(defn ok-response->specced-body [spec {:keys [body] :as response}]
   (tc/assert-is-ok-response response)
-  (tc/assert-schema schema body)
+  (tc/assert-spec spec body)
   body)
 
 (defn get-draftsets-request [include user]
-  (tc/with-identity user
-    {:uri "/v1/draftsets" :request-method :get :params {:include include}}))
+  (let [req {:uri "/v1/draftsets" :request-method :get}
+        req (if (some? include) (assoc-in req [:params :include] include) req)]
+    (tc/with-identity user req)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TESTS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- assert-visibility [expected-draftset-names {:keys [body] :as response} message]
-  (ok-response->typed-body [Draftset] response) ;; check we get our draftset json back in an appropriate HTML response
+  (ok-response->specced-body (s/coll-of ::ds/Draftset) response) ;; check we get our draftset json back in an appropriate HTML response
 
   (let [draftset-names (set (map :display-name body))]
     (t/is (= expected-draftset-names draftset-names)
@@ -70,15 +72,13 @@
   (let [get-draftsets-through-api (fn [include user]
                                     (let [request (get-draftsets-request include user)
                                           {:keys [body] :as response} (get-draftsets-handler request)]
-
-                                      (ok-response->typed-body [Draftset] response)
-
+                                      (ok-response->specced-body (s/coll-of ::ds/Draftset) response)
                                       body))]
 
     (t/testing "Missing include filter should return all owned and claimable draftsets"
       (let [request (tc/with-identity test-publisher {:uri "/v1/draftsets" :request-method :get})
             response (get-draftsets-handler request)
-            draftsets (ok-response->typed-body [Draftset] response)]
+            draftsets (ok-response->specced-body (s/coll-of ::ds/Draftset) response)]
         (t/is (= 2 (count draftsets)))
         (t/is (= #{"owned" "claimable"} (set (map :display-name draftsets))))))
 
