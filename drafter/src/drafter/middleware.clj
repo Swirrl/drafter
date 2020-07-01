@@ -10,7 +10,8 @@
             [drafter.util :as util]
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
             [ring.util.request :as request]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [ring.middleware.cors :as cors])
   (:import java.io.File
            (org.apache.tika.mime MediaType)
            (java.util.zip GZIPInputStream)))
@@ -174,3 +175,34 @@
     (datadog/measure!
      "drafter.request.time" {}
      (handler req))))
+
+(defn- matches-whitelist?
+  "true if coll contains val"
+  [re-whitelist val]
+  (->> re-whitelist
+       (some #(re-find % val))
+       (boolean)))
+
+(def default-cors-allowed-headers
+  #{"Accept"
+    "Accept-Encoding"
+    "Authorization"
+    "Cache-Control"
+    "Content-Type"
+    "DNT"
+    "If-Modified-Since"
+    "Keep-Alive"
+    "User-Agent"
+    "X-CustomHeader"
+    "X-Requested-With"})
+
+(defn wrap-endpoint-cors
+  "A thin Drafter wrapper for `ring.middleware.cors` which adds Cross-Origin
+  Resource Sharing headers to a white-list of live SPARQL endpoint path
+  matchers."
+  [handler request-path-regex-whitelist & access-control]
+  (let [access-control (cors/normalize-config access-control)]
+    (fn [req]
+      (if (matches-whitelist? request-path-regex-whitelist (:uri req))
+        (cors/handle-cors handler req access-control cors/add-access-control)
+        (handler req)))))

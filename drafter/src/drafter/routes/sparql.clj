@@ -3,9 +3,7 @@
             [drafter.rdf
              [sparql-protocol :refer [sparql-end-point] :as sp]]
             [integrant.core :as ig]
-            [clojure.spec.alpha :as s]
-            [drafter.timeouts :as timeouts]
-            [ring.middleware.cors :as cors]))
+            [clojure.spec.alpha :as s]))
 
 ;; TODO: Remove this namespace as all it really adds to
 ;; sparql-protocol is some route-matching code to /v1/sparql/:name
@@ -32,13 +30,6 @@
 (defmethod ig/pre-init-spec ::live-sparql-query-route [_]
   (s/keys :opt-un [::sp/timeout-fn]))
 
-(def cors-allowed-headers
-  #{"Accept-Encoding" "DNT" "Accept" "Cache-Control" "Content-Type"
-    "content-type" "If-Modified-Since" "Keep-Alive" "User-Agent"
-    "X-CustomHeader" "X-Requested-With"})
-
 (defmethod ig/init-key ::live-sparql-query-route [_ {:keys [repo] :as opts}]
-  (cors/wrap-cors (get-live-sparql-query-route repo opts)
-                  :access-control-allow-headers cors-allowed-headers
-                  :access-control-allow-methods [:get :options :post]
-                  :access-control-allow-origin #".*"))
+  (get-live-sparql-query-route repo opts))
+

@@ -10,7 +10,6 @@
             [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.status :refer [status-routes]]
             [drafter.swagger :as swagger]
-            [drafter.timeouts :as timeouts]
             [drafter.util :refer [conj-if set-var-root!]]
             [drafter.write-scheduler
              :refer [start-writer! stop-writer!]]
@@ -42,6 +41,10 @@
       ;; Content-Type, Content-Length, and Last Modified headers for files in body
       wrap-file-info))
 
+(def cors-path-match-whitelist
+  [#"^\/v\d\/sparql\/live"
+   #"^\/v\d\/draftset\/[\w-]+\/query"])
+
 (defn- build-handler
   [{backend :repo
     live-sparql-route :live-sparql-query-route
@@ -64,6 +67,13 @@
                  :middleware [#(wrap-resource % "swagger-ui")
                               wrap-verbs
                               wrap-encode-errors
+                              ;; wrapping here affords us CORS headers in error responses to browser clients
+                              #(middleware/wrap-endpoint-cors %
+                                                              cors-path-match-whitelist
+                                                              :access-control-allow-headers middleware/default-cors-allowed-headers
+                                                              :access-control-allow-methods [:get :options :post]
+                                                              :access-control-allow-origin #".*")
+
                               middleware/wrap-total-requests-counter
                               middleware/wrap-request-timer
                               log-request
