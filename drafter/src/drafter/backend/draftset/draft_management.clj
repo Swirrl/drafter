@@ -12,7 +12,8 @@
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.core :as s]
-            [grafter-2.rdf4j.io :as rio])
+            [grafter-2.rdf4j.io :as rio]
+            [clojure.string :as string])
   (:import java.net.URI
            [java.util Date UUID Calendar]
            [javax.xml.bind DatatypeConverter]))
@@ -442,40 +443,27 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
-(defn fixup-rewrite-q [in-graph-uri graph-a-uri graph-b-uri]
+(defn fixup-rewrite-q [gabs]
   (format "
 DELETE { GRAPH ?g { ?a ?p ?o } }
 INSERT { GRAPH ?g { ?b ?p ?o } }
-WHERE  { VALUES (?g ?a ?b) { (
-  <%s>
-  <%s>
-  <%s>
-) } GRAPH ?g { ?a ?p ?o } } ;
+WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?a ?p ?o } } ;
 
 DELETE { GRAPH ?g { ?s ?a ?o } }
 INSERT { GRAPH ?g { ?s ?b ?o } }
-WHERE  { VALUES (?g ?a ?b) { (
-  <%s>
-  <%s>
-  <%s>
-) } GRAPH ?g { ?s ?a ?o } } ;
+WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?s ?a ?o } } ;
 
 DELETE { GRAPH ?g { ?s ?p ?a } }
 INSERT { GRAPH ?g { ?s ?p ?b } }
-WHERE  { VALUES (?g ?a ?b) { (
-  <%s>
-  <%s>
-  <%s>
-) } GRAPH ?g { ?s ?p ?a } }"
-          in-graph-uri graph-a-uri graph-b-uri
-          in-graph-uri graph-a-uri graph-b-uri
-          in-graph-uri graph-a-uri graph-b-uri))
+WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?s ?p ?a } }"
+          gabs gabs gabs))
 
 (defn fixup-compound-q [in-graph-uris mapping]
-  (util/make-compound-sparql-query
-   (for [in-graph in-graph-uris
-         [a b] mapping]
-     (fixup-rewrite-q in-graph a b))))
+  (->> (for [in-graph in-graph-uris
+             [a b] mapping]
+         (format "( <%s> <%s> <%s> )" in-graph a b))
+       (string/join " ")
+       (fixup-rewrite-q)))
 
 (defn fixup-rewrite! [db in-graph-uris mapping]
   (let [compound-q (fixup-compound-q in-graph-uris mapping)]
