@@ -466,9 +466,13 @@ WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?s ?p ?a } }"
        (string/join " ")
        (fixup-rewrite-q)))
 
+(def ^:dynamic *do-rewrite?* true)
+
 (defn fixup-rewrite! [db in-graph-uris mapping]
-  (let [compound-q (fixup-compound-q in-graph-uris mapping)]
-    (sparql/update! db compound-q)))
+  (when *do-rewrite?*
+    (doseq [batch (partition-all 100 in-graph-uris)]
+      (let [compound-q (fixup-compound-q batch mapping)]
+        (sparql/update! db compound-q)))))
 
 (defn migrate-graphs-to-live! [repo graphs clock-fn]
   "Migrates a collection of draft graphs to live through a single
