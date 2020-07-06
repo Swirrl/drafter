@@ -47,10 +47,14 @@
           ;;NOTE: do this immediately instead of scheduling a
           ;;continuation since we haven't done any real work yet
           (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-      (do
-        (mgmt/fixup-rewrite! repo (vals live->draft) live->draft)
+      (let [draftset-info (ops/get-draftset-info repo draftset-ref)
+            rewrite-map (->> (:changes draftset-info)
+                             (keep (fn [[uri {:keys [status]}]]
+                                     (when (not= :deleted status)
+                                       [uri (live->draft uri)]))))]
+        (when (seq rewrite-map)
+          (mgmt/fixup-rewrite! repo (vals live->draft) rewrite-map))
         (ajobs/job-succeeded! job)))))
-
 
 (defn- copy-graph-for-append*
   [state draftset-ref resources live->draft quad-batches job]
