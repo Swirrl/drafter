@@ -1,17 +1,35 @@
 (ns drafter.rewrite-fixup-test
   (:require [cheshire.core :as json]
-            [clojure.test :as t :refer [is testing]]
+            [clojure.test :as t :refer [are is testing]]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-publisher]]
-            [grafter-2.rdf.protocols :refer [->Quad]]
+            [grafter-2.rdf.protocols :refer [->Quad map->Quad]]
             [grafter-2.rdf4j.repository :as repo]
             [drafter.feature.draftset.create-test :as ct]
-            [clojure.string :as string])
+            [clojure.string :as string]
+            [drafter.backend.draftset.operations :as ops]
+            [clojure.walk :as walk])
   (:import java.net.URI
            java.util.UUID))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
+
+(def s1 (URI. "http://s1"))
+(def p1 (URI. "http://p1"))
+(def o1 (URI. "http://o1"))
+(def s2 (URI. "http://s2"))
+(def p2 (URI. "http://p2"))
+(def o2 (URI. "http://o2"))
+(def s3 (URI. "http://s3"))
+(def p3 (URI. "http://p3"))
+(def o3 (URI. "http://o3"))
+(def s4 (URI. "http://s4"))
+(def p4 (URI. "http://p4"))
+(def o4 (URI. "http://o4"))
+
+(defn random-uri [& [domain]]
+  (URI. (str "http://" (when domain (str domain "/")) (UUID/randomUUID))))
 
 (def system-config "test-system.edn")
 
@@ -28,462 +46,337 @@
 (defn draft-graph-uri-for [conn graph-uri]
   (:o (first (repo/query conn (format dg-q graph-uri)))))
 
-(tc/deftest-system-with-keys append-draft-graph-in-non-graph-position-rewrite-test
-  keys-for-test [system system-config]
+(def ds-quads-q
+  "SELECT * WHERE { GRAPH ?c { ?s ?p ?o } VALUES ?c { %s } }")
+
+(defn ds-quads [conn graphs]
+  (let [q (format ds-quads-q (string/join " " (map #(str "<" % ">") graphs)))]
+    (repo/query conn q)))
+
+(defn get-draftset-quads [system draftset-id]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [ds-graphs (keys (:changes (ops/get-draftset-info conn draftset-id)))
+          draft-graphs (mapv (partial draft-graph-uri-for conn) ds-graphs)]
+      (set (mapv (juxt :s :p :o :c) (ds-quads conn draft-graphs))))))
+
+(defn get-live-quads-for-graphs [system graphs]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (set (mapv (juxt :s :p :o :c) (ds-quads conn graphs)))))
+
+(defn copy-live-graph-into-draftset [handler draftset-location draftset-id graph]
+  (-> (tc/with-identity test-publisher
+        {:uri (str draftset-location "/graph")
+         :request-method :put
+         :params {:draftset-id draftset-id
+                  :graph (str graph)}})
+      (handler)
+      (get-in [:body :finished-job])
+      (tc/await-success)))
+
+(defn draftset-functions [system]
   (let [handler (get system [:drafter/routes :draftset/api])
         live    (:drafter.routes.sparql/live-sparql-query-route system)
         draftset-location (help/create-draftset-through-api handler test-publisher)
-        live-graph-uri (URI. (str "http://live-graph/" (UUID/randomUUID)))
-        quad-1 (->Quad live-graph-uri
-                       (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
-                       (URI. "http://example.org/animals/kitten")
-                       live-graph-uri)
-        quad-2 (->Quad (URI. "http://uri-1")
-                       (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
-                       live-graph-uri
-                       live-graph-uri)
-        live-graph-uri-2 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-        quad-3 (->Quad live-graph-uri-2
-                       (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
-                       (URI. "http://uri-2")
-                       live-graph-uri-2)
-        quads [quad-1 quad-2 quad-3]
-        endpoint (:drafter.common.config/sparql-query-endpoint system)]
-    (help/append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
-    (with-open [conn (repo/->connection (repo/sparql-repo endpoint))]
-      (let [draft-graph-q (-> "SELECT ?o WHERE { GRAPH ?g { <%s> <http://publishmydata.com/def/drafter/hasDraft> ?o } }"
-                              (format live-graph-uri))
-            draft-graph-uri (:o (first (repo/query conn draft-graph-q)))]
-        (testing "The graph in ?s position has been rewritten"
+        draftset-id (last (string/split draftset-location #"/"))
+        ->uri #(if (keyword? %) (URI. (str "http://" (name %))) %)
+        ->quad #(apply ->Quad (map ->uri %))
+        ->quads (partial map ->quad)]
 
-          (is (->> draft-graph-uri
-                   (format "ASK { <%s> ?p <http://example.org/animals/kitten> }")
-                   (repo/query conn)))
+    (letfn [(set-live! [quads]
+              (let [draftset-location (help/create-draftset-through-api
+                                       handler test-publisher)
+                    quads (->quads quads)
+                    graphs (distinct (map :c quads))]
+                (help/append-quads-to-draftset-through-api
+                 handler test-publisher draftset-location quads)
+                (help/publish-draftset-through-api
+                 handler draftset-location test-publisher)
+                (get-live-quads-for-graphs system graphs)))
 
-          (is (->> draft-graph-uri
-                   (format "ASK { <http://uri-1> ?p <%s> }")
-                   (repo/query conn))))
+            (append! [quads]
+              (help/append-quads-to-draftset-through-api
+               handler test-publisher draftset-location (->quads quads))
+              (get-draftset-quads system draftset-id))
 
-        (testing "We can still query for the live graph URI in ?s position"
-          (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" live-graph-uri)
-                req (tc/with-identity test-publisher
-                      {:uri (str draftset-location "/query")
-                       :request-method :post
-                       :headers {"accept" "application/sparql-results+json"
-                                 "content-type" "application/sparql-query"}
-                       :body (java.io.ByteArrayInputStream. (.getBytes q))})
-                res (handler req)]
-            (is (= true (:boolean (json/parse-string (:body res) keyword))))))
+            (delete! [quads]
+              (help/delete-quads-through-api
+               handler test-publisher draftset-location (->quads quads))
+              (get-draftset-quads system draftset-id))
 
-        (testing "When deleting a triple, it's gone"
-          (help/delete-quads-through-api handler
-                                         test-publisher
-                                         draftset-location
-                                         [quad-2])
+            (copy-graph! [graph]
+              (copy-live-graph-into-draftset
+               handler draftset-location draftset-id graph)
+              (get-draftset-quads system draftset-id))
 
-          ;; Triple is not present with draft-graph uri in ?o position
-          (is (false? (->> draft-graph-uri
-                           (format "ASK { <http://uri-1> ?p <%s> }")
-                           (repo/query conn))))
+            (delete-graph! [graph]
+              (help/delete-draftset-graph-through-api
+               handler test-publisher draftset-location graph)
+              (get-draftset-quads system draftset-id))
 
-          ;; Triple is not present with live-graph uri in ?o position
-          (is (false? (->> live-graph-uri
-                           (format "ASK { <http://uri-1> ?p <%s> }")
-                           (repo/query conn))))
+            (publish! [& live-graphs-to-return]
+              (help/publish-draftset-through-api
+               handler draftset-location test-publisher)
+              (get-live-quads-for-graphs system live-graphs-to-return))
 
-          (help/delete-quads-through-api handler
-                                         test-publisher
-                                         draftset-location
-                                         [quad-3])
+            (graph' [graph]
+              (with-open [conn (-> system
+                                   :drafter.common.config/sparql-query-endpoint
+                                   repo/sparql-repo
+                                   repo/->connection)]
+                (draft-graph-uri-for conn graph)))]
+      {:set-live! set-live!
+       :append! append!
+       :delete! delete!
+       :copy-graph! copy-graph!
+       :delete-graph! delete-graph!
+       :publish! publish!
+       :graph' (memoize graph')})))
 
-          ;; Triple is not present in draftset quads
-          (is (not (some #(= (:o quad-3) (:o %))
-                         (help/get-draftset-quads-through-api handler draftset-location test-publisher)))))
+(defmacro test-table [& forms]
+  (->> forms
+       (walk/postwalk
+        (fn [x]
+          (if (and (symbol? x) (= \' (last (name x))))
+            (list 'graph' (symbol (apply str (butlast (name x)))))
+            x)))
+       (partition-by #{'|})
+       (remove (partial every? #{'|}))
+       (partition 4)
+       (map (fn [[t action args expected]]
+              `(let [t# (~@action ~@args)]
+                 (is (= ~@expected t#)
+                     ~(str "T" (first t) " | "(name (first action))
+                           " did not match expected state")))))
+       (cons 'do)))
 
-        (testing "Graph metadata reports graph deleted where last triple is deleted"
-          (is (= :deleted (get-in (help/get-draftset-info-through-api handler draftset-location test-publisher)
-                                  [:changes live-graph-uri-2 :status]))))
-
-        (testing "When publishing, draft-graph-uris are written back"
-          (help/publish-draftset-through-api handler draftset-location test-publisher)
-
-          ;; triple is back with the live graph in ?s position
-          (is (->> live-graph-uri
-                   (format "ASK { <%s> ?p <http://example.org/animals/kitten> }")
-                   (repo/query conn)))
-
-          ;; and the draft graph is not in thes ?s position
-          (is (false? (->> draft-graph-uri
-                           (format "ASK { <%s> ?p ?o }")
-                           (repo/query conn))))
-
-          ;; and we can query it from the live endpoint
-          (let [q (format "ASK { <%s> ?p <http://example.org/animals/kitten> }" live-graph-uri)
-                req {:uri "/v1/sparql/live"
-                     :request-method :post
-                     :headers {"accept" "application/sparql-results+json"
-                               "content-type" "application/sparql-query"}
-                     :body (java.io.ByteArrayInputStream. (.getBytes q))}
-                res (live req)]
-            (is (true? (:boolean (json/parse-string (:body res) keyword))))))
-
-        (testing "After publish, triple deleted from draft is not present"
-          ;; Triple is not in stardog
-          (is (false? (->> live-graph-uri
-                           (format "ASK { <http://uri-1> ?p <%s> }")
-                           (repo/query conn))))
-
-          ;; And can't be accessed in the live drafter endpoint
-          (let [q (format "ASK { <http://uri-1> ?p <%s> }" live-graph-uri)
-                req {:uri "/v1/sparql/live"
-                     :request-method :post
-                     :headers {"accept" "application/sparql-results+json"
-                               "content-type" "application/sparql-query"}
-                     :body (java.io.ByteArrayInputStream. (.getBytes q))}
-                res (live req)]
-            (is (false? (:boolean (json/parse-string (:body res) keyword))))))))))
-
-(tc/deftest-system-with-keys live-graph-in-data-rewriting-delete-test
+(tc/deftest-system-with-keys sequence-1-test
   keys-for-test [system system-config]
-  (with-open [conn (-> system
-                       :drafter.common.config/sparql-query-endpoint
-                       repo/sparql-repo
-                       repo/->connection)]
-    (let [handler (get system [:drafter/routes :draftset/api])
-          live    (:drafter.routes.sparql/live-sparql-query-route system)
-          draftset-location (help/create-draftset-through-api handler test-publisher)
-          live-graph-uri-1 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          live-graph-uri-2 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          quad-1 (->Quad live-graph-uri-1
-                         (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
-                         live-graph-uri-2
-                         live-graph-uri-1)
-          quad-2 (->Quad (URI. "http://uri-1")
-                         (URI. "http://www.w3.org/1999/02/22-rdf-syntax-ns#a")
-                         live-graph-uri-2
-                         live-graph-uri-2)
-          quads [quad-1]
-          _ (help/append-quads-to-draftset-through-api handler test-publisher draftset-location [quad-1 quad-2])
-          ;; _ (help/append-quads-to-draftset-through-api handler test-publisher draftset-location [quad-2])
-          draft-graph-uri-1 (:o (first (repo/query conn (format dg-q live-graph-uri-1))))
-          draft-graph-uri-2 (:o (first (repo/query conn (format dg-q live-graph-uri-2))))]
-
-      (testing "Draft graph 1 & 2 were rewritten"
-
-        (is (false? (->> (format "ASK { GRAPH <%s> { <%s> ?p <%s> } }"
-                                 live-graph-uri-1
-                                 live-graph-uri-1
-                                 live-graph-uri-2)
-                         (repo/query conn))))
-
-        (is (true? (->> (format "ASK { GRAPH <%s> { <%s> ?p <%s> } }"
-                                draft-graph-uri-1
-                                draft-graph-uri-1
-                                draft-graph-uri-2)
-                        (repo/query conn))))
-
-        (is (true? (->> (format "ASK { GRAPH <%s> { <http://uri-1> ?p <%s> } }"
-                                draft-graph-uri-2
-                                draft-graph-uri-2)
-                        (repo/query conn)))))
-
-      ;; When we delete a draft graph, references to it should be rewritten back
-      ;; to the live uri
-      (help/delete-draftset-graph-through-api
-       handler test-publisher draftset-location live-graph-uri-2)
-
-      (testing "Deleted graph triples are gone"
-        (is (false? (->> (format "ASK { GRAPH <%s> { <http://uri-1> ?p <%s> } }"
-                                 draft-graph-uri-2
-                                 draft-graph-uri-2)
-                         (repo/query conn)))))
-
-      (testing "Draft graph 2 was rewritten back to live"
-
-        (is (false? (->> (format "ASK { GRAPH <%s> { <%s> ?p <%s> } }"
-                                 draft-graph-uri-1
-                                 draft-graph-uri-1
-                                 draft-graph-uri-2)
-                         (repo/query conn))))
-
-        (is (true? (->> (format "ASK { GRAPH <%s> { <%s> ?p <%s> } }"
-                                draft-graph-uri-1
-                                draft-graph-uri-1
-                                live-graph-uri-2)
-                        (repo/query conn)))))
-
-      (testing "Graph metadata reports graph deleted where last triple is deleted"
-        (is (= :deleted (get-in (help/get-draftset-info-through-api
-                                 handler draftset-location test-publisher)
-                                [:changes live-graph-uri-2 :status])))))))
+  ;; From Rick's example
+  ;; 1. Publish a graph :A with quad :foo :hasGraph :B :A in it, and the other
+  ;;    quad :live-data :live-data :live-data :B in it.
+  ;; 2. Create a new draftset
+  ;; 3. PUT graph :A into our draftset (creating :foo :hasGraph :B :ADraft)
+  ;; 4. PUT graph :B into our draftset (creating :live-data :live-data :live-data
+  ;;    :BDraft) and updating `:foo :hasGraph :B :ADraft` to be:
+  ;;    `:foo :hasGraph :BDraft :ADraft`
+  ;; 5. Deleting graph B from draftset should result in :live-data :live-data
+  ;;   :live-data :BDraft being removed AND :foo :hasGraph :BDraft :ADraft being
+  ;;   updated back to :foo :hasGraph :B :ADraft
+  (let [{:keys [set-live! append! delete! publish! copy-graph! delete-graph! graph']}
+        (draftset-functions system)
+        g1 (random-uri 'g)
+        g2 (random-uri 'g)
+        q1 [s1 p1 g2 g1]
+        q2 [s2 p2 g1 g2]]
+    ;; Trivial case Just appends no deletes:
+    (test-table
+     |;T | Operation     | Args     | Expected State                     |
+     | 1 | set-live!     | #{q1 q2} | #{q1 q2}                           |
+     | 2 | copy-graph!   | g1       | #{[s1 p1 g2 g1']}                  |
+     | 3 | copy-graph!   | g2       | #{[s1 p1 g2' g1'] [s2 p2 g1' g2']} |
+     | 4 | delete-graph! | g2       | #{[s1 p1 g2 g1']}                  |
+     | 5 | publish!      | g1 g2    | #{q1}                              |)))
 
 (tc/deftest-system-with-keys copy-live-graph-into-draftset-test
   keys-for-test [system system-config]
-  (with-open [conn (-> system
-                       :drafter.common.config/sparql-query-endpoint
-                       repo/sparql-repo
-                       repo/->connection)]
-    ;; Setup
-    (let [handler (get system [:drafter/routes :draftset/api])
-          live    (:drafter.routes.sparql/live-sparql-query-route system)
-          draftset-location (help/create-draftset-through-api handler test-publisher)
-          graph-to-copy-uri (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          quad-in-copy-graph (->Quad graph-to-copy-uri
-                                     (URI. "http://p")
-                                     (URI. "http://o")
-                                     graph-to-copy-uri)
-          ;; add quad to graph
-          _ (help/append-quads-to-draftset-through-api
-             handler test-publisher draftset-location [quad-in-copy-graph])
-          ;; and publish to live
-          _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+  (let [{:keys [set-live! append! delete! publish! copy-graph! graph']}
+        (draftset-functions system)
+        g1 (random-uri 'g)
+        g2 (random-uri 'g)
+        g3 (random-uri 'g)
+        q1 [s1 p1 o1 g1]
+        q2 [s2 p2 g1 g2]
+        q3 [s3 p3 g2 g3]]
+    ;; Trivial case Just appends no deletes:
+    (test-table
+     |;T | Operation   | Args     | Expected State                                    |
+     | 1 | set-live!   | #{q1}    | #{q1}                                             |
+     | 2 | append!     | #{q2}    | #{[s2 p2 g1 g2']}                                 |
+     | 3 | append!     | #{q3}    | #{[s2 p2 g1 g2'] [s3 p3 g2' g3']}                 |
+     | 4 | copy-graph! | g1       | #{[s1 p1 o1 g1'] [s2 p2 g1' g2'] [s3 p3 g2' g3']} |
+     | 5 | publish!    | g1 g2 g3 | #{[s1 p1 o1 g1] [s2 p2 g1 g2] [s3 p3 g2 g3]}      |)))
 
-          ;; new draftset, old one is gone
-          draftset-location (help/create-draftset-through-api handler test-publisher)
-          draftset-id (last (string/split draftset-location #"/"))
-          live-graph-uri-1 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          quad-1 (->Quad live-graph-uri-1
-                         (URI. "http://p")
-                         graph-to-copy-uri
-                         live-graph-uri-1)
+;; Perfect Rewriting Scenarios
 
-          ;; add quad referencing quad-in-copy-graph to ds
-          _ (help/append-quads-to-draftset-through-api
-             handler test-publisher draftset-location [quad-1])
-          draft-graph-uri-1 (draft-graph-uri-for conn live-graph-uri-1)
-
-          copy-graph-request (tc/with-identity test-publisher
-                               {:uri (str draftset-location "/graph")
-                                :request-method :put
-                                :params {:draftset-id draftset-id
-                                         :graph (str graph-to-copy-uri)}})
-          copy-graph-response (handler copy-graph-request)
-          _ (tc/await-success (get-in copy-graph-response [:body :finished-job]))
-          draft-graph-to-copy-uri (draft-graph-uri-for conn graph-to-copy-uri)
-
-          live-graph-uri-2 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          quad-2 (->Quad graph-to-copy-uri
-                         (URI. "http://p")
-                         live-graph-uri-2
-                         live-graph-uri-2)
-          ;; add quad referencing quad-in-copy-graph to ds
-          _ (help/append-quads-to-draftset-through-api
-             handler test-publisher draftset-location [quad-2])
-          draft-graph-uri-2 (draft-graph-uri-for conn live-graph-uri-2)]
-
-      (testing "Has `graph-to-copy-uri` been rewritten in itself?"
-        (is (true? (->> (format "ASK { GRAPH <%s> { <%s> <http://p> <http://o> } }"
-                                 draft-graph-to-copy-uri draft-graph-to-copy-uri)
-                        (repo/query conn)))))
-
-      (testing "Has `graph-to-copy-uri` been rewritten in `quad-1`?"
-        (is (false? (->> (format "ASK { GRAPH <%s> { <%s> <http://p> <%s> } }"
-                                 draft-graph-uri-1 draft-graph-uri-1 graph-to-copy-uri)
-                         (repo/query conn))))
-
-        (is (true? (->> (format "ASK { GRAPH <%s> { <%s> <http://p> <%s> } }"
-                                draft-graph-uri-1 draft-graph-uri-1 draft-graph-to-copy-uri)
-                        (repo/query conn)))))
-
-      (testing "Has `graph-to-copy-uri` been rewritten in `quad-2`?"
-        (is (false? (->> (format "ASK { GRAPH <%s> { <%s> <http://p> <%s> } }"
-                                 draft-graph-uri-2 graph-to-copy-uri draft-graph-uri-2)
-                         (repo/query conn))))
-
-        (is (true? (->> (format "ASK { GRAPH <%s> { <%s> <http://p> <%s> } }"
-                                draft-graph-uri-2 draft-graph-to-copy-uri draft-graph-uri-2)
-                        (repo/query conn)))))
-
-      (help/delete-draftset-graph-through-api
-       handler test-publisher draftset-location live-graph-uri-1)
-
-      (testing "Deleted graph triples are gone"
-        (is (false? (->> (format "ASK { GRAPH <%s> { ?s ?p ?o } }"
-                                 draft-graph-uri-1)
-                         (repo/query conn)))))
-
-      (testing "Graph metadata reports graph deleted where last triple is deleted"
-        (is (= :deleted (get-in (help/get-draftset-info-through-api
-                                 handler draftset-location test-publisher)
-                                [:changes live-graph-uri-1 :status]))))
-
-      (help/delete-quads-through-api
-       handler test-publisher draftset-location [quad-in-copy-graph])
-
-      (help/publish-draftset-through-api handler draftset-location test-publisher)
-
-      (testing "After publish triple copied from live, then deleted, is gone"
-        (is (false? (->> (format "ASK { GRAPH <%s> { ?s ?p ?o } }"
-                                 draft-graph-to-copy-uri)
-                         (repo/query conn)))))
-
-      (testing "After publish, triple copied from live, then deleted, is rewritten back to live"
-          (let [[{:keys [s o]}] (->> live-graph-uri-2
-                                  (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                  (repo/query conn))]
-         (is (= graph-to-copy-uri s))
-         (is (= live-graph-uri-2 o)))))))
-
-(tc/deftest-system-with-keys delete-quads-dont-delete-draft-graph-test
+(tc/deftest-system-with-keys *_1_trivial-append-test
   keys-for-test [system system-config]
-  (with-open [conn (-> system
-                       :drafter.common.config/sparql-query-endpoint
-                       repo/sparql-repo
-                       repo/->connection)]
-    ;; Setup
-    (let [handler (get system [:drafter/routes :draftset/api])
-          live    (:drafter.routes.sparql/live-sparql-query-route system)
-          draftset-location (help/create-draftset-through-api handler test-publisher)
-          draftset-id (last (string/split draftset-location #"/"))
-          live-graph-uri-1 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          s1 (URI. "http://s1")
-          p1 (URI. "http://p1")
-          o1 (URI. "http://o1")
-          s2 (URI. "http://s2")
-          p2 (URI. "http://p2")
-          o2 (URI. "http://o2")
-          s3 (URI. "http://s3")
-          p3 (URI. "http://p3")
-          o3 (URI. "http://o3")
+  ;; Trivial appends
+  (let [{:keys [append! delete! publish! graph']} (draftset-functions system)
+        g1  (random-uri 'g)
+        g2  (random-uri 'g)
+        q1  [s1 p1 o1 g1]
+        q2  [s2 p2 g1 g2]]
+    ;; Trivial case Just appends no deletes:
+    (test-table
+     |;T | Operation  | Args     | Expected State                    |
+     |;1 | create-ds! | ...      | ...                               |
+     | 2 | append!    | #{q1}    | #{[s1 p1 o1 g1']}                 |
+     | 3 | append!    | #{q2}    | #{[s1 p1 o1 g1'] [s2 p2 g1' g2']} |
+     | 4 | publish!   | g1 g2    | #{[s1 p1 o1 g1] [s2 p2 g1 g2]}    |)))
 
-          ;; creates a graph with live-graph-uri-1
-          quad-1_1 (->Quad s1 p1 live-graph-uri-1 live-graph-uri-1)
-          ;; put some other triple in there
-          quad-1_2 (->Quad s2 p2 o2 live-graph-uri-1)
-
-          _ (help/append-quads-to-draftset-through-api
-             handler test-publisher draftset-location [quad-1_1 quad-1_2])
-          draft-graph-uri-1 (draft-graph-uri-for conn live-graph-uri-1)
-
-          live-graph-uri-2 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          ;; creates graph2, has a ref to live-graph-uri-1
-          quad-2 (->Quad s3 p3 live-graph-uri-1 live-graph-uri-2)
-          _ (help/append-quads-to-draftset-through-api
-             handler test-publisher draftset-location [quad-2])
-          draft-graph-uri-2 (draft-graph-uri-for conn live-graph-uri-2)]
-
-      (testing "Quads with graph refs are rewritten"
-        (let [[{:keys [p o]}] (->> draft-graph-uri-1
-                                   (format "SELECT * { GRAPH <%s> { <http://s1> ?p ?o } }")
-                                   (repo/query conn))]
-          (is (= p1 p))
-          (is (= draft-graph-uri-1 o)))
-
-        (let [[{:keys [s p o]}] (->> draft-graph-uri-2
-                                     (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                     (repo/query conn))]
-          (is (= s3 s))
-          (is (= p3 p))
-          (is (= draft-graph-uri-1 o))))
-
-      ;; delete 1st quad
-      (help/delete-quads-through-api
-       handler test-publisher draftset-location [quad-1_1])
-
-      (testing "Quads that still exist in draft are as expected"
-        (let [[{:keys [s p o]}] (->> draft-graph-uri-1
-                                     (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                     (repo/query conn))]
-          (is (= s2 s))
-          (is (= p2 p))
-          (is (= o2 o)))
-
-        (let [[{:keys [s p o]}] (->> draft-graph-uri-2
-                                     (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                     (repo/query conn))]
-          (is (= s3 s))
-          (is (= p3 p))
-          (is (= draft-graph-uri-1 o))))
-
-      (help/publish-draftset-through-api handler draftset-location test-publisher)
-
-      (testing "After publish live-graph-uri-1 still has quad-1_2"
-        (let [[{:keys [s p o]}] (->> live-graph-uri-1
-                                     (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                     (repo/query conn))]
-          (is (= s2 s))
-          (is (= p2 p))
-          (is (= o2 o))))
-
-      (testing "After publish quad in live-graph-uri-2 refers to live-graph-uri-1"
-        (let [[{:keys [s p o]}] (->> live-graph-uri-2
-                                     (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                     (repo/query conn))]
-          (is (= s3 s))
-          (is (= p3 p))
-          (is (= live-graph-uri-1 o)))))))
-
-(tc/deftest-system-with-keys delete-quads-delete-draft-graph-test
+(tc/deftest-system-with-keys *_2_immediate-append-undo-test
   keys-for-test [system system-config]
-  (with-open [conn (-> system
-                       :drafter.common.config/sparql-query-endpoint
-                       repo/sparql-repo
-                       repo/->connection)]
-    ;; Setup
-    (let [handler (get system [:drafter/routes :draftset/api])
-          live    (:drafter.routes.sparql/live-sparql-query-route system)
-          draftset-location (help/create-draftset-through-api handler test-publisher)
-          draftset-id (last (string/split draftset-location #"/"))
-          live-graph-uri-1 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          s1 (URI. "http://s1")
-          p1 (URI. "http://p1")
-          o1 (URI. "http://o1")
-          s2 (URI. "http://s2")
-          p2 (URI. "http://p2")
-          o2 (URI. "http://o2")
-          s3 (URI. "http://s3")
-          p3 (URI. "http://p3")
-          o3 (URI. "http://o3")
+  ;; Undoing an append immediately
+  (let [{:keys [append! delete! publish! graph']} (draftset-functions system)
+        g1  (random-uri 'g)
+        g2  (random-uri 'g)
+        q1  [s1 p1 o1 g1]
+        q2  [s2 p2 g1 g2]]
+    ;; Trivial case repeat of 1 but with delete of first quad, immediately after
+    ;; first quads append:
+    (test-table
+     |;T | Operation  | Args     | Expected State    |
+     |;1 | create-ds! | ...      | ...               |
+     | 2 | append!    | #{q1}    | #{[s1 p1 o1 g1']} |
+     | 3 | delete!    | #{q1}    | #{}               |
+     | 4 | append!    | #{q2}    | #{[s2 p2 g1 g2']} |
+     | 5 | publish!   | g1 g2    | #{[s2 p2 g1 g2 ]} |)))
 
-          ;; creates a graph with live-graph-uri-1
-          quad-1_1 (->Quad s1 p1 live-graph-uri-1 live-graph-uri-1)
-          ;; put some other triple in there
-          quad-1_2 (->Quad s2 p2 o2 live-graph-uri-1)
+(tc/deftest-system-with-keys *_3_undo-append-after-other-append-test
+  keys-for-test [system system-config]
+  ;; Undoing append later on
+  (let [{:keys [append! delete! publish! graph']} (draftset-functions system)
 
-          _ (help/append-quads-to-draftset-through-api
-             handler test-publisher draftset-location [quad-1_1 quad-1_2])
-          draft-graph-uri-1 (draft-graph-uri-for conn live-graph-uri-1)
+        g1  (random-uri 'g)
+        g2  (random-uri 'g)
+        q1  [s1 p1 o1 g1]
+        q2  [s2 p2 g1 g2]]
+    ;; Similar to 2 except delete happens later on, g1' -> g1 when g1 is deleted
+    (test-table
+     |;T | Operation  | Args     | Expected State                    |
+     |;1 | create-ds! | ...      | ...                               |
+     | 2 | append!    | #{q1}    | #{[s1 p1 o1 g1']}                 |
+     | 3 | append!    | #{q2}    | #{[s1 p1 o1 g1'] [s2 p2 g1' g2']} |
+     | 4 | delete!    | #{q1}    | #{[s2 p2 g1 g2']}                 |
+     | 5 | publish!   | g1 g2    | #{[s2 p2 g1 g2]}                  |)))
 
-          live-graph-uri-2 (URI. (str "http://live-graph/" (UUID/randomUUID)))
-          ;; creates graph2, has a ref to live-graph-uri-1
-          quad-2 (->Quad s3 p3 live-graph-uri-1 live-graph-uri-2)
-          _ (help/append-quads-to-draftset-through-api
-             handler test-publisher draftset-location [quad-2])
-          draft-graph-uri-2 (draft-graph-uri-for conn live-graph-uri-2)]
+(tc/deftest-system-with-keys *_4_delete-without-graph-deletion-test
+  keys-for-test [system system-config]
+  ;; Delete without graph deletion
+  (let [{:keys [append! delete! publish! graph']} (draftset-functions system)
+        g1  (random-uri 'g)
+        g2  (random-uri 'g)
+        q1  [s1 p1 o1 g1]
+        q2  [s1 p1 o2 g1]
+        q3  [s2 p2 g1 g2]]
+    ;; Similar to 2 but two quads in initial append, with only one deleted:
+    (test-table
+     |;T | Operation  | Args     | Expected State                                    |
+     |;1 | create-ds! | ...      | ...                                               |
+     | 2 | append!    | #{q1 q2} | #{[s1 p1 o1 g1'] [s1 p1 o2  g1']                } |
+     | 3 | append!    | #{q3}    | #{[s1 p1 o1 g1'] [s1 p1 o2  g1'] [s2 p2 g1' g2']} |
+     | 4 | delete!    | #{q1}    | #{[s1 p1 o2 g1'] [s2 p2 g1' g2']                } |
+     | 5 | publish!   | g1 g2    | #{[s1 p1 o2 g1 ] [s2 p2 g1  g2 ]                } |)))
 
-      (testing "Quads with graph refs are rewritten"
-        (let [[{:keys [p o]}] (->> draft-graph-uri-1
-                                   (format "SELECT * { GRAPH <%s> { <http://s1> ?p ?o } }")
-                                   (repo/query conn))]
-          (is (= p1 p))
-          (is (= draft-graph-uri-1 o)))
+(tc/deftest-system-with-keys *_5_1_reference-live-graph-simple-test
+  keys-for-test [system system-config]
+  ;; Referencing live graph simple case
+  (let [{:keys [set-live! append! delete! publish! graph']} (draftset-functions system)
+        g1  (random-uri 'g)
+        g2  (random-uri 'g)
+        q1  [s1 p1 o1 g1]
+        q2  [s2 p2 g1 g2]]
+    ;; Similar to 1 but with a live graph referenced in draft
+    (test-table
+     |;T | Operation  | Args  | Expected State                  |
+     | 1 | set-live!  | #{q1} | #{[s1 p1 o1 g1]}                |
+     | 2 | append!    | #{q2} | #{[s2 p2 g1 g2']}               |
+     | 3 | publish!   | g1 g2 | #{[s1 p1 o1 g1 ] [s2 p2 g1 g2]} |)))
 
-        (let [[{:keys [s p o]}] (->> draft-graph-uri-2
-                                     (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                     (repo/query conn))]
-          (is (= s3 s))
-          (is (= p3 p))
-          (is (= draft-graph-uri-1 o))))
+(tc/deftest-system-with-keys *_5_2_deleting-triple-from-live-test
+  keys-for-test [system system-config]
+  ;; Deleting a triple from live
+  (let [{:keys [set-live! append! delete! publish! graph']} (draftset-functions system)
+        g1  (random-uri 'g)
+        q1  [s1 p1 o1 g1]
+        q2  [s2 p2 o2 g1]]
+    ;; NOTE: Delete at T2 first copies g1 to g1' then applies delete (drafter
+    ;; should do this already).
+    (test-table
+     |;T | Operation | Args     | Expected State    |
+     | 1 | set-live! | #{q1 q2} | #{q1 q2}          |
+     | 2 | delete!   | #{q2}    | #{[s1 p1 o1 g1']} |
+     | 3 | publish!  | g1       | #{[s1 p1 o1 g1]}  |)))
 
-      ;; delete 1st quad
-      (help/delete-quads-through-api
-       handler test-publisher draftset-location [quad-1_1 quad-1_2])
+(tc/deftest-system-with-keys *_5_3_reference-live-graph-with-append-test
+  keys-for-test [system system-config]
+  ;; referencing live graph with append on live graph
+  (let [{:keys [set-live! append! delete! publish! graph']} (draftset-functions system)
+        g1  (random-uri 'g)
+        g2  (random-uri 'g)
+        q1  [s1 p1 o1 g1]
+        q2  [s1 p1 o2 g1]
+        q3  [s2 p2 g1 g2]]
+    ;; NOTE: At T2 we detect that we're modifying g1 so copy g1 into 'g1 and
+    ;; then append [s1 p2 o2 g1].  Drafter should already do that copy.
+    (test-table
+     |;T | Operation     | Args  | Expected State                                   |
+     | 1 | set-live!     | #{q1} | #{[s1 p1 o1 g1]}                                 |
+     | 2 | append!       | #{q2} | #{[s1 p1 o1 g1'] [s1 p1 o2 g1']}                 |
+     | 3 | append!       | #{q3} | #{[s1 p1 o1 g1'] [s1 p1 o2 g1'] [s2 p2 g1' g2']} |
+     | 4 | publish!      | g1 g2 | #{[s1 p1 o1 g1] [s1 p1 o2 g1] [s2 p2 g1 g2]}     |)))
 
-      (testing "Quads that still exist in draft are as expected"
 
-        (let [[{:keys [s p o]}] (->> draft-graph-uri-2
-                                     (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                     (repo/query conn))]
-          (is (= s3 s))
-          (is (= p3 p))
-          (is (= live-graph-uri-1 o))))
+;; 6 Disambiguate deleting draftset changes from deleting live graph
 
-      (help/publish-draftset-through-api handler draftset-location test-publisher)
+(tc/deftest-system-with-keys *_6_1
+  keys-for-test [system system-config]
+  (let [{:keys [set-live! append! delete! delete-graph! publish! graph']}
+        (draftset-functions system)
+        g1 (random-uri 'g)]
+    ;; At T3 we need to know that because we are starting with an empty g1
+    ;; that we shouldn't first copy the graph into g1'.
+    (test-table
+     |;T | Operation     | Args                           | Expected State                 |
+     | 1 | set-live!     | #{[s1 p1 o1 g1] [s2 p1 o1 g1]} | #{[s1 p1 o1 g1] [s2 p1 o1 g1]} |
+     | 2 | delete-graph! | g1                             | #{}                            |
+     | 3 | delete!       | [[:z1 :z1 :z1 g1]]             | #{}                            |
+     | 4 | publish!      | g1                             | #{}                            |)))
 
-      (testing "After publish quad in live-graph-uri-2 refers to live-graph-uri-1"
-        (let [[{:keys [s p o]}] (->> live-graph-uri-2
-                                     (format "SELECT * { GRAPH <%s> { ?s ?p ?o } }")
-                                     (repo/query conn))]
-          (is (= s3 s))
-          (is (= p3 p))
-          (is (= live-graph-uri-1 o)))))))
+(tc/deftest-system-with-keys *_6_2
+  keys-for-test [system system-config]
+  (let [{:keys [set-live! append! delete! delete-graph! publish! graph']}
+        (draftset-functions system)
+        g1  (random-uri 'g)
+        q1  [s1 p1 o1 g1]
+        q2  [s2 p1 o1 g1]]
+    ;; In contrast to 6.1 at T2 we need to copy g1 into g1' then delete s1 p1 o1.
+    (test-table
+     |;T | Operation | Args    | Expected State                  |
+     | 1 | set-live! | [q1 q2] | #{[s1 p1 o1 g1 ] [s2 p1 o1 g1]} |
+     | 2 | delete!   | [q2]    | #{[s1 p1 o1 g1']              } |
+     | 3 | publish!  | g1      | #{[s1 p1 o1 g1 ]              } |)))
+
+(tc/deftest-system-with-keys *_6_3_delete-variants
+  keys-for-test [system system-config]
+  ;; Delete variants
+  (let [{:keys [set-live! append! delete! delete-graph! publish! graph']}
+        (draftset-functions system)
+        g1 (random-uri 'g)
+        g2 (random-uri 'g)
+        g3 (random-uri 'g)
+        g4 (random-uri 'g)
+        q1 [s1 p1 o1 g1]
+        q2 [s2 p1 o1 g2]]
+    ;; T2 deleting a live graph by supplying all its triples
+    ;; T3 deleting a live graph through the delete graph op
+    ;; T5 deleting a graph (created in T4) that only existed in the draft by
+    ;; supplying triples
+    ;; T7 deleting a graph (created in T6) that only existed in the draft
+    ;; through the delete graph op
+    (test-table
+     |;T | Operation     | Args             | Expected State    |
+     | 1 | set-live!     | #{q1 q2}         | #{q1 q2}          |
+     | 2 | delete!       | #{q1}            | #{}               |
+     | 3 | delete-graph! | g2               | #{}               |
+     | 4 | append!       | #{[s3 p3 o3 g3]} | #{[s3 p3 o3 g3']} |
+     | 5 | delete!       | #{[s3 p3 o3 g3]} | #{}               |
+     | 6 | append!       | #{[s4 p4 o4 g4]} | #{[s4 p4 o4 g4']} |
+     | 7 | delete-graph! | g4               | #{}               |
+     | 8 | publish!      | g1 g2 g3 g4      | #{}               |)))
