@@ -1,0 +1,801 @@
+* Setup
+
+#+BEGIN_SRC elisp :results silent :exports none
+(require 'ob-clojure)
+(setq org-babel-clojure-backend 'cider)
+(require 'cider)
+(org-babel-do-load-languages
+  'org-babel-load-languages
+  '((emacs-lisp . t)
+    (gnuplot . t)
+    (clojure . t)))
+; disable nrepl timeout so that results can actually come back
+(setq org-babel-clojure-sync-nrepl-timeout nil)
+#+END_SRC
+
+#+BEGIN_SRC clojure :results silent :exports none
+(ns drafter-rewrite-load-test
+  (:refer-clojure :exclude [time])
+  (:require [clojure.test :as t :refer [is testing]]
+            [drafter.user-test :refer [test-publisher]]
+            [drafter.test-common :as tc]
+            [grafter-2.rdf.protocols :as pr]
+            [drafter.feature.draftset.test-helper :as help]
+            [drafter.backend.draftset.draft-management :as dm]
+            [clojure.string :as string])
+  (:import java.net.URI))
+#+END_SRC
+
+Setup some common config for the test drafter system.
+
+#+BEGIN_SRC clojure :results silent
+(def system-config "test-system.edn")
+
+(def keys-for-test
+  [[:drafter/routes :draftset/api]
+   :drafter/write-scheduler
+   :drafter.routes.sparql/live-sparql-query-route
+   :drafter.backend.live/endpoint
+   :drafter.common.config/sparql-query-endpoint])
+#+END_SRC
+
+Redefine some test helpers, allowing us to wait longer than the defaults for
+results to come back.
+
+#+BEGIN_SRC clojure :results silent
+
+(def ten-minutes (* 10 60000))
+
+(def extended-timeout ten-minutes)
+
+(defn await-success
+  "Waits for the job with the given path to be present in the given
+  job state atom and then asserts the job succeeded. Returns the job
+  result map."
+  ([job-path]
+   (await-success job-path tc/default-timeout))
+  ([job-path timeout]
+   (let [job-result (tc/await-completion job-path timeout)]
+     (is (= :ok (:type job-result))
+         (str "job failed: " (pr-str job-result)))
+     job-result)))
+
+(defn append-quads-to-draftset-through-api [handler user draftset-location quads]
+  (let [request (help/statements->append-request
+                 user draftset-location quads {:format :nq})
+        response (handler request)]
+    (await-success (get-in response [:body :finished-job]) extended-timeout)))
+
+
+(defn copy-live-graph-into-draftset [handler draftset-location draftset-id graph]
+  (-> (tc/with-identity test-publisher
+        {:uri (str draftset-location "/graph")
+         :request-method :put
+         :params {:draftset-id draftset-id
+                  :graph (str graph)}})
+      (handler)
+      (get-in [:body :finished-job])
+      (await-success extended-timeout)))
+
+(defn publish-draftset-through-api [handler draftset-location user]
+  (let [publish-request (help/create-publish-request draftset-location user)
+        publish-response (handler publish-request)]
+    (await-success (:finished-job (:body publish-response)) extended-timeout)))
+
+(defn delete-draftset [handler draftset-location]
+  (-> (tc/with-identity test-publisher
+        {:uri draftset-location :request-method :delete})
+      (handler)
+      (get-in [:body :finished-job])
+      (await-success extended-timeout)))
+#+END_SRC
+
+~time~ is like the ~clojure.core/time~ macro, except it returns the time taken
+to execute in ms, rather than printing it.
+
+#+BEGIN_SRC clojure :results silent
+(defmacro time
+  [expr]
+  `(let [start# (. System (nanoTime))]
+     ~expr
+     (/ (double (- (. System (nanoTime)) start#)) 1000000.0)))
+#+END_SRC
+
+
+Some helper functions to create pathological quads.
+
+#+BEGIN_SRC clojure :results silent
+(defn uri-str [& strs]
+  (URI. (apply str strs)))
+
+(defn quad [g pos ref]
+  (let [ref' (uri-str "http://g/" ref)]
+    (pr/->Quad
+     (if (= pos :s) ref' (uri-str "http://s/" g))
+     (if (= pos :p) ref' (uri-str "http://p/" g))
+     (if (= pos :o) ref' (uri-str "http://o/" g))
+     (uri-str "http://g/" g))))
+#+END_SRC
+
+* Generating test triples
+
+  We want pathological (worst case) test triples to:
+
+  1. Create new draft graphs
+  1. Reference other draft graphs in the list of quads
+  1. In every position (?s ?p ?o)
+
+#+BEGIN_SRC clojure :results silent
+(def pathological-test-triples
+  (->> (range)
+       (mapcat (fn [i]
+                 [(quad i :s (dec i))
+                  (quad i :p (dec i))
+                  (quad i :o (dec i))
+                  (quad i :s (inc i))
+                  (quad i :p (inc i))
+                  (quad i :o (inc i))]))))
+#+END_SRC
+
+Here, we want a list of triples which all reference the same graph, in each
+position (?s ?p ?o).
+
+#+BEGIN_SRC clojure :results silent
+(defn graph-referencing-test-triples [graph-id]
+  (->> (range)
+       (mapcat (fn [i]
+                 [(quad "graph" :s graph-id)
+                  (quad "graph" :p graph-id)
+                  (quad "graph" :o graph-id)]))
+       (concat [(quad graph-id nil nil)])))
+#+END_SRC
+
+
+Representative test triples are simple triples with a number (~n-graphs~) of
+pathological triples per measure (~n-quads~).
+
+#+BEGIN_SRC clojure :results silent
+(defn representative-test-triples
+  "Take /some/ pathological triples, but mostly regular triples with no
+  references to other graphs"
+  [n-graphs n-quads]
+  (let [partitions (if (zero? n-graphs)
+                     (+ n-quads 6)
+                     (int (/ n-quads n-graphs)))]
+    (->> (interleave (partition (- partitions 6) (range))
+                     (partition 6 pathological-test-triples))
+         (partition 2)
+         (mapcat (fn [[is pathos]]
+                   (concat (map (fn [i]
+                                  (pr/->Quad
+                                   (uri-str "http://s/" i)
+                                   (uri-str "http://p/" i)
+                                   (uri-str "http://o/" i)
+                                   (uri-str "http://g/" "graph")))
+                                is)
+                           pathos))))))
+#+END_SRC
+
+* Append load test
+
+~append-quads-load-test~
+
+- ~n-graphs~: vary the number of /referenced/ graphs in the append
+- ~n-quads~: vary the total number of quads appended
+
+The function makes two appends with an identical set of triples, one where
+rewriting is enabled, and one where it is switched off.
+
+Time taken for each append is recorded and printed in seconds.
+
+#+BEGIN_SRC clojure :results silent
+(defn append-quads-load-test [n-graphs n-quads]
+  (tc/with-system keys-for-test [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          quads (take n-quads (representative-test-triples n-graphs n-quads))
+          yes-rw (binding [dm/*do-rewrite?* true]
+                   (time
+                    (append-quads-to-draftset-through-api
+                     handler test-publisher draftset-location quads)))
+          _ (delete-draftset handler draftset-location)
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          no-rw (binding [dm/*do-rewrite?* false]
+                  (time
+                   (append-quads-to-draftset-through-api
+                    handler test-publisher draftset-location quads)))
+          _ (delete-draftset handler draftset-location)]
+      (printf "| %s | %s | %.2f | %.2f | \n"
+              n-graphs
+              (int (/ n-quads 1000))
+              (/ yes-rw 1000)
+              (/ no-rw 1000)))))
+#+END_SRC
+
+** Append tests
+
+*** Varying number of referenced graphs
+
+ Here, we vary the number of graphs in a constant 100,000 triples.
+
+ Taking some samples from 0 - 500 /referenced/ graphs. There will always be at
+ least one graph, and in this case, that graph ~<http://g/graph>~ is not
+ referenced by any triples. The additional graphs set by ~n~ will be referenced
+ by the ~pathological-triples~.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [0 1 5 10 20 30 40 50 100 200 300 400 500]]
+  (append-quads-load-test n 100000))
+ #+END_SRC
+
+ #+Name: table-1
+ #+RESULTS:
+ |   0 | 100 |  2.37 |  2.48 |
+ |   1 | 100 |  2.51 |  2.42 |
+ |   5 | 100 |  2.87 |  2.70 |
+ |  10 | 100 |  2.68 |  2.80 |
+ |  20 | 100 |  3.62 |  3.02 |
+ |  30 | 100 |  3.81 |  3.29 |
+ |  40 | 100 |  3.68 |  4.37 |
+ |  50 | 100 |  4.02 |  3.83 |
+ | 100 | 100 |  6.73 |  6.95 |
+ | 200 | 100 | 15.22 | 14.09 |
+ | 300 | 100 | 28.03 | 26.60 |
+ | 400 | 100 | 46.11 | 44.39 |
+ | 500 | 100 | 69.62 | 65.18 |
+
+ #+BEGIN_SRC gnuplot :var  data=table-1 :file graph_rewriting_fixup_1.png :exports results
+set title "Rewriting vs not during draft append"
+set style data line
+set xlabel "Number of referenced graphs in 100,000 triples"
+set ylabel "Time (s)"
+set auto x
+plot data using 1:3 with lines title 'YES-RW', \
+     data using 1:4 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_1.png]]
+
+*** Varying number of total triples
+
+**** Test 1 - 50 referenced graphs
+
+ Here, we vary the total number of triples (~n~) with a fixed number of
+ referenced graphs (~50~). This is still /fairly/ unlikely. Most appends will not
+ reference many, if any, graphs.
+
+ Taking samples of 1k - 1M triples.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [1000 5000 10000 20000 30000 40000 50000 60000 70000 80000 90000 100000
+           200000 300000 400000 500000 1000000]]
+  (append-quads-load-test 50 n))
+ #+END_SRC
+ #+Name: table-2
+ #+RESULTS:
+ | 50 |    1 |  3.06 |  2.96 |
+ | 50 |    5 |  3.23 |  2.27 |
+ | 50 |   10 |  2.24 |  1.91 |
+ | 50 |   20 |  2.89 |  2.31 |
+ | 50 |   30 |  3.42 |  2.44 |
+ | 50 |   40 |  2.32 |  2.21 |
+ | 50 |   50 |  2.50 |  2.36 |
+ | 50 |   60 |  3.18 |  3.06 |
+ | 50 |   70 |  3.88 |  2.84 |
+ | 50 |   80 |  3.51 |  3.33 |
+ | 50 |   90 |  4.29 |  4.08 |
+ | 50 |  100 |  4.38 |  4.30 |
+ | 50 |  200 |  7.68 |  7.01 |
+ | 50 |  300 | 11.08 |  9.54 |
+ | 50 |  400 | 14.03 | 12.23 |
+ | 50 |  500 | 16.23 | 15.24 |
+ | 50 | 1000 | 33.33 | 29.88 |
+
+ #+BEGIN_SRC gnuplot :var  data=table-2 :file graph_rewriting_fixup_2.png :exports results
+set title "Rewriting vs not during draft append"
+set style data line
+set xlabel "Number of triples (k)"
+set ylabel "Time (s)"
+set auto x
+plot data using 2:3 with lines title 'YES-RW', \
+     data using 2:4 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_2.png]]
+
+**** Test 2 - 5 referenced graphs
+
+ Here, we vary the total number of triples (~n~) with a fixed number of
+ referenced graphs (~5~).
+
+ Taking samples of 1k - 1M triples.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [1000 5000 10000 20000 30000 40000 50000 60000 70000 80000 90000 100000
+           200000 300000 400000 500000 1000000]]
+  (append-quads-load-test 5 n))
+ #+END_SRC
+
+ #+Name: table-3
+ #+RESULTS:
+ | 5 |    1 |  0.25 |  0.13 |
+ | 5 |    5 |  0.38 |  0.20 |
+ | 5 |   10 |  0.41 |  0.30 |
+ | 5 |   20 |  1.03 |  0.50 |
+ | 5 |   30 |  1.05 |  0.78 |
+ | 5 |   40 |  1.24 |  0.97 |
+ | 5 |   50 |  2.22 |  1.61 |
+ | 5 |   60 |  2.79 |  1.58 |
+ | 5 |   70 |  2.51 |  2.03 |
+ | 5 |   80 |  3.16 |  3.18 |
+ | 5 |   90 |  4.02 |  2.67 |
+ | 5 |  100 |  3.80 |  3.46 |
+ | 5 |  200 |  7.53 |  5.97 |
+ | 5 |  300 | 10.62 |  9.04 |
+ | 5 |  400 | 14.44 | 11.42 |
+ | 5 |  500 | 16.62 | 14.86 |
+ | 5 | 1000 | 31.86 | 29.18 |
+
+ #+BEGIN_SRC gnuplot :var  data=table-3 :file graph_rewriting_fixup_3.png :exports results
+set title "Rewriting vs not during draft append"
+set style data line
+set xlabel "Number of triples (k)"
+set ylabel "Time (s)"
+set auto x
+plot data using 2:3 with lines title 'YES-RW', \
+     data using 2:4 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_3.png]]
+
+**** Test 2 - 0 referenced graphs
+
+ And finally, we vary the total number of triples (~n~) with zero /referenced/
+ graphs (~n-graphs = 0~). The graph ~<http://g/graph>~ still exists, but none of
+ the triples reference it.
+
+ Taking samples of 1k - 1M triples.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [1000 5000 10000 20000 30000 40000 50000 60000 70000 80000 90000 100000
+           200000 300000 400000 500000 1000000]]
+  (append-quads-load-test 0 n))
+ #+END_SRC
+
+ #+Name: table-4
+ #+RESULTS:
+ | 0 |    1 |  0.09 |  0.07 |
+ | 0 |    5 |  0.19 |  0.13 |
+ | 0 |   10 |  0.29 |  0.26 |
+ | 0 |   20 |  1.41 |  0.73 |
+ | 0 |   30 |  1.27 |  1.05 |
+ | 0 |   40 |  2.36 |  1.33 |
+ | 0 |   50 |  2.98 |  1.68 |
+ | 0 |   60 |  3.28 |  1.93 |
+ | 0 |   70 |  3.60 |  2.86 |
+ | 0 |   80 |  3.98 |  2.89 |
+ | 0 |   90 |  4.66 |  3.79 |
+ | 0 |  100 |  5.68 |  3.02 |
+ | 0 |  200 |  8.47 |  6.64 |
+ | 0 |  300 | 12.38 |  9.22 |
+ | 0 |  400 | 14.87 | 11.92 |
+ | 0 |  500 | 18.31 | 15.13 |
+ | 0 | 1000 | 32.10 | 28.32 |
+
+ #+BEGIN_SRC gnuplot :var  data=table-4 :file graph_rewriting_fixup_4.png :exports results
+set title "Rewriting vs not during draft append"
+set style data line
+set xlabel "Number of triples (k)"
+set ylabel "Time (s)"
+set auto x
+plot data using 2:3 with lines title 'YES-RW', \
+     data using 2:4 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_4.png]]
+
+
+* Delete graph load test
+
+~delete-graph-load-test~
+
+The quads we append here are all referencing the same graph, but much of the
+test is similar to ~append-quads-load-test~.
+
+- ~n-quads~: vary the total number of quads appended
+
+Time taken for each delete is recorded and printed in seconds.
+
+#+BEGIN_SRC clojure :results silent
+(defn delete-graph-load-test [n-quads]
+  (tc/with-system keys-for-test [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          graph-id (rand-int 10000000)
+          graph (uri-str "http://g/" graph-id)
+          quads (take n-quads (graph-referencing-test-triples graph-id))
+          yes-rw (binding [dm/*do-rewrite?* true]
+                   (append-quads-to-draftset-through-api
+                    handler test-publisher draftset-location quads)
+                   (time
+                    (help/delete-draftset-graph-through-api
+                     handler test-publisher draftset-location graph)))
+          _ (delete-draftset handler draftset-location)
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          no-rw (binding [dm/*do-rewrite?* false]
+                  (append-quads-to-draftset-through-api
+                   handler test-publisher draftset-location quads)
+                  (time
+                   (help/delete-draftset-graph-through-api
+                    handler test-publisher draftset-location graph)))
+          _ (delete-draftset handler draftset-location)]
+      (printf "| %s | %.2f | %.2f | \n"
+              (int (/ n-quads 1000))
+              (/ yes-rw 1000)
+              (/ no-rw 1000)))))
+#+END_SRC
+
+** Delete graph tests
+
+*** Varying number of total triples
+
+**** Referenced graphs
+
+     We're looking for a performance difference when deleting a draft graph
+     between rewriting and non-rewriting.
+
+     Taking samples of 1k - 1M triples.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [1000 5000 10000 20000 30000 40000
+           50000 60000 70000 80000 90000 100000
+           200000 300000 400000 500000 1000000]]
+       (delete-graph-load-test n))
+ #+END_SRC
+
+ #+Name: table-5
+ #+RESULTS:
+ |    1 | 0.06 | 0.04 |
+ |    5 | 0.05 | 0.04 |
+ |   10 | 0.05 | 0.04 |
+ |   20 | 0.05 | 0.04 |
+ |   30 | 0.05 | 0.04 |
+ |   40 | 0.05 | 0.04 |
+ |   50 | 0.05 | 0.05 |
+ |   60 | 0.06 | 0.04 |
+ |   70 | 0.04 | 0.04 |
+ |   80 | 0.05 | 0.04 |
+ |   90 | 0.05 | 0.05 |
+ |  100 | 0.05 | 0.04 |
+ |  200 | 0.05 | 0.04 |
+ |  300 | 0.05 | 0.05 |
+ |  400 | 0.05 | 0.05 |
+ |  500 | 0.05 | 0.05 |
+ | 1000 | 0.05 | 0.06 |
+
+ #+BEGIN_SRC gnuplot :var  data=table-5 :file graph_rewriting_fixup_5.png :exports results
+set title "Rewriting vs not during draft graph delete\"
+set style data line
+set xlabel "Number of triples (k)"
+set ylabel "Time (s)"
+set auto x
+plot data using 1:2 with lines title 'YES-RW', \
+     data using 1:3 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_5.png]]
+
+
+* Publish load test
+
+~publish-quads-load-test~
+
+We still have to append the quads in the first place, so most of the test is
+similar to ~append-quads-load-test~.
+
+- ~n-graphs~: vary the number of /referenced/ graphs in the append
+- ~n-quads~: vary the total number of quads appended
+
+After the appends, the draftset is published. Time taken for the publish is
+recorded and printed in seconds.
+
+Because rewriting only happens to draft graphs, graphs published to live do not
+need rewriting, and so performance should not be affected (much) by having
+triples/graphs in live which are referenced by triples appended and published.
+
+#+BEGIN_SRC clojure :results silent
+(defn publish-quads-load-test [n-graphs n-quads]
+  (tc/with-system keys-for-test [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          quads (take n-quads (representative-test-triples n-graphs n-quads))
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          yes-rw (binding [dm/*do-rewrite?* true]
+                   (append-quads-to-draftset-through-api
+                    handler test-publisher draftset-location quads)
+                   (time
+                    (publish-draftset-through-api
+                     handler draftset-location test-publisher)))
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          no-rw (binding [dm/*do-rewrite?* false]
+                  (append-quads-to-draftset-through-api
+                   handler test-publisher draftset-location quads)
+                  (time
+                   (publish-draftset-through-api
+                    handler draftset-location test-publisher)))]
+      (printf "| %s | %s | %.2f | %.2f | \n"
+              n-graphs
+              (int (/ n-quads 1000))
+              (/ yes-rw 1000)
+              (/ no-rw 1000)))))
+#+END_SRC
+
+** Publish tests
+
+*** Varying number of referenced graphs
+
+ Here, we vary the number of graphs in a constant 100,000 triples.
+
+ Taking some samples from 0 - 500 /referenced/ graphs. There will always be at
+ least one graph, and in this case, that graph ~<http://g/graph>~ is not
+ referenced by any triples. The additional graphs set by ~n~ will be referenced
+ by the ~pathological-triples~.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [0 1 5 10 20 30 40 50 100 200 300 400 500]]
+  (publish-quads-load-test n 100000))
+ #+END_SRC
+
+ #+Name: table-6
+ #+RESULTS:
+ |  0 | 100 | 0.33 | 0.28 |
+ |  1 | 100 | 0.37 | 0.28 |
+ |  5 | 100 | 0.54 | 0.42 |
+ | 10 | 100 | 0.64 | 0.47 |
+ | 20 | 100 | 0.71 | 0.77 |
+ | 30 | 100 | 0.95 | 1.01 |
+ | 40 | 100 | 1.20 | 1.52 |
+ | 50 | 100 | 2.26 | 2.16 |
+ | 100 | 100 |  4.32 |  4.35 |
+ | 200 | 100 | 15.80 | 13.01 |
+ | 300 | 100 | 27.84 | 26.48 |
+ | 400 | 100 | 46.22 | 45.39 |
+ | 500 | 100 | 77.49 | 80.17 |
+
+
+ #+BEGIN_SRC gnuplot :var  data=table-6 :file graph_rewriting_fixup_6.png :exports results
+set title "Rewriting vs not during draft publish"
+set style data line
+set xlabel "Number of referenced graphs in 100,000 triples"
+set ylabel "Time (s)"
+set auto x
+plot data using 1:3 with lines title 'YES-RW', \
+     data using 1:4 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_6.png]]
+
+*** Varying number of total triples
+
+**** Test 1 - 50 referenced graphs
+
+ Here, we vary the total number of triples (~n~) with a fixed number of
+ referenced graphs (~50~). This is still /fairly/ unlikely. Most appends will not
+ reference many, if any, graphs.
+
+ Taking samples of 1k - 1M triples.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [1000 5000 10000 20000 30000 40000 50000 60000 70000 80000 90000 100000
+           200000 300000 400000 500000 1000000]]
+  (publish-quads-load-test 50 n))
+ #+END_SRC
+
+ #+Name: table-7
+ #+RESULTS:
+ | 50 |    1 |  1.06 |  0.96 |
+ | 50 |    5 |  0.98 |  0.97 |
+ | 50 |   10 |  1.13 |  1.05 |
+ | 50 |   20 |  1.26 |  1.20 |
+ | 50 |   30 |  1.36 |  1.42 |
+ | 50 |   40 |  1.93 |  1.68 |
+ | 50 |   50 |  1.84 |  1.79 |
+ | 50 |   60 |  2.08 |  1.72 |
+ | 50 |   70 |  1.81 |  1.91 |
+ | 50 |   80 |  2.07 |  2.03 |
+ | 50 |   90 |  2.02 |  2.35 |
+ | 50 |  100 |  2.26 |  2.44 |
+ | 50 |  200 |  3.33 |  3.81 |
+ | 50 |  300 |  4.97 |  5.61 |
+ | 50 |  400 |  6.26 |  6.55 |
+ | 50 |  500 |  8.92 |  9.31 |
+ | 50 | 1000 | 17.68 | 17.71 |
+
+#+BEGIN_SRC gnuplot :var  data=table-7 :file graph_rewriting_fixup_7.png :exports results
+set title "Rewriting vs not during draft append"
+set style data line
+set xlabel "Number of triples (k)"
+set ylabel "Time (s)"
+set auto x
+plot data using 2:3 with lines title 'YES-RW', \
+     data using 2:4 with lines title 'NO-RW'
+#+END_SRC
+
+#+RESULTS:
+[[file:graph_rewriting_fixup_7.png]]
+
+**** Test 2 - 5 referenced graphs
+
+ Here, we vary the total number of triples (~n~) with a fixed number of
+ referenced graphs (~5~).
+
+ Taking samples of 1k - 1M triples.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [1000 5000 10000 20000 30000 40000 50000 60000 70000 80000 90000 100000
+           200000 300000 400000 500000 1000000]]
+  (publish-quads-load-test 5 n))
+ #+END_SRC
+
+ #+Name: table-8
+ #+RESULTS:
+ | 5 |    1 | 0.28 | 0.18 |
+ | 5 |    5 | 0.19 | 0.39 |
+ | 5 |   10 | 0.21 | 0.17 |
+ | 5 |   20 | 0.24 | 0.18 |
+ | 5 |   30 | 0.21 | 0.20 |
+ | 5 |   40 | 0.26 | 0.22 |
+ | 5 |   50 | 0.28 | 0.25 |
+ | 5 |   60 | 0.28 | 0.28 |
+ | 5 |   70 | 0.31 | 0.30 |
+ | 5 |   80 | 0.35 | 0.31 |
+ | 5 |   90 | 0.37 | 0.35 |
+ | 5 |  100 | 0.46 | 0.41 |
+ | 5 |  200 | 0.73 | 0.66 |
+ | 5 |  300 | 1.27 | 0.83 |
+ | 5 |  400 | 1.76 | 1.14 |
+ | 5 |  500 | 2.14 | 2.02 |
+ | 5 | 1000 | 5.60 | 5.11 |
+
+ #+BEGIN_SRC gnuplot :var  data=table-8 :file graph_rewriting_fixup_8.png :exports results
+set title "Rewriting vs not during draft publish"
+set style data line
+set xlabel "Number of triples (k)"
+set ylabel "Time (s)"
+set auto x
+plot data using 2:3 with lines title 'YES-RW', \
+     data using 2:4 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_8.png]]
+
+**** Test 2 - 0 referenced graphs
+
+ And finally, we vary the total number of triples (~n~) with zero /referenced/
+ graphs (~n-graphs = 0~). The graph ~<http://g/graph>~ still exists, but none of
+ the triples reference it.
+
+ Taking samples of 1k - 1M triples.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [1000 5000 10000 20000 30000 40000 50000 60000 70000 80000 90000 100000
+           200000 300000 400000 500000 1000000]]
+  (publish-quads-load-test 0 n))
+ #+END_SRC
+
+ #+Name: table-9
+ #+RESULTS:
+ | 0 |    1 | 0.17 | 0.08 |
+ | 0 |    5 | 0.10 | 0.08 |
+ | 0 |   10 | 0.19 | 0.09 |
+ | 0 |   20 | 0.13 | 0.09 |
+ | 0 |   30 | 0.11 | 0.12 |
+ | 0 |   40 | 0.40 | 0.16 |
+ | 0 |   50 | 0.16 | 0.12 |
+ | 0 |   60 | 0.16 | 0.15 |
+ | 0 |   70 | 0.15 | 0.13 |
+ | 0 |   80 | 0.18 | 0.21 |
+ | 0 |   90 | 0.22 | 0.20 |
+ | 0 |  100 | 0.22 | 0.19 |
+ | 0 |  200 | 0.69 | 0.42 |
+ | 0 |  300 | 0.70 | 0.48 |
+ | 0 |  400 | 0.77 | 0.71 |
+ | 0 |  500 | 1.77 | 0.78 |
+ | 0 | 1000 | 3.63 | 3.26 |
+
+ #+BEGIN_SRC gnuplot :var  data=table-9 :file graph_rewriting_fixup_9.png :exports results
+set title "Rewriting vs not during draft publish"
+set style data line
+set xlabel "Number of triples (k)"
+set ylabel "Time (s)"
+set auto x
+plot data using 2:3 with lines title 'YES-RW', \
+     data using 2:4 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_9.png]]
+
+* Copy graph load test
+
+#+BEGIN_SRC clojure :results silent
+(defn copy-graph-load-test [n-quads]
+  (tc/with-system keys-for-test [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          graph-id (rand-int 10000000)
+          graph (uri-str "http://g/" graph-id)
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          draftset-id (last (string/split draftset-location #"/"))
+          quads (take n-quads (graph-referencing-test-triples graph-id))
+          _ (append-quads-to-draftset-through-api
+             handler test-publisher draftset-location quads)
+          _ (publish-draftset-through-api
+             handler draftset-location test-publisher)
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          yes-rw (binding [dm/*do-rewrite?* true]
+                   (time
+                    (copy-live-graph-into-draftset
+                     handler draftset-location draftset-id graph)))
+          _ (delete-draftset handler draftset-location)
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          no-rw (binding [dm/*do-rewrite?* false]
+                  (time
+                   (copy-live-graph-into-draftset
+                    handler draftset-location draftset-id graph)))
+          _ (delete-draftset handler draftset-location)]
+      (printf "| %s | %.2f | %.2f | \n"
+              (int (/ n-quads 1000))
+              (/ yes-rw 1000)
+              (/ no-rw 1000)))))
+#+END_SRC
+
+** Copy graph tests
+
+*** Varying number of total triples
+
+**** Referenced graphs
+
+     We're looking for a performance difference when copying a draft graph
+     between rewriting and non-rewriting.
+
+     Taking samples of 1k - 1M triples.
+
+ #+BEGIN_SRC clojure :results output raw :exports code
+(doseq [n [1000 5000 10000 20000 30000 40000
+           50000 60000 70000 80000 90000 100000]]
+  (copy-graph-load-test n))
+ #+END_SRC
+
+ #+Name: table-10
+ #+RESULTS:
+ |   1 | 0.04 | 0.04 |
+ |   5 | 0.04 | 0.04 |
+ |  10 | 0.06 | 0.04 |
+ |  20 | 0.08 | 0.05 |
+ |  30 | 0.06 | 0.05 |
+ |  40 | 0.06 | 0.05 |
+ |  50 | 0.07 | 0.05 |
+ |  60 | 0.05 | 0.05 |
+ |  70 | 0.05 | 0.06 |
+ |  80 | 0.05 | 0.05 |
+ |  90 | 0.05 | 0.06 |
+ | 100 | 0.04 | 0.04 |
+
+ #+BEGIN_SRC gnuplot :var  data=table-10 :file graph_rewriting_fixup_10.png :exports results
+set title "Rewriting vs not during draft graph delete"
+set style data line
+set xlabel "Number of triples (k)"
+set ylabel "Time (s)"
+set auto x
+plot data using 1:2 with lines title 'YES-RW', \
+     data using 1:3 with lines title 'NO-RW'
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:graph_rewriting_fixup_10.png]]
