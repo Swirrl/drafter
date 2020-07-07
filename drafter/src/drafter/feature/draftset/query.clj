@@ -4,6 +4,7 @@
             [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
             [drafter.rdf.sparql-protocol :as sp :refer [sparql-protocol-handler]]
             [ring.middleware.cors :as cors]
+            [swirrl-server.errors :refer [wrap-encode-errors]]
             [integrant.core :as ig]))
 
 (defn handler
@@ -20,12 +21,21 @@
           :req-un [::wrap-as-draftset-owner ::sp/timeout-fn]))
 
 (def cors-allowed-headers
-  #{"Accept-Encoding" "Authorization" "authorization" "DNT" "Accept"
-    "Cache-Control" "Content-Type" "content-type" "If-Modified-Since"
-    "Keep-Alive" "User-Agent" "X-CustomHeader" "X-Requested-With"})
+  #{"Accept"
+    "Accept-Encoding"
+    "Authorization"
+    "Cache-Control"
+    "Content-Type"
+    "DNT"
+    "If-Modified-Since"
+    "Keep-Alive"
+    "User-Agent"
+    "X-CustomHeader"
+    "X-Requested-With"})
 
 (defmethod ig/init-key ::handler [_ opts]
-  (cors/wrap-cors (handler opts)
-                  :access-control-allow-headers cors-allowed-headers
-                  :access-control-allow-methods [:get :options :post]
-                  :access-control-allow-origin #".*"))
+  (-> (handler opts)
+      (wrap-encode-errors)
+      (cors/wrap-cors :access-control-allow-headers cors-allowed-headers
+                      :access-control-allow-methods [:get :options :post]
+                      :access-control-allow-origin #".*")))
