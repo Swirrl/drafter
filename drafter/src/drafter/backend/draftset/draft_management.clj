@@ -14,7 +14,8 @@
             [schema.core :as s]
             [swirrl-server.errors :refer [ex-swirrl]]
             [grafter-2.rdf4j.io :as rio]
-            [clojure.string :as string])
+            [clojure.string :as string]
+            [drafter.draftset :as ds])
   (:import java.net.URI
            [java.util Date UUID Calendar]
            [javax.xml.bind DatatypeConverter]))
@@ -459,6 +460,54 @@ INSERT { GRAPH ?g { ?s ?p ?b } }
 WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?s ?p ?a } }"
           gabs gabs gabs))
 
+(defn rewrite-draftset-q [draftset-uri]
+  (format "
+DELETE { GRAPH ?g { ?a ?p ?o } }
+INSERT { GRAPH ?g { ?b ?p ?o } }
+WHERE  {
+  GRAPH ?g { ?a ?p ?o }
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
+        <http://publishmydata.com/def/drafter/DraftSet> .
+    ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?b <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?a <http://publishmydata.com/def/drafter/hasDraft> ?b .
+    FILTER EXISTS { GRAPH ?b { ?s ?p ?o } }
+    VALUES ?ds { <%s> }
+  }
+} ;
+
+DELETE { GRAPH ?g { ?s ?a ?o } }
+INSERT { GRAPH ?g { ?s ?b ?o } }
+WHERE  {
+  GRAPH ?g { ?s ?a ?o }
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
+        <http://publishmydata.com/def/drafter/DraftSet> .
+    ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?b <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?a <http://publishmydata.com/def/drafter/hasDraft> ?b .
+    FILTER EXISTS { GRAPH ?b { ?s ?p ?o } }
+    VALUES ?ds { <%s> }
+  }
+} ;
+
+DELETE { GRAPH ?g { ?s ?p ?a } }
+INSERT { GRAPH ?g { ?s ?p ?b } }
+WHERE  {
+  GRAPH ?g { ?s ?p ?a }
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
+        <http://publishmydata.com/def/drafter/DraftSet> .
+    ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?b <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?a <http://publishmydata.com/def/drafter/hasDraft> ?b .
+    FILTER EXISTS { GRAPH ?b { ?s ?p ?o } }
+    VALUES ?ds { <%s> }
+  }
+} ;"
+          draftset-uri draftset-uri draftset-uri))
+
 (defn fixup-compound-q [in-graph-uris mapping]
   (->> (for [in-graph in-graph-uris
              [a b] mapping]
@@ -473,6 +522,11 @@ WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?s ?p ?a } }"
     (doseq [batch (partition-all 100 in-graph-uris)]
       (let [compound-q (fixup-compound-q batch mapping)]
         (sparql/update! db compound-q)))))
+
+(defn rewrite-draftset! [conn draftset-id]
+  (when *do-rewrite?*
+    (let [draftset-uri (ds/->draftset-uri draftset-id)]
+      (sparql/update! conn (rewrite-draftset-q draftset-uri)))))
 
 (defn migrate-graphs-to-live! [repo graphs clock-fn]
   "Migrates a collection of draft graphs to live through a single
