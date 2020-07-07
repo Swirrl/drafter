@@ -4,13 +4,15 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [grafter-2.rdf.protocols :refer [context]]
-            [grafter-2.rdf4j.io :refer [statements]]))
+            [grafter-2.rdf4j.io :refer [statements]]
+            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system "drafter/feature/empty-db-system.edn")
 
-(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
+(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler
+                    :drafter.feature.endpoint.public/init])
 
 (tc/deftest-system-with-keys delete-live-graph-not-in-draftset
   keys-for-test
@@ -54,6 +56,17 @@
           expected-graphs (keys grouped-quads)]
       (is (= (set expected-quads) (set remaining-quads)))
       (is (= (set expected-graphs) (set draftset-graphs))))))
+
+(t/deftest delete-endpoints-graph-test
+  (tc/with-system keys-for-test
+    [ig-system system]
+    (tc/check-endpoint-graph-consistent ig-system
+      (let [handler (get ig-system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-publisher)
+            delete-request (help/delete-draftset-graph-request test-publisher draftset-location drafter:endpoints)
+            response (handler delete-request)]
+        (t/is (help/is-client-error-response? response))
+        (help/publish-draftset-through-api handler draftset-location test-publisher)))))
 
 (tc/deftest-system-with-keys delete-graph-request-for-non-existent-draftset
   keys-for-test

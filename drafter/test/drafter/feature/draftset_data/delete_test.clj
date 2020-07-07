@@ -11,9 +11,12 @@
             [drafter.feature.draftset.test-helper :as help]
             [grafter-2.rdf4j.io :as gio]
             [drafter.async.jobs :as async]
-            [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.formats :as formats]
-            [clojure.set :as set])
+            [clojure.set :as set]
+            [grafter-2.rdf.protocols :as gproto]
+            [drafter.rdf.drafter-ontology :refer [drafter:endpoints drafter:public drafter:Endpoint]]
+            [grafter.vocabularies.rdf :refer [rdf:a]]
+            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -52,6 +55,39 @@
       (t/is (.isEqual (delete-time)
                        ts-3)
             "Modified time is updated after delete"))))
+
+(t/deftest delete-public-endpoint-quads-test
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api]
+     :drafter/write-scheduler :drafter.feature.endpoint.public/init]
+    [system system-config]
+    (tc/check-endpoint-graph-consistent system
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-publisher)
+            {:keys [created-at updated-at]} (help/get-public-endpoint-through-api handler)
+            to-delete [(gproto/->Quad drafter:public rdf:a drafter:Endpoint drafter:endpoints)
+                       (gproto/->Quad drafter:public dcterms:modified updated-at drafter:endpoints)
+                       (gproto/->Quad drafter:public dcterms:issued created-at drafter:endpoints)]]
+        ;;NOTE: endpoints graph is not managed so attempting to delete statements from it
+        ;;is a no-op
+        (help/delete-quads-through-api handler test-publisher draftset-location to-delete)))))
+
+(t/deftest delete-public-endpoint-triples-test
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api]
+     :drafter/write-scheduler :drafter.feature.endpoint.public/init]
+    [system system-config]
+    (tc/check-endpoint-graph-consistent system
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-publisher)
+            {:keys [created-at updated-at]} (help/get-public-endpoint-through-api handler)
+            to-delete [(gproto/->Triple drafter:public rdf:a drafter:Endpoint)
+                       (gproto/->Triple drafter:public dcterms:issued created-at)
+                       (gproto/->Triple drafter:public dcterms:modified updated-at)]]
+        ;;NOTE: endpoints graph is not managed so attempting to delete statements from it
+        ;;is a no-op
+        (help/delete-triples-through-api handler test-publisher draftset-location to-delete drafter:endpoints)
+        (help/publish-draftset-through-api handler draftset-location test-publisher)))))
 
 (tc/deftest-system-with-keys delete-draftset-data-for-non-existent-draftset
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]

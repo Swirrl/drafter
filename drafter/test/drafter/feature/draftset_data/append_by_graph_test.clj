@@ -6,13 +6,15 @@
             [grafter-2.rdf.protocols :refer [context]]
             [grafter-2.rdf4j.io :refer [statements]]
             [martian.encoders :as enc]
-            [drafter.async.jobs :as async]))
+            [drafter.async.jobs :as async]
+            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system-config "drafter/feature/empty-db-system.edn")
 
-(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
+(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler
+                    :drafter.feature.endpoint.public/init :drafter.fixture-data/loader])
 
 (defn- copy-live-graph-into-draftset-request
   ([draftset-location user live-graph]
@@ -42,6 +44,17 @@
     (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "false")
           expected-quads (help/eval-statements quads)]
       (is (= (set expected-quads) (set ds-quads))))))
+
+(t/deftest copy-endpoints-graph-into-draftset-test
+  (tc/with-system
+    keys-for-test
+    [system system-config]
+    (tc/check-endpoint-graph-consistent system
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-publisher)
+            req (copy-live-graph-into-draftset-request draftset-location test-publisher drafter:endpoints)
+            response (handler req)]
+        (t/is (help/is-client-error-response? response))))))
 
 (tc/deftest-system-with-keys copy-draft-with-metadata-test
   keys-for-test

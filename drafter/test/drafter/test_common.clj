@@ -24,7 +24,9 @@
             [schema.core :as s]
             [drafter.async.jobs :as async :refer [create-job]]
             [aero.core :as aero]
-            [drafter.user :as user])
+            [drafter.user :as user]
+            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]])
   (:import [com.auth0.jwk Jwk JwkProvider]
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT
@@ -520,3 +522,25 @@
   "Returns whether two Temporal instances are within the specified interval of each other"
   [^Temporal t1 ^Temporal t2 limit units]
   (< (.until t1 t2 units) limit))
+
+(defn get-public-endpoint-triples [repo]
+  (sparql/eager-query repo (select-all-in-graph drafter:endpoints)))
+
+(defn is-modified-statement? [s]
+  (= dcterms:modified (:p s)))
+
+(defn remove-updated [endpoint-triples]
+  (remove is-modified-statement? endpoint-triples))
+
+(defmacro check-endpoint-graph-consistent
+  "Macro to check the public endpoints graph is not corrupted by the actions executed
+   in forms. The statements in the endpoint graphs must be equal before and after executing
+   forms with the possible exception that the updated time of the public endpoint can be
+   updated"
+  [system & forms]
+  `(let [repo# (:drafter/backend ~system)
+         triples-before# (get-public-endpoint-triples repo#)]
+     ~@forms
+     (let [triples-after# (get-public-endpoint-triples repo#)]
+       (is (some is-modified-statement? triples-after#))
+       (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#)))))))
