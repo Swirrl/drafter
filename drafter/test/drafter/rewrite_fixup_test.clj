@@ -95,6 +95,7 @@
                     graphs (distinct (map :c quads))]
                 (help/append-quads-to-draftset-through-api
                  handler test-publisher draftset-location quads)
+                (prn 'here-publish)
                 (help/publish-draftset-through-api
                  handler draftset-location test-publisher)
                 (get-live-quads-for-graphs system graphs)))

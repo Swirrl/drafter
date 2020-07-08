@@ -452,89 +452,70 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
-(defn fixup-rewrite-q [gabs]
-  (format "
-DELETE { GRAPH ?g { ?a ?p ?o } }
-INSERT { GRAPH ?g { ?b ?p ?o } }
-WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?a ?p ?o } } ;
-
-DELETE { GRAPH ?g { ?s ?a ?o } }
-INSERT { GRAPH ?g { ?s ?b ?o } }
-WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?s ?a ?o } } ;
-
-DELETE { GRAPH ?g { ?s ?p ?a } }
-INSERT { GRAPH ?g { ?s ?p ?b } }
-WHERE  { VALUES (?g ?a ?b) { %s } GRAPH ?g { ?s ?p ?a } }"
-          gabs gabs gabs))
-
-(defn rewrite-draftset-q [draftset-uri]
-  (format "
-DELETE { GRAPH ?g { ?a ?p ?o } }
-INSERT { GRAPH ?g { ?b ?p ?o } }
+(defn- rewrite-1-q
+  [{:keys [?s1 ?s2 ?p1 ?p2 ?o1 ?o2
+           draftset-uri
+           deleted
+           live-graph-uris
+           draft-graph-uris]
+    :or {?s1 '?s ?s2 '?s
+         ?p1 '?p ?p2 '?p
+         ?o1 '?o ?o2 '?o}
+    :as opts}]
+  (let [filter (case deleted
+                 :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s ?p ?o } }")
+                 :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s ?p ?o } }")
+                 nil)
+        ds-values (when draftset-uri (str "VALUES ?ds { <" draftset-uri "> }"))
+        live-values (->> live-graph-uris
+                         (map #(str "<" % ">"))
+                         (string/join " ")
+                         (format "VALUES ?lg { %s }"))
+        draft-values (->> draft-graph-uris
+                          (map #(str "<" % ">"))
+                          (string/join " ")
+                          (format "VALUES ?dg { %s }"))
+        ]
+    (str "
+DELETE { GRAPH ?g { " ?s1 " " ?p1 " " ?o1 " } }
+INSERT { GRAPH ?g { " ?s2 " " ?p2 " " ?o2 " } }
 WHERE  {
-  GRAPH ?g { ?a ?p ?o }
+  GRAPH ?g { " ?s1 " " ?p1 " " ?o1 " }
   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
     ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
         <http://publishmydata.com/def/drafter/DraftSet> .
     ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?b <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?a <http://publishmydata.com/def/drafter/hasDraft> ?b .
-    FILTER EXISTS { GRAPH ?b { ?s ?p ?o } }
-    VALUES ?ds { <%s> }
+    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+    " filter "
+    " ds-values "
+    " (when (seq live-graph-uris) live-values) "
+    " (when (seq draft-graph-uris) draft-values) "
   }
-} ;
+} ;")))
 
-DELETE { GRAPH ?g { ?s ?a ?o } }
-INSERT { GRAPH ?g { ?s ?b ?o } }
-WHERE  {
-  GRAPH ?g { ?s ?a ?o }
-  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
-        <http://publishmydata.com/def/drafter/DraftSet> .
-    ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?b <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?a <http://publishmydata.com/def/drafter/hasDraft> ?b .
-    FILTER EXISTS { GRAPH ?b { ?s ?p ?o } }
-    VALUES ?ds { <%s> }
-  }
-} ;
+(defn- rewrite-draftset-q [opts]
+  (str
+   (rewrite-1-q (assoc opts :?s1 '?lg :?s2 '?dg :deleted :ignore)) \newline
+   (rewrite-1-q (assoc opts :?p1 '?lg :?p2 '?dg :deleted :ignore)) \newline
+   (rewrite-1-q (assoc opts :?o1 '?lg :?o2 '?dg :deleted :ignore)) \newline))
 
-DELETE { GRAPH ?g { ?s ?p ?a } }
-INSERT { GRAPH ?g { ?s ?p ?b } }
-WHERE  {
-  GRAPH ?g { ?s ?p ?a }
-  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
-        <http://publishmydata.com/def/drafter/DraftSet> .
-    ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?b <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?a <http://publishmydata.com/def/drafter/hasDraft> ?b .
-    FILTER EXISTS { GRAPH ?b { ?s ?p ?o } }
-    VALUES ?ds { <%s> }
-  }
-} ;"
-          draftset-uri draftset-uri draftset-uri))
-
-(defn fixup-compound-q [in-graph-uris mapping]
-  (->> (for [in-graph in-graph-uris
-             [a b] mapping]
-         (format "( <%s> <%s> <%s> )" in-graph a b))
-       (string/join " ")
-       (fixup-rewrite-q)))
+(defn- unrewrite-draftset-q [opts]
+  (str
+   (rewrite-1-q (assoc opts :?s1 '?dg :?s2 '?lg)) \newline
+   (rewrite-1-q (assoc opts :?p1 '?dg :?p2 '?lg)) \newline
+   (rewrite-1-q (assoc opts :?o1 '?dg :?o2 '?lg)) \newline))
 
 (def ^:dynamic *do-rewrite?* true)
-(def ^:dynamic *rw-batch?* false)
 
-(defn fixup-rewrite! [db in-graph-uris mapping]
+(defn rewrite-draftset! [conn opts]
   (when *do-rewrite?*
-    (doseq [batch (partition-all 100 in-graph-uris)]
-      (let [compound-q (fixup-compound-q batch mapping)]
-        (sparql/update! db compound-q)))))
+    (->> (rewrite-draftset-q opts)
+         (sparql/update! conn))))
 
-(defn rewrite-draftset! [conn draftset-id]
+(defn unrewrite-draftset! [conn opts]
   (when *do-rewrite?*
-    (->> (ds/->draftset-uri draftset-id)
-         (rewrite-draftset-q)
+    (->> (unrewrite-draftset-q opts)
          (sparql/update! conn))))
 
 (defn migrate-graphs-to-live! [repo graphs clock-fn]
@@ -546,10 +527,9 @@ WHERE  {
     (let [transaction-started-at (clock-fn)
           graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at))
                                         graphs)
-          rewrite-graphs (map (juxt identity (partial lookup-live-graph repo)) graphs)
-          fixup-q (fixup-compound-q graphs rewrite-graphs)
-          update-str (util/make-compound-sparql-query
-                      (cons fixup-q graph-migrate-queries))]
+          fixup-q (unrewrite-draftset-q {:draft-graph-uris graphs})
+          _ (println fixup-q)
+          update-str (str fixup-q (util/make-compound-sparql-query graph-migrate-queries))]
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
 
