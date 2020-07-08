@@ -19,7 +19,6 @@
             [drafter.requests :as req]
             [grafter-2.rdf4j.repository :as repo]))
 
-(def ^:dynamic *rw-batch?* false)
 
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."
@@ -29,9 +28,11 @@
   (when-not (empty? triple-batch)
     ;;WARNING: This assumes the backend is a sesame backend which is
     ;;true for all current backends.
-    (sparql/add repo graph-uri triple-batch)
-    (when *rw-batch?*
-      (mgmt/rewrite-draftset! repo draftset-ref))))
+    (with-open [conn (repo/->connection repo)]
+      (repo/with-transaction conn
+        (pr/add conn graph-uri triple-batch)
+        (when (and mgmt/*do-rewrite?* mgmt/*rw-batch?*)
+          (mgmt/rewrite-draftset! conn draftset-ref))))))
 
 (declare append-draftset-quads)
 
@@ -53,8 +54,7 @@
           ;;continuation since we haven't done any real work yet
           (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
       (do
-        (when-not *rw-batch?*
-          (mgmt/rewrite-draftset! repo draftset-ref))
+        (when (and mgmt/*do-rewrite?* (not mgmt/*rw-batch?*)))
         (ajobs/job-succeeded! job)))))
 
 (defn- copy-graph-for-append*

@@ -523,6 +523,7 @@ WHERE  {
        (fixup-rewrite-q)))
 
 (def ^:dynamic *do-rewrite?* true)
+(def ^:dynamic *rw-batch?* false)
 
 (defn fixup-rewrite! [db in-graph-uris mapping]
   (when *do-rewrite?*
@@ -532,8 +533,9 @@ WHERE  {
 
 (defn rewrite-draftset! [conn draftset-id]
   (when *do-rewrite?*
-    (let [draftset-uri (ds/->draftset-uri draftset-id)]
-      (sparql/update! conn (rewrite-draftset-q draftset-uri)))))
+    (->> (ds/->draftset-uri draftset-id)
+         (rewrite-draftset-q)
+         (sparql/update! conn))))
 
 (defn migrate-graphs-to-live! [repo graphs clock-fn]
   "Migrates a collection of draft graphs to live through a single
