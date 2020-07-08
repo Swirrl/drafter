@@ -28,9 +28,10 @@
                      (let [draft-graph-uri (create-or-empty-draft-graph-for repo draftset-id graph util/get-current-time)
                            mapping (ops/get-draftset-graph-mapping repo draftset-id)]
                        (ds-data-common/lock-writes-and-copy-graph resources graph draft-graph-uri {:silent true})
-                       (mgmt/fixup-rewrite! (:backend resources)
-                                            (vals mapping)
-                                            (merge mapping {graph draft-graph-uri}))
+                       (mgmt/rewrite-draftset! repo
+                                               {:draftset-uri (ds/->draftset-uri draftset-id)
+                                               ; :live-graph-uris [graph]
+                                                })
                        (jobs/job-succeeded! job))))))
 
 (defn- required-live-graph-param-handler [repo inner-handler]
