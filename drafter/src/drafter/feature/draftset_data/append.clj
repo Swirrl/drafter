@@ -31,8 +31,8 @@
     (with-open [conn (repo/->connection repo)]
       (repo/with-transaction conn
         (pr/add conn graph-uri triple-batch)
-        (when (and mgmt/*do-rewrite?* mgmt/*rw-batch?*)
-          (mgmt/rewrite-draftset! conn draftset-ref))))))
+        (mgmt/rewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset-ref)
+                                      :delete :ignore})))))
 
 (declare append-draftset-quads)
 
@@ -53,9 +53,7 @@
           ;;NOTE: do this immediately instead of scheduling a
           ;;continuation since we haven't done any real work yet
           (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-      (do
-        (when (and mgmt/*do-rewrite?* (not mgmt/*rw-batch?*)))
-        (ajobs/job-succeeded! job)))))
+      (ajobs/job-succeeded! job))))
 
 (defn- copy-graph-for-append*
   [state draftset-ref resources live->draft quad-batches job]
