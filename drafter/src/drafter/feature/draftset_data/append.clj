@@ -29,10 +29,9 @@
     ;;WARNING: This assumes the backend is a sesame backend which is
     ;;true for all current backends.
     (with-open [conn (repo/->connection repo)]
-      (repo/with-transaction conn
-        (pr/add conn graph-uri triple-batch)
-        (mgmt/rewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset-ref)
-                                      :delete :ignore})))))
+      (pr/add conn graph-uri triple-batch)
+      (mgmt/rewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset-ref)
+                                    :deleted :ignore}))))
 
 (declare append-draftset-quads)
 

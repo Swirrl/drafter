@@ -463,8 +463,8 @@
          ?o1 '?o ?o2 '?o}
     :as opts}]
   (let [filter (case deleted
-                 :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s ?p ?o } }")
-                 :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s ?p ?o } }")
+                 :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s1 ?p1 ?o1 } }")
+                 :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s1 ?p1 ?o1 } }")
                  nil)
         ds-values (when draftset-uri (str "VALUES ?ds { <" draftset-uri "> }"))
         live-values (->> live-graph-uris
