@@ -58,8 +58,7 @@
 
 (t/deftest delete-public-endpoint-quads-test
   (tc/with-system
-    [:drafter.fixture-data/loader [:drafter/routes :draftset/api]
-     :drafter/write-scheduler :drafter.feature.endpoint.public/init]
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
     [system system-config]
     (tc/check-endpoint-graph-consistent system
       (let [handler (get system [:drafter/routes :draftset/api])
@@ -74,8 +73,7 @@
 
 (t/deftest delete-public-endpoint-triples-test
   (tc/with-system
-    [:drafter.fixture-data/loader [:drafter/routes :draftset/api]
-     :drafter/write-scheduler :drafter.feature.endpoint.public/init]
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
     [system system-config]
     (tc/check-endpoint-graph-consistent system
       (let [handler (get system [:drafter/routes :draftset/api])

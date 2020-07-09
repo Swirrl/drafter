@@ -11,8 +11,7 @@
 
 (def system "drafter/feature/empty-db-system.edn")
 
-(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler
-                    :drafter.feature.endpoint.public/init])
+(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
 
 (tc/deftest-system-with-keys delete-live-graph-not-in-draftset
   keys-for-test

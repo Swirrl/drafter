@@ -14,10 +14,7 @@
             [grafter-2.rdf4j.formats :as formats]
             [drafter.fixture-data :as fd]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
-            [grafter-2.rdf4j.repository :as repo]
-            [drafter.rdf.sparql :as sparql]
-            [grafter-2.rdf.protocols :as gproto])
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -63,8 +60,7 @@
                    (.toEpochSecond ts-3))
                 "Modified time is updated after delete"))))))
 
-(def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.feature.endpoint.public/init
-                    :drafter.fixture-data/loader])
+(def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
 
 (tc/deftest-system-with-keys append-quad-data-with-valid-content-type-to-draftset
   keys-for-test

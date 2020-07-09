@@ -26,7 +26,8 @@
             [aero.core :as aero]
             [drafter.user :as user]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]])
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
+            [drafter.feature.endpoint.public :as pub])
   (:import [com.auth0.jwk Jwk JwkProvider]
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT
@@ -538,9 +539,10 @@
    forms with the possible exception that the updated time of the public endpoint can be
    updated"
   [system & forms]
-  `(let [repo# (:drafter/backend ~system)
-         triples-before# (get-public-endpoint-triples repo#)]
-     ~@forms
-     (let [triples-after# (get-public-endpoint-triples repo#)]
-       (is (some is-modified-statement? triples-after#))
-       (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#)))))))
+  `(let [repo# (:drafter/backend ~system)]
+     (pub/ensure-public-endpoint repo#)
+     (let [triples-before# (get-public-endpoint-triples repo#)]
+       ~@forms
+       (let [triples-after# (get-public-endpoint-triples repo#)]
+         (is (some is-modified-statement? triples-after#))
+         (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#))))))))

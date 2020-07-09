@@ -29,7 +29,3 @@
 (s/fdef get-public-endpoint
   :args (s/cat :repo any?)
   :ret ::ep/Endpoint)
-
-(defmethod ig/init-key ::init [_ {:keys [repo]}]
-  (ensure-public-endpoint repo)
-  nil)

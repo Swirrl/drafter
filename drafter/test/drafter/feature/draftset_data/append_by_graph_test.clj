@@ -14,7 +14,7 @@
 (def system-config "drafter/feature/empty-db-system.edn")
 
 (def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler
-                    :drafter.feature.endpoint.public/init :drafter.fixture-data/loader])
+                    :drafter.fixture-data/loader])
 
 (defn- copy-live-graph-into-draftset-request
   ([draftset-location user live-graph]

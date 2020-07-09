@@ -153,11 +153,6 @@
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
- ;;NOTE: dependency on the fixture loader ensure the database isn't dropped after the public endpoint
- ;;has been created
- :drafter.feature.endpoint.public/init {:repo #ig/ref :drafter/backend :loader #ig/ref :drafter.fixture-data/loader}
-
  :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
                        :draftset-api-routes #ig/ref [:drafter/routes :draftset/api]
