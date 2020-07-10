@@ -7,7 +7,8 @@
             [grafter.url :as url]
             [drafter.endpoint :as ep])
   (:import java.net.URI
-           [java.util Date UUID]))
+           [java.util Date UUID]
+           [java.time OffsetDateTime]))
 
 (defprotocol DraftsetRef
   (->draftset-uri [this])
@@ -50,7 +51,7 @@
     (let [relative (.relativize ont/draftset-uri uri)]
       (->DraftsetId (str relative)))))
 
-(s/def ::EmailAddress util/validate-email-address)
+(s/def ::EmailAddress util/email-string?)
 (s/def ::status #{:created :updated :deleted})
 (s/def ::changes (s/map-of ::ep/URI (s/keys :req-un [::status])))
 (s/def ::created-by ::EmailAddress)
@@ -79,12 +80,13 @@
 ;; in-memory/json schema.
 (defn create-draftset
   ([creator]
-   (let [created-at (Date.)]
+   (let [created-at (OffsetDateTime/now)]
      {:id (->DraftsetId (str (UUID/randomUUID)))
       :type "Draftset"
+      :changes {}
       :created-by creator
       :created-at created-at
-      :modified-at created-at
+      :updated-at created-at
       :current-owner creator}))
   ([creator display-name]
    (assoc (create-draftset creator) :display-name display-name))

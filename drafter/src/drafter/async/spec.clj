@@ -1,7 +1,7 @@
 (ns drafter.async.spec
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
-            [clojure.string :as string]
+            [drafter.util :refer [email-string?]]
             [clj-time.coerce :refer [from-long]]
             [clj-time.format :refer [formatters parse unparse]]
             [drafter.draftset :as ds])
@@ -12,11 +12,6 @@
   (and (instance? clojure.lang.IPending x)
        (instance? clojure.lang.IBlockingDeref x)
        (instance? clojure.lang.IFn x)))
-
-(def email-string?
-  (s/with-gen (s/and string? #(string/includes? % "@"))
-    (fn [] (gen/fmap (fn [[a b]] (str a "@" b ".com"))
-                    (gen/tuple (gen/string-ascii) (gen/string-ascii))))))
 
 (def uuid-string?
   (s/with-gen (s/and string? #(try (UUID/fromString %) (catch Throwable _)))

@@ -3,7 +3,10 @@
              [pprint :as pp]
              [string :as str]]
             [buddy.core.codecs.base64 :as base64]
-            [buddy.core.codecs :as codecs])
+            [buddy.core.codecs :as codecs]
+            [clojure.spec.gen.alpha :as gen]
+            [clojure.string :as string]
+            [clojure.spec.alpha :as s])
   (:import java.nio.charset.Charset
            [java.util UUID]
            [java.time OffsetDateTime]
@@ -173,6 +176,11 @@
        (.validate ia)
        (.getAddress ia))
      (catch AddressException ex false))))
+
+(def email-string?
+  (s/with-gen validate-email-address
+              (fn [] (gen/fmap (fn [[a b]] (str a "@" b ".com"))
+                               (gen/tuple (gen/string-alphanumeric) (gen/string-alphanumeric))))))
 
 (def utf8 (Charset/forName "UTF-8"))
 
