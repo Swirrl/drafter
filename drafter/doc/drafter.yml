@@ -146,6 +146,8 @@ securityDefinitions:
     in: header
 basePath: /v1
 tags:
+  - name: Endpoints
+    description: Viewing and creating endpoints
   - name: Draftsets
     description: The publication lifecycle
   - name: Updating Data
@@ -165,12 +167,52 @@ produces:
 consumes:
   - application/json
 paths:
+  /endpoints:
+    get:
+      operationId: get-endpoints
+      summary: Get all visible endpoints
+      tags:
+        - Endpoints
+      description: |
+        Lists all endpoints visible to the user subject to the constraints specified by the value of the
+        optional include parameter. If no include parameter is specified, all visible endpoints are returned.
+        If a login is present, all applicable draftsets will be returned, while the public endpoint will always
+        be returned if permitted by the include parameter. The public endpoint is not owned or claimable by any
+        user so the public endpoint will not be included in the results if the include parameter is one of these
+        values.
+      parameters:
+        - $ref: '#/parameters/include'
+      security:
+        - jws-auth: []
+      responses:
+        '200':
+          description: 'All endpoints visible to the user satisfying the include criteria'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Endpoint'
+  /endpoint/public:
+    get:
+      operationId: get-public-endpoint
+      description: Returns the public endpoint
+      summary: Get the public endpoint
+      tags:
+        - Endpoints
+      responses:
+        '200':
+          description: 'The public endpoint'
+          schema:
+            $ref: '#/definitions/Draftset'
+        '404':
+          description: 'When the public endpoint has not been created'
+
   /draftsets:
     post:
       operationId: create-draftset
       summary: Create a new Draftset
       tags:
         - Draftsets
+        - Endpoints
       description: |
         Creates a new draftset in the database.
 
@@ -196,8 +238,10 @@ paths:
         - jws-auth: []
       parameters:
         - $ref: '#/parameters/include'
+        - $ref: '#/parameters/union-with-live'
       tags:
         - Draftsets
+        - Endpoints
       responses:
         '200':
           description: An array of Draftsets
@@ -218,6 +262,7 @@ paths:
         - jws-auth: []
       parameters:
         - $ref: '#/parameters/id'
+        - $ref: '#parameters/union-with-live'
       tags:
         - Metadata
       responses:
@@ -827,7 +872,7 @@ parameters:
   include:
     name: include
     in: query
-    description: which visible draftsets to include in the results
+    description: which visible endpoints to include in the results
     required: false
     type: string
     enum:
@@ -1001,56 +1046,72 @@ definitions:
       username: user@example.com
       role: publisher
 
-  Draftset:
+  Endpoint:
     type: object
-    required: [id, changes, updated-at, created-at, created-by]
+    required: [id, type, created-at, updated-at]
+    discriminator: "type"
     properties:
       id:
         type: string
-        format: uuid
-        description: 'Unique identifier representing this draftset'
-      created-by:
-        type: string
-        description: The user who created this Draftset
-      changes:
-        type: object
-        additionalProperties:
-          $ref: '#/definitions/Graph'
-      display-name:
-        type: string
-        description: Display name of the Draftset
-      current-owner:
-        type: string
-        description: The current owner of this Draftset
-      submitted-by:
-        type: string
-        description: The owner who submitted this Draftset for review
-      claim-role:
+        description: 'Unique identifier for this endpoint'
+      type:
         type: string
         enum:
-          - editor
-          - publisher
-          - manager
-        description: The required role for users who can claim this Draftset
-      claim-user:
-        type: string
-        description: The user who can claim this Draftset
-      description:
-        type: string
-        description: A description of the Draftset
-      updated-at:
-        type: string
-        format: date-time
-        description: IS0 8601 DateTime representing the time the draftsets metadata was last updated
+          - "Endpoint"
+          - "Draftset"
+        description: 'Identifier for the endpoint type'
       created-at:
         type: string
         format: date-time
-        description: IS0 8601 DateTime representing the time the draftset was created
-      # note:
-      #   type: string
-      #   description: |
-      #     A note that can be used by users to communicate the status
-      #     of a submission, why a draftset was returned etc.
+        description: 'IS0 8601 DateTime representing the time the endpoint was created'
+      updated-at:
+        type: string
+        format: date-time
+        description: 'IS0 8601 DateTime representing the time the contents or metadata of the endnpoint was last updated'
+  Draftset:
+    allOf:
+      - $ref: '#/definitions/Endpoint'
+      - type: object
+        required: [changes, created-by]
+        properties:
+          id:
+            type: string
+            format: uuid
+            description: 'Unique identifier representing this draftset'
+          created-by:
+            type: string
+            description: The user who created this Draftset
+          changes:
+            type: object
+            additionalProperties:
+              $ref: '#/definitions/Graph'
+          display-name:
+            type: string
+            description: Display name of the Draftset
+          current-owner:
+            type: string
+            description: The current owner of this Draftset
+          submitted-by:
+            type: string
+            description: The owner who submitted this Draftset for review
+          claim-role:
+            type: string
+            enum:
+              - editor
+              - publisher
+              - manager
+            description: The required role for users who can claim this Draftset
+          claim-user:
+            type: string
+            description: The user who can claim this Draftset
+          description:
+            type: string
+            description: A description of the Draftset
+          # note:
+          #   type: string
+          #   description: |
+          #     A note that can be used by users to communicate the status
+          #     of a submission, why a draftset was returned etc.
     example:
       id: de305d54-75b4-431b-adb2-eb6b9e546014
       changes:
