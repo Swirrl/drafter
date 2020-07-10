@@ -14,7 +14,8 @@
    endpoint is not owned or claimable by any user."
   [repo include]
   (if (= :all include)
-    [(pub/get-public-endpoint repo)]))
+    (if-let [pe (pub/get-public-endpoint repo)]
+      [pe])))
 
 (defn get-endpoints
   "Returns a sequence of all the endpoints visible to a user which satisfy the include

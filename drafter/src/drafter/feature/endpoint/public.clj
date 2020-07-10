@@ -28,4 +28,4 @@
 
 (s/fdef get-public-endpoint
   :args (s/cat :repo any?)
-  :ret ::ep/Endpoint)
+  :ret (s/nilable ::ep/Endpoint))

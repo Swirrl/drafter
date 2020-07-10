@@ -16,9 +16,11 @@
 (defn- merge-endpoints
   "Modifies the updated-at time of a draftset endpoint to the latest
    of its modified time and that of the public endpoint"
-  [{public-modified :updated-at :as _public-endpoint} draftset-endpoint]
-  (update draftset-endpoint :updated-at (fn [draftset-modified]
-                                          (latest public-modified draftset-modified))))
+  [{public-modified :updated-at :as public-endpoint} draftset-endpoint]
+  (if public-endpoint
+    (update draftset-endpoint :updated-at (fn [draftset-modified]
+                                            (latest public-modified draftset-modified)))
+    draftset-endpoint))
 
 (defn handler
   [{wrap-authenticated :wrap-auth backend :drafter/backend}]

@@ -121,7 +121,22 @@
         (let [{:keys [body] :as response} (handler request)]
           (tc/assert-is-ok-response response)
           (tc/assert-spec ::ds/OwnedDraftset body)
-          (is (= (OffsetDateTime/parse "2020-07-03T11:43:02.373Z") (:updated-at body))))))))
+          (is (= (OffsetDateTime/parse "2020-07-03T11:43:02.373Z") (:updated-at body)))))))
+
+  (t/testing "no public endpoint"
+    (tc/with-system
+      keys-for-test
+      [system system-config]
+      (let [repo (:drafter/backend system)
+            handler (get system [:drafter/routes :draftset/api])
+            fixture-resources [(io/resource "drafter/feature/draftset/show_test-union-with-live-3.trig")]
+            request (help/get-draftset-info-request "/v1/draftset/35f645f7-ff4b-4949-b530-c64d48b7c6ce" test-editor)
+            request (assoc-in request [:params :union-with-live] "true")]
+        (fd/load-fixture! {:repo repo :fixtures fixture-resources :format :trig})
+        (let [{:keys [body] :as response} (handler request)]
+          (tc/assert-is-ok-response response)
+          (tc/assert-spec ::ds/OwnedDraftset body)
+          (is (= (OffsetDateTime/parse "2020-07-07T16:17:45.539Z") (:updated-at body))))))))
 
 (tc/deftest-system-with-keys get-draftset-request-for-non-existent-draftset
   keys-for-test

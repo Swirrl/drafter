@@ -539,10 +539,9 @@
    forms with the possible exception that the updated time of the public endpoint can be
    updated"
   [system & forms]
-  `(let [repo# (:drafter/backend ~system)]
-     (pub/ensure-public-endpoint repo#)
-     (let [triples-before# (get-public-endpoint-triples repo#)]
-       ~@forms
-       (let [triples-after# (get-public-endpoint-triples repo#)]
-         (is (some is-modified-statement? triples-after#))
-         (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#))))))))
+  `(let [repo# (:drafter/backend ~system)
+        triples-before# (get-public-endpoint-triples repo#)]
+    ~@forms
+    (let [triples-after# (get-public-endpoint-triples repo#)]
+      (is (= (set (map :p triples-before#)) (set (map :p triples-after#))))
+      (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#)))))))

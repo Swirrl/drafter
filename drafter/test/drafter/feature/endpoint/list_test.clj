@@ -10,6 +10,16 @@
             [clojure.java.io :as io])
   (:import [java.time OffsetDateTime]))
 
+(defn get-endpoints-request [& {:keys [include user]}]
+  (let [req {:uri "/v1/endpoints" :request-method :get}
+        req (if (some? include)
+              (assoc-in req [:params :include] (name include))
+              req)
+        req (if (some? user)
+              (tc/with-identity user req)
+              req)]
+    req))
+
 (deftest no-login-test
   (tc/with-system
     [:drafter.stasher/repo [:drafter/routes :draftset/api] :drafter.fixture-data/loader :drafter/write-scheduler]
@@ -29,10 +39,15 @@
         (tc/assert-spec (s/coll-of ::ep/Endpoint :count 1) body)
         (is (= [expected] body))))))
 
-(defn get-endpoints-request [include user]
-  (let [req {:uri "/v1/endpoints" :request-method :get}
-        req (if (some? include) (assoc-in req [:params :include] include) req)]
-    (tc/with-identity user req)))
+(deftest no-public-endpoint-test
+  (tc/with-system
+    [:drafter.stasher/repo [:drafter/routes :draftset/api] :drafter.fixture-data/loader :drafter/write-scheduler]
+    [system "drafter/feature/empty-db-system.edn"]
+    (let [handler (get system [:drafter/routes :draftset/api])]
+      (let [req (get-endpoints-request)
+            {:keys [body] :as resp} (handler req)]
+        (tc/assert-is-ok-response resp)
+        (is (= [] body))))))
 
 (defn- partition-endpoints [endpoints]
   (letfn [(type-filter [t]
@@ -57,7 +72,7 @@
                                         [:owned false]
                                         [:claimable false]
                                         [nil true]]]
-        (let [endpoints-request (get-endpoints-request include test-publisher)
+        (let [endpoints-request (get-endpoints-request :include include :user test-publisher)
               draftsets-request (get-draftsets-request include test-publisher)
               {endpoints :body :as endpoints-response} (handler endpoints-request)
               {draftsets :body :as draftsets-response} (handler draftsets-request)

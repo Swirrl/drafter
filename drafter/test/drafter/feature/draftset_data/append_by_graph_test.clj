@@ -7,7 +7,8 @@
             [grafter-2.rdf4j.io :refer [statements]]
             [martian.encoders :as enc]
             [drafter.async.jobs :as async]
-            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]))
+            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
+            [drafter.feature.endpoint.public :as pub]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -49,12 +50,14 @@
   (tc/with-system
     keys-for-test
     [system system-config]
-    (tc/check-endpoint-graph-consistent system
-      (let [handler (get system [:drafter/routes :draftset/api])
-            draftset-location (help/create-draftset-through-api handler test-publisher)
-            req (copy-live-graph-into-draftset-request draftset-location test-publisher drafter:endpoints)
-            response (handler req)]
-        (t/is (help/is-client-error-response? response))))))
+    (do
+      (pub/ensure-public-endpoint (:drafter/backend system))
+      (tc/check-endpoint-graph-consistent system
+        (let [handler (get system [:drafter/routes :draftset/api])
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              req (copy-live-graph-into-draftset-request draftset-location test-publisher drafter:endpoints)
+              response (handler req)]
+          (t/is (help/is-client-error-response? response)))))))
 
 (tc/deftest-system-with-keys copy-draft-with-metadata-test
   keys-for-test
