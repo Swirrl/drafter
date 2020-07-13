@@ -359,8 +359,7 @@ set xlabel "Number of triples (k)"
 set ylabel "Time (s)"
 set auto x
 plot data using 2:3 with lines title 'Batch-RW', \
-     data using 2:4 with lines title 'YES-RW', \
-     data using 2:5 with lines title 'NO-RW'
+     data using 2:4 with lines title 'NO-RW'
  #+END_SRC
 
  #+RESULTS:
@@ -408,8 +407,7 @@ set xlabel "Number of triples (k)"
 set ylabel "Time (s)"
 set auto x
 plot data using 2:3 with lines title 'Batch-RW', \
-     data using 2:4 with lines title 'YES-RW', \
-     data using 2:5 with lines title 'NO-RW'
+     data using 2:4 with lines title 'NO-RW'
  #+END_SRC
 
  #+RESULTS:
@@ -528,16 +526,20 @@ triples/graphs in live which are referenced by triples appended and published.
           yes-rw (with-redefs [dm/*do-rewrite?* true]
                    (append-quads-to-draftset-through-api
                     handler test-publisher draftset-location quads)
+                   (Thread/sleep 20000)
                    (time
                     (publish-draftset-through-api
                      handler draftset-location test-publisher)))
+          _ (Thread/sleep 20000)
           draftset-location (help/create-draftset-through-api handler test-publisher)
           no-rw (with-redefs [dm/*do-rewrite?* false]
                   (append-quads-to-draftset-through-api
                    handler test-publisher draftset-location quads)
+                   (Thread/sleep 20000)
                   (time
                    (publish-draftset-through-api
                     handler draftset-location test-publisher)))]
+      (Thread/sleep 20000)
       (printf "| %s | %s | %.2f | %.2f | \n"
               n-graphs
               (int (/ n-quads 1000))
@@ -563,19 +565,19 @@ triples/graphs in live which are referenced by triples appended and published.
 
  #+Name: table-6
  #+RESULTS:
- |  0 | 100 | 0.33 | 0.28 |
- |  1 | 100 | 0.37 | 0.28 |
- |  5 | 100 | 0.54 | 0.42 |
- | 10 | 100 | 0.64 | 0.47 |
- | 20 | 100 | 0.71 | 0.77 |
- | 30 | 100 | 0.95 | 1.01 |
- | 40 | 100 | 1.20 | 1.52 |
- | 50 | 100 | 2.26 | 2.16 |
- | 100 | 100 |  4.32 |  4.35 |
- | 200 | 100 | 15.80 | 13.01 |
- | 300 | 100 | 27.84 | 26.48 |
- | 400 | 100 | 46.22 | 45.39 |
- | 500 | 100 | 77.49 | 80.17 |
+ |   0 | 100 |  0.62 |  0.35 |
+ |   1 | 100 |  0.39 |  0.32 |
+ |   5 | 100 |  0.54 |  0.45 |
+ |  10 | 100 |  0.61 |  0.46 |
+ |  20 | 100 |  0.57 |  0.79 |
+ |  30 | 100 |  0.73 |  1.16 |
+ |  40 | 100 |  0.83 |  1.14 |
+ |  50 | 100 |  2.21 |  1.00 |
+ | 100 | 100 |  2.72 |  3.71 |
+ | 200 | 100 |  8.22 |  6.47 |
+ | 300 | 100 | 11.65 | 10.20 |
+ | 400 | 100 | 17.18 | 14.40 |
+ | 500 | 100 | 22.82 | 20.30 |
 
 
  #+BEGIN_SRC gnuplot :var  data=table-6 :file graph_rewriting_fixup_6.png :exports results
@@ -655,23 +657,23 @@ plot data using 2:3 with lines title 'YES-RW', \
 
  #+Name: table-8
  #+RESULTS:
- | 5 |    1 | 0.28 | 0.18 |
- | 5 |    5 | 0.19 | 0.39 |
- | 5 |   10 | 0.21 | 0.17 |
- | 5 |   20 | 0.24 | 0.18 |
- | 5 |   30 | 0.21 | 0.20 |
- | 5 |   40 | 0.26 | 0.22 |
- | 5 |   50 | 0.28 | 0.25 |
- | 5 |   60 | 0.28 | 0.28 |
- | 5 |   70 | 0.31 | 0.30 |
- | 5 |   80 | 0.35 | 0.31 |
- | 5 |   90 | 0.37 | 0.35 |
- | 5 |  100 | 0.46 | 0.41 |
- | 5 |  200 | 0.73 | 0.66 |
- | 5 |  300 | 1.27 | 0.83 |
- | 5 |  400 | 1.76 | 1.14 |
- | 5 |  500 | 2.14 | 2.02 |
- | 5 | 1000 | 5.60 | 5.11 |
+ | 5 | 1 | 0.44 | 0.29 |
+ | 5 | 5 | 0.43 | 0.38 |
+ | 5 | 10 | 0.43 | 0.27 |
+ | 5 | 20 | 0.40 | 0.35 |
+ | 5 | 30 | 0.37 | 0.45 |
+ | 5 | 40 | 0.27 | 0.42 |
+ | 5 | 50 | 0.46 | 0.26 |
+ | 5 | 60 | 0.47 | 0.45 |
+ | 5 | 70 | 0.42 | 0.52 |
+ | 5 | 80 | 0.57 | 0.29 |
+ | 5 | 90 | 0.56 | 0.53 |
+ | 5 | 100 | 0.49 | 0.68 |
+ | 5 | 200 | 1.08 | 0.75 |
+ | 5 | 300 | 0.85 | 0.89 |
+ | 5 | 400 | 1.54 | 1.05 |
+ | 5 | 500 | 1.34 | 1.20 |
+ | 5 | 1000 | 5.56 | 2.91 |
 
  #+BEGIN_SRC gnuplot :var  data=table-8 :file graph_rewriting_fixup_8.png :exports results
 set title "Rewriting vs not during draft publish"
@@ -702,23 +704,23 @@ plot data using 2:3 with lines title 'YES-RW', \
 
  #+Name: table-9
  #+RESULTS:
- | 0 |    1 | 0.17 | 0.08 |
- | 0 |    5 | 0.10 | 0.08 |
- | 0 |   10 | 0.19 | 0.09 |
- | 0 |   20 | 0.13 | 0.09 |
- | 0 |   30 | 0.11 | 0.12 |
- | 0 |   40 | 0.40 | 0.16 |
- | 0 |   50 | 0.16 | 0.12 |
- | 0 |   60 | 0.16 | 0.15 |
- | 0 |   70 | 0.15 | 0.13 |
- | 0 |   80 | 0.18 | 0.21 |
- | 0 |   90 | 0.22 | 0.20 |
- | 0 |  100 | 0.22 | 0.19 |
- | 0 |  200 | 0.69 | 0.42 |
- | 0 |  300 | 0.70 | 0.48 |
- | 0 |  400 | 0.77 | 0.71 |
- | 0 |  500 | 1.77 | 0.78 |
- | 0 | 1000 | 3.63 | 3.26 |
+ | 0 |    1 | 2.84 | 4.70 |
+ | 0 |    5 | 3.36 | 3.08 |
+ | 0 |   10 | 3.24 | 3.01 |
+ | 0 |   20 | 3.05 | 3.87 |
+ | 0 |   30 | 4.43 | 4.86 |
+ | 0 |   40 | 4.57 | 3.66 |
+ | 0 |   50 | 4.66 | 3.89 |
+ | 0 |   60 | 4.22 | 3.09 |
+ | 0 |   70 | 2.82 | 4.29 |
+ | 0 |   80 | 5.06 | 3.68 |
+ | 0 |   90 | 4.00 | 4.05 |
+ | 0 |  100 | 3.86 | 4.63 |
+ | 0 |  200 | 4.41 | 4.61 |
+ | 0 |  300 | 4.46 | 4.70 |
+ | 0 |  400 | 3.86 | 4.24 |
+ | 0 |  500 | 3.88 | 4.64 |
+ | 0 | 1000 | 3.21 | 4.18 |
 
  #+BEGIN_SRC gnuplot :var  data=table-9 :file graph_rewriting_fixup_9.png :exports results
 set title "Rewriting vs not during draft publish"
@@ -748,18 +750,22 @@ plot data using 2:3 with lines title 'YES-RW', \
              handler test-publisher draftset-location quads)
           _ (publish-draftset-through-api
              handler draftset-location test-publisher)
+          _ (Thread/sleep 20000)
           draftset-location (help/create-draftset-through-api handler test-publisher)
           yes-rw (with-redefs [dm/*do-rewrite?* true]
                    (time
                     (copy-live-graph-into-draftset
                      handler draftset-location draftset-id graph)))
           _ (delete-draftset handler draftset-location)
+          _ (Thread/sleep 20000)
+
           draftset-location (help/create-draftset-through-api handler test-publisher)
           no-rw (with-redefs [dm/*do-rewrite?* false]
                   (time
                    (copy-live-graph-into-draftset
                     handler draftset-location draftset-id graph)))
-          _ (delete-draftset handler draftset-location)]
+          _ (delete-draftset handler draftset-location)
+          _ (Thread/sleep 20000)]
       (printf "| %s | %.2f | %.2f | \n"
               (int (/ n-quads 1000))
               (/ yes-rw 1000)
