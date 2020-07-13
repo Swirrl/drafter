@@ -499,17 +499,13 @@ WHERE  {
    (rewrite-1-q (assoc opts :?p1 '?dg :?p2 '?lg)) \newline
    (rewrite-1-q (assoc opts :?o1 '?dg :?o2 '?lg)) \newline))
 
-(def ^:dynamic *do-rewrite?* true)
-
 (defn rewrite-draftset! [conn opts]
-  (when *do-rewrite?*
-    (->> (rewrite-draftset-q opts)
-         (sparql/update! conn))))
+  (->> (rewrite-draftset-q opts)
+       (sparql/update! conn)))
 
 (defn unrewrite-draftset! [conn opts]
-  (when *do-rewrite?*
-    (->> (unrewrite-draftset-q opts)
-         (sparql/update! conn))))
+  (->> (unrewrite-draftset-q opts)
+       (sparql/update! conn)))
 
 (defn migrate-graphs-to-live! [repo graphs clock-fn]
   "Migrates a collection of draft graphs to live through a single
@@ -521,7 +517,6 @@ WHERE  {
           graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at))
                                         graphs)
           fixup-q (unrewrite-draftset-q {:draft-graph-uris graphs})
-          _ (println fixup-q)
           update-str (str fixup-q (util/make-compound-sparql-query graph-migrate-queries))]
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
