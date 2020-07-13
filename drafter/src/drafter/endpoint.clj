@@ -29,3 +29,15 @@
   ([created] (public created created))
   ([created modified]
    {:id "public" :type "Endpoint" :created-at created :updated-at modified}))
+
+(defn- latest [^OffsetDateTime x ^OffsetDateTime y]
+  (if (.isAfter x y) x y))
+
+(defn merge-endpoints
+  "Modifies the updated-at time of a draftset endpoint to the latest
+   of its modified time and that of the public endpoint"
+  [{public-modified :updated-at :as public-endpoint} draftset-endpoint]
+  (if public-endpoint
+    (update draftset-endpoint :updated-at (fn [draftset-modified]
+                                            (latest public-modified draftset-modified)))
+    draftset-endpoint))

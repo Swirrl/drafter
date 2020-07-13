@@ -73,7 +73,7 @@
                                         [:claimable false]
                                         [nil true]]]
         (let [endpoints-request (get-endpoints-request :include include :user test-publisher)
-              draftsets-request (get-draftsets-request include test-publisher)
+              draftsets-request (get-draftsets-request test-publisher :include include)
               {endpoints :body :as endpoints-response} (handler endpoints-request)
               {draftsets :body :as draftsets-response} (handler draftsets-request)
               {public-endpoints :public draftset-endpoints :draftsets} (partition-endpoints endpoints)]

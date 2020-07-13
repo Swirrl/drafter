@@ -5,22 +5,10 @@
             [drafter.feature.endpoint.public :as pub]
             [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
             [drafter.responses :refer [forbidden-response]]
+            [drafter.endpoint :as ep]
             [drafter.user :as user]
             [integrant.core :as ig]
-            [ring.util.response :as ring])
-  (:import [java.time OffsetDateTime]))
-
-(defn- latest [^OffsetDateTime x ^OffsetDateTime y]
-  (if (.isAfter x y) x y))
-
-(defn- merge-endpoints
-  "Modifies the updated-at time of a draftset endpoint to the latest
-   of its modified time and that of the public endpoint"
-  [{public-modified :updated-at :as public-endpoint} draftset-endpoint]
-  (if public-endpoint
-    (update draftset-endpoint :updated-at (fn [draftset-modified]
-                                            (latest public-modified draftset-modified)))
-    draftset-endpoint))
+            [ring.util.response :as ring]))
 
 (defn handler
   [{wrap-authenticated :wrap-auth backend :drafter/backend}]
@@ -33,7 +21,7 @@
           (if (user/can-view? user info)
             (if union-with-live
               (let [public-endpoint (pub/get-public-endpoint backend)
-                    info (merge-endpoints public-endpoint info)]
+                    info (ep/merge-endpoints public-endpoint info)]
                 (ring/response info))
               (ring/response info))
             (forbidden-response "Draftset not in accessible state"))

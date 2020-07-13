@@ -222,6 +222,7 @@ paths:
       parameters:
         - $ref: '#/parameters/display-name'
         - $ref: '#/parameters/draftset-description'
+        - $ref: '#/parameters/union-with-live'
       responses:
         '303':
           description: Upon the creation of a new draftset the caller is redirected to its representation.
@@ -992,7 +993,11 @@ parameters:
     type: string
   union-with-live:
     name: union-with-live
-    description: Whether or not the query should run against the union of this draftset with the live site.
+    description: |
+      When applied to an operation returning draftsets, setting this flag sets the last-modified
+      time of each returned draftset to the latest of the modified times of the draftset and the
+      public endpoint. When applied to a query operation setting the flag causes the query to be
+      executed against the union of the draftset and live data.
     in: query
     required: false
     type: boolean

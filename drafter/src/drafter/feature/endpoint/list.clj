@@ -4,6 +4,7 @@
             [drafter.feature.endpoint.public :as pub]
             [drafter.feature.draftset.list :as dsl]
             [drafter.middleware :refer [include-endpoints-param maybe-authenticated]]
+            [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
             [clojure.spec.alpha :as s]
             [ring.util.response :as ring]))
 
@@ -20,15 +21,15 @@
 (defn get-endpoints
   "Returns a sequence of all the endpoints visible to a user which satisfy the include
    constraint."
-  [repo user include]
+  [repo user include union-with-live?]
   (let [public (public-endpoints repo include)
         draftsets (if user
-                    (dsl/get-draftsets repo user include))]
+                    (dsl/get-draftsets repo user include union-with-live?))]
     (concat public draftsets)))
 
 ;;TODO: find/create repo and user specs
 (s/fdef get-endpoints
-  :args (s/cat :repo any? :user any? :include ep/includes)
+  :args (s/cat :repo any? :user any? :include ep/includes :union-with-live? boolean?)
   :ret (s/coll-of ::ep/Endpoint))
 
 (defn list-handler
@@ -37,8 +38,9 @@
   (maybe-authenticated
     wrap-authenticated
     (include-endpoints-param
-      (fn [{user :identity {:keys [include]} :params :as request}]
-        (ring/response (get-endpoints backend user include))))))
+      (parse-union-with-live-handler
+        (fn [{user :identity {:keys [include union-with-live]} :params :as request}]
+          (ring/response (get-endpoints backend user include union-with-live)))))))
 
 (defmethod ig/init-key ::handler [_ {:keys [drafter/backend wrap-auth] :as opts}]
   (list-handler backend wrap-auth))

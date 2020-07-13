@@ -5,8 +5,11 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [drafter.util :as dutil]
-            [clojure.spec.alpha :as s])
-  (:import java.net.URI))
+            [clojure.spec.alpha :as s]
+            [clojure.java.io :as io]
+            [drafter.fixture-data :as fd])
+  (:import java.net.URI
+           [java.time OffsetDateTime]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -15,9 +18,11 @@
   (tc/assert-spec spec body)
   body)
 
-(defn get-draftsets-request [include user]
+(defn get-draftsets-request
+  [user & {:keys [include union-with-live?]}]
   (let [req {:uri "/v1/draftsets" :request-method :get}
-        req (if (some? include) (assoc-in req [:params :include] include) req)]
+        req (if (some? include) (assoc-in req [:params :include] include) req)
+        req (if (some? union-with-live?) (assoc-in req [:params :union-with-live] (str union-with-live?)) req)]
     (tc/with-identity user req)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -51,16 +56,36 @@
 
   (t/testing "All draftsets"
     (assert-visibility #{"owned" "publishing"}
-                       (get-draftsets-handler (get-draftsets-request :all test-publisher))
+                       (get-draftsets-handler (get-draftsets-request test-publisher :include :all))
                        (str"Expected publisher to see owned and publishing draftsets"))
 
     (assert-visibility #{"editing" "publishing" "admining"}
-                       (get-draftsets-handler (get-draftsets-request :all test-editor))
+                       (get-draftsets-handler (get-draftsets-request test-editor :include :all))
                        (str "Expected editor to see editing, publishing & admining draftsets"))
 
     (assert-visibility #{"publishing" "admining"}
-                       (get-draftsets-handler (get-draftsets-request :all test-manager))
+                       (get-draftsets-handler (get-draftsets-request test-manager :include :all))
                        (str "Expected manager to see publishing and admining draftsets"))))
+
+(t/deftest get-draftsets-union-with-live-test
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [system "drafter/feature/empty-db-system.edn"]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          repo (:drafter/backend system)
+          fixture-resources [(io/resource "drafter/feature/draftset/list_test-union-with-live.trig")]
+          request (get-draftsets-request test-editor :union-with-live? true)]
+      (fd/load-fixture! {:repo repo :fixtures fixture-resources :format :trig})
+      (let [response (handler request)
+            draftsets (ok-response->specced-body (s/coll-of ::ds/Draftset) response)
+            ds-times (map (fn [ds] (select-keys ds [:id :created-at :updated-at])) draftsets)
+            expected [{:id         "e06cf827-de24-47ae-8a43-2a1a37c5be4e"
+                       :created-at (OffsetDateTime/parse "2020-07-03T12:12:53.223Z")
+                       :updated-at (OffsetDateTime/parse "2020-07-08T17:40:25.688Z")}
+                      {:id         "7f94456f-8a92-4d40-8691-2c32f89e9741"
+                       :created-at (OffsetDateTime/parse "2020-07-01T09:55:42.147Z")
+                       :updated-at (OffsetDateTime/parse "2020-07-10T08:04:53.787Z")}]]
+        (t/is (= (set ds-times) (set expected)))))))
 
 ;; NOTE many of these tests are likely dupes of others in this file
 (tc/deftest-system-with-keys get-draftsets-handler-test+visibility
@@ -70,7 +95,7 @@
     :as sys} "drafter/feature/draftset/list_test-unclaimable.edn"]
 
   (let [get-draftsets-through-api (fn [include user]
-                                    (let [request (get-draftsets-request include user)
+                                    (let [request (get-draftsets-request user :include include)
                                           {:keys [body] :as response} (get-draftsets-handler request)]
                                       (ok-response->specced-body (s/coll-of ::ds/Draftset) response)
                                       body))]
@@ -93,7 +118,7 @@
         (t/is (= "claimable" (:display-name (first draftsets))))))
 
     (t/testing "Invalid include parameter"
-      (let [request (get-draftsets-request :invalid test-publisher)
+      (let [request (get-draftsets-request test-publisher :include :invalid)
             response (get-draftsets-handler request)]
         (tc/assert-is-unprocessable-response response)))
 
@@ -110,7 +135,7 @@
   ;;case
 
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/list_test-1-draftset-with-submission.edn"]
-  (let [{claimable-draftsets :body status :status} (get-draftsets-handler (get-draftsets-request :claimable test-manager))]
+  (let [{claimable-draftsets :body status :status} (get-draftsets-handler (get-draftsets-request test-manager :include :claimable))]
     (t/is (= 200 status))
     (t/is (= 1 (count claimable-draftsets)))))
 
@@ -120,10 +145,10 @@
 
   ;; This test contains just a single empty draftset created by test-editor.
 
-  (let [{all-draftsets :body} (get-draftsets-handler (get-draftsets-request :all test-editor))]
+  (let [{all-draftsets :body} (get-draftsets-handler (get-draftsets-request test-editor :include :all))]
     (t/is (= 1 (count all-draftsets))))
 
-  (let [{all-draftsets :body} (get-draftsets-handler (get-draftsets-request :all test-publisher))]
+  (let [{all-draftsets :body} (get-draftsets-handler (get-draftsets-request test-publisher :include :all))]
     (t/is (= 0 (count all-draftsets))
           "Other users can't access draftset as it's not been shared (submitted) to them")))
 
@@ -133,7 +158,7 @@
   (let [g1 (URI. "http://graph1")
         g2 (URI. "http://graph2")]
 
-    (let [{ds-infos :body status :status } (get-draftsets-handler (get-draftsets-request :claimable test-publisher))
+    (let [{ds-infos :body status :status } (get-draftsets-handler (get-draftsets-request test-publisher :include :claimable))
           grouped-draftsets (group-by :display-name ds-infos)
           ds1-info (first (grouped-draftsets "ds1"))
           ds2-info (first (grouped-draftsets "ds2"))]
@@ -149,7 +174,8 @@
 
   (let [g1 (URI. "http://graph1")
         g2 (URI. "http://graph2")
-        {ds-infos :body status :status} (get-draftsets-handler (get-draftsets-request :owned test-editor))
+        req (get-draftsets-request test-editor :include :owned)
+        {ds-infos :body status :status} (get-draftsets-handler req)
         {:keys [changes] :as ds-info} (first ds-infos)]
 
     (t/is (= 200 status))
