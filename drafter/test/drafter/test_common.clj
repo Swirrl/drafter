@@ -468,6 +468,9 @@
 (defn assert-is-ok-response [response]
   (assert-schema (response-code-schema 200) response))
 
+(defn assert-is-created-response [response]
+  (assert-schema (response-code-schema 201) response))
+
 (defn assert-is-accepted-response [response]
   (assert-schema (response-code-schema 202) response))
 

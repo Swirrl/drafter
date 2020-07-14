@@ -126,6 +126,8 @@
                                                 :drafter.user/repo #ig/ref :drafter.user/repo}
 
  :drafter.feature.endpoint.show/handler {:repo #ig/ref :drafter/backend}
+ :drafter.feature.endpoint.public/create-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
+                                                  :repo #ig/ref :drafter/backend}
  :drafter.feature.endpoint.list/handler {:drafter/backend #ig/ref :drafter/backend
                                          :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
@@ -156,6 +158,7 @@
                                            [:put "/draftset/:id/claim" #ig/ref :drafter.feature.draftset.claim/handler]
 
                                            [:get "/endpoint/public" #ig/ref :drafter.feature.endpoint.show/handler]
+                                           [:post "/endpoint/public" #ig/ref :drafter.feature.endpoint.public/create-handler]
                                            [:get "/endpoints" #ig/ref :drafter.feature.endpoint.list/handler]
                                            ]
                                   }

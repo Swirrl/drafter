@@ -4,7 +4,7 @@
             [drafter.feature.draftset.create-test :as ct]
             [drafter.test-common :as tc]
             [drafter.user :as user]
-            [drafter.user-test :refer [test-editor test-publisher]]
+            [drafter.user-test :refer [test-editor test-publisher test-system]]
             [drafter.util :as util]
             [grafter-2.rdf.protocols :refer [add]]
             [grafter-2.rdf4j.formats :as formats]
@@ -120,6 +120,23 @@
   (let [draftset-location (create-draftset-through-api handler test-publisher)]
     (append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
     (publish-draftset-through-api handler draftset-location test-publisher)))
+
+(defn create-public-endpoint-request
+  ([user] (create-public-endpoint-request user {}))
+  ([user params]
+   (let [params (util/map-values str params)]
+     (tc/with-identity user {:request-method :post
+                             :uri "/v1/endpoint/public"
+                             :params params}))))
+
+(defn create-public-endpoint-through-api
+  "Creates and returns the public endpoint"
+  ([handler] (create-public-endpoint-through-api handler {}))
+  ([handler params]
+   (let [response (handler (create-public-endpoint-request test-system params))
+         endpoint (:body response)]
+     (tc/assert-spec ::ep/Endpoint endpoint)
+     endpoint)))
 
 (defn request-public-endpoint-through-api
   "Submits a request for the public endpoint to a handler and returns the response"

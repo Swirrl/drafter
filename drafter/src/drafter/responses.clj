@@ -10,6 +10,14 @@
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
 
+(defn created-response
+  ([] (created-response ""))
+  ([body] {:status 201 :headers {} :body body}))
+
+(defn bad-request-response
+  ([] (bad-request-response ""))
+  ([body] {:status 400 :headers {} :body body}))
+
 (defn not-acceptable-response
   ([] (not-acceptable-response ""))
   ([body] {:status 406 :headers {} :body body}))
