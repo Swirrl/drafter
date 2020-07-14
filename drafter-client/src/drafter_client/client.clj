@@ -9,25 +9,19 @@
             [drafter-client.client.draftset :as draftset]
             [drafter-client.client.impl :as i :refer [->DrafterClient]]
             [drafter-client.client.repo :as repo]
+            [drafter-client.client.endpoint :as endpoint]
+            [drafter-client.client.util :refer [uuid date-time]]
             [integrant.core :as ig]
             [martian.clj-http :as martian-http]
             [martian.core :as martian])
-  (:import clojure.lang.ExceptionInfo
-           java.util.UUID
-           (java.io File)))
+  (:import clojure.lang.ExceptionInfo))
 
 (alias 'c 'clojure.core)
 
 (def live draftset/live)
 
-(defn uuid [s]
-  (some-> s UUID/fromString (try (catch Throwable _))))
-
 (defn exception? [v]
   (instance? Exception v))
-
-(defn date-time [s]
-  (some->> s (parse (formatters :date-time))))
 
 (defn ->job [m]
   (-> m
@@ -69,47 +63,79 @@
 (defn- job-details [job-state]
   (:details job-state))
 
-(defn- json-draftset->draftset [ds]
-  (let [{:keys [id display-name description]} ds
-        id (uuid id)]
-    (draftset/->draftset id display-name description)))
-
-(defn- ->draftset [ds]
-  (-> (draftset/map->Draftset ds)
-      (update :id uuid)
-      (update :created-at date-time)
-      (update :updated-at date-time)
-      (assoc :name (:display-name ds))
-      (dissoc :display-name)))
-
 (defn ->repo [client access-token context]
   (repo/make-repo client context access-token {}))
 
+(defn endpoints
+  "Get all endpoints visible to the user represented by the optional access-token.
+   If access-token is nil, only the publicly-visible endpoints will be returned. The
+   list of endpoints can be constrained by the include parameter which behaves the
+   same as for draftsets."
+  [client access-token & [include]]
+  (let [get-endpoints (partial i/request client i/get-endpoints access-token)
+        include (if (keyword? include) (c/name include) include)
+        endpoints (if include (get-endpoints :include include) (get-endpoints))]
+    (map endpoint/from-json endpoints)))
+
+(defn create-public-endpoint
+  "Creates the public endpoint if it does not exist and returns the current value.
+   Supports the following options:
+    - created-at: Datetime to use for the created-at time of the public endpoint"
+  ([client access-token] (create-public-endpoint client access-token {}))
+  ([client access-token opts]
+   (let [result (i/request client i/create-public-endpoint access-token opts)]
+     (endpoint/from-json result))))
+
+(defn get-public-endpoint
+  "Gets the public endpoint"
+  [client]
+  (endpoint/from-json (i/get-public-endpoint client)))
+
 (defn draftsets
-  "List available Draftsets"
-  [client access-token]
-  (->> (i/request client i/get-draftsets access-token)
-       (map json-draftset->draftset)))
+  "List available Draftsets. The optional opts map allows additional options to be provided
+   to the request. The supported parameters are:
+   - include: One of (:all :owned :claimable) specifying which draftsets to return
+   - union-with-live: Whether to combine each draftset with the public endpoint"
+  ([client access-token] (draftsets client access-token {}))
+  ([client access-token opts]
+   (->> (i/request client i/get-draftsets access-token opts)
+        (map draftset/from-json))))
 
 (defn new-draftset
   "Create a new Draftset"
   [client access-token name description]
   (-> client
       (i/request i/create-draftset access-token :display-name name :description description)
-      (json-draftset->draftset)))
+      (draftset/from-json)))
 
 (defn get-draftsets
   "List available draftsets, optionally `:include` either
   `#{:all :owned :claimable}`.
   Returns all properties."
   [client access-token & [include]]
-  (let [get-draftsets (partial i/request client i/get-draftsets access-token)
-        include (if (keyword include) (c/name include) include)
-        response (if include (get-draftsets :include include) (get-draftsets))]
-    (map ->draftset response)))
+  (let [opts (if include {:include include} {})]
+    (draftsets client access-token opts)))
 
-(defn get-draftset [client access-token id]
-  (->draftset (i/request client i/get-draftset access-token id)))
+(defn get-draftset
+  ([client access-token id] (get-draftset client access-token id {}))
+  ([client access-token id opts]
+   (draftset/from-json (i/request client i/get-draftset access-token id opts))))
+
+(defn get-endpoint
+  "Fetches the specified endpoint from a reference to it. If the reference
+   is to a draftset access-token must be specified."
+  ([client access-token endpoint-ref] (get-endpoint client access-token endpoint-ref {}))
+  ([client access-token endpoint-ref opts]
+   (cond
+     (draftset/draft? endpoint-ref)
+     (get-draftset client access-token (draftset/id endpoint-ref) opts)
+
+     (endpoint/public-ref? endpoint-ref)
+     (get-public-endpoint client)
+
+     :else
+     (throw (ex-info "No get operation for endpoint" {:type :invalid-operation
+                                                      :endpoint endpoint-ref})))))
 
 (defn edit-draftset [client access-token id name description]
   (i/request client i/put-draftset access-token id

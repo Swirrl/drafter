@@ -17,11 +17,12 @@
             [clojure.java.io :as io]
             [grafter-2.rdf.protocols :as pr]
             [clojure.spec.alpha :as s]
-            [clj-time.core :as time])
+            [clj-time.core :as time]
+            [drafter-client.client.endpoint :as endpoint])
   (:import clojure.lang.ExceptionInfo
            java.net.URI
            [java.util UUID]
-           (java.util.concurrent ExecutionException)))
+           [java.util.concurrent ExecutionException]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setup ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -148,6 +149,91 @@
           (is (false? result)
               "I really expected the database to be empty"))))))
 
+(defn- create-public-endpoint [client]
+  (sut/create-public-endpoint client (auth-util/system-token)))
+
+(t/deftest create-public-endpoint-test
+  (t/testing "unauthorised"
+    (let [token (auth-util/publisher-token)
+          client (drafter-client)]
+      (is (thrown? ExceptionInfo (sut/create-public-endpoint client token)))))
+
+  (t/testing "creation time"
+    (let [created-at (time/date-time 2020 3 28 10 43 27)
+          client (drafter-client)
+          token (auth-util/system-token)
+          public-endpoint (sut/create-public-endpoint client token {:created-at (str created-at)})]
+      (is (= created-at (endpoint/created-at public-endpoint))))))
+
+(t/deftest endpoints-unauthenticated-tests
+  (let [client (drafter-client)]
+    (t/testing "No endpoints"
+      (t/is (empty? (sut/endpoints client nil))))
+
+    (t/testing "Public endpoint"
+      (create-public-endpoint client)
+      (t/testing "default"
+        (let [endpoints (sut/endpoints client nil)]
+          (t/is (= 1 (count endpoints)))
+          (t/is (endpoint/public-ref? (first endpoints)))))
+
+      (t/testing "owned"
+        (let [owned-endpoints (sut/endpoints client nil :owned)]
+          (is (empty? owned-endpoints)))))
+
+    (t/testing "With draftset"
+      (let [token (auth-util/publisher-token)]
+        (sut/new-draftset client token "name" "description")
+        (let [endpoints (sut/endpoints client nil)]
+          (t/is (= 1 (count endpoints)))
+          (t/is (endpoint/public-ref? (first endpoints))))))))
+
+(t/deftest endpoints-authenticated-tests
+  (let [client (drafter-client)
+        token (auth-util/publisher-token)]
+    (create-public-endpoint client)
+    (t/testing "Public endpoint"
+      (let [endpoints (sut/endpoints client token)]
+        (is (= 1 (count endpoints)))
+        (is (endpoint/public-ref? (first endpoints)))))
+
+    (t/testing "With draftset"
+      (let [ds (sut/new-draftset client token "name" "description")]
+        (t/testing "All endpoints"
+          (let [endpoints (sut/endpoints client token)]
+            (t/is (= 2 (count endpoints)))))
+
+        (t/testing "Owned endpoints"
+          (let [owned-endpoints (sut/endpoints client token :owned)]
+            (t/is (= 1 (count owned-endpoints)))
+            (t/is (= (draftset/id ds) (draftset/id (first owned-endpoints))))))))))
+
+(defn- update-public-endpoint! [client]
+  (let [token (auth-util/publisher-token)
+        ds (sut/new-draftset client token "temp" "temp")]
+    (sut/wait! client token (sut/publish client token ds))))
+
+(t/deftest get-endpoint-test
+  (let [client (drafter-client)]
+    (create-public-endpoint client)
+    (t/testing "Public endpoint"
+      (let [endpoint (sut/get-public-endpoint client)]
+        (is (endpoint/public-ref? endpoint))))
+
+    (t/testing "Draftset"
+      (let [token (auth-util/publisher-token)
+            ds (sut/new-draftset client token "name" "description")]
+        (t/testing "union with live"
+          (update-public-endpoint! client)
+          (let [endpoint (sut/get-endpoint client token ds {:union-with-live true})
+                public-endpoint (sut/get-public-endpoint client)]
+            (t/is (= (endpoint/endpoint-id ds) (endpoint/endpoint-id endpoint)))
+            (t/is (= (endpoint/updated-at public-endpoint) (endpoint/updated-at endpoint)))))
+
+        (t/testing "default"
+          (let [endpoint (sut/get-endpoint client token ds)]
+            (t/is (= (endpoint/endpoint-id ds) (endpoint/endpoint-id endpoint)))))))))
+
 (t/deftest draftsets-tests
   (let [client (drafter-client)
         token (auth-util/system-token)
@@ -170,6 +256,63 @@
         (sut/remove-draftset-sync client token draftset)
         (let [all-draftsets (sut/draftsets client token)]
           (t/is (empty? all-draftsets)))))))
+
+(t/deftest draftsets-include-test
+  (let [client (drafter-client)
+        token (auth-util/publisher-token)
+        ds-1 (sut/new-draftset client token "first" "description")
+        ds-2 (sut/new-draftset client token "second" "description")]
+    (sut/submit-to-role client token (draftset/id ds-2) :publisher)
+    (t/testing "default"
+      (let [draftsets (sut/draftsets client token)]
+        (t/is (= #{(draftset/id ds-1) (draftset/id ds-2)}
+                 (set (map draftset/id draftsets))))))
+    (t/testing "all"
+      (let [draftsets (sut/draftsets client token {:include :all})]
+        (t/is (= #{(draftset/id ds-1) (draftset/id ds-2)}
+                 (set (map draftset/id draftsets))))))
+    (t/testing "owned"
+      (let [owned (sut/draftsets client token {:include :owned})]
+        (is (= #{(draftset/id ds-1)}
+               (set (map draftset/id owned))))))
+    (t/testing "claimable"
+      (let [claimable (sut/draftsets client token {:include :claimable})]
+        (is (= #{(draftset/id ds-2)}
+               (set (map draftset/id claimable))))))))
+
+(t/deftest draftsets-union-with-live-test
+  (let [client (drafter-client)
+        token (auth-util/publisher-token)
+        ds (sut/new-draftset client token "test" "description")]
+    (create-public-endpoint client)
+    (update-public-endpoint! client)
+    (t/testing "default"
+      (let [draftsets (sut/draftsets client token)]
+        (is (= 1 (count draftsets)))
+        (is (= (draftset/id ds) (draftset/id (first draftsets))))
+        (is (= (endpoint/updated-at ds) (endpoint/updated-at (first draftsets))))))
+    (t/testing "true"
+      (let [draftsets (sut/draftsets client token {:union-with-live true})
+            public-endpoint (sut/get-public-endpoint client)]
+        (is (= 1 (count draftsets)))
+        (is (= (draftset/id ds) (draftset/id (first draftsets))))
+        (is (= (endpoint/updated-at public-endpoint) (endpoint/updated-at (first draftsets))))))))
+
+(t/deftest get-draftset-test
+  (let [client (drafter-client)
+        token (auth-util/publisher-token)
+        ds (sut/new-draftset client token "test" "test")]
+    (create-public-endpoint client)
+    (t/testing "default"
+      (let [result (sut/get-draftset client token (draftset/id ds))]
+        (is (= ds result))))
+
+    (t/testing "union with live"
+      (update-public-endpoint! client)
+      (let [public-endpoint (sut/get-public-endpoint client)
+            result (sut/get-draftset client token (draftset/id ds) {:union-with-live true})]
+        (is (= (draftset/id ds) (draftset/id result)))
+        (is (= (endpoint/updated-at public-endpoint) (endpoint/updated-at result)))))))
 
 (t/deftest adding-to-a-draftset
   (let [client (drafter-client)

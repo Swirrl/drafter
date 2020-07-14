@@ -100,8 +100,8 @@
 (defn get-draftset
   "Get information about a Draftset"
   #:drafter-client.client.impl{:generated true}
-  [client id]
-  (martian/response-for client :get-draftset {:id id}))
+  [client id opts]
+  (martian/response-for client :get-draftset (merge {:id id} opts)))
 
 (defn get-draftset-data
   "Access the quads inside this Draftset"
@@ -115,8 +115,22 @@
 (defn get-draftsets
   "List available Draftsets"
   #:drafter-client.client.impl{:generated true}
-  [client & {:keys [include] :as opts}]
+  [client {:keys [union-with-live include] :as opts}]
   (martian/response-for client :get-draftsets (merge {} opts)))
+
+(defn get-endpoints
+  "List available Endpoints"
+  [client & {:keys [include] :as opts}]
+  (martian/response-for client :get-endpoints (merge {} opts)))
+
+(defn get-public-endpoint
+  [client]
+  (-> (martian/response-for client :get-public-endpoint)
+      (:body)))
+
+(defn create-public-endpoint
+  [client opts]
+  (martian/response-for client :create-public-endpoint opts))
 
 (defn get-job
   "Get metadata about a specific Job"
@@ -275,14 +289,27 @@
    :submit-draftset-to
    (merge {:id id} opts)))
 
+(defn- assert-client [client]
+  (when-not client
+    (throw (ex-info "Trying to make request to drafter with `nil` client."
+                    {:type :no-drafter-client}))))
+
+(defn request-operation [client operation access-token opts]
+  (assert-client client)
+  (let [client (if (some? access-token)
+                 (set-bearer-token client access-token)
+                 client)
+        response (martian/response-for client operation opts)]
+    (:body response)))
+
 (defn request
   {:style/indent :defn}
   [client f access-token & args]
-  (if client
-    (let [client (set-bearer-token client access-token)]
-      (:body (apply f client args)))
-    (throw (ex-info "Trying to make request to drafter with `nil` client."
-                    {:type :no-drafter-client}))))
+  (assert-client client)
+  (let [client (if (some? access-token)
+                 (set-bearer-token client access-token)
+                 client)]
+    (:body (apply f client args))))
 
 (defn accept [client content-type]
   (intercept client

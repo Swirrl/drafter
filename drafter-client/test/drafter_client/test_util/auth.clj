@@ -15,5 +15,5 @@
 (defn publisher-token []
   (jwt/token (env :auth0-domain)
              (env :auth0-aud)
-             "publiser@swirrl.com"
+             "publisher@swirrl.com"
              "drafter:publisher"))
