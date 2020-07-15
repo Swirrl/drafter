@@ -2,3 +2,4 @@ stardog
 stardog-*
 stardog.log
 .envrc
+drafter/doc/graph_rewriting_fixup.html
