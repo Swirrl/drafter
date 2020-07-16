@@ -280,7 +280,7 @@
                             (.replace "< " "<"))
                         "}")))
 
-(def default-timeout 5000)
+(def default-timeout 10000)
 
 (def job-id-path #"/v1/status/finished-jobs/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})")
 
