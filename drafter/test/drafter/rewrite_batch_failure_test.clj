@@ -10,7 +10,7 @@
             [drafter.backend.draftset.operations :as ops])
   (:import java.net.URI
            java.io.ByteArrayInputStream
-           ))
+           java.util.UUID))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -30,12 +30,13 @@
 
 (def valid-triples
   (->> (range)
-       (map (fn [i]
-                 (pr/->Quad
-                  (uri-str "http://s/" i)
-                  (uri-str "http://p/" 0)
-                  (uri-str "http://g/" 0)
-                  (uri-str "http://g/" i))))))
+       (map (fn [_]
+              (let [uuid (UUID/randomUUID)]
+                (pr/->Quad
+                 (uri-str "http://s/" uuid)
+                 (uri-str "http://p/" 0)
+                 (uri-str "http://g/" 0)
+                 (uri-str "http://g/" uuid)))))))
 
 (def invalid-triples-str
   (with-open [r (java.io.StringWriter.)]
