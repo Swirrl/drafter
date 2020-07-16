@@ -7,7 +7,8 @@
             [drafter.feature.draftset.test-helper :as help]
             [clojure.string :as string]
             [grafter-2.rdf4j.repository :as repo]
-            [drafter.backend.draftset.operations :as ops])
+            [drafter.backend.draftset.operations :as ops]
+            [drafter.draftset :as ds])
   (:import java.net.URI
            java.io.ByteArrayInputStream
            java.util.UUID))
@@ -29,19 +30,25 @@
   (URI. (apply str strs)))
 
 (def valid-triples
-  (->> (range)
-       (map (fn [_]
-              (let [uuid (UUID/randomUUID)]
-                (pr/->Quad
-                 (uri-str "http://s/" uuid)
-                 (uri-str "http://p/" 0)
-                 (uri-str "http://g/" 0)
-                 (uri-str "http://g/" uuid)))))))
+  (let [g (UUID/randomUUID)]
+    (->> (range)
+         (map (fn [_]
+                (let [uuid (UUID/randomUUID)]
+                  (pr/->Quad
+                   (uri-str "http://s/" uuid)
+                   (uri-str "http://p/" 0)
+                   (uri-str "http://g/" g)
+                   (uri-str "http://g/" uuid)))))
+         (cons (pr/->Quad
+                (uri-str "http://s/" 0)
+                (uri-str "http://p/" 0)
+                (uri-str "http://g/" g)
+                (uri-str "http://g/" g))))))
 
 (def invalid-triples-str
   (with-open [r (java.io.StringWriter.)]
     (pr/add (grafter-2.rdf4j.io/rdf-writer r :format :nq)
-            (take 60 valid-triples) )
+            (take 60 valid-triples))
     (str r "<http://s/10> <http://p/10/ > \"test\" <http://g/graph> .")))
 
 (def dg-q
@@ -64,10 +71,37 @@
                        repo/->connection)]
     (let [ds-graphs (keys (:changes (ops/get-draftset-info conn draftset-id)))
           draft-graphs (mapv (partial draft-graph-uri-for conn) ds-graphs)]
-      (set (mapv (juxt :s :p :o :c) (ds-quads conn draft-graphs))))))
+      (set (ds-quads conn draft-graphs)))))
 
 (defn rewritten? [quads draft-graph-uri]
   (every? #(= draft-graph-uri (nth % 2)) quads))
+
+(defn rewrite [quads mapping]
+  (letfn [(rewrite1 [x] (get mapping x x))]
+    (map (fn [q]
+           (-> (into {} q)
+               (update :s rewrite1)
+               (update :p rewrite1)
+               (update :o rewrite1)
+               (update :c rewrite1)))
+         quads)))
+
+(def ds-mapping-q
+  "
+SELECT ?dg ?lg WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    BIND ( <%s> AS ?ds )
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
+        <http://publishmydata.com/def/drafter/DraftSet> .
+    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+  }
+}")
+
+(defn ds-mapping [conn draftset-id]
+  (->> (repo/query conn (format ds-mapping-q (ds/->draftset-uri draftset-id)))
+       (mapv (juxt :lg :dg))
+       (into {})))
 
 (tc/deftest-system-with-keys bad-triple-in-last-batch
   keys-for-test [system system-config]
@@ -81,11 +115,11 @@
                    {:content-type "application/n-quads"})
           response (handler request)
           complete (tc/await-completion (get-in response [:body :finished-job]))
-          draft-graph-uri (with-open [conn (-> system
-                                               :drafter.common.config/sparql-query-endpoint
-                                               repo/sparql-repo
-                                               repo/->connection)]
-                            (draft-graph-uri-for conn "http://g/0"))
+          mapping (with-open [conn (-> system
+                                       :drafter.common.config/sparql-query-endpoint
+                                       repo/sparql-repo
+                                       repo/->connection)]
+                    (ds-mapping conn draftset-id))
           quads (get-draftset-quads system draftset-id)]
       (is (= {:type :error
               :message "Reading triples aborted."
@@ -93,4 +127,4 @@
               :details {:error :reading-aborted}}
              complete))
       (is (= 60 (count quads)))
-      (is (rewritten? quads draft-graph-uri)))))
+      (is (= quads (set (rewrite (take 60 valid-triples) mapping)))))))
