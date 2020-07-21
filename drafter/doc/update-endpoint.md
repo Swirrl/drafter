@@ -11,15 +11,15 @@ one small sidestep to get the classes to line up, but it's fine.
 
 We need to know which graphs _would be_ affected by an update, so that:
 
-a) We can clone them into the draftset
-b) Update metadata about them in drafter
+1. We can clone them into the draftset
+2. Update metadata about them in drafter
 
 #### Enforce specified graphs
 
 We _could_ ensure that we know which graphs are affected by only allowing update
 statements that specify graphs.
 
-#### Magic[1]
+#### Magic
 
 Come up with a way of knowing this, that's adequately performant.
 
