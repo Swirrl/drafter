@@ -75,3 +75,11 @@
                                (live-query
                                 (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
         (is (not= graph-1-result (second csv-result)))))))
+
+(tc/deftest-system-with-keys query-draftset-disallowed-with-service-query
+  [:drafter.routes.sparql/live-sparql-query-route]
+  [system "drafter/routes/sparql-test/system.edn"]
+  (let [handler (get system :drafter.routes.sparql/live-sparql-query-route)
+        query-request (live-query "SELECT * WHERE { SERVICE <http://anything> { ?s ?p ?o } }")
+        query-response (handler query-request)]
+    (tc/assert-is-bad-request-response query-response)))
