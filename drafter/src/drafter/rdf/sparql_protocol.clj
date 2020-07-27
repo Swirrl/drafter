@@ -157,10 +157,13 @@
               (let [[op arg] (seq (.getList n))]
                 (and (.isSymbol op) (= (.getSymbol op) "service")))))
           (assert-valid [ssez]
-            (if (service-node? (z/node ssez))
-              (throw (ex-info "Service node present in query"
-                              {:type ::service-node-present-in-query}))
-              (recur (z/next ssez))))]
+            (cond (service-node? (z/node ssez))
+                  (throw (ex-info "Service node present in query"
+                                  {:type ::service-node-present-in-query}))
+                  (z/end? ssez)
+                  (z/root ssez)
+                  :else
+                  (recur (z/next ssez))))]
     (try
       (-> (QueryFactory/create q Syntax/syntaxSPARQL_11)
           (arq/->sse-item)
