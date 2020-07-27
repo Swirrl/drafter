@@ -156,27 +156,30 @@
             (if (.isList n)
               (let [[op arg] (seq (.getList n))]
                 (and (.isSymbol op) (= (.getSymbol op) "service")))))
-          (assert-valid [ssez]
-            (cond (service-node? (z/node ssez))
-                  (throw (ex-info "Service node present in query"
-                                  {:type ::service-node-present-in-query}))
-                  (z/end? ssez)
-                  (z/root ssez)
-                  :else
-                  (recur (z/next ssez))))]
-    (try
-      (-> (QueryFactory/create q Syntax/syntaxSPARQL_11)
-          (arq/->sse-item)
-          (arq/sse-zipper)
-          (assert-valid))
-      (handler request)
-      (catch ExceptionInfo e
-        (let [{:keys [type]} (ex-data e)]
-          (if (= type ::service-node-present-in-query)
-            {:status 400
-             :headers {"Content-Type" "text/plain; charset=utf-8"}
-             :body "Cannot use SERVICE keyword in query"}
-            (throw e)))))))
+          (valid? [ssez]
+            (let [ssez'
+                  (loop [ssez ssez]
+                    (cond (service-node? (z/node ssez))
+                          (z/replace (z/up ssez)
+                                     {:type ::service-node-present-in-query})
+                          (z/end? ssez)
+                          (z/root ssez)
+                          :else
+                          (recur (z/next ssez))))]
+              (not (and (sequential? ssez')
+                        (= (:type (first ssez'))
+                           ::service-node-present-in-query)))))]
+    (let [query (try
+                  (QueryFactory/create q Syntax/syntaxSPARQL_11)
+                  (catch Exception _))
+          zipper (some-> query arq/->sse-item arq/sse-zipper)]
+      (if (or (nil? zipper) (valid? zipper))
+        ;; a `(nil? zipper)` means that the query was unable to be parsed, but
+        ;; this middleware does not deal with that
+        (handler request)
+        {:status 400
+         :headers {"Content-Type" "text/plain; charset=utf-8"}
+         :body "Cannot use SERVICE keyword in query"}))))
 
 (defn disallow-sparql-service-db-uri [handler]
   (fn [request]

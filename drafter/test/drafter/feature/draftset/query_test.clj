@@ -148,9 +148,20 @@
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
   [system system-config]
   (let [handler (get system [:drafter/routes :draftset/api])
-        draftset-location (help/create-draftset-through-api handler test-editor)
-        query-request (create-query-request test-editor
-                                            draftset-location
-                                            "SELECT * WHERE { SERVICE <http://anything> { ?s ?p ?o } }" "application/sparql-results+json")
-        query-response (handler query-request)]
-    (tc/assert-is-bad-request-response query-response)))
+        draftset-location (help/create-draftset-through-api handler test-editor)]
+    (let [query-request (create-query-request test-editor
+                                              draftset-location
+                                              "SELECT * WHERE { SERVICE <http://anything> { ?s ?p ?o } }" "application/sparql-results+json")
+          query-response (handler query-request)]
+      (tc/assert-is-bad-request-response query-response))
+    (let [query-request (create-query-request test-editor draftset-location "
+SELECT * WHERE {
+  GRAPH ?g { ?s ?p ?o }
+  GRAPH ?g {
+    SERVICE <db:somedb> {
+      { ?s ?p ?o }
+    }
+  }
+}"  "application/sparql-results+json")
+          query-response (handler query-request)]
+      (tc/assert-is-bad-request-response query-response))))
