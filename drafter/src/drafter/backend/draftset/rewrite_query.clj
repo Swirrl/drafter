@@ -2,7 +2,7 @@
   "Functions related to syntactically rewriting drafter queries."
   (:require [clojure.tools.logging :as log]
             [clojure.zip :as z]
-            [drafter.backend.draftset.arq :refer [apply-rewriter]])
+            [drafter.backend.draftset.arq :as arq :refer [apply-rewriter]])
   (:import org.apache.jena.graph.NodeFactory
            org.apache.jena.sparql.sse.Item))
 
@@ -49,6 +49,17 @@
     (log/debug "Rewritten query: " rewritten-query)
     rewritten-query))
 
+(defn rewrite-sparql-update [live->draft update-str]
+  (log/info "Rewriting update " update-str)
+
+  (let [live->draft (zipmap (map str (keys live->draft))
+                            (map str (vals live->draft)))
+        rewriter (partial uri-constant-rewriter live->draft)
+        rewritten-update (->> update-str (arq/rewrite-update rewriter) str)]
+
+    (log/debug "Rewritten update: " rewritten-update)
+    rewritten-update))
+
 
 (comment
 
@@ -58,13 +69,31 @@
                   "SELECT * WHERE { GRAPH <http://foo.com/> { ?s ?p ?o }}")
 
   (apply-rewriter (partial uri-constant-rewriter {})
-                  "SELECT DISTINCT ?mdg 
+                  "SELECT DISTINCT ?mdg
 WHERE  {
   VALUES ?mdg {  }
          GRAPH ?mdg {
            ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
          }
 }")
+
+
+  (->
+   (partial uri-constant-rewriter {"http://a" "http://b"})
+   (apply-rewriter "
+INSERT { GRAPH ?g { <http://a> ?p ?o } }
+"))
+
+  (arq/rewrite-update
+   (partial uri-constant-rewriter {"http://a" "http://b"})
+   "
+INSERT { GRAPH ?g { <http://a> ?p ?o } }
+WHERE  { GRAPH ?g { <http://a> ?p ?o } }")
+
+(arq/rewrite-update
+   (partial uri-constant-rewriter {"http://a" "http://b"})
+   "
+INSERT { GRAPH ?g { <http://a> ?p ?o } }")
 
 
 )

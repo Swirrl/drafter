@@ -4,8 +4,12 @@
   (:require [clojure.zip :as z])
   (:import org.apache.jena.graph.NodeFactory
            [org.apache.jena.query Query QueryFactory Syntax]
+           [org.apache.jena.update UpdateRequest UpdateFactory]
+           [org.apache.jena.sparql.modify.request
+            QuadDataAcc UpdateDeleteInsert UpdateDataDelete UpdateDataInsert]
            [org.apache.jena.sparql.algebra Algebra Op OpAsQuery]
-           [org.apache.jena.sparql.sse Item SSE]))
+           [org.apache.jena.sparql.sse Item SSE]
+           [org.apache.jena.sparql.core Quad]))
 
 (defprotocol ToArqQuery
   (sparql-string->arq-query [this]
@@ -67,7 +71,7 @@
        (.isList i)))
 
 (defn sse-zipper
-  "Construct a zipper on a Sparql SExpression Item, that allows easy 
+  "Construct a zipper on a Sparql SExpression Item, that allows easy
   walking of the sparql algebra tree."
   [sse-item]
   (z/zipper sse-list-item?
@@ -114,23 +118,23 @@
                                str
                                (SSE/parseOp (.getPrefixMapping q))
                                OpAsQuery/asQuery)
-                           
+
                            #_(-> q
                                ->sse-item
                                sse-zipper
                                rewriter
-                              
-                              
+
+
                                org.apache.jena.sparql.sse.builders.BuilderOp/build
 
 
                              OpAsQuery/asQuery)
 
                            #_(->> (-> q
-                                    
+
                                     Algebra/compile
                                     sse-zipper)
-                                
+
                                 rewriter
                                 org.apache.jena.sparql.sse.builders.BuilderOp/build
                                 OpAsQuery/asQuery))]
@@ -174,6 +178,33 @@
               (.setQueryAskType)))
       (.setPrefixMapping (.getPrefixMapping q)))))
 
+(defprotocol UpdateRewrite
+  (rewrite1 [op rewriter]))
+
+(extend-protocol UpdateRewrite
+  UpdateDataDelete
+
+
+  UpdateDataInsert
+
+
+  Object
+  (rewrite1 [op _]
+    (let [c (class op)]
+      (throw (ex-info (format "Update operation %s not supported" c)
+                      {:type ::update-operation-not-supported
+                       :class c
+                       :op op})))))
+
+(defn rewrite-update [rewriter qstr]
+  (let [update (UpdateFactory/create qstr)
+        update' (UpdateRequest.)]
+    (doseq [op (map #(rewrite1 % rewriter) (.getOperations update))]
+      (.add update' op))
+    update'))
+
+
+
 (comment
 
   (println (str (->sse-item (sparql-string->arq-query "SELECT DISTINCT ?mdg
@@ -183,7 +214,7 @@ WHERE  {
            ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/dataset#Dataset> .
          }
 }"))))
-  
+
   ;; Playing with zippers
 
   (let [item (->sse-item (sparql-string->arq-query "SELECT * WHERE { GRAPH <http://replace-me.com> { ?s ?p ?o } GRAPH <http://bar.com> { ?s ?p ?o } }"))]
@@ -230,14 +261,16 @@ WHERE  {
 
   (Algebra/optimize (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }")))
 
-                  
+
   (Algebra/compile (QueryFactory/create "SELECT ?s WHERE { GRAPH <:foo> { ?s ?p ?o } GRAPH <:foo> { ?s ?p ?o } }"))
 
   (last (.getList (SSE/parseItem "(graph :foo (bgp (triple ?s ?p ?o)))")))
 
 
 
-  ;; (OpAsQuery/asQuery (drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {} (Algebra/compile (sparql-string->arq-query "SELECT DISTINCT ?mdg 
+
+
+  ;; (OpAsQuery/asQuery (drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {} (Algebra/compile (sparql-string->arq-query "SELECT DISTINCT ?mdg
   ;; WHERE  {
   ;;   VALUES ?mdg {  }
   ;;          GRAPH ?mdg {
@@ -247,7 +280,7 @@ WHERE  {
   ;; "))))
 
   ;; simplified
-  (->> (-> 
+  (->> (->
         "SELECT DISTINCT ?mdg
 WHERE  {
   VALUES ?mdg {  }
@@ -274,13 +307,13 @@ WHERE  {
 ")
 
   ;; expanded
-  (->> (-> 
+  (->> (->
         mdg-query
         (QueryFactory/create Syntax/syntaxSPARQL_11)
         Algebra/compile
         sse-zipper
         )
-     
+
        (drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {} )
        OpAsQuery/asQuery)
   ;; above works wtf...
@@ -293,14 +326,14 @@ WHERE  {
                                         ;#_str
                                         ;#_(SSE/parseOp (.getPrefixMapping q))
                                         ;#_OpAsQuery/asQuery
-                              
-                              
+
+
       org.apache.jena.sparql.sse.builders.BuilderOp/build
 
       OpAsQuery/asQuery)
 
 
-  (-> 
+  (->
       (partial drafter.rdf.rewriting.query-rewriting/uri-constant-rewriter {})
       (apply-rewriter "SELECT DISTINCT ?mdg
 WHERE  {
@@ -313,9 +346,13 @@ WHERE  {
       str)
 
   (println "SELECT DISTINCT  ?mdg\nWHERE\n  { VALUES ?mdg { }\n    GRAPH ?mdg\n      { ?ds  a                     <http://publishmydata.com/def/dataset#Dataset> }\n  }\n")
-  
+
 
 
   (OpAsQuery/asQuery (Algebra/compile (QueryFactory/create "SELECT ?foo WHERE { ?foo ?bar ?baz . VALUES ?foo {} }")))
-  
+
+  (Algebra/compile (.getWherePattern (first (.getOperations (UpdateFactory/create "
+INSERT { GRAPH ?g { <http://a> ?p ?o } }
+WHERE  { GRAPH ?g { <http://a> ?p ?o } }")))))
+
   )

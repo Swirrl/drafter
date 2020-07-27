@@ -144,3 +144,44 @@ Could we:
 
 Most of the other Update types seem trivial to implement. However, `UpdateLoad`
 seems like it would probably be problematic.
+
+# Choices
+
+Choices, choices, choices...
+
+Obviously, if we're attempting to implement some part of a SPARQL update
+endpoint, we'd like to keep the semantics the same.
+
+But, what do we do when a DELETE DATA/INSERT DATA request is large? Do we:
+
+* hold up writes for an indeterminate amount of time
+* say no
+* split it up/batch
+
+The problem being with batching it, at least how batching currently works, is
+that now we now diverge from an update request being atomic. If we batch, the
+DELETE may succeed but the INSERT not. (Unless we can wrangle a transaction
+across async jobs - which seems potentially leaky.) We also need to sync the
+async job, so that the HTTP request can return the correct codes, etc., not that
+that's too much of a big deal.
+
+I'm a little concerned about rewriting a big update with the current SSE
+strategy too. The jena modify/Update API is apparently designed with large
+INSERT DATA type requests in mind, but I'm not sure about the SSE stuff, and
+certainly not the way we currently convert to strings & back. To be fair, SSE is
+only focusing on one quad at once, so maybe it's OK, but rebuilding the Query
+might need some work to work in a memory efficient way.
+
+The "easy" path then is to not allow "big" updates, at least for the
+moment. This would still be good for the few uses in muttnik around
+delete/insert, but I'm not sure if still worth it for a now doubly limited
+endpoint.
+
+If we could branch off a draft (a draft of a draft? as we've fancifully
+discussed before), then we could "solve" the atomicity issue, by using the
+branch like a transaction, and dropping it if there's a failure in the batched
+job.
+
+Ideally, to solve the update rewriting on memory busting data, we'd need a
+streaming SPARQL parser, where we could rewrite as part of a
+stream->parse->partition/batch->rewrite->unparse->stream pipeline.

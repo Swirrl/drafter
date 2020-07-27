@@ -15,6 +15,7 @@
             [clojure.set :as set])
   (:import java.io.Closeable
            [org.apache.jena.query QueryFactory Syntax]
+           [org.apache.jena.update UpdateRequest UpdateFactory]
            [org.eclipse.rdf4j.model Resource URI]
            org.eclipse.rdf4j.model.impl.URIImpl))
 
@@ -28,6 +29,24 @@
 (defn- prepare-rewrite-query
   [conn live->draft sparql-string union-with-live? dataset]
   (let [query (QueryFactory/create sparql-string Syntax/syntaxSPARQL_11)
+        user-restriction (some->> dataset
+                                  (bprot/dataset->restriction)
+                                  (live->draft-remap-restriction live->draft))
+        query-restriction (->> query
+                               (bprot/query-dataset-restriction)
+                               (live->draft-remap-restriction live->draft))
+        rewritten-query (rewrite-sparql-string live->draft sparql-string)
+        graph-restriction (mgmt/graph-mapping->graph-restriction conn
+                                                                 live->draft
+                                                                 union-with-live?)]
+    (-> conn
+        (bprot/prep-and-validate-query rewritten-query)
+        (bprot/restrict-query user-restriction query-restriction graph-restriction)
+        (rewrite-query-results live->draft))))
+
+(defn- prepare-rewrite-update
+  [conn live->draft sparql-string union-with-live? dataset]
+  (let [query (UpdateFactory/create sparql-string Syntax/syntaxSPARQL_11)
         user-restriction (some->> dataset
                                   (bprot/dataset->restriction)
                                   (live->draft-remap-restriction live->draft))

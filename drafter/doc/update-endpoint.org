@@ -1,0 +1,36 @@
+* UPDATE
+** Rewriting UPDATEs
+   It seems we can rewrite updates queries. There's a slightly odd recombination
+   effort, but not too abnormal.
+
+** Knowing which graphs are affected
+*** DELETE/INSERT
+    ASSUMPTION: DELETE/WHERE /deletes/ the same triples that would be present in
+    a SELECT/WHERE query.
+
+    As a user would first have to SELECT triples to delete, then delete them, we
+    can do this operation in ~drafter~ at no cost. I.E., first SELECT triples to
+    be deleted, analyse for our purposes, and then DELETE DATA on those triples.
+
+    The problem then is INSERT, that would be broken.
+
+*** Only allow DELETE/INSERT where graphs are named?
+    Is this useful enough?
+
+*** INSERT
+    Triple INSERTs without a graph specified are inserted into the default
+    graph. Drafter disallows this(?).
+
+** Operating on graphs not currently in draft
+   This requires knowledge of what graphs are affected, and copying them.
+** Motivation
+
+* Why?
+  We wanted to implement an UPDATE endpoint because:
+
+  a) It's generally useful
+  b) It solves a worked-around issue we have in muttnik
+  c) It makes some query/inserts we write easier
+
+* Partial solution/Do nothing?
+  Is implementing /some/ solution to b) worth it?
