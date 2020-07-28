@@ -21,7 +21,8 @@
            java.util.concurrent.TimeUnit
            [org.apache.jena.query QueryFactory QueryParseException Syntax]
            org.eclipse.rdf4j.query.QueryInterruptedException
-           org.eclipse.rdf4j.query.resultio.QueryResultIO))
+           org.eclipse.rdf4j.query.resultio.QueryResultIO
+           [org.apache.jena.sparql.sse Item]))
 
 (defn sparql-prepare-query-handler
   "Returns a ring handler which fetches the query string from an
@@ -117,13 +118,14 @@
 
 (defn disallow-sparql-service-db-uri*
   [handler {{q :query-string} :sparql :as request}]
-  (letfn [(service-node? [n]
+  (letfn [(service-node? [^Item n]
             (if (.isList n)
-              (let [[op arg] (seq (.getList n))]
-                (and (.isSymbol op) (= (.getSymbol op) "service")))))
+              (if-let [[op _arg] (seq (.getList n))]
+                (and (.isSymbol op) (= (.getSymbol op) "service"))
+                false)))
           (valid? [ssez]
             (let [ssez'
-                  (loop [ssez ssez]
+                  (loop [ssez ssez]                    
                     (cond (service-node? (z/node ssez))
                           (z/replace (z/up ssez)
                                      {:type ::service-node-present-in-query})
