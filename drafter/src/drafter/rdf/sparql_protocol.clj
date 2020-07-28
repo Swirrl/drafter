@@ -1,26 +1,30 @@
 (ns drafter.rdf.sparql-protocol
   (:require [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
+            [clojure.zip :as z]
             [cognician.dogstatsd :as datadog]
-            [grafter-2.rdf4j.repository :as repo]
             [compojure.core :refer [make-route]]
-            [drafter.channels :refer :all]
-            [drafter.requests :as drafter-request]
-            [drafter.rdf.content-negotiation :as conneg]
             [drafter.backend.common :as bcom]
+            [drafter.backend.draftset.arq :as arq]
+            [drafter.channels :refer :all]
+            [drafter.rdf.content-negotiation :as conneg]
             [drafter.rdf.sesame
+             :as
+             ses
              :refer
-             [create-signalling-query-handler get-query-type]
-             :as ses]
+             [create-signalling-query-handler get-query-type]]
+            [drafter.requests :as drafter-request]
             [drafter.responses :as response]
             [drafter.timeouts :as timeouts]
+            [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [ring.util.request :as request])
-  (:import [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
+  (:import clojure.lang.ExceptionInfo
+           [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            java.util.concurrent.TimeUnit
+           [org.apache.jena.query QueryFactory QueryParseException Syntax]
            org.eclipse.rdf4j.query.QueryInterruptedException
-           org.eclipse.rdf4j.query.resultio.QueryResultIO
-           org.apache.jena.query.QueryParseException))
+           org.eclipse.rdf4j.query.resultio.QueryResultIO))
 
 (defn- parse-reasoning [{params :query-params :as request}]
   (let [param (or (get params "reasoning") (get params "infer"))]
@@ -146,6 +150,41 @@
                           "'query' form or query parameter")))
         (response/method-not-allowed-response request-method)))))
 
+(defn disallow-sparql-service-db-uri*
+  [handler {{q :query-string} :sparql :as request}]
+  (letfn [(service-node? [n]
+            (if (.isList n)
+              (let [[op arg] (seq (.getList n))]
+                (and (.isSymbol op) (= (.getSymbol op) "service")))))
+          (valid? [ssez]
+            (let [ssez'
+                  (loop [ssez ssez]
+                    (cond (service-node? (z/node ssez))
+                          (z/replace (z/up ssez)
+                                     {:type ::service-node-present-in-query})
+                          (z/end? ssez)
+                          (z/root ssez)
+                          :else
+                          (recur (z/next ssez))))]
+              (not (and (sequential? ssez')
+                        (= (:type (first ssez'))
+                           ::service-node-present-in-query)))))]
+    (let [query (try
+                  (QueryFactory/create q Syntax/syntaxSPARQL_11)
+                  (catch Exception _))
+          zipper (some-> query arq/->sse-item arq/sse-zipper)]
+      (if (or (nil? zipper) (valid? zipper))
+        ;; a `(nil? zipper)` means that the query was unable to be parsed, but
+        ;; this middleware does not deal with that
+        (handler request)
+        {:status 400
+         :headers {"Content-Type" "text/plain; charset=utf-8"}
+         :body "Cannot use SERVICE keyword in query"}))))
+
+(defn disallow-sparql-service-db-uri [handler]
+  (fn [request]
+    (disallow-sparql-service-db-uri* handler request)))
+
 (defn- execute-boolean-query [pquery result-format response-content-type]
   (let [os (ByteArrayOutputStream. 1024)
         writer (QueryResultIO/createWriter result-format os)]
@@ -230,6 +269,7 @@
        (sparql-timeout-handler query-timeout-fn)
        (sparql-negotiation-handler)
        (prepare-handler)
+       (disallow-sparql-service-db-uri)
        (sparql-query-parser-handler)))
 
 (def default-query-timeout-fn (fn [request] timeouts/default-query-timeout))
