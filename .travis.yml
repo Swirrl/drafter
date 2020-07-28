@@ -1,6 +1,7 @@
 language: clojure
 sudo: required
-lein: 2.7.1
+dist: trusty
+lein: 2.9.1
 jdk:
 - oraclejdk8
 services:
@@ -9,10 +10,10 @@ env:
   global:
   - STARDOG_VERSION='stardog-5.2.0'
 before_install:
-- "sudo ./travis/install_base.sh"  
+- "sudo ./travis/install_base.sh"
 - "sudo ./travis/bootstrap_stardog.sh"
 before_script:
-- "./travis/before_script.sh"  
+- "./travis/before_script.sh"
 script: travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
 after_success:
 - env LEIN_SNAPSHOTS_IN_RELEASE=true lein uberjar
