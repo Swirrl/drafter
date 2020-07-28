@@ -11,7 +11,8 @@ env:
   - STARDOG_VERSION='stardog-5.2.0'
 before_install:
 - "sudo ./travis/install_base.sh"
-- "sudo ./travis/bootstrap_stardog.sh"
+- "sudo ./travis/install_clojure.sh"
+- "./travis/install_services.sh"
 before_script:
 - "./travis/before_script.sh"
 script: travis_retry env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java lein test
