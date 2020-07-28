@@ -297,11 +297,12 @@ Accept-Language: en-US,en;q=0.5
 Content-Type: application/sparql-query
 
 SELECT * WHERE {
-  VALUES ?c { <http://publishmydata.com/graphs/drafter/draft/85fec2c2-102d-4aab-b831-53215065c3f1> }
-  GRAPH ?c { ?s ?p ?o }
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+    # ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+  }
 }
-
-
 
 #
 POST http://localhost:5820/drafter-test-db/query

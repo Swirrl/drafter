@@ -4,6 +4,7 @@
             [drafter.backend.draftset.arq :as arq]
             [drafter.backend.draftset.draft-management :as dm]
             [drafter.backend.draftset.operations :as ops]
+            [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.draftset :as ds]
             [drafter.rdf.sparql :as sparql]
@@ -11,8 +12,10 @@
             [integrant.core :as ig]
             [ring.middleware.cors :as cors]
             [swirrl-server.errors :refer [wrap-encode-errors]]
-            [grafter.vocabularies.rdf :refer :all])
-  (:import org.apache.jena.graph.NodeFactory
+            [grafter.vocabularies.rdf :refer :all]
+            [grafter.url :as url])
+  (:import java.net.URI
+           org.apache.jena.graph.NodeFactory
            [org.apache.jena.sparql.algebra Algebra OpAsQuery]
            org.apache.jena.sparql.core.Quad
            [org.apache.jena.sparql.modify.request
@@ -50,7 +53,7 @@
 (extend-protocol UpdateOperation
   UpdateDataDelete
   (affected-graphs [op]
-    (set (map #(.getURI (.getGraph %)) (.getQuads op))))
+    (set (map #(URI. (.getURI (.getGraph %))) (.getQuads op))))
   (size [op]
     (count (.getQuads op)))
   (rewrite [op rewriter]
@@ -61,10 +64,10 @@
 
   UpdateDataInsert
   (affected-graphs [op]
-    (set (map #(.getURI (.getGraph %)) (.getQuads op))))
+    (set (map #(URI. (.getURI (.getGraph %))) (.getQuads op))))
   (size [op]
     (count (.getQuads op)))
-  (rewrite1 [op rewriter]
+  (rewrite [op rewriter]
     (->> (.getQuads op)
          (map (partial rewrite-quad rewriter))
          (QuadDataAcc.)
@@ -157,19 +160,20 @@
                                               draft-graph-quads))
         copy-graph-stmt (UpdateCopy. (Target/create (str graph-uri))
                                      (Target/create (str draft-graph-uri)))]
-    [insert-data copy-graph-stmt]))
+    {:map [graph-uri draft-graph-uri]
+     :stmts [insert-data copy-graph-stmt]}))
 
 (defn- copy-graphs-operations [draftset-id graphs-to-copy]
-  (let [draftset-uri (ds/->draftset-uri draftset-id)
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
         now (util/get-current-time)]
-    (mapcat (partial copy-graph-operation draftset-uri now) graphs-to-copy)))
+    (map (partial copy-graph-operation draftset-uri now) graphs-to-copy)))
 
 (defn- prerequisites [repo draftset-id update-request]
   (let [affected-graphs (->> (.getOperations update-request)
                              (map affected-graphs)
                              (apply set/union))
-        graphs-to-copy (set/difference affected-graphs
-                                       (draftset-graphs repo draftset-id))]
+        draftset-graphs (draftset-graphs repo draftset-id)
+        graphs-to-copy (set/difference affected-graphs draftset-graphs)]
     ;; TODO: Can we do this check in the query, and have it report decent errors?
     (if-let [uncopyable-graphs (seq (remove graph-copyable? graphs-to-copy))]
       (ex-info "Unable to copy graphs"
@@ -189,14 +193,20 @@
     (if-let [error-response (ex-data update-request)]
       error-response
       ;; TODO: UpdateRequest base-uri, prefix, etc?
-      (let [prerequisite-ops (prerequisites backend draftset-id update-request)
+      (let [prerequisites (prerequisites backend draftset-id update-request)
+            prerequisite-ops (mapcat :stmts prerequisites)
+            graph-map (->> (map :map prerequisites)
+                           (into (ops/get-draftset-graph-mapping backend draftset-id))
+                           (map (fn [[k v]] [(str k) (str v)]))
+                           (into {}))
+            rewriter (partial uri-constant-rewriter graph-map)
             operations' (->> (.getOperations update-request)
                              (map #(rewrite % rewriter)))
             update-request' (-> (UpdateRequest.)
                                 (add-operations prerequisite-ops)
                                 (add-operations operations'))]
-        (println 'update-request' update-request')
-        (sparql/update! backend (str update-request'))))))
+        (sparql/update! backend (str update-request'))
+        {:status 204}))))
 
 (defn handler
   [{:keys [drafter/backend wrap-as-draftset-owner] :as opts}]
