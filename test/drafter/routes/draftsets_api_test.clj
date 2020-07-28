@@ -32,7 +32,7 @@
 (def ^:private ^:dynamic *route* nil)
 (def ^:private ^:dynamic *user-repo* nil)
 
-(defn- setup-route [test-function]
+(defn setup-route [test-function]
   (let [users (:drafter.user/memory-repository tc/*test-system*)
         swagger-spec (swagger/load-spec-and-resolve-refs)
         api-handler (:drafter.routes/draftsets-api tc/*test-system*)]
@@ -125,7 +125,7 @@
 (defn- concrete-statements [source format]
   (eval-statements (statements source :format format)))
 
-(defn- create-draftset-through-api
+(defn create-draftset-through-api
   ([] (create-draftset-through-api test-editor))
   ([user] (create-draftset-through-api user nil))
   ([user display-name] (create-draftset-through-api user display-name nil))
@@ -1348,4 +1348,3 @@
   (tc/assert-is-ok-response response)
   (tc/assert-schema schema body)
   body)
-
