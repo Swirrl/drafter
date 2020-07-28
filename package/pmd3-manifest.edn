@@ -40,4 +40,6 @@
                                        :env #{:dev :ci}}]}
 
               :omni/package-name "drafter-pmd3"
-              :omni/dependencies #include "../dependencies-mongo-auth.edn"}]
+              :omni/dependencies {"stardog" "5.2.0-1.0" ; pmd3 needs stardog 5
+                                  "mongodb" "3.2"
+                                  "server-ssl" "1.0"}}]
