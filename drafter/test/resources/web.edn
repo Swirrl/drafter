@@ -98,7 +98,7 @@
 
  :drafter.feature.draftset.update/handler {:drafter/backend #ig/ref :drafter/backend
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                           :max-update-size 10}
+                                           :max-update-size 50}
 
  :drafter.feature.draftset.publish/handler {:drafter/backend #ig/ref :drafter/backend
                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}

@@ -174,12 +174,14 @@
                              (apply set/union))
         draftset-graphs (draftset-graphs repo draftset-id)
         graphs-to-copy (set/difference affected-graphs draftset-graphs)]
+    (prn 'graphs-to-copy graphs-to-copy)
     ;; TODO: Can we do this check in the query, and have it report decent errors?
     (if-let [uncopyable-graphs (seq (remove graph-copyable? graphs-to-copy))]
       (ex-info "Unable to copy graphs"
                {:status 500
                 :headers {"Content-Type" "text/plain"}
                 :body "500 Unable to copy graphs"})
+      ;; TODO: Need to rewrite all copied graphs after copy
       (copy-graphs-operations draftset-id graphs-to-copy))))
 
 (defn- add-operations [update-request operations]
@@ -205,6 +207,7 @@
             update-request' (-> (UpdateRequest.)
                                 (add-operations prerequisite-ops)
                                 (add-operations operations'))]
+        (println update-request')
         (sparql/update! backend (str update-request'))
         {:status 204}))))
 

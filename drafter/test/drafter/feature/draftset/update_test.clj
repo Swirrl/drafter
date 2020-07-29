@@ -1,5 +1,5 @@
 (ns ^:rest-api drafter.feature.draftset.update-test
-  (:require [clojure.test :as t :refer [is]]
+  (:require [clojure.test :as t :refer [is testing]]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [drafter.test-common :as tc]
@@ -34,12 +34,26 @@
      :request-method :post
      :body stmt}))
 
+(defn draftset-quads-mapping-q [draftset-location]
+  (let [draftset-id (last (string/split draftset-location #"/"))
+        draftset-uri (ds/->draftset-uri draftset-id)
+        q "
+SELECT ?lg ?dg ?s ?p ?o WHERE {
+  GRAPH ?dg { ?s ?p ?o }
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    BIND ( <%s> AS ?ds )
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
+      <http://publishmydata.com/def/drafter/DraftSet> .
+    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+  }
+}"]
+    (format q draftset-uri)))
+
 (tc/deftest-system-with-keys insert-modify-test
   keys-for-test [system system-config]
   (let [handler (get system [:drafter/routes :draftset/api])
         draftset-location (help/create-draftset-through-api handler test-editor)
-        draftset-id (last (string/split draftset-location #"/"))
-        draftset-uri (ds/->draftset-uri draftset-id)
         update! (fn [stmt]
                   (handler (create-update-request
                             test-editor draftset-location "text/plain" stmt)))]
@@ -53,25 +67,13 @@ DELETE DATA { GRAPH <http://g> { <http://s> <http://p> <http://o> } } ;
 INSERT DATA { GRAPH <http://g> { <http://s> <http://p> <http://g> } }
 "
           response (update! stmt)
-          _ (tc/assert-is-no-content-response response)
-
-          q "
-SELECT ?dg ?s ?p ?o WHERE {
-  GRAPH ?dg { ?s ?p ?o }
-  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    BIND ( <%s> AS ?ds )
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
-      <http://publishmydata.com/def/drafter/DraftSet> .
-    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-  }
-}"]
+          _ (tc/assert-is-no-content-response response)]
       (let [[{:keys [dg s p o]} :as quads]
             (with-open [conn (-> system
                                  :drafter.common.config/sparql-query-endpoint
                                  repo/sparql-repo
                                  repo/->connection)]
-              (repo/query conn (format q draftset-uri)))]
+              (repo/query conn (draftset-quads-mapping-q draftset-location)))]
         (is (= 1 (count quads)))
         (is (= dg o))
         (is (not= o (URI. "http://g")))))))
@@ -84,11 +86,21 @@ SELECT ?dg ?s ?p ?o WHERE {
                (URI. (str "http://p/" i))
                (URI. (str "http://g/" i))]))))
 
+(defn valid-triples-g [g]
+  (->> (range)
+       (map (fn [i]
+              [g (URI. (str "http://s/" i)) (URI. (str "http://p/" i)) g]))))
+
 (defn quad-pattern-str [quad]
   (apply format "GRAPH <%s> { <%s> <%s> <%s> }" quad))
 
 (defn insert-stmt-str [quads]
   (str "INSERT DATA { "
+       (string/join " . \n" (map quad-pattern-str quads))
+       "}"))
+
+(defn delete-stmt-str [quads]
+  (str "DELETE DATA { "
        (string/join " . \n" (map quad-pattern-str quads))
        "}"))
 
@@ -102,6 +114,106 @@ SELECT ?dg ?s ?p ?o WHERE {
                (update 3 rewrite1)))
          quads)))
 
+(tc/deftest-system-with-keys insert-and-delete-max-payload-test
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])]
+      (testing "Maximum size of payload"
+        (testing "Insert max payload"
+          (let [draftset-location (help/create-draftset-through-api handler test-editor)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                    test-editor draftset-location "text/plain" stmt)))
+                n 50
+                quads (take n valid-triples)
+                stmt (insert-stmt-str quads)
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))
+                mapping (into {} (map (juxt :lg :dg) res))
+
+                quads' (set (map (juxt :dg :s :p :o) res))]
+            (tc/assert-is-no-content-response response)
+            (is (= n (count quads')))
+            (is (= (set (rewrite quads mapping)) quads'))
+
+            (testing "Delete max payload"
+              (tc/assert-is-no-content-response (update! (delete-stmt-str quads)))
+              (is (zero? (count (repo/query conn (draftset-quads-mapping-q draftset-location)))))))))
+
+      (testing "Too large payload"
+        (testing "Insert too large payload"
+          (let [draftset-location (help/create-draftset-through-api handler test-editor)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                    test-editor draftset-location "text/plain" stmt)))
+                n 51
+                quads (take n valid-triples)
+                stmt (insert-stmt-str quads)
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+            (tc/assert-is-payload-too-large-response response)
+            (is (zero? (count res)))
+            (testing "Delete too large payload"
+              (tc/assert-is-payload-too-large-response (update! (delete-stmt-str quads))))))))))
+
+(tc/deftest-system-with-keys DELETE_INSERT-max-payload-test
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])]
+      (testing "DELETE/INSERT max payload"
+        (let [draftset-location (help/create-draftset-through-api handler test-editor)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-editor draftset-location "text/plain" stmt)))
+              n 25
+              [quads1 more] (split-at n valid-triples)
+              [quads2 more] (split-at n more)
+              [quads3 more] (split-at n more)
+
+              ;; first, insert 50 triples
+              stmt (insert-stmt-str (concat quads1 quads2))
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+
+              ;; then, delete 25 and insert 25 different ones
+              stmt (str (delete-stmt-str quads1) \;
+                        (insert-stmt-str quads3))
+              response (update! stmt)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))
+              mapping (into {} (map (juxt :lg :dg) res))
+              quads  (set (rewrite (concat quads2 quads3) mapping))
+              quads' (set (map (juxt :dg :s :p :o) res))]
+          (tc/assert-is-no-content-response response)
+          (is (= (* 2 n) (count quads')))
+          (is (= quads quads'))))
+
+      (testing "DELETE/INSERT too large payload"
+        (let [draftset-location (help/create-draftset-through-api handler test-editor)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-editor draftset-location "text/plain" stmt)))
+              n 26
+              [quads1 more] (split-at n valid-triples)
+              [quads2 more] (split-at n more)
+              [quads3 more] (split-at n more)
+
+              stmt (insert-stmt-str (drop 2 (concat quads1 quads2)))
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+
+              stmt (str (delete-stmt-str quads1) \;
+                        (insert-stmt-str quads3))
+              response (update! stmt)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+          (tc/assert-is-payload-too-large-response response)
+          (is (= (- (* 2 n) 2) (count res))))))))
+
 (tc/with-system
   keys-for-test [system system-config]
   (with-open [conn (-> system
@@ -109,33 +221,56 @@ SELECT ?dg ?s ?p ?o WHERE {
                        repo/sparql-repo
                        repo/->connection)]
     (let [handler (get system [:drafter/routes :draftset/api])
-          draftset-location (help/create-draftset-through-api handler test-editor)
-          draftset-id (last (string/split draftset-location #"/"))
-          draftset-uri (ds/->draftset-uri draftset-id)
-          update! (fn [stmt]
-                    (handler (create-update-request
-                              test-editor draftset-location "text/plain" stmt)))
-          n 10
-          quads (take n valid-triples)
-          stmt (insert-stmt-str quads)
-          response (update! stmt)
-          _ (tc/assert-is-no-content-response response)
-          q "
-SELECT ?lg ?dg ?s ?p ?o WHERE {
-  GRAPH ?dg { ?s ?p ?o }
-  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    BIND ( <%s> AS ?ds )
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
-      <http://publishmydata.com/def/drafter/DraftSet> .
-    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-  }
-}"
-          res (repo/query conn (format q draftset-uri))
-          mapping (into {} (map (juxt :lg :dg) res))
+          g (URI. (str "http://g/" (UUID/randomUUID)))]
+      (testing "Copies graph, deletes triple from it"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 50
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (insert-stmt-str quads1)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+              ;; There should now be 50 triples live in graph g
 
-          quads  (set (rewrite quads mapping))
-          quads' (set (map (juxt :dg :s :p :o) res))]
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
 
-      (is (= n (count quads')))
-      (is (= quads quads')))))
+              stmt (delete-stmt-str [(first quads1)])
+              response (update! stmt)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+          (tc/assert-is-no-content-response response)
+          (is (= 49 (count res)))))
+
+      (testing "Fail on trying to copy large graphs"
+        (let [;; There should already be 50 triples in live
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 50
+              [quads1 more] (split-at n (drop 50(valid-triples-g g)))
+              [quads2 more] (split-at n more)
+              stmt (insert-stmt-str quads1)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              stmt (insert-stmt-str quads2)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+              ;; There should now be 150 triples live in graph g
+
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+
+              stmt (delete-stmt-str [(first quads1)])
+              response (update! stmt)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+          (tc/assert-is-server-error response)
+          (is (= 150 (count res))))))))
