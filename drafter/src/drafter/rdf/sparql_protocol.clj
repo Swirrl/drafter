@@ -23,6 +23,7 @@
            [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            java.util.concurrent.TimeUnit
            [org.apache.jena.query QueryFactory QueryParseException Syntax]
+           org.apache.jena.sparql.sse.Item
            org.eclipse.rdf4j.query.QueryInterruptedException
            org.eclipse.rdf4j.query.resultio.QueryResultIO))
 
@@ -152,10 +153,11 @@
 
 (defn disallow-sparql-service-db-uri*
   [handler {{q :query-string} :sparql :as request}]
-  (letfn [(service-node? [n]
-            (if (.isList n)
-              (let [[op arg] (seq (.getList n))]
-                (and (.isSymbol op) (= (.getSymbol op) "service")))))
+  (letfn [(service-node? [^Item n]
+            (and (.isList n)
+                 (if-let [[op arg] (seq (.getList n))]
+                   (and (.isSymbol op) (= (.getSymbol op) "service"))
+                   false)))
           (valid? [ssez]
             (let [ssez'
                   (loop [ssez ssez]
