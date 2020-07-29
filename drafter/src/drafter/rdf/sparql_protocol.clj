@@ -153,9 +153,10 @@
 (defn disallow-sparql-service-db-uri*
   [handler {{q :query-string} :sparql :as request}]
   (letfn [(service-node? [n]
-            (if (.isList n)
-              (let [[op arg] (seq (.getList n))]
-                (and (.isSymbol op) (= (.getSymbol op) "service")))))
+            (and (.isList n)
+                 (if-let [[op arg] (seq (.getList n))]
+                   (and (.isSymbol op) (= (.getSymbol op) "service"))
+                   false)))
           (valid? [ssez]
             (let [ssez'
                   (loop [ssez ssez]
