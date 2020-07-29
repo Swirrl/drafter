@@ -79,10 +79,10 @@ SELECT ?dg ?s ?p ?o WHERE {
 (def valid-triples
   (->> (range)
        (map (fn [i]
-              [(str "http://g/" i)
-               (str "http://s/" i)
-               (str "http://p/" i)
-               (str "http://g/" i)]))))
+              [(URI. (str "http://g/" i))
+               (URI. (str "http://s/" i))
+               (URI. (str "http://p/" i))
+               (URI. (str "http://g/" i))]))))
 
 (defn quad-pattern-str [quad]
   (apply format "GRAPH <%s> { <%s> <%s> <%s> }" quad))
@@ -91,3 +91,51 @@ SELECT ?dg ?s ?p ?o WHERE {
   (str "INSERT DATA { "
        (string/join " . \n" (map quad-pattern-str quads))
        "}"))
+
+(defn rewrite [quads mapping]
+  (letfn [(rewrite1 [x] (get mapping x x))]
+    (map (fn [q]
+           (-> q
+               (update 0 rewrite1)
+               (update 1 rewrite1)
+               (update 2 rewrite1)
+               (update 3 rewrite1)))
+         quads)))
+
+(tc/with-system
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-editor)
+          draftset-id (last (string/split draftset-location #"/"))
+          draftset-uri (ds/->draftset-uri draftset-id)
+          update! (fn [stmt]
+                    (handler (create-update-request
+                              test-editor draftset-location "text/plain" stmt)))
+          n 10
+          quads (take n valid-triples)
+          stmt (insert-stmt-str quads)
+          response (update! stmt)
+          _ (tc/assert-is-no-content-response response)
+          q "
+SELECT ?lg ?dg ?s ?p ?o WHERE {
+  GRAPH ?dg { ?s ?p ?o }
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    BIND ( <%s> AS ?ds )
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
+      <http://publishmydata.com/def/drafter/DraftSet> .
+    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+  }
+}"
+          res (repo/query conn (format q draftset-uri))
+          mapping (into {} (map (juxt :lg :dg) res))
+
+          quads  (set (rewrite quads mapping))
+          quads' (set (map (juxt :dg :s :p :o) res))]
+
+      (is (= n (count quads')))
+      (is (= quads quads')))))

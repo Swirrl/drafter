@@ -92,7 +92,7 @@
   )
 
 (defn- within-limit? [operations {:keys [max-update-size] :as opts}]
-  (< (reduce + (map size operations)) max-update-size))
+  (<= (reduce + (map size operations)) max-update-size))
 
 (defn- processable? [operation]
   (satisfies? UpdateOperation operation))
