@@ -695,6 +695,8 @@ paths:
       description: |
         Whether pending or complete, get information about the current state of
         the specified Job.
+      security:
+        - jws-auth: []
       parameters:
         - $ref: "#/parameters/jobid"
       tags:
@@ -712,6 +714,8 @@ paths:
       description: |
         A list of all jobs submitted to the application since the application
         started. Held in memory, not persisted.
+      security:
+        - jws-auth: []
       tags:
           - Jobs
       responses:
@@ -748,6 +752,8 @@ paths:
         awaiting has been lost, and that they should propogate an
         appropriate error.
 
+      security:
+        - jws-auth: []
       parameters:
         - $ref: "#/parameters/jobid"
       tags:
