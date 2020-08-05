@@ -19,11 +19,13 @@
            [org.apache.jena.sparql.algebra Algebra OpAsQuery]
            org.apache.jena.sparql.core.Quad
            [org.apache.jena.sparql.modify.request
-            QuadDataAcc Target UpdateCopy UpdateDataDelete UpdateDataInsert]
+            QuadDataAcc Target
+            UpdateCopy UpdateDrop UpdateDataDelete UpdateDataInsert]
            org.apache.jena.sparql.sse.SSE
+           org.apache.jena.sparql.sse.Item
            [org.apache.jena.update UpdateFactory UpdateRequest]))
 
-;; TODO: size/batching?
+;; TODO: drop graph
 ;; TODO: sparql protocol handler for update
 ;; TODO: which graphs in data?
 ;; TODO: update graph metadata
@@ -72,6 +74,13 @@
          (map (partial rewrite-quad rewriter))
          (QuadDataAcc.)
          (UpdateDataInsert.)))
+
+  UpdateDrop
+  (affected-graphs [op]
+    #{(URI. (.getURI (.getGraph op)))})
+  (size [op] 1)
+  (rewrite [op rewriter]
+    (UpdateDrop. (rewriter (Item/createNode (.getGraph op)))))
 
   ;; TODO: Although this does a naïve rewrite of a DELETE/INSERT, we're not
   ;; supporting this operation until we can work out if it's possible to
@@ -133,9 +142,15 @@
            "}")]
     (set (map :lg (sparql/eager-query repo q)))))
 
-(defn- graph-copyable? [graph-uri]
-  ;; (not-implemented)
-  true)
+(defn- graph-copyable? [repo max-update-size graph-uri]
+  (let [q "
+SELECT (COUNT (*) AS ?c) WHERE {
+  GRAPH <%s> {
+    ?s ?p ?o
+  }
+}"
+        [{c :c}] (sparql/eager-query repo (format q graph-uri))]
+    (<= c max-update-size )))
 
 (defn- ->jena-quad [{:keys [c s p o]}]
   (letfn [(->node [x]
@@ -168,34 +183,41 @@
         now (util/get-current-time)]
     (map (partial copy-graph-operation draftset-uri now) graphs-to-copy)))
 
-(defn- prerequisites [repo draftset-id update-request]
+(defn- rewrite-draftset-ops [draftset-id]
+  [{:stmts (-> {:draftset-uri (ds/->draftset-uri draftset-id)}
+               dm/rewrite-draftset-q
+               UpdateFactory/create
+               .getOperations)}])
+
+(defn- prerequisites [repo max-update-size draftset-id update-request]
   (let [affected-graphs (->> (.getOperations update-request)
                              (map affected-graphs)
                              (apply set/union))
         draftset-graphs (draftset-graphs repo draftset-id)
-        graphs-to-copy (set/difference affected-graphs draftset-graphs)]
-    (prn 'graphs-to-copy graphs-to-copy)
+        graphs-to-copy (set/difference affected-graphs draftset-graphs)
+        copyable? (partial graph-copyable? repo max-update-size)]
     ;; TODO: Can we do this check in the query, and have it report decent errors?
-    (if-let [uncopyable-graphs (seq (remove graph-copyable? graphs-to-copy))]
+    (if-let [uncopyable-graphs (seq (remove copyable? graphs-to-copy))]
       (ex-info "Unable to copy graphs"
                {:status 500
                 :headers {"Content-Type" "text/plain"}
                 :body "500 Unable to copy graphs"})
-      ;; TODO: Need to rewrite all copied graphs after copy
-      (copy-graphs-operations draftset-id graphs-to-copy))))
+      (concat
+       (copy-graphs-operations draftset-id graphs-to-copy)
+       (rewrite-draftset-ops draftset-id)))))
 
 (defn- add-operations [update-request operations]
   (doseq [op operations] (.add update-request op))
   update-request)
 
 (defn handler*
-  [{:keys [drafter/backend wrap-as-draftset-owner] :as opts} request]
+  [{:keys [drafter/backend max-update-size wrap-as-draftset-owner] :as opts} request]
   (let [draftset-id (:draftset-id (:params request))
         update-request (parse-body request opts)]
     (if-let [error-response (ex-data update-request)]
       error-response
       ;; TODO: UpdateRequest base-uri, prefix, etc?
-      (let [prerequisites (prerequisites backend draftset-id update-request)
+      (let [prerequisites (prerequisites backend max-update-size draftset-id update-request)
             prerequisite-ops (mapcat :stmts prerequisites)
             graph-map (->> (map :map prerequisites)
                            (into (ops/get-draftset-graph-mapping backend draftset-id))
@@ -207,7 +229,7 @@
             update-request' (-> (UpdateRequest.)
                                 (add-operations prerequisite-ops)
                                 (add-operations operations'))]
-        (println update-request')
+        (println (str update-request'))
         (sparql/update! backend (str update-request'))
         {:status 204}))))
 

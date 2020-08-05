@@ -52,31 +52,30 @@ SELECT ?lg ?dg ?s ?p ?o WHERE {
 
 (tc/deftest-system-with-keys insert-modify-test
   keys-for-test [system system-config]
-  (let [handler (get system [:drafter/routes :draftset/api])
-        draftset-location (help/create-draftset-through-api handler test-editor)
-        update! (fn [stmt]
-                  (handler (create-update-request
-                            test-editor draftset-location "text/plain" stmt)))]
-    (let [stmt "
-INSERT DATA { GRAPH <http://g> { <http://s> <http://p> <http://o> } }
-"
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-editor)
+          update! (fn [stmt]
+                    (handler (create-update-request
+                              test-editor draftset-location "text/plain" stmt)))
+          g (URI. (str "http://g/" (UUID/randomUUID)))
+          stmt (format " INSERT DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } " g)
           response (update! stmt)
           _ (tc/assert-is-no-content-response response)
-          stmt "
-DELETE DATA { GRAPH <http://g> { <http://s> <http://p> <http://o> } } ;
-INSERT DATA { GRAPH <http://g> { <http://s> <http://p> <http://g> } }
-"
+          stmt (format "
+DELETE DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } ;
+INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
+" g g g)
           response (update! stmt)
-          _ (tc/assert-is-no-content-response response)]
-      (let [[{:keys [dg s p o]} :as quads]
-            (with-open [conn (-> system
-                                 :drafter.common.config/sparql-query-endpoint
-                                 repo/sparql-repo
-                                 repo/->connection)]
-              (repo/query conn (draftset-quads-mapping-q draftset-location)))]
-        (is (= 1 (count quads)))
-        (is (= dg o))
-        (is (not= o (URI. "http://g")))))))
+          _ (tc/assert-is-no-content-response response)
+          [{:keys [dg s p o]} :as quads]
+          (repo/query conn (draftset-quads-mapping-q draftset-location))]
+      (is (= 1 (count quads)))
+      (is (= dg o))
+      (is (not= o (URI. "http://g"))))))
 
 (def valid-triples
   (->> (range)
@@ -214,7 +213,7 @@ INSERT DATA { GRAPH <http://g> { <http://s> <http://p> <http://g> } }
           (tc/assert-is-payload-too-large-response response)
           (is (= (- (* 2 n) 2) (count res))))))))
 
-(tc/with-system
+(tc/deftest-system-with-keys delete-from-live-test
   keys-for-test [system system-config]
   (with-open [conn (-> system
                        :drafter.common.config/sparql-query-endpoint
@@ -273,4 +272,4 @@ INSERT DATA { GRAPH <http://g> { <http://s> <http://p> <http://g> } }
               response (update! stmt)
               res (repo/query conn (draftset-quads-mapping-q draftset-location))]
           (tc/assert-is-server-error response)
-          (is (= 150 (count res))))))))
+          (is (zero? (count res))))))))
