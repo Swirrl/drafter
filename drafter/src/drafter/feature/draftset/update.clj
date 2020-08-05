@@ -20,7 +20,7 @@
            org.apache.jena.sparql.core.Quad
            [org.apache.jena.sparql.modify.request
             QuadDataAcc Target
-            UpdateCopy UpdateDrop UpdateDataDelete UpdateDataInsert]
+            UpdateCopy UpdateDrop UpdateDataDelete UpdateDeleteInsert UpdateDataInsert]
            org.apache.jena.sparql.sse.SSE
            org.apache.jena.sparql.sse.Item
            [org.apache.jena.update UpdateFactory UpdateRequest]))
@@ -46,6 +46,63 @@
                str
                SSE/parseOp)]
     (-> op  OpAsQuery/asQuery .getQueryPattern)))
+
+(defn- update-op [& q-strs]
+  (let [ops (->> q-strs (apply str) UpdateFactory/create .getOperations)]
+    (assert (= 1 (count ops)))
+    (first ops)))
+
+(defn- drop-live-graph-op [draftset-uri graph-uri]
+  (let [op (update-op "
+INSERT { } WHERE { GRAPH <" dm/drafter-state-graph "> {
+  <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph ">
+} FILTER NOT EXISTS { GRAPH <" dm/drafter-state-graph "> {
+    <" graph-uri "> <" drafter:inDraftSet "> <" draftset-uri ">
+  } }
+}")
+        insert-acc (.getInsertAcc op)]
+    (doseq [quad (->> (dm/create-draft-graph graph-uri
+                                             (dm/make-draft-graph-uri)
+                                             (util/get-current-time)
+                                             draftset-uri)
+                      (apply dm/to-quads)
+                      (map ->jena-quad))]
+      (.addQuad insert-acc quad))
+    op))
+
+(defn- drop-draft-graph-op [draftset-uri graph-uri]
+  "DROP GRAPH "
+  )
+
+(println (drop-live-graph-op "http://ds" "http://g"))
+
+(defn- manage-graph-op [graph-uri]
+  (update-op "
+INSERT { GRAPH <" dm/drafter-state-graph "> {
+  <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> .
+  <" graph-uri "> <" drafter:isPublic "> false .
+  }
+} WHERE {
+  FILTER NOT EXISTS {
+    GRAPH <" dm/drafter-state-graph "> {
+     <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph ">
+    }
+  }
+}"))
+
+(defn- empty-draft-graph-for-op [draftset-uri timestamp graph-uri]
+  (let [draft-graph-uri (dm/make-draft-graph-uri)]
+    (->> (dm/create-draft-graph graph-uri draft-graph-uri timestamp draftset-uri)
+         (apply dm/to-quads)
+         (map ->jena-quad)
+         (QuadDataAcc.)
+         (UpdateDataInsert.))))
+
+;; TODO: need to know whether a graph is:
+;; a) Just in live (not being copied)
+;; b) Already copied to draftset
+;; c) Only in current update
+
 
 (defprotocol UpdateOperation
   (affected-graphs [op])
@@ -77,10 +134,11 @@
 
   UpdateDrop
   (affected-graphs [op]
-    #{(URI. (.getURI (.getGraph op)))})
+    #{;(URI. (.getURI (.getGraph op)))
+      })
   (size [op] 1)
   (rewrite [op rewriter]
-    (UpdateDrop. (rewriter (Item/createNode (.getGraph op)))))
+    (-> op .getGraph Item/createNode arq/sse-zipper rewriter UpdateDrop.))
 
   ;; TODO: Although this does a naïve rewrite of a DELETE/INSERT, we're not
   ;; supporting this operation until we can work out if it's possible to
@@ -163,6 +221,9 @@ SELECT (COUNT (*) AS ?c) WHERE {
 (defn- insert-data-stmt [quads]
   (UpdateDataInsert. (QuadDataAcc. (map ->jena-quad quads))))
 
+;; TODO: What if the live graph is already managed? I think we're setting it to
+;; isPublic = false
+
 (defn- copy-graph-operation [draftset-uri timestamp graph-uri]
   (let [managed-graph-quads (dm/to-quads (dm/create-managed-graph graph-uri))
         draft-graph-uri (dm/make-draft-graph-uri)
@@ -229,7 +290,7 @@ SELECT (COUNT (*) AS ?c) WHERE {
             update-request' (-> (UpdateRequest.)
                                 (add-operations prerequisite-ops)
                                 (add-operations operations'))]
-        (println (str update-request'))
+        ;; (println (str update-request'))
         (sparql/update! backend (str update-request'))
         {:status 204}))))
 

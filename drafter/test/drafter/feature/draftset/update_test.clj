@@ -11,6 +11,7 @@
             [clojure.string :as string]
             [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI
+           java.util.UUID
            org.eclipse.rdf4j.query.QueryResultHandler
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
 
@@ -273,3 +274,62 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
               res (repo/query conn (draftset-quads-mapping-q draftset-location))]
           (tc/assert-is-server-error response)
           (is (zero? (count res))))))))
+
+;; TODO: What if the live graph is already managed? I think we're setting it to
+;; isPublic = false
+
+(tc/with-system
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          g (URI. (str "http://g/" (UUID/randomUUID)))]
+      #_(testing "Add quads, drop graph"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 50
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (insert-stmt-str quads1)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+
+              stmt (format "DROP GRAPH <%s>" g)
+              response (update! stmt)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+          (tc/assert-is-no-content-response response)
+          (is (zero? (count res)))))
+
+      (testing "Add quads, publish, drop graph"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 50
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (insert-stmt-str quads1)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+              res (repo/query conn (format q g))
+              _ (is (= 50 ( count res)))
+
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              stmt (format "DROP GRAPH <%s>" g)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              res (repo/query conn (format q g))
+              _ (is (= 50 ( count res)) "Ensure graph still in live")
+              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+
+              res (repo/query conn (format q g))]
+          (tc/assert-is-no-content-response response)
+          (is (zero? (count res)))))
+      )))
