@@ -1,7 +1,7 @@
 (ns drafter.async.spec
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
-            [drafter.util :refer [email-string?]]
+            [drafter.spec]
             [clj-time.coerce :refer [from-long]]
             [clj-time.format :refer [formatters parse unparse]]
             [drafter.draftset :as ds])
@@ -29,7 +29,7 @@
                     (s/gen int?)))))
 
 (s/def ::id uuid?)
-(s/def ::user-id email-string?)
+(s/def ::user-id :drafter/EmailAddress)
 (s/def ::operation symbol?)
 (s/def ::status #{:pending :complete})
 (s/def ::priority #{:batch-write :background-write :blocking-write :publish-write})

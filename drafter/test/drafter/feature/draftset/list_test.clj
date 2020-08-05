@@ -2,6 +2,7 @@
   (:require [clojure.test :as t]
             [drafter.feature.draftset.list :as sut]
             [drafter.draftset :as ds]
+            [drafter.draftset.spec :as dss]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [drafter.util :as dutil]

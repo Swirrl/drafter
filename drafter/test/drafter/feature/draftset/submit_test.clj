@@ -1,6 +1,7 @@
 (ns ^:rest-api drafter.feature.draftset.submit-test
   (:require [clojure.test :as t :refer [is]]
             [drafter.draftset :as ds]
+            [drafter.draftset.spec :as dss]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]
             [drafter.user :as user]

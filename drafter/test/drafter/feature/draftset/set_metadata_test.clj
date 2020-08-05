@@ -1,5 +1,6 @@
 (ns ^:rest-api drafter.feature.draftset.set-metadata-test
   (:require [clojure.test :as t :refer [is]]
+            [drafter.draftset.spec]
             [drafter.draftset :as ds]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]

@@ -486,7 +486,7 @@
   (slurp (io/resource "drafter/backend/draftset/operations/update-public-endpoint-modified-at.sparql")))
 
 (defn update-public-endpoint-modified-at!
-  "Updates the "
+  "Updates the modified time of the public endpoint to the current time"
   [backend]
   (let [q (update-public-endpoint-modified-at-query)]
     (sparql/update! backend q)))

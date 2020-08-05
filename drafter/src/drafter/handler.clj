@@ -1,8 +1,5 @@
 (ns drafter.handler
-  (:require [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
-            [cognician.dogstatsd :as datadog]
-            [compojure.core :refer [context defroutes GET]]
+  (:require [compojure.core :refer [context defroutes GET]]
             [compojure.route :as route]
             [drafter.backend.common :refer [stop-backend]]
             [drafter.env :as denv]
@@ -11,9 +8,8 @@
             [drafter.routes.status :refer [status-routes]]
             [drafter.swagger :as swagger]
             [drafter.timeouts :as timeouts]
-            [drafter.util :refer [conj-if set-var-root!]]
-            [drafter.write-scheduler
-             :refer [start-writer! stop-writer!]]
+            [drafter.util :refer [set-var-root!]]
+            [drafter.write-scheduler :refer [start-writer! stop-writer!]]
             [integrant.core :as ig]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.defaults :refer [api-defaults]]

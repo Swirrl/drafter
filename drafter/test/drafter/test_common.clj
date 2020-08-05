@@ -26,8 +26,7 @@
             [aero.core :as aero]
             [drafter.user :as user]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
-            [drafter.feature.endpoint.public :as pub])
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]])
   (:import [com.auth0.jwk Jwk JwkProvider]
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT

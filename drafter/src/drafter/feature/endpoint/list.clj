@@ -27,11 +27,6 @@
                     (dsl/get-draftsets repo user include union-with-live?))]
     (concat public draftsets)))
 
-;;TODO: find/create repo and user specs
-(s/fdef get-endpoints
-  :args (s/cat :repo any? :user any? :include ep/includes :union-with-live? boolean?)
-  :ret (s/coll-of ::ep/Endpoint))
-
 (defn list-handler
   ":get /endpoints"
   [backend wrap-authenticated]

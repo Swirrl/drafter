@@ -4,7 +4,6 @@
   (:require [clojure.spec.alpha :as s]
             [drafter.backend.common :as bprot :refer [->sesame-repo]]
             [drafter.backend.draftset.draft-management :as mgmt]
-            [drafter.backend.spec :as bs]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
@@ -69,9 +68,6 @@
   "Creates a backend restricted to the live graphs."
   [{:keys [repo]}]
   (->RestrictedExecutor repo (partial mgmt/live-graphs repo)))
-
-(defmethod ig/pre-init-spec ::endpoint [_]
-  (s/keys :req-un [::bs/repo]))
 
 (defmethod ig/init-key ::endpoint [_ opts]
   (live-endpoint-with-stasher opts))

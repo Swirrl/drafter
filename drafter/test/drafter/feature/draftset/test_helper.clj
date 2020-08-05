@@ -10,6 +10,7 @@
             [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [drafter.draftset :as ds]
+            [drafter.draftset.spec]
             [drafter.endpoint :as ep]
             [clojure.java.io :as io]
             [drafter.util :as util]

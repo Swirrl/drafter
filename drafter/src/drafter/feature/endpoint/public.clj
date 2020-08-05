@@ -62,10 +62,6 @@
             {:id "public" :type "Endpoint" :created-at created :updated-at modified})
         (throw (ex-info "Found multiple public endpoints - expected at most one" {:bindings bindings}))))))
 
-(s/fdef get-public-endpoint
-  :args (s/cat :repo any?)
-  :ret (s/nilable ::ep/Endpoint))
-
 (defn- get-created-at
   "Parses the created-at parameter for the public endpoint if one is provided.
    If present it must parse as an ISO datetime. Returns nil if no created-at parameter

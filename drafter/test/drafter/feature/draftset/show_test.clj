@@ -1,6 +1,7 @@
 (ns ^:rest-api drafter.feature.draftset.show-test
   (:require [clojure.test :as t :refer [is]]
             [drafter.draftset :as ds]
+            [drafter.draftset.spec]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
@@ -8,7 +9,7 @@
             [drafter.feature.draftset.test-helper :as help]
             [drafter.fixture-data :as fd]
             [clojure.java.io :as io])
-  (:import (java.time OffsetDateTime)))
+  (:import [java.time OffsetDateTime]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 

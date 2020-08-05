@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [drafter.feature.endpoint.list :refer :all]
             [drafter.endpoint :as ep]
+            [drafter.endpoint.spec]
             [drafter.test-common :as tc]
             [drafter.fixture-data :as fd]
             [drafter.user-test :refer [test-publisher]]

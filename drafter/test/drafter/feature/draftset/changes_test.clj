@@ -3,6 +3,7 @@
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as ops]
             [drafter.draftset :as ds]
+            [drafter.draftset.spec]
             [drafter.feature.draftset.changes :as sut]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]
