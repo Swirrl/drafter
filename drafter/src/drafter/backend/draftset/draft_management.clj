@@ -445,59 +445,45 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
-(defn- rewrite-1-q
-  [{:keys [?s1 ?s2 ?p1 ?p2 ?o1 ?o2
-           draftset-uri
-           deleted
-           live-graph-uris
-           draft-graph-uris]
-    :or {?s1 '?s ?s2 '?s
-         ?p1 '?p ?p2 '?p
-         ?o1 '?o ?o2 '?o}
-    :as opts}]
+(defn- rewrite-q
+  [{:keys [?from ?to draftset-uri deleted live-graph-uris draft-graph-uris]}]
   (let [filter (case deleted
-                 :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s1 ?p1 ?o1 } }")
-                 :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s1 ?p1 ?o1 } }")
+                 :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
+                 :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
                  nil)
         ds-values (when draftset-uri (str "VALUES ?ds { <" draftset-uri "> }"))
-        live-values (->> live-graph-uris
-                         (map #(str "<" % ">"))
-                         (string/join " ")
-                         (format "VALUES ?lg { %s }"))
-        draft-values (->> draft-graph-uris
-                          (map #(str "<" % ">"))
-                          (string/join " ")
-                          (format "VALUES ?dg { %s }"))
-        ]
-    (str "
-DELETE { GRAPH ?g { " ?s1 " " ?p1 " " ?o1 " } }
-INSERT { GRAPH ?g { " ?s2 " " ?p2 " " ?o2 " } }
-WHERE  {
-  GRAPH ?g { " ?s1 " " ?p1 " " ?o1 " }
+        live-values (some->> (seq live-graph-uris)
+                             (map #(str "<" % ">"))
+                             (string/join " ")
+                             (format "VALUES ?lg { %s }"))
+        draft-values (some->> (seq draft-graph-uris)
+                              (map #(str "<" % ">"))
+                              (string/join " ")
+                              (format "VALUES ?dg { %s }"))
+        suffix (->> [filter ds-values live-values draft-values]
+                    (remove nil?)
+                    (string/join "\n    ")
+                    (str "\n    "))]
+    (format "
+DELETE { GRAPH ?g { %1$s ?p1 ?o1 . ?s2 %1$s ?o2 . ?s3 ?p3 %1$s . } }
+INSERT { GRAPH ?g { %2$s ?p1 ?o1 . ?s2 %2$s ?o2 . ?s3 ?p3 %2$s . } }
+WHERE {
+  GRAPH ?g { { %1$s ?p1 ?o1 } UNION
+             { ?s2 %1$s ?o2 } UNION
+             { ?s3 ?p3 %1$s } }
   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>
-        <http://publishmydata.com/def/drafter/DraftSet> .
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
     ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
     ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-    " filter "
-    " ds-values "
-    " (when (seq live-graph-uris) live-values) "
-    " (when (seq draft-graph-uris) draft-values) "
+    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .%3$s
   }
-} ;")))
+} ;" ?from ?to suffix)))
 
 (defn- rewrite-draftset-q [opts]
-  (str
-   (rewrite-1-q (assoc opts :?s1 '?lg :?s2 '?dg :deleted :ignore)) \newline
-   (rewrite-1-q (assoc opts :?p1 '?lg :?p2 '?dg :deleted :ignore)) \newline
-   (rewrite-1-q (assoc opts :?o1 '?lg :?o2 '?dg :deleted :ignore)) \newline))
+  (rewrite-q (assoc opts :?from '?lg :?to '?dg :deleted :ignore)))
 
 (defn- unrewrite-draftset-q [opts]
-  (str
-   (rewrite-1-q (assoc opts :?s1 '?dg :?s2 '?lg)) \newline
-   (rewrite-1-q (assoc opts :?p1 '?dg :?p2 '?lg)) \newline
-   (rewrite-1-q (assoc opts :?o1 '?dg :?o2 '?lg)) \newline))
+  (rewrite-q (assoc opts :?from '?dg :?to '?lg)))
 
 (defn rewrite-draftset! [conn opts]
   (->> (rewrite-draftset-q opts)
