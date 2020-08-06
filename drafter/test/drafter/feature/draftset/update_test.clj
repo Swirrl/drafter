@@ -275,9 +275,6 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (tc/assert-is-server-error response)
           (is (zero? (count res))))))))
 
-;; TODO: What if the live graph is already managed? I think we're setting it to
-;; isPublic = false
-
 (tc/with-system
   keys-for-test [system system-config]
   (with-open [conn (-> system
