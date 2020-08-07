@@ -77,15 +77,6 @@
         endpoints (if include (get-endpoints :include include) (get-endpoints))]
     (map endpoint/from-json endpoints)))
 
-(defn create-public-endpoint
-  "Creates the public endpoint if it does not exist and returns the current value.
-   Supports the following options:
-    - created-at: Datetime to use for the created-at time of the public endpoint"
-  ([client access-token] (create-public-endpoint client access-token {}))
-  ([client access-token opts]
-   (let [result (i/request client i/create-public-endpoint access-token opts)]
-     (endpoint/from-json result))))
-
 (defn get-public-endpoint
   "Gets the public endpoint"
   [client]

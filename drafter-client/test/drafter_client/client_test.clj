@@ -59,6 +59,10 @@
     (when-not (Boolean/parseBoolean (env :disable-drafter-cleaning-protection))
       (db-util/assert-empty stardog-repo))
     (f)
+    (db-util/delete-test-data! stardog-repo)))
+
+(defn- drop-test-db! []
+  (let [stardog-repo (get-stardog-repo)]
     (db-util/drop-all! stardog-repo)))
 
 (defn res-file [filename]
@@ -69,12 +73,16 @@
   (main/-main (res-file "drafter-client-test-config.edn")
               (res-file "stasher-off.edn")))
 
+(defn stop-drafter-server []
+  (main/stop-system!))
+
 (defn drafter-server-fixture [f]
   (try
+    (drop-test-db!)
     (start-drafter-server)
     (f)
     (finally
-      (main/stop-system!))))
+      (stop-drafter-server))))
 
 (defn drafter-client []
   (let [drafter-endpoint (env :drafter-endpoint)]
@@ -149,29 +157,9 @@
           (is (false? result)
               "I really expected the database to be empty"))))))
 
-(defn- create-public-endpoint [client]
-  (sut/create-public-endpoint client (auth-util/system-token)))
-
-(t/deftest create-public-endpoint-test
-  (t/testing "unauthorised"
-    (let [token (auth-util/publisher-token)
-          client (drafter-client)]
-      (is (thrown? ExceptionInfo (sut/create-public-endpoint client token)))))
-
-  (t/testing "creation time"
-    (let [created-at (time/date-time 2020 3 28 10 43 27)
-          client (drafter-client)
-          token (auth-util/system-token)
-          public-endpoint (sut/create-public-endpoint client token {:created-at (str created-at)})]
-      (is (= created-at (endpoint/created-at public-endpoint))))))
-
 (t/deftest endpoints-unauthenticated-tests
   (let [client (drafter-client)]
-    (t/testing "No endpoints"
-      (t/is (empty? (sut/endpoints client nil))))
-
     (t/testing "Public endpoint"
-      (create-public-endpoint client)
       (t/testing "default"
         (let [endpoints (sut/endpoints client nil)]
           (t/is (= 1 (count endpoints)))
@@ -191,7 +179,6 @@
 (t/deftest endpoints-authenticated-tests
   (let [client (drafter-client)
         token (auth-util/publisher-token)]
-    (create-public-endpoint client)
     (t/testing "Public endpoint"
       (let [endpoints (sut/endpoints client token)]
         (is (= 1 (count endpoints)))
@@ -215,7 +202,6 @@
 
 (t/deftest get-endpoint-test
   (let [client (drafter-client)]
-    (create-public-endpoint client)
     (t/testing "Public endpoint"
       (let [endpoint (sut/get-public-endpoint client)]
         (is (endpoint/public-ref? endpoint))))
@@ -284,7 +270,6 @@
   (let [client (drafter-client)
         token (auth-util/publisher-token)
         ds (sut/new-draftset client token "test" "description")]
-    (create-public-endpoint client)
     (update-public-endpoint! client)
     (t/testing "default"
       (let [draftsets (sut/draftsets client token)]
@@ -302,7 +287,6 @@
   (let [client (drafter-client)
         token (auth-util/publisher-token)
         ds (sut/new-draftset client token "test" "test")]
-    (create-public-endpoint client)
     (t/testing "default"
       (let [result (sut/get-draftset client token (draftset/id ds))]
         (is (= ds result))))

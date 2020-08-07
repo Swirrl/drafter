@@ -1,20 +1,18 @@
 (ns drafter-client.test-util.db
   (:require [clojure.test :as t]
             [grafter-2.rdf4j.repository :as repo]
-            [grafter-2.rdf.protocols :as pr]))
-
-
+            [grafter-2.rdf.protocols :as pr]
+            [clojure.java.io :as io]))
 
 (defn- contains-triples-or-quads? [repo]
-  (repo/query (repo/->connection repo)
-              "ASK {
-                 SELECT * WHERE {
-                   {  ?s ?p ?o }
-                   UNION {
-                     GRAPH ?g { ?s ?p ?o }
-                   }
-                } LIMIT 1
-              }"))
+  (with-open [conn (repo/->connection repo)]
+    (let [q (slurp (io/resource "ask_contains_unexpected_data.sparql"))]
+      (repo/query conn q))))
+
+(defn delete-test-data! [repo]
+  (with-open [conn (repo/->connection repo)]
+    (let [q (slurp (io/resource "delete_test_data.sparql"))]
+      (pr/update! conn q))))
 
 (defn drop-all! [repo]
   (pr/update! (repo/->connection repo) "DROP ALL ;"))
