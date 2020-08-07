@@ -102,3 +102,6 @@
 
 (defmethod ig/init-key ::create-handler [_ {:keys [wrap-auth repo]}]
   (create-public-endpoint wrap-auth repo))
+
+(defmethod ig/init-key ::init [_ {:keys [repo]}]
+  (ensure-public-endpoint repo))
