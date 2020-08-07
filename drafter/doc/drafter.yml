@@ -205,25 +205,6 @@ paths:
             $ref: '#/definitions/Draftset'
         '404':
           description: 'When the public endpoint has not been created'
-    post:
-      operationId: create-public-endpoint
-      description: Creates the public endpoint if it does not already exist
-      summary: Create the public endpoint
-      tags:
-        - Endpoints
-      parameters:
-        - $ref: '#/parameters/public-endpoint-created-at'
-      responses:
-        '201':
-          description: 'The public endpoint was created'
-          schema:
-            $ref: '#/definitions/Endpoint'
-        '200':
-          description: 'The public endpoint already exists and was not created'
-          schema:
-            $ref: '#/definitions/Endpoint'
-        '400':
-          description: 'The specified created-at parameter could not be parsed as a datetime'
 
   /draftsets:
     post:
@@ -282,7 +263,7 @@ paths:
         - jws-auth: []
       parameters:
         - $ref: '#/parameters/id'
-        - $ref: '#/parameters/union-with-live'
+        - $ref: '#parameters/union-with-live'
       tags:
         - Metadata
       responses:
@@ -872,13 +853,6 @@ parameters:
     in: query
     required: false
     type: string
-  public-endpoint-created-at:
-    name: created-at
-    description: Creation time for the public endpoint
-    in: query
-    required: false
-    type: string
-    format: datetime
   role:
     name: role
     description: The role to submit the draftset to

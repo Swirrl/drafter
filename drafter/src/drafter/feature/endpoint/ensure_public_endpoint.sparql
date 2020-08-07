@@ -1,0 +1,20 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+INSERT {
+    GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+        drafter:public rdf:type drafter:Endpoint ;
+                       dcterms:modified ?n ;
+                       dcterms:issued ?n .
+    }
+} WHERE {
+    GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+        { SELECT ?n WHERE { BIND(now() AS ?n) } }
+        FILTER NOT EXISTS {
+            drafter:public rdf:type drafter:Endpoint ;
+                           dcterms:modified ?modified ;
+                           dcterms:issued ?created .
+        }
+    }
+}

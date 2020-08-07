@@ -12,8 +12,7 @@
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
             [ring.util.request :as request]
             [integrant.core :as ig]
-            [buddy.auth.http :as http]
-            [drafter.user :as user])
+            [buddy.auth.http :as http])
   (:import java.io.File
            (org.apache.tika.mime MediaType)
            (java.util.zip GZIPInputStream)))
@@ -189,15 +188,6 @@
     (if-let [_ (http/-get-header request "authorization")]
       ((wrap-authenticated handler) request)
       (handler request))))
-
-(defn require-role
-  "Returns a handler which checks the user associated with the request is in the
-   specified role."
-  [role inner-handler]
-  (fn [{user :identity :as request}]
-    (if (user/has-role? user role)
-      (inner-handler request)
-      (response/forbidden-response ""))))
 
 (defn wrap-request-timer [handler]
   (fn [req]
