@@ -107,6 +107,7 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
 (defprotocol UpdateOperation
   (affected-graphs [op])
   (size [op])
+  (raw-operations [op db])
   (rewrite [op rewriter]))
 
 (extend-protocol UpdateOperation
@@ -115,6 +116,9 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
     (set (map #(URI. (.getURI (.getGraph %))) (.getQuads op))))
   (size [op]
     (count (.getQuads op)))
+  (raw-operations [op db]
+
+    )
   (rewrite [op rewriter]
     (->> (.getQuads op)
          (map (partial rewrite-quad rewriter))
@@ -138,6 +142,7 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
       })
   (size [op] 1)
   (rewrite [op rewriter]
+    ;; here, something needs to know which rewrite mode to be in
     (-> op .getGraph Item/createNode arq/sse-zipper rewriter UpdateDrop.))
 
   ;; TODO: Although this does a naïve rewrite of a DELETE/INSERT, we're not
@@ -270,6 +275,19 @@ SELECT (COUNT (*) AS ?c) WHERE {
 (defn- add-operations [update-request operations]
   (doseq [op operations] (.add update-request op))
   update-request)
+
+;; get affected graphs
+;; minus existing draftset graphs
+;; return live->draft for request
+
+(defn- graph-mapping [backend draftset-id update-request]
+  (let [affected-graphs (->> (.getOperations update-request)
+                             (map affected-graphs)
+                             (apply set/union))
+        request-mapping (map (fn [g] [g (dm/make-draft-graph-uri)])
+                             affected-graphs)
+        draftset-mapping (ops/get-draftset-graph-mapping backend draftset-id)]
+    (merge request-mapping draftset-mapping)))
 
 (defn handler*
   [{:keys [drafter/backend max-update-size wrap-as-draftset-owner] :as opts} request]
