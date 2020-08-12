@@ -4,7 +4,7 @@
             [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
             [drafter.rdf.sparql-protocol :as sp :refer [sparql-protocol-handler]]
             [ring.middleware.cors :as cors]
-            [swirrl-server.errors :refer [wrap-encode-errors]]
+            [drafter.errors :refer [wrap-encode-errors]]
             [integrant.core :as ig]))
 
 (defn handler

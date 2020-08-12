@@ -38,14 +38,17 @@
         grafter/grafter {:mvn/version "2.1.2"}
 
         org.apache.tika/tika-core {:mvn/version "1.23"} ;; mime types
-        org.eclipse.rdf4j/rdf4j-runtime {:mvn/version "2.5.0"
+        org.eclipse.rdf4j/rdf4j-runtime {:mvn/version "3.0.0"
                                          :exclusions [ch.qos.logback/logback-classic]}
 
 
         grafter/url {:mvn/version "0.2.5"}
 
         lib-noir/lib-noir {:mvn/version "0.9.9"
-                  :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]}
+                           :exclusions [compojure/compojure
+                                        org.clojure/java.classpath
+                                        org.clojure/tools.reader
+                                        org.clojure/java.classpath]}
         me.raynes/fs {:mvn/version "1.4.6"} ;; filesystem utils
 
         metosin/ring-swagger-ui {:mvn/version "3.20.1"}
@@ -62,7 +65,15 @@
 
         org.mindrot/jbcrypt {:mvn/version "0.4"}
 
-        org.slf4j/slf4j-log4j12 {:mvn/version "1.7.26" :exclusions [log4j org.slf4j/slf4j-api]}
+        org.clojure/tools.logging {:mvn/version "0.5.0"}
+        org.apache.logging.log4j/log4j-api {:mvn/version "2.11.1"} ; Import log4j2 as the logging backend
+        org.apache.logging.log4j/log4j-core {:mvn/version "2.11.1"} ; Import log4j2 as the logging backend
+        org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.11.1"} ; Redirect all SLF4J logs over the log4j2 backend
+
+        org.slf4j/log4j-over-slf4j {:mvn/version "1.7.25"} ; redirect log4j 1.x logs
+        org.slf4j/jcl-over-slf4j {:mvn/version "1.7.25"} ; redirect commons logging
+        org.slf4j/jul-to-slf4j {:mvn/version "1.7.25"}
+
         prismatic/schema {:mvn/version "1.1.10"}
 
         ring-middleware-format/ring-middleware-format {:mvn/version "0.7.4"}
@@ -72,13 +83,14 @@
         ring/ring-core {:mvn/version "1.7.1"}
         ring-cors/ring-cors {:mvn/version "0.1.13"}
 
-        swirrl/lib-swirrl-server {:mvn/version "0.6.3" :exclusions [clout org.clojure/java.classpath]}
         wrap-verbs/wrap-verbs {:mvn/version "0.1.1"}
 
         com.auth0/jwks-rsa {:mvn/version "0.8.1"}
         com.auth0/java-jwt {:mvn/version "3.8.0"}
         martian/martian {:mvn/version "0.1.10"}
-        martian-clj-http/martian-clj-http {:mvn/version "0.1.10" :exclusions [clj-http]}
+        martian-clj-http/martian-clj-http {:mvn/version "0.1.10"
+                                           :exclusions [clj-http/clj-http]}
+        medley/medley {:mvn/version "1.3.0"}
         clj-http/clj-http {:mvn/version "3.10.0"}
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
                       :sha "11fbe37324ab238752502f275d3a321fd012a65b"}

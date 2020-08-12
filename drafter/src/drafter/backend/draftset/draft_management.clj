@@ -12,7 +12,6 @@
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.core :as s]
-            [swirrl-server.errors :refer [ex-swirrl]]
             [grafter-2.rdf4j.io :as rio])
   (:import java.net.URI
            [java.util Date UUID Calendar]
@@ -339,8 +338,8 @@
 
       (let [live-graphs (map :live results)]
         (when (has-duplicates? live-graphs)
-          (throw (ex-swirrl :multiple-drafts-error
-                            "Multiple draft graphs were supplied referencing the same live graph.")))
+          (throw (ex-info "Multiple draft graphs were supplied referencing the same live graph."
+                          {:error :multiple-drafts-error})))
 
         (zipmap live-graphs
                 (map :draft results))))))

@@ -1,16 +1,16 @@
 (ns drafter.async.jobs
-  (:require [compojure.core :refer [context GET routes]]
+  (:require [clj-time.coerce :refer [from-long]]
+            [clj-time.format :refer [formatters unparse]]
             [clojure.spec.alpha :as s]
-            [clj-logging-config.log4j :as l4j]
+            [compojure.core :refer [context GET routes]]
             [drafter.async.responses :as r]
             [drafter.async.spec :as spec]
-            [integrant.core :as ig]
-            [clj-time.coerce :refer [to-date from-long]]
-            [clj-time.format :refer [formatters unparse]]
-            [drafter.draftset :as ds])
-  (:import (java.util UUID)
-           (clojure.lang ExceptionInfo)
-           (org.apache.log4j MDC)))
+            [drafter.draftset :as ds]
+            [drafter.logging :refer [with-logging-context]]
+            [integrant.core :as ig])
+  (:import clojure.lang.ExceptionInfo
+           java.util.UUID
+           org.apache.log4j.MDC))
 
 (defrecord Job [id
                 user-id
@@ -83,7 +83,7 @@
   [f]
   (let [request-id (MDC/get "reqId")] ;; copy reqId off calling thread
     (fn [{job-id :id :as job}]
-      (l4j/with-logging-context {:jobId (str "job-" (.substring (str job-id) 0 8))
+      (with-logging-context {:jobId (str "job-" (.substring (str job-id) 0 8))
                                  :reqId request-id}
         (f job)))))
 
