@@ -5,7 +5,7 @@ ssh-agent
 ssh-add
 
 # install service dependencies
-clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn 
+clojure -A:omni install-dependencies --dependencies dependencies-mongo-auth.edn
 
 # start services
 ./.omni_cache/install/stardog/install/dev-start.sh
