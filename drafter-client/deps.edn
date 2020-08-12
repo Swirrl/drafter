@@ -17,7 +17,7 @@
         grafter.db/grafter.db {:mvn/version "0.8.5"}
         com.cemerick/url {:mvn/version "0.1.1"}
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
-                      :sha "29a8ced9943a5cc6e20c14202c123a3f970b18f5"
+                      :sha "11fbe37324ab238752502f275d3a321fd012a65b"
                       :exclusions [com.auth0/jwks-rsa com.auth0/java-jwt]
                       }
         }
