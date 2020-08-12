@@ -71,12 +71,12 @@ deploy:
     on:
       tags: true
   - provider: script
-    script: clojure -M:omni publish -m package/pmd3-manifest.edn
+    script: clojure -A:omni publish -m package/pmd3-manifest.edn
     skip_cleanup: true
     on:
       all_branches: true
   - provider: script
-    script: clojure -M:omni publish -m package/pmd4-manifest.edn
+    script: clojure -A:omni publish -m package/pmd4-manifest.edn
     skip_cleanup: true
     on:
       all_branches: true
