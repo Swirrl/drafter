@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o errexit
+
 # start ssh agent and add key so clojure tools can clone git repos
 ssh-agent
 ssh-add

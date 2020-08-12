@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o errexit
+
 sleep 15
 
 env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java \
