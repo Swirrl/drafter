@@ -7,7 +7,7 @@
                           :drafter/auth0-aud {:doc "The intended audience of the auth0 token, usually the sites URL.  This is normally a URI, that identifies an arbitrary grouping of services.  The same value needs to be specified in your auth0 admin panel configuration."
                                               :env-var AUTH0_AUD}
                           :drafter/auth0-client-id {:doc "The auth0 client id."
-                                                    :env-var AUTH0_CLIENT}
+                                                    :env-var AUTH0_CLIENT_ID}
                           :drafter/auth0-client-secret {:doc "The auth0 client secret."
                                                         :env-var AUTH0_CLIENT_SECRET}
                           }

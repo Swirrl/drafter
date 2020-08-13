@@ -2,22 +2,22 @@
 
  :deps {
         buddy/buddy-sign {:mvn/version "3.0.0"}
-        cheshire {:mvn/version "5.8.0"}
-        clj-http {:mvn/version "3.9.0"}
-        grafter {:mvn/version "2.1.2"}
+        cheshire/cheshire {:mvn/version "5.8.0"}
+        clj-http/clj-http {:mvn/version "3.9.0"}
+        grafter/grafter {:mvn/version "2.1.2"}
         grafter/url {:mvn/version "0.2.5"}
         grafter/vocabularies {:mvn/version "0.2.6"}
-        integrant {:mvn/version "0.6.3"}
-        martian {:mvn/version "0.1.10"}
-        martian-clj-http {:mvn/version "0.1.10"}
+        integrant/integrant {:mvn/version "0.6.3"}
+        martian/martian {:mvn/version "0.1.10"}
+        martian-clj-http/martian-clj-http {:mvn/version "0.1.10"}
         org.clojure/clojure {:mvn/version "1.9.0"}
         org.clojure/tools.logging {:mvn/version "0.4.1"}
         ring/ring-core {:mvn/version "1.6.3"}
-        clj-time {:mvn/version "0.15.1"}
-        grafter.db {:mvn/version "0.8.5"}
+        clj-time/clj-time {:mvn/version "0.15.1"}
+        grafter.db/grafter.db {:mvn/version "0.8.5"}
         com.cemerick/url {:mvn/version "0.1.1"}
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
-                      :sha "29a8ced9943a5cc6e20c14202c123a3f970b18f5"
+                      :sha "11fbe37324ab238752502f275d3a321fd012a65b"
                       :exclusions [com.auth0/jwks-rsa com.auth0/java-jwt]
                       }
         }
@@ -29,7 +29,7 @@
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
                  :extra-deps {
                               lambdaisland/kaocha {:mvn/version "0.0-418"}
-                              environ {:mvn/version "1.0.3"}
+                              environ/environ {:mvn/version "1.0.3"}
                               integrant/repl {:mvn/version "0.3.1"}
                               org.slf4j/slf4j-log4j12 {:mvn/version "1.7.25"}
                               com.auth0/java-jwt {:mvn/version "3.8.0"}
@@ -39,7 +39,7 @@
                   :extra-deps {drafter {:local/root "../drafter"}
                                org.clojure/test.check {:mvn/version "0.9.0"}
                                lambdaisland/kaocha {:mvn/version "1.0.629"}
-                               environ {:mvn/version "1.0.3"}
+                               environ/environ {:mvn/version "1.0.3"}
                                integrant/repl {:mvn/version "0.3.1"}
                                org.slf4j/slf4j-log4j12 {:mvn/version "1.7.25"}
                                com.auth0/java-jwt {:mvn/version "3.8.0"}

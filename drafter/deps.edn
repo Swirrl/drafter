@@ -9,15 +9,15 @@
 
         cognician/dogstatsd-clj {:mvn/version "0.1.2"}
 
-        commons-codec {:mvn/version "1.12"}
+        commons-codec/commons-codec {:mvn/version "1.12"}
 
         clj-commons/clj-yaml {:mvn/version "0.7.0"} ;; for loading our Swagger schemas
         metosin/scjsv {:mvn/version "0.5.0"} ;; for validating our Swagger/JSON schemas
 
-        aero {:mvn/version "1.1.3"}
+        aero/aero {:mvn/version "1.1.3"}
 
-        integrant {:mvn/version "0.7.0"}
-        meta-merge {:mvn/version "1.0.0"}
+        integrant/integrant {:mvn/version "0.7.0"}
+        meta-merge/meta-merge {:mvn/version "1.0.0"}
 
         ;; Lock dependency of jackson to a version that
         ;; works with sesame's sparql json results renderer
@@ -35,7 +35,7 @@
         com.sun.mail/javax.mail {:mvn/version "1.6.2"}
         ;;[com.taoensso/tower "2.0.2"]
 
-        grafter {:mvn/version "2.1.2"}
+        grafter/grafter {:mvn/version "2.1.2"}
 
         org.apache.tika/tika-core {:mvn/version "1.23"} ;; mime types
         org.eclipse.rdf4j/rdf4j-runtime {:mvn/version "2.5.0"
@@ -44,7 +44,7 @@
 
         grafter/url {:mvn/version "0.2.5"}
 
-        lib-noir {:mvn/version "0.9.9"
+        lib-noir/lib-noir {:mvn/version "0.9.9"
                   :exclusions [compojure org.clojure/java.classpath org.clojure/tools.reader org.clojure/java.classpath]}
         me.raynes/fs {:mvn/version "1.4.6"} ;; filesystem utils
 
@@ -65,23 +65,23 @@
         org.slf4j/slf4j-log4j12 {:mvn/version "1.7.26" :exclusions [log4j org.slf4j/slf4j-api]}
         prismatic/schema {:mvn/version "1.1.10"}
 
-        ring-middleware-format {:mvn/version "0.7.4"}
-        ring {:mvn/version "1.7.1" :exclusions [org.clojure/java.classpath]}
-        ring-middleware-accept {:mvn/version "2.0.3"}
-        ring-server {:mvn/version "0.5.0"}
+        ring-middleware-format/ring-middleware-format {:mvn/version "0.7.4"}
+        ring/ring {:mvn/version "1.7.1" :exclusions [org.clojure/java.classpath]}
+        ring-middleware-accept/ring-middleware-accept {:mvn/version "2.0.3"}
+        ring-server/ring-server {:mvn/version "0.5.0"}
         ring/ring-core {:mvn/version "1.7.1"}
-        ring-cors {:mvn/version "0.1.13"}
+        ring-cors/ring-cors {:mvn/version "0.1.13"}
 
         swirrl/lib-swirrl-server {:mvn/version "0.6.3" :exclusions [clout org.clojure/java.classpath]}
-        wrap-verbs {:mvn/version "0.1.1"}
+        wrap-verbs/wrap-verbs {:mvn/version "0.1.1"}
 
         com.auth0/jwks-rsa {:mvn/version "0.8.1"}
         com.auth0/java-jwt {:mvn/version "3.8.0"}
-        martian {:mvn/version "0.1.10"}
-        martian-clj-http {:mvn/version "0.1.10" :exclusions [clj-http]}
-        clj-http {:mvn/version "3.10.0"}
+        martian/martian {:mvn/version "0.1.10"}
+        martian-clj-http/martian-clj-http {:mvn/version "0.1.10" :exclusions [clj-http]}
+        clj-http/clj-http {:mvn/version "3.10.0"}
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
-                      :sha "29a8ced9943a5cc6e20c14202c123a3f970b18f5"}
+                      :sha "11fbe37324ab238752502f275d3a321fd012a65b"}
         }
 
  :mvn/repos
@@ -92,11 +92,11 @@
 
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
                  :extra-deps {clojure-csv/clojure-csv {:mvn/version "2.0.2"}
-                              environ {:mvn/version "1.0.3"}
+                              environ/environ {:mvn/version "1.0.3"}
                               lambdaisland/kaocha {:mvn/version "1.0.629"}
                               org.clojure/data.json {:mvn/version "0.2.6"}
                               org.clojure/test.check {:mvn/version "0.9.0"}
-                              ring-mock {:mvn/version "0.1.5"}
+                              ring-mock/ring-mock {:mvn/version "0.1.5"}
                               ring/ring-devel {:mvn/version "1.7.1" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]}}}
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}

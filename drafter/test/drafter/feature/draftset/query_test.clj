@@ -143,3 +143,47 @@
         query-request (create-query-request test-publisher draftset-location "SELECT * WHERE { ?s ?p ?o }" "application/sparql-results+json")
         query-response (handler query-request)]
     (tc/assert-is-forbidden-response query-response)))
+
+(tc/deftest-system-with-keys query-draftset-disallowed-with-service-query
+  [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)]
+    (let [query-request (create-query-request test-editor
+                                              draftset-location
+                                              "SELECT * WHERE { SERVICE <http://anything> { ?s ?p ?o } }" "application/sparql-results+json")
+          query-response (handler query-request)]
+      (tc/assert-is-bad-request-response query-response))
+    (let [query-request (create-query-request test-editor draftset-location "
+SELECT * WHERE {
+  GRAPH ?g { ?s ?p ?o }
+  GRAPH ?g {
+    SERVICE <db:somedb> {
+      { ?s ?p ?o }
+    }
+  }
+}"  "application/sparql-results+json")
+          query-response (handler query-request)]
+      (tc/assert-is-bad-request-response query-response))
+    (let [query-request (create-query-request test-editor draftset-location "
+PREFIX dcat: <http://www.w3.org/ns/dcat#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX qb: <http://purl.org/linked-data/cube#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sdmx: <http://purl.org/linked-data/sdmx/2009/concept#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX void: <http://rdfs.org/ns/void#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT (COUNT(*) as ?tripod_count_var) {
+  SELECT * {
+    SELECT * WHERE {
+      ?s ?p ?odd
+    }
+    LIMIT 100
+  }
+  LIMIT 1000 OFFSET 0
+}" "application/sparql-results+json")
+            query-response (handler query-request)]
+        (tc/assert-is-ok-response query-response))))
