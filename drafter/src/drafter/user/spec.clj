@@ -68,15 +68,15 @@
   :ret boolean?)
 
 (s/fdef user/can-claim?
-  :arg (s/cat :user ::user/User :draftset ::ds/Draftset)
+  :args (s/cat :user ::user/User :draftset ::ds/Draftset)
   :ret boolean?)
 
 (s/fdef user/can-view?
-  :arg (s/cat :user ::user/User :draftset ::ds/Draftset)
+  :args (s/cat :user ::user/User :draftset ::ds/Draftset)
   :ret boolean?)
 
 (s/fdef user/permitted-draftset-operations
-  :arg (s/cat :draftset ::ds/Draftset :user ::user/User)
+  :args (s/cat :draftset ::ds/Draftset :user ::user/User)
   :ret (s/coll-of ::ds/Operation :kind set?))
 
 (def ^:private fns-with-specs
