@@ -1,12 +1,11 @@
 (ns ^:rest-api drafter.feature.draftset.options-test
   (:require [clojure.test :as t :refer [is]]
-            [drafter.feature.draftset.create-test :as ct]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]
-            [drafter.user :as user]
             [drafter.user-test
-             :refer [test-editor test-manager test-password test-publisher]]
-            [drafter.user.memory-repository :as memrepo]))
+             :refer [test-editor test-manager test-password test-publisher]]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (tc/deftest-system-with-keys get-options-test
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]

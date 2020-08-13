@@ -7,6 +7,7 @@
             [kaocha.repl :as test]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
+            [drafter.spec :refer [load-spec-namespaces!]]
             [clojure.java.io :as io]
             [meta-merge.core :as mm]
             [drafter.test-common] ;; for :mock profile
@@ -24,6 +25,8 @@
 
 (defn stub-fdefs [set-of-syms]
   (st/instrument set-of-syms {:stub set-of-syms}))
+
+(load-spec-namespaces!)
 
 (defn start-system!
   ([] (start-system! {:instrument? true}))

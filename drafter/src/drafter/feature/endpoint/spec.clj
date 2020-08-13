@@ -11,7 +11,7 @@
             [drafter.backend :as backend]))
 
 (s/fdef list/get-endpoints
-        :args (s/cat :repo ::backend/repo :user ::user/User :include ep/includes :union-with-live? boolean?)
+        :args (s/cat :repo ::backend/repo :user (s/nilable ::user/User) :include ep/includes :union-with-live? boolean?)
         :ret (s/coll-of ::ep/Endpoint))
 
 (s/fdef public/get-public-endpoint

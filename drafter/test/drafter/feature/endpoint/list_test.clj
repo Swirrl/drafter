@@ -1,5 +1,5 @@
 (ns drafter.feature.endpoint.list-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer :all :as t]
             [drafter.feature.endpoint.list :refer :all]
             [drafter.endpoint :as ep]
             [drafter.endpoint.spec]
@@ -10,6 +10,8 @@
             [clojure.spec.alpha :as s]
             [clojure.java.io :as io])
   (:import [java.time OffsetDateTime]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (defn get-endpoints-request [& {:keys [include user]}]
   (let [req {:uri "/v1/endpoints" :request-method :get}

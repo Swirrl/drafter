@@ -26,7 +26,8 @@
             [aero.core :as aero]
             [drafter.user :as user]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]])
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
+            [drafter.spec :refer [load-spec-namespaces!]])
   (:import [com.auth0.jwk Jwk JwkProvider]
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT
@@ -46,10 +47,11 @@
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
            org.eclipse.rdf4j.rio.trig.TriGParserFactory
            [java.util.zip GZIPOutputStream]
-           (java.time.temporal Temporal)))
+           [java.time.temporal Temporal]))
 
 (defn with-spec-instrumentation [f]
   (try
+    (load-spec-namespaces!)
     (st/instrument)
     (f)
     (finally

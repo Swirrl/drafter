@@ -5,9 +5,7 @@
             [drafter.backend :as backend]
             [drafter.backend.live :as live]
             [drafter.backend.draftset :as draftset]
-            [integrant.core :as ig])
-  (:import [grafter_2.rdf4j.repository ToConnection]))
-
+            [integrant.core :as ig]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Specs for backend config etc.
@@ -16,7 +14,7 @@
 (s/def ::sparql-query-endpoint uri?)
 (s/def ::sparql-update-endpoint uri?)
 
-(s/def ::repo (s/with-gen #(satisfies? ToConnection %)
+(s/def ::backend/repo (s/with-gen #(satisfies? repo/ToConnection %)
                           (fn [] (gen/return (repo/sail-repo)))))
 
 (defmethod ig/pre-init-spec :drafter/backend [_]

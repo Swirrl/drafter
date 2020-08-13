@@ -16,7 +16,6 @@
           :skip-meta   [:auth0]
           :auth-env    :basic-auth}]
  :capture-output? false
- :plugins [:kaocha.plugin/auth-env-plugin
-           :kaocha.plugin/instrument-specs]
+ :plugins [:kaocha.plugin/auth-env-plugin]
  :reporter [kaocha.report/documentation]
  }

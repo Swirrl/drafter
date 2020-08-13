@@ -1,24 +1,20 @@
 (ns ^:rest-api drafter.routes.reasoning-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
-            [clojure.tools.logging :as log]
             [drafter.feature.draftset.create-test :as create-test]
             [drafter.test-common :as tc :refer [deftest-system]]
             [drafter.user-test :refer [test-editor test-publisher]]
             [grafter-2.rdf.protocols :refer [add context]]
-            [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [schema.test :refer [validate-schemas]]
             [clojure.string :as string]
-            [clojure-csv.core :as csv]
             [drafter.routes.common
              :refer [default-sparql-query live-query
                      draftset-query append-quads-to-draftset-through-api
                      publish-draftset]]
-            [clojure.set :as set])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
+            [clojure.set :as set]))
 
-(use-fixtures :each (join-fixtures [validate-schemas]))
+(use-fixtures :each (join-fixtures [validate-schemas tc/with-spec-instrumentation]))
 
 (def system-config "drafter/routes/sparql-test/reasoning-system.edn")
 

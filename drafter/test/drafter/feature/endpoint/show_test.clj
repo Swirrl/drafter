@@ -1,11 +1,13 @@
 (ns drafter.feature.endpoint.show-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer :all :as t]
             [drafter.test-common :as tc]
             [drafter.fixture-data :as fd]
             [drafter.endpoint :as ep]
             [clojure.java.io :as io]
             [drafter.feature.draftset.test-helper :as help])
   (:import [java.time OffsetDateTime]))
+
+(t/use-fixtures :each tc/with-spec-instrumentation)
 
 (deftest show-public-endpoint-empty-test
   (tc/with-system
