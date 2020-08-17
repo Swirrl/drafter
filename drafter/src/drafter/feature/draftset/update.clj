@@ -52,6 +52,14 @@
     (assert (= 1 (count ops)))
     (first ops)))
 
+(defn- ->jena-quad [{:keys [c s p o]}]
+  (letfn [(->node [x]
+            (if (uri? x)
+              (NodeFactory/createURI (str x))
+              (NodeFactory/createLiteral (str x))))]
+    (let [[c s p o] (map ->node [c s p o])]
+      (Quad. c s p o))))
+
 (defn- drop-live-graph-op [draftset-uri graph-uri]
   (let [op (update-op "
 INSERT { } WHERE { GRAPH <" dm/drafter-state-graph "> {
@@ -107,8 +115,16 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
 (defprotocol UpdateOperation
   (affected-graphs [op])
   (size [op])
-  (raw-operations [op db])
+  (raw-operations [op rewriter draftset-uri graph-meta])
   (rewrite [op rewriter]))
+
+(defn just-in-live? [g meta]
+  (let [{:keys [live? draft?]} (get meta g)]
+    (and live? (not draft?))))
+
+(defn in-draftset? [g meta]
+  (let [{:keys [live? draft?]} (get meta g)]
+    draft?))
 
 (extend-protocol UpdateOperation
   UpdateDataDelete
@@ -116,9 +132,6 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
     (set (map #(URI. (.getURI (.getGraph %))) (.getQuads op))))
   (size [op]
     (count (.getQuads op)))
-  (raw-operations [op db]
-
-    )
   (rewrite [op rewriter]
     (->> (.getQuads op)
          (map (partial rewrite-quad rewriter))
@@ -130,6 +143,9 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
     (set (map #(URI. (.getURI (.getGraph %))) (.getQuads op))))
   (size [op]
     (count (.getQuads op)))
+  (raw-operations [op rewriter draftset-uri graph-meta]
+    ;; do we need to copy?
+    )
   (rewrite [op rewriter]
     (->> (.getQuads op)
          (map (partial rewrite-quad rewriter))
@@ -141,6 +157,20 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
     #{;(URI. (.getURI (.getGraph op)))
       })
   (size [op] 1)
+  (raw-operations [op rewriter draftset-uri graph-meta]
+    (let [g (URI. (.getURI (.getGraph op)))]
+      (cond (just-in-live? g graph-meta)
+            [(empty-draft-graph-for-op draftset-uri (util/get-current-time) g)]
+            ;; what if we insert an empty graph and then insert stuff follows it?
+            (in-draftset? g graph-meta)
+            ;; TODO: if-not (too-big? g)
+            [(rewrite op rewriter)]
+            ;; else throw? too large?
+            :nowhere
+            [(rewrite op rewriter)]
+            ;; TODO: is this right? we're either going to be deleting nothing -
+            ;; OK, or deleting stuff we just inserted.
+            )))
   (rewrite [op rewriter]
     ;; here, something needs to know which rewrite mode to be in
     (-> op .getGraph Item/createNode arq/sse-zipper rewriter UpdateDrop.))
@@ -215,14 +245,6 @@ SELECT (COUNT (*) AS ?c) WHERE {
         [{c :c}] (sparql/eager-query repo (format q graph-uri))]
     (<= c max-update-size )))
 
-(defn- ->jena-quad [{:keys [c s p o]}]
-  (letfn [(->node [x]
-            (if (uri? x)
-              (NodeFactory/createURI (str x))
-              (NodeFactory/createLiteral (str x))))]
-    (let [[c s p o] (map ->node [c s p o])]
-      (Quad. c s p o))))
-
 (defn- insert-data-stmt [quads]
   (UpdateDataInsert. (QuadDataAcc. (map ->jena-quad quads))))
 
@@ -288,6 +310,31 @@ SELECT (COUNT (*) AS ?c) WHERE {
                              affected-graphs)
         draftset-mapping (ops/get-draftset-graph-mapping backend draftset-id)]
     (merge request-mapping draftset-mapping)))
+
+(defn- draftset-graph-meta-q [draftset-id]
+  (let [ds-uri (ds/->draftset-uri draftset-id)
+        q (str
+           "SELECT ?lg (COUNT(?t) AS ?c) WHERE { "
+           (dm/with-state-graph
+             "?ds <" rdf:a "> <" drafter:DraftSet "> ."
+             "?dg <" drafter:inDraftSet "> ?ds ."
+             "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+             "?lg <" drafter:hasDraft "> ?dg ."
+             "VALUES ?ds { <" ds-uri "> }")
+           "  GRAPH ?dg { ?_s ?_p ?_o } "
+           "}")]
+    (set (map :lg (sparql/eager-query repo q)))))
+
+(defn- draftset-graph-meta [backend draftset-id])
+
+(s/fdef draftset-graph-meta
+  :args (s/cat :backend any? :draftset-id uuid?)
+  :ret ::graph-meta)
+
+(s/def ::draft-graph-uri uri?)
+(s/def ::size integer?)
+(s/def ::graph-meta
+  (s/map-of uri? (s/keys :req-un [::draft-graph-uri ::size])))
 
 (defn handler*
   [{:keys [drafter/backend max-update-size wrap-as-draftset-owner] :as opts} request]

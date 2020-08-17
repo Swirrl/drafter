@@ -479,7 +479,7 @@ WHERE {
   }
 } ;" ?from ?to suffix)))
 
-(defn- rewrite-draftset-q [opts]
+(defn rewrite-draftset-q [opts]
   (rewrite-q (assoc opts :?from '?lg :?to '?dg :deleted :ignore)))
 
 (defn- unrewrite-draftset-q [opts]
