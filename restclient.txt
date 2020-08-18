@@ -332,17 +332,15 @@ Accept: application/sparql-results+json
 Accept-Language: en-US,en;q=0.5
 Content-Type: application/sparql-query
 
-SELECT * WHERE {
-  GRAPH ?g { { ?lg ?p1 ?o1 } UNION
-             { ?s2 ?lg ?o2 } UNION
-             { ?s3 ?p3 ?lg } }
+SELECT ?lg ?dg (COUNT(?s) AS ?c) WHERE {
+  GRAPH ?dg { ?s ?p ?o }
   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
     ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-    ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
     ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
     ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
   }
 }
+GROUP BY ?lg ?dg ?c
 
 #
 POST http://localhost:5820/drafter-test-db/update

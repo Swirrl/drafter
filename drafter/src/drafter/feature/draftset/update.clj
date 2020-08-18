@@ -312,29 +312,41 @@ SELECT (COUNT (*) AS ?c) WHERE {
     (merge request-mapping draftset-mapping)))
 
 (defn- draftset-graph-meta-q [draftset-id]
-  (let [ds-uri (ds/->draftset-uri draftset-id)
-        q (str
-           "SELECT ?lg (COUNT(?t) AS ?c) WHERE { "
-           (dm/with-state-graph
-             "?ds <" rdf:a "> <" drafter:DraftSet "> ."
-             "?dg <" drafter:inDraftSet "> ?ds ."
-             "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-             "?lg <" drafter:hasDraft "> ?dg ."
-             "VALUES ?ds { <" ds-uri "> }")
-           "  GRAPH ?dg { ?_s ?_p ?_o } "
-           "}")]
-    (set (map :lg (sparql/eager-query repo q)))))
+  (let [ds-uri (ds/->draftset-uri draftset-id)]
+    (str
+     "SELECT ?lg ?dg (COUNT(?_s) AS ?c) WHERE { "
+     (dm/with-state-graph
+       "?ds <" rdf:a "> <" drafter:DraftSet "> ."
+       "?dg <" drafter:inDraftSet "> ?ds ."
+       "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
+       "?lg <" drafter:hasDraft "> ?dg ."
+       "VALUES ?ds { <" ds-uri "> }")
+     "  GRAPH ?dg { ?_s ?_p ?_o } "
+     "} "
+     "GROUP BY ?lg ?dg ?_s")))
 
-(defn- draftset-graph-meta [backend draftset-id])
+(defn- draftset-graph-meta [backend draftset-id]
+  (let [q (draftset-graph-meta-q draftset-id)]
+    (->> (sparql/eager-query backend q)
+         (map (fn [{:keys [dg lg c]}]
+                [lg {:size c :draft-graph-uri dg :managed? true}]))
+         (into {}))))
 
 (s/fdef draftset-graph-meta
   :args (s/cat :backend any? :draftset-id uuid?)
   :ret ::graph-meta)
 
 (s/def ::draft-graph-uri uri?)
-(s/def ::size integer?)
+(s/def ::size nat-int?)
+(s/def ::managed? boolean?)
 (s/def ::graph-meta
-  (s/map-of uri? (s/keys :req-un [::draft-graph-uri ::size])))
+  (s/map-of uri? (s/keys :req-un [::draft-graph-uri ::size ::managed?])))
+
+(defn rewriter [graph-meta]
+  (->> graph-meta
+       (map (juxt key (comp :draft-graph-uri val)))
+       (into {})
+       (partial uri-constant-rewriter)))
 
 (defn handler*
   [{:keys [drafter/backend max-update-size wrap-as-draftset-owner] :as opts} request]
