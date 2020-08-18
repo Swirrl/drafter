@@ -4,9 +4,7 @@
             [drafter.routes.status :refer :all]
             [drafter.test-common :as tc]
             [ring.mock.request :refer :all]
-            [schema.core :as s]
-            [schema.test :refer [validate-schemas]]
-            [swirrl-server.async.status-routes :refer [JobNotFinishedResponse]])
+            [schema.test :refer [validate-schemas]])
   (:import java.util.concurrent.locks.ReentrantLock
            java.util.UUID))
 
