@@ -332,15 +332,25 @@ Accept: application/sparql-results+json
 Accept-Language: en-US,en;q=0.5
 Content-Type: application/sparql-query
 
-SELECT ?lg ?dg (COUNT(?s) AS ?c) WHERE {
-  GRAPH ?dg { ?s ?p ?o }
-  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+SELECT ?ds ?lg ?dg (COUNT(?s1) AS ?c1) (COUNT(?s2) AS ?c2) WHERE {
+  { GRAPH ?dg { ?s1 ?p1 ?o1 }
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+      ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+    }
+  } UNION {
+    GRAPH ?lg { ?s2 ?p2 ?o2 }
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+      ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+      MINUS {
+        ?lg <http://publishmydata.com/def/drafter/hasDraft> ?_dg .
+      }
+    }
   }
 }
-GROUP BY ?lg ?dg ?c
+GROUP BY ?ds ?lg ?dg ?c1 ?c2
 
 #
 POST http://localhost:5820/drafter-test-db/update
@@ -360,5 +370,51 @@ WHERE {
     ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
     ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
     ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+  }
+}
+
+#
+POST http://localhost:5820/drafter-test-db/query
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+Accept: application/sparql-results+json
+Accept-Language: en-US,en;q=0.5
+Content-Type: application/sparql-query
+
+SELECT ?ds ?lg ?dg (COUNT(?s1) AS ?c1) WHERE {
+  { GRAPH ?dg { ?s1 ?p1 ?o1 }
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+      ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+    }
+    VALUES ?ds { <http://publishmydata.com/def/drafter/draftset/735374b8-6252-476d-8445-c1ba0aec5d32> }
+  } UNION {
+    GRAPH ?lg { ?s2 ?p2 ?o2 }
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+      ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+      MINUS {
+        ?lg <http://publishmydata.com/def/drafter/hasDraft> ?_dg .
+      }
+    }
+    VALUES ?lg { <http://g/cfca2450-7018-46bc-9308-65855849f158> }
+  }
+}
+GROUP BY ?ds ?lg ?dg ?s1 ?s2
+
+#
+POST http://localhost:5820/drafter-test-db/query
+Host: localhost:3001
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0
+Accept: application/sparql-results+json
+Accept-Language: en-US,en;q=0.5
+Content-Type: application/sparql-query
+
+SELECT ?lg ?dg ?ds WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+    # ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    VALUES ?ds { <http://publishmydata.com/def/drafter/draftset/252122a5-7f20-43a6-b3d4-240e3327053d> }
   }
 }

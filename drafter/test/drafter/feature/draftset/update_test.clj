@@ -52,6 +52,7 @@ SELECT ?lg ?dg ?s ?p ?o WHERE {
     (format q draftset-uri)))
 
 (tc/deftest-system-with-keys insert-modify-test
+  ;; TODO: wtf is this testing?
   keys-for-test [system system-config]
   (with-open [conn (-> system
                        :drafter.common.config/sparql-query-endpoint
@@ -74,6 +75,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           _ (tc/assert-is-no-content-response response)
           [{:keys [dg s p o]} :as quads]
           (repo/query conn (draftset-quads-mapping-q draftset-location))]
+      (is (not (nil? dg)))
       (is (= 1 (count quads)))
       (is (= dg o))
       (is (not= o (URI. "http://g"))))))
@@ -275,7 +277,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (tc/assert-is-server-error response)
           (is (zero? (count res))))))))
 
-(tc/with-system
+#_(tc/with-system
   keys-for-test [system system-config]
   (with-open [conn (-> system
                        :drafter.common.config/sparql-query-endpoint
