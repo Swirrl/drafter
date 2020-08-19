@@ -58,56 +58,6 @@
     (let [[c s p o] (map ->node [c s p o])]
       (Quad. c s p o))))
 
-(defn- drop-live-graph-op [draftset-uri graph-uri]
-  (let [op (update-op "
-INSERT { } WHERE { GRAPH <" dm/drafter-state-graph "> {
-  <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph ">
-} FILTER NOT EXISTS { GRAPH <" dm/drafter-state-graph "> {
-    <" graph-uri "> <" drafter:inDraftSet "> <" draftset-uri ">
-  } }
-}")
-        insert-acc (.getInsertAcc op)]
-    (doseq [quad (->> (dm/create-draft-graph graph-uri
-                                             (dm/make-draft-graph-uri)
-                                             (util/get-current-time)
-                                             draftset-uri)
-                      (apply dm/to-quads)
-                      (map ->jena-quad))]
-      (.addQuad insert-acc quad))
-    op))
-
-(defn- drop-draft-graph-op [draftset-uri graph-uri]
-  "DROP GRAPH "
-  )
-
-(defn- manage-graph-op [graph-uri]
-  (update-op "
-INSERT { GRAPH <" dm/drafter-state-graph "> {
-  <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> .
-  <" graph-uri "> <" drafter:isPublic "> false .
-  }
-} WHERE {
-  FILTER NOT EXISTS {
-    GRAPH <" dm/drafter-state-graph "> {
-     <" graph-uri "> <" rdf:a "> <" drafter:ManagedGraph ">
-    }
-  }
-}"))
-
-(defn- empty-draft-graph-for-op [draftset-uri timestamp graph-uri]
-  (let [draft-graph-uri (dm/make-draft-graph-uri)]
-    (->> (dm/create-draft-graph graph-uri draft-graph-uri timestamp draftset-uri)
-         (apply dm/to-quads)
-         (map ->jena-quad)
-         (QuadDataAcc.)
-         (UpdateDataInsert.))))
-
-;; TODO: need to know whether a graph is:
-;; a) Just in live (not being copied)
-;; b) Already copied to draftset
-;; c) Only in current update
-
-
 (defprotocol UpdateOperation
   (affected-graphs [op])
   (size [op])
@@ -135,30 +85,6 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
 (defn- insert-data-stmt [quads]
   (UpdateDataInsert. (QuadDataAcc. (map ->jena-quad quads))))
 
-;; TODO: What if the live graph is already managed? I think we're setting it to
-;; isPublic = false
-
-(defn- copy-graph-operation
-  ;; TODO: this is the issue, we don't actually create the draft
-  ;; ******
-  [draftset-uri timestamp [graph-uri {:keys [draft-graph-uri]}]]
-  (let [managed-graph-quads (dm/to-quads (dm/create-managed-graph graph-uri))
-        draft-graph-quads (apply dm/to-quads
-                                 (dm/create-draft-graph graph-uri
-                                                        draft-graph-uri
-                                                        timestamp
-                                                        draftset-uri))
-        insert-data (insert-data-stmt (concat managed-graph-quads
-                                              draft-graph-quads))
-        copy-graph-stmt (UpdateCopy. (Target/create (str graph-uri))
-                                     (Target/create (str draft-graph-uri)))]
-    [insert-data copy-graph-stmt]))
-
-(defn- copy-graphs-operations [draftset-id graphs-to-copy]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
-        now (util/get-current-time)]
-    (mapcat (partial copy-graph-operation draftset-uri now) graphs-to-copy)))
-
 (defn- rewrite-draftset-ops [draftset-id]
   (-> {:draftset-uri (ds/->draftset-uri draftset-id)}
       dm/rewrite-draftset-q
@@ -183,42 +109,38 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
   (UpdateCopy. (Target/create (str graph-uri))
                (Target/create (str draft-graph-uri))))
 
-(defn- prerequisites [graph-meta max-update-size draftset-id update-request]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
-        timestamp (util/get-current-time)
-        graphs-to-manage (keep (fn [[lg {:keys [live? draft? draft-graph-uri]}]]
-                                 (when (and (not live?) (not draft?))
-                                   (manage-graph-stmt draftset-uri
-                                                      timestamp
-                                                      lg
-                                                      draft-graph-uri)))
-                               graph-meta)
-        copyable? (fn [[_ {:keys [live-size]}]] (<= live-size max-update-size))
-        graphs-to-copy (->> graph-meta
-                            (keep (fn [[lg {:keys [live? draft? live-size draft-graph-uri]}]]
-                                    (when (and live? (not draft?))
-                                      (if (> live-size max-update-size)
-                                        (throw
-                                         (ex-info "Unable to copy graphs"
-                                                  {:status 500
-                                                   :headers {"Content-Type" "text/plain"}
-                                                   :body "500 Unable to copy graphs"}))
-                                        [(draft-graph-stmt draftset-uri
-                                                           timestamp
-                                                           lg
-                                                           draft-graph-uri)
-                                         (copy-graph-stmt lg draft-graph-uri)]))))
-                            (apply concat))]
-    (concat graphs-to-manage
-            graphs-to-copy
-            (if (seq graphs-to-copy) (rewrite-draftset-ops draftset-id) []))))
+(defn- graphs-to-manage [draftset-uri timestamp graph-meta]
+  (keep (fn [[lg {:keys [live? draft? draft-graph-uri]}]]
+          (when (and (not live?) (not draft?))
+            (manage-graph-stmt draftset-uri timestamp lg draft-graph-uri)))
+        graph-meta))
+
+(defn- graphs-to-copy [draftset-uri timestamp max-update-size graph-meta]
+  (->> graph-meta
+       (keep (fn [[lg {:keys [live? draft? live-size draft-graph-uri]}]]
+               (when (and live? (not draft?))
+                 (if (> live-size max-update-size)
+                   (throw
+                    (ex-info "Unable to copy graphs"
+                             {:status 500
+                              :headers {"Content-Type" "text/plain"}
+                              :body "500 Unable to copy graphs"}))
+                   [(draft-graph-stmt draftset-uri
+                                      timestamp
+                                      lg
+                                      draft-graph-uri)
+                    (copy-graph-stmt lg draft-graph-uri)]))))
+       (apply concat)))
 
 (defn- data-insert-delete-ops
   [op {:keys [max-update-size rewriter draftset-id graph-meta] :as opts}]
-  ;; do we /need/ to copy?
-  ;; (println 'op (str op))
-  (concat (prerequisites graph-meta max-update-size draftset-id op)
-          [(rewrite op rewriter)]))
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
+        timestamp (util/get-current-time)
+        manage (graphs-to-manage draftset-uri timestamp graph-meta)
+        copy (graphs-to-copy draftset-uri timestamp max-update-size graph-meta)
+        rewrite-ds (when (seq copy) (rewrite-draftset-ops draftset-id))
+        op [(rewrite op rewriter)]]
+    (concat manage copy rewrite-ds op)))
 
 (defn- parse-body [request opts]
   (let [update-request (-> request :body UpdateFactory/create)
@@ -269,8 +191,22 @@ GROUP BY ?lg ?dg")))
                          :draft-size 0
                          :live-size 0}])
         affected-graphs (->> (.getOperations update-request)
-                             (map affected-graphs)
-                             (apply set/union))]
+                             (map (juxt identity affected-graphs)))
+        graph-op-order (reduce (fn [acc [op gs]]
+                                 (reduce (fn [acc g]
+                                           (if-let [ops (acc g)]
+                                             (update acc g conj op)
+                                             (assoc acc g [op])))
+                                         acc
+                                         gs))
+                               {}
+                               affected-graphs)
+        affected-graphs (->> (map second affected-graphs)
+                             (apply set/union)
+                             (map new-graph)
+                             (map (fn [[lg m]]
+                                    [lg (assoc m :ops (graph-op-order lg))]))
+                             (into {}))]
     (->> (graph-meta-q draftset-id affected-graphs)
          (sparql/eager-query backend)
          (filter (fn [{:keys [dg lg]}] (or dg lg)))
@@ -281,7 +217,7 @@ GROUP BY ?lg ?dg")))
                      :draft-size c1
                      :live-size c2}]))
          (into {})
-         (merge (->> affected-graphs (map new-graph) (into {}))))))
+         (merge affected-graphs))))
 
 (s/def ::draft-graph-uri uri?)
 (s/def ::draft? boolean?)
@@ -295,13 +231,19 @@ GROUP BY ?lg ?dg")))
                                   ::draft-size
                                   ::live-size])))
 
-(defn just-in-live? [g meta]
+(defn- just-in-live? [g meta]
   (let [{:keys [live? draft?]} (get meta g)]
     (and live? (not draft?))))
 
-(defn in-draftset? [g meta]
+(defn- in-draftset? [g meta]
   (let [{:keys [live? draft?]} (get meta g)]
     draft?))
+
+(defn- prior-reference? [g meta op]
+  (let [{:keys [live? draft? ops]} (get meta g)]
+    (and (not live?)
+         (not draft?)
+         (not (empty? (take-while (complement #{op}) (ops g)))))))
 
 (extend-protocol UpdateOperation
   UpdateDataDelete
@@ -334,28 +276,37 @@ GROUP BY ?lg ?dg")))
   (affected-graphs [op]
     #{(URI. (.getURI (.getGraph op)))})
   (size [op] 1)
-  (raw-operations [op {:keys [rewriter draftset-id graph-meta]}]
+  (raw-operations [op {:keys [rewriter draftset-id graph-meta max-update-size]}]
     (let [g (URI. (.getURI (.getGraph op)))
+          {:keys [draft-graph-uri draft-size]} (graph-meta g)
           draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))]
       (cond (just-in-live? g graph-meta)
             [(manage-graph-stmt draftset-uri
                                 (util/get-current-time)
                                 g
-                                (get-in graph-meta [g :draft-graph-uri]))]
-            ;; what if we insert an empty graph and then insert stuff follows it?
+                                draft-graph-uri)]
+            ;; TODO: what if we insert an empty graph and then insert stuff
+            ;; follows it?
             (in-draftset? g graph-meta)
-            ;; TODO: if-not (too-big? g)
+            (if (<= draft-size max-update-size)
+              [(rewrite op rewriter)]
+              (throw (ex-info "Unable to copy graphs"
+                              {:status 500
+                               :headers {"Content-Type" "text/plain"}
+                               :body "500 Unable to copy graphs"})))
+            (prior-reference? g graph-meta op)
             [(rewrite op rewriter)]
-            ;; else throw? too large?
-            :nowhere
-            [(rewrite op rewriter)]
-            ;; TODO: is this right? we're either going to be deleting nothing -
-            ;; OK, or deleting stuff we just inserted.
-            )))
+            (.isSilent op)
+            [] ;; NOOP
+            :not-silent
+            (throw (ex-info (str "Source graph " g
+                                 " does not exist, cannot proceed with update.")
+                            {:type :error}))))) ;; NOOP
   (rewrite [op rewriter]
     ;; here, something needs to know which rewrite mode to be in
     ;; what does ^^ this mean now? still relevant?
-    (-> op .getGraph Item/createNode arq/sse-zipper rewriter UpdateDrop.)))
+    (let [node (-> op .getGraph Item/createNode arq/sse-zipper rewriter)]
+      (UpdateDrop. node (.isSilent op)))))
 
 (defn- rewriter [graph-meta]
   (->> graph-meta
@@ -363,7 +314,7 @@ GROUP BY ?lg ?dg")))
        (into {})
        (partial uri-constant-rewriter)))
 
-(defn handler*
+(defn- handler*
   [{:keys [drafter/backend max-update-size] :as opts} request]
   (let [draftset-id (:draftset-id (:params request))
         update-request (parse-body request opts)]

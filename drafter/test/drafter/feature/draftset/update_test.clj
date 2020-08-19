@@ -288,7 +288,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
                        repo/->connection)]
     (let [handler (get system [:drafter/routes :draftset/api])
           g (URI. (str "http://g/" (UUID/randomUUID)))]
-      (testing "Add quads, drop graph"
+
+      #_(testing "Add quads, drop graph"
         (let [draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
@@ -305,7 +306,28 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (tc/assert-is-no-content-response response)
           (is (zero? (count res)))))
 
-      (testing "Add quads, publish, drop graph"
+      #_(testing "Add quads, drop graph, fail too big"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 50
+              [quads1 more] (split-at n (valid-triples-g g))
+              [quads2 more] (split-at n more)
+              stmt (insert-stmt-str quads1)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              stmt (insert-stmt-str quads2)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+
+              stmt (format "DROP GRAPH <%s>" g)
+              response (update! stmt)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+          (tc/assert-is-server-error response)
+          (is (= 100 (count res)))))
+
+      #_(testing "Add quads, publish, drop graph"
         (let [draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
@@ -335,4 +357,66 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
               res (repo/query conn (format q g))]
           (tc/assert-is-no-content-response response)
           (is (zero? (count res)))))
-      )))
+
+      #_(testing "Add quads and drop graph in one statement - noop"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 49
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (str (insert-stmt-str quads1) ";\n"
+                        (format "DROP GRAPH <%s>" g))
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+          (is (zero? (count res)))))
+
+      (testing "DROP SILENT GRAPH then add quads in one statement - just adds quads"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 49
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (str (format "DROP SILENT GRAPH <%s>" g) ";\n"
+                        (insert-stmt-str quads1))
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+          (is (= 49 (count res)))))
+
+      (testing "DROP GRAPH then add quads in one statement - errors with live graph message"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 49
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (str (format "DROP GRAPH <%s>" g) ";\n"
+                        (insert-stmt-str quads1))
+              response (update! stmt)]
+          (clojure.pprint/pprint response)
+          (tc/assert-is-server-error response)
+          (is (.contains (:message (:body response)) (str g)))
+          ))
+
+      #_(testing "DROP SILENT non-existent GRAPH - noop"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              stmt (format "DROP SILENT GRAPH <%s>" g)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+          (is (zero? (count res)))))
+
+      #_(testing "DROP non-existent GRAPH - Error"
+        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              stmt (format "DROP GRAPH <%s>" g)
+              response (update! stmt)]
+          (tc/assert-is-server-error response))))))
