@@ -280,7 +280,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (tc/assert-is-server-error response)
           (is (zero? (count res))))))))
 
-#_(tc/with-system
+(tc/with-system
   keys-for-test [system system-config]
   (with-open [conn (-> system
                        :drafter.common.config/sparql-query-endpoint
@@ -288,7 +288,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
                        repo/->connection)]
     (let [handler (get system [:drafter/routes :draftset/api])
           g (URI. (str "http://g/" (UUID/randomUUID)))]
-      #_(testing "Add quads, drop graph"
+      (testing "Add quads, drop graph"
         (let [draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
@@ -327,10 +327,11 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
               stmt (format "DROP GRAPH <%s>" g)
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
+              res (repo/query conn (draftset-quads-mapping-q draftset-location))
+              _ (is (zero? (count res)) "Ensure draft graph is empty")
               res (repo/query conn (format q g))
-              _ (is (= 50 ( count res)) "Ensure graph still in live")
+              _ (is (= 50 (count res)) "Ensure graph still in live")
               _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-
               res (repo/query conn (format q g))]
           (tc/assert-is-no-content-response response)
           (is (zero? (count res)))))

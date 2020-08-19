@@ -332,13 +332,16 @@ GROUP BY ?lg ?dg")))
 
   UpdateDrop
   (affected-graphs [op]
-;(URI. (.getURI (.getGraph op)))
-    #{})
+    #{(URI. (.getURI (.getGraph op)))})
   (size [op] 1)
-  (raw-operations [op {:keys [rewriter draftset-uri graph-meta]}]
-    (let [g (URI. (.getURI (.getGraph op)))]
+  (raw-operations [op {:keys [rewriter draftset-id graph-meta]}]
+    (let [g (URI. (.getURI (.getGraph op)))
+          draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))]
       (cond (just-in-live? g graph-meta)
-            [(empty-draft-graph-for-op draftset-uri (util/get-current-time) g)]
+            [(manage-graph-stmt draftset-uri
+                                (util/get-current-time)
+                                g
+                                (get-in graph-meta [g :draft-graph-uri]))]
             ;; what if we insert an empty graph and then insert stuff follows it?
             (in-draftset? g graph-meta)
             ;; TODO: if-not (too-big? g)
@@ -375,7 +378,7 @@ GROUP BY ?lg ?dg")))
             update-request' (->> (.getOperations update-request)
                                  (mapcat #(raw-operations % opts))
                                  (add-operations (UpdateRequest.)))]
-        (clojure.pprint/pprint graph-meta)
+        ;; (clojure.pprint/pprint graph-meta)
         ;; (println (str update-request'))
         (sparql/update! backend (str update-request'))
         {:status 204}))))
