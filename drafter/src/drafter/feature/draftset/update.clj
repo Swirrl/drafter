@@ -165,21 +165,53 @@ INSERT { GRAPH <" dm/drafter-state-graph "> {
       UpdateFactory/create
       .getOperations))
 
+(defn- draft-graph-quads [draftset-uri timestamp graph-uri draft-graph-uri]
+  (->> (dm/create-draft-graph graph-uri draft-graph-uri timestamp draftset-uri)
+       (apply dm/to-quads)))
+
+(defn- draft-graph-stmt [draftset-uri timestamp graph-uri draft-graph-uri]
+  (-> (draft-graph-quads draftset-uri timestamp graph-uri draft-graph-uri)
+      (insert-data-stmt)))
+
+(defn- manage-graph-stmt [draftset-uri timestamp graph-uri draft-graph-uri]
+  (-> (concat
+       (dm/to-quads (dm/create-managed-graph graph-uri))
+       (draft-graph-quads draftset-uri timestamp graph-uri draft-graph-uri))
+      (insert-data-stmt)))
+
+(defn- copy-graph-stmt [graph-uri draft-graph-uri]
+  (UpdateCopy. (Target/create (str graph-uri))
+               (Target/create (str draft-graph-uri))))
+
 (defn- prerequisites [graph-meta max-update-size draftset-id update-request]
-  (let [graphs-to-copy (filter (fn [[lg {:keys [live? draft? live-size]}]]
-                                 (and live? (not draft?)))
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
+        timestamp (util/get-current-time)
+        graphs-to-manage (keep (fn [[lg {:keys [live? draft? draft-graph-uri]}]]
+                                 (when (and (not live?) (not draft?))
+                                   (manage-graph-stmt draftset-uri
+                                                      timestamp
+                                                      lg
+                                                      draft-graph-uri)))
                                graph-meta)
-        copyable? (fn [[_ {:keys [live-size]}]] (<= live-size max-update-size))]
-    (if (seq graphs-to-copy)
-      (if (empty? (remove copyable? graphs-to-copy))
-        (ex-info "Unable to copy graphs"
-                 {:status 500
-                  :headers {"Content-Type" "text/plain"}
-                  :body "500 Unable to copy graphs"})
-        (concat
-         (copy-graphs-operations draftset-id graphs-to-copy)
-         (rewrite-draftset-ops draftset-id)))
-      [])))
+        copyable? (fn [[_ {:keys [live-size]}]] (<= live-size max-update-size))
+        graphs-to-copy (->> graph-meta
+                            (keep (fn [[lg {:keys [live? draft? live-size draft-graph-uri]}]]
+                                    (when (and live? (not draft?))
+                                      (if (> live-size max-update-size)
+                                        (throw
+                                         (ex-info "Unable to copy graphs"
+                                                  {:status 500
+                                                   :headers {"Content-Type" "text/plain"}
+                                                   :body "500 Unable to copy graphs"}))
+                                        [(draft-graph-stmt draftset-uri
+                                                           timestamp
+                                                           lg
+                                                           draft-graph-uri)
+                                         (copy-graph-stmt lg draft-graph-uri)]))))
+                            (apply concat))]
+    (concat graphs-to-manage
+            graphs-to-copy
+            (if (seq graphs-to-copy) (rewrite-draftset-ops draftset-id) []))))
 
 (defn- data-insert-delete-ops
   [op {:keys [max-update-size rewriter draftset-id graph-meta] :as opts}]
@@ -227,7 +259,7 @@ SELECT ?lg ?dg (COUNT(?s1) AS ?c1) (COUNT(?s2) AS ?c2) WHERE {
     VALUES ?lg { " live-values-str " }
   }
 }
-GROUP BY ?lg ?dg ?s1 ?s2")))
+GROUP BY ?lg ?dg")))
 
 (defn- graph-meta [backend draftset-id update-request]
   (let [new-graph (fn [lg]
@@ -343,8 +375,8 @@ GROUP BY ?lg ?dg ?s1 ?s2")))
             update-request' (->> (.getOperations update-request)
                                  (mapcat #(raw-operations % opts))
                                  (add-operations (UpdateRequest.)))]
-        (prn draftset-id)
-        (println (str update-request'))
+        (clojure.pprint/pprint graph-meta)
+        ;; (println (str update-request'))
         (sparql/update! backend (str update-request'))
         {:status 204}))))
 

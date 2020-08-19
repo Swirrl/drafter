@@ -236,6 +236,9 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
               _ (tc/assert-is-no-content-response response)
               _ (help/publish-draftset-through-api handler draftset-location test-publisher)
               ;; There should now be 50 triples live in graph g
+              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+              res (repo/query conn (format q g))
+              _ (is (= 50 ( count res)))
 
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
