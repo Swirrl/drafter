@@ -115,12 +115,6 @@
 
            :prod {:extra-paths ["env/prod/clj" "env/prod/resources"]}
 
-           :uber {:extra-paths ["target/classes"]
-                  :main-opts ["-m" "mach.pack.alpha.capsule"
-                              "-e" "env/prod/clj"
-                              "--application-id" "drafter"
-                              "-m" "drafter.main"]}
-
            :krunk {:extra-deps {swirrl/krunk {:git/url "git@github.com:Swirrl/krunk.git"
                                               :sha "dc2666a4550c219a8ce1eea326c82d9871d6908f"}}
                    :main-opts ["-m" "krunk.deploy"]}
