@@ -71,7 +71,8 @@
 
 (defn start-drafter-server []
   (main/-main (res-file "drafter-client-test-config.edn")
-              (res-file "stasher-off.edn")))
+              (res-file "stasher-off.edn")
+              (res-file "init-public-endpoint.edn")))
 
 (defn stop-drafter-server []
   (main/stop-system!))
