@@ -26,11 +26,11 @@
            org.apache.jena.sparql.sse.Item
            [org.apache.jena.update UpdateFactory UpdateRequest]))
 
-;; TODO: drop graph
 ;; TODO: sparql protocol handler for update
 ;; TODO: which graphs in data?
 ;; TODO: update graph metadata
 ;; TODO: copy-graph
+;; TODO: write-lock?
 
 (defn- rewrite-quad [rewriter quad]
   (-> quad SSE/str arq/->sse-item arq/sse-zipper rewriter str SSE/parseQuad))
@@ -45,11 +45,6 @@
                SSE/parseOp)]
     (-> op  OpAsQuery/asQuery .getQueryPattern)))
 
-(defn- update-op [& q-strs]
-  (let [ops (->> q-strs (apply str) UpdateFactory/create .getOperations)]
-    (assert (= 1 (count ops)))
-    (first ops)))
-
 (defn- ->jena-quad [{:keys [c s p o]}]
   (letfn [(->node [x]
             (if (uri? x)
@@ -58,17 +53,17 @@
     (let [[c s p o] (map ->node [c s p o])]
       (Quad. c s p o))))
 
-(defprotocol UpdateOperation
-  (affected-graphs [op])
-  (size [op])
-  (raw-operations [op opts])
-  (rewrite [op rewriter]))
-
 (defn- within-limit? [operations {:keys [max-update-size] :as opts}]
   (<= (reduce + (map size operations)) max-update-size))
 
 (defn- processable? [operation]
   (satisfies? UpdateOperation operation))
+
+(defprotocol UpdateOperation
+  (affected-graphs [op])
+  (size [op])
+  (raw-operations [op opts])
+  (rewrite [op rewriter]))
 
 (defn- unprocessable-request [unprocessable]
   (ex-info "422 Unprocessable Entity"
@@ -115,10 +110,26 @@
             (manage-graph-stmt draftset-uri timestamp lg draft-graph-uri)))
         graph-meta))
 
-(defn- graphs-to-copy [draftset-uri timestamp max-update-size graph-meta]
+(defn- just-in-live? [g meta]
+  (let [{:keys [live? draft?]} (get meta g)]
+    (and live? (not draft?))))
+
+(defn- in-draftset? [g meta]
+  (let [{:keys [live? draft?]} (get meta g)]
+    draft?))
+
+(defn- prior-reference? [g meta op]
+  (not (empty? (take-while (complement #{op}) (get meta g)))))
+
+(defn- copy? [g op {:keys [live? draft? live-size draft-graph-uri]} graph-meta]
+  (and live?
+       (not draft?)
+       (not (prior-reference? g graph-meta op))))
+
+(defn- graphs-to-copy [op draftset-uri timestamp max-update-size graph-meta]
   (->> graph-meta
-       (keep (fn [[lg {:keys [live? draft? live-size draft-graph-uri]}]]
-               (when (and live? (not draft?))
+       (keep (fn [[lg {:keys [live? draft? live-size draft-graph-uri] :as opts}]]
+               (when (copy? lg op opts graph-meta)
                  (if (> live-size max-update-size)
                    (throw
                     (ex-info "Unable to copy graphs"
@@ -137,7 +148,7 @@
   (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
         timestamp (util/get-current-time)
         manage (graphs-to-manage draftset-uri timestamp graph-meta)
-        copy (graphs-to-copy draftset-uri timestamp max-update-size graph-meta)
+        copy (graphs-to-copy op draftset-uri timestamp max-update-size graph-meta)
         rewrite-ds (when (seq copy) (rewrite-draftset-ops draftset-id))
         op [(rewrite op rewriter)]]
     (concat manage copy rewrite-ds op)))
@@ -207,7 +218,7 @@ GROUP BY ?lg ?dg")))
                              (map (fn [[lg m]]
                                     [lg (assoc m :ops (graph-op-order lg))]))
                              (into {}))]
-    (->> (graph-meta-q draftset-id affected-graphs)
+    (->> (graph-meta-q draftset-id (keys affected-graphs))
          (sparql/eager-query backend)
          (filter (fn [{:keys [dg lg]}] (or dg lg)))
          (map (fn [{:keys [dg lg c1 c2]}]
@@ -230,20 +241,6 @@ GROUP BY ?lg ?dg")))
                                   ::live?
                                   ::draft-size
                                   ::live-size])))
-
-(defn- just-in-live? [g meta]
-  (let [{:keys [live? draft?]} (get meta g)]
-    (and live? (not draft?))))
-
-(defn- in-draftset? [g meta]
-  (let [{:keys [live? draft?]} (get meta g)]
-    draft?))
-
-(defn- prior-reference? [g meta op]
-  (let [{:keys [live? draft? ops]} (get meta g)]
-    (and (not live?)
-         (not draft?)
-         (not (empty? (take-while (complement #{op}) (ops g)))))))
 
 (extend-protocol UpdateOperation
   UpdateDataDelete
@@ -278,7 +275,7 @@ GROUP BY ?lg ?dg")))
   (size [op] 1)
   (raw-operations [op {:keys [rewriter draftset-id graph-meta max-update-size]}]
     (let [g (URI. (.getURI (.getGraph op)))
-          {:keys [draft-graph-uri draft-size]} (graph-meta g)
+          {:keys [live? draft? draft-graph-uri draft-size]} (graph-meta g)
           draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))]
       (cond (just-in-live? g graph-meta)
             [(manage-graph-stmt draftset-uri
@@ -294,7 +291,9 @@ GROUP BY ?lg ?dg")))
                               {:status 500
                                :headers {"Content-Type" "text/plain"}
                                :body "500 Unable to copy graphs"})))
-            (prior-reference? g graph-meta op)
+            (and (not live?)
+                 (not draft?)
+                 (prior-reference? g graph-meta op))
             [(rewrite op rewriter)]
             (.isSilent op)
             [] ;; NOOP
