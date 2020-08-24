@@ -282,9 +282,13 @@ GROUP BY ?lg ?dg")))
                                 (util/get-current-time)
                                 g
                                 draft-graph-uri)]
-            ;; TODO: what if we insert an empty graph and then insert stuff
-            ;; follows it?
             (in-draftset? g graph-meta)
+            ;; There are 2 cases here:
+            ;; a) The graph is in live (and has a draft)
+            ;; b) The graph is not in live (but has a draft)
+            ;; Do we do the same thing in both cases? I think we want to remove
+            ;; all the triples, I.E., DROP GRAPH g; Then, the draft graph will
+            ;; be deleted, and so will the live if present.
             (if (<= draft-size max-update-size)
               [(rewrite op rewriter)]
               (throw (ex-info "Unable to copy graphs"
