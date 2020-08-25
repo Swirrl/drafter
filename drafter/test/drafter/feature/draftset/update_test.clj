@@ -289,11 +289,11 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
                        :drafter.common.config/sparql-query-endpoint
                        repo/sparql-repo
                        repo/->connection)]
-    (let [handler (get system [:drafter/routes :draftset/api])
-          g (URI. (str "http://g/" (UUID/randomUUID)))]
+    (let [handler (get system [:drafter/routes :draftset/api])]
 
       (testing "Add quads, drop graph"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -310,7 +310,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (is (zero? (count res)))))
 
       (testing "Add quads, drop graph, fail too big"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -331,7 +332,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (is (= 100 (count res)))))
 
       (testing "Add quads, publish, drop graph"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -362,7 +364,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (is (zero? (count res)))))
 
       (testing "Add quads and drop graph in one statement - noop"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -376,7 +379,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (is (zero? (count res)))))
 
       (testing "DROP SILENT GRAPH then add quads in one statement - just adds quads"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -390,7 +394,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (is (= 49 (count res)))))
 
       (testing "DROP GRAPH then add quads in one statement - errors with live graph message"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -403,7 +408,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (is (.contains (:message (:body response)) (str g)))))
 
       (testing "DROP SILENT non-existent GRAPH - noop"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -414,7 +420,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (is (zero? (count res)))))
 
       (testing "DROP non-existent GRAPH - Error"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -423,7 +430,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           (tc/assert-is-server-error response)))
 
       (testing "DROP GRAPH g; from live, drops graph from live"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
@@ -458,7 +466,8 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
               (is (zero? (count res2)))))
 
       (testing "DROP GRAPH g; INSERT DATA { GRAPH g { ... } } - only new triples left in live"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))

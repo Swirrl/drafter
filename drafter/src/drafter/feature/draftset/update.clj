@@ -53,12 +53,6 @@
     (let [[c s p o] (map ->node [c s p o])]
       (Quad. c s p o))))
 
-(defn- within-limit? [operations {:keys [max-update-size] :as opts}]
-  (<= (reduce + (map size operations)) max-update-size))
-
-(defn- processable? [operation]
-  (satisfies? UpdateOperation operation))
-
 (defprotocol UpdateOperation
   (affected-graphs [op])
   (size [op])
@@ -110,6 +104,12 @@
             (manage-graph-stmt draftset-uri timestamp lg draft-graph-uri)))
         graph-meta))
 
+(defn- within-limit? [operations {:keys [max-update-size] :as opts}]
+  (<= (reduce + (map size operations)) max-update-size))
+
+(defn- processable? [operation]
+  (satisfies? UpdateOperation operation))
+
 (defn- just-in-live? [g meta]
   (let [{:keys [live? draft?]} (get meta g)]
     (and live? (not draft?))))
@@ -118,18 +118,18 @@
   (let [{:keys [live? draft?]} (get meta g)]
     draft?))
 
-(defn- prior-reference? [g meta op]
-  (not (empty? (take-while (complement #{op}) (get meta g)))))
+(defn- prior-reference? [g op ops]
+  (not (empty? (take-while (complement #{op}) ops))))
 
-(defn- copy? [g op {:keys [live? draft? live-size draft-graph-uri]} graph-meta]
+(defn- copy? [g op {:keys [live? draft? live-size draft-graph-uri ops]}]
   (and live?
        (not draft?)
-       (not (prior-reference? g graph-meta op))))
+       (not (prior-reference? g op ops))))
 
 (defn- graphs-to-copy [op draftset-uri timestamp max-update-size graph-meta]
   (->> graph-meta
        (keep (fn [[lg {:keys [live? draft? live-size draft-graph-uri] :as opts}]]
-               (when (copy? lg op opts graph-meta)
+               (when (copy? lg op opts)
                  (if (> live-size max-update-size)
                    (throw
                     (ex-info "Unable to copy graphs"
@@ -194,7 +194,7 @@ SELECT ?lg ?dg (COUNT(?s1) AS ?c1) (COUNT(?s2) AS ?c2) WHERE {
 }
 GROUP BY ?lg ?dg")))
 
-(defn- graph-meta [backend draftset-id update-request]
+(defn- get-graph-meta [backend draftset-id update-request]
   (let [new-graph (fn [lg]
                     [lg {:draft-graph-uri (dm/make-draft-graph-uri)
                          :draft? false
@@ -228,7 +228,7 @@ GROUP BY ?lg ?dg")))
                      :draft-size c1
                      :live-size c2}]))
          (into {})
-         (merge affected-graphs))))
+         (merge-with merge affected-graphs))))
 
 (s/def ::draft-graph-uri uri?)
 (s/def ::draft? boolean?)
@@ -275,7 +275,7 @@ GROUP BY ?lg ?dg")))
   (size [op] 1)
   (raw-operations [op {:keys [rewriter draftset-id graph-meta max-update-size]}]
     (let [g (URI. (.getURI (.getGraph op)))
-          {:keys [live? draft? draft-graph-uri draft-size]} (graph-meta g)
+          {:keys [live? draft? draft-graph-uri draft-size ops]} (graph-meta g)
           draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))]
       (cond (just-in-live? g graph-meta)
             [(manage-graph-stmt draftset-uri
@@ -297,7 +297,7 @@ GROUP BY ?lg ?dg")))
                                :body "500 Unable to copy graphs"})))
             (and (not live?)
                  (not draft?)
-                 (prior-reference? g graph-meta op))
+                 (prior-reference? g op ops))
             [(rewrite op rewriter)]
             (.isSilent op)
             [] ;; NOOP
@@ -324,7 +324,7 @@ GROUP BY ?lg ?dg")))
     (if-let [error-response (ex-data update-request)]
       error-response
       ;; TODO: UpdateRequest base-uri, prefix, etc?
-      (let [graph-meta (graph-meta backend draftset-id update-request)
+      (let [graph-meta (get-graph-meta backend draftset-id update-request)
             opts {:graph-meta graph-meta
                   :rewriter (rewriter graph-meta)
                   :draftset-id draftset-id
@@ -332,7 +332,6 @@ GROUP BY ?lg ?dg")))
             update-request' (->> (.getOperations update-request)
                                  (mapcat #(raw-operations % opts))
                                  (add-operations (UpdateRequest.)))]
-        ;; (clojure.pprint/pprint graph-meta)
         ;; (println (str update-request'))
         (sparql/update! backend (str update-request'))
         {:status 204}))))
