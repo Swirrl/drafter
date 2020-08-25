@@ -52,7 +52,6 @@ SELECT ?lg ?dg ?s ?p ?o WHERE {
     (format q draftset-uri)))
 
 (tc/deftest-system-with-keys insert-modify-test
-  ;; TODO: wtf is this testing?
   keys-for-test [system system-config]
   (with-open [conn (-> system
                        :drafter.common.config/sparql-query-endpoint
@@ -68,9 +67,72 @@ SELECT ?lg ?dg ?s ?p ?o WHERE {
           response (update! stmt)
           _ (tc/assert-is-no-content-response response)
           stmt (format "
+PREFIX test: <http://test/>
 DELETE DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } ;
 INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
 " g g g)
+          response (update! stmt)
+          _ (tc/assert-is-no-content-response response)
+          [{:keys [dg s p o]} :as quads]
+          (repo/query conn (draftset-quads-mapping-q draftset-location))]
+      (is (not (nil? dg)))
+      (is (= 1 (count quads)))
+      (is (= dg o))
+      (is (not= o (URI. "http://g"))))))
+
+(tc/deftest-system-with-keys prefix-mapping-rewrite-test
+  ;; Same test as above, but use a prefix mapping - actually works for free
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-editor)
+          update! (fn [stmt]
+                    (handler (create-update-request
+                              test-editor draftset-location "text/plain" stmt)))
+          g (URI. (str "http://g/" (UUID/randomUUID)))
+          stmt (format " INSERT DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } " g)
+          response (update! stmt)
+          _ (tc/assert-is-no-content-response response)
+          stmt (format "
+PREFIX d: <%s>
+DELETE DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } ;
+INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
+" g g g)
+          response (update! stmt)
+          _ (tc/assert-is-no-content-response response)
+          [{:keys [dg s p o]} :as quads]
+          (repo/query conn (draftset-quads-mapping-q draftset-location))]
+      (is (not (nil? dg)))
+      (is (= 1 (count quads)))
+      (is (= dg o))
+      (is (not= o (URI. "http://g"))))))
+
+(tc/deftest-system-with-keys base-uri-rewrite-test
+  ;; Same test as above, but use a prefix mapping - actually works for free
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-editor)
+          update! (fn [stmt]
+                    (handler (create-update-request
+                              test-editor draftset-location "text/plain" stmt)))
+          uuid (UUID/randomUUID)
+          g (URI. (str "http://g/" uuid))
+          stmt (format " INSERT DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } " g)
+          response (update! stmt)
+          _ (tc/assert-is-no-content-response response)
+          stmt (format "
+BASE <http://g/>
+PREFIX d: <%s>
+DELETE DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } ;
+INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
+" uuid uuid uuid)
           response (update! stmt)
           _ (tc/assert-is-no-content-response response)
           [{:keys [dg s p o]} :as quads]

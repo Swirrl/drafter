@@ -223,17 +223,6 @@ GROUP BY ?lg ?dg")))
          (into {})
          (merge-with merge affected-graphs))))
 
-(s/def ::draft-graph-uri uri?)
-(s/def ::draft? boolean?)
-(s/def ::live? boolean?)
-(s/def ::draft-size nat-int?)
-(s/def ::live-size nat-int?)
-(s/def ::graph-meta
-  (s/map-of uri? (s/keys :req-un [::draft-graph-uri
-                                  ::draft?
-                                  ::live?
-                                  ::draft-size
-                                  ::live-size])))
 
 (extend-protocol UpdateOperation
   UpdateDataDelete
@@ -269,7 +258,8 @@ GROUP BY ?lg ?dg")))
   (raw-operations [op {:keys [rewriter draftset-id graph-meta max-update-size]}]
     (let [g (URI. (.getURI (.getGraph op)))
           {:keys [live? draft? draft-graph-uri draft-size ops]} (graph-meta g)
-          draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))]
+          draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
+          noop []]
       (cond (just-in-live? g graph-meta)
             [(manage-graph-stmt draftset-uri
                                 (util/get-current-time)
@@ -287,37 +277,36 @@ GROUP BY ?lg ?dg")))
                  (prior-reference? g op ops))
             [(rewrite op rewriter)]
             (.isSilent op)
-            [] ;; NOOP
+            noop
             :not-silent
             (throw (ex-info (str "Source graph " g
                                  " does not exist, cannot proceed with update.")
-                            {:type :error}))))) ;; NOOP
+                            {:type :error})))))
   (rewrite [op rewriter]
     (let [node (-> op .getGraph Item/createNode arq/sse-zipper rewriter)]
       (UpdateDrop. node (.isSilent op)))))
 
-(defn- rewriter [graph-meta]
+(defn- rewriter-map [graph-meta]
   (->> graph-meta
        (map (juxt (comp str key) (comp str :draft-graph-uri val)))
-       (into {})
-       (partial uri-constant-rewriter)))
+       (into {})))
 
 (defn- handler*
   [{:keys [drafter/backend max-update-size] :as opts} request]
   (let [draftset-id (:draftset-id (:params request))
-        update-request (parse-body request opts)]
-    ;; TODO: UpdateRequest base-uri, prefix, etc?
-    (let [graph-meta (get-graph-meta backend draftset-id update-request)
-          opts {:graph-meta graph-meta
-                :rewriter (rewriter graph-meta)
-                :draftset-id draftset-id
-                :max-update-size max-update-size}
-          update-request' (->> (.getOperations update-request)
-                               (mapcat #(raw-operations % opts))
-                               (add-operations (UpdateRequest.)))]
-      ;; (println (str update-request'))
-      (sparql/update! backend (str update-request'))
-      {:status 204})))
+        update-request (parse-body request opts)
+        graph-meta (get-graph-meta backend draftset-id update-request)
+        rewriter-map (rewriter-map graph-meta)
+        rewriter (partial uri-constant-rewriter rewriter-map)
+        opts {:graph-meta graph-meta
+              :rewriter rewriter
+              :draftset-id draftset-id
+              :max-update-size max-update-size}
+        update-request' (->> (.getOperations update-request)
+                             (mapcat #(raw-operations % opts))
+                             (add-operations (UpdateRequest.)))]
+    (sparql/update! backend (str update-request'))
+    {:status 204}))
 
 (defn handler
   [{:keys [wrap-as-draftset-owner] :as opts}]
