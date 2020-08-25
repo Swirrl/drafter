@@ -10,6 +10,12 @@
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
 
+(defmethod encode-error :payload-too-large [ex]
+  (r/error-response 413 ex))
+
+(defmethod encode-error :unprocessable-request [ex]
+  (r/error-response 413 ex))
+
 (defn not-acceptable-response
   ([] (not-acceptable-response ""))
   ([body] {:status 406 :headers {} :body body}))

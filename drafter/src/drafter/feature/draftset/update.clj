@@ -29,7 +29,6 @@
 ;; TODO: sparql protocol handler for update
 ;; TODO: which graphs in data?
 ;; TODO: update graph metadata
-;; TODO: copy-graph
 ;; TODO: write-lock?
 
 (defn- rewrite-quad [rewriter quad]
@@ -60,16 +59,10 @@
   (rewrite [op rewriter]))
 
 (defn- unprocessable-request [unprocessable]
-  (ex-info "422 Unprocessable Entity"
-           {:status 422
-            :headers {"Content-Type" "text/plain"}
-            :body "422 Unprocessable Entity"}))
+  (ex-info "422 Unprocessable Entity" {:error :unprocessable-request}))
 
 (defn- payload-too-large [operations]
-  (ex-info "413 Payload Too Large."
-           {:status 413
-            :headers {"Content-Type" "text/plain"}
-            :body "413 Payload Too Large."}))
+  (ex-info "413 Payload Too Large." {:error :payload-too-large}))
 
 (defn- insert-data-stmt [quads]
   (UpdateDataInsert. (QuadDataAcc. (map ->jena-quad quads))))
@@ -158,9 +151,9 @@
         operations (.getOperations update-request)
         unprocessable (remove processable? operations)]
     (cond (seq unprocessable)
-          (unprocessable-request unprocessable)
+          (throw (unprocessable-request unprocessable))
           (not (within-limit? operations opts))
-          (payload-too-large operations)
+          (throw (payload-too-large operations))
           :else
           update-request)))
 
@@ -283,12 +276,6 @@ GROUP BY ?lg ?dg")))
                                 g
                                 draft-graph-uri)]
             (in-draftset? g graph-meta)
-            ;; There are 2 cases here:
-            ;; a) The graph is in live (and has a draft)
-            ;; b) The graph is not in live (but has a draft)
-            ;; Do we do the same thing in both cases? I think we want to remove
-            ;; all the triples, I.E., DROP GRAPH g; Then, the draft graph will
-            ;; be deleted, and so will the live if present.
             (if (<= draft-size max-update-size)
               [(rewrite op rewriter)]
               (throw (ex-info "Unable to copy graphs"
@@ -306,8 +293,6 @@ GROUP BY ?lg ?dg")))
                                  " does not exist, cannot proceed with update.")
                             {:type :error}))))) ;; NOOP
   (rewrite [op rewriter]
-    ;; here, something needs to know which rewrite mode to be in
-    ;; what does ^^ this mean now? still relevant?
     (let [node (-> op .getGraph Item/createNode arq/sse-zipper rewriter)]
       (UpdateDrop. node (.isSilent op)))))
 
@@ -321,20 +306,18 @@ GROUP BY ?lg ?dg")))
   [{:keys [drafter/backend max-update-size] :as opts} request]
   (let [draftset-id (:draftset-id (:params request))
         update-request (parse-body request opts)]
-    (if-let [error-response (ex-data update-request)]
-      error-response
-      ;; TODO: UpdateRequest base-uri, prefix, etc?
-      (let [graph-meta (get-graph-meta backend draftset-id update-request)
-            opts {:graph-meta graph-meta
-                  :rewriter (rewriter graph-meta)
-                  :draftset-id draftset-id
-                  :max-update-size max-update-size}
-            update-request' (->> (.getOperations update-request)
-                                 (mapcat #(raw-operations % opts))
-                                 (add-operations (UpdateRequest.)))]
-        ;; (println (str update-request'))
-        (sparql/update! backend (str update-request'))
-        {:status 204}))))
+    ;; TODO: UpdateRequest base-uri, prefix, etc?
+    (let [graph-meta (get-graph-meta backend draftset-id update-request)
+          opts {:graph-meta graph-meta
+                :rewriter (rewriter graph-meta)
+                :draftset-id draftset-id
+                :max-update-size max-update-size}
+          update-request' (->> (.getOperations update-request)
+                               (mapcat #(raw-operations % opts))
+                               (add-operations (UpdateRequest.)))]
+      ;; (println (str update-request'))
+      (sparql/update! backend (str update-request'))
+      {:status 204})))
 
 (defn handler
   [{:keys [wrap-as-draftset-owner] :as opts}]
