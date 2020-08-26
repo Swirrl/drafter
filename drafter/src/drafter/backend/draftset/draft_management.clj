@@ -186,8 +186,8 @@
   draftset."
   [repo live-graph graph-map draftset-uri]
   (when (protected-graph? live-graph)
-    (throw (ex-swirrl :protected-graph-modification-error
-                      (str "Cannot create draft of protected graph " live-graph))))
+    (throw (ex-info (str "Cannot create draft of protected graph " live-graph)
+                    {:error :protected-graph-modification-error})))
   (if-let [draft-graph (get graph-map live-graph)]
     {:draft-graph-uri draft-graph :graph-map graph-map}
     (let [live-graph-uri (create-managed-graph! repo live-graph)
