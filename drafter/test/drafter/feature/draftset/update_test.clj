@@ -320,7 +320,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
                         (handler (create-update-request
                                   test-publisher draftset-location "text/plain" stmt)))
               n 50
-              [quads1 more] (split-at n (drop 50(valid-triples-g g)))
+              [quads1 more] (split-at n (drop 50 (valid-triples-g g)))
               [quads2 more] (split-at n more)
               stmt (insert-stmt-str quads1)
               response (update! stmt)
@@ -557,3 +557,160 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               res (repo/query conn (format q g))]
               (is (= 2 (count res)))
               (is (= quads2 (map (juxt :g :s :p :o) res))))))))
+
+
+(defn metadata-q [draftset-uri]
+  (format "
+SELECT * WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+    ?dg <http://purl.org/dc/terms/created> ?dg_created .
+    ?dg <http://purl.org/dc/terms/modified> ?dg_modified .
+    ?ds <http://purl.org/dc/terms/created> ?ds_created .
+    ?ds <http://purl.org/dc/terms/modified> ?ds_modified .
+  }
+  VALUES ?ds { <%s> }
+}" draftset-uri))
+
+(tc/deftest-system-with-keys draft-graph-metadata-test
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])]
+
+      (testing "Live graph g; DELETE DATA from g; check metadata"
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 50
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (insert-stmt-str quads1)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+              res (repo/query conn (format q g))
+              _ (is (= 50 (count res)))
+
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              draftset-id (last (string/split draftset-location #"/"))
+              draftset-uri (ds/->draftset-uri draftset-id)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              stmt (delete-stmt-str (take 5 quads1))
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              [{:keys [dg_created dg_modified
+                       ds_created ds_modified] :as ds-meta}]
+              (repo/query conn (metadata-q draftset-uri))
+              _ (is (= ds_modified ds_created))
+              _ (is (= dg_modified dg_created))
+
+              ;; 2nd go, now the graph will already be copied, so modified
+              ;; should update.
+              stmt (delete-stmt-str (take 5 quads1))
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              [{:keys [dg_created dg_modified
+                       ds_created ds_modified] :as ds-meta}]
+              (repo/query conn (metadata-q draftset-uri))]
+          (is (.isAfter ds_modified ds_created))
+          (is (.isAfter dg_modified dg_created))))
+
+      (testing "Live graph g; INSERT DATA into g; check metadata"
+        ;; Almost identical code path to DELETE, but here for completeness
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 50
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (insert-stmt-str quads1)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+              res (repo/query conn (format q g))
+              _ (is (= 50 (count res)))
+
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              draftset-id (last (string/split draftset-location #"/"))
+              draftset-uri (ds/->draftset-uri draftset-id)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              [quads2 more] (split-at 5 more)
+              stmt (insert-stmt-str quads2)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              [{:keys [dg_created dg_modified
+                       ds_created ds_modified] :as ds-meta}]
+              (repo/query conn (metadata-q draftset-uri))
+              _ (is (= ds_modified ds_created))
+              _ (is (= dg_modified dg_created))
+
+              ;; 2nd go, now the graph will already be copied, so modified
+              ;; should update.
+              [quads3 more] (split-at 5 more)
+              stmt (insert-stmt-str quads3)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              [{:keys [dg_created dg_modified
+                       ds_created ds_modified] :as ds-meta}]
+              (repo/query conn (metadata-q draftset-uri))]
+          (is (.isAfter ds_modified ds_created))
+          (is (.isAfter dg_modified dg_created))))
+
+      (testing "Live graph g, with draft graph; DROP GRAPH g; check metadata"
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              n 10
+              [quads1 more] (split-at n (valid-triples-g g))
+              stmt (insert-stmt-str quads1)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+              res (repo/query conn (format q g))
+              _ (is (= 10 (count res)))
+              ;; INSERT DATA so that graph g makes it into the draftset
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              draftset-id (last (string/split draftset-location #"/"))
+              draftset-uri (ds/->draftset-uri draftset-id)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              [quads2 more] (split-at 5 more)
+              stmt (insert-stmt-str quads2)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              [{:keys [dg_created dg_modified
+                       ds_created ds_modified] :as ds-meta}]
+              (repo/query conn (metadata-q draftset-uri))
+              _ (is (= ds_modified ds_created))
+              _ (is (= dg_modified dg_created))
+              ;; The graph will now be copied, so test DROP GRAPH
+              stmt (format "DROP GRAPH <%s>" g)
+              response (update! stmt)
+              _ (tc/assert-is-no-content-response response)
+              [{:keys [dg_created dg_modified
+                       ds_created ds_modified] :as ds-meta}]
+              (repo/query conn (metadata-q draftset-uri))]
+          (is (.isAfter ds_modified ds_created))
+          (is (.isAfter dg_modified dg_created)))))))
+
+;; TODO:
+;; a) If we're copying graph from live, then (= dg_modified dg_created)
+;; b) If graph already exists in draft, then (> dg_modified dg_created)

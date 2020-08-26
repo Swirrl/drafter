@@ -5,6 +5,7 @@
             [drafter.backend.draftset.draft-management :as dm]
             [drafter.backend.draftset.operations :as ops]
             [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
+            [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.draftset :as ds]
             [drafter.rdf.sparql :as sparql]
@@ -24,12 +25,9 @@
             UpdateCopy UpdateDrop UpdateDataDelete UpdateDeleteInsert UpdateDataInsert]
            org.apache.jena.sparql.sse.SSE
            org.apache.jena.sparql.sse.Item
-           [org.apache.jena.update UpdateFactory UpdateRequest]))
-
-;; TODO: sparql protocol handler for update
-;; TODO: which graphs in data?
-;; TODO: update graph metadata
-;; TODO: write-lock?
+           [org.apache.jena.update UpdateFactory UpdateRequest]
+           java.time.OffsetDateTime
+           org.apache.jena.datatypes.xsd.XSDDatatype))
 
 (defn- rewrite-quad [rewriter quad]
   (-> quad SSE/str arq/->sse-item arq/sse-zipper rewriter str SSE/parseQuad))
@@ -44,11 +42,17 @@
                SSE/parseOp)]
     (-> op  OpAsQuery/asQuery .getQueryPattern)))
 
+(defn- ->literal [x]
+  (let [t (condp = (type x)
+            OffsetDateTime XSDDatatype/XSDdateTime
+            nil)]
+    (NodeFactory/createLiteral (str x) t)))
+
 (defn- ->jena-quad [{:keys [c s p o]}]
   (letfn [(->node [x]
             (if (uri? x)
               (NodeFactory/createURI (str x))
-              (NodeFactory/createLiteral (str x))))]
+              (->literal x)))]
     (let [[c s p o] (map ->node [c s p o])]
       (Quad. c s p o))))
 
@@ -124,11 +128,7 @@
        (keep (fn [[lg {:keys [live? draft? live-size draft-graph-uri] :as opts}]]
                (when (copy? lg op opts)
                  (if (> live-size max-update-size)
-                   (throw
-                    (ex-info "Unable to copy graphs"
-                             {:status 500
-                              :headers {"Content-Type" "text/plain"}
-                              :body "500 Unable to copy graphs"}))
+                   (throw (ex-info "Unable to copy graphs" {:type :error}))
                    [(draft-graph-stmt draftset-uri
                                       timestamp
                                       lg
@@ -136,15 +136,22 @@
                     (copy-graph-stmt lg draft-graph-uri)]))))
        (apply concat)))
 
+(defn- graphs-to-touch [op draftset-uri timestamp graph-meta]
+  (keep (fn [[lg {:keys [live? draft? draft-graph-uri]}]]
+          (when (and live? draft?)
+            (touch-graph-in-draftset draftset-uri draft-graph-uri timestamp)))
+        graph-meta))
+
 (defn- data-insert-delete-ops
   [op {:keys [max-update-size rewriter draftset-id graph-meta] :as opts}]
   (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
         timestamp (util/get-current-time)
         manage (graphs-to-manage draftset-uri timestamp graph-meta)
         copy (graphs-to-copy op draftset-uri timestamp max-update-size graph-meta)
+        touch (graphs-to-touch op draftset-uri timestamp graph-meta)
         rewrite-ds (when (seq copy) (rewrite-draftset-ops draftset-id))
         op [(rewrite op rewriter)]]
-    (concat manage copy rewrite-ds op)))
+    (concat manage copy rewrite-ds touch op)))
 
 (defn- parse-body [request opts]
   (let [update-request (-> request :body UpdateFactory/create)
@@ -163,10 +170,24 @@
 
 (defn- graph-meta-q [draftset-id live-graphs]
   (let [ds-uri (ds/->draftset-uri draftset-id)
-        live-values-str (string/join " " (map #(str "<" % ">") live-graphs))]
+        live-values-str (string/join " " (map #(str "<" % ">") live-graphs))
+        live-only-values (string/join " " (map #(str "( <" % "> <" ds-uri "> )") live-graphs))]
+    ;; TODO: Surely there's a better query than this to do the same? At least
+    ;; the first two?
     (str "
-SELECT ?lg ?dg (COUNT(?s1) AS ?c1) (COUNT(?s2) AS ?c2) WHERE {
+SELECT ?lg ?dg (COUNT(DISTINCT ?s1) AS ?c1) (COUNT(DISTINCT ?s2) AS ?c2) WHERE {
   { GRAPH ?dg { ?s1 ?p1 ?o1 }
+    GRAPH ?lg { ?s2 ?p2 ?o2 }
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+      ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+    }
+    VALUES ?ds { <" ds-uri "> }
+  } UNION {
+    GRAPH ?dg { ?s1 ?p1 ?o1 }
+    FILTER NOT EXISTS { GRAPH ?lg { ?s2 ?p2 ?o2 } }
     GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
       ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
       ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
@@ -178,11 +199,13 @@ SELECT ?lg ?dg (COUNT(?s1) AS ?c1) (COUNT(?s2) AS ?c2) WHERE {
     GRAPH ?lg { ?s2 ?p2 ?o2 }
     GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
       ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
-      MINUS {
-        ?lg <http://publishmydata.com/def/drafter/hasDraft> ?_dg .
+      FILTER NOT EXISTS {
+        ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+        ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+        ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
       }
     }
-    VALUES ?lg { " live-values-str " }
+    VALUES ( ?lg ?ds ) { " live-only-values " }
   }
 }
 GROUP BY ?lg ?dg")))
@@ -210,9 +233,11 @@ GROUP BY ?lg ?dg")))
                              (map new-graph)
                              (map (fn [[lg m]]
                                     [lg (assoc m :ops (graph-op-order lg))]))
-                             (into {}))]
-    (->> (graph-meta-q draftset-id (keys affected-graphs))
-         (sparql/eager-query backend)
+                             (into {}))
+        db-graphs (->> (graph-meta-q draftset-id (keys affected-graphs))
+                       (sparql/eager-query backend))]
+    (clojure.pprint/pprint db-graphs)
+    (->> db-graphs
          (filter (fn [{:keys [dg lg]}] (or dg lg)))
          (map (fn [{:keys [dg lg c1 c2]}]
                 [lg {:draft-graph-uri (or dg (dm/make-draft-graph-uri))
@@ -259,19 +284,15 @@ GROUP BY ?lg ?dg")))
     (let [g (URI. (.getURI (.getGraph op)))
           {:keys [live? draft? draft-graph-uri draft-size ops]} (graph-meta g)
           draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
+          now (util/get-current-time)
           noop []]
       (cond (just-in-live? g graph-meta)
-            [(manage-graph-stmt draftset-uri
-                                (util/get-current-time)
-                                g
-                                draft-graph-uri)]
+            [(manage-graph-stmt draftset-uri now g draft-graph-uri)]
             (in-draftset? g graph-meta)
             (if (<= draft-size max-update-size)
-              [(rewrite op rewriter)]
-              (throw (ex-info "Unable to copy graphs"
-                              {:status 500
-                               :headers {"Content-Type" "text/plain"}
-                               :body "500 Unable to copy graphs"})))
+              [(touch-graph-in-draftset draftset-uri draft-graph-uri now)
+               (rewrite op rewriter)]
+              (throw (ex-info "Unable to copy graphs" {:type :error})))
             (and (not live?)
                  (not draft?)
                  (prior-reference? g op ops))
@@ -293,9 +314,14 @@ GROUP BY ?lg ?dg")))
 
 (defn- handler*
   [{:keys [drafter/backend max-update-size] :as opts} request]
+  ;; TODO: handle SPARQL protocol
+  ;; TODO: sparql protocol handler for update
+  ;; TODO: update graph metadata
+  ;; TODO: write-lock?
   (let [draftset-id (:draftset-id (:params request))
         update-request (parse-body request opts)
         graph-meta (get-graph-meta backend draftset-id update-request)
+        ;; _ (clojure.pprint/pprint graph-meta)
         rewriter-map (rewriter-map graph-meta)
         rewriter (partial uri-constant-rewriter rewriter-map)
         opts {:graph-meta graph-meta
@@ -305,6 +331,7 @@ GROUP BY ?lg ?dg")))
         update-request' (->> (.getOperations update-request)
                              (mapcat #(raw-operations % opts))
                              (add-operations (UpdateRequest.)))]
+    ;; (println (str update-request'))
     (sparql/update! backend (str update-request'))
     {:status 204}))
 
