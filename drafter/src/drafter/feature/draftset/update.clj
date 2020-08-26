@@ -15,8 +15,10 @@
             [swirrl-server.errors :refer [wrap-encode-errors]]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.url :as url]
-            [clojure.string :as string])
+            [clojure.string :as string]
+            [ring.util.request :as request])
   (:import java.net.URI
+           java.util.UUID
            org.apache.jena.graph.NodeFactory
            [org.apache.jena.sparql.algebra Algebra OpAsQuery]
            org.apache.jena.sparql.core.Quad
@@ -25,6 +27,7 @@
             UpdateCopy UpdateDrop UpdateDataDelete UpdateDeleteInsert UpdateDataInsert]
            org.apache.jena.sparql.sse.SSE
            org.apache.jena.sparql.sse.Item
+           [org.apache.jena.query Syntax]
            [org.apache.jena.update UpdateFactory UpdateRequest]
            java.time.OffsetDateTime
            org.apache.jena.datatypes.xsd.XSDDatatype))
@@ -101,7 +104,7 @@
             (manage-graph-stmt draftset-uri timestamp lg draft-graph-uri)))
         graph-meta))
 
-(defn- within-limit? [operations {:keys [max-update-size] :as opts}]
+(defn- within-limit? [operations max-update-size]
   (<= (reduce + (map size operations)) max-update-size))
 
 (defn- processable? [operation]
@@ -311,16 +314,8 @@ GROUP BY ?lg ?dg")))
        (map (juxt (comp str key) (comp str :draft-graph-uri val)))
        (into {})))
 
-(defn- handler*
-  [{:keys [drafter/backend max-update-size] :as opts} request]
-  ;; TODO: handle SPARQL protocol
-  ;; TODO: sparql protocol handler for update
-  ;; TODO: update graph metadata
-  ;; TODO: write-lock?
-  (let [draftset-id (:draftset-id (:params request))
-        update-request (parse-body request opts)
-        graph-meta (get-graph-meta backend draftset-id update-request)
-        ;; _ (clojure.pprint/pprint graph-meta)
+(defn update! [backend max-update-size draftset-id update-request]
+  (let [graph-meta (get-graph-meta backend draftset-id update-request)
         rewriter-map (rewriter-map graph-meta)
         rewriter (partial uri-constant-rewriter rewriter-map)
         opts {:graph-meta graph-meta
@@ -331,7 +326,73 @@ GROUP BY ?lg ?dg")))
                              (mapcat #(raw-operations % opts))
                              (add-operations (UpdateRequest.)))]
     ;; (println (str update-request'))
-    (sparql/update! backend (str update-request'))
+    (sparql/update! backend (str update-request'))))
+
+
+;; Handler
+
+(defn- parse-update-params [{:keys [body query-params form-params] :as request}]
+  (case (request/content-type request)
+    "application/x-www-form-urlencoded"
+    {:update (get form-params "update")
+     :using-graph-uri (get form-params "using-graph-uri")
+     :using-named-graph-uri (get form-params "using-named-graph-uri")
+     :from "'update' form parameter"}
+    "application/sparql-query"
+    {:update body
+     :using-graph-uri (get query-params "using-graph-uri")
+     :using-named-graph-uri (get query-params "using-named-graph-uri")
+     :from "body"}
+    (throw (ex-info "Bad request" {:error :bad-request}))))
+
+(defn- parse-draftset-id [request]
+  (or (try
+        (some-> request :params :draftset-id UUID/fromString)
+        (catch IllegalArgumentException _))
+      (throw (ex-info "Parameter draftset-id must be provided in UUID format"
+                      {:error :bad-request}))))
+
+(defn- parse-update-param [{:keys [update from]} max-update-size]
+  (let [update' (cond (string? update)
+                      update
+                      (instance? java.io.InputStream update)
+                      (slurp update)
+                      (coll? update)
+                      (throw (ex-info "Exactly one query parameter required"
+                                      {:error :unprocessable-request}))
+                      :else
+                      (throw (ex-info (str "Expected SPARQL query in " from)
+                                      {:error :unprocessable-request})))
+        update-request (UpdateFactory/create update' Syntax/syntaxSPARQL_11)
+        operations (.getOperations update-request)
+        unprocessable (remove processable? operations)]
+    (cond (seq unprocessable)
+          (throw (unprocessable-request unprocessable))
+          (not (within-limit? operations max-update-size))
+          (throw (payload-too-large operations))
+          :else
+          update-request)))
+
+;; TODO: First apply restricted dataset?
+;; TODO: Create prepareUpdate ?
+;; TODO: Convert to jena UpdateRequest?
+;; TODO: rewrite from restricted Update?
+(defn- parse-update [request max-update-size]
+  (let [{:keys [request-method body query-params form-params]} request]
+    (if (= request-method :post)
+      (let [draftset-id (parse-draftset-id request)
+            params (parse-update-params request)
+            update-request (parse-update-param params max-update-size)]
+        (assoc params :update-request update-request :draftset-id draftset-id))
+      (throw (ex-info "Method not supported"
+                      {:error :method-not-allowed :method request-method})))))
+(defn- handler*
+  [{:keys [drafter/backend max-update-size] :as opts} request]
+  ;; TODO: handle SPARQL protocol
+  ;; TODO: sparql protocol handler for update
+  ;; TODO: write-lock?
+  (let [{:keys [update-request draftset-id]} (parse-update request max-update-size)]
+    (update! backend max-update-size draftset-id update-request)
     {:status 204}))
 
 (defn handler

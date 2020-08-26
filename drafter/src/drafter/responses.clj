@@ -7,15 +7,6 @@
             [drafter.async.responses :as r :refer [submitted-job-response]]
             [swirrl-server.errors :refer [encode-error]]))
 
-(defmethod encode-error :writes-temporarily-disabled [ex]
-  (r/error-response 503 ex))
-
-(defmethod encode-error :payload-too-large [ex]
-  (r/error-response 413 ex))
-
-(defmethod encode-error :unprocessable-request [ex]
-  (r/error-response 413 ex))
-
 (defn not-acceptable-response
   ([] (not-acceptable-response ""))
   ([body] {:status 406 :headers {} :body body}))
@@ -30,6 +21,21 @@
   {:status 405
    :headers {}
    :body (str "Method " (upper-case (name method)) " not supported by this resource")})
+
+(defmethod encode-error :writes-temporarily-disabled [ex]
+  (r/error-response 503 ex))
+
+(defmethod encode-error :payload-too-large [ex]
+  (r/error-response 413 ex))
+
+(defmethod encode-error :bad-request [ex]
+  (r/error-response 400 ex))
+
+(defmethod encode-error :unprocessable-request [ex]
+  (r/error-response 413 ex))
+
+(defmethod encode-error :method-not-allowed [ex]
+  (method-not-allowed-response (:method (ex-data ex))))
 
 (defn unauthorised-basic-response [realm]
   (let [params (str "Basic realm=\"" realm "\"")]
