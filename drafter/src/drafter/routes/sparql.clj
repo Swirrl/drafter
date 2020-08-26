@@ -1,11 +1,8 @@
 (ns drafter.routes.sparql
-  (:require [compojure.core :refer [make-route]]
-            [drafter.rdf
-             [sparql-protocol :refer [sparql-end-point] :as sp]]
+  (:require [clojure.spec.alpha :as s]
+            [drafter.errors :refer [wrap-encode-errors]]
+            [drafter.rdf.sparql-protocol :as sp :refer [sparql-end-point]]
             [integrant.core :as ig]
-            [clojure.spec.alpha :as s]
-            [drafter.timeouts :as timeouts]
-            [swirrl-server.errors :refer [wrap-encode-errors]]
             [ring.middleware.cors :as cors]))
 
 ;; TODO: Remove this namespace as all it really adds to

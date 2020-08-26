@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -e
+
+# NOTE: This script should be executed from within the drafter repository
+REPO_DIR=$(git rev-parse --show-toplevel)
+DRAFTER_DIR="${REPO_DIR}/drafter"
+TARGET_DIR="${DRAFTER_DIR}/target"
+DRAFTER_JAR="${TARGET_DIR}/drafter.jar"
+DRAFTER_LIB_DIR="${TARGET_DIR}/lib"
+TEMP_PACKAGE_DIR="${TARGET_DIR}/package"
+
+if [ ! -f "${DRAFTER_JAR}" ] || [ ! -d "${DRAFTER_LIB_DIR}" ]; then
+  echo "Cannot create package - drafter pack does not exist. Run bin/pack script to create it" 1>&2
+fi
+
+# setup environment
+# drafter package definition requires the TRAVIS_BRANCH and TRAVIS_BUILD_NUMBER
+# environment variables to be set. These should be set by the travis build but need
+# to be set when building locally
+if [ -z "${TRAVIS_BRANCH}" ]; then
+  TRAVIS_BRANCH=$(git rev-parse --short HEAD)
+fi
+
+if [ -z "${TRAVIS_BUILD_NUMBER}" ]; then
+  TRAVIS_BUILD_NUMBER=1
+fi
+
+PACKAGE_VERSION="${TRAVIS_BRANCH}-${TRAVIS_BUILD_NUMBER}"
+
+# clean existing
+if [ -d "${TEMP_PACKAGE_DIR}" ]; then
+  rm -r "${TEMP_PACKAGE_DIR}"
+fi
+rm -f "${TARGET_DIR}/dependencies.edn"
+rm -f "${TARGET_DIR}/drafter-pmd3-${PACKAGE_VERSION}.zip"
+rm -f "${TARGET_DIR}/drafter-pmd4-${PACKAGE_VERSION}.zip"
+
+# copy package directory to temp location
+cp -R -L "${REPO_DIR}/package" "${TEMP_PACKAGE_DIR}"
+cp "${REPO_DIR}/dependencies.edn" "${TARGET_DIR}"
+
+# add pack zip to temp package directory
+pushd "${TARGET_DIR}" || exit
+zip -r package/install/drafter.zip drafter.jar lib
+popd || exit
+
+pushd "${REPO_DIR}" || exit
+
+# build packages
+env TRAVIS_BRANCH="${TRAVIS_BRANCH}" \
+    TRAVIS_BUILD_NUMBER="${TRAVIS_BUILD_NUMBER}" \
+    clojure -A:omni package -m "${TEMP_PACKAGE_DIR}/pmd3-manifest.edn" -o "${TARGET_DIR}"
+
+env TRAVIS_BRANCH="${TRAVIS_BRANCH}" \
+    TRAVIS_BUILD_NUMBER="${TRAVIS_BUILD_NUMBER}" \
+    clojure -A:omni package -m "${TEMP_PACKAGE_DIR}/pmd4-manifest.edn" -o "${TARGET_DIR}"
+
+popd || exit

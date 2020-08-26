@@ -4,7 +4,7 @@
  ;;:omni/dependencies #include "../dependencies.edn"
  :omni/package-version #join [#env TRAVIS_BRANCH "-" #env TRAVIS_BUILD_NUMBER]
 
- :omni/defs {:jar-name #join ["drafter-" #ref [:omni/package-version] ".jar"]}
+ :omni/defs {:zip-name "drafter.zip"}
 
  :server/drafter-domain {:doc "Domain drafter is hosted on"}
  :omni/metadata {:omni/repository-uri "https://github.com/swirrl/drafter"}
@@ -15,10 +15,10 @@
                          {:type :selmer/template
                           :path "drafter-start.sh"
                           :mode "755"}
-                         #ref [:omni/defs :jar-name]
-                         {:type :symlink
-                          :dest-path "drafter.jar"
-                          :target #ref [:omni/defs :jar-name]}
+                         {:type :zip
+                          :path #ref [:omni/defs :zip-name]
+                          :dest-path #ref [:omni/defs :zip-name]
+                          :extract-dir "."}                         
                          {:type :env
                           :dest-path "drafter-env.list"
                           :mode "660"

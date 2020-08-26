@@ -10,13 +10,12 @@
   waiting for their results.
 
   Jobs can be added to the write queue using the queue-job! function."
-  (:require [clj-logging-config.log4j :as l4j]
-            [cognician.dogstatsd :as datadog]
+  (:require [cognician.dogstatsd :as datadog]
             [clojure.tools.logging :as log]
             [drafter.util :refer [log-time-taken]]
             [drafter.async.jobs :refer [job-failed!]]
+            [drafter.logging :refer [with-logging-context]]
             [integrant.core :as ig]
-            [swirrl-server.errors :refer [ex-swirrl]]
             [clojure.string :as string]
             [clojure.spec.alpha :as s])
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
@@ -113,9 +112,9 @@
       (finally
         (.unlock lock)))
     (throw
-     (ex-swirrl :writes-temporarily-disabled
-                "Write operations are temporarily unavailable, due to other
-                 large write operations.  Please try again later."))))
+     (ex-info "Write operations are temporarily unavailable, due to other
+               large write operations.  Please try again later."
+              {:error :writes-temporarily-disabled}))))
 
 (defn- write-loop
   "Start the write loop running.  Note this function does not return
@@ -131,9 +130,9 @@
                   job-id :id
                   promis :value-p :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS)]
         (datadog/gauge! "drafter.jobs_queue_size" (.size writes-queue))
-        (l4j/with-logging-context (assoc
-                                   (meta job)
-                                   :jobId (str "job-" (.substring (str job-id) 0 8)))
+        (with-logging-context (assoc
+                               (meta job)
+                               :jobId (str "job-" (.substring (str job-id) 0 8)))
           (try
             ;; Note that task functions are responsible for the delivery
             ;; of the promise and the setting of DONE and also preserve

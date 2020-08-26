@@ -16,8 +16,8 @@
             [ring.middleware.file-info :refer [wrap-file-info]]
             [ring.middleware.resource :refer [wrap-resource]]
             [ring.middleware.verbs :refer [wrap-verbs]]
-            [swirrl-server.errors :refer [wrap-encode-errors]]
-            [swirrl-server.middleware.log-request :refer [log-request]]))
+            [drafter.errors :refer [wrap-encode-errors]]
+            [drafter.logging :refer [log-request]]))
 
 (defroutes app-routes
   (GET "/swagger/swagger.json" []
