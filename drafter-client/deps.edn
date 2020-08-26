@@ -36,7 +36,7 @@
                               }}
 
            :test {:extra-paths ["test" "test/resources"]
-                  :extra-deps {drafter {:local/root "../drafter"}
+                  :extra-deps {drafter/drafter {:local/root "../drafter"}
                                org.clojure/test.check {:mvn/version "0.9.0"}
                                lambdaisland/kaocha {:mvn/version "1.0.629"}
                                environ/environ {:mvn/version "1.0.3"}
