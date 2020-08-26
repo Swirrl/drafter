@@ -33,50 +33,14 @@ script:
   - ./travis/test-all
 after_success:
   - ./travis/after_success.sh
-before_deploy:
-  - export TRAVIS_BRANCH=$(echo $TRAVIS_BRANCH | sed -e 's=/=_=g')
-  - echo $TRAVIS_BRANCH
-  - "./travis/before_deploy.sh"
-deploy:
-  - provider: s3
-    access_key_id: AKIAJZVFELTIBDDYV5OQ
-    secret_access_key:
-      secure: BIaToFo+lK7GB+/IQhEAR44Ix18+ykJt+HIR6uxzZi3WRDuAP+JjngPf+A9rwKQ3fooyAgNZLnIp4EP00rpJ+YfAdUeQzxpcJxeMeUgH0hAR7o8udMTujqBLsTjxwI7B8nZGUHpUpVZiAG4SWhgm7QaU/x5/tTSmGk9inO6SJQY=
-    bucket: travis-drafter-jars
-    local-dir: drafter/dist
-    upload-dir: travis-$TRAVIS_BRANCH
-    region: eu-west-1
-    skip_cleanup: true
-    on:
-      repo: Swirrl/drafter
-      all_branches: true
-  - provider: releases
-    api_key: "$RELEASE_OAUTH_TOKEN"
-    file: "drafter/releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
-    skip_cleanup: true
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+$
-  - provider: releases
-    api_key: "$RELEASE_OAUTH_TOKEN"
-    file: "drafter/releases/drafter-$TRAVIS_TAG-$TRAVIS_BUILD_NUMBER.jar"
-    prerelease: true
-    skip_cleanup: true
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+-.+$
+deploy:  
   - provider: script
-    script: drafter/bin/deploy
-    skip_cleanup: true
-    on:
-      tags: true
-  - provider: script
-    script: clojure -A:omni publish -m package/pmd3-manifest.edn
+    script: clojure -A:omni publish -f drafter/target/drafter-pmd3-${TRAVIS_BRANCH}-${TRAVIS_BUILD_NUMBER}.zip
     skip_cleanup: true
     on:
       all_branches: true
   - provider: script
-    script: clojure -A:omni publish -m package/pmd4-manifest.edn
+    script: clojure -A:omni publish -f drafter/target/drafter-pmd4-${TRAVIS_BRANCH}-${TRAVIS_BUILD_NUMBER}.zip    
     skip_cleanup: true
     on:
       all_branches: true

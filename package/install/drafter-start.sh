@@ -9,6 +9,4 @@ DRAFTER_JVM_OPTS="-Xmx4g \
                   -Dhttp.maxConnections=60 \
                   -Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
 
-java -Dcapsule.jvm.args="$DRAFTER_JVM_OPTS" \
-     -jar {{omni/install-dir}}/drafter.jar \
-     drafter-prod.edn
+java ${DRAFTER_JVM_OPTS} -cp 'lib/*:drafter.jar' clojure.main -m drafter.main drafter-prod.edn
