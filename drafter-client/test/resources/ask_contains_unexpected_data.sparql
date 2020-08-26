@@ -1,0 +1,6 @@
+ASK WHERE {
+    GRAPH ?g {
+        ?s ?p ?o
+        FILTER (?g != <http://publishmydata.com/graphs/drafter/endpoints>)
+    }
+}

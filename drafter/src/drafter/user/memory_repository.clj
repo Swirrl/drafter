@@ -1,10 +1,8 @@
 (ns drafter.user.memory-repository
   (:require [clojure.edn :as edn]
             [integrant.core :as ig]
-            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [drafter.user :refer [create-user get-digest username UserRepository]])
-  (:import [java.io Closeable FileNotFoundException PushbackReader]))
+            [drafter.user :refer [create-user get-digest username UserRepository]]))
 
 (defn -find-user-by-username [users username]
   (log/info "getting " username " from " users)

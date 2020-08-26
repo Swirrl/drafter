@@ -1,6 +1,5 @@
 (ns drafter.user
-  (:require [clojure.spec.alpha :as s]
-            [drafter.util :as util]
+  (:require [drafter.util :as util]
             [integrant.core :as ig])
   (:import java.net.URI
            org.mindrot.jbcrypt.BCrypt))
@@ -40,7 +39,6 @@ permissions."
 (defn username->uri
   "Gets a user's URI from their username."
   [username]
-  {:pre [(util/validate-email-address username)]}
   (URI. "mailto" username nil))
 
 (def user->uri (comp username->uri username))
@@ -61,7 +59,6 @@ permissions."
   "Creates a user with a username, role and password digest which can
   be used to authenticate the user."
   [email role password-digest]
-  {:pre [(is-known-role? role)]}
   (let [email (get-valid-email email)]
      (->User email role password-digest)))
 
@@ -72,7 +69,6 @@ permissions."
   no longer be needed, so users are normalised into a model without
   these parameters."
   [email role]
-  {:pre [(is-known-role? role)]}
   (let [email (get-valid-email email)]
     {:email email :role role}))
 
@@ -99,7 +95,6 @@ permissions."
   "Takes a user and a role keyword and tests whether the user is
   authorised to operate in that role."
   [{:keys [role] :as user} requested]
-  {:pre [(is-known-role? requested)]}
   (<= (role->permission-level requested) (role->permission-level role)))
 
 (defn- user-token-invalid [token invalid-key info]
@@ -138,17 +133,15 @@ permissions."
   (or (can-claim? user draftset)
       (is-owner? user draftset)))
 
-(defn permitted-draftset-operations [{:keys [current-owner claim-role] :as draftset} user]
+(defn permitted-draftset-operations [draftset user]
   (cond
    (is-owner? user draftset)
-   (util/conj-if
-    (has-role? user :publisher)
-    #{:delete :edit :submit :claim}
-    :publish)
+   (let [ops #{:delete :edit :submit :claim}]
+     (if (has-role? user :publisher)
+       (conj ops :publish)
+       ops))
 
    (can-claim? user draftset)
    #{:claim}
 
    :else #{}))
-
-(s/def ::repo (partial satisfies? UserRepository))

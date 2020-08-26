@@ -8,10 +8,14 @@
             [drafter.feature.draftset-data.append :as sut]
             [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor]]
+            [drafter.user-test :refer [test-editor test-publisher]]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.async.jobs :as async]
-            [grafter-2.rdf4j.formats :as formats])
+            [grafter-2.rdf4j.formats :as formats]
+            [drafter.fixture-data :as fd]
+            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
+            [drafter.feature.endpoint.public :as pub])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -57,7 +61,7 @@
                    (.toEpochSecond ts-3))
                 "Modified time is updated after delete"))))))
 
-(def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler])
+(def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
 
 (tc/deftest-system-with-keys append-quad-data-with-valid-content-type-to-draftset
   keys-for-test
@@ -172,6 +176,39 @@
     (let [draftset-graph-triples (help/get-draftset-graph-triples-through-api handler draftset-location test-editor graph "false")
           expected-triples (help/eval-statements (map map->Triple graph-quads))]
       (is (= (set expected-triples) (set draftset-graph-triples))))))
+
+(t/deftest append-quads-to-endpoints-graph-in-draftset
+  (tc/with-system
+    keys-for-test
+    [system system-config]
+    (do
+      (pub/ensure-public-endpoint (:drafter/backend system))
+      (tc/check-endpoint-graph-consistent system
+        (let [handler (get system [:drafter/routes :draftset/api])
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              data (io/resource "drafter/feature/draftset_data/append_to_public_endpoint_graph.trig")
+              response (help/make-append-data-to-draftset-request handler test-publisher draftset-location data)
+              result (tc/await-completion (get-in response [:body :finished-job]))]
+          (is (= :error (:type result)))
+
+          (help/publish-draftset-through-api handler draftset-location test-publisher))))))
+
+(t/deftest append-triples-to-endpoints-graph-in-draftset
+  (tc/with-system
+    keys-for-test
+    [system system-config]
+    (do
+      (pub/ensure-public-endpoint (:drafter/backend system))
+      (tc/check-endpoint-graph-consistent
+        system
+        (let [handler (get system [:drafter/routes :draftset/api])
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              triples (statements "test/test-triple.nt")
+              request (help/statements->append-triples-request test-publisher draftset-location triples {:graph drafter:endpoints})
+              response (handler request)
+              result (tc/await-completion (get-in response [:body :finished-job]))]
+          (is (= :error (:type result)))
+          (help/publish-draftset-through-api handler draftset-location test-publisher))))))
 
 (tc/deftest-system-with-keys append-quad-data-without-content-type-to-draftset
   keys-for-test

@@ -1,0 +1,19 @@
+@prefix : <http://api.stardog.com/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix stardog: <tag:stardog:api:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+  draftset:35f645f7-ff4b-4949-b530-c64d48b7c6ce a drafter:DraftSet ;
+	dcterms:modified "2020-07-07T16:17:45.539Z"^^xsd:dateTime ;
+	dcterms:created "2020-06-30T08:32:52.004Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:editor@swirrl.com> ;
+	drafter:hasOwner <mailto:editor@swirrl.com> ;
+	rdfs:label "editing" .
+}

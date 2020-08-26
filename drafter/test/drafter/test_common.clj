@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [clojure.pprint :as pp]
             [clojure.spec.test.alpha :as st]
+            [clojure.spec.alpha :as sp]
             [clojure.test :refer :all]
             [drafter.backend.draftset.draft-management
              :refer
@@ -23,7 +24,10 @@
             [schema.core :as s]
             [drafter.async.jobs :as async :refer [create-job]]
             [aero.core :as aero]
-            [drafter.user :as user])
+            [drafter.user :as user]
+            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
+            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
+            [drafter.spec :refer [load-spec-namespaces!]])
   (:import [com.auth0.jwk Jwk JwkProvider]
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT
@@ -42,10 +46,12 @@
            org.apache.http.ProtocolVersion
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
            org.eclipse.rdf4j.rio.trig.TriGParserFactory
-           [java.util.zip GZIPOutputStream]))
+           [java.util.zip GZIPOutputStream]
+           [java.time.temporal Temporal]))
 
 (defn with-spec-instrumentation [f]
   (try
+    (load-spec-namespaces!)
     (st/instrument)
     (f)
     (finally
@@ -446,6 +452,12 @@
   (let [errors (s/check schema value)]
     (is (not errors) errors)))
 
+(defn assert-spec [spec x]
+  (is (nil? (sp/explain-data spec x))))
+
+(defn deny-spec [spec x]
+  (is (some? (sp/explain-data spec x))))
+
 (def ring-response-schema
   {:status s/Int
    :headers {s/Str s/Str}
@@ -507,3 +519,30 @@
     (with-open [gzos (GZIPOutputStream. baos)]
       (io/copy source gzos))
     (ByteArrayInputStream. (.toByteArray baos))))
+
+(defn equal-up-to
+  "Returns whether two Temporal instances are within the specified interval of each other"
+  [^Temporal t1 ^Temporal t2 limit units]
+  (< (.until t1 t2 units) limit))
+
+(defn get-public-endpoint-triples [repo]
+  (sparql/eager-query repo (select-all-in-graph drafter:endpoints)))
+
+(defn is-modified-statement? [s]
+  (= dcterms:modified (:p s)))
+
+(defn remove-updated [endpoint-triples]
+  (remove is-modified-statement? endpoint-triples))
+
+(defmacro check-endpoint-graph-consistent
+  "Macro to check the public endpoints graph is not corrupted by the actions executed
+   in forms. The statements in the endpoint graphs must be equal before and after executing
+   forms with the possible exception that the updated time of the public endpoint can be
+   updated"
+  [system & forms]
+  `(let [repo# (:drafter/backend ~system)
+        triples-before# (get-public-endpoint-triples repo#)]
+    ~@forms
+    (let [triples-after# (get-public-endpoint-triples repo#)]
+      (is (= (set (map :p triples-before#)) (set (map :p triples-after#))))
+      (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#)))))))

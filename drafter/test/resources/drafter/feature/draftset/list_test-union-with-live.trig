@@ -1,0 +1,37 @@
+@prefix : <http://api.stardog.com/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix stardog: <tag:stardog:api:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+
+<http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public rdf:type drafter:Endpoint ;
+                   dcterms:modified "2020-07-08T17:40:25.688Z"^^xsd:dateTime ;
+                   dcterms:issued "2020-06-26T13:37:34.683Z"^^xsd:dateTime .
+}
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+
+draftset:e06cf827-de24-47ae-8a43-2a1a37c5be4e a drafter:DraftSet ;
+    dcterms:created "2020-07-03T12:12:53.223Z"^^xsd:dateTime ;
+	dcterms:modified "2020-07-05T10:44:26.905Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:editor@swirrl.com> ;
+	drafter:hasOwner <mailto:editor@swirrl.com> ;
+	rdfs:label "modified before public" .
+
+draftset:7f94456f-8a92-4d40-8691-2c32f89e9741 a drafter:DraftSet ;
+    dcterms:created "2020-07-01T09:55:42.147Z"^^xsd:dateTime ;
+	dcterms:modified "2020-07-10T08:04:53.787Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:editor@swirrl.com> ;
+	rdfs:label "modified after public" ;
+	drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/1414fd7a-62dc-4aa4-8b3c-d0059883bbee> ;
+	drafter:submittedBy <mailto:editor@swirrl.com> .
+
+<http://publishmydata.com/def/drafter/submission/1414fd7a-62dc-4aa4-8b3c-d0059883bbee> a drafter:Submission ;
+	drafter:claimRole "publisher" .
+}

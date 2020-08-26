@@ -1,11 +1,14 @@
 (ns drafter.feature.draftset.list
-  (:require [drafter.middleware :refer [optional-enum-param]]
+  (:require [drafter.middleware :refer [include-endpoints-param]]
             [ring.util.response :as ring]
             [drafter.backend.draftset.operations :as dsops]
             [clojure.spec.alpha :as s]
             [drafter.user :as user]
             [drafter.rdf.drafter-ontology :refer :all]
-            [integrant.core :as ig]))
+            [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
+            [integrant.core :as ig]
+            [drafter.feature.endpoint.public :as pub]
+            [drafter.endpoint :as ep]))
 
 (defn- role-scores-values-clause [scored-roles]
   (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
@@ -58,17 +61,25 @@
 (defn get-draftsets-owned-by [repo user]
   (dsops/get-all-draftsets-by repo [(user-is-owner-clause user)]))
 
+(defn get-draftsets [backend user include union-with-live?]
+  (let [draftsets (case include
+                    :all (get-all-draftsets-info backend user)
+                    :claimable (get-draftsets-claimable-by backend user)
+                    :owned (get-draftsets-owned-by backend user))]
+    (if (and union-with-live?
+             (seq draftsets))
+      (let [public (pub/get-public-endpoint backend)]
+        (map (fn [ds] (ep/merge-endpoints public ds)) draftsets))
+      draftsets)))
+
 (defn get-draftsets-handler
   ":get /draftsets"
   [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
-   (optional-enum-param
-    :include #{:all :owned :claimable} :all
-    (fn [{user :identity {:keys [include]} :params :as request}]
-      (case include
-        :all (ring/response (get-all-draftsets-info backend user))
-        :claimable (ring/response (get-draftsets-claimable-by backend user))
-        :owned (ring/response (get-draftsets-owned-by backend user)))))))
+    (include-endpoints-param
+      (parse-union-with-live-handler
+        (fn [{user :identity {:keys [include union-with-live]} :params :as request}]
+          (ring/response (get-draftsets backend user include union-with-live)))))))
 
 (defmethod ig/pre-init-spec ::get-draftsets-handler [_]
   (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))

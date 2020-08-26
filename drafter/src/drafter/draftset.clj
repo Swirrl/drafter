@@ -1,12 +1,11 @@
 (ns drafter.draftset
   "In memory clojure representations of Draftset objects and functions
   to operate on them."
-  (:require [drafter.util :as util]
-            [schema.core :as s]
-            [drafter.rdf.drafter-ontology :as ont]
+  (:require [drafter.rdf.drafter-ontology :as ont]
             [grafter.url :as url])
   (:import java.net.URI
-           [java.util Date UUID]))
+           [java.util UUID]
+           [java.time OffsetDateTime]))
 
 (defprotocol DraftsetRef
   (->draftset-uri [this])
@@ -49,46 +48,24 @@
     (let [relative (.relativize ont/draftset-uri uri)]
       (->DraftsetId (str relative)))))
 
-(def ^:private email-schema (s/pred util/validate-email-address))
-
-(def ^:private SchemaCommon
-  {:id (s/protocol DraftsetRef)
-   :changes {URI {:status (s/enum :created :updated :deleted)}}
-   :created-by email-schema
-   :created-at Date
-   :updated-at Date
-   (s/optional-key :display-name) s/Str
-   (s/optional-key :description) s/Str
-   (s/optional-key :submitted-by) email-schema})
-
-(def OwnedDraftset
-  (merge SchemaCommon
-         {:current-owner email-schema}))
-
-(def SubmittedDraftset
-  (merge SchemaCommon
-         {(s/optional-key :claim-user) s/Str
-          (s/optional-key :claim-role) s/Keyword}))
-
-(def Draftset (s/either OwnedDraftset SubmittedDraftset))
-
-;; NOTE: this is currently only Used only by tests
+;; NOTE: this is currently only used only by tests
 ;;
 ;; TODO: Make the application use this function when loading a
 ;; draftset out of the database, and validate it conforms to our
 ;; in-memory/json schema.
-(s/defn create-draftset :- Draftset
-  ([creator :- email-schema]
-   {:id (->DraftsetId (str (UUID/randomUUID)))
-    :created-by creator
-    :created-at (Date.)
-    :current-owner creator})
-  ([creator :- email-schema
-    display-name :- s/Str]
+(defn create-draftset
+  ([creator]
+   (let [created-at (OffsetDateTime/now)]
+     {:id (->DraftsetId (str (UUID/randomUUID)))
+      :type "Draftset"
+      :changes {}
+      :created-by creator
+      :created-at created-at
+      :updated-at created-at
+      :current-owner creator}))
+  ([creator display-name]
    (assoc (create-draftset creator) :display-name display-name))
-  ([creator :- email-schema
-    display-name :- s/Str
-    description :- s/Str]
+  ([creator display-name description]
    (assoc (create-draftset creator display-name) :description description)))
 
 (defn- submit [draftset submitter role-or-user-key role-or-user-value]
@@ -109,13 +86,3 @@
   (-> draftset
       (dissoc :submission)
       (assoc :current-owner claimant)))
-
-
-;; NOTE: This var is currently unreferenced, we should probably try
-;; and use it - tying it into either a SPEC/validation or something.
-;;
-;; It certainly seems useful to have an explicit list of expected
-;; values.
-;;
-;; TODO consider making this a schema enum
-(def operations #{:delete :edit :submit :publish :claim})

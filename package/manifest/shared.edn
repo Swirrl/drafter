@@ -34,7 +34,8 @@
                           :path "log-config.edn.template"
                           :dest-path "log-config.edn"
                           :keys [:drafter/sparql-log-file-path
-                                 :drafter/drafter-log-file-path]}]
+                                 :drafter/drafter-log-file-path]}
+                         "init-public-endpoint.edn"]
                :systemd [{:type :selmer/template
                           :path "drafter.service"
                           :keys [:omni/install-dir]}]

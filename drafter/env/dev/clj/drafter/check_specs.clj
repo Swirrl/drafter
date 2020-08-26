@@ -10,7 +10,9 @@
 (def disabled-specs
   "Specs listed here will be excluded from check-specs call.  Useful
   if we're still working on them and expect them to fail."
-  #{`drafter.stasher/generate-drafter-cache-key})
+  #{`drafter.stasher/generate-drafter-cache-key
+    'drafter.feature.endpoint.public/get-public-endpoint
+    'drafter.feature.endpoint.list/get-endpoints})
 
 (defn check-specs*
   ([] (check-specs* 20))

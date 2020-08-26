@@ -8,7 +8,6 @@
             [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI))
 
-
 (t/use-fixtures :each
   ct/with-spec-instrumentation
   ;; Drop db after tests
@@ -16,7 +15,6 @@
 
 (t/use-fixtures :once
   ct/drafter-server-fixture)
-
 
 (t/deftest grafter-repo-test
   (let [client (ct/drafter-client)

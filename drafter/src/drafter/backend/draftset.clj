@@ -1,18 +1,15 @@
 (ns drafter.backend.draftset
-  (:require [clojure.spec.alpha :as sp]
-            [drafter.backend.common :as bprot :refer [->sesame-repo]]
+  (:require [drafter.backend.common :as bprot :refer [->sesame-repo]]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as dsmgmt]
             [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
             [drafter.backend.draftset.rewrite-result :refer [rewrite-query-results]]
-            [drafter.backend.spec :as bs]
             [grafter-2.rdf.protocols :as proto]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [schema.core :as sc]
-            [clojure.tools.logging :as log]
-            [clojure.set :as set])
+            [clojure.tools.logging :as log])
   (:import java.io.Closeable
            [org.apache.jena.query QueryFactory Syntax]
            [org.eclipse.rdf4j.model Resource URI]
@@ -114,9 +111,6 @@
   [{:keys [repo]} draftset-ref union-with-live?]
   (let [graph-mapping (dsmgmt/get-draftset-graph-mapping repo draftset-ref)]
     (->RewritingSesameSparqlExecutor repo graph-mapping union-with-live?)))
-
-(defmethod ig/pre-init-spec ::endpoint [_]
-  (sp/keys :req-un [::bs/repo]))
 
 (defmethod ig/init-key ::endpoint [_ opts]
   opts)
