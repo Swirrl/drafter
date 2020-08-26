@@ -199,8 +199,8 @@ SELECT ?lg ?dg (COUNT(DISTINCT ?s1) AS ?c1) (COUNT(DISTINCT ?s2) AS ?c2) WHERE {
     GRAPH ?lg { ?s2 ?p2 ?o2 }
     GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
       ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
       FILTER NOT EXISTS {
-        ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
         ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
         ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
       }
@@ -236,7 +236,6 @@ GROUP BY ?lg ?dg")))
                              (into {}))
         db-graphs (->> (graph-meta-q draftset-id (keys affected-graphs))
                        (sparql/eager-query backend))]
-    (clojure.pprint/pprint db-graphs)
     (->> db-graphs
          (filter (fn [{:keys [dg lg]}] (or dg lg)))
          (map (fn [{:keys [dg lg c1 c2]}]
