@@ -31,7 +31,8 @@
   [user draftset-location accept-content-type stmt]
   (tc/with-identity user
     {:uri (str draftset-location "/update")
-     :headers {"accept" accept-content-type}
+     :headers {"accept" accept-content-type
+               "content-type" "application/sparql-update"}
      :request-method :post
      :body stmt}))
 
@@ -711,6 +712,47 @@ SELECT * WHERE {
           (is (.isAfter ds_modified ds_created))
           (is (.isAfter dg_modified dg_created)))))))
 
-;; TODO:
-;; a) If we're copying graph from live, then (= dg_modified dg_created)
-;; b) If graph already exists in draft, then (> dg_modified dg_created)
+(tc/deftest-system-with-keys drop-forbidden-graphs-test
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])]
+
+      (testing "Can't DROP drafter's graphs"
+        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+              draftset-location (help/create-draftset-through-api handler test-publisher)
+              update! (fn [stmt]
+                        (handler (create-update-request
+                                  test-publisher draftset-location "text/plain" stmt)))
+              stmt "DROP GRAPH <http://publishmydata.com/graphs/drafter/drafts>"
+              response (update! stmt)]
+          (is (tc/assert-is-server-error response)))))))
+
+;; TODO: currently the regular draftset endpoints `append`, etc. are vulnerable
+;; to this too.
+;; (testing "Can't INSERT DATA into drafter's graphs"
+;;   (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+;;         draftset-location (help/create-draftset-through-api handler test-publisher)
+;;         update! (fn [stmt]
+;;                   (handler (create-update-request
+;;                             test-publisher draftset-location "text/plain" stmt)))
+;;         stmt "INSERT DATA {
+;;                       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+;;                         <http://s> <http://p> <http://o> } }"
+;;         ;; response (update! stmt)
+;;         quad (pr/->Quad (URI. "http://s")
+;;                         (URI. "http://p")
+;;                         (URI. "http://o")
+;;                         (URI. "http://publishmydata.com/graphs/drafter/drafts"))
+;;         response (help/append-quads-to-draftset-through-api
+;;                   handler test-publisher draftset-location [quad])
+;;         _ (clojure.pprint/pprint response)
+;;         _ (is (tc/assert-is-server-error response))
+;;         _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+;;         q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+;;         res (repo/query conn (format q "http://publishmydata.com/graphs/drafter/drafts"))
+;;         ]
+;;     (clojure.pprint/pprint res)
+;;     ))

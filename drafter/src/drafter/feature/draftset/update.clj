@@ -16,7 +16,8 @@
             [grafter.vocabularies.rdf :refer :all]
             [grafter.url :as url]
             [clojure.string :as string]
-            [ring.util.request :as request])
+            [ring.util.request :as request]
+            [grafter-2.rdf4j.repository :as repo])
   (:import java.net.URI
            java.util.UUID
            org.apache.jena.graph.NodeFactory
@@ -338,7 +339,7 @@ GROUP BY ?lg ?dg")))
      :using-graph-uri (get form-params "using-graph-uri")
      :using-named-graph-uri (get form-params "using-named-graph-uri")
      :from "'update' form parameter"}
-    "application/sparql-query"
+    "application/sparql-update"
     {:update body
      :using-graph-uri (get query-params "using-graph-uri")
      :using-named-graph-uri (get query-params "using-named-graph-uri")
@@ -346,10 +347,8 @@ GROUP BY ?lg ?dg")))
     (throw (ex-info "Bad request" {:error :bad-request}))))
 
 (defn- parse-draftset-id [request]
-  (or (try
-        (some-> request :params :draftset-id UUID/fromString)
-        (catch IllegalArgumentException _))
-      (throw (ex-info "Parameter draftset-id must be provided in UUID format"
+  (or (some-> request :route-params :id)
+      (throw (ex-info "Parameter draftset-id must be provided"
                       {:error :bad-request}))))
 
 (defn- parse-update-param [{:keys [update from]} max-update-size]
@@ -386,6 +385,17 @@ GROUP BY ?lg ?dg")))
         (assoc params :update-request update-request :draftset-id draftset-id))
       (throw (ex-info "Method not supported"
                       {:error :method-not-allowed :method request-method})))))
+
+(defn- prepare-update [backend request]
+  (with-open [repo (repo/->connection backend)]
+    (let [params (parse-update-params request)
+          default-graph (:using-graph-uri params)
+          named-graphs (:using-named-graph-uri params)
+          dataset (repo/make-restricted-dataset :default-graph default-graph
+                                                :named-graphs named-graphs)]
+      (doto (.prepareUpdate repo (:update params))
+        (.setDataset dataset)))))
+
 (defn- handler*
   [{:keys [drafter/backend max-update-size] :as opts} request]
   ;; TODO: handle SPARQL protocol
