@@ -122,9 +122,14 @@
 (defn- prior-reference? [g op ops]
   (not (empty? (take-while (complement #{op}) ops))))
 
+(defn- copy-allowed? [g graph-meta]
+  true
+  )
+
 (defn- copy? [g op {:keys [live? draft? live-size draft-graph-uri ops]}]
   (and live?
        (not draft?)
+       (copy-allowed? g {})
        (not (prior-reference? g op ops))))
 
 (defn- graphs-to-copy [op draftset-uri timestamp max-update-size graph-meta]
