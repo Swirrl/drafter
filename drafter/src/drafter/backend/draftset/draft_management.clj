@@ -178,6 +178,12 @@
   place."}  set-modifed-at-on-resource!
   (partial set-timestamp-on-resource! drafter:modifiedAt))
 
+
+(def protected-graphs #{drafter:endpoints drafter:drafts})
+
+(defn protected-graph? [graph-uri]
+  (contains? protected-graphs graph-uri))
+
 (defn ensure-draft-exists-for
   "Finds or creates a draft graph for the given live graph in the
   draftset."
@@ -478,7 +484,7 @@ WHERE {
   }
 } ;" ?from ?to suffix)))
 
-(defn- rewrite-draftset-q [opts]
+(defn rewrite-draftset-q [opts]
   (rewrite-q (assoc opts :?from '?lg :?to '?dg :deleted :ignore)))
 
 (defn- unrewrite-draftset-q [opts]

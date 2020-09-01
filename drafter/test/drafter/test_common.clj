@@ -460,6 +460,9 @@
 (defn assert-is-accepted-response [response]
   (assert-schema (response-code-schema 202) response))
 
+(defn assert-is-no-content-response [response]
+  (assert-schema (response-code-schema 204) response))
+
 (defn assert-is-not-found-response [response]
   (assert-schema (response-code-schema 404) response))
 
@@ -468,6 +471,9 @@
 
 (defn assert-is-unprocessable-response [response]
   (assert-schema (response-code-schema 422) response))
+
+(defn assert-is-payload-too-large-response [response]
+  (assert-schema (response-code-schema 413) response))
 
 (defn assert-is-unsupported-media-type-response [response]
   (assert-schema (response-code-schema 415) response))
@@ -483,6 +489,9 @@
 
 (defn assert-is-bad-request-response [response]
   (assert-schema (response-code-schema 400) response))
+
+(defn assert-is-server-error [response]
+  (assert-schema (response-code-schema 500) response))
 
 (defn assert-is-service-unavailable-response [response]
   (assert-schema (response-code-schema 503) response))
