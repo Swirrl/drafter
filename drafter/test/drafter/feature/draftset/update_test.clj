@@ -1,19 +1,16 @@
 (ns ^:rest-api drafter.feature.draftset.update-test
-  (:require [clojure.test :as t :refer [is testing]]
-            [grafter-2.rdf4j.io :refer [rdf-writer statements]]
-            [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
-            [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
-            [drafter.feature.draftset.test-helper :as help]
-            [drafter.util :as util]
-            [grafter-2.rdf4j.repository :as repo]
+  (:require [clojure.string :as string]
+            [clojure.test :as t :refer [is testing]]
             [drafter.draftset :as ds]
-            [clojure.string :as string]
-            [grafter-2.rdf.protocols :as pr])
+            [drafter.feature.draftset.test-helper :as help]
+            [drafter.feature.draftset.update :as update]
+            [drafter.test-common :as tc]
+            [drafter.user-test :refer [test-editor test-publisher]]
+            [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.repository :as repo])
   (:import java.net.URI
            java.util.UUID
-           org.eclipse.rdf4j.query.QueryResultHandler
-           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
+           org.apache.jena.update.UpdateRequest))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -28,10 +25,10 @@
    :drafter.common.config/sparql-query-endpoint])
 
 (defn- create-update-request
-  [user draftset-location accept-content-type stmt]
+  [user draftset-location stmt]
   (tc/with-identity user
     {:uri (str draftset-location "/update")
-     :headers {"accept" accept-content-type
+     :headers {"accept" "text/plain"
                "content-type" "application/sparql-update"}
      :request-method :post
      :body stmt}))
@@ -62,7 +59,7 @@ SELECT ?lg ?dg ?s ?p ?o WHERE {
           draftset-location (help/create-draftset-through-api handler test-editor)
           update! (fn [stmt]
                     (handler (create-update-request
-                              test-editor draftset-location "text/plain" stmt)))
+                              test-editor draftset-location stmt)))
           g (URI. (str "http://g/" (UUID/randomUUID)))
           stmt (format " INSERT DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } " g)
           response (update! stmt)
@@ -92,7 +89,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
           draftset-location (help/create-draftset-through-api handler test-editor)
           update! (fn [stmt]
                     (handler (create-update-request
-                              test-editor draftset-location "text/plain" stmt)))
+                              test-editor draftset-location stmt)))
           g (URI. (str "http://g/" (UUID/randomUUID)))
           stmt (format " INSERT DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } " g)
           response (update! stmt)
@@ -122,7 +119,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           draftset-location (help/create-draftset-through-api handler test-editor)
           update! (fn [stmt]
                     (handler (create-update-request
-                              test-editor draftset-location "text/plain" stmt)))
+                              test-editor draftset-location stmt)))
           uuid (UUID/randomUUID)
           g (URI. (str "http://g/" uuid))
           stmt (format " INSERT DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } " g)
@@ -191,7 +188,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (let [draftset-location (help/create-draftset-through-api handler test-editor)
                 update! (fn [stmt]
                           (handler (create-update-request
-                                    test-editor draftset-location "text/plain" stmt)))
+                                    test-editor draftset-location stmt)))
                 n 50
                 quads (take n valid-triples)
                 stmt (insert-stmt-str quads)
@@ -213,7 +210,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (let [draftset-location (help/create-draftset-through-api handler test-editor)
                 update! (fn [stmt]
                           (handler (create-update-request
-                                    test-editor draftset-location "text/plain" stmt)))
+                                    test-editor draftset-location stmt)))
                 n 51
                 quads (take n valid-triples)
                 stmt (insert-stmt-str quads)
@@ -235,7 +232,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
         (let [draftset-location (help/create-draftset-through-api handler test-editor)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-editor draftset-location "text/plain" stmt)))
+                                  test-editor draftset-location stmt)))
               n 25
               [quads1 more] (split-at n valid-triples)
               [quads2 more] (split-at n more)
@@ -262,7 +259,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
         (let [draftset-location (help/create-draftset-through-api handler test-editor)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-editor draftset-location "text/plain" stmt)))
+                                  test-editor draftset-location stmt)))
               n 26
               [quads1 more] (split-at n valid-triples)
               [quads2 more] (split-at n more)
@@ -291,7 +288,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
         (let [draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (insert-stmt-str quads1)
@@ -306,7 +303,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
 
               stmt (delete-stmt-str [(first quads1)])
               response (update! stmt)
@@ -319,7 +316,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (drop 50 (valid-triples-g g)))
               [quads2 more] (split-at n more)
@@ -338,7 +335,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
 
               stmt (delete-stmt-str [(first quads1)])
               response (update! stmt)
@@ -359,7 +356,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (insert-stmt-str quads1)
@@ -377,7 +374,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (valid-triples-g g))
               [quads2 more] (split-at n more)
@@ -399,7 +396,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (insert-stmt-str quads1)
@@ -413,7 +410,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               stmt (format "DROP GRAPH <%s>" g)
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
@@ -431,7 +428,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 49
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (str (insert-stmt-str quads1) ";\n"
@@ -446,7 +443,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 49
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (str (format "DROP SILENT GRAPH <%s>" g) ";\n"
@@ -461,7 +458,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 49
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (str (format "DROP GRAPH <%s>" g) ";\n"
@@ -475,7 +472,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               stmt (format "DROP SILENT GRAPH <%s>" g)
               response (update! stmt)
               res (repo/query conn (draftset-quads-mapping-q draftset-location))]
@@ -487,7 +484,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               stmt (format "DROP GRAPH <%s>" g)
               response (update! stmt)]
           (tc/assert-is-server-error response)))
@@ -497,7 +494,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (insert-stmt-str quads1)
@@ -511,7 +508,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               stmt (format "DROP GRAPH <%s>" g)
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
@@ -533,7 +530,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (insert-stmt-str quads1)
@@ -547,7 +544,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               [quads2 more] (split-at 2 more)
               stmt (str (format "DROP GRAPH <%s>" g) ";\n"
                         (insert-stmt-str quads2))
@@ -589,7 +586,7 @@ SELECT * WHERE {
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (insert-stmt-str quads1)
@@ -605,7 +602,7 @@ SELECT * WHERE {
               draftset-uri (ds/->draftset-uri draftset-id)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               stmt (delete-stmt-str (take 5 quads1))
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
@@ -632,7 +629,7 @@ SELECT * WHERE {
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 50
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (insert-stmt-str quads1)
@@ -648,7 +645,7 @@ SELECT * WHERE {
               draftset-uri (ds/->draftset-uri draftset-id)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               [quads2 more] (split-at 5 more)
               stmt (insert-stmt-str quads2)
               response (update! stmt)
@@ -676,7 +673,7 @@ SELECT * WHERE {
               draftset-location (help/create-draftset-through-api handler test-publisher)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               n 10
               [quads1 more] (split-at n (valid-triples-g g))
               stmt (insert-stmt-str quads1)
@@ -692,7 +689,7 @@ SELECT * WHERE {
               draftset-uri (ds/->draftset-uri draftset-id)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
+                                  test-publisher draftset-location stmt)))
               [quads2 more] (split-at 5 more)
               stmt (insert-stmt-str quads2)
               response (update! stmt)
@@ -712,47 +709,78 @@ SELECT * WHERE {
           (is (.isAfter ds_modified ds_created))
           (is (.isAfter dg_modified dg_created)))))))
 
-(tc/deftest-system-with-keys drop-forbidden-graphs-test
+(tc/deftest-system-with-keys protected-graphs-test
   keys-for-test [system system-config]
   (with-open [conn (-> system
                        :drafter.common.config/sparql-query-endpoint
                        repo/sparql-repo
                        repo/->connection)]
-    (let [handler (get system [:drafter/routes :draftset/api])]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          backend (:drafter/backend system)]
 
-      (testing "Can't DROP drafter's graphs"
+      (testing "Cannot operate on drafter's graphs"
+        (let [g (URI. "http://publishmydata.com/graphs/drafter/drafts")
+              draftset-location (help/create-draftset-through-api handler test-editor)
+              draftset-id (last (string/split draftset-location #"/"))
+              update! (fn [stmt]
+                        (->> stmt
+                             (create-update-request test-editor draftset-location)
+                             (handler)))
+              quad (pr/->Quad (URI. "http://s") (URI. "http://p") (URI. "http://o") g)]
+
+          (testing "INSERT DATA ..."
+            (let [stmt (#'update/insert-data-stmt [quad])
+                  update-request (#'update/add-operations (UpdateRequest.) [stmt])
+                  response (update! (str update-request))]
+              (tc/assert-is-forbidden-response response)))
+
+          (testing "DELETE DATA ..."
+            (let [stmt (#'update/delete-data-stmt [quad])
+                  update-request (#'update/add-operations (UpdateRequest.) [stmt])
+                  response (update! (str update-request))]
+              (tc/assert-is-forbidden-response response)))
+
+          (testing "DROP GRAPH ..."
+            (let [stmt (format "DROP GRAPH <%s>" g)
+                  update-request (#'update/add-operations (UpdateRequest.) [stmt])
+                  response (update! (str update-request))]
+              (tc/assert-is-forbidden-response response))))))))
+
+(tc/deftest-system-with-keys access-forbidden-graphs-test
+  keys-for-test [system system-config]
+  (with-open [conn (-> system
+                       :drafter.common.config/sparql-query-endpoint
+                       repo/sparql-repo
+                       repo/->connection)]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          backend (:drafter/backend system)]
+
+      (testing "Cannot see draft graphs in other draftsets"
+        ;; I.E., a user can operate on the same live graph in another draftset
+        ;; but cannot access the draft graph of another draftset
         (let [g (URI. (str "http://g/" (UUID/randomUUID)))
               draftset-location (help/create-draftset-through-api handler test-publisher)
+              draftset-id (last (string/split draftset-location #"/"))
+              draftset-uri (ds/->draftset-uri draftset-id)
               update! (fn [stmt]
                         (handler (create-update-request
-                                  test-publisher draftset-location "text/plain" stmt)))
-              stmt "DROP GRAPH <http://publishmydata.com/graphs/drafter/drafts>"
-              response (update! stmt)]
-          (is (tc/assert-is-server-error response)))))))
-
-;; TODO: currently the regular draftset endpoints `append`, etc. are vulnerable
-;; to this too.
-;; (testing "Can't INSERT DATA into drafter's graphs"
-;;   (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-;;         draftset-location (help/create-draftset-through-api handler test-publisher)
-;;         update! (fn [stmt]
-;;                   (handler (create-update-request
-;;                             test-publisher draftset-location "text/plain" stmt)))
-;;         stmt "INSERT DATA {
-;;                       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-;;                         <http://s> <http://p> <http://o> } }"
-;;         ;; response (update! stmt)
-;;         quad (pr/->Quad (URI. "http://s")
-;;                         (URI. "http://p")
-;;                         (URI. "http://o")
-;;                         (URI. "http://publishmydata.com/graphs/drafter/drafts"))
-;;         response (help/append-quads-to-draftset-through-api
-;;                   handler test-publisher draftset-location [quad])
-;;         _ (clojure.pprint/pprint response)
-;;         _ (is (tc/assert-is-server-error response))
-;;         _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-;;         q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
-;;         res (repo/query conn (format q "http://publishmydata.com/graphs/drafter/drafts"))
-;;         ]
-;;     (clojure.pprint/pprint res)
-;;     ))
+                                  test-publisher draftset-location stmt)))
+              quad (pr/->Quad (URI. "http://s") (URI. "http://p") (URI. "http://o") g)
+              response (help/append-quads-to-draftset-through-api
+                        handler test-publisher draftset-location [quad])
+              q "SELECT ?dg WHERE {
+                   VALUES ?ds { <%s> }
+                   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+                     ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+                   }
+                 }"
+              [{:keys [dg]}] (repo/query conn (format q draftset-uri))
+              draftset-location (help/create-draftset-through-api handler test-editor)
+              draftset-id (last (string/split draftset-location #"/"))
+              quad (pr/->Quad (URI. "http://s") (URI. "http://p") (URI. "http://o") g)
+              stmt (#'update/insert-data-stmt [quad])
+              update-request (#'update/add-operations (UpdateRequest.) [stmt])
+              gmeta (#'update/get-graph-meta backend draftset-id update-request)
+              draft-graph-uri (get-in gmeta [g :draft-graph-uri])]
+          (is (not= dg draft-graph-uri))
+          (is (not (nil? draft-graph-uri))))))))

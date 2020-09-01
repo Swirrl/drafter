@@ -25,6 +25,9 @@
 (defmethod encode-error :writes-temporarily-disabled [ex]
   (r/error-response 503 ex))
 
+(defmethod encode-error :forbidden [ex]
+  (r/error-response 403 ex))
+
 (defmethod encode-error :payload-too-large [ex]
   (r/error-response 413 ex))
 

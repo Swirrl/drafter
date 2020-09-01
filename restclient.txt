@@ -537,16 +537,9 @@ Accept: application/sparql-results+json
 Accept-Language: en-US,en;q=0.5
 Content-Type: application/sparql-query
 
-
-SELECT * WHERE {
-  GRAPH ?lg { ?s2 ?p2 ?o2 }
+SELECT ?dg WHERE {
+  VALUES ?ds { <http://publishmydata.com/def/drafter/draftset/72415ffc-4837-4878-9774-c653ec391775> }
   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-    FILTER NOT EXISTS {
-      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-    }
+  ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
   }
-  VALUES ( ?lg ?ds ) { ( <http://g/18cb8f45-1175-44a0-8002-12a07e110871> <http://publishmydata.com/def/drafter/draftset/0fa0412b-a6ef-4740-90d9-506edd69ccd8> ) }
 }

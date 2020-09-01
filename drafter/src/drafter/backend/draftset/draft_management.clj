@@ -179,6 +179,12 @@
   place."}  set-modifed-at-on-resource!
   (partial set-timestamp-on-resource! drafter:modifiedAt))
 
+
+(def protected-graphs #{drafter:endpoints drafter:drafts})
+
+(defn protected-graph? [graph-uri]
+  (contains? protected-graphs graph-uri))
+
 (defn ensure-draft-exists-for
   "Finds or creates a draft graph for the given live graph in the
   draftset."

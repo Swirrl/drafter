@@ -66,6 +66,9 @@
   (raw-operations [op opts])
   (rewrite [op rewriter]))
 
+(defn- forbidden-request [& [msg]]
+  (ex-info (str "403 Forbidden" (when msg (str ": " msg))) {:error :forbidden}))
+
 (defn- unprocessable-request [unprocessable]
   (ex-info "422 Unprocessable Entity" {:error :unprocessable-request}))
 
@@ -74,6 +77,9 @@
 
 (defn- insert-data-stmt [quads]
   (UpdateDataInsert. (QuadDataAcc. (map ->jena-quad quads))))
+
+(defn- delete-data-stmt [quads]
+  (UpdateDataDelete. (QuadDataAcc. (map ->jena-quad quads))))
 
 (defn- rewrite-draftset-ops [draftset-id]
   (-> {:draftset-uri (ds/->draftset-uri draftset-id)}
@@ -122,14 +128,9 @@
 (defn- prior-reference? [g op ops]
   (not (empty? (take-while (complement #{op}) ops))))
 
-(defn- copy-allowed? [g graph-meta]
-  true
-  )
-
 (defn- copy? [g op {:keys [live? draft? live-size draft-graph-uri ops]}]
   (and live?
        (not draft?)
-       (copy-allowed? g {})
        (not (prior-reference? g op ops))))
 
 (defn- graphs-to-copy [op draftset-uri timestamp max-update-size graph-meta]
@@ -161,17 +162,6 @@
         rewrite-ds (when (seq copy) (rewrite-draftset-ops draftset-id))
         op [(rewrite op rewriter)]]
     (concat manage copy rewrite-ds touch op)))
-
-(defn- parse-body [request opts]
-  (let [update-request (-> request :body UpdateFactory/create)
-        operations (.getOperations update-request)
-        unprocessable (remove processable? operations)]
-    (cond (seq unprocessable)
-          (throw (unprocessable-request unprocessable))
-          (not (within-limit? operations opts))
-          (throw (payload-too-large operations))
-          :else
-          update-request)))
 
 (defn- add-operations [update-request operations]
   (doseq [op operations] (.add update-request op))
@@ -331,7 +321,6 @@ GROUP BY ?lg ?dg")))
         update-request' (->> (.getOperations update-request)
                              (mapcat #(raw-operations % opts))
                              (add-operations (UpdateRequest.)))]
-    ;; (println (str update-request'))
     (sparql/update! backend (str update-request'))))
 
 
@@ -356,6 +345,9 @@ GROUP BY ?lg ?dg")))
       (throw (ex-info "Parameter draftset-id must be provided"
                       {:error :bad-request}))))
 
+(defn- protected? [op]
+  (not (empty? (set/intersection (affected-graphs op) dm/protected-graphs))))
+
 (defn- parse-update-param [{:keys [update from]} max-update-size]
   (let [update' (cond (string? update)
                       update
@@ -370,17 +362,27 @@ GROUP BY ?lg ?dg")))
         update-request (UpdateFactory/create update' Syntax/syntaxSPARQL_11)
         operations (.getOperations update-request)
         unprocessable (remove processable? operations)]
-    (cond (seq unprocessable)
+    (cond (some protected? operations)
+          (throw (forbidden-request "Protected graphs in update request"))
+          (seq unprocessable)
           (throw (unprocessable-request unprocessable))
           (not (within-limit? operations max-update-size))
           (throw (payload-too-large operations))
           :else
           update-request)))
 
-;; TODO: First apply restricted dataset?
-;; TODO: Create prepareUpdate ?
-;; TODO: Convert to jena UpdateRequest?
-;; TODO: rewrite from restricted Update?
+(defn- prepare-update [backend request]
+  ;; NOTE: Currently unused. None of the Update types that we have implemented
+  ;; support `using-(named-)graph-uri`.
+  (with-open [repo (repo/->connection backend)]
+    (let [params (parse-update-params request)
+          default-graph (:using-graph-uri params)
+          named-graphs (:using-named-graph-uri params)
+          dataset (repo/make-restricted-dataset :default-graph default-graph
+                                                :named-graphs named-graphs)]
+      (doto (.prepareUpdate repo (:update params))
+        (.setDataset dataset)))))
+
 (defn- parse-update [request max-update-size]
   (let [{:keys [request-method body query-params form-params]} request]
     (if (= request-method :post)
@@ -391,20 +393,8 @@ GROUP BY ?lg ?dg")))
       (throw (ex-info "Method not supported"
                       {:error :method-not-allowed :method request-method})))))
 
-(defn- prepare-update [backend request]
-  (with-open [repo (repo/->connection backend)]
-    (let [params (parse-update-params request)
-          default-graph (:using-graph-uri params)
-          named-graphs (:using-named-graph-uri params)
-          dataset (repo/make-restricted-dataset :default-graph default-graph
-                                                :named-graphs named-graphs)]
-      (doto (.prepareUpdate repo (:update params))
-        (.setDataset dataset)))))
-
 (defn- handler*
   [{:keys [drafter/backend max-update-size] :as opts} request]
-  ;; TODO: handle SPARQL protocol
-  ;; TODO: sparql protocol handler for update
   ;; TODO: write-lock?
   (let [{:keys [update-request draftset-id]} (parse-update request max-update-size)]
     (update! backend max-update-size draftset-id update-request)

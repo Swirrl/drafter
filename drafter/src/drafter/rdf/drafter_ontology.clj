@@ -7,6 +7,7 @@
 
 (def drafter (URI. "http://publishmydata.com/def/drafter/"))
 (def draftset-uri (URI. "http://publishmydata.com/def/drafter/draftset/"))
+(def drafter:endpoints (URI. "http://publishmydata.com/graphs/drafter/endpoints"))
 
 (defn draftset-id->uri [id]
   (url/append-path-segments draftset-uri id))
@@ -47,6 +48,8 @@
 (def drafter:submittedBy (url/append-path-segments drafter "submittedBy"))
 
 (def drafter:draft (url/append-path-segments drafter ))
+
+(def drafter:drafts (url/append-path-segments pmd-graphs "drafter" "drafts"))
 
 (defn draft:graph [graph-id]
   (url/append-path-segments pmd-graphs "drafter" "draft" graph-id))
