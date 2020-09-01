@@ -1,0 +1,12 @@
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://publishmydata.com/graphs/drafter/endpoints> {
+    <http://s> <http://p> <http://o> .
+    drafter:public rdfs:label "Public endpoint" ;
+                   dcterms:modified "2020-01-01T00:00:00.000Z"^^xsd:dateTime ;
+                   dcterms:issued "2019-12-31T04:38:15.542Z"^^xsd:dateTime .
+
+}

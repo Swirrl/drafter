@@ -1,5 +1,7 @@
 (ns ^:rest-api drafter.feature.draftset.set-metadata-test
   (:require [clojure.test :as t :refer [is]]
+            [drafter.draftset.spec]
+            [drafter.draftset :as ds]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]))
@@ -16,7 +18,7 @@
   (let [request (create-update-draftset-metadata-request user draftset-location title description)
         {:keys [body] :as response} (handler request)]
     (tc/assert-is-ok-response response)
-    (tc/assert-schema help/Draftset body)
+    (tc/assert-spec ::ds/Draftset body)
     body))
 
 (tc/deftest-system-with-keys set-draftset-with-existing-title-and-description-metadata

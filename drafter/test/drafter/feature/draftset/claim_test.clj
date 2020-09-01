@@ -1,7 +1,8 @@
 (ns ^:rest-api drafter.feature.draftset.claim-test
   (:require [clojure.test :as t :refer [is]]
+            [drafter.draftset :as ds]
+            [drafter.draftset.spec :as dss]
             [drafter.feature.draftset.create-test :as ct]
-            [drafter.feature.draftset.test-helper :refer [Draftset]]
             [drafter.test-common :as tc]
             [drafter.user :as user]
             [drafter.user-test
@@ -17,7 +18,7 @@
   (let [claim-request (create-claim-request draftset-location user)
         {:keys [body] :as claim-response} (handler claim-request)]
     (tc/assert-is-ok-response claim-response)
-    (tc/assert-schema Draftset body)
+    (tc/assert-spec ::ds/Draftset body)
       body))
 
 (defn- create-submit-to-role-request [user draftset-location role]

@@ -4,9 +4,9 @@
             [buddy.auth.backends.token :refer [jws-backend]]
             [buddy.auth.middleware :refer [wrap-authentication wrap-authorization]]
             [buddy.auth.protocols :as authproto]
-            [clj-logging-config.log4j :as l4j]
             [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
+            [drafter.logging :refer [with-logging-context]]
             [cognician.dogstatsd :as datadog]
             [drafter.responses :as response]
             [drafter.user :as user]
@@ -42,13 +42,14 @@
               (log/error ex "Token authentication failed due to an invalid user token")
               (auth/throw-unauthorized {:message "Invalid token"}))))))))
 
+
 (defn require-authenticated
   "Requires the incoming request has been authenticated."
   [inner-handler]
   (fn [request]
     (if (auth/authenticated? request)
       (let [email (:email (:identity request))]
-        (l4j/with-logging-context {:user email} ;; wrap a logging context over the request so we can trace the user
+        (with-logging-context {:user email} ;; wrap a logging context over the request so we can trace the user
           (datadog/increment! "drafter.requests.authorised" 1)
           (log/info "got user" email)
           (inner-handler request)))

@@ -1,11 +1,8 @@
 (ns drafter.backend
-  (:require [clojure.spec.alpha :as s]
-            [drafter.backend.draftset :as draftsets]
+  (:require [drafter.backend.draftset :as draftsets]
             [drafter.backend.live :as live]
-            [drafter.backend.spec :as bs]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
-            [grafter.url :as url]
             [drafter.draftset :as ds])
   (:import java.net.URI
            drafter.draftset.DraftsetId))
@@ -57,7 +54,7 @@
 (defn drafter-repo
   "Return a repository from the backend that has acccess to the
   drafter state graph and information."
-  [{:keys [::bs/repo]}]
+  [{:keys [::repo]}]
   repo)
 
 (defn endpoint-repo
@@ -69,9 +66,6 @@
    (endpoint-repo* drafter endpoint-id {}))
   ([drafter endpoint-id opts]
    (endpoint-repo* drafter endpoint-id opts)))
-
-(defmethod ig/pre-init-spec :drafter/backend [_]
-  (s/keys :req-un [::bs/repo]))
 
 (defmethod ig/init-key :drafter/backend [_ opts]
   (map->DrafterService opts))

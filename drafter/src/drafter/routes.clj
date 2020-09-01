@@ -10,18 +10,15 @@
 
   Also takes a :context \"/path\" option.
   "
-  (:require [clj-logging-config.log4j :as l4j]
+  (:require [clojure.spec.alpha :as s]
             [compojure.core :as compojure]
-            [integrant.core :as ig]
-            [clojure.spec.alpha :as s]
-            [clojure.string :as string]))
+            [drafter.logging :refer [with-logging-context]]
+            [integrant.core :as ig]))
 
 (defn make-route [method route handler-fn]
   (compojure/make-route method route
                         (fn [req]
-                          (l4j/with-logging-context
-                            {:method method
-                             :route route}
+                          (with-logging-context {:method method :route route}
                             (handler-fn req)))))
 
 (defn attach-route [[method route handler]]

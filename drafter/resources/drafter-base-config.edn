@@ -125,6 +125,10 @@
  :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                                 :drafter.user/repo #ig/ref :drafter.user/repo}
 
+ :drafter.feature.endpoint.show/handler {:repo #ig/ref :drafter/backend}
+ :drafter.feature.endpoint.list/handler {:drafter/backend #ig/ref :drafter/backend
+                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+
  [:drafter/routes :draftset/api] {:context "/v1"
                                   :routes [[:get "/users" #ig/ref :drafter.feature.users.list/get-users-handler]
 
@@ -151,12 +155,10 @@
                                            [:post "/draftset/:id/submit-to" #ig/ref :drafter.feature.draftset.submit/handler]
                                            [:put "/draftset/:id/claim" #ig/ref :drafter.feature.draftset.claim/handler]
 
-                                           ;; TODO new handler....
-                                           ;;[:get "/endpoint/live" #ig/ref :drafter.feature.endpoint.show/handler]
+                                           [:get "/endpoint/public" #ig/ref :drafter.feature.endpoint.show/handler]
+                                           [:get "/endpoints" #ig/ref :drafter.feature.endpoint.list/handler]
                                            ]
-
                                   }
-
 
  :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo
                        :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route

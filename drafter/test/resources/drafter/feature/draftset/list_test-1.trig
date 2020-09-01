@@ -17,6 +17,4 @@ draftset:32159abf-d2ca-4f8b-8cc0-9609704c2553 a drafter:DraftSet ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	drafter:hasOwner <mailto:editor@swirrl.com> ;
 	rdfs:label "editing" .
-
-
 }

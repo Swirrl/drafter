@@ -3,12 +3,15 @@
              [pprint :as pp]
              [string :as str]]
             [buddy.core.codecs.base64 :as base64]
-            [buddy.core.codecs :as codecs])
+            [buddy.core.codecs :as codecs]
+            [integrant.core :as ig])
   (:import java.nio.charset.Charset
            [java.util UUID]
            [java.time OffsetDateTime]
            [javax.mail.internet AddressException InternetAddress]
-           org.eclipse.rdf4j.model.impl.URIImpl))
+           org.eclipse.rdf4j.model.impl.URIImpl
+           [java.net URI]
+           [java.io IOException]))
 
 (defn get-current-time
   "Function that get's the current time."
@@ -178,3 +181,51 @@
 
 (defn throwable? [x]
   (instance? Throwable x))
+
+(defn try-connect
+  "Attempts to open a connection to the endpoint specified by the given URI
+   and returns whether the attempt was successful."
+  [^URI uri]
+  (let [conn (.openConnection (.toURL uri))]
+    (.setConnectTimeout conn 10)
+    (try
+      (.connect conn)
+      true
+      (catch IOException _ex
+        false))))
+
+(defn- wait-periods
+  "Returns a sequence of linearly-increasing wait periods up to a maximum
+   of 10 seconds until the total wait time exceeds the specified timeout.
+   The last period is scheduled before the total timeout is exceeded so the
+   total time to wait may be up to 9 seconds longer than the specified
+   timeout."
+  [timeout-seconds]
+  (letfn [(periods [period remaining]
+            (if (>= period remaining)
+              [period]
+              (let [next-period (min 10 (inc period))]
+                (cons period (lazy-seq (periods next-period (- remaining period)))))))]
+    (periods 1 timeout-seconds)))
+
+(defn wait-for-connection
+  "Polls attempting to open a connection to the endpoint identified by
+   URI for at least the specified number of seconds. The polling period
+   is increased linearly up to a maximum of 10 seconds until the timeout
+   period is exceeded. Returns nil as soon as a connection attempt is
+   successful and throws an exception if the endpoint cannot be connected
+   to within the timeout period."
+  [uri timeout-seconds]
+  (loop [periods (wait-periods timeout-seconds)]
+    (when-not (try-connect uri)
+      (if-let [period (first periods)]
+        (do
+          (Thread/sleep (* 1000 period))
+          (recur (next periods)))
+        (let [msg (format "Timed out waiting %s seconds for connection to %s"
+                          timeout-seconds
+                          uri)]
+          (throw (ex-info msg {:uri uri :timeout-seconds timeout-seconds})))))))
+
+(defmethod ig/init-key ::wait-for-connection [_ {:keys [uri timeout-seconds]}]
+  (wait-for-connection uri timeout-seconds))

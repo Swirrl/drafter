@@ -129,11 +129,14 @@
     (println "Using supplied configs " profiles)
     (map read-system profiles)))
 
+(defn build-config [configs]
+  (apply mm/meta-merge (resolve-configs configs)))
+
 (defn -main [& args]
   (println "Starting Drafter")
   (add-shutdown-hook!)
   (if (seq args)
-    (start-system! (apply mm/meta-merge (resolve-configs args)))
+    (start-system! (build-config args))
     (binding [*out* *err*]
       (println "You must provide an integrant file of additional config to start drafter.")
       (println)

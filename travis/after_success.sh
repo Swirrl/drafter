@@ -4,4 +4,5 @@ set -o errexit
 
 cd `dirname $0`/../drafter
 
-./bin/uberjar
+./bin/pack
+./bin/package
