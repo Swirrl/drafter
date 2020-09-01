@@ -96,6 +96,10 @@
                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
                                           :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
+ :drafter.feature.draftset.update/handler {:drafter/backend #ig/ref :drafter/backend
+                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
+                                           :max-update-size 50}
+
  :drafter.feature.draftset.publish/handler {:drafter/backend #ig/ref :drafter/backend
                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
@@ -139,6 +143,7 @@
                                            [:put "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.append/data-handler]
                                            [:put "/draftset/:id/graph" #ig/ref :drafter.feature.draftset-data.append-by-graph/handler]
                                            [nil "/draftset/:id/query" #ig/ref :drafter.feature.draftset.query/handler]
+                                           [:post "/draftset/:id/update" #ig/ref :drafter.feature.draftset.update/handler]
 
                                            [:post "/draftset/:id/publish" #ig/ref :drafter.feature.draftset.publish/handler]
                                            [:put "/draftset/:id" #ig/ref :drafter.feature.draftset.set-metadata/handler]
