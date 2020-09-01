@@ -48,11 +48,11 @@ popd || exit
 pushd "${REPO_DIR}" || exit
 
 # build packages
-env TRAVIS_BRANCH="${TRAVIS_BRANCH}" \
+env TRAVIS_BRANCH="${TRAVIS_BRANCH_ESC}" \
     TRAVIS_BUILD_NUMBER="${TRAVIS_BUILD_NUMBER}" \
     clojure -A:omni package -m "${TEMP_PACKAGE_DIR}/pmd3-manifest.edn" -o "${TARGET_DIR}"
 
-env TRAVIS_BRANCH="${TRAVIS_BRANCH}" \
+env TRAVIS_BRANCH="${TRAVIS_BRANCH_ESC}" \
     TRAVIS_BUILD_NUMBER="${TRAVIS_BUILD_NUMBER}" \
     clojure -A:omni package -m "${TEMP_PACKAGE_DIR}/pmd4-manifest.edn" -o "${TARGET_DIR}"
 
