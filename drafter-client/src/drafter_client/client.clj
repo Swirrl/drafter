@@ -186,12 +186,13 @@
   ([client access-token draftset graph]
    (delete-graph client access-token draftset graph {}))
   ([client access-token draftset graph opts]
-   (i/request client
-     i/delete-draftset-graph
-     access-token
-     (draftset/id draftset)
-     (str graph)
-     opts)))
+   (apply i/request
+          client
+          i/delete-draftset-graph
+          access-token
+          (draftset/id draftset)
+          (str graph)
+          (apply concat opts))))
 
 (defn delete-quads
   ([client access-token draftset quads]
