@@ -172,9 +172,26 @@
              (draftset/id draftset) (str graph)))
 
 (defn delete-graph
-  "Schedules the deletion of the graph from live"
-  [client access-token draftset graph]
-  (i/request client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
+  "Schedules the deletion of the graph from live.
+
+  Takes an optional last argument of opts. Currently the supported
+  opts are:
+
+  :silent    - When true equivalent to SPARQL's DROP SILENT.  A
+               boolean indicating whether or not to raise an error
+               if the graph to be deleted doesn't exist.  If set to
+               true the function will succeed without error if the
+               graph being deleted doesn't exist.  Defaults to false.
+  "
+  ([client access-token draftset graph]
+   (delete-graph client access-token draftset graph {}))
+  ([client access-token draftset graph opts]
+   (i/request client
+     i/delete-draftset-graph
+     access-token
+     (draftset/id draftset)
+     (str graph)
+     opts)))
 
 (defn delete-quads
   ([client access-token draftset quads]
