@@ -78,9 +78,15 @@
       statements
       (map #(util/make-quad-statement % graph) statements))))
 
+(defn- validate-quad [quad]
+  (let [g (pr/context quad)]
+    (if (pr/blank-node? g)
+      (throw (ex-info "Blank node as graph ID" {:type :error}))
+      quad)))
+
 (defn append-data-to-draftset-job
   [tempfile {:keys [backend] :as resources} user-id {:keys [draftset-id metadata] :as params} clock-fn]
-  (let [quads (get-quads tempfile params)]
+  (let [quads (map validate-quad (get-quads tempfile params))]
     (jobs/make-job user-id
                    :background-write
                    (jobs/job-metadata backend draftset-id 'append-data-to-draftset metadata)

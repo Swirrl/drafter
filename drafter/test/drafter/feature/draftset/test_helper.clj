@@ -97,7 +97,10 @@
 (defn append-quads-to-draftset-through-api [handler user draftset-location quads]
   (let [request (statements->append-request user draftset-location quads {:format :nq})
         response (handler request)]
-    (tc/await-success (get-in response [:body :finished-job]))))
+    (or (some-> response
+                (get-in [:body :finished-job])
+                (tc/await-success))
+        (throw (ex-info "No job-path present in response" response)))))
 
 (defn make-append-data-to-draftset-request [handler user draftset-location data-file-path]
   (with-open [fs (io/input-stream data-file-path)]
