@@ -16,6 +16,7 @@ env:
     - AUTH0_AUD=https://pmd
     - AUTH0_CLIENT_ID=7klE25HUY333vTEx7rM1dmsnO6vHkaSG
     - AUTH0_CLIENT_SECRET=QYoWNwf11dzWNh6XYd3jH8-j5j8r36UKuoFgrPakE_aw_Gy_EwWSppvqSULRICY4
+    - TRAVIS_BRANCH_ESC="${TRAVIS_BRANCH//\//_}"
 cache:
   directories:
     - $HOME/.m2
@@ -33,14 +34,14 @@ script:
   - ./travis/test-all
 after_success:
   - ./travis/after_success.sh
-deploy:  
+deploy:
   - provider: script
-    script: clojure -A:omni publish -f drafter/target/drafter-pmd3-${TRAVIS_BRANCH}-${TRAVIS_BUILD_NUMBER}.zip
+    script: "clojure -A:omni publish -f drafter/target/drafter-pmd3-${TRAVIS_BRANCH_ESC}-${TRAVIS_BUILD_NUMBER}.zip"
     skip_cleanup: true
     on:
       all_branches: true
   - provider: script
-    script: clojure -A:omni publish -f drafter/target/drafter-pmd4-${TRAVIS_BRANCH}-${TRAVIS_BUILD_NUMBER}.zip    
+    script: "clojure -A:omni publish -f drafter/target/drafter-pmd4-${TRAVIS_BRANCH_ESC}-${TRAVIS_BUILD_NUMBER}.zip"
     skip_cleanup: true
     on:
       all_branches: true
