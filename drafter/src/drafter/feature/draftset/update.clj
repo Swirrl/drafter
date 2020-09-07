@@ -17,7 +17,8 @@
             [grafter.url :as url]
             [clojure.string :as string]
             [ring.util.request :as request]
-            [grafter-2.rdf4j.repository :as repo])
+            [grafter-2.rdf4j.repository :as repo]
+            [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI
            java.util.UUID
            org.apache.jena.graph.NodeFactory
@@ -30,7 +31,8 @@
            org.apache.jena.sparql.sse.Item
            [org.apache.jena.query Syntax]
            [org.apache.jena.update UpdateFactory UpdateRequest]
-           java.time.OffsetDateTime
+           [java.time LocalDateTime OffsetDateTime]
+           java.time.format.DateTimeFormatter
            org.apache.jena.datatypes.xsd.XSDDatatype))
 
 (defn- rewrite-quad [rewriter quad]
@@ -46,11 +48,27 @@
                SSE/parseOp)]
     (-> op  OpAsQuery/asQuery .getQueryPattern)))
 
+(def type-mapper
+  (doto (org.apache.jena.datatypes.TypeMapper.)
+    (org.apache.jena.datatypes.xsd.XSDDatatype/loadXSDSimpleTypes)))
+
+(defn- format-date-time [x]
+  (.format (DateTimeFormatter/ofPattern "uuuu-MM-dd'T'HH:mm:ss.SSS") x))
+
+(defn- value-str [x]
+  ;; if we have a `LocalDateTime` which should get mapped to XMLSchema#dateTime
+  ;; the default toString implementation may render an unparsable format, if
+  ;; the seconds/milliseconds fields read zero.
+  ;; See: https://docs.oracle.com/javase/8/docs/api/java/time/LocalDateTime.html#toString--
+  (if (instance? LocalDateTime x)
+    (format-date-time x)
+    (str (pr/raw-value x))))
+
 (defn- ->literal [x]
-  (let [t (condp = (type x)
-            OffsetDateTime XSDDatatype/XSDdateTime
-            nil)]
-    (NodeFactory/createLiteral (str x) t)))
+  (let [t (.getSafeTypeByName type-mapper (str (pr/datatype-uri x)))
+        lang (when (satisfies? pr/IRDFString x)
+               (some-> x pr/lang name))]
+    (NodeFactory/createLiteral (value-str x) lang t)))
 
 (defn- ->jena-quad [{:keys [c s p o]}]
   (letfn [(->node [x]
