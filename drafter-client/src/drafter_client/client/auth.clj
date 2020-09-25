@@ -1,8 +1,7 @@
 (ns drafter-client.client.auth
-  (:require [clj-time.coerce :refer [to-date]]
-            [clj-time.format :refer [formatter parse]]
+  (:require [clj-time.format :refer [formatter]]
+            [drafter-client.auth.basic-auth :as ba]
             [drafter-client.client.impl :as i]
-            [ring.util.codec :refer [form-encode]]
             [schema.core :as schema]
             [martian.core :as martian]))
 
@@ -57,10 +56,7 @@
         (:body))))
 
 (defn basic-auth [user password]
-  (let [bpass (.getBytes (str user \: password))]
-    {:name ::auth-header
-     :enter (fn [ctx]
-              (assoc-in ctx [:request :headers "Authorization"]
-                        (str "Basic "
-                             (-> (java.util.Base64/getEncoder)
-                                 (.encodeToString bpass)))))}))
+  {:name ::auth-header
+   :enter (fn [ctx]
+            (assoc-in ctx [:request :headers "Authorization"]
+                      (ba/basic-auth-header user password)))})
