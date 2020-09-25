@@ -5,8 +5,10 @@
 
 (defn basic-auth-header
   "Given a username and a password return the encoded value for Basic
-  Auth as a string. This value can be included as the value for an
-  HTTP Authorization header."
+  Auth, for the Authorization Header as a string. This value can be
+  included as the value for an HTTP Authorization header.
+
+  e.g. returns something like: \"Basic cmljazpwYXNzd29yZA==\" "
   [user password]
   (let [bpass (.getBytes (str user \: password))]
     (str "Basic "
@@ -36,8 +38,8 @@
 (s/def ::user string?)
 (s/def ::password string?)
 
-(defmethod ig/pre-init-spec :drafter-client.client.auth/basic-auth [_]
+(defmethod ig/pre-init-spec :drafter-client.auth/basic-auth [_]
   (s/keys :req-un [::user ::password]))
 
-(defmethod ig/init-key :drafter-client.client.auth/basic-auth [_ opts]
+(defmethod ig/init-key :drafter-client.auth/basic-auth [_ opts]
   (map->BasicAuthProvider opts))

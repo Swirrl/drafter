@@ -7,6 +7,7 @@
             [clojure.tools.logging :as log]
             [swirrl.auth0.client :as auth]
             [drafter-client.client.draftset :as draftset]
+            [drafter-client.client.interceptors :as interceptor]
             [drafter-client.client.impl :as i :refer [->DrafterClient]]
             [drafter-client.client.repo :as repo]
             [drafter-client.client.endpoint :as endpoint]
@@ -199,7 +200,7 @@
    (delete-quads client access-token draftset quads {}))
   ([client access-token draftset quads {:keys [metadata]}]
    (-> client
-       (i/set-content-type "application/n-quads")
+       (interceptor/set-content-type "application/n-quads")
        (i/request i/delete-draftset-data access-token (draftset/id draftset) quads {:metadata metadata})
        (->async-job))))
 
@@ -208,7 +209,7 @@
    (delete-triples client access-token draftset graph triples {}))
   ([client access-token draftset graph triples {:keys [metadata]}]
    (-> client
-       (i/set-content-type "application/n-triples")
+       (interceptor/set-content-type "application/n-triples")
        (i/request i/delete-draftset-data
                   access-token
                   (draftset/id draftset)
@@ -225,7 +226,7 @@
     - `metadata`: a map with arbitrary keys that will be included on the job for future reference"
   ([client access-token draftset statements]
    (add-data client access-token draftset statements {}))
-  ([client access-token draftset statements opts]
+  ([{:keys [auth-provider] :as client} access-token draftset statements opts]
    (let [url (martian/url-for client
                               :put-draftset-data
                               {:id (draftset/id draftset)})
@@ -233,7 +234,9 @@
      (-> (i/append-via-http-stream access-token
                                    url
                                    statements
-                                   (assoc opts :format format))
+                                   (assoc opts
+                                          :format format
+                                          :auth-provider auth-provider))
          (->async-job)))))
 
 (defn add
@@ -272,11 +275,11 @@
   "Access the quads inside this Draftset"
   ([client access-token draftset]
    (-> client
-       (i/accept "application/n-quads")
+       (interceptor/accept "application/n-quads")
        (i/request i/get-draftset-data access-token (draftset/id draftset))))
   ([client access-token draftset graph]
    (-> client
-       (i/accept "application/n-triples")
+       (interceptor/accept "application/n-triples")
        (i/request i/get-draftset-data access-token (draftset/id draftset) :graph graph))))
 
 (defn job [client access-token id]
@@ -422,12 +425,13 @@
   [client job-timeout]
   (->DrafterClient (:martian client)
                    (assoc (:opts client) :job-timeout job-timeout)
+                   (:auth-provider client)
                    (:auth0 client)))
 
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
-  [drafter-uri & {:keys [batch-size version auth0 job-timeout] :as opts}]
+  [drafter-uri & {:keys [batch-size version auth-provider auth0 job-timeout] :as opts}]
   (let [version (or version "v1")
         swagger-json "swagger/swagger.json"
         job-timeout (or job-timeout ##Inf)
@@ -437,7 +441,7 @@
     (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
           (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
-          (->DrafterClient opts auth0)))))
+          (->DrafterClient opts auth-provider auth0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Integrant ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -448,6 +452,7 @@
   (when (seq drafter-uri)
     (let [opts (apply concat (dissoc opts :drafter-uri))]
       (try
+        (println client)
        (apply client drafter-uri opts)
        (catch Throwable t
          (let [e (Throwable->map t)]
