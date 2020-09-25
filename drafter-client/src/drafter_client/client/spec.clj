@@ -1,6 +1,5 @@
 (ns drafter-client.client.spec
   (:require [clojure.spec.alpha :as s]
-            [drafter-client.client.auth :as auth]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.client.repo :as repo]
             [martian.core :as m]))
