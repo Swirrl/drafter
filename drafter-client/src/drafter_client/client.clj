@@ -226,17 +226,18 @@
     - `metadata`: a map with arbitrary keys that will be included on the job for future reference"
   ([client access-token draftset statements]
    (add-data client access-token draftset statements {}))
-  ([{:keys [auth-provider] :as client} access-token draftset statements opts]
+  ([client access-token draftset statements opts]
    (let [url (martian/url-for client
                               :put-draftset-data
                               {:id (draftset/id draftset)})
          format (i/get-format statements (opts :graph))]
+     ;;(sc.api/spy)
      (-> (i/append-via-http-stream access-token
                                    url
                                    statements
                                    (assoc opts
                                           :format format
-                                          :auth-provider auth-provider))
+                                          :auth-provider (:auth-provider client)))
          (->async-job)))))
 
 (defn add
@@ -452,16 +453,16 @@
   (when (seq drafter-uri)
     (let [opts (apply concat (dissoc opts :drafter-uri))]
       (try
-        (println client)
-       (apply client drafter-uri opts)
-       (catch Throwable t
-         (let [e (Throwable->map t)]
-           (throw
-            (ex-info (str "Failure to init " ig-key "\n"
-                          (:cause e)
-                          "\nCheck that Drafter is running!"
+        (println client opts)
+        (apply client drafter-uri opts)
+        (catch Throwable t
+          (let [e (Throwable->map t)]
+            (throw
+             (ex-info (str "Failure to init " ig-key "\n"
+                           (:cause e)
+                           "\nCheck that Drafter is running!"
                           "\nCheck that your Drafter Client config is correct.")
-                     e))))))))
+                      e))))))))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.
