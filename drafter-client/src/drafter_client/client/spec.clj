@@ -2,7 +2,8 @@
   (:require [clojure.spec.alpha :as s]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.client.repo :as repo]
-            [martian.core :as m]))
+            [martian.core :as m])
+  (:import [drafter_client.client.protocols DrafterClient]))
 
 (s/def ::m/api-root string?)
 (s/def ::m/handlers any?)
@@ -11,7 +12,7 @@
 
 (s/def ::jws-key string?)
 (s/def ::api (s/merge ::m/martian (s/keys :req-un [::jws-key])))
-(s/def ::client (partial instance? drafter_client.client.impl.DrafterClient))
+(s/def ::client (partial instance? DrafterClient))
 
 (s/def ::context (s/or :live draftset/live? :draft draftset/draft?))
 

@@ -15,11 +15,11 @@
             [martian.encoders :as enc]
             [drafter-client.client.protocols :as dcpr])
   (:import (java.io InputStream File PipedInputStream PipedOutputStream)
-           (drafter_client.client.interceptors DrafterClient)))
+           (drafter_client.client.protocols DrafterClient)))
 
 
 
-(def ->DrafterClient interceptor/->DrafterClient)
+(def ->DrafterClient dcpr/->DrafterClient)
 (def ^{:deprecated "moved to drafter-client.client.interceptors/intercept"} intercept interceptor/intercept)
 
 (s/def ::DrafterClient #(instance? DrafterClient %))

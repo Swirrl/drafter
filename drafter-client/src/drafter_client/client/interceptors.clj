@@ -1,28 +1,12 @@
 (ns drafter-client.client.interceptors
-  (:require [clojure.walk :refer [postwalk]]))
-
-(alias 'c 'clojure.core)
-
-(deftype DrafterClient [martian opts auth-provider auth0]
-  ;; Wrap martian in a type so that:
-  ;; a) we don't leak the auth0 client
-  ;; b) we don't expose the martian impl to the "system"
-  ;; We can still get at the pieces if necessary due to the ILookup impl.
-  clojure.lang.ILookup
-  (valAt [this k] (.valAt this k nil))
-  (valAt [this k default]
-    (case k
-      :martian martian
-      :auth0 auth0
-      :auth-provider auth-provider
-      (or (c/get opts k)
-          (.valAt martian k default)))))
+  (:require [clojure.walk :refer [postwalk]]
+            [drafter-client.client.protocols :as dcp]))
 
 (defn intercept
   {:style/indent :defn}
   [{:keys [martian opts auth-provider auth0] :as client}
    & interceptors]
-  (->DrafterClient (apply update martian :interceptors conj interceptors)
+  (dcp/->DrafterClient (apply update martian :interceptors conj interceptors)
                    opts
                    auth-provider
                    auth0))
