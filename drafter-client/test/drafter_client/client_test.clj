@@ -69,8 +69,8 @@
   (or (some-> filename io/resource io/file .getCanonicalPath)
       (throw (Exception. (format "Cannot find %s on resource path" filename)))))
 
-(defn start-drafter-server []
-  (main/-main (res-file "drafter-client-test-config.edn")
+(defn start-auth0-drafter-server []
+  (main/-main (res-file "auth0-test-config.edn")
               (res-file "stasher-off.edn")
               (res-file "init-public-endpoint.edn")))
 
@@ -80,7 +80,7 @@
 (defn drafter-server-fixture [f]
   (try
     (drop-test-db!)
-    (start-drafter-server)
+    (start-auth0-drafter-server)
     (f)
     (finally
       (stop-drafter-server))))
