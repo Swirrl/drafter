@@ -207,16 +207,17 @@
 (defn delete-triples
   ([client access-token draftset graph triples]
    (delete-triples client access-token draftset graph triples {}))
-  ([client access-token draftset graph triples {:keys [metadata]}]
-   (-> client
-       (interceptor/set-content-type "application/n-triples")
-       (i/request i/delete-draftset-data
-                  access-token
-                  (draftset/id draftset)
-                  triples
-                  {:graph graph
-                   :metadata metadata})
-       (->async-job))))
+  ([client access-token draftset graph triples opts]
+   (let [{:keys [metadata]} opts]
+     (-> client
+         (interceptor/set-content-type "application/n-triples")
+         (i/request i/delete-draftset-data
+           access-token
+           (draftset/id draftset)
+           triples
+           {:graph graph
+            :metadata metadata})
+         (->async-job)))))
 
 (defn add-data
   "Append the supplied RDF statements to this Draftset.
@@ -231,7 +232,6 @@
                               :put-draftset-data
                               {:id (draftset/id draftset)})
          format (i/get-format statements (opts :graph))]
-     ;;(sc.api/spy)
      (-> (i/append-via-http-stream access-token
                                    url
                                    statements
