@@ -663,7 +663,7 @@
          (sut/remove-draftset-sync client token draftset)
          false
          (catch ExceptionInfo e
-           (= (sut/job-timeout-exception? e))))))))
+           (sut/job-timeout-exception? e)))))))
 
 (deftest client-job-timeout-test
   (let [job-timeout -1]
