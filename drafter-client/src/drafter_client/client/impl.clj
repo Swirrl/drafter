@@ -19,10 +19,12 @@
 
 
 
-(def ->DrafterClient dcpr/->DrafterClient)
+(def ^{:deprecated "Use drafter-client.client.protocols/->DrafterClient instead"}
+  ->DrafterClient dcpr/->DrafterClient)
+
 (def ^{:deprecated "moved to drafter-client.client.interceptors/intercept"} intercept interceptor/intercept)
 
-(s/def ::DrafterClient #(instance? DrafterClient %))
+(s/def ::DrafterClient dcpr/drafter-client?)
 (s/def ::AccessToken string?)
 
 

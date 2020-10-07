@@ -15,6 +15,10 @@
       (or (get opts k)
           (.valAt martian k default)))))
 
+(def drafter-client?
+  "Test if value is an instance of DrafterClient"
+  (partial instance? DrafterClient))
+
 (defprotocol AuthorizationProvider
   "Necessary internal protocol to implement in order to swap
   authorization inside drafter-client."
