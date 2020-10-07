@@ -114,6 +114,14 @@
   ([client access-token id opts]
    (draftset/from-json (i/request client i/get-draftset access-token id opts))))
 
+(defn get-users
+  "Return registered drafter users.  Currently not supported on auth0
+  backed systems (usually just PMD3 configs)"
+  ([client]
+   (get-users client nil))
+  ([client access-token]
+   (i/request client i/get-users access-token)))
+
 (defn get-endpoint
   "Fetches the specified endpoint from a reference to it. If the reference
    is to a draftset access-token must be specified."
