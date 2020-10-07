@@ -59,9 +59,11 @@
 
 (s/def ::wait-opts (s/nilable (s/keys :opt [::job-timeout])))
 
+(s/def ::MaybeAccessToken (s/nilable ::i/AccessToken)) ;; when access-token is nil client should have an :auth-provider
+
 (s/fdef client/wait-result!
-  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
-               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob :opts ::wait-opts))
+  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::MaybeAccessToken :job ::AsyncJob)
+               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::MaybeAccessToken :job ::AsyncJob :opts ::wait-opts))
   :ret ::JobResult)
 
 (s/fdef client/wait-results!
@@ -69,17 +71,17 @@
   :ret (s/coll-of ::JobResult))
 
 (s/fdef client/wait!
-  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
-               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob :opts ::wait-opts))
+  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::MaybeAccessToken :job ::AsyncJob)
+               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::MaybeAccessToken :job ::AsyncJob :opts ::wait-opts))
   :ret ::JobSucceededResult)
 
 (s/fdef client/wait-nil!
-  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob)
-               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :job ::AsyncJob :opts ::wait-opts))
+  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::MaybeAccessToken :job ::AsyncJob)
+               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::MaybeAccessToken :job ::AsyncJob :opts ::wait-opts))
   :ret nil?)
 
 (s/fdef client/wait-all!
-  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :jobs (s/coll-of ::AsyncJob))
-               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::i/AccessToken :jobs (s/coll-of ::AsyncJob) :opts ::wait-opts))
+  :args (s/alt :arity-3 (s/cat :client ::i/DrafterClient :access-token ::MaybeAccessToken :jobs (s/coll-of ::AsyncJob))
+               :arity-4 (s/cat :client ::i/DrafterClient :access-token ::MaybeAccessToken :jobs (s/coll-of ::AsyncJob) :opts ::wait-opts))
   :ret (s/coll-of ::JobSucceededResult)
   :fn (fn [{ret :ret {jobs :jobs} :args}] (= (count ret) (count jobs))))
