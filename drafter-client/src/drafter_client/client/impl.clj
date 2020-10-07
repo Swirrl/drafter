@@ -1,6 +1,5 @@
 (ns drafter-client.client.impl
   (:require [cheshire.core :as json]
-            [clojure.spec.alpha :as s]
             [drafter-client.auth.legacy-default :as default-auth]
             [drafter-client.client.interceptors :as interceptor]
             [grafter-2.rdf.protocols :as pr]
@@ -9,13 +8,11 @@
             [grafter-2.rdf4j.io :as rio]
             [clj-http.client :as http]
             [martian.core :as martian]
-            [martian.encoders :as encoders]
             [martian.interceptors :as interceptors]
             [ring.util.codec :refer [form-decode form-encode]]
             [martian.encoders :as enc]
             [drafter-client.client.protocols :as dcpr])
-  (:import (java.io InputStream File PipedInputStream PipedOutputStream)
-           (drafter_client.client.protocols DrafterClient)))
+  (:import (java.io InputStream File PipedInputStream PipedOutputStream)))
 
 
 
@@ -23,10 +20,6 @@
   ->DrafterClient dcpr/->DrafterClient)
 
 (def ^{:deprecated "moved to drafter-client.client.interceptors/intercept"} intercept interceptor/intercept)
-
-(s/def ::DrafterClient dcpr/drafter-client?)
-(s/def ::AccessToken string?)
-
 
 (defn claim-draftset
   "Claim this draftset as your own"
@@ -320,13 +313,13 @@
    :as :stream})
 
 (def json-encoder
-  {:encode json :decode #(encoders/json-decode % keyword)})
+  {:encode json :decode #(enc/json-decode % keyword)})
 
 (def form-encoder
   {:encode form-encode :decode form-decode})
 
 (def default-encoders
-  (assoc (encoders/default-encoders)
+  (assoc (enc/default-encoders)
          "application/x-www-form-urlencoded" form-encoder
          "application/json" json-encoder
          "application/n-quads" (n-binary-encoder "application/n-quads")
