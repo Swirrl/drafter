@@ -34,8 +34,7 @@
 (s/def ::job-timeout (s/or :finite integer?
                            :infinite #{##Inf}))
 
-(s/def ::AsyncJob (s/and #(instance? AsyncJob %)
-                         (s/keys :req-un [::job-id ::restart-id])))
+(s/def ::AsyncJob (s/keys :req-un [::job-id ::restart-id]))
 
 (s/fdef client/job-succeeded? :args (s/cat :job-state ::job) :ret boolean?)
 
