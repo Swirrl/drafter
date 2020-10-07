@@ -1,17 +1,18 @@
 (ns drafter-client.triplestore-test
-  (:require [drafter-client.client-test :as ct]
-            [drafter-client.triplestore :as sut]
-            [clojure.test :as t]
-            [drafter-client.test-util.auth :as auth-util]
+  (:require [clojure.test :as t]
+            [drafter-client.client-test :as ct]
             [drafter-client.client.draftset :as draftset]
-            [grafter-2.rdf4j.repository :as repo]
-            [grafter-2.rdf.protocols :as pr])
+            [drafter-client.test-helpers :as h]
+            [drafter-client.test-util.auth :as auth-util]
+            [drafter-client.triplestore :as sut]
+            [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.repository :as repo])
   (:import java.net.URI))
 
 (t/use-fixtures :each
-  ct/with-spec-instrumentation
+  h/with-spec-instrumentation
   ;; Drop db after tests
-  ct/db-fixture)
+  h/db-fixture)
 
 (t/use-fixtures :once
   ct/drafter-server-fixture)

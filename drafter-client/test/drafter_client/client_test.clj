@@ -1,14 +1,12 @@
 (ns drafter-client.client-test
-  (:require [clojure.spec.test.alpha :as st]
-            [clojure.test :as t :refer :all]
-            [drafter.main :as main]
+  (:require [clojure.test :as t :refer :all]
+            [drafter.main :as drafter]
             [drafter.middleware.auth0-auth]
             [drafter.middleware.auth]
             [drafter-client.client :as sut]
-            [drafter-client.client-spec :as spec]
+            [drafter-client.client-spec]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.test-util.auth :as auth-util]
-            [drafter-client.test-util.db :as db-util]
             [drafter-client.test-util.jwt :as jwt]
             [environ.core :refer [env]]
             [grafter-2.rdf4j.io :as rio]
@@ -16,9 +14,9 @@
             [integrant.core :as ig]
             [clojure.java.io :as io]
             [grafter-2.rdf.protocols :as pr]
-            [clojure.spec.alpha :as s]
             [clj-time.core :as time]
-            [drafter-client.client.endpoint :as endpoint])
+            [drafter-client.client.endpoint :as endpoint]
+            [drafter-client.test-helpers :as h])
   (:import clojure.lang.ExceptionInfo
            java.net.URI
            [java.util UUID]
@@ -37,53 +35,26 @@
 (defmethod ig/init-key :drafter.auth.auth0/mock-jwk [_ {:keys [endpoint] :as opts}]
   (jwt/mock-jwk))
 
-(defn with-spec-instrumentation [f]
-  (try
-    (st/instrument)
-    (f)
-    (catch Throwable e
-      (prn e)
-      (throw e))
-    (finally
-      (st/unstrument))))
-
-(defn- get-stardog-repo []
-  (let [stardog-query (env :sparql-query-endpoint)
-        stardog-update (env :sparql-update-endpoint)]
-    (assert stardog-query "Set SPARQL_QUERY_ENDPOINT to run these tests.")
-    (assert stardog-update "Set SPARQL_UPDATE_ENDPOINT to run these tests.")
-    (gr-repo/sparql-repo "http://localhost:5820/drafter-client-test/query" "http://localhost:5820/drafter-client-test/update")))
-
-(defn db-fixture [f]
-  (let [stardog-repo (get-stardog-repo)]
-    (when-not (Boolean/parseBoolean (env :disable-drafter-cleaning-protection))
-      (db-util/assert-empty stardog-repo))
-    (f)
-    (db-util/delete-test-data! stardog-repo)))
-
-(defn- drop-test-db! []
-  (let [stardog-repo (get-stardog-repo)]
-    (db-util/drop-all! stardog-repo)))
-
-(defn res-file [filename]
-  (or (some-> filename io/resource io/file .getCanonicalPath)
-      (throw (Exception. (format "Cannot find %s on resource path" filename)))))
-
 (defn start-auth0-drafter-server []
-  (main/-main (res-file "auth0-test-config.edn")
-              (res-file "stasher-off.edn")
-              (res-file "init-public-endpoint.edn")))
-
-(defn stop-drafter-server []
-  (main/stop-system!))
+  (drafter/-main (h/res-file "auth0-test-config.edn")
+                 (h/res-file "stasher-off.edn")
+                 (h/res-file "init-public-endpoint.edn")))
 
 (defn drafter-server-fixture [f]
   (try
-    (drop-test-db!)
+    (h/drop-test-db!)
     (start-auth0-drafter-server)
     (f)
     (finally
-      (stop-drafter-server))))
+      (h/stop-drafter-server))))
+
+(t/use-fixtures :each
+  h/with-spec-instrumentation
+  ;; Drop db after tests
+  h/db-fixture)
+
+(t/use-fixtures :once
+  drafter-server-fixture)
 
 (defn drafter-client []
   (let [drafter-endpoint (env :drafter-endpoint)]
@@ -92,10 +63,8 @@
                 :auth0-endpoint (env :auth0-domain)
                 :batch-size 150000)))
 
-(def triples-nt-filename "resources/specific_mappingbased_properties_bg.nt")
-
 (defn test-triples []
-  (let [file (res-file triples-nt-filename)]
+  (let [file (h/res-file h/test-triples-filename)]
     (rio/statements file)))
 
 (defn infinite-test-triples
@@ -109,13 +78,7 @@
                          i
                          graph)))))
 
-(t/use-fixtures :each
-  with-spec-instrumentation
-  ;; Drop db after tests
-  db-fixture)
 
-(t/use-fixtures :once
-  drafter-server-fixture)
 
 (defn mock-job-with-kvs [& kvs]
   (let [job {:id (UUID/randomUUID)
@@ -345,7 +308,7 @@
     (t/testing "Adding .nt file of triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             draftset (sut/new-draftset client token name description)
-            _ (sut/add-sync client token draftset graph (io/file (res-file triples-nt-filename)))
+            _ (sut/add-sync client token draftset graph (io/file (h/res-file h/test-triples-filename)))
             triples* (sut/get client token draftset)]
         (t/is (= 2252 (count triples*)))
         (t/is (= (set (map #(assoc % :c graph) (test-triples)))
@@ -354,7 +317,7 @@
     (t/testing "Adding .ttl file of statements to a draft set"
       ;; check that the correct mime-type for the file is sent to Drafter
       (let [graph (URI. "http://test.graph.com/rdf-graph")
-            file (res-file "resources/rdf-syntax-ns.ttl")
+            file (h/res-file "resources/rdf-syntax-ns.ttl")
             draftset (sut/new-draftset client token name description)
             _ (sut/add-sync client token draftset graph (io/file file))
             triples* (sut/get client token draftset)]
