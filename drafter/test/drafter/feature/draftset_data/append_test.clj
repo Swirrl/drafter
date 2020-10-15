@@ -15,7 +15,8 @@
             [drafter.fixture-data :as fd]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
             [grafter.vocabularies.dcterms :refer [dcterms:modified]]
-            [drafter.feature.endpoint.public :as pub])
+            [drafter.feature.endpoint.public :as pub]
+            [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -247,3 +248,21 @@
         append-request (help/statements->append-triples-request test-publisher draftset-location graph-quads {:graph graph})
         append-response (handler append-request)]
     (tc/assert-is-forbidden-response append-response)))
+
+(tc/deftest-system-with-keys cannot-append-quads-with-bnode-as-graph-id
+  keys-for-test
+  [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
+        quads [(pr/->Quad (URI. "http://s")
+                          (URI. "http://p")
+                          (URI. "http://o")
+                          (pr/make-blank-node))]
+        request (help/statements->append-request
+                 test-editor draftset-location quads {:format :nq})
+        response (handler request)
+        {:keys [type message]} (-> response
+                                   (get-in [:body :finished-job])
+                                   (tc/await-completion))]
+    (is (= type :error))
+    (is (= message "Blank node as graph ID"))))
