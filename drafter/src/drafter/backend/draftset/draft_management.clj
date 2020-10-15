@@ -176,16 +176,19 @@
   place."}  set-modifed-at-on-resource!
   (partial set-timestamp-on-resource! drafter:modifiedAt))
 
-(def protected-graphs #{drafter:endpoints})
-
-(defn- protected-graph? [graph-uri]
-  (contains? protected-graphs graph-uri))
+(defn- protected-graph? [protected-graphs graph-uri]
+  (->> protected-graphs
+       (some (fn [g]
+               (or (= g graph-uri)
+                   (re-matches g (str graph-uri)))))
+       (boolean)))
 
 (defn ensure-draft-exists-for
   "Finds or creates a draft graph for the given live graph in the
   draftset."
-  [repo live-graph graph-map draftset-uri]
-  (when (protected-graph? live-graph)
+  [{:keys [protected-graphs]
+    {:keys [repo]} :backend} live-graph graph-map draftset-uri]
+  (when (protected-graph? protected-graphs live-graph)
     (throw (ex-info (str "Cannot create draft of protected graph " live-graph)
                     {:error :protected-graph-modification-error})))
   (if-let [draft-graph (get graph-map live-graph)]

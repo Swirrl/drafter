@@ -25,6 +25,7 @@
 
  :drafter/backend {:repo #ig/ref :drafter.stasher/repo}
  :drafter/global-writes-lock {:fairness true :time 10 :unit :seconds}
+ :drafter/protected-graphs {:graphset #{#regex "http://publishmydata.com/graphs/drafter/.*"}}
 
  :drafter.backend.draftset/endpoint {:repo #ig/ref :drafter.stasher/repo}
 
