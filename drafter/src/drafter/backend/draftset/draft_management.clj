@@ -178,7 +178,7 @@
   place."}  set-modifed-at-on-resource!
   (partial set-timestamp-on-resource! drafter:modifiedAt))
 
-(defn- protected-graph? [protected-graphs graph-uri]
+(defn protected-graph? [protected-graphs graph-uri]
   (->> protected-graphs
        (some (fn [g]
                (or (= g graph-uri)
