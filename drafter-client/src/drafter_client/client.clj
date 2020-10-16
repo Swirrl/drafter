@@ -7,7 +7,9 @@
             [clojure.tools.logging :as log]
             [swirrl.auth0.client :as auth]
             [drafter-client.client.draftset :as draftset]
-            [drafter-client.client.impl :as i :refer [->DrafterClient]]
+            [drafter-client.client.interceptors :as interceptor]
+            [drafter-client.client.impl :as i]
+            [drafter-client.client.protocols :refer [->DrafterClient]]
             [drafter-client.client.repo :as repo]
             [drafter-client.client.endpoint :as endpoint]
             [drafter-client.client.util :refer [uuid date-time]]
@@ -112,6 +114,14 @@
   ([client access-token id opts]
    (draftset/from-json (i/request client i/get-draftset access-token id opts))))
 
+(defn get-users
+  "Return registered drafter users.  Currently not supported on auth0
+  backed systems (usually just PMD3 configs)"
+  ([client]
+   (get-users client nil))
+  ([client access-token]
+   (i/request client i/get-users access-token)))
+
 (defn get-endpoint
   "Fetches the specified endpoint from a reference to it. If the reference
    is to a draftset access-token must be specified."
@@ -172,32 +182,51 @@
              (draftset/id draftset) (str graph)))
 
 (defn delete-graph
-  "Schedules the deletion of the graph from live"
-  [client access-token draftset graph]
-  (i/request client i/delete-draftset-graph access-token (draftset/id draftset) (str graph)))
+  "Schedules the deletion of the graph from live.
+
+  Takes an optional last argument of opts. Currently the supported
+  opts are:
+
+  :silent    - When true equivalent to SPARQL's DROP SILENT.  A
+               boolean indicating whether or not to raise an error
+               if the graph to be deleted doesn't exist.  If set to
+               true the function will succeed without error if the
+               graph being deleted doesn't exist.  Defaults to false.
+  "
+  ([client access-token draftset graph]
+   (delete-graph client access-token draftset graph {}))
+  ([client access-token draftset graph opts]
+   (apply i/request
+          client
+          i/delete-draftset-graph
+          access-token
+          (draftset/id draftset)
+          (str graph)
+          (apply concat opts))))
 
 (defn delete-quads
   ([client access-token draftset quads]
    (delete-quads client access-token draftset quads {}))
   ([client access-token draftset quads {:keys [metadata]}]
    (-> client
-       (i/set-content-type "application/n-quads")
+       (interceptor/set-content-type "application/n-quads")
        (i/request i/delete-draftset-data access-token (draftset/id draftset) quads {:metadata metadata})
        (->async-job))))
 
 (defn delete-triples
   ([client access-token draftset graph triples]
    (delete-triples client access-token draftset graph triples {}))
-  ([client access-token draftset graph triples {:keys [metadata]}]
-   (-> client
-       (i/set-content-type "application/n-triples")
-       (i/request i/delete-draftset-data
-                  access-token
-                  (draftset/id draftset)
-                  triples
-                  {:graph graph
-                   :metadata metadata})
-       (->async-job))))
+  ([client access-token draftset graph triples opts]
+   (let [{:keys [metadata]} opts]
+     (-> client
+         (interceptor/set-content-type "application/n-triples")
+         (i/request i/delete-draftset-data
+           access-token
+           (draftset/id draftset)
+           triples
+           {:graph graph
+            :metadata metadata})
+         (->async-job)))))
 
 (defn add-data
   "Append the supplied RDF statements to this Draftset.
@@ -215,7 +244,9 @@
      (-> (i/append-via-http-stream access-token
                                    url
                                    statements
-                                   (assoc opts :format format))
+                                   (assoc opts
+                                          :format format
+                                          :auth-provider (:auth-provider client)))
          (->async-job)))))
 
 (defn add
@@ -254,11 +285,11 @@
   "Access the quads inside this Draftset"
   ([client access-token draftset]
    (-> client
-       (i/accept "application/n-quads")
+       (interceptor/accept "application/n-quads")
        (i/request i/get-draftset-data access-token (draftset/id draftset))))
   ([client access-token draftset graph]
    (-> client
-       (i/accept "application/n-triples")
+       (interceptor/accept "application/n-triples")
        (i/request i/get-draftset-data access-token (draftset/id draftset) :graph graph))))
 
 (defn job [client access-token id]
@@ -404,12 +435,13 @@
   [client job-timeout]
   (->DrafterClient (:martian client)
                    (assoc (:opts client) :job-timeout job-timeout)
+                   (:auth-provider client)
                    (:auth0 client)))
 
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
-  [drafter-uri & {:keys [batch-size version auth0 job-timeout] :as opts}]
+  [drafter-uri & {:keys [batch-size version auth-provider auth0 job-timeout] :as opts}]
   (let [version (or version "v1")
         swagger-json "swagger/swagger.json"
         job-timeout (or job-timeout ##Inf)
@@ -419,7 +451,7 @@
     (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
           (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
-          (->DrafterClient opts auth0)))))
+          (->DrafterClient opts auth-provider auth0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Integrant ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -430,15 +462,16 @@
   (when (seq drafter-uri)
     (let [opts (apply concat (dissoc opts :drafter-uri))]
       (try
-       (apply client drafter-uri opts)
-       (catch Throwable t
-         (let [e (Throwable->map t)]
-           (throw
-            (ex-info (str "Failure to init " ig-key "\n"
-                          (:cause e)
-                          "\nCheck that Drafter is running!"
+        (println client opts)
+        (apply client drafter-uri opts)
+        (catch Throwable t
+          (let [e (Throwable->map t)]
+            (throw
+             (ex-info (str "Failure to init " ig-key "\n"
+                           (:cause e)
+                           "\nCheck that Drafter is running!"
                           "\nCheck that your Drafter Client config is correct.")
-                     e))))))))
+                      e))))))))
 
 (defmethod ig/halt-key! :drafter-client/client [_ client]
   ;; Shutdown client.

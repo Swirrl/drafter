@@ -1,53 +1,25 @@
 (ns drafter-client.client.impl
   (:require [cheshire.core :as json]
-            [clojure.spec.alpha :as s]
-            [clojure.walk :refer [postwalk]]
+            [drafter-client.auth.legacy-default :as default-auth]
+            [drafter-client.client.interceptors :as interceptor]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format
                                              filename->rdf-format]]
             [grafter-2.rdf4j.io :as rio]
             [clj-http.client :as http]
             [martian.core :as martian]
-            [martian.encoders :as encoders]
             [martian.interceptors :as interceptors]
             [ring.util.codec :refer [form-decode form-encode]]
-            [martian.encoders :as enc])
+            [martian.encoders :as enc]
+            [drafter-client.client.protocols :as dcpr])
   (:import (java.io InputStream File PipedInputStream PipedOutputStream)))
 
-(alias 'c 'clojure.core)
 
-(deftype DrafterClient [martian opts auth0]
-  ;; Wrap martian in a type so that:
-  ;; a) we don't leak the auth0 client
-  ;; b) we don't expose the martian impl to the "system"
-  ;; We can still get at the pieces if necessary due to the ILookup impl.
-  clojure.lang.ILookup
-  (valAt [this k] (.valAt this k nil))
-  (valAt [this k default]
-    (case k
-      :martian martian
-      :auth0 auth0
-      (or (c/get opts k)
-          (.valAt martian k default)))))
 
-(s/def ::DrafterClient #(instance? DrafterClient %))
-(s/def ::AccessToken string?)
+(def ^{:deprecated "Use drafter-client.client.protocols/->DrafterClient instead"}
+  ->DrafterClient dcpr/->DrafterClient)
 
-(defn intercept
-  {:style/indent :defn}
-  [{:keys [martian opts auth0] :as client}
-   & interceptors]
-  (->DrafterClient (apply update martian :interceptors conj interceptors)
-                   opts
-                   auth0))
-
-(defn bearer-token [access-token]
-  (let [token (str "Bearer " access-token)]
-    {:name ::bearer-token
-     :enter #(assoc-in % [:request :headers "Authorization"] token)}))
-
-(defn set-bearer-token [client access-token]
-  (intercept client (bearer-token access-token)))
+(def ^{:deprecated "moved to drafter-client.client.interceptors/intercept"} intercept interceptor/intercept)
 
 (defn claim-draftset
   "Claim this draftset as your own"
@@ -243,17 +215,22 @@
   (let [format (mimetype->rdf-format content-type)]
     (n*->stream format data)))
 
+(defn- legacy-auth-call? [access-token]
+  (some? access-token))
+
 (defn append-via-http-stream
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
-  [access-token url statements {:keys [graph format metadata] :as opts}]
+  [access-token url statements {:keys [auth-provider graph format metadata] :as opts}]
   (let [{input-stream :input worker :worker}
         (if (some #(instance? % statements) [InputStream File])
           {:input statements}
           (grafter->format-stream format statements))
         headers {:Content-Type format
                  :Accept "application/json"
-                 :Authorization (str "Bearer " access-token)}
+                 :Authorization (if (legacy-auth-call? access-token)
+                                  (str "Bearer " access-token)
+                                  (dcpr/authorization-header auth-provider))}
         params (cond-> nil
                        graph (merge {:graph (.toString graph)})
                        metadata (merge {:metadata (enc/json-encode metadata)}))
@@ -302,11 +279,18 @@
     (throw (ex-info "Trying to make request to drafter with `nil` client."
                     {:type :no-drafter-client}))))
 
+(defn with-authorization [{:keys [auth-provider] :as client} access-token]
+  (cond
+    (some? auth-provider)
+    (interceptor/intercept client (dcpr/interceptor auth-provider))
+    (some? access-token)
+    (default-auth/with-auth0-default client access-token)
+    :else client ;; at some point we could perhaps raise an error here...
+    ))
+
 (defn request-operation [client operation access-token opts]
   (assert-client client)
-  (let [client (if (some? access-token)
-                 (set-bearer-token client access-token)
-                 client)
+  (let [client (with-authorization client access-token)
         response (martian/response-for client operation opts)]
     (:body response)))
 
@@ -314,48 +298,9 @@
   {:style/indent :defn}
   [client f access-token & args]
   (assert-client client)
-  (let [client (if (some? access-token)
-                 (set-bearer-token client access-token)
-                 client)]
+  (let [client (with-authorization client access-token)]
     (:body (apply f client args))))
 
-(defn accept [client content-type]
-  (intercept client
-    {:name ::content-type
-     :enter (fn [ctx]
-              (assoc-in ctx [:request :headers "Accept"] content-type))}))
-
-(defn content-type [content-type]
-  {:name ::content-type
-   :enter (fn [ctx]
-            (assoc-in ctx [:request :headers "Content-Type"] content-type))})
-
-(defn set-content-type [client c-type]
-  (intercept client (content-type c-type)))
-
-(defn keywordize-keys
-  "Recursively transforms all map keys from strings to keywords."
-  [m]
-  (let [f (fn [[k v]] (if (string? k) [(keyword k) v] [k v]))]
-    (postwalk (fn [x]
-                (cond (record? x)
-                      (let [ks (filter string? (keys x))]
-                        (into (apply dissoc x ks) (map f x)))
-                      (map? x) (into {} (map f x))
-                      :else x))
-              m)))
-
-(def keywordize-params
-  {:name ::keywordize-params
-   :enter (fn [ctx] (update ctx :params keywordize-keys))})
-
-(defn set-redirect-strategy [strategy]
-  {:name ::set-redirect-strategy
-   :enter (fn [ctx] (assoc-in ctx [:request :redirect-strategy] strategy))})
-
-(defn set-max-redirects [n]
-  {:name ::set-max-redirects
-   :enter (fn [ctx] (assoc-in ctx [:request :max-redirects] n))})
 
 (def default-format
   {:date-format     "yyyy-MM-dd"
@@ -376,13 +321,13 @@
    :as :stream})
 
 (def json-encoder
-  {:encode json :decode #(encoders/json-decode % keyword)})
+  {:encode json :decode #(enc/json-decode % keyword)})
 
 (def form-encoder
   {:encode form-encode :decode form-decode})
 
 (def default-encoders
-  (assoc (encoders/default-encoders)
+  (assoc (enc/default-encoders)
          "application/x-www-form-urlencoded" form-encoder
          "application/json" json-encoder
          "application/n-quads" (n-binary-encoder "application/n-quads")
@@ -399,7 +344,7 @@
               (assoc ctx :response response)))})
 
 (def default-interceptors
-  (vec (concat [keywordize-params]
+  (vec (concat [interceptor/keywordize-params]
                (rest martian/default-interceptors)
                [(interceptors/encode-body default-encoders)
                 (interceptors/coerce-response default-encoders)

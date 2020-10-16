@@ -40,6 +40,7 @@
 
  :drafter/backend {:repo #ig/ref :drafter.stasher/repo}
  :drafter/global-writes-lock {:fairness true :time 10 :unit :seconds}
+ :drafter/protected-graphs {:graphset #{#regex "http://publishmydata.com/graphs/drafter/.*"}}
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -83,6 +84,7 @@
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/backend #ig/ref :drafter/backend
                                                             :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                                            :drafter/protected-graphs #ig/ref :drafter/protected-graphs
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler {:drafter/backend #ig/ref :drafter/backend
@@ -95,6 +97,7 @@
 
  :drafter.feature.draftset-data.append/data-handler {:drafter/backend #ig/ref :drafter/backend
                                                      :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                                     :drafter/protected-graphs #ig/ref :drafter/protected-graphs
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/backend #ig/ref :drafter/backend

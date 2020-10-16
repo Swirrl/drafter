@@ -22,6 +22,9 @@
 (defmethod aero/reader 'resource [_ _ value]
   (io/resource value))
 
+(defmethod aero/reader 'regex [_ _ value]
+  (re-pattern value))
+
 ;;Reads a timeout setting from the configuration. Timeout configurations
 ;;are optional. Returns an exception if the timeout string is invalid.
 (defmethod aero/reader 'timeout

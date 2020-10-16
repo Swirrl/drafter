@@ -58,9 +58,11 @@
   [state draftset-ref resources live->draft quad-batches job]
   (let [live-graph-uri (:graph state)
         ds-uri (str (ds/->draftset-uri draftset-ref))
-        repo (-> resources :backend :repo)
         {:keys [draft-graph-uri graph-map]}
-        (mgmt/ensure-draft-exists-for repo live-graph-uri live->draft ds-uri)]
+        (-> resources
+            (update :protected-graphs :graphset)
+            (select-keys [:backend :protected-graphs])
+            (mgmt/ensure-draft-exists-for live-graph-uri live->draft ds-uri))]
 
     (ds-data-common/lock-writes-and-copy-graph resources live-graph-uri draft-graph-uri {:silent true})
     ;; Now resume appending the batch
@@ -82,9 +84,15 @@
       statements
       (map #(util/make-quad-statement % graph) statements))))
 
+(defn- validate-quad [quad]
+  (let [g (pr/context quad)]
+    (if (pr/blank-node? g)
+      (throw (ex-info "Blank node as graph ID" {:type :error}))
+      quad)))
+
 (defn append-data-to-draftset-job
   [tempfile {:keys [backend] :as resources} user-id {:keys [draftset-id metadata] :as params} clock-fn]
-  (let [quads (get-quads tempfile params)]
+  (let [quads (map validate-quad (get-quads tempfile params))]
     (jobs/make-job user-id
                    :background-write
                    (jobs/job-metadata backend draftset-id 'append-data-to-draftset metadata)
@@ -101,8 +109,11 @@
 
 (defn data-handler
   "Ring handler to append data into a draftset."
-  [{:keys [:drafter/backend :drafter/global-writes-lock wrap-as-draftset-owner]}]
-  (let [resources {:backend backend :global-writes-lock global-writes-lock}]
+  [{:keys [:drafter/backend :drafter/global-writes-lock :drafter/protected-graphs
+           wrap-as-draftset-owner]}]
+  (let [resources {:backend backend
+                   :global-writes-lock global-writes-lock
+                   :protected-graphs protected-graphs}]
     (wrap-as-draftset-owner
      (require-rdf-content-type
       (dset-middleware/require-graph-for-triples-rdf-format
@@ -114,7 +125,9 @@
                  (response/submit-async-job! append-job)))))))))))
 
 (defmethod ig/pre-init-spec ::data-handler [_]
-  (s/keys :req [:drafter/backend :drafter/global-writes-lock]
+  (s/keys :req [:drafter/backend
+                :drafter/global-writes-lock
+                :drafter/protected-graphs]
           :req-un [::wrap-as-draftset-owner]))
 
 (defmethod ig/init-key ::data-handler [_ opts]

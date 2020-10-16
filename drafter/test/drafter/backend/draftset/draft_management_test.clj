@@ -353,14 +353,16 @@
           live-graph-uri (URI. "http://live")
           ds-uri (URI. "http://draftset")
           initial-mapping {live-graph-uri draft-graph-uri}
-          {found-draft-uri :draft-graph-uri graph-map :graph-map} (ensure-draft-exists-for *test-backend* live-graph-uri initial-mapping ds-uri)]
+          resources {:backend {:repo *test-backend*} :protected-graphs #{}}
+          {found-draft-uri :draft-graph-uri graph-map :graph-map} (ensure-draft-exists-for resources live-graph-uri initial-mapping ds-uri)]
       (is (= draft-graph-uri found-draft-uri))
       (is (= initial-mapping graph-map))))
 
   (testing "Live graph exists without draft"
     (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
           ds-uri (URI. "http://draftset")
-          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
+          resources {:backend {:repo *test-backend*} :protected-graphs #{}}
+          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for resources live-graph-uri {} ds-uri)]
       (is (= {live-graph-uri draft-graph-uri} graph-map))
       (is (is-graph-managed? *test-backend*  live-graph-uri))
       (is (mgmt/draft-exists? *test-backend* draft-graph-uri))))
@@ -368,7 +370,8 @@
   (testing "Live graph does not exist"
     (let [live-graph-uri (URI. "http://live")
           ds-uri (URI. "http://draftset")
-          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for *test-backend* live-graph-uri {} ds-uri)]
+          resources {:backend {:repo *test-backend*} :protected-graphs #{}}
+          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for resources live-graph-uri {} ds-uri)]
       (is (= {live-graph-uri draft-graph-uri} graph-map))
       (is (is-graph-managed? *test-backend* live-graph-uri))
       (is (mgmt/draft-exists? *test-backend* draft-graph-uri)))))

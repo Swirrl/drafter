@@ -59,7 +59,11 @@
       :copy-graph
       (let [{:keys [live-graph]} state
             ds-uri (str (ds/->draftset-uri draftset-ref))
-            {:keys [draft-graph-uri graph-map]} (mgmt/ensure-draft-exists-for repo live-graph live->draft ds-uri)]
+            {:keys [draft-graph-uri graph-map]}
+            (-> resources
+                (select-keys [:backend :protected-graphs])
+                (update :protected-graphs :graphset)
+                (mgmt/ensure-draft-exists-for live-graph live->draft ds-uri))]
 
         (ds-data-common/lock-writes-and-copy-graph resources live-graph draft-graph-uri {:silent true})
         ;; Now resume appending the batch
@@ -98,8 +102,11 @@
                                                              clock-fn))))))
 
 (defn delete-draftset-data-handler
-  [{:keys [wrap-as-draftset-owner :drafter/backend :drafter/global-writes-lock]}]
-  (let [resources {:backend backend :global-writes-lock global-writes-lock}]
+  [{:keys [:drafter/backend :drafter/global-writes-lock :drafter/protected-graphs
+           wrap-as-draftset-owner]}]
+  (let [resources {:backend backend
+                   :global-writes-lock global-writes-lock
+                   :protected-graphs protected-graphs}]
     (-> (fn [{:keys [params body] :as request}]
           (let [user-id (req/user-id request)
                 delete-job (delete-data-from-draftset-job body user-id resources params util/get-current-time)]
@@ -112,7 +119,8 @@
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete/delete-data-handler [_]
   (s/keys :req [:drafter/backend
-                :drafter/global-writes-lock]
+                :drafter/global-writes-lock
+                :drafter/protected-graphs]
           :req-un [::wrap-as-draftset-owner]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete/delete-data-handler [_ opts]
