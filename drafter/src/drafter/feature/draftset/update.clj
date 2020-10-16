@@ -363,10 +363,13 @@ GROUP BY ?lg ?dg")))
       (throw (ex-info "Parameter draftset-id must be provided"
                       {:error :bad-request}))))
 
-(defn- protected? [op]
-  (not (empty? (set/intersection (affected-graphs op) dm/protected-graphs))))
+(defn- protected? [{:keys [drafter/protected-graphs] :as opts} op]
+  ;;(not (empty? (set/intersection (affected-graphs op) #_dm/protected-graphs)))
+  (some (partial dm/protected-graph? (:graphset protected-graphs)) (affected-graphs op))
 
-(defn- parse-update-param [{:keys [update from]} max-update-size]
+  )
+
+(defn- parse-update-param [opts {:keys [update from]} max-update-size]
   (let [update' (cond (string? update)
                       update
                       (instance? java.io.InputStream update)
@@ -380,7 +383,7 @@ GROUP BY ?lg ?dg")))
         update-request (UpdateFactory/create update' Syntax/syntaxSPARQL_11)
         operations (.getOperations update-request)
         unprocessable (remove processable? operations)]
-    (cond (some protected? operations)
+    (cond (some (partial protected? opts) operations)
           (throw (forbidden-request "Protected graphs in update request"))
           (seq unprocessable)
           (throw (unprocessable-request unprocessable))
@@ -401,12 +404,12 @@ GROUP BY ?lg ?dg")))
       (doto (.prepareUpdate repo (:update params))
         (.setDataset dataset)))))
 
-(defn- parse-update [request max-update-size]
+(defn- parse-update [opts request max-update-size]
   (let [{:keys [request-method body query-params form-params]} request]
     (if (= request-method :post)
       (let [draftset-id (parse-draftset-id request)
             params (parse-update-params request)
-            update-request (parse-update-param params max-update-size)]
+            update-request (parse-update-param opts params max-update-size)]
         (assoc params :update-request update-request :draftset-id draftset-id))
       (throw (ex-info "Method not supported"
                       {:error :method-not-allowed :method request-method})))))
@@ -414,7 +417,7 @@ GROUP BY ?lg ?dg")))
 (defn- handler*
   [{:keys [drafter/backend max-update-size] :as opts} request]
   ;; TODO: write-lock?
-  (let [{:keys [update-request draftset-id]} (parse-update request max-update-size)]
+  (let [{:keys [update-request draftset-id]} (parse-update opts request max-update-size)]
     (update! backend max-update-size draftset-id update-request)
     {:status 204}))
 

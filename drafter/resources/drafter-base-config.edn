@@ -109,6 +109,7 @@
                                           :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset.update/handler {:drafter/backend #ig/ref :drafter/backend
+                                           :drafter/protected-graphs #ig/ref :drafter/protected-graphs
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
                                            :max-update-size 5000}
 
