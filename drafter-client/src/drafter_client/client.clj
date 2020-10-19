@@ -336,6 +336,51 @@
 (defn- wait-opts [client]
   {:job-timeout (or (:job-timeout client) ##Inf)})
 
+(defn poll-legacy-drafter
+  "Poll drafter earlier than 2.2.0 which has a follows a slightly
+  different protocol to drafter 2.2.1 and above.
+
+  The legacy async jobs protocol is poll until you stop getting 404's
+  and get a 200 response. Newer versions of drafter represent the jobs
+  state (pending/finished/errored etc) in the job itself."
+  [client access-token {:keys [job-id] :as job}]
+  (try
+    (i/request client i/status-job-finished access-token job-id)
+    (catch clojure.lang.ExceptionInfo ex
+      (if (= 404 (:status (ex-data ex)))
+        ::pending
+        (throw ex)))))
+
+(defmulti wait-result-impl! (fn [client access-token job opts] (clojure.core/get client :job-polling)))
+
+(defmethod wait-result-impl! :drafter-2.2.0 [client access-token job {:keys [job-timeout]}]
+  (loop [waited 0
+         status (poll-legacy-drafter client access-token job)]
+    (let [wait 500]
+      (cond (>= waited job-timeout)
+            (job-timeout-exception job)
+            (= ::pending status)
+            (do (Thread/sleep wait)
+                (recur (+ waited wait)
+                       (poll-legacy-drafter client access-token job)))
+            :else
+            status))))
+
+;; assume we're using a drafter more recent than 2.2.0 by default
+(defmethod wait-result-impl! :default [client access-token job {:keys [job-timeout]}]
+  (loop [waited 0]
+    (if-let [state (refresh-job client access-token job)]
+      (let [status (job-status job state)
+            wait 500]
+        (cond (>= waited job-timeout)
+              (job-timeout-exception job)
+              (= ::pending status)
+              (do (Thread/sleep wait) (recur (+ waited wait)))
+              :else
+              status))
+      (ex-info "Job not found" job))))
+
+
 (defn wait-result!
   "Waits for an async job to complete and returns the result map if it
   succeeded or, returns an exception representing the failure
@@ -350,18 +395,8 @@
   side and the job itself will be left running against drafter."
   ([client access-token job]
    (wait-result! client access-token job (wait-opts client)))
-  ([client access-token job {:keys [job-timeout]}]
-   (loop [waited 0]
-     (if-let [state (refresh-job client access-token job)]
-       (let [status (job-status job state)
-             wait 500]
-         (cond (>= waited job-timeout)
-               (job-timeout-exception job)
-               (= ::pending status)
-               (do (Thread/sleep wait) (recur (+ waited wait)))
-               :else
-               status))
-       (ex-info "Job not found" job)))))
+  ([client access-token job opts]
+   (wait-result-impl! client access-token job opts)))
 
 (defn wait-results!
   "Waits for a sequence of jobs to complete and returns a sequence of results in corresponding order.
@@ -462,7 +497,6 @@
   (when (seq drafter-uri)
     (let [opts (apply concat (dissoc opts :drafter-uri))]
       (try
-        (println client opts)
         (apply client drafter-uri opts)
         (catch Throwable t
           (let [e (Throwable->map t)]
