@@ -20,6 +20,8 @@
 (s/def :drafter/protected-graphs
   (s/keys :req-un [::graphset]))
 
+(s/def :drafter/union-with-live? boolean?)
+
 (defmethod ig/init-key :drafter/protected-graphs [_ opts]
   ;; :groan: :duct/const
   opts)
@@ -28,6 +30,7 @@
   '[drafter.spec
     drafter.async.spec
     drafter.backend.spec
+    drafter.backend.draftset.spec
     drafter.draftset.spec
     drafter.endpoint.spec
     drafter.user.spec])

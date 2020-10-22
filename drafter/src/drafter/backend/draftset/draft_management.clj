@@ -11,13 +11,10 @@
             [grafter.url :as url]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
-            [schema.core :as s]
-            [grafter-2.rdf4j.io :as rio]
-            [clojure.string :as string]
-            [drafter.draftset :as ds])
+            [clojure.spec.alpha :as s]
+            [grafter-2.rdf4j.io :as rio])
   (:import java.net.URI
-           [java.util Date UUID Calendar]
-           [javax.xml.bind DatatypeConverter]))
+           [java.util UUID]))
 
 (def drafter-state-graph (URI. "http://publishmydata.com/graphs/drafter/drafts"))
 
@@ -162,16 +159,15 @@
      "  }"
      "}")))
 
-(s/defn set-timestamp-on-resource!
+(defn set-timestamp-on-resource!
   "Sets the specified object on the specified subject/predicate.  It
   assumes the property has a cardinality of 1 or 0, so will delete all
   other values of \":subject :predicate ?object\" if present."
-  [predicate
-   repo
-   subject
-   date-time :- Date]
-
+  [predicate repo subject date-time]
   (update! repo (set-timestamp subject predicate date-time)))
+
+(s/fdef set-timestamp-on-resource!
+  :args (s/cat :predicate uri? :repo any? :subject uri? :date-time util/date?))
 
 (def ^{:doc "Set modified at time on a resource.  It is assumed the
   cardinality of modifiedAt is at most 1, and that it will be updated in
@@ -464,15 +460,15 @@
         ds-values (when draftset-uri (str "VALUES ?ds { <" draftset-uri "> }"))
         live-values (some->> (seq live-graph-uris)
                              (map #(str "<" % ">"))
-                             (string/join " ")
+                             (str/join " ")
                              (format "VALUES ?lg { %s }"))
         draft-values (some->> (seq draft-graph-uris)
                               (map #(str "<" % ">"))
-                              (string/join " ")
+                              (str/join " ")
                               (format "VALUES ?dg { %s }"))
         suffix (->> [filter ds-values live-values draft-values]
                     (remove nil?)
-                    (string/join "\n    ")
+                    (str/join "\n    ")
                     (str "\n    "))]
     (format "
 DELETE { GRAPH ?g { %1$s ?p1 ?o1 . ?s2 %1$s ?o2 . ?s3 ?p3 %1$s . } }
