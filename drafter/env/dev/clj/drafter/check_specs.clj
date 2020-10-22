@@ -12,7 +12,9 @@
   if we're still working on them and expect them to fail."
   #{`drafter.stasher/generate-drafter-cache-key
     'drafter.feature.endpoint.public/get-public-endpoint
-    'drafter.feature.endpoint.list/get-endpoints})
+    'drafter.feature.endpoint.list/get-endpoints
+    'drafter.errors/encode-error
+    'drafter.backend.draftset.draft-management/set-timestamp-on-resource!})
 
 (defn check-specs*
   ([] (check-specs* 20))
