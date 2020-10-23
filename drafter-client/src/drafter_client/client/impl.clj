@@ -204,6 +204,14 @@
    :post-query-live
    (merge {:query query} opts)))
 
+(defn post-update-draftset
+  "Update this Draftset with SPARQL"
+  [client id update
+   & {:keys [timeout using-graph-uri using-named-graph-uri] :as opts}]
+  (martian/response-for client
+                        :post-update-draftset
+                        (merge {:id id :update update} opts)))
+
 (defn publish-draftset
   "Publish the specified Draftset"
   [client id {:keys [metadata]}]

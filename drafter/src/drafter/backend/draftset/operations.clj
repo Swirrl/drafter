@@ -287,6 +287,8 @@
       (if-let [draft-graph-uri (get graph-mapping graph-uri)]
         (let [modified-at (modified-time-fn)]
           (mgmt/delete-graph-contents! db draft-graph-uri modified-at)
+          (mgmt/unrewrite-draftset! db {:draftset-uri (ds/->draftset-uri draftset-ref)
+                                        :live-graph-uris [graph-uri]})
           draft-graph-uri)
         (mgmt/create-draft-graph! db graph-uri draftset-ref modified-time-fn)))))
 

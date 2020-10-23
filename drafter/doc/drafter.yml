@@ -660,6 +660,30 @@ paths:
           description: The query results returned according to the SPARQL specification.
           schema:
             type: file
+  /draftset/{id}/update:
+    post:
+      operationId: post-update-draftset
+      summary: Update this Draftset with SPARQL
+      description: |
+        Update this Draftset via the SPARQL update language and protocol.
+
+        Please consult the SPARQL update protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+      security:
+        - jws-auth: []
+      consumes:
+        - application/sparql-update
+      produces:
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/update'
+        - $ref: '#/parameters/timeout'
+        - $ref: '#/parameters/using-graph-uri'
+        - $ref: '#/parameters/using-named-graph-uri'
+      tags:
+        - Update
+      responses:
+        '204':
+          description: Update success
   /sparql/live:
     get:
       operationId: get-query-live
@@ -915,6 +939,26 @@ parameters:
     items:
       type: string
 
+  using-graph-uri:
+    name: using-graph-uri
+    in: query
+    description: Specify RDF default graph(s) to update against
+    required: false
+    type: array
+    collectionFormat: multi
+    items:
+      type: string
+
+  using-named-graph-uri:
+    name: using-named-graph-uri
+    in: query
+    description: Specify RDF named graph(s) to update against
+    required: false
+    type: array
+    collectionFormat: multi
+    items:
+      type: string
+
 # message:
 #   name: message
 #   description: |
@@ -994,6 +1038,12 @@ parameters:
   post_query:
     name: query
     description: URI Encoded SPARQL Query in the HTTP body
+    in: formData
+    required: true
+    type: string
+  update:
+    name: update
+    description: SPARQL Update in HTTP body
     in: formData
     required: true
     type: string

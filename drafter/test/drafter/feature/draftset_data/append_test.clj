@@ -3,7 +3,7 @@
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
-            [clojure.test :as t :refer [is]]
+            [clojure.test :as t :refer [is testing]]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.draftset-data.append :as sut]
             [drafter.feature.draftset-data.test-helper :as th]
@@ -18,6 +18,7 @@
             [drafter.feature.endpoint.public :as pub]
             [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI
+           java.util.UUID
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
 

@@ -12,7 +12,9 @@
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.core :as s]
-            [grafter-2.rdf4j.io :as rio])
+            [grafter-2.rdf4j.io :as rio]
+            [clojure.string :as string]
+            [drafter.draftset :as ds])
   (:import java.net.URI
            [java.util Date UUID Calendar]
            [javax.xml.bind DatatypeConverter]))
@@ -176,7 +178,7 @@
   place."}  set-modifed-at-on-resource!
   (partial set-timestamp-on-resource! drafter:modifiedAt))
 
-(defn- protected-graph? [protected-graphs graph-uri]
+(defn protected-graph? [protected-graphs graph-uri]
   (->> protected-graphs
        (some (fn [g]
                (or (= g graph-uri)
@@ -453,6 +455,54 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
+(defn- rewrite-q
+  [{:keys [?from ?to draftset-uri deleted live-graph-uris draft-graph-uris]}]
+  (let [filter (case deleted
+                 :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
+                 :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
+                 nil)
+        ds-values (when draftset-uri (str "VALUES ?ds { <" draftset-uri "> }"))
+        live-values (some->> (seq live-graph-uris)
+                             (map #(str "<" % ">"))
+                             (string/join " ")
+                             (format "VALUES ?lg { %s }"))
+        draft-values (some->> (seq draft-graph-uris)
+                              (map #(str "<" % ">"))
+                              (string/join " ")
+                              (format "VALUES ?dg { %s }"))
+        suffix (->> [filter ds-values live-values draft-values]
+                    (remove nil?)
+                    (string/join "\n    ")
+                    (str "\n    "))]
+    (format "
+DELETE { GRAPH ?g { %1$s ?p1 ?o1 . ?s2 %1$s ?o2 . ?s3 ?p3 %1$s . } }
+INSERT { GRAPH ?g { %2$s ?p1 ?o1 . ?s2 %2$s ?o2 . ?s3 ?p3 %2$s . } }
+WHERE {
+  GRAPH ?g { { %1$s ?p1 ?o1 } UNION
+             { ?s2 %1$s ?o2 } UNION
+             { ?s3 ?p3 %1$s } }
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+    ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .%3$s
+  }
+} ;" ?from ?to suffix)))
+
+(defn rewrite-draftset-q [opts]
+  (rewrite-q (assoc opts :?from '?lg :?to '?dg :deleted :ignore)))
+
+(defn- unrewrite-draftset-q [opts]
+  (rewrite-q (assoc opts :?from '?dg :?to '?lg)))
+
+(defn rewrite-draftset! [conn opts]
+  (->> (rewrite-draftset-q opts)
+       (sparql/update! conn)))
+
+(defn unrewrite-draftset! [conn opts]
+  (->> (unrewrite-draftset-q opts)
+       (sparql/update! conn)))
+
 (defn migrate-graphs-to-live! [repo graphs clock-fn]
   "Migrates a collection of draft graphs to live through a single
   compound SPARQL update statement. Explicit UPDATE statements do not
@@ -460,8 +510,10 @@
   (log/info "Starting make-live for graphs " graphs)
   (when (seq graphs)
     (let [transaction-started-at (clock-fn)
-          graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at)) graphs)
-          update-str (util/make-compound-sparql-query graph-migrate-queries)]
+          graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at))
+                                        graphs)
+          fixup-q (unrewrite-draftset-q {:draft-graph-uris graphs})
+          update-str (str fixup-q (util/make-compound-sparql-query graph-migrate-queries))]
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
 

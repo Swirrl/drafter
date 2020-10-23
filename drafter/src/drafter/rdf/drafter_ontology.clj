@@ -53,5 +53,7 @@
 
 (def drafter:public (url/append-path-segments drafter "public"))
 
+(def drafter:drafts (url/append-path-segments pmd-graphs "drafter" "drafts"))
+
 (defn draft:graph [graph-id]
   (url/append-path-segments pmd-graphs "drafter" "draft" graph-id))

@@ -16,17 +16,22 @@
             [grafter-2.rdf.protocols :as pr]
             [integrant.core :as ig]
             [drafter.async.jobs :as ajobs]
-            [drafter.requests :as req]))
+            [drafter.requests :as req]
+            [grafter-2.rdf4j.repository :as repo]))
+
 
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."
-  [conn graph-uri triple-batch]
+  [repo graph-uri triple-batch draftset-ref]
   ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
   ;;so only create one if there is data in the batch
   (when-not (empty? triple-batch)
     ;;WARNING: This assumes the backend is a sesame backend which is
     ;;true for all current backends.
-    (sparql/add conn graph-uri triple-batch)))
+    (with-open [conn (repo/->connection repo)]
+      (pr/add conn graph-uri triple-batch)
+      (mgmt/rewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset-ref)
+                                    :deleted :ignore}))))
 
 (declare append-draftset-quads)
 
@@ -37,7 +42,7 @@
       (let [{:keys [graph-uri triples]} (ds-data-common/quad-batch->graph-triples batch)]
         (if-let [draft-graph-uri (get live->draft graph-uri)]
           (do
-            (append-data-batch! repo draft-graph-uri triples)
+            (append-data-batch! repo draft-graph-uri triples draftset-ref)
             (ds-data-common/touch-graph-in-draftset! repo draftset-ref draft-graph-uri job-started-at)
 
             (let [next-job (ajobs/create-child-job
@@ -48,7 +53,6 @@
           ;;continuation since we haven't done any real work yet
           (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
       (ajobs/job-succeeded! job))))
-
 
 (defn- copy-graph-for-append*
   [state draftset-ref resources live->draft quad-batches job]
