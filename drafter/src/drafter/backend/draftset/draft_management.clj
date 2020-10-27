@@ -1,6 +1,5 @@
 (ns drafter.backend.draftset.draft-management
   (:require [clojure.set :as set]
-            [clojure.string :as str]
             [clojure.tools.logging :as log]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql :refer [update!]]
@@ -51,7 +50,7 @@
                 "   <" graph-uri "> <" drafter:isPublic "> true ."
                 "}"))))
 
-(defn has-more-than-one-draft?
+(defn- has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
   [db live-graph-uri]
@@ -65,74 +64,6 @@
                  "  HAVING (?numberOfRefs > 1)"
                  "}")]
     (sparql/eager-query db qry)))
-
-(defn graph-exists?
-  "Checks that a graph exists"
-  [db graph-uri]
-  (sparql/eager-query db
-         (str "ASK WHERE {"
-              "  SELECT ?s ?p ?o WHERE {"
-              "    GRAPH <" graph-uri "> { ?s ?p ?o }"
-              "  }"
-              "  LIMIT 1"
-              "}")))
-
-(defn create-managed-graph
-  "Returns some RDF statements to represent the ManagedGraphs state."
-  [graph-uri]
-  [graph-uri
-   [rdf:a drafter:ManagedGraph]
-   [drafter:isPublic false]])
-
-(defn create-managed-graph!
-  "Create a record of a managed graph in the database, returns the
-  graph-uri that was passed in."
-  [db graph-uri]
-  ;; We only do anything if it's not already a managed graph
-
-  ;; FIXME: Is this a potential race condition? i.e. we check for existence (and it's false) and before executing someone else makes
-  ;; the managed graph(?). Ideally, we'd do this as a single INSERT/WHERE statement.
-  (if (not (is-graph-managed? db graph-uri))
-    (let [managed-graph-quads (to-quads (create-managed-graph graph-uri))]
-      (sparql/add db managed-graph-quads)))
-  graph-uri)
-
-(defn create-draft-graph
-  [live-graph-uri draft-graph-uri time draftset-uri]
-  (let [live-graph-triples [live-graph-uri
-                            [drafter:hasDraft draft-graph-uri]]
-        draft-graph-triples [draft-graph-uri
-                             [rdf:a drafter:DraftGraph]
-                             [drafter:createdAt time]
-                             [drafter:modifiedAt time]]
-        draft-graph-triples (util/conj-if (some? draftset-uri)
-                                          draft-graph-triples [drafter:inDraftSet draftset-uri])]
-    [live-graph-triples draft-graph-triples]))
-
-(defn create-draft-graph!
-  "Creates a new draft graph with a unique graph name, expects the
-  live graph to already be created.  Returns the URI of the draft that
-  was created.
-
-  Converts the optional opts hash into drafter meta-data triples
-  attached to the draft graph resource in the drafter state graph.
-
-  If draftset-uri is provided (i.e. is not nil) a statement will be
-  added connecting the created draft graph to the given draft set. No
-  validation is done that the draftset actually exists."
-  ([db live-graph-uri]
-   (create-draft-graph! db live-graph-uri nil))
-  ([db live-graph-uri draftset-ref]
-   (create-draft-graph! db live-graph-uri draftset-ref util/get-current-time))
-  ([db live-graph-uri draftset-ref clock-fn]
-   (let [now (clock-fn)
-         draft-graph-uri (make-draft-graph-uri)
-         draftset-uri (some-> draftset-ref (url/->java-uri))
-         triple-templates (create-draft-graph live-graph-uri draft-graph-uri now draftset-uri)
-         quads (apply to-quads triple-templates)]
-     (sparql/add db quads)
-
-     draft-graph-uri)))
 
 (defn xsd-datetime
   "Coerce a date into the xsd-datetime string"
@@ -158,42 +89,6 @@
      "     <" subject "> <" time-predicate "> ?lastvalue ."
      "  }"
      "}")))
-
-(defn set-timestamp-on-resource!
-  "Sets the specified object on the specified subject/predicate.  It
-  assumes the property has a cardinality of 1 or 0, so will delete all
-  other values of \":subject :predicate ?object\" if present."
-  [predicate repo subject date-time]
-  (update! repo (set-timestamp subject predicate date-time)))
-
-(s/fdef set-timestamp-on-resource!
-  :args (s/cat :predicate uri? :repo any? :subject uri? :date-time util/date?))
-
-(def ^{:doc "Set modified at time on a resource.  It is assumed the
-  cardinality of modifiedAt is at most 1, and that it will be updated in
-  place."}  set-modifed-at-on-resource!
-  (partial set-timestamp-on-resource! drafter:modifiedAt))
-
-(defn protected-graph? [protected-graphs graph-uri]
-  (->> protected-graphs
-       (some (fn [g]
-               (or (= g graph-uri)
-                   (re-matches g (str graph-uri)))))
-       (boolean)))
-
-(defn ensure-draft-exists-for
-  "Finds or creates a draft graph for the given live graph in the
-  draftset."
-  [{:keys [protected-graphs]
-    {:keys [repo]} :backend} live-graph graph-map draftset-uri]
-  (when (protected-graph? protected-graphs live-graph)
-    (throw (ex-info (str "Cannot create draft of protected graph " live-graph)
-                    {:error :protected-graph-modification-error})))
-  (if-let [draft-graph (get graph-map live-graph)]
-    {:draft-graph-uri draft-graph :graph-map graph-map}
-    (let [live-graph-uri (create-managed-graph! repo live-graph)
-          draft-graph-uri (create-draft-graph! repo live-graph-uri draftset-uri)]
-      {:draft-graph-uri draft-graph-uri :graph-map (assoc graph-map live-graph-uri draft-graph-uri)})))
 
 (defn- escape-sparql-value [val]
   (if (string? val)
@@ -236,7 +131,7 @@
                    (set-timestamp graph-uri drafter:modifiedAt modified-at)))
   (log/info (str "Deleted graph " graph-uri)))
 
-(defn delete-draft-state-query [draft-graph-uri]
+(defn- delete-draft-state-query [draft-graph-uri]
   ;; if the graph-uri is a draft graph uri,
   ;; remove the mention of this draft uri, but leave the live graph as a managed graph.
   (str
@@ -295,7 +190,7 @@
         first
         (:live))))
 
-(defn delete-live-graph-from-state-query [live-graph-uri]
+(defn- delete-live-graph-from-state-query [live-graph-uri]
   (str
    "DELETE WHERE {"
    (with-state-graph
@@ -303,7 +198,7 @@
      "                     ?p ?o")
    "}"))
 
-(defn copy-graph-query
+(defn- copy-graph-query
   [from to {:keys [silent] :as opts :or {silent false}}]
   (let [silent (if silent
                  "SILENT"
@@ -322,36 +217,6 @@
   ([repo from to] (copy-graph repo from to {}))
   ([repo from to opts]
    (update! repo (copy-graph-query from to opts))))
-
-(defn- has-duplicates? [col]
-  (not= col
-        (distinct col)))
-
-(defn graph-map
-  "Takes a database and a set of drafts and returns a hashmap of live
-  graphs associated with their drafts.
-
-  If a draft URI is not in the database then this function will skip
-  over it, i.e. it won't error if a URI is not found."
-  [db draft-set]
-  (if (empty? draft-set)
-    {}
-    (let [drafts (str/join " " (map #(str "<" % ">") draft-set))
-          q (str "SELECT ?live ?draft WHERE {"
-                (with-state-graph
-                  "  VALUES ?draft {" drafts "}"
-                  "  ?live a <" drafter:ManagedGraph "> ;"
-                  "        <" drafter:hasDraft "> ?draft .")
-                "}")
-          results (sparql/eager-query db q)]
-
-      (let [live-graphs (map :live results)]
-        (when (has-duplicates? live-graphs)
-          (throw (ex-info "Multiple draft graphs were supplied referencing the same live graph."
-                          {:error :multiple-drafts-error})))
-
-        (zipmap live-graphs
-                (map :draft results))))))
 
 (defn live-graphs
   "Get all live graph names.  Takes an optional boolean keyword

@@ -1,6 +1,7 @@
 (ns drafter.feature.draftset-data.delete
   (:require [clojure.spec.alpha :as s]
             [drafter.backend.draftset.draft-management :as mgmt]
+            [drafter.backend.draftset.graphs :as graphs]
             [drafter.backend.draftset.operations :as ops]
             [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
             [drafter.draftset :as ds]
@@ -57,12 +58,8 @@
 
       :copy-graph
       (let [{:keys [live-graph]} state
-            ds-uri (str (ds/->draftset-uri draftset-ref))
-            {:keys [draft-graph-uri graph-map]}
-            (-> resources
-                (select-keys [:backend :protected-graphs])
-                (update :protected-graphs :graphset)
-                (mgmt/ensure-draft-exists-for live-graph live->draft ds-uri))]
+            {:keys [graph-manager]} resources
+            draft-graph-uri (graphs/create-user-graph-draft graph-manager draftset-ref live-graph)]
 
         (ds-data-common/lock-writes-and-copy-graph resources live-graph draft-graph-uri {:silent true})
         ;; Now resume appending the batch
@@ -101,11 +98,12 @@
                                                              clock-fn))))))
 
 (defn delete-draftset-data-handler
-  [{:keys [:drafter/backend :drafter/global-writes-lock :drafter/protected-graphs
+  [{:keys [:drafter/backend :drafter/global-writes-lock
+           :drafter.backend.draftset.graphs/manager
            wrap-as-draftset-owner]}]
   (let [resources {:backend backend
                    :global-writes-lock global-writes-lock
-                   :protected-graphs protected-graphs}]
+                   :graph-manager manager}]
     (-> (fn [{:keys [params body] :as request}]
           (let [user-id (req/user-id request)
                 delete-job (delete-data-from-draftset-job body user-id resources params util/get-current-time)]
@@ -118,8 +116,7 @@
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete/delete-data-handler [_]
   (s/keys :req [:drafter/backend
-                :drafter/global-writes-lock
-                :drafter/protected-graphs]
+                :drafter/global-writes-lock]
           :req-un [::wrap-as-draftset-owner]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete/delete-data-handler [_ opts]

@@ -38,6 +38,7 @@
    :drafter/write-scheduler
    :drafter.routes.sparql/live-sparql-query-route
    :drafter.backend.live/endpoint
+   :drafter.backend.draftset.graphs/manager
    :drafter.common.config/sparql-query-endpoint])
 
 (def dg-q
@@ -353,30 +354,31 @@
      | 2 | delete!   | [q2]    | #{[s1 p1 o1 g1']              } |
      | 3 | publish!  | g1      | #{[s1 p1 o1 g1 ]              } |)))
 
-(tc/deftest-system-with-keys *_6_3_delete-variants
-  keys-for-test [system system-config]
-  ;; Delete variants
-  (let [{:keys [set-live! append! delete! delete-graph! publish! graph']}
-        (draftset-functions system)
-        g1 (random-uri 'g)
-        g2 (random-uri 'g)
-        g3 (random-uri 'g)
-        g4 (random-uri 'g)
-        q1 [s1 p1 o1 g1]
-        q2 [s2 p1 o1 g2]]
-    ;; T2 deleting a live graph by supplying all its triples
-    ;; T3 deleting a live graph through the delete graph op
-    ;; T5 deleting a graph (created in T4) that only existed in the draft by
-    ;; supplying triples
-    ;; T7 deleting a graph (created in T6) that only existed in the draft
-    ;; through the delete graph op
-    (test-table
-     |;T | Operation     | Args             | Expected State    |
-     | 1 | set-live!     | #{q1 q2}         | #{q1 q2}          |
-     | 2 | delete!       | #{q1}            | #{}               |
-     | 3 | delete-graph! | g2               | #{}               |
-     | 4 | append!       | #{[s3 p3 o3 g3]} | #{[s3 p3 o3 g3']} |
-     | 5 | delete!       | #{[s3 p3 o3 g3]} | #{}               |
-     | 6 | append!       | #{[s4 p4 o4 g4]} | #{[s4 p4 o4 g4']} |
-     | 7 | delete-graph! | g4               | #{}               |
-     | 8 | publish!      | g1 g2 g3 g4      | #{}               |)))
+(t/deftest *_6_3_delete-variants
+  (tc/with-system
+    keys-for-test [system system-config]
+    ;; Delete variants
+    (let [{:keys [set-live! append! delete! delete-graph! publish! graph']}
+          (draftset-functions system)
+          g1 (random-uri 'g)
+          g2 (random-uri 'g)
+          g3 (random-uri 'g)
+          g4 (random-uri 'g)
+          q1 [s1 p1 o1 g1]
+          q2 [s2 p1 o1 g2]]
+      ;; T2 deleting a live graph by supplying all its triples
+      ;; T3 deleting a live graph through the delete graph op
+      ;; T5 deleting a graph (created in T4) that only existed in the draft by
+      ;; supplying triples
+      ;; T7 deleting a graph (created in T6) that only existed in the draft
+      ;; through the delete graph op
+      (test-table
+        |                                                   ;T | Operation     | Args             | Expected State    |
+        | 1 | set-live! | #{q1 q2} | #{q1 q2} |
+        | 2 | delete! | #{q1} | #{} |
+        | 3 | delete-graph! | g2 | #{} |
+        | 4 | append! | #{[s3 p3 o3 g3]} | #{[s3 p3 o3 g3']} |
+        | 5 | delete! | #{[s3 p3 o3 g3]} | #{} |
+        | 6 | append! | #{[s4 p4 o4 g4]} | #{[s4 p4 o4 g4']} |
+        | 7 | delete-graph! | g4 | #{} |
+        | 8 | publish! | g1 g2 g3 g4 | #{} |))))

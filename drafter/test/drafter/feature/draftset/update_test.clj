@@ -344,218 +344,219 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
             (tc/assert-is-server-error response)
             (is (zero? (count res)))))))))
 
-(tc/deftest-system-with-keys drop-graph-test
-  keys-for-test [system system-config]
-  (with-open [conn (-> system
-                       :drafter.common.config/sparql-query-endpoint
-                       repo/sparql-repo
-                       repo/->connection)]
-    (let [handler (get system [:drafter/routes :draftset/api])]
+(t/deftest drop-graph-test
+  (tc/with-system
+    keys-for-test [system system-config]
+    (with-open [conn (-> system
+                         :drafter.common.config/sparql-query-endpoint
+                         repo/sparql-repo
+                         repo/->connection)]
+      (let [handler (get system [:drafter/routes :draftset/api])]
 
-      (testing "Add quads, drop graph"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 50
-              [quads1 more] (split-at n (valid-triples-g g))
-              stmt (insert-stmt-str quads1)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
+        (testing "Add quads, drop graph"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 50
+                [quads1 more] (split-at n (valid-triples-g g))
+                stmt (insert-stmt-str quads1)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
 
-              stmt (format "DROP GRAPH <%s>" g)
-              response (update! stmt)
-              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
-          (tc/assert-is-no-content-response response)
-          (is (zero? (count res)))))
+                stmt (format "DROP GRAPH <%s>" g)
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+            (tc/assert-is-no-content-response response)
+            (is (zero? (count res)))))
 
-      (testing "Add quads, drop graph, fail too big"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 50
-              [quads1 more] (split-at n (valid-triples-g g))
-              [quads2 more] (split-at n more)
-              stmt (insert-stmt-str quads1)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              stmt (insert-stmt-str quads2)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
+        (testing "Add quads, drop graph, fail too big"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 50
+                [quads1 more] (split-at n (valid-triples-g g))
+                [quads2 more] (split-at n more)
+                stmt (insert-stmt-str quads1)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                stmt (insert-stmt-str quads2)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
 
-              stmt (format "DROP GRAPH <%s>" g)
-              response (update! stmt)
-              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
-          (tc/assert-is-server-error response)
-          (is (= 100 (count res)))))
+                stmt (format "DROP GRAPH <%s>" g)
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+            (tc/assert-is-server-error response)
+            (is (= 100 (count res)))))
 
-      (testing "Add quads, publish, drop graph"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 50
-              [quads1 more] (split-at n (valid-triples-g g))
-              stmt (insert-stmt-str quads1)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
-              res (repo/query conn (format q g))
-              _ (is (= 50 ( count res)))
+        (testing "Add quads, publish, drop graph"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 50
+                [quads1 more] (split-at n (valid-triples-g g))
+                stmt (insert-stmt-str quads1)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+                q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+                res (repo/query conn (format q g))
+                _ (is (= 50 (count res)))
 
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              stmt (format "DROP GRAPH <%s>" g)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              res (repo/query conn (draftset-quads-mapping-q draftset-location))
-              _ (is (zero? (count res)) "Ensure draft graph is empty")
-              res (repo/query conn (format q g))
-              _ (is (= 50 (count res)) "Ensure graph still in live")
-              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-              res (repo/query conn (format q g))]
-          (tc/assert-is-no-content-response response)
-          (is (zero? (count res)))))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                stmt (format "DROP GRAPH <%s>" g)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))
+                _ (is (zero? (count res)) "Ensure draft graph is empty")
+                res (repo/query conn (format q g))
+                _ (is (= 50 (count res)) "Ensure graph still in live")
+                _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+                res (repo/query conn (format q g))]
+            (tc/assert-is-no-content-response response)
+            (is (zero? (count res)))))
 
-      (testing "Add quads and drop graph in one statement - noop"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 49
-              [quads1 more] (split-at n (valid-triples-g g))
-              stmt (str (insert-stmt-str quads1) ";\n"
-                        (format "DROP GRAPH <%s>" g))
-              response (update! stmt)
-              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
-          (tc/assert-is-no-content-response response)
-          (is (zero? (count res)))))
+        (testing "Add quads and drop graph in one statement - noop"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 49
+                [quads1 more] (split-at n (valid-triples-g g))
+                stmt (str (insert-stmt-str quads1) ";\n"
+                          (format "DROP GRAPH <%s>" g))
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+            (tc/assert-is-no-content-response response)
+            (is (zero? (count res)))))
 
-      (testing "DROP SILENT GRAPH then add quads in one statement - just adds quads"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 49
-              [quads1 more] (split-at n (valid-triples-g g))
-              stmt (str (format "DROP SILENT GRAPH <%s>" g) ";\n"
-                        (insert-stmt-str quads1))
-              response (update! stmt)
-              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
-          (tc/assert-is-no-content-response response)
-          (is (= 49 (count res)))))
+        (testing "DROP SILENT GRAPH then add quads in one statement - just adds quads"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 49
+                [quads1 more] (split-at n (valid-triples-g g))
+                stmt (str (format "DROP SILENT GRAPH <%s>" g) ";\n"
+                          (insert-stmt-str quads1))
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+            (tc/assert-is-no-content-response response)
+            (is (= 49 (count res)))))
 
-      (testing "DROP GRAPH then add quads in one statement - errors with live graph message"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 49
-              [quads1 more] (split-at n (valid-triples-g g))
-              stmt (str (format "DROP GRAPH <%s>" g) ";\n"
-                        (insert-stmt-str quads1))
-              response (update! stmt)]
-          (tc/assert-is-server-error response)
-          (is (.contains (:message (:body response)) (str g)))))
+        (testing "DROP GRAPH then add quads in one statement - errors with live graph message"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 49
+                [quads1 more] (split-at n (valid-triples-g g))
+                stmt (str (format "DROP GRAPH <%s>" g) ";\n"
+                          (insert-stmt-str quads1))
+                response (update! stmt)]
+            (tc/assert-is-server-error response)
+            (is (.contains (:message (:body response)) (str g)))))
 
-      (testing "DROP SILENT non-existent GRAPH - noop"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              stmt (format "DROP SILENT GRAPH <%s>" g)
-              response (update! stmt)
-              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
-          (tc/assert-is-no-content-response response)
-          (is (zero? (count res)))))
+        (testing "DROP SILENT non-existent GRAPH - noop"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                stmt (format "DROP SILENT GRAPH <%s>" g)
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+            (tc/assert-is-no-content-response response)
+            (is (zero? (count res)))))
 
-      (testing "DROP non-existent GRAPH - Error"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              stmt (format "DROP GRAPH <%s>" g)
-              response (update! stmt)]
-          (tc/assert-is-server-error response)))
+        (testing "DROP non-existent GRAPH - Error"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                stmt (format "DROP GRAPH <%s>" g)
+                response (update! stmt)]
+            (tc/assert-is-server-error response)))
 
-      (testing "DROP GRAPH g; from live, drops graph from live"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 50
-              [quads1 more] (split-at n (valid-triples-g g))
-              stmt (insert-stmt-str quads1)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
-              res (repo/query conn (format q g))
-              _ (is (= 50 ( count res)))
+        (testing "DROP GRAPH g; from live, drops graph from live"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 50
+                [quads1 more] (split-at n (valid-triples-g g))
+                stmt (insert-stmt-str quads1)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+                q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+                res (repo/query conn (format q g))
+                _ (is (= 50 (count res)))
 
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              stmt (format "DROP GRAPH <%s>" g)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
-              res (repo/query conn (format q g))
-              q "SELECT * WHERE {
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                stmt (format "DROP GRAPH <%s>" g)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+                q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+                res (repo/query conn (format q g))
+                q "SELECT * WHERE {
                    BIND ( <%s> AS ?g )
                    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
                      ?g a <http://publishmydata.com/def/drafter/ManagedGraph> .
                    }
                  }"
-              res2 (repo/query conn (format q g))]
-              (is (zero? (count res)))
-              (is (zero? (count res2)))))
+                res2 (repo/query conn (format q g))]
+            (is (zero? (count res)))
+            (is (zero? (count res2)))))
 
-      (testing "DROP GRAPH g; INSERT DATA { GRAPH g { ... } } - only new triples left in live"
-        (let [g (URI. (str "http://g/" (UUID/randomUUID)))
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 50
-              [quads1 more] (split-at n (valid-triples-g g))
-              stmt (insert-stmt-str quads1)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
-              res (repo/query conn (format q g))
-              _ (is (= 50 ( count res)))
+        (testing "DROP GRAPH g; INSERT DATA { GRAPH g { ... } } - only new triples left in live"
+          (let [g (URI. (str "http://g/" (UUID/randomUUID)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 50
+                [quads1 more] (split-at n (valid-triples-g g))
+                stmt (insert-stmt-str quads1)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+                q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+                res (repo/query conn (format q g))
+                _ (is (= 50 (count res)))
 
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              [quads2 more] (split-at 2 more)
-              stmt (str (format "DROP GRAPH <%s>" g) ";\n"
-                        (insert-stmt-str quads2))
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
-              res (repo/query conn (format q g))]
-              (is (= 2 (count res)))
-              (is (= quads2 (map (juxt :g :s :p :o) res))))))))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                [quads2 more] (split-at 2 more)
+                stmt (str (format "DROP GRAPH <%s>" g) ";\n"
+                          (insert-stmt-str quads2))
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+                q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+                res (repo/query conn (format q g))]
+            (is (= 2 (count res)))
+            (is (= quads2 (map (juxt :g :s :p :o) res)))))))))
 
 
 (defn metadata-q [draftset-uri]
@@ -710,19 +711,13 @@ SELECT * WHERE {
           (is (.isAfter ds_modified ds_created))
           (is (.isAfter dg_modified dg_created)))))))
 
-(tc/deftest-system-with-keys protected-graphs-test
-  keys-for-test [system system-config]
-  (with-open [conn (-> system
-                       :drafter.common.config/sparql-query-endpoint
-                       repo/sparql-repo
-                       repo/->connection)]
-    (let [handler (get system [:drafter/routes :draftset/api])
-          backend (:drafter/backend system)]
-
+(t/deftest protected-graphs-test
+  (tc/with-system
+    keys-for-test [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])]
       (testing "Cannot operate on drafter's graphs"
         (let [g (URI. "http://publishmydata.com/graphs/drafter/drafts")
               draftset-location (help/create-draftset-through-api handler test-editor)
-              draftset-id (last (string/split draftset-location #"/"))
               update! (fn [stmt]
                         (->> stmt
                              (create-update-request test-editor draftset-location)

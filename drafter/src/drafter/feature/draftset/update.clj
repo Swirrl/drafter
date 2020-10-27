@@ -3,7 +3,6 @@
             [clojure.spec.alpha :as s]
             [drafter.backend.draftset.arq :as arq]
             [drafter.backend.draftset.draft-management :as dm]
-            [drafter.backend.draftset.operations :as ops]
             [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
             [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
             [drafter.rdf.drafter-ontology :refer :all]
@@ -18,22 +17,21 @@
             [clojure.string :as string]
             [ring.util.request :as request]
             [grafter-2.rdf4j.repository :as repo]
-            [grafter-2.rdf.protocols :as pr])
+            [grafter-2.rdf.protocols :as pr]
+            [drafter.backend.draftset.graphs :as graphs])
   (:import java.net.URI
-           java.util.UUID
            org.apache.jena.graph.NodeFactory
            [org.apache.jena.sparql.algebra Algebra OpAsQuery]
            org.apache.jena.sparql.core.Quad
            [org.apache.jena.sparql.modify.request
             QuadDataAcc Target
-            UpdateCopy UpdateDrop UpdateDataDelete UpdateDeleteInsert UpdateDataInsert]
+            UpdateCopy UpdateDrop UpdateDataDelete UpdateDataInsert]
            org.apache.jena.sparql.sse.SSE
            org.apache.jena.sparql.sse.Item
            [org.apache.jena.query Syntax]
            [org.apache.jena.update UpdateFactory UpdateRequest]
-           [java.time LocalDateTime OffsetDateTime]
-           java.time.format.DateTimeFormatter
-           org.apache.jena.datatypes.xsd.XSDDatatype))
+           [java.time LocalDateTime]
+           java.time.format.DateTimeFormatter))
 
 (defn- rewrite-quad [rewriter quad]
   (-> quad SSE/str arq/->sse-item arq/sse-zipper rewriter str SSE/parseQuad))
@@ -105,28 +103,24 @@
       UpdateFactory/create
       .getOperations))
 
-(defn- draft-graph-quads [draftset-uri timestamp graph-uri draft-graph-uri]
-  (->> (dm/create-draft-graph graph-uri draft-graph-uri timestamp draftset-uri)
-       (apply dm/to-quads)))
-
-(defn- draft-graph-stmt [draftset-uri timestamp graph-uri draft-graph-uri]
-  (-> (draft-graph-quads draftset-uri timestamp graph-uri draft-graph-uri)
+(defn- draft-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
+  (-> (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri)
       (insert-data-stmt)))
 
-(defn- manage-graph-stmt [draftset-uri timestamp graph-uri draft-graph-uri]
+(defn- manage-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
   (-> (concat
-       (dm/to-quads (dm/create-managed-graph graph-uri))
-       (draft-graph-quads draftset-uri timestamp graph-uri draft-graph-uri))
+        (graphs/new-managed-user-graph-statements graph-manager graph-uri)
+        (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri))
       (insert-data-stmt)))
 
 (defn- copy-graph-stmt [graph-uri draft-graph-uri]
   (UpdateCopy. (Target/create (str graph-uri))
                (Target/create (str draft-graph-uri))))
 
-(defn- graphs-to-manage [draftset-uri timestamp graph-meta]
+(defn- graphs-to-manage [graph-manager draftset-uri timestamp graph-meta]
   (keep (fn [[lg {:keys [live? draft? draft-graph-uri]}]]
           (when (and (not live?) (not draft?))
-            (manage-graph-stmt draftset-uri timestamp lg draft-graph-uri)))
+            (manage-graph-stmt graph-manager draftset-uri timestamp lg draft-graph-uri)))
         graph-meta))
 
 (defn- within-limit? [operations max-update-size]
@@ -151,13 +145,14 @@
        (not draft?)
        (not (prior-reference? g op ops))))
 
-(defn- graphs-to-copy [op draftset-uri timestamp max-update-size graph-meta]
+(defn- graphs-to-copy [graph-manager op draftset-uri timestamp max-update-size graph-meta]
   (->> graph-meta
        (keep (fn [[lg {:keys [live? draft? live-size draft-graph-uri] :as opts}]]
                (when (copy? lg op opts)
                  (if (> live-size max-update-size)
                    (throw (ex-info "Unable to copy graphs" {:type :error}))
-                   [(draft-graph-stmt draftset-uri
+                   [(draft-graph-stmt graph-manager
+                                      draftset-uri
                                       timestamp
                                       lg
                                       draft-graph-uri)
@@ -171,11 +166,11 @@
         graph-meta))
 
 (defn- data-insert-delete-ops
-  [op {:keys [max-update-size rewriter draftset-id graph-meta] :as opts}]
+  [op {:keys [graph-manager max-update-size rewriter draftset-id graph-meta] :as opts}]
   (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
         timestamp (util/get-current-time)
-        manage (graphs-to-manage draftset-uri timestamp graph-meta)
-        copy (graphs-to-copy op draftset-uri timestamp max-update-size graph-meta)
+        manage (graphs-to-manage graph-manager draftset-uri timestamp graph-meta)
+        copy (graphs-to-copy graph-manager op draftset-uri timestamp max-update-size graph-meta)
         touch (graphs-to-touch op draftset-uri timestamp graph-meta)
         rewrite-ds (when (seq copy) (rewrite-draftset-ops draftset-id))
         op [(rewrite op rewriter)]]
@@ -187,7 +182,6 @@
 
 (defn- graph-meta-q [draftset-id live-graphs]
   (let [ds-uri (ds/->draftset-uri draftset-id)
-        live-values-str (string/join " " (map #(str "<" % ">") live-graphs))
         live-only-values (string/join " " (map #(str "( <" % "> <" ds-uri "> )") live-graphs))]
     ;; TODO: Surely there's a better query than this to do the same? At least
     ;; the first two?
@@ -296,14 +290,14 @@ GROUP BY ?lg ?dg")))
   (affected-graphs [op]
     #{(URI. (.getURI (.getGraph op)))})
   (size [op] 1)
-  (raw-operations [op {:keys [rewriter draftset-id graph-meta max-update-size]}]
+  (raw-operations [op {:keys [rewriter graph-manager draftset-id graph-meta max-update-size]}]
     (let [g (URI. (.getURI (.getGraph op)))
           {:keys [live? draft? draft-graph-uri draft-size ops]} (graph-meta g)
           draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
           now (util/get-current-time)
           noop []]
       (cond (just-in-live? g graph-meta)
-            [(manage-graph-stmt draftset-uri now g draft-graph-uri)]
+            [(manage-graph-stmt graph-manager draftset-uri now g draft-graph-uri)]
             (in-draftset? g graph-meta)
             (if (<= draft-size max-update-size)
               [(touch-graph-in-draftset draftset-uri draft-graph-uri now)
@@ -328,13 +322,14 @@ GROUP BY ?lg ?dg")))
        (map (juxt (comp str key) (comp str :draft-graph-uri val)))
        (into {})))
 
-(defn update! [backend max-update-size draftset-id update-request]
+(defn- update! [backend graph-manager max-update-size draftset-id update-request]
   (let [graph-meta (get-graph-meta backend draftset-id update-request)
         rewriter-map (rewriter-map graph-meta)
         rewriter (partial uri-constant-rewriter rewriter-map)
         opts {:graph-meta graph-meta
               :rewriter rewriter
               :draftset-id draftset-id
+              :graph-manager graph-manager
               :max-update-size max-update-size}
         update-request' (->> (.getOperations update-request)
                              (mapcat #(raw-operations % opts))
@@ -363,11 +358,8 @@ GROUP BY ?lg ?dg")))
       (throw (ex-info "Parameter draftset-id must be provided"
                       {:error :bad-request}))))
 
-(defn- protected? [{:keys [drafter/protected-graphs] :as opts} op]
-  ;;(not (empty? (set/intersection (affected-graphs op) #_dm/protected-graphs)))
-  (some (partial dm/protected-graph? (:graphset protected-graphs)) (affected-graphs op))
-
-  )
+(defn- protected? [{:keys [drafter.backend.draftset.graphs/manager] :as opts} op]
+  (some (partial graphs/protected-graph? manager) (affected-graphs op)))
 
 (defn- parse-update-param [opts {:keys [update from]} max-update-size]
   (let [update' (cond (string? update)
@@ -415,10 +407,10 @@ GROUP BY ?lg ?dg")))
                       {:error :method-not-allowed :method request-method})))))
 
 (defn- handler*
-  [{:keys [drafter/backend max-update-size] :as opts} request]
+  [{:keys [drafter/backend drafter.backend.draftset.graphs/manager max-update-size] :as opts} request]
   ;; TODO: write-lock?
   (let [{:keys [update-request draftset-id]} (parse-update opts request max-update-size)]
-    (update! backend max-update-size draftset-id update-request)
+    (update! backend manager max-update-size draftset-id update-request)
     {:status 204}))
 
 (defn handler
