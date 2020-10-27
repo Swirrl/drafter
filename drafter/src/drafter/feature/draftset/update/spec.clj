@@ -72,8 +72,14 @@
 
 (s/def ::update/AbstractOperation (s/multi-spec abstract-operation-spec :type))
 
+;; touch operations are handled separately from those which modify the data
+;; the affected graphs are collected in the plan and converted into updates on the draft modifications
+;; graph
+(s/def ::update/DataOperation (s/and ::update/AbstractOperation
+                                     #(not= :touch (:type %))))
+
 (s/fdef update/reify-operation
-  :args (s/cat :abstract-op ::update/AbstractOperation :update-context ::update/UpdateContext)
+  :args (s/cat :abstract-op ::update/DataOperation :update-context ::update/UpdateContext)
   :ret (s/coll-of ::jena/JenaUpdateOperation))
 
 ;; UpdateOperation
@@ -94,12 +100,14 @@
   :ret ::update/UpdateOperation)
 
 ;; update plan
-(s/def ::update/operations (s/and (s/coll-of ::update/AbstractOperation)
+(s/def ::update/operations (s/and (s/coll-of ::update/DataOperation)
                                   sequential?))
 (s/def ::update/graph-meta ::update/GraphsMeta)
+(s/def ::update/draft-graphs-to-touch (s/coll-of ::update/draft-graph-uri :kind set?))
 
 (s/def ::update/UpdatePlan (s/keys :req-un [::update/operations
-                                            ::update/graph-meta]))
+                                            ::update/graph-meta
+                                            ::update/draft-graphs-to-touch]))
 
 (s/fdef update/build-update
   :args (s/cat :update-plan ::update/UpdatePlan :update-context ::update/UpdateContext)

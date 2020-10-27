@@ -67,5 +67,8 @@
   ([drafter endpoint-id opts]
    (endpoint-repo* drafter endpoint-id opts)))
 
+(defn live-endpoint-repo [repo]
+  (endpoint-repo repo ::live))
+
 (defmethod ig/init-key :drafter/backend [_ opts]
   (map->DrafterService opts))

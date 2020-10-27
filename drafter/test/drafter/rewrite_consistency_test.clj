@@ -14,10 +14,10 @@
             [drafter.backend.draftset :as ep]
             [drafter.middleware :as mw]
             [drafter.backend.draftset.operations :as dsops]
+            [drafter.rdf.drafter-ontology :refer [modified-times-graph-uri]]
             [drafter.rdf.sparql-protocol :as sp]
             [drafter.backend :as backend])
-  (:import java.net.URI)
-  )
+  (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -74,6 +74,7 @@ SELECT ?c ?s ?p ?o WHERE {
     ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
     ?c <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
     ?l <http://publishmydata.com/def/drafter/hasDraft> ?c .
+    FILTER(?l != <http://publishmydata.com/graphs/drafter/graph-modified-times>)
   }
 }")
 
@@ -171,32 +172,33 @@ SELECT ?dg ?lg WHERE {
                     (set))]
     (is (= quads' quads''))))
 
-(tc/deftest-system-with-keys delete-graph-consistency-test
-  keys-for-test [system system-config]
-  (let [handler (get system [:drafter/routes :draftset/api])
-        draftset-location (help/create-draftset-through-api handler test-publisher)
-        draftset-id (last (string/split draftset-location #"/"))
-        n-graphs 10
-        graphs (->> (range n-valid (+ n-graphs n-valid))
-                    (map (fn [i] (uri-str "http://g/" i)))
-                    (take n-graphs))
-        quads (shuffle (concat (take n-valid valid-triples)
-                               (graph-referencing-triples n-valid graphs)))
-        to-delete (rand-nth graphs)
-        _ (help/append-quads-to-draftset-through-api
-           handler test-publisher draftset-location quads)
-        _ (help/delete-draftset-graph-through-api
-           handler test-publisher draftset-location to-delete)
-        mapping (with-open [conn (-> system
-                                     :drafter.common.config/sparql-query-endpoint
-                                     repo/sparql-repo
-                                     repo/->connection)]
-                  (ds-mapping conn draftset-id))
-        quads' (get-draftset-quads system draftset-id)
-        quads'' (-> (remove #(= to-delete (:c %)) quads)
-                    (rewrite mapping)
-                    (set))]
-    (is (= quads' quads''))))
+(t/deftest delete-graph-consistency-test
+  (tc/with-system
+    keys-for-test [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          draftset-id (last (string/split draftset-location #"/"))
+          n-graphs 10
+          graphs (->> (range n-valid (+ n-graphs n-valid))
+                      (map (fn [i] (uri-str "http://g/" i)))
+                      (take n-graphs))
+          quads (shuffle (concat (take n-valid valid-triples)
+                                 (graph-referencing-triples n-valid graphs)))
+          to-delete (rand-nth graphs)
+          _ (help/append-quads-to-draftset-through-api
+              handler test-publisher draftset-location quads)
+          _ (help/delete-draftset-graph-through-api
+              handler test-publisher draftset-location to-delete)
+          mapping (with-open [conn (-> system
+                                       :drafter.common.config/sparql-query-endpoint
+                                       repo/sparql-repo
+                                       repo/->connection)]
+                    (ds-mapping conn draftset-id))
+          quads' (get-draftset-quads system draftset-id)
+          quads'' (-> (remove #(= to-delete (:c %)) quads)
+                      (rewrite mapping)
+                      (set))]
+      (is (= quads' quads'')))))
 
 (defn copy-live-graph-into-draftset [handler draftset-location draftset-id graph]
   (-> (tc/with-identity test-publisher

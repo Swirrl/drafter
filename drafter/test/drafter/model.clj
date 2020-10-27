@@ -28,13 +28,16 @@
             [drafter.write-scheduler :as writes]
             [drafter.feature.draftset.update :as update]
             [drafter.write-scheduler :as write-scheduler]
-            [drafter.time :as time])
+            [drafter.time :as time]
+            [drafter.feature.draftset.update :as update]
+            [drafter.feature.draftset.test-helper :as help]
+            [clojure.set :as set])
   (:import [java.time OffsetDateTime ZoneOffset]
            [java.net URI]
            [clojure.lang ExceptionInfo]
            [java.lang AutoCloseable]))
 
-(defn- format-metadata [metadata]
+(defn format-metadata [metadata]
   (some-> metadata enc/json-encode))
 
 (defn- create-draftset-op [{:keys [backend clock] :as drafter} user {:keys [display-name description id] :as opts}]
@@ -42,7 +45,7 @@
     (dsops/create-draftset! backend user display-name description id-fn clock)))
 
 (defn- revert-draftset-graph-changes-op [{:keys [backend] :as drafter} _user draftset-ref graph-uri]
-  (let [result (ds-changes/revert-graph-changes! backend draftset-ref graph-uri)]
+  (let [result (ds-changes/revert-graph-changes! drafter draftset-ref graph-uri)]
     (case result
       :reverted (dsops/get-draftset-info backend draftset-ref)
       :not-found (throw (ex-info (format "Graph %s not found" graph-uri)
@@ -350,6 +353,7 @@
             (delete-data drafter test-publisher ds-id (ses/->CollectionStatementSource to-delete) {})
 
             (let [quads (get-data drafter test-publisher ds-id {})
+                  quads (filter help/is-user-quad? quads)
                   graph-triples (get-data drafter test-publisher ds-id {:graph (URI. "http://g1")})
                   query-endpoint (get-draftset-query-endpoint drafter test-publisher ds-id {:union-with-live? false})]
               (t/is (= #{(pr/->Quad (URI. "http://s1") (URI. "http://p1") "o1" (URI. "http://g1"))
@@ -373,8 +377,8 @@
             (let [live-endpoint (get-live-query-endpoint drafter)
                   triples (with-open [conn (repo/->connection live-endpoint)]
                             (set (repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")))]
-              (t/is (= #{(pr/->Triple (URI. "http://s1") (URI. "http://p1") "o1")
-                         (pr/->Triple (URI. "http://s1") (URI. "http://p3") "o3")} triples) "Live should contain published draft data"))
+              (t/is (set/subset? #{(pr/->Triple (URI. "http://s1") (URI. "http://p1") "o1")
+                                   (pr/->Triple (URI. "http://s1") (URI. "http://p3") "o3")} triples) "Live should contain published draft data"))
 
             (let [ds2-id (create-draftset drafter test-editor {:id "second" :display-name "Second test draftset"})
                   query-endpoint (get-draftset-query-endpoint drafter test-editor ds2-id {:union-with-live? true})

@@ -46,7 +46,7 @@
         draftset-data-file "test/resources/test-draftset.trig"]
     (help/append-data-to-draftset-through-api handler test-editor draftset-location draftset-data-file)
 
-    (let [response-quads (set (help/get-draftset-quads-through-api handler draftset-location test-editor))
+    (let [response-quads (set (help/get-user-draftset-quads-through-api handler draftset-location test-editor))
           input-quads (set (help/eval-statements (statements draftset-data-file)))]
       (is (= input-quads response-quads)))))
 
@@ -79,7 +79,7 @@
     (help/publish-quads-through-api handler quads)
     (help/delete-draftset-graph-through-api handler test-editor draftset-location graph-to-delete)
 
-    (let [response-quads (set (help/get-draftset-quads-through-api handler draftset-location test-editor "true"))
+    (let [response-quads (set (help/get-user-draftset-quads-through-api handler draftset-location test-editor "true"))
           expected-quads (set (help/eval-statements (mapcat second (rest grouped-quads))))]
       (is (= expected-quads response-quads)))))
 
@@ -94,7 +94,7 @@
     (help/publish-quads-through-api handler live-quads)
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location draftset-quads)
 
-    (let [response-quads (set (help/get-draftset-quads-through-api handler draftset-location test-editor "true"))
+    (let [response-quads (set (help/get-user-draftset-quads-through-api handler draftset-location test-editor "true"))
           expected-quads (set (help/eval-statements (concat live-quads draftset-quads)))]
       (is (= expected-quads response-quads)))))
 

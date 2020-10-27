@@ -8,12 +8,19 @@
    [drafter.backend.draftset.operations :as dsops]
    [drafter.feature.common :as feat-common]
    [drafter.feature.middleware :as feat-middleware]
+   [drafter.feature.modified-times :as modified-times]
    [drafter.rdf.draftset-management.job-util :as jobs]
    [drafter.requests :as req]
    [drafter.responses :as response]
    [drafter.routes.draftsets-api :refer [parse-query-param-flag-handler]]
+   [drafter.time :as time]
    [integrant.core :as ig]
    [ring.util.response :as ring]))
+
+(defn- delete-graph-job [{:keys [backend graph-manager clock] :as manager} draftset-ref graph-uri]
+  (let [draft-graph-uri (graphs/delete-user-graph graph-manager draftset-ref graph-uri)]
+    (modified-times/draft-graph-deleted! backend graph-manager draftset-ref draft-graph-uri (time/now clock))
+    nil))
 
 (defn delete-graph
   "Deletes the given live graph within a draftset. Returns the draftset summary for the
@@ -21,7 +28,7 @@
    false. An exception will be thrown if silent? is falsey and the graph does not exist,
    or if the delete operation fails for some reason. In these cases the ex-info of the
    exception will be a map containing a :type key indicating the reason for the error."
-  [{:keys [backend graph-manager] :as manager} user-id draftset-ref graph silent?]
+  [{:keys [backend] :as manager} user-id draftset-ref graph silent?]
   (cond
     (mgmt/is-graph-managed? backend graph)
     (let [job-result (feat-common/run-sync
@@ -29,7 +36,7 @@
                       user-id
                       'delete-draftset-graph
                       draftset-ref
-                      #(graphs/delete-user-graph graph-manager draftset-ref graph)
+                      #(delete-graph-job manager draftset-ref graph)
                       identity)]
       (if (jobs/failed-job-result? job-result)
         (throw (ex-info "Delete job failed" {:type ::delete-job-failed
