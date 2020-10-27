@@ -9,7 +9,9 @@
             [schema.test :refer [validate-schemas]]
             [clojure-csv.core :as csv]
             [drafter.routes.common
-             :refer [live-query draftset-query append-quads-to-draftset-through-api]]))
+             :refer [live-query draftset-query append-quads-to-draftset-through-api]]
+            [drafter.feature.draftset.test-helper :as help])
+  (:import [java.net URI]))
 
 (use-fixtures :each (join-fixtures [validate-schemas tc/with-spec-instrumentation]))
 
@@ -94,137 +96,140 @@
     (check-user-restrictions run-query)))
 
 
-(deftest-system draftset-sparql-user-restrictions-test
-  [{endpoint :drafter.routes.draftsets-api/draftset-query-handler
-    :keys [drafter.stasher/repo] :as system}
-   system-config]
-  (let [api (get system [:drafter/routes :draftset/api])
-        req (create-test/create-draftset-request test-editor nil nil)
-        draftset (-> req api :headers (get "Location"))
-        quads (statements "test/resources/drafter/routes/sparql-test/graph-restriction-additions.trig")]
-    (letfn [(run-query [q & kwargs]
-              (let [{:keys [->csv?]} (apply hash-map kwargs)
-                    request (apply draftset-query draftset q kwargs)
-                    process (if ->csv?
-                              (partial map csv/parse-csv)
-                              identity)]
-                (-> request api :body io/reader line-seq rest process set)))]
+(deftest draftset-sparql-user-restrictions-test
+  (tc/with-system
+    [{endpoint :drafter.routes.draftsets-api/draftset-query-handler
+      :keys    [drafter.stasher/repo] :as system}
+     system-config]
+    (let [api (get system [:drafter/routes :draftset/api])
+          req (create-test/create-draftset-request test-editor nil nil)
+          draftset (-> req api :headers (get "Location"))
+          quads (statements "test/resources/drafter/routes/sparql-test/graph-restriction-additions.trig")]
+      (letfn [(run-query [q & kwargs]
+                (let [{:keys [->csv?]} (apply hash-map kwargs)
+                      request (apply draftset-query draftset q kwargs)
+                      process (if ->csv?
+                                (partial map csv/parse-csv)
+                                identity)]
+                  (-> request api :body io/reader line-seq rest process set)))]
 
-      (check-user-restrictions (fn [q & kwargs]
-                                 (apply run-query q :union-with-live true kwargs)))
+        (check-user-restrictions (fn [q & kwargs]
+                                   (apply run-query q :union-with-live true kwargs)))
 
-      (append-quads-to-draftset-through-api api test-editor draftset quads)
+        (append-quads-to-draftset-through-api api test-editor draftset quads)
 
-      (testing "Live (union) public graphs are visible"
-        (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
-          (is (= #{"http://test.com/graph-1"
-                   "http://test.com/graph-2"
-                   "http://test.com/graph-3"
-                   "http://test.com/graph-6"
-                   "http://test.com/fake-default-graph-1"
-                   "http://test.com/fake-default-graph-2"
-                   "http://test.com/fake-default-graph-3"}
-                 (run-query q :union-with-live true)))))
+        (testing "Live (union) public graphs are visible"
+          (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"
+                all-graphs (run-query q :union-with-live true)
+                user-graphs (set (filter (fn [uri-str] (help/is-default-user-graph? (URI. uri-str))) all-graphs))]
+            (is (= #{"http://test.com/graph-1"
+                     "http://test.com/graph-2"
+                     "http://test.com/graph-3"
+                     "http://test.com/graph-6"
+                     "http://test.com/fake-default-graph-1"
+                     "http://test.com/fake-default-graph-2"
+                     "http://test.com/fake-default-graph-3"}
+                   user-graphs))))
 
-      (testing "User can select added triples"
-        (let [q "SELECT ?s ?p ?o
-                 WHERE { ?s ?p ?o }"]
-          (is (=  #{
-                    [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/2"]]
-                    [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/3"]]
-                    [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"]]
-
-                    [["http://test.com/subject-6" "http://test.com/hasProperty" "http://test.com/data/2"]]
-                    [["http://test.com/subject-6" "http://test.com/hasProperty" "http://test.com/data/1"]]
-
-                    [["http://test.com/graph-6" "http://publisher" "http://freddy"]]
-
-                    }
-                  (run-query q :->csv? true)))))
-
-      (testing "Restrictions in query"
-
-        (testing "User can select added triples by graph"
+        (testing "User can select added triples"
           (let [q "SELECT ?s ?p ?o
-                 FROM <http://test.com/graph-1>
-                 WHERE { ?s ?p ?o }"]
-            (is (= #{[["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/2"]]
+                 WHERE { GRAPH ?g { ?s ?p ?o } FILTER(?g != <http://publishmydata.com/graphs/drafter/graph-modified-times>) }"]
+            (is (= #{
+                     [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/2"]]
                      [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/3"]]
-                     [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"]]}
+                     [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"]]
+
+                     [["http://test.com/subject-6" "http://test.com/hasProperty" "http://test.com/data/2"]]
+                     [["http://test.com/subject-6" "http://test.com/hasProperty" "http://test.com/data/1"]]
+
+                     [["http://test.com/graph-6" "http://publisher" "http://freddy"]]
+
+                     }
                    (run-query q :->csv? true)))))
 
-        (testing "User can select public (added) graphs"
-          (let [q "SELECT DISTINCT ?g
+        (testing "Restrictions in query"
+
+          (testing "User can select added triples by graph"
+            (let [q "SELECT ?s ?p ?o
+                 FROM <http://test.com/graph-1>
+                 WHERE { ?s ?p ?o }"]
+              (is (= #{[["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/2"]]
+                       [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/3"]]
+                       [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"]]}
+                     (run-query q :->csv? true)))))
+
+          (testing "User can select public (added) graphs"
+            (let [q "SELECT DISTINCT ?g
                  FROM NAMED <http://test.com/graph-6>
                  WHERE { GRAPH ?g { ?s ?p ?o } }"]
-            (is (= #{"http://test.com/graph-6"}
-                   (run-query q)))))
+              (is (= #{"http://test.com/graph-6"}
+                     (run-query q)))))
 
-        (testing "User can select public (added w/union) graphs"
-          (let [q "SELECT DISTINCT ?g
+          (testing "User can select public (added w/union) graphs"
+            (let [q "SELECT DISTINCT ?g
                  FROM NAMED <http://test.com/graph-6>
                  WHERE { GRAPH ?g { ?s ?p ?o } }"]
-            (is (= #{"http://test.com/graph-6"}
-                   (run-query q :union-with-live true)))))
+              (is (= #{"http://test.com/graph-6"}
+                     (run-query q :union-with-live true)))))
 
-        (testing "User can select public graphs (added + union)"
-          (let [q "SELECT DISTINCT ?g
+          (testing "User can select public graphs (added + union)"
+            (let [q "SELECT DISTINCT ?g
                  FROM NAMED <http://test.com/graph-1>
                  FROM NAMED <http://test.com/graph-6>
                  WHERE { GRAPH ?g { ?s ?p ?o } }"]
-            (is (= #{"http://test.com/graph-1"
-                     "http://test.com/graph-6"}
-                   (run-query q :union-with-live true)))))
+              (is (= #{"http://test.com/graph-1"
+                       "http://test.com/graph-6"}
+                     (run-query q :union-with-live true)))))
 
-        (testing "User can't select private graphs, but added and public graphs are OK"
-          (let [q "SELECT DISTINCT ?g
+          (testing "User can't select private graphs, but added and public graphs are OK"
+            (let [q "SELECT DISTINCT ?g
                  FROM NAMED <http://test.com/graph-1>
                  FROM NAMED <http://test.com/graph-4>
                  FROM NAMED <http://test.com/graph-6>
                  WHERE { GRAPH ?g { ?s ?p ?o } }"]
-            (is (= #{"http://test.com/graph-1"
-                     "http://test.com/graph-6"}
-                   (run-query q :union-with-live true))))))
+              (is (= #{"http://test.com/graph-1"
+                       "http://test.com/graph-6"}
+                     (run-query q :union-with-live true))))))
 
-      (testing "Restrictions in protocol"
+        (testing "Restrictions in protocol"
 
-        (testing "User can select added triples by graph"
-          (let [q "SELECT ?s ?p ?o WHERE { ?s ?p ?o }"]
-            (is (= #{[["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/2"]]
-                     [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/3"]]
-                     [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"]]}
-                   (run-query q :->csv? true :default-graph-uri ["http://test.com/graph-1"])))))
+          (testing "User can select added triples by graph"
+            (let [q "SELECT ?s ?p ?o WHERE { ?s ?p ?o }"]
+              (is (= #{[["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/2"]]
+                       [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/3"]]
+                       [["http://test.com/subject-1" "http://test.com/hasProperty" "http://test.com/data/1"]]}
+                     (run-query q :->csv? true :default-graph-uri ["http://test.com/graph-1"])))))
 
-        (testing "User can select public (added) graphs"
-          (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
-            (is (= #{"http://test.com/graph-6"}
-                   (run-query q :named-graph-uri ["http://test.com/graph-6"])))))
+          (testing "User can select public (added) graphs"
+            (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
+              (is (= #{"http://test.com/graph-6"}
+                     (run-query q :named-graph-uri ["http://test.com/graph-6"])))))
 
-        (testing "User can select public (added w/union) graphs"
-          (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
-            (is (= #{"http://test.com/graph-6"}
-                   (run-query q
-                              :union-with-live true
-                              :named-graph-uri ["http://test.com/graph-6"])))))
+          (testing "User can select public (added w/union) graphs"
+            (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
+              (is (= #{"http://test.com/graph-6"}
+                     (run-query q
+                                :union-with-live true
+                                :named-graph-uri ["http://test.com/graph-6"])))))
 
-        (testing "User can select public graphs (added + union)"
-          (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
-            (is (= #{"http://test.com/graph-1"
-                     "http://test.com/graph-6"}
-                   (run-query q
-                              :union-with-live true
-                              :named-graph-uri ["http://test.com/graph-1"
-                                                "http://test.com/graph-6"])))))
+          (testing "User can select public graphs (added + union)"
+            (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
+              (is (= #{"http://test.com/graph-1"
+                       "http://test.com/graph-6"}
+                     (run-query q
+                                :union-with-live true
+                                :named-graph-uri ["http://test.com/graph-1"
+                                                  "http://test.com/graph-6"])))))
 
-        (testing "User can't select private graphs, but added and public graphs are OK"
-          (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
-            (is (= #{"http://test.com/graph-1"
-                     "http://test.com/graph-6"}
-                   (run-query q
-                              :union-with-live true
-                              :named-graph-uri ["http://test.com/graph-1"
-                                                "http://test.com/graph-4"
-                                                "http://test.com/graph-6"])))))))))
+          (testing "User can't select private graphs, but added and public graphs are OK"
+            (let [q "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }"]
+              (is (= #{"http://test.com/graph-1"
+                       "http://test.com/graph-6"}
+                     (run-query q
+                                :union-with-live true
+                                :named-graph-uri ["http://test.com/graph-1"
+                                                  "http://test.com/graph-4"
+                                                  "http://test.com/graph-6"]))))))))))
 
 (deftest-system live-from-and-from-named-interaction-test
   [{endpoint :drafter.routes.sparql/live-sparql-query-route

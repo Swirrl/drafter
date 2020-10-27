@@ -96,7 +96,6 @@
     (datadog/gauge! "drafter.jobs_queue_size" (inc (.size writes-queue)))
     (.add writes-queue job)))
 
-;; exec-sync-job! :: Job -> ApiResponse
 (defn exec-sync-job!
   "Executes a sync job waits for it to complete. Returns the result of
   the job execution.  Sync jobs skip the queue entirely and just run

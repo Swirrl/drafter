@@ -39,7 +39,6 @@
             [drafter.backend.draftset.arq :as arq]
             [drafter.backend.draftset.draft-management :as dm]
             [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
-            [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.draftset :as ds]
             [drafter.rdf.sparql :as sparql]
@@ -52,7 +51,8 @@
             [ring.util.request :as request]
             [drafter.backend.draftset.graphs :as graphs]
             [drafter.time :as time]
-            [drafter.rdf.jena :as jena])
+            [drafter.rdf.jena :as jena]
+            [drafter.feature.modified-times :as modified-times])
   (:import java.net.URI
            [org.apache.jena.sparql.modify.request
             QuadDataAcc Target
@@ -94,8 +94,8 @@
       UpdateFactory/create
       .getOperations))
 
-(defn- draft-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
-  (-> (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri)
+(defn- draft-graph-stmt [graph-manager draftset-ref timestamp graph-uri draft-graph-uri]
+  (-> (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-ref)
       (jena/insert-data-stmt)))
 
 (defn- manage-graph-stmt [graph-manager graph-uri]
@@ -198,9 +198,8 @@
   {:type :create-new-draft :graph-uri graph-uri :draft-graph-uri draft-graph-uri})
 
 (defmethod reify-operation :create-new-draft [{:keys [graph-uri draft-graph-uri] :as abstract-op} {:keys [graph-manager timestamp draftset-ref] :as update-context}]
-  (let [draftset-uri (url/->java-uri draftset-ref)]
-    [(manage-graph-stmt graph-manager graph-uri)
-     (draft-graph-stmt graph-manager draftset-uri timestamp graph-uri draft-graph-uri)]))
+  [(manage-graph-stmt graph-manager graph-uri)
+   (draft-graph-stmt graph-manager draftset-ref timestamp graph-uri draft-graph-uri)])
 
 (defn- create-live-draft-op
   "Represents creating a draft for an existing live graph"
@@ -208,8 +207,7 @@
   {:type :create-live-draft :graph-uri graph-uri :draft-graph-uri draft-graph-uri})
 
 (defmethod reify-operation :create-live-draft [{:keys [graph-uri draft-graph-uri] :as abstract-op} {:keys [graph-manager timestamp draftset-ref]}]
-  (let [draftset-uri (url/->java-uri draftset-ref)]
-    [(draft-graph-stmt graph-manager draftset-uri timestamp graph-uri draft-graph-uri)]))
+  [(draft-graph-stmt graph-manager draftset-ref timestamp graph-uri draft-graph-uri)])
 
 (defn- clone-graph-op
   "Represents cloning a live graph into the given draft graph"
@@ -241,9 +239,6 @@
   [draft-graph-uri]
   {:type :touch :draft-graph-uri draft-graph-uri})
 
-(defmethod reify-operation :touch [{:keys [draft-graph-uri]} {:keys [timestamp draftset-ref] :as update-context}]
-  [(touch-graph-in-draftset draftset-ref draft-graph-uri timestamp)])
-
 (defn- insert-delete-graph-operations
   "Returns the sequence of abstract operations required to setup a DELETE/INSERT DATA operation
    before it can be applied. Live graphs which do not exist within the draft must be cloned
@@ -261,13 +256,15 @@
 
 (defn- data-insert-delete-ops [op affected-graphs graph-states max-update-size]
   (let [affected-graph-states (select-keys graph-states affected-graphs)
+        affected-draft-graphs (set (map :draft-graph-uri (vals affected-graph-states)))
         setup-ops (mapcat (fn [gm] (insert-delete-graph-operations gm max-update-size)) (vals affected-graph-states))
 
         ;; need to rewrite live data after any clone operations
         is-clone-op? (fn [op] (= :clone (:type op)))
         does-clone? (boolean (some is-clone-op? setup-ops))
-        rewrite-ds (when does-clone? [(rewrite-draftset-op)])]
-    (concat setup-ops rewrite-ds [(rewrite-op op)])))
+        rewrite-ds (when does-clone? [(rewrite-draftset-op)])
+        touch-ops (map touch-graph-op affected-draft-graphs)]
+    (concat setup-ops rewrite-ds [(rewrite-op op)] touch-ops)))
 
 ;; update plan
 
@@ -287,7 +284,9 @@
   "Adds an abstract operation to the current update plan"
   [plan {:keys [type] :as abstract-op}]
   (letfn [(add-operation [plan abstract-op]
-            (update plan :operations conj abstract-op))]
+            (update plan :operations conj abstract-op))
+          (add-touch [plan {:keys [draft-graph-uri] :as touch-op}]
+            (update plan :draft-graphs-to-touch conj draft-graph-uri))]
     (case type
       :create-new-draft (-> plan
                             (add-operation abstract-op)
@@ -295,7 +294,16 @@
       :create-live-draft (-> plan
                              (add-operation abstract-op)
                              (transition-graph-state (:graph-uri abstract-op) :live :draft))
+      :touch (add-touch plan abstract-op)
       (add-operation plan abstract-op))))
+
+(defn create-empty-plan [graph-meta]
+  {:operations []
+   :draft-graphs-to-touch #{}
+   :graph-meta graph-meta})
+
+(defn- empty-plan? [{:keys [operations draft-graphs-to-touch]}]
+  (and (empty? operations) (empty? draft-graphs-to-touch)))
 
 (defn- plan-update
   "Constructs an update plan from a sequence of Jena Update operations and the state of all affected graphs.
@@ -303,8 +311,7 @@
    current plan. The subsequent state of graphs within the draft (unmanaged, draft, live) may be changed as a
    result."
   [operations graph-meta max-update-size]
-  (let [empty-plan {:operations []
-                    :graph-meta graph-meta}]
+  (let [empty-plan (create-empty-plan graph-meta)]
     (reduce (fn [{:keys [graph-meta] :as plan} op]
               (let [abstract-ops (abstract-operations op graph-meta max-update-size)]
                 (reduce add-to-plan plan abstract-ops)))
@@ -352,7 +359,8 @@
                                [(rewrite-op op)
                                 (touch-graph-op draft-graph-uri)]
                                (throw (ex-info "Unable to copy graphs" {:type :error})))
-            (= :live state) [(create-live-draft-op graph-uri draft-graph-uri)]
+            (= :live state) [(create-live-draft-op graph-uri draft-graph-uri)
+                             (touch-graph-op draft-graph-uri)]
             (.isSilent op) []
             :not-silent (throw (ex-info (format "Source graph %s does not exist, cannot proceed with update." graph-uri)
                                         {:type :error})))))
@@ -368,31 +376,32 @@
 
 (defn build-update
   "Converts an update plan into a SPARQL UPDATE string"
-  [{:keys [operations] :as update-plan} update-context]
-  (let [ops (mapcat (fn [op] (reify-operation op update-context)) operations)]
-    (jena/->update-string ops)))
+  [{:keys [operations draft-graphs-to-touch] :as update-plan} {:keys [backend graph-manager draftset-ref timestamp] :as update-context}]
+  (let [data-ops (mapcat (fn [op] (reify-operation op update-context)) operations)
+        update-operations (modified-times/update-modifications-queries backend graph-manager draftset-ref draft-graphs-to-touch timestamp)]
+    (jena/->update-string (concat data-ops update-operations))))
 
 (defn update! [{:keys [backend graph-manager clock] :as manager} max-update-size draftset-id ^UpdateRequest update-request]
   (let [graph-meta (get-graph-meta backend
                                    draftset-id
                                    update-request
                                    max-update-size)
-        update-plan (plan-update (.getOperations update-request) graph-meta max-update-size)
+        update-plan (plan-update (.getOperations update-request) graph-meta max-update-size)]
+    (when-not (empty-plan? update-plan)
+      (let [rewriter-map (rewriter-map graph-meta)
+            rewriter (partial uri-constant-rewriter rewriter-map)
 
-        rewriter-map (rewriter-map graph-meta)
-        rewriter (partial uri-constant-rewriter rewriter-map)
+            ;; represents the static properties of the environment the update is
+            ;; executed within
+            update-context {:rewriter        rewriter
+                            :draftset-ref    (ds/->DraftsetId draftset-id)
+                            :timestamp       (time/now clock)
+                            :backend         backend
+                            :graph-manager   graph-manager
+                            :max-update-size max-update-size}
 
-        ;; represents the static properties of the environment the update is
-        ;; executed within
-        update-context {:rewriter        rewriter
-                        :draftset-ref    (ds/->DraftsetId draftset-id)
-                        :timestamp       (time/now clock)
-                        :graph-manager   graph-manager
-                        :max-update-size max-update-size}
-
-        update-request' (build-update update-plan update-context)]
-
-    (sparql/update! backend update-request')))
+            update-request' (build-update update-plan update-context)]
+        (sparql/update! backend update-request')))))
 
 ;; Handler
 

@@ -82,11 +82,14 @@
   (->connection [this]
     (build-draftset-connection this)))
 
+(defn create-draftset-repo [raw-repo live->draft union-with-live?]
+  (->RewritingSesameSparqlExecutor raw-repo live->draft union-with-live?))
+
 (defn build-draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"
   [repo draftset-ref union-with-live?]
-  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping repo draftset-ref)]
-    (->RewritingSesameSparqlExecutor repo graph-mapping union-with-live?)))
+  (let [live->draft (dsmgmt/get-draftset-graph-mapping repo draftset-ref)]
+    (create-draftset-repo repo live->draft union-with-live?)))
 
 (defmethod ig/init-key ::endpoint [_ opts]
   opts)

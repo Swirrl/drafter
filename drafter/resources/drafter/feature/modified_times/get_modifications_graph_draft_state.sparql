@@ -1,0 +1,12 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+SELECT ?public ?dg WHERE {
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        <http://publishmydata.com/graphs/drafter/graph-modified-times> a drafter:ManagedGraph .
+        <http://publishmydata.com/graphs/drafter/graph-modified-times> drafter:isPublic ?public .
+        OPTIONAL {
+            <http://publishmydata.com/graphs/drafter/graph-modified-times> drafter:hasDraft ?dg .
+            ?dg drafter:inDraftSet ?ds .
+        }
+    }
+}

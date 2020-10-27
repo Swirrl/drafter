@@ -4,10 +4,12 @@
    [clojure.spec.alpha :as s]
    [drafter.async.responses :as async-response]
    [drafter.backend.draftset.draft-management :as mgmt]
+   [drafter.backend.draftset.graphs :as graphs]
    [drafter.draftset :as ds]
    [drafter.feature.draftset-data.common :as ds-data-common]
    [drafter.feature.draftset-data.middleware :as dset-middleware]
    [drafter.middleware :refer [require-rdf-content-type temp-file-body inflate-gzipped]]
+   [drafter.rdf.drafter-ontology :refer [modified-times-graph-uri]]
    [drafter.rdf.draftset-management.job-util :as jobs]
    [drafter.requests :as req]
    [drafter.responses :as response]
@@ -30,10 +32,10 @@
       (mgmt/rewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset-ref)
                                     :deleted :ignore}))))
 
-(defn- append-to-draft-graph [{:keys [draftset-ref job-started-at] :as context} draft-graph-uri triples]
+(defn- append-to-draft-graph [state {:keys [draftset-ref] :as context} draft-graph-uri triples]
   (let [repo (ds-data-common/get-repo context)]
     (append-data-batch! repo draft-graph-uri triples draftset-ref)
-    (ds-data-common/touch-graph-in-draftset! repo draftset-ref draft-graph-uri job-started-at)))
+    (ds-data-common/draft-graph-appended state context draft-graph-uri)))
 
 (defn- consume-batch
   "Consumes the current quad batch and returns the new state"
@@ -51,8 +53,8 @@
         ;;draft graph already exists so append current batch
         (some? draft-graph-uri)
         (do
-          (append-to-draft-graph context draft-graph-uri triples)
-          (consume-batch state quad-batches))
+          (let [state (append-to-draft-graph state context draft-graph-uri triples)]
+            (consume-batch state quad-batches)))
 
         ;;live graph exists so clone it and update the draft graph mapping
         (mgmt/is-graph-live? repo graph-uri)
@@ -63,8 +65,8 @@
         ;;draftset before appending current batch
         :else
         (let [draft-graph-uri (ds-data-common/create-user-graph-draft context graph-uri)
-              state (ds-data-common/add-draft-graph state graph-uri draft-graph-uri)]
-          (append-to-draft-graph context draft-graph-uri triples)
+              state (ds-data-common/add-draft-graph state graph-uri draft-graph-uri)
+              state (append-to-draft-graph state context draft-graph-uri triples)]
           (consume-batch state quad-batches))))))
 
 (defn- start-state [{:keys [quad-batches] :as state} context]

@@ -1,0 +1,22 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+  <http://publishmydata.com/graphs/drafter/graph-modified-times> a drafter:ManagedGraph ;
+    drafter:isPublic false ;
+    drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/5dda55ec-1769-4df4-8c9e-bd60e47ff2dd> .
+
+  <http://publishmydata.com/def/drafter/draftset/98bbbb82-77c5-45eb-bf02-e587bb00f3da> a drafter:DraftSet ;
+      dcterms:modified "2021-01-06T09:32:34.000Z"^^xsd:dateTime .
+
+  # draft of modification times graph
+  <http://publishmydata.com/graphs/drafter/draft/5dda55ec-1769-4df4-8c9e-bd60e47ff2dd> a drafter:DraftGraph ;
+      drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/98bbbb82-77c5-45eb-bf02-e587bb00f3da> .
+}
+
+<http://publishmydata.com/graphs/drafter/draft/5dda55ec-1769-4df4-8c9e-bd60e47ff2dd> {
+  <http://publishmydata.com/graphs/drafter/draft/5dda55ec-1769-4df4-8c9e-bd60e47ff2dd> dcterms:modified "2021-01-20T15:29:03.492Z"^^xsd:dateTime .
+
+  # old modification time for reverted draft graph
+  <http://publishmydata.com/graphs/drafter/draft/4203edc3-dcb1-43ac-b369-0774956fe7f4> dcterms:modified "2021-01-20T15:29:03.492Z"^^xsd:dateTime .
+}

@@ -9,10 +9,10 @@
             [drafter.test-common :as tc]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
-            [drafter.util :as util]
             [grafter-2.rdf.protocols :refer [context]]
             [grafter-2.rdf4j.io :refer [statements]]
-            [drafter.backend.draftset.graphs :as graphs])
+            [drafter.backend.draftset.graphs :as graphs]
+            [drafter.manager :as manager])
   (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -33,23 +33,26 @@
     [:drafter.stasher/repo ::graphs/manager :drafter/write-scheduler]
     [{backend :drafter.stasher/repo graph-manager ::graphs/manager} system]
     (let [live-graph (URI. "http://live")
-          draftset-id (ops/create-draftset! backend test-editor)]
-      (let [draft-graph (graphs/create-user-graph-draft graph-manager draftset-id live-graph)
-            result (sut/revert-graph-changes! backend draftset-id live-graph)]
-        (t/is (= :reverted result))
-        (t/is (= false (mgmth/draft-exists? backend draft-graph)))
-        (t/is (= false (mgmt/is-graph-managed? backend draft-graph)))))))
+          draftset-id (ops/create-draftset! backend test-editor)
+          draft-graph (graphs/create-user-graph-draft graph-manager draftset-id live-graph)
+          manager (manager/create-manager backend)
+          result (sut/revert-graph-changes! manager draftset-id live-graph)]
+      (t/is (= :reverted result))
+      (t/is (= false (mgmth/draft-exists? backend draft-graph)))
+      (t/is (= false (mgmt/is-graph-managed? backend draft-graph))))))
 
 (def keys-for-test [[:drafter/routes :draftset/api] :drafter.stasher/repo :drafter/write-scheduler
                     ::graphs/manager])
 
-(tc/deftest-system-with-keys revert-changes-from-graph-which-exists-in-live
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo graph-manager ::graphs/manager} system]
-  (let [live-graph-uri (tc/make-graph-live! backend (URI. "http://live"))
-        draftset-id (ops/create-draftset! backend test-editor)
-        draft-graph-uri (graphs/delete-user-graph graph-manager draftset-id live-graph-uri)]
-    (let [result (sut/revert-graph-changes! backend draftset-id live-graph-uri)]
+(t/deftest revert-changes-from-graph-which-exists-in-live
+  (tc/with-system
+    keys-for-test
+    [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo graph-manager ::graphs/manager} system]
+    (let [live-graph-uri (tc/make-graph-live! backend (URI. "http://live"))
+          draftset-id (ops/create-draftset! backend test-editor)
+          draft-graph-uri (graphs/delete-user-graph graph-manager draftset-id live-graph-uri)
+          manager (manager/create-manager backend)
+          result (sut/revert-graph-changes! manager draftset-id live-graph-uri)]
       (t/is (= :reverted result))
       (t/is (mgmt/is-graph-managed? backend live-graph-uri))
       (t/is (= false (mgmth/draft-exists? backend draft-graph-uri))))))
@@ -62,59 +65,65 @@
           ds1-id (ops/create-draftset! backend test-editor "ds 1" "description 1")
           ds2-id (ops/create-draftset! backend test-publisher "ds 2" "description 2")
           draft-graph1-uri (graphs/create-user-graph-draft graph-manager ds1-id live-graph-uri)
-          draft-graph2-uri (graphs/create-user-graph-draft graph-manager ds2-id live-graph-uri)]
+          draft-graph2-uri (graphs/create-user-graph-draft graph-manager ds2-id live-graph-uri)
+          manager (manager/create-manager backend {:graph-manager graph-manager})
+          result (sut/revert-graph-changes! manager ds2-id live-graph-uri)]
+      (t/is (= :reverted result))
+      (t/is (mgmt/is-graph-managed? backend live-graph-uri))
+      (t/is (= false (mgmth/draft-exists? backend draft-graph2-uri)))
+      (t/is (mgmth/draft-exists? backend draft-graph1-uri)))))
 
-      (let [result (sut/revert-graph-changes! backend ds2-id live-graph-uri)]
-        (t/is (= :reverted result))
-        (t/is (mgmt/is-graph-managed? backend live-graph-uri))
-        (t/is (= false (mgmth/draft-exists? backend draft-graph2-uri)))
-        (t/is (mgmth/draft-exists? backend draft-graph1-uri))))))
+(t/deftest revert-non-existent-change-in-draftset
+  (tc/with-system
+    keys-for-test
+    [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo} system]
+    (let [draftset-id (ops/create-draftset! backend test-editor)
+          manager (manager/create-manager backend)
+          result (sut/revert-graph-changes! manager draftset-id (URI. "http://missing"))]
+      (t/is (= :not-found result)))))
 
-(tc/deftest-system-with-keys revert-non-existent-change-in-draftset
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo} system]
-  (let [draftset-id (ops/create-draftset! backend test-editor)
-        result (sut/revert-graph-changes! backend draftset-id (URI. "http://missing"))]
-    (t/is (= :not-found result))))
+(t/deftest revert-changes-in-non-existent-draftset
+  (tc/with-system
+    keys-for-test
+    [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo} system]
+    (let [live-graph (tc/make-graph-live! backend (URI. "http://live"))
+          manager (manager/create-manager backend)
+          result (sut/revert-graph-changes! manager (ds/->DraftsetId "missing") live-graph)]
+      (t/is (= :not-found result)))))
 
-(tc/deftest-system-with-keys revert-changes-in-non-existent-draftset
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo} system]
-  (let [live-graph (tc/make-graph-live! backend (URI. "http://live"))
-        result (sut/revert-graph-changes! backend (ds/->DraftsetId "missing") live-graph)]
-    (t/is (= :not-found result))))
+(t/deftest revert-graph-change-in-draftset
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [{handler [:drafter/routes :draftset/api]} system]
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/publish-quads-through-api handler quads)
+      (help/delete-draftset-graph-through-api handler test-editor draftset-location live-graph)
 
-(tc/deftest-system-with-keys revert-graph-change-in-draftset
-  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
-  [{handler [:drafter/routes :draftset/api]} system]
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (help/create-draftset-through-api handler test-editor)]
-    (help/publish-quads-through-api handler quads)
-    (help/delete-draftset-graph-through-api handler test-editor draftset-location live-graph)
+      (let [{:keys [changes]} (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
+        (is (= #{live-graph} (tc/key-set changes))))
 
-    (let [{:keys [changes]} (help/get-draftset-info-through-api handler draftset-location test-editor)]
-      (is (= #{live-graph} (tc/key-set changes))))
+      (let [{:keys [changes] :as ds-info} (revert-draftset-graph-changes-through-api handler draftset-location test-editor live-graph)]
+        (is (= #{} (tc/key-set changes))))
 
-    (let [{:keys [changes] :as ds-info} (revert-draftset-graph-changes-through-api handler draftset-location test-editor live-graph)]
-      (is (= #{} (tc/key-set changes))))
+      (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor "true")]
 
-    (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "true")]
-
-      (is (= (set (help/eval-statements quads)) (set ds-quads))))))
+        (is (= (set (help/eval-statements quads)) (set ds-quads)))))))
 
 (def keys-for-test-2 [[:drafter/routes :draftset/api] :drafter/write-scheduler])
 
-(tc/deftest-system-with-keys revert-graph-change-in-unowned-draftset
-  keys-for-test-2
-  [{handler [:drafter/routes :draftset/api]} system]
-  (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        draftset-location (help/create-draftset-through-api handler test-editor)]
-    (help/publish-quads-through-api handler quads)
-    (help/delete-draftset-graph-through-api handler test-editor draftset-location live-graph)
+(t/deftest revert-graph-change-in-unowned-draftset
+  (tc/with-system
+    keys-for-test-2
+    [{handler [:drafter/routes :draftset/api]} system]
+    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/publish-quads-through-api handler quads)
+      (help/delete-draftset-graph-through-api handler test-editor draftset-location live-graph)
 
-    (let [revert-request (revert-draftset-graph-changes-request draftset-location test-publisher live-graph)
-          response (handler revert-request)]
-      (tc/assert-is-forbidden-response response))))
+      (let [revert-request (revert-draftset-graph-changes-request draftset-location test-publisher live-graph)
+            response (handler revert-request)]
+        (tc/assert-is-forbidden-response response)))))
 
 (def keys-for-test-2 [[:drafter/routes :draftset/api] :drafter/write-scheduler])
 
@@ -156,40 +165,42 @@
         response (handler revert-request)]
     (tc/assert-is-unprocessable-response response)))
 
-(tc/deftest-system-with-keys draftset-graphs-state-test
-  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
-  [{handler [:drafter/routes :draftset/api]} system]
-  (testing "Graph created"
-    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-          draftset-location (help/create-draftset-through-api handler test-editor)]
-      (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
-      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
-        (is (= :created (get-in changes [live-graph :status]))))))
+(t/deftest draftset-graphs-state-test
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [{handler [:drafter/routes :draftset/api]} system]
+    (do
+      (testing "Graph created"
+        (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+              draftset-location (help/create-draftset-through-api handler test-editor)]
+          (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
+          (let [{:keys [changes] :as ds-info} (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
+            (is (= :created (get-in changes [live-graph :status]))))))
 
-  (testing "Quads deleted from live graph"
-    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-          draftset-location (help/create-draftset-through-api handler test-editor)]
-      (help/publish-quads-through-api handler quads)
-      (help/delete-quads-through-api handler test-editor draftset-location (take 1 quads))
+      (testing "Quads deleted from live graph"
+        (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+              draftset-location (help/create-draftset-through-api handler test-editor)]
+          (help/publish-quads-through-api handler quads)
+          (help/delete-quads-through-api handler test-editor draftset-location (take 1 quads))
 
-      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
-        (is (= :updated (get-in changes [live-graph :status]))))))
+          (let [{:keys [changes] :as ds-info} (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
+            (is (= :updated (get-in changes [live-graph :status]))))))
 
-  (testing "Quads added to live graph"
-    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-          [published to-add] (split-at 1 quads)
-          draftset-location (help/create-draftset-through-api handler test-editor)]
-      (help/publish-quads-through-api handler published)
-      (help/append-quads-to-draftset-through-api handler test-editor draftset-location to-add)
+      (testing "Quads added to live graph"
+        (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+              [published to-add] (split-at 1 quads)
+              draftset-location (help/create-draftset-through-api handler test-editor)]
+          (help/publish-quads-through-api handler published)
+          (help/append-quads-to-draftset-through-api handler test-editor draftset-location to-add)
 
-      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
-        (is (= :updated (get-in changes [live-graph :status]))))))
+          (let [{:keys [changes] :as ds-info} (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
+            (is (= :updated (get-in changes [live-graph :status]))))))
 
-  (testing "Graph deleted"
-    (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-          draftset-location (help/create-draftset-through-api handler test-editor)]
-      (help/publish-quads-through-api handler quads)
-      (help/delete-draftset-graph-through-api handler test-editor draftset-location live-graph)
+      (testing "Graph deleted"
+        (let [[live-graph quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+              draftset-location (help/create-draftset-through-api handler test-editor)]
+          (help/publish-quads-through-api handler quads)
+          (help/delete-draftset-graph-through-api handler test-editor draftset-location live-graph)
 
-      (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
-        (is (= :deleted (get-in changes [live-graph :status])))))))
+          (let [{:keys [changes] :as ds-info} (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
+            (is (= :deleted (get-in changes [live-graph :status])))))))))

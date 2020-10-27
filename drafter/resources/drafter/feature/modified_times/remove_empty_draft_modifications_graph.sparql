@@ -1,0 +1,31 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+DELETE {
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        <http://publishmydata.com/graphs/drafter/graph-modified-times> drafter:hasDraft ?dmg .
+        ?dmg ?sp ?so .
+    }
+    GRAPH ?dmg {
+        ?dmg dcterms:modified ?modified .
+    }
+}
+WHERE {
+    { GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+            ?dmg ?sp ?so .
+        } 
+    } UNION {
+        GRAPH ?dmg {
+        ?dg dcterms:modified ?modified .
+        }
+    }
+    FILTER NOT EXISTS {
+        GRAPH ?dmg {
+            # NOTE: The variable for the draft graph should be different to the one for matching the modified times above
+            # Need to remove all solutions unless the modifications graph is empty (ignoring its own entry)
+            ?dge dcterms:modified ?gm .
+            FILTER(?dge != ?dmg)
+        }
+    }
+    
+}

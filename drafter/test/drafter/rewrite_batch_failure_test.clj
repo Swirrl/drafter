@@ -64,12 +64,14 @@
   (let [q (format ds-quads-q (string/join " " (map #(str "<" % ">") graphs)))]
     (repo/query conn q)))
 
-(defn get-draftset-quads [system draftset-id]
+(defn- get-user-draftset-quads [system draftset-id]
   (with-open [conn (-> system
                        :drafter.common.config/sparql-query-endpoint
                        repo/sparql-repo
                        repo/->connection)]
-    (let [ds-graphs (keys (:changes (ops/get-draftset-info conn draftset-id)))
+    (let [system-draftset-info (ops/get-draftset-info conn draftset-id)
+          draftset-info (help/user-draftset-info-view system-draftset-info)
+          ds-graphs (keys (:changes draftset-info))
           draft-graphs (mapv (partial draft-graph-uri-for conn) ds-graphs)]
       (set (ds-quads conn draft-graphs)))))
 
@@ -103,28 +105,29 @@ SELECT ?dg ?lg WHERE {
        (mapv (juxt :lg :dg))
        (into {})))
 
-(tc/deftest-system-with-keys bad-triple-in-last-batch
-  keys-for-test [system system-config]
-  (with-redefs [drafter.rdf.draftset-management.job-util/batched-write-size 5]
-    (let [handler (get system [:drafter/routes :draftset/api])
-          draftset-location (help/create-draftset-through-api handler test-publisher)
-          draftset-id (last (string/split draftset-location #"/"))
-          input-stream (ByteArrayInputStream. (.getBytes invalid-triples-str))
-          request (help/append-to-draftset-request
-                   test-publisher draftset-location input-stream
-                   {:content-type "application/n-quads"})
-          response (handler request)
-          complete (tc/await-completion (get-in response [:body :finished-job]))
-          mapping (with-open [conn (-> system
-                                       :drafter.common.config/sparql-query-endpoint
-                                       repo/sparql-repo
-                                       repo/->connection)]
-                    (ds-mapping conn draftset-id))
-          quads (get-draftset-quads system draftset-id)]
-      (is (= {:type :error
-              :message "Reading triples aborted."
-              :error-class "clojure.lang.ExceptionInfo"
-              :details {:error :reading-aborted}}
-             complete))
-      (is (= 60 (count quads)))
-      (is (= quads (set (rewrite (take 60 valid-triples) mapping)))))))
+(t/deftest bad-triple-in-last-batch
+  (tc/with-system
+    keys-for-test [system system-config]
+    (with-redefs [drafter.rdf.draftset-management.job-util/batched-write-size 5]
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-publisher)
+            draftset-id (last (string/split draftset-location #"/"))
+            input-stream (ByteArrayInputStream. (.getBytes invalid-triples-str))
+            request (help/append-to-draftset-request
+                      test-publisher draftset-location input-stream
+                      {:content-type "application/n-quads"})
+            response (handler request)
+            complete (tc/await-completion (get-in response [:body :finished-job]))
+            mapping (with-open [conn (-> system
+                                         :drafter.common.config/sparql-query-endpoint
+                                         repo/sparql-repo
+                                         repo/->connection)]
+                      (ds-mapping conn draftset-id))
+            quads (get-user-draftset-quads system draftset-id)]
+        (is (= {:type        :error
+                :message     "Reading triples aborted."
+                :error-class "clojure.lang.ExceptionInfo"
+                :details     {:error :reading-aborted}}
+               complete))
+        (is (= 60 (count quads)))
+        (is (= quads (set (rewrite (take 60 valid-triples) mapping))))))))

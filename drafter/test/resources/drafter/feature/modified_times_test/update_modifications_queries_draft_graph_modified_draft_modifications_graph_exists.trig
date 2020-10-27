@@ -1,0 +1,53 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+  <http://publishmydata.com/def/drafter/draftset/ff5cdb64-7911-48ac-afc5-deeec223c940> a drafter:DraftSet ;
+        dcterms:modified "2021-01-06T09:32:34.000Z"^^xsd:dateTime .
+
+   <http://publishmydata.com/graphs/drafter/graph-modified-times> a drafter:ManagedGraph ;
+       drafter:isPublic false ;
+       drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/1cc696c5-3296-40ee-a59a-50877461b081> .
+
+  <http://example.com/graphs/1> a drafter:ManagedGraph ;
+      drafter:isPublic false ;
+      drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/63b3dbbb-ae14-49b4-85a0-a90f42cd8064> .
+
+  <http://example.com/graphs/2> a drafter:ManagedGraph ;
+        drafter:isPublic false ;
+        drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/ac93f5d3-cea0-41c9-91f5-57aa6e1fe93b> .
+
+  # draft of modifications graph: <http://publishmydata.com/graphs/drafter/graph-modified-times>
+    <http://publishmydata.com/graphs/drafter/draft/1cc696c5-3296-40ee-a59a-50877461b081> a drafter:DraftGraph ;
+        drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/ff5cdb64-7911-48ac-afc5-deeec223c940> .
+
+  # draft of graph-1: <http://example.com/graphs/1>
+  <http://publishmydata.com/graphs/drafter/draft/63b3dbbb-ae14-49b4-85a0-a90f42cd8064> a drafter:DraftGraph ;
+      drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/ff5cdb64-7911-48ac-afc5-deeec223c940> .
+
+  # draft of graph-2: <http://example.com/graphs/2>
+    <http://publishmydata.com/graphs/drafter/draft/ac93f5d3-cea0-41c9-91f5-57aa6e1fe93b> a drafter:DraftGraph ;
+        drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/ff5cdb64-7911-48ac-afc5-deeec223c940> .
+}
+
+# draft of modifications graph
+<http://publishmydata.com/graphs/drafter/draft/1cc696c5-3296-40ee-a59a-50877461b081> {
+  # modifications graph
+  <http://publishmydata.com/graphs/drafter/draft/1cc696c5-3296-40ee-a59a-50877461b081> dcterms:modified "2021-02-02T12:03:45.094Z"^^xsd:dateTime .
+
+  # graph-1 draft
+  <http://publishmydata.com/graphs/drafter/draft/63b3dbbb-ae14-49b4-85a0-a90f42cd8064> dcterms:modified "2021-02-02T12:03:45.094Z"^^xsd:dateTime .
+
+  # graph-2 draft
+  <http://publishmydata.com/graphs/drafter/draft/ac93f5d3-cea0-41c9-91f5-57aa6e1fe93b> dcterms:modified "2021-02-02T08:34:01.228Z"^^xsd:dateTime .
+}
+
+# draft of graph-1
+<http://publishmydata.com/graphs/drafter/draft/63b3dbbb-ae14-49b4-85a0-a90f42cd8064> {
+  <http://s2> <http://p2> "o2" .
+}
+
+# draft of graph-2
+<http://publishmydata.com/graphs/drafter/draft/ac93f5d3-cea0-41c9-91f5-57aa6e1fe93b> {
+  <http://s3> <http://p3> "o3" .
+}

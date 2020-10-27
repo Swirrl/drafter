@@ -1,0 +1,32 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+  <http://publishmydata.com/def/drafter/draftset/81d32692-feeb-4de6-97b8-6beb8d5f0bc5> a drafter:DraftSet ;
+        dcterms:modified "2021-01-06T09:32:34.000Z"^^xsd:dateTime .
+
+   <http://publishmydata.com/graphs/drafter/graph-modified-times> a drafter:ManagedGraph ;
+       drafter:isPublic true .
+
+  <http://example.com/graphs/1> a drafter:ManagedGraph ;
+      drafter:isPublic true ;
+      drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/2af87107-33f9-40bd-9e57-cfd43797ac00> .
+
+  # draft of graph-1: <http://example.com/graphs/1>
+  <http://publishmydata.com/graphs/drafter/draft/2af87107-33f9-40bd-9e57-cfd43797ac00> a drafter:DraftGraph ;
+      drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/81d32692-feeb-4de6-97b8-6beb8d5f0bc5> .
+}
+
+# live modifications graph
+<http://publishmydata.com/graphs/drafter/graph-modified-times> {
+  <http://example.com/graphs/1> dcterms:modified "2021-01-20T10:38:05.410Z"^^xsd:dateTime .
+}
+
+# live graph-1
+<http://example.com/graphs/1> {
+  <http://s1> <http://p1> "o1" .
+}
+
+# draft of graph-1
+<http://publishmydata.com/graphs/drafter/draft/2af87107-33f9-40bd-9e57-cfd43797ac00> {
+}

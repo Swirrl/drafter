@@ -1,0 +1,64 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+  <http://publishmydata.com/graphs/drafter/graph-modified-times> a drafter:ManagedGraph ;
+    drafter:isPublic true ;
+    drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/53b38e87-49a8-42a5-99b0-62375dbfdee7> .
+
+  # user graph-1
+  <http://example.com/graphs/1> a drafter:ManagedGraph ;
+      drafter:isPublic true ;
+      drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/ffb1bfbd-5340-41d3-991d-f99ccf1c5c11> .
+
+  # user graph-2
+  <http://example.com/graphs/2> a drafter:ManagedGraph ;
+      drafter:isPublic true ;
+      drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/e9e7f199-2f20-451d-ba2f-b027aa6c8ee5> .
+
+  # user graph-3
+  <http://example.com/graphs/3> a drafter:ManagedGraph ;
+      drafter:isPublic true .
+
+  <http://publishmydata.com/def/drafter/draftset/13604fed-3971-4c93-85b0-04081490d637> a drafter:DraftSet ;
+      dcterms:modified "2021-01-25T17:04:11.405Z"^^xsd:dateTime .
+
+  # draft of modification times graph
+  <http://publishmydata.com/graphs/drafter/draft/53b38e87-49a8-42a5-99b0-62375dbfdee7> a drafter:DraftGraph ;
+      drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/13604fed-3971-4c93-85b0-04081490d637> .
+
+  # draft of user graph-1
+    <http://publishmydata.com/graphs/drafter/draft/ffb1bfbd-5340-41d3-991d-f99ccf1c5c11> a drafter:DraftGraph ;
+        drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/13604fed-3971-4c93-85b0-04081490d637> .
+
+  # draft of user graph-2
+      <http://publishmydata.com/graphs/drafter/draft/e9e7f199-2f20-451d-ba2f-b027aa6c8ee5> a drafter:DraftGraph ;
+          drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/13604fed-3971-4c93-85b0-04081490d637> .
+}
+
+# live modifications graph
+<http://publishmydata.com/graphs/drafter/graph-modified-times> {
+  # t5
+  <http://publishmydata.com/graphs/drafter/graph-modified-times> dcterms:modified "2021-01-26T10:46:30.442Z"^^xsd:dateTime .
+
+  # t5
+  <http://example.com/graphs/1> dcterms:modified "2021-01-26T10:46:30.442Z"^^xsd:dateTime .
+
+  # t1
+  <http://example.com/graphs/2> dcterms:modified "2021-01-25T09:34:20.844Z"^^xsd:dateTime .
+
+  # t2
+  <http://example.com/graphs/3> dcterms:modified "2021-01-25T10:01:43.219Z"^^xsd:dateTime .
+}
+
+# draft modifications graph
+<http://publishmydata.com/graphs/drafter/draft/53b38e87-49a8-42a5-99b0-62375dbfdee7> {
+  # modifications graph modified at t4
+  <http://publishmydata.com/graphs/drafter/draft/53b38e87-49a8-42a5-99b0-62375dbfdee7> dcterms:modified "2021-01-25T17:04:11.405Z"^^xsd:dateTime .
+
+  # graph-1 modified at t4
+  <http://publishmydata.com/graphs/drafter/draft/ffb1bfbd-5340-41d3-991d-f99ccf1c5c11> dcterms:modified "2021-01-25T17:04:11.405Z"^^xsd:dateTime .
+
+  # graph-2 modified at t3
+  <http://publishmydata.com/graphs/drafter/draft/e9e7f199-2f20-451d-ba2f-b027aa6c8ee5> dcterms:modified "2021-01-25T16:53:05.554Z"^^xsd:dateTime .
+}

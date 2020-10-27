@@ -19,7 +19,9 @@
             [drafter.backend.draftset :as draftset-backend]
             [drafter.backend.draftset.operations :as dsops]
             [grafter-2.rdf4j.repository :as repo]
-            [drafter.backend.live :as live])
+            [drafter.backend.live :as live]
+            [drafter.backend.draftset.graphs :as graphs]
+            [grafter-2.rdf.protocols :as pr])
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
            [java.util.zip GZIPOutputStream]))
 
@@ -162,14 +164,27 @@
 (defn get-draftset-quads-request [draftset-location user format union-with-live?-str]
   (get-draftset-quads-accept-request draftset-location user (.getDefaultMIMEType (formats/->rdf-format format)) union-with-live?-str))
 
-(defn get-draftset-quads-through-api
+(defn is-default-user-graph? [graph-uri]
+  (let [gm (graphs/create-manager nil)]
+    (graphs/user-graph? gm graph-uri)))
+
+(defn is-user-quad?
+  ([quad] (is-user-quad? (graphs/create-manager nil) quad))
+  ([graph-manager quad]
+   (graphs/user-graph? graph-manager (pr/context quad))))
+
+(defn get-user-draftset-quads-through-api
   ([handler draftset-location user]
-   (get-draftset-quads-through-api handler draftset-location user "false"))
+   (get-user-draftset-quads-through-api handler draftset-location user "false"))
   ([handler draftset-location user union-with-live?]
    (let [data-request (get-draftset-quads-request draftset-location user :nq union-with-live?)
          data-response (handler data-request)]
      (tc/assert-is-ok-response data-response)
-     (concrete-statements (:body data-response) :nq))))
+     (let [source (:body data-response)
+           quads (statements source :format :nq)
+           gm (graphs/create-manager nil)
+           user-quads (filter #(is-user-quad? gm %) quads)]
+       (eval-statements user-quads)))))
 
 (defn get-draftset-graph-triples-through-api [handler draftset-location user graph union-with-live?-str]
   (let [data-request {:uri            (str draftset-location "/data")
@@ -183,13 +198,9 @@
 
 ;;TODO: Get quads through query of live endpoint? This depends on
 ;;'union with live' working correctly
-(defn get-live-quads-through-api [handler]
+(defn get-live-user-quads-through-api [handler]
   (let [tmp-ds (create-draftset-through-api handler test-editor)]
-    (get-draftset-quads-through-api handler tmp-ds test-editor "true")))
-
-(defn assert-live-quads [handler expected-quads]
-  (let [live-quads (get-live-quads-through-api handler)]
-    (is (= (set (eval-statements expected-quads)) (set live-quads)))))
+    (get-user-draftset-quads-through-api handler tmp-ds test-editor "true")))
 
 (defn await-delete-statements-response [response]
   (let [job-result (tc/await-success (get-in response [:body :finished-job]))]
@@ -234,11 +245,21 @@
 (defn get-draftset-info-request [draftset-location user]
   (tc/with-identity user {:uri draftset-location :request-method :get}))
 
-(defn get-draftset-info-through-api [handler draftset-location user]
+(defn user-draftset-info-view
+  "Returns a view of a draftset info return which contains only information about user graphs"
+  [ds-info]
+  (letfn [(user-graph? [graph-uri] (graphs/user-graph? (graphs/create-manager nil) graph-uri))
+          (user-graph-changes [changes]
+            (into {} (filter (fn [[graph-uri _graph-state]]
+                               (user-graph? graph-uri))
+                             changes)))]
+    (update ds-info :changes user-graph-changes)))
+
+(defn get-user-draftset-info-view-through-api [handler draftset-location user]
   (let [{:keys [body] :as response} (handler (get-draftset-info-request draftset-location user))]
     (tc/assert-is-ok-response response)
     (tc/assert-spec ::ds/Draftset body)
-    body))
+    (user-draftset-info-view body)))
 
 (defn append-data-to-draftset-through-api [handler user draftset-location draftset-data-file]
   (let [append-response (make-append-data-to-draftset-request handler user draftset-location draftset-data-file)]
@@ -263,12 +284,12 @@
   (let [draftset-ref (location->draftset-ref draftset-location)]
     (draftset-backend/build-draftset-endpoint backend draftset-ref false)))
 
-(defn get-draftset-quads
-  "Returns all the raw quads within a draftset"
+(defn get-draftset-user-quads
+  "Returns all the quads within user graphs within a draftset"
   [backend draftset-location]
   (let [draft-repo (get-draftset-repo backend draftset-location)
         query (dsops/all-quads-query draft-repo)]
-    (set (repo/evaluate query))))
+    (set (filter is-user-quad? (repo/evaluate query)))))
 
 (defn get-draftset-graph-triples
   "Returns all the triples within a graph in a draftset"
