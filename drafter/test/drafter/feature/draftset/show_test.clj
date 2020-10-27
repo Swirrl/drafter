@@ -38,13 +38,13 @@
     (help/delete-quads-through-api handler test-editor draftset-location (take 1 graph1-quads))
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location graph2-quads)
 
-    (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
+    (let [{:keys [changes] :as ds-info} (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
       (is (= :updated (get-in changes [graph1 :status])))
       (is (= :created (get-in changes [graph2 :status]))))
 
     ;;delete graph1
     (help/delete-draftset-graph-through-api handler test-editor draftset-location graph1)
-    (let [{:keys [changes] :as ds-info} (help/get-draftset-info-through-api handler draftset-location test-editor)]
+    (let [{:keys [changes] :as ds-info} (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
       (is (= :deleted (get-in changes [graph1 :status])))
       (is (= :created (get-in changes [graph2 :status]))))))
 
@@ -53,7 +53,7 @@
   [system system-config]
   (let [handler (get system [:drafter/routes :draftset/api])
         draftset-location (help/create-draftset-through-api handler test-editor)
-        ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
+        ds-info (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
     (tc/deny-spec ::ds/HasDescription ds-info)
     (tc/deny-spec ::ds/HasDisplayName ds-info)))
 
@@ -63,7 +63,7 @@
   (let [handler (get system [:drafter/routes :draftset/api])
         display-name "Test title!"
         draftset-location (help/create-draftset-through-api handler test-editor display-name)
-        ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
+        ds-info (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
     (tc/deny-spec ::ds/HasDescription ds-info)
     (is (= display-name (:display-name ds-info)))))
 
@@ -75,7 +75,7 @@
         description "Draftset used in a test"
         draftset-location (help/create-draftset-through-api handler test-editor display-name description)]
 
-    (let [ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
+    (let [ds-info (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
       (tc/assert-spec ::ds/HasDescription ds-info)
       (is (= display-name (:display-name ds-info)))
       (is (= description (:description ds-info))))))
@@ -90,7 +90,7 @@
         live-graphs (set (keys (group-by context quads)))]
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
 
-    (let [ds-info (help/get-draftset-info-through-api handler draftset-location test-editor)]
+    (let [ds-info (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)]
       (tc/deny-spec ::ds/HasDescription ds-info)
 
       (is (= display-name (:display-name ds-info)))
@@ -152,7 +152,7 @@
   (let [handler (get system [:drafter/routes :draftset/api])
         draftset-location (help/create-draftset-through-api handler test-editor)]
     (submit-draftset-to-role-through-api handler test-editor draftset-location :publisher)
-    (let [ds-info (help/get-draftset-info-through-api handler draftset-location test-publisher)])))
+    (let [ds-info (help/get-user-draftset-info-view-through-api handler draftset-location test-publisher)])))
 
 (tc/deftest-system-with-keys get-draftset-for-other-user-test
   keys-for-test

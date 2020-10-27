@@ -1,11 +1,10 @@
 (ns drafter.feature.draftset-data.common
   (:require [drafter.backend.draftset.draft-management :as mgmt]
-            [drafter.draftset :as ds]
-            [drafter.rdf.sparql :as sparql]
             [drafter.write-scheduler :as writes]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.io :refer [rdf-writer]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
+            [grafter-2.rdf4j.io :as rio]
+            [drafter.rdf.drafter-ontology :refer [modified-times-graph-uri]]
             [drafter.rdf.sesame :as ses]
             [drafter.async.jobs :as ajobs]
             [drafter.backend.draftset.graphs :as graphs]
@@ -14,23 +13,10 @@
             [drafter.util :as util]
             [drafter.rdf.draftset-management.job-util :as job-util]
             [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.backend.draftset.operations :as ops])
+            [drafter.backend.draftset.operations :as ops]
+            [drafter.feature.modified-times :as modified-times]
+            [drafter.time :as time])
   (:import java.io.StringWriter))
-
-(defn touch-graph-in-draftset
-  "Builds and returns an update string to update both the dcterms:modified
-  times of the supplied resource draft-graph/draftset."
-  [draftset-ref draft-graph-uri modified-at]
-  (let [update-str (str (mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at) " ; "
-                        (mgmt/set-timestamp (ds/->draftset-uri draftset-ref) dcterms:modified modified-at))]
-    update-str))
-
-(defn touch-graph-in-draftset!
-  "Updates both the dcterms:modified times on the given draftgraph and
-  draftset."
-  [backend draftset-ref draft-graph-uri modified-at]
-  (sparql/update! backend
-                  (touch-graph-in-draftset draftset-ref draft-graph-uri modified-at)))
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
@@ -44,7 +30,7 @@
     (if (some? graph-uri)
       {:graph-uri graph-uri :triples (map pr/map->Triple quads)}
       (let [sw (StringWriter.)]
-        (pr/add (rdf-writer sw :format :nq) (take 5 quads))
+        (pr/add (rio/rdf-writer sw :format :nq) (take 5 quads))
         (throw (IllegalArgumentException.
                 (str "All statements must have an explicit target graph. The following statements have no graph:\n" sw)))))))
 
@@ -97,6 +83,9 @@
   [{:keys [draftset-ref] :as context} live-graph-uri]
   (graphs/create-user-graph-draft (graph-manager context) draftset-ref live-graph-uri))
 
+(defn- create-protected-graph-draft [{:keys [draftset-ref] :as context} live-graph-uri]
+  (graphs/create-protected-graph-draft (graph-manager context) draftset-ref live-graph-uri))
+
 (defn copy-user-graph
   "Copies a live graph into a new draft graph within the draft of the executing job"
   [{:keys [manager] :as context} live-graph-uri]
@@ -110,10 +99,55 @@
   [{:keys [live->draft] :as state} live-graph-uri]
   (get live->draft live-graph-uri))
 
+(defn- get-required-draft-graph [{:keys [live->draft] :as state} live-graph-uri]
+  (if-let [draft-graph (get-draft-graph state live-graph-uri)]
+    draft-graph
+    (throw (ex-info (format "No draft graph found for live graph %s" live-graph-uri)
+                    {:live->draft live->draft
+                     :graph-uri live-graph-uri}))))
+
+(defn- get-draft-modified-times-graph [state]
+  (get-required-draft-graph state modified-times-graph-uri))
+
 (defn add-draft-graph
   "Adds a live->draft graph mapping to the current state and returns the new state"
   [state live-graph-uri draft-graph-uri]
   (update state :live->draft assoc live-graph-uri draft-graph-uri))
+
+(defn remove-draft-graph
+  "Removes a live graph from the live->draft graph mapping from the job state"
+  [state live-graph-uri]
+  (update state :live->draft dissoc live-graph-uri))
+
+(defn has-draft-for? [{:keys [live->draft] :as state} live-graph-uri]
+  (contains? live->draft live-graph-uri))
+
+(defn- ensure-draft-modifications-graph
+  "Ensures a draft modifications graph exists within the updating draftset. Returns a pair of the new job state
+   and the draft modifications graph URI."
+  [{:keys [live->draft] :as state} {:keys [draftset-ref] :as context}]
+  (if-let [dmg (get live->draft modified-times-graph-uri)]
+    [state dmg]
+    (let [dmg (graphs/ensure-protected-graph-draft (graph-manager context) draftset-ref modified-times-graph-uri)]
+      [(add-draft-graph state modified-times-graph-uri dmg) dmg])))
+
+(defn draft-graph-appended [state {:keys [draftset-ref job-started-at] :as context} draft-graph-uri]
+  (let [[state dmg] (ensure-draft-modifications-graph state context)]
+    (modified-times/draft-graph-appended! (get-repo context) draftset-ref dmg draft-graph-uri job-started-at)
+    state))
+
+(defn draft-graph-deletion
+  "Updates the modifications graph in response to some data being deleted from a draft graph"
+  [state {:keys [draftset-ref job-started-at] :as context} draft-graph-uri]
+  (let [[state dmg] (ensure-draft-modifications-graph state context)]
+    (modified-times/draft-graph-data-deleted! (get-repo context) draftset-ref dmg draft-graph-uri job-started-at)
+    state))
+
+(defn remove-draft-only-graph-modified-time
+  "Removes the modification time for a draft-only graph from the modifications graph."
+  [{:keys [live->draft] :as state} {:keys [draftset-ref job-started-at] :as context} draft-graph-uri]
+  (let [live->draft (modified-times/draft-only-graph-deleted! (get-repo context) (graph-manager context) draftset-ref live->draft draft-graph-uri job-started-at)]
+    (assoc state :live->draft live->draft)))
 
 (defn init-state
   "Creates an initial state with the given label, live->draft graph mapping and

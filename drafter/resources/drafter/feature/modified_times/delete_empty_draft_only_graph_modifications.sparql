@@ -1,0 +1,24 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+DELETE {
+    GRAPH ?dmg {
+        ?dg dcterms:modified ?modified .
+    }
+} WHERE {
+    { SELECT ?dg WHERE { 
+        GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+            ?lg a drafter:ManagedGraph .
+            ?lg drafter:isPublic false .
+            ?lg drafter:hasDraft ?dg .
+            ?dg drafter:inDraftSet ?ds .
+            FILTER(?lg != <http://publishmydata.com/graphs/drafter/graph-modified-times>)
+            FILTER NOT EXISTS {
+                GRAPH ?dg { ?s ?p ?o }
+            }
+        }
+    } }
+    GRAPH ?dmg {
+        ?dg dcterms:modified ?modified .
+    }
+}

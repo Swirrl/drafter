@@ -4,6 +4,7 @@
   (:import [java.net URI]))
 
 (def pmd-graphs (URI. "http://publishmydata.com/graphs/"))
+(def modified-times-graph-uri (URI. "http://publishmydata.com/graphs/drafter/graph-modified-times"))
 
 (def drafter (URI. "http://publishmydata.com/def/drafter/"))
 (def draftset-uri (URI. "http://publishmydata.com/def/drafter/draftset/"))
@@ -57,3 +58,5 @@
 
 (defn draft:graph [graph-id]
   (url/append-path-segments pmd-graphs "drafter" "draft" graph-id))
+
+(def drafter:graph-modified (url/append-path-segments drafter "graph-modified"))

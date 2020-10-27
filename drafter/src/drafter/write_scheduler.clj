@@ -15,8 +15,7 @@
             [drafter.util :refer [log-time-taken]]
             [drafter.async.jobs :refer [job-failed!]]
             [drafter.logging :refer [with-logging-context]]
-            [integrant.core :as ig]
-            [clojure.string :as string])
+            [integrant.core :as ig])
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
            java.util.concurrent.atomic.AtomicBoolean
            java.util.concurrent.locks.ReentrantLock
@@ -96,7 +95,6 @@
     (datadog/gauge! "drafter.jobs_queue_size" (inc (.size writes-queue)))
     (.add writes-queue job)))
 
-;; exec-sync-job! :: Job -> ApiResponse
 (defn exec-sync-job!
   "Executes a sync job waits for it to complete. Returns the result of
   the job execution.  Sync jobs skip the queue entirely and just run

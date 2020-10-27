@@ -14,7 +14,7 @@
             [drafter.backend.draftset.operations :as dsops]
             [drafter.test-helpers.draft-management-helpers :as mgmt-helpers]
             [clojure.set :as set]
-            [drafter.rdf.sparql :as sparql])
+            [drafter.generators :refer [random-graph-uri generate-graph-triples generate-quads quad-gen]])
   (:import java.net.URI
            java.util.UUID))
 
@@ -40,36 +40,6 @@
      :request-method :post
      :body stmt}))
 
-(def graph-gen (gen/fmap (fn [id]
-                           (URI. (str "http://g/" id))) gen/uuid))
-
-(def subject-gen (gen/fmap (fn [id]
-                             (URI. (str "http://s/" id))) gen/uuid))
-
-(def predicate-gen (gen/fmap (fn [id]
-                               (URI. (str "http://p/" id))) gen/uuid))
-
-(def object-uri-gen (gen/fmap (fn [id]
-                                (URI. (str "http://o/" id))) gen/uuid))
-
-(def object-gen (gen/one-of [object-uri-gen
-                             gen/string-alphanumeric
-                             gen/int
-                             gen/boolean]))
-
-(defn quad-gen
-  ([] (quad-gen {}))
-  ([gens]
-   (let [default-gens {:s subject-gen
-                       :p predicate-gen
-                       :o object-gen
-                       :c graph-gen}
-         gens (merge default-gens gens)]
-     (gen/fmap pr/map->Quad (apply gen/hash-map (mapcat identity gens))))))
-
-(defn- random-graph-uri []
-  (gen/generate graph-gen))
-
 (defn- submit-update
   "Submit an update request within a draftset and return the response map"
   [handler user draftset-location query]
@@ -82,40 +52,6 @@
   (let [resp (submit-update handler user draftset-location query)]
     (tc/assert-is-no-content-response resp)
     nil))
-
-(defn- generate-graph-triples
-  "Generates the specified number of triples within a graph"
-  [graph-uri n]
-  (let [graph-gen (gen/return graph-uri)
-        qg (quad-gen {:c graph-gen
-                      ;; NOTE: generate some self-referential objects which are subject to rewriting
-                      :o (gen/one-of [graph-gen object-gen])})]
-    (gen/generate (gen/vector qg n))))
-
-(defn- generate-quads
-  "Generates the specified number of random quads"
-  [n]
-  (let [graph-uri (random-graph-uri)]
-    (generate-graph-triples graph-uri n)))
-
-(defn- get-graph-state
-  "Returns the state of the graph in the state graph:
-     :unmanaged - the graph is not a managed graph
-     :draft     - the graph is managed but exists only within drafts
-     :public    - the graph is live"
-  [repo graph-uri]
-  (let [q (str
-            "PREFIX drafter: <http://publishmydata.com/def/drafter/>"
-            "SELECT ?public WHERE {"
-            "  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
-            "    <" graph-uri "> drafter:isPublic ?public ."
-            "  }"
-            "}")
-        state-mapping {nil :unmanaged
-                       true :live
-                       false :draft}
-        state (:public (sparql/select-1 repo q))]
-    (get state-mapping state)))
 
 ;; NOTE: This is the max update operation size defined in web.edn
 (def max-update-size 50)
@@ -132,7 +68,7 @@
       (apply-update handler test-publisher draftset-location insert-query)
       (let [graph-triples (help/get-draftset-graph-triples repo draftset-location graph-uri)
             expected (set (map pr/map->Triple draft-graph-quads))]
-        (t/is (= :draft (get-graph-state repo graph-uri)))
+        (t/is (= :draft (tc/get-graph-state repo graph-uri)))
         (t/is (= expected graph-triples))))))
 
 (t/deftest insert-modify-test
@@ -144,7 +80,7 @@
           g (random-graph-uri)]
       (let [stmt (format " INSERT DATA { GRAPH <%s> { <http://s> <http://p> <http://o> } } " g)]
         (apply-update handler test-editor draftset-location stmt)
-        (t/is (= :draft (get-graph-state repo g))))
+        (t/is (= :draft (tc/get-graph-state repo g))))
 
       (let [stmt (format "
 PREFIX test: <http://test/>
@@ -154,9 +90,9 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
         (apply-update handler test-editor draftset-location stmt))
 
       (let [expected #{(pr/->Quad (URI. "http://s") (URI. "http://p") g g)}
-            draftset-quads (help/get-draftset-quads repo draftset-location)]
+            draftset-quads (help/get-draftset-user-quads repo draftset-location)]
         (t/is (= expected draftset-quads))
-        (t/is (= :draft (get-graph-state repo g)))))))
+        (t/is (= :draft (tc/get-graph-state repo g)))))))
 
 (t/deftest insert-data-into-live-graph-test
   (t/testing "INSERT DATA into a live graph causes a draft graph to be created and the live graph data cloned"
@@ -178,7 +114,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> <%s> } }
             (t/is (= expected (set graph-triples)))
 
             ;; graph should still be live
-            (t/is (= :live (get-graph-state repo g)))))))))
+            (t/is (= :live (tc/get-graph-state repo g)))))))))
 
 (t/deftest prefix-mapping-rewrite-test
   (tc/with-system
@@ -200,7 +136,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
         (apply-update handler test-editor draftset-location stmt))
 
       (let [expected #{(pr/->Quad (URI. "http://s") (URI. "http://p") g g)}
-            draftset-quads (help/get-draftset-quads repo draftset-location)]
+            draftset-quads (help/get-draftset-user-quads repo draftset-location)]
         (t/is (= expected draftset-quads))))))
 
 (t/deftest base-uri-rewrite-test
@@ -225,7 +161,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
         (apply-update handler test-editor draftset-location stmt))
 
       (let [expected #{(pr/->Quad (URI. "http://s") (URI. "http://p") g g)}
-            draftset-quads (help/get-draftset-quads repo draftset-location)]
+            draftset-quads (help/get-draftset-user-quads repo draftset-location)]
         (t/is (= expected draftset-quads))))))
 
 (t/deftest insert-and-delete-max-payload-test
@@ -239,13 +175,13 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
                 quads (set (generate-quads max-update-size))
                 stmt (jena/->update-string [(jena/insert-data-stmt quads)])]
             (apply-update handler test-editor draftset-location stmt)
-            (let [draftset-quads (help/get-draftset-quads repo draftset-location)]
+            (let [draftset-quads (help/get-draftset-user-quads repo draftset-location)]
               (t/is (= quads draftset-quads)))
 
             (testing "Delete max payload"
               (let [delete-query (jena/->update-string [(jena/delete-data-stmt quads)])]
                 (apply-update handler test-editor draftset-location delete-query))
-              (t/is (= #{} (help/get-draftset-quads repo draftset-location)))))))
+              (t/is (= #{} (help/get-draftset-user-quads repo draftset-location)))))))
 
       (testing "Too large payload"
         (testing "Insert too large payload"
@@ -256,7 +192,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
             (t/testing "Delete too large payload"
               (tc/assert-is-payload-too-large-response response))
             (t/testing "Insert failed"
-              (t/is (= #{} (help/get-draftset-quads repo draftset-location))))))))))
+              (t/is (= #{} (help/get-draftset-user-quads repo draftset-location))))))))))
 
 (t/deftest DELETE_INSERT-max-payload-test
   (tc/with-system
@@ -278,7 +214,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (let [stmt (jena/->update-string [(jena/delete-data-stmt quads1)
                                             (jena/insert-data-stmt quads3)])]
             (apply-update handler test-editor draftset-location stmt))
-          (let [draftset-quads (help/get-draftset-quads repo draftset-location)
+          (let [draftset-quads (help/get-draftset-user-quads repo draftset-location)
                 expected (set (concat quads2 quads3))]
             (t/is (= expected draftset-quads)))))
 
@@ -307,7 +243,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
 
           ;; initial insert data should be in draft since last update was rejected
           (let [expected (set initial-insert)
-                draftset-quads (help/get-draftset-quads repo draftset-location)]
+                draftset-quads (help/get-draftset-user-quads repo draftset-location)]
             (t/is (= expected draftset-quads))))))))
 
 (t/deftest delete-from-draft-test
@@ -326,7 +262,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (t/is (= #{} (help/get-draftset-graph-triples repo draftset-location g)))
 
           ;; managed graph should be created within the draft
-          (t/is (= :draft (get-graph-state repo g)))))
+          (t/is (= :draft (tc/get-graph-state repo g)))))
 
       (t/testing "Draft-only graph"
         (let [g (random-graph-uri)
@@ -345,7 +281,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
             (t/is (= expected-triples triples)))
 
           ;; graph should be managed and private
-          (t/is (= :draft (get-graph-state repo g))))))))
+          (t/is (= :draft (tc/get-graph-state repo g))))))))
 
 (t/deftest delete-from-live-graph-test
   (tc/with-system
@@ -367,7 +303,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (t/is (= expected draft-graph-triples))
 
           ;;graph should still be live
-          (t/is (= :live (get-graph-state repo graph-uri))))))))
+          (t/is (= :live (tc/get-graph-state repo graph-uri))))))))
 
 (t/deftest delete-from-large-live-graph-test
   (tc/with-system
@@ -384,12 +320,12 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
                 to-delete (take 13 live-quads)
                 stmt (jena/->update-string [(jena/delete-data-stmt to-delete)])]
             (apply-update handler test-publisher draftset-location stmt)
-            (let [draftset-quads (help/get-draftset-quads repo draftset-location)
+            (let [draftset-quads (help/get-draftset-user-quads repo draftset-location)
                   expected (set/difference (set live-quads) (set to-delete))]
               (t/is (= expected draftset-quads))))
 
           ;; graph should still be live
-          (t/is (= :live (get-graph-state repo g)))))
+          (t/is (= :live (tc/get-graph-state repo g)))))
 
       (testing "Fail on trying to copy large graphs"
         ;; There should already contain the maximum number of allowed triples
@@ -406,10 +342,10 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
                 stmt (jena/->update-string [(jena/insert-data-stmt to-delete)])
                 response (submit-update handler test-publisher draftset-location stmt)]
             (tc/assert-is-server-error response)
-            (t/is (= #{} (help/get-draftset-quads repo draftset-location))))
+            (t/is (= #{} (help/get-draftset-user-quads repo draftset-location))))
 
           ;; graph should still be live
-          (t/is (= :live (get-graph-state repo g))))))))
+          (t/is (= :live (tc/get-graph-state repo g))))))))
 
 (t/deftest drop-graph-visible-only-in-other-draftset-test
   (tc/with-system
@@ -434,12 +370,12 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (let [drop-query (str "DROP GRAPH <" graph-uri ">")
                 response (submit-update handler test-publisher draftset-location drop-query)]
             (tc/assert-is-server-error response)
-            (t/is (= false (mgmt-helpers/draft-exists? repo graph-uri draftset-ref)))))
+            (t/is (= false (mgmt-helpers/draft-graph-exists-for? repo draftset-ref graph-uri)))))
 
         (t/testing "DROP SILENT GRAPH"
           (let [drop-query (str "DROP SILENT GRAPH <" graph-uri ">")]
             (apply-update handler test-publisher draftset-location drop-query)
-            (t/is (= false (mgmt-helpers/draft-exists? repo graph-uri draftset-ref)))))))))
+            (t/is (= false (mgmt-helpers/draft-graph-exists-for? repo draftset-ref graph-uri)))))))))
 
 (t/deftest drop-graph-exists-only-in-draft-test
   (tc/with-system
@@ -458,7 +394,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
 
       (t/is (= 0 (count (help/get-draftset-graph-triples repo draftset-location graph-uri))))
 
-      (t/is (= :draft (get-graph-state repo graph-uri))))))
+      (t/is (= :draft (tc/get-graph-state repo graph-uri))))))
 
 (t/deftest drop-graph-test
   (tc/with-system
@@ -477,7 +413,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (t/is (= #{} (help/get-draftset-graph-triples repo draftset-location g)))
 
           ;; draft graph should still exist
-          (t/is (= :draft (get-graph-state repo g)))))
+          (t/is (= :draft (tc/get-graph-state repo g)))))
 
       (testing "Add quads, drop graph, fail too big"
         (let [g (random-graph-uri)
@@ -493,7 +429,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (t/is (= expected draft-graph-triples))
 
           ;; graph should still exist within the draft
-          (t/is (= :draft (get-graph-state repo g)))))
+          (t/is (= :draft (tc/get-graph-state repo g)))))
 
       (testing "Add quads, publish, drop graph"
         (let [g (random-graph-uri)
@@ -508,7 +444,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
 
           ;; graph should exist within draft
           (let [draftset-ref (help/location->draftset-ref draftset-location)]
-            (t/is (= true (mgmt-helpers/draft-exists? repo g draftset-ref))))
+            (t/is (= true (mgmt-helpers/draft-graph-exists-for? repo draftset-ref g))))
 
           ;; draft graph should be empty
           (let [draft-graph-triples (help/get-draftset-graph-triples repo draftset-location g)]
@@ -520,7 +456,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
             (t/is (= expected live-graph-triples)))
 
           ;; graph should still be live
-          (t/is (= :live (get-graph-state repo g)))
+          (t/is (= :live (tc/get-graph-state repo g)))
 
           ;; publish empty graph
           (help/publish-draftset-through-api handler draftset-location test-publisher)
@@ -528,7 +464,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (t/is (= #{} (help/get-live-graph-triples repo g)))
 
           ;; graph should be deleted
-          (t/is (= :unmanaged (get-graph-state repo g)))))
+          (t/is (= :unmanaged (tc/get-graph-state repo g)))))
 
       (testing "Add quads and drop graph in one statement - noop"
         (let [g (random-graph-uri)
@@ -542,7 +478,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (t/is (= #{} (help/get-draftset-graph-triples repo draftset-location g)))
 
           ;; graph should be created within the draft
-          (t/is (= :draft (get-graph-state repo g)))))
+          (t/is (= :draft (tc/get-graph-state repo g)))))
 
       (testing "DROP SILENT GRAPH then add quads in one statement - just adds quads"
         (let [g (random-graph-uri)
@@ -559,7 +495,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
             (t/is (= expected draftset-graph-triples)))
 
           ;; graph should be created within the draft
-          (t/is (= :draft (get-graph-state repo g)))))
+          (t/is (= :draft (tc/get-graph-state repo g)))))
 
       (testing "DROP GRAPH then add quads in one statement - errors with live graph message"
         (let [g (random-graph-uri)
@@ -575,7 +511,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           ;; managed graph should not be created
           (t/is (= false (mgmt/is-graph-managed? repo g)))
 
-          (t/is (= :unmanaged (get-graph-state repo g)))))
+          (t/is (= :unmanaged (tc/get-graph-state repo g)))))
 
       (testing "DROP SILENT non-existent GRAPH - noop"
         (let [g (random-graph-uri)
@@ -587,7 +523,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (t/is (= false (mgmt/is-graph-managed? repo g)))
 
           ;; graph should not be managed
-          (t/is (= :unmanaged (get-graph-state repo g)))))
+          (t/is (= :unmanaged (tc/get-graph-state repo g)))))
 
       (testing "DROP non-existent GRAPH - Error"
         (let [g (URI. (str "http://g/" (UUID/randomUUID)))
@@ -598,7 +534,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
 
           ;; managed graph should not be created
           (t/is (= false (mgmt/is-graph-managed? repo g)))
-          (t/is (= :unmanaged (get-graph-state repo g)))))
+          (t/is (= :unmanaged (tc/get-graph-state repo g)))))
 
       (testing "DROP GRAPH g; from live, drops graph from live"
         (let [g (random-graph-uri)
@@ -614,7 +550,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
             (help/publish-draftset-through-api handler draftset-location test-publisher))
 
           (t/is (= #{} (help/get-live-graph-triples repo g)))
-          (t/is (= :unmanaged (get-graph-state repo g)))))
+          (t/is (= :unmanaged (tc/get-graph-state repo g)))))
 
       (testing "DROP GRAPH g; INSERT DATA { GRAPH g { ... } } - only new triples left in live"
         (let [g (random-graph-uri)
@@ -633,136 +569,7 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
                 expected (set (map pr/map->Triple new-draft-quads))]
             (t/is (= expected live-graph-triples)))
 
-          (t/is (= :live (get-graph-state repo g))))))))
-
-(defn metadata-q [draftset-uri]
-  (format "
-SELECT * WHERE {
-  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-    ?dg <http://purl.org/dc/terms/created> ?dg_created .
-    ?dg <http://purl.org/dc/terms/modified> ?dg_modified .
-    ?ds <http://purl.org/dc/terms/created> ?ds_created .
-    ?ds <http://purl.org/dc/terms/modified> ?ds_modified .
-  }
-  VALUES ?ds { <%s> }
-}" draftset-uri))
-
-(t/deftest draft-graph-metadata-test
-  (tc/with-system
-    keys-for-test [system system-config]
-    (with-open [conn (-> system
-                         :drafter.common.config/sparql-query-endpoint
-                         repo/sparql-repo
-                         repo/->connection)]
-      (let [handler (get system [:drafter/routes :draftset/api])]
-
-        (testing "Live graph g; DELETE DATA from g; check metadata"
-          (let [g (random-graph-uri)
-                n 50
-
-                quads1 (generate-graph-triples g n)
-                _ (help/publish-quads-through-api handler quads1)
-
-                draftset-location (help/create-draftset-through-api handler test-publisher)
-                draftset-id (help/location->draftset-ref draftset-location)
-                draftset-uri (ds/->draftset-uri draftset-id)
-
-                to-delete (take 5 quads1)
-                stmt (jena/->update-string [(jena/delete-data-stmt to-delete)])
-                _ (apply-update handler test-publisher draftset-location stmt)
-
-                [{:keys [dg_created dg_modified
-                         ds_created ds_modified] :as ds-meta}]
-                (repo/query conn (metadata-q draftset-uri))
-                _ (t/is (= ds_modified ds_created))
-                _ (t/is (= dg_modified dg_created))
-
-                ;; 2nd go, now the graph will already be copied, so modified
-                ;; should update.
-                stmt (jena/->update-string [(jena/delete-data-stmt to-delete)])
-                _ (apply-update handler test-publisher draftset-location stmt)
-
-                [{:keys [dg_created dg_modified
-                         ds_created ds_modified] :as ds-meta}]
-                (repo/query conn (metadata-q draftset-uri))]
-            (t/is (.isAfter ds_modified ds_created))
-            (t/is (.isAfter dg_modified dg_created))
-
-            (t/is (= :live (get-graph-state conn g)))))
-
-        (testing "Live graph g; INSERT DATA into g; check metadata"
-          ;; Almost identical code path to DELETE, but here for completeness
-          (let [g (random-graph-uri)
-                n 50
-                quads1 (generate-graph-triples g n)
-
-                _ (help/publish-quads-through-api handler quads1)
-
-                draftset-location (help/create-draftset-through-api handler test-publisher)
-                draftset-id (help/location->draftset-ref draftset-location)
-                draftset-uri (ds/->draftset-uri draftset-id)
-
-                quads2 (generate-graph-triples g 5)
-                stmt (jena/->update-string [(jena/insert-data-stmt quads2)])
-                _ (apply-update handler test-publisher draftset-location stmt)
-
-                [{:keys [dg_created dg_modified
-                         ds_created ds_modified] :as ds-meta}]
-                (repo/query conn (metadata-q draftset-uri))
-                _ (t/is (= ds_modified ds_created))
-                _ (t/is (= dg_modified dg_created))
-
-                ;; 2nd go, now the graph will already be copied, so modified
-                ;; should update.
-                quads3 (generate-graph-triples g 5)
-                stmt (jena/->update-string [(jena/insert-data-stmt quads3)])
-                _ (apply-update handler test-publisher draftset-location stmt)
-
-                [{:keys [dg_created dg_modified
-                         ds_created ds_modified] :as ds-meta}]
-                (repo/query conn (metadata-q draftset-uri))]
-            (t/is (.isAfter ds_modified ds_created))
-            (t/is (.isAfter dg_modified dg_created))
-
-            (t/is (= :live (get-graph-state conn g)))))
-
-        (testing "Live graph g, with draft graph; DROP GRAPH g; check metadata"
-          (let [g (random-graph-uri)
-                n 10
-
-                quads1 (generate-graph-triples g n)
-                _ (help/publish-quads-through-api handler quads1)
-
-                ;; INSERT DATA so that graph g makes it into the draftset
-                draftset-location (help/create-draftset-through-api handler test-publisher)
-                draftset-id (help/location->draftset-ref draftset-location)
-                draftset-uri (ds/->draftset-uri draftset-id)
-
-                quads2 (generate-graph-triples g 5)
-                stmt (jena/->update-string [(jena/insert-data-stmt quads2)])
-                _ (apply-update handler test-publisher draftset-location stmt)
-
-                [{:keys [dg_created dg_modified
-                         ds_created ds_modified] :as ds-meta}]
-                (repo/query conn (metadata-q draftset-uri))
-                _ (t/is (= ds_modified ds_created))
-                _ (t/is (= dg_modified dg_created))
-
-                ;; The graph will now be copied, so test DROP GRAPH
-                stmt (format "DROP GRAPH <%s>" g)
-                _ (apply-update handler test-publisher draftset-location stmt)
-
-                [{:keys [dg_created dg_modified
-                         ds_created ds_modified] :as ds-meta}]
-                (repo/query conn (metadata-q draftset-uri))]
-            (t/is (.isAfter ds_modified ds_created))
-            (t/is (.isAfter dg_modified dg_created))
-
-            (t/is (= :live (get-graph-state conn g)))))))))
+          (t/is (= :live (tc/get-graph-state repo g))))))))
 
 (t/deftest protected-graphs-test
   (tc/with-system
@@ -778,19 +585,19 @@ SELECT * WHERE {
             (let [update-request (jena/->update-string [(jena/insert-data-stmt [quad])])
                   response (submit-update handler test-editor draftset-location update-request)]
               (tc/assert-is-forbidden-response response)
-              (t/is (= :unmanaged (get-graph-state repo g)))))
+              (t/is (= :unmanaged (tc/get-graph-state repo g)))))
 
           (testing "DELETE DATA ..."
             (let [update-request (jena/->update-string [(jena/delete-data-stmt [quad])])
                   response (submit-update handler test-editor draftset-location update-request)]
               (tc/assert-is-forbidden-response response)
-              (t/is (= :unmanaged (get-graph-state repo g)))))
+              (t/is (= :unmanaged (tc/get-graph-state repo g)))))
 
           (testing "DROP GRAPH ..."
             (let [update-request (format "DROP GRAPH <%s>" g)
                   response (submit-update handler test-editor draftset-location update-request)]
               (tc/assert-is-forbidden-response response)
-              (t/is (= :unmanaged (get-graph-state repo g))))))))))
+              (t/is (= :unmanaged (tc/get-graph-state repo g))))))))))
 
 (t/deftest access-forbidden-graphs-test
   (tc/with-system

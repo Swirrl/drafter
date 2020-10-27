@@ -4,7 +4,6 @@
              :refer [to-quads with-state-graph]]
             [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.rdf.sparql :as sparql]
             [drafter.user :as user]
             [drafter.util :as util]
@@ -467,19 +466,6 @@
   (let [q (find-draftset-draft-graph-query draftset-ref live-graph)
         [result] (sparql/eager-query backend q)]
     (:dg result)))
-
-(defn- update-public-endpoint-modified-at-query []
-  (slurp (io/resource "drafter/backend/draftset/operations/update-public-endpoint-modified-at.sparql")))
-
-(defn update-public-endpoint-modified-at!
-  "Updates the modified time of the public endpoint to the current time"
-  [backend]
-  (let [q (update-public-endpoint-modified-at-query)]
-    (sparql/update! backend q)))
-
-(defn publish-draftset-graphs! [backend draftset-ref clock]
-  (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
-    (mgmt/migrate-graphs-to-live! backend (vals graph-mapping) clock)))
 
 (defn- spog-bindings->statement [^BindingSet bindings]
   (let [subj (.getValue bindings "s")

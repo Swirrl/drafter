@@ -48,6 +48,11 @@
     (let [relative (.relativize ont/draftset-uri uri)]
       (->DraftsetId (str relative)))))
 
+(defn new-id
+  "Creates a new draftset id"
+  []
+  (->DraftsetId (str (UUID/randomUUID))))
+
 ;; NOTE: this is currently only used only by tests
 ;;
 ;; TODO: Make the application use this function when loading a
@@ -56,7 +61,7 @@
 (defn create-draftset
   ([creator]
    (let [created-at (OffsetDateTime/now)]
-     {:id (->DraftsetId (str (UUID/randomUUID)))
+     {:id (new-id)
       :type "Draftset"
       :changes {}
       :created-by creator

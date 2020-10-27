@@ -278,9 +278,9 @@
     (t/testing "Adding quads to a draft set"
       (let [graph (URI. "http://test.graph.com/vanilla-quad-graph")
             draftset (sut/new-draftset client token name description)
-            quads (map #(assoc % :c graph) (drop 97 triples))
+            quads (map #(assoc % :c graph) (take 97 triples))
             _ (sut/add-sync client token draftset quads)
-            quads* (sut/get client token draftset)]
+            quads* (h/get-user-quads client token draftset)]
         (t/is (= (set quads) (set quads*)))))
 
     (t/testing "Adding input-stream of triples to a draft set"
@@ -290,9 +290,9 @@
             bais (java.io.ByteArrayInputStream. (.toByteArray baos))
             draftset (sut/new-draftset client token name description)
             _ (sut/add-sync client token draftset graph bais)
-            quads (sut/get client token draftset)]
-        (t/is (= (set (map #(assoc % :c graph) triples))
-                 (set quads)))))
+            quads (h/get-user-quads client token draftset)
+            expected-quads (set (map #(assoc % :c graph) triples))]
+        (t/is (= expected-quads (set quads)))))
 
     (t/testing "Adding input-stream of quads to a draft set"
       (let [graph (URI. "http://test.graph.com/sexy-stream-of-quads-graph")
@@ -302,17 +302,16 @@
             bais (java.io.ByteArrayInputStream. (.toByteArray baos))
             draftset (sut/new-draftset client token name description)
             _ (sut/add-sync client token draftset bais)
-            quads* (sut/get client token draftset)]
+            quads* (h/get-user-quads client token draftset)]
         (t/is (= (set quads) (set quads*)))))
 
     (t/testing "Adding .nt file of triples to a draft set"
       (let [graph (URI. "http://test.graph.com/triple-graph")
             draftset (sut/new-draftset client token name description)
             _ (sut/add-sync client token draftset graph (io/file (h/res-file h/test-triples-filename)))
-            triples* (sut/get client token draftset)]
+            triples* (sut/get client token draftset graph)]
         (t/is (= 2252 (count triples*)))
-        (t/is (= (set (map #(assoc % :c graph) (test-triples)))
-                 (set triples*)))))
+        (t/is (= (set (test-triples)) (set triples*)))))
 
     (t/testing "Adding .ttl file of statements to a draft set"
       ;; check that the correct mime-type for the file is sent to Drafter
@@ -320,10 +319,9 @@
             file (h/res-file "resources/rdf-syntax-ns.ttl")
             draftset (sut/new-draftset client token name description)
             _ (sut/add-sync client token draftset graph (io/file file))
-            triples* (sut/get client token draftset)]
+            triples* (sut/get client token draftset graph)]
         (t/is (= 102 (count triples*)))
-        (t/is (= (set (map #(assoc % :c graph) (rio/statements file)))
-                 (set triples*)))))
+        (t/is (= (set (rio/statements file)) (set triples*)))))
 
     (t/testing "Adding invalid quads to a draft set"
       (let [draftset (sut/new-draftset client token name description)
@@ -357,7 +355,7 @@
             draftset (sut/new-draftset client token name description)
             quads (map #(assoc % :c graph) (drop 97 triples))
             _ (sut/add-data-sync client token draftset quads)
-            quads* (sut/get client token draftset)]
+            quads* (h/get-user-quads client token draftset)]
         (t/is (= (set quads) (set quads*)))))
 
     (testing "Custom metadata gets passed on to job"
@@ -430,8 +428,8 @@
             quads-2 (map #(assoc % :c graph-2) triples)
             quads-2 (take how-many (drop how-many quads-2))
             _ (sut/add-sync client token draftset quads-2)
-            quads* (sut/get client token draftset)]
-        (is (= (set (concat quads-1 quads-2)) (set quads*)))))))
+            quads* (h/get-user-quads client token draftset)]
+        (is (= (count (set (concat quads-1 quads-2))) (count (set quads*))))))))
 
 (t/deftest adding-triples-to-multiple-graphs-in-a-draftset
   (let [client (drafter-client)
@@ -468,7 +466,8 @@
         (sut/add-sync client token draftset quads)
         (sut/publish-sync client token draftset)
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
-          (let [quads* (map #(assoc % :c graph) (gr-repo/query conn "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"))]
+          (let [user-triples (h/query-user-triples conn)
+                quads* (map #(assoc % :c graph) user-triples)]
             (is (= (set quads) (set quads*)))))))))
 
 (t/deftest publishing-with-metadata
@@ -511,7 +510,7 @@
             draftset-2 (sut/new-draftset client token name description)
             job-3 (sut/load-graph client token draftset-2 graph)
             _ (sut/wait! client token job-3)
-            quads* (sut/get client token draftset-2)]
+            quads* (h/get-user-quads client token draftset-2)]
         (is (= (set quads) (set quads*)))))))
 
 (t/deftest loading-a-graph-into-a-draftset-with-metadata

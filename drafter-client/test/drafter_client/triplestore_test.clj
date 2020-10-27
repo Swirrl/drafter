@@ -29,6 +29,5 @@
         (with-open [conn (repo/->connection store)]
           (repo/with-transaction conn
             (pr/add conn graph triples))
-          (let [q "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
-                res (repo/query conn q)]
+          (let [res (h/query-user-triples conn)]
             (t/is (= (set triples) (set res)))))))))

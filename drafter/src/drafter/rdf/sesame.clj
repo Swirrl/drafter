@@ -5,13 +5,15 @@
             [grafter.url :as url]
             [grafter-2.rdf4j.io :refer [statements]]
             [grafter-2.rdf.protocols :as pr]
-            [drafter.util :as util])
+            [drafter.util :as util]
+            [grafter-2.rdf4j.io :as rio])
   (:import [org.eclipse.rdf4j.query BindingSet BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult Update Binding]
            [org.eclipse.rdf4j.query.resultio QueryResultIO QueryResultWriter]
            [org.eclipse.rdf4j.rio RDFHandler Rio RDFFormat]
            [org.eclipse.rdf4j.common.iteration Iteration]
            [org.eclipse.rdf4j.repository RepositoryConnection]
-           [org.eclipse.rdf4j.model Resource IRI Value]))
+           [org.eclipse.rdf4j.model Resource IRI Value]
+           [org.eclipse.rdf4j.query.impl MapBindingSet]))
 
 (defn is-quads-format? [^RDFFormat rdf-format]
   (.supportsContexts rdf-format))
@@ -50,6 +52,14 @@
        (map (fn [^Binding b] [(.getName b) (.getValue b)]))
        (into {})))
 
+(defn map->binding-set
+  "Creates an RDF4j BindingSet given a map of binding names to grafter values"
+  [m]
+  (let [bs (MapBindingSet.)]
+    (doseq [[k v] m]
+      (.addBinding bs (name k) (rio/->backend-type v)))
+    bs))
+
 (defn read-statements
   "Creates a lazy stream of statements from an input stream containing
   RDF data serialised in the given format."
@@ -67,7 +77,7 @@
 (defrecord GraphTripleStatementSource [triple-source graph]
   pr/ITripleReadable
   (to-statements [_this options]
-    (map #(util/make-quad-statement % graph) (pr/to-statements triple-source options))))
+    (map #(util/make-quad graph %) (pr/to-statements triple-source options))))
 
 (defrecord CollectionStatementSource [statements]
   pr/ITripleReadable

@@ -6,7 +6,6 @@
             [drafter.rdf.sparql :as sparql]
             [drafter.draftset :as ds]
             [drafter.backend.draftset.operations :as dsops]
-            [drafter.util :as util]
             [grafter.url :as url]
             [drafter.time :as time])
   (:import [java.util.regex Pattern]
@@ -46,6 +45,11 @@
        (some (fn [m] (uri-matches? m graph-uri)))
        (boolean)))
 
+(defn user-graph?
+  "Whether the given graph URI is a user graph"
+  [manager graph-uri]
+  (not (protected-graph? manager graph-uri)))
+
 (defn- check-graph-unprotected!
   "Throws an exception if the given live graph URI represents a protected graph"
   [manager live-graph-uri]
@@ -74,20 +78,39 @@
   (check-graph-unprotected! manager graph-uri)
   (new-managed-graph-statements graph-uri))
 
-(defn new-draft-user-graph-statements
-  "Returns RDF statements representing a new draft graph for the user graph URI. Throws
-   and exception if the URI is not valid for user graphs."
-  [manager live-graph-uri draft-graph-uri time draftset-uri]
-  (check-graph-unprotected! manager live-graph-uri)
-  (let [live-graph-triples [live-graph-uri
+(defn new-managed-protected-graph-statements
+  "Returns RDF statements representing a new managed protected graph. Throws an exception
+   if the URI is a protected graph URI."
+  [manager protected-graph-uri]
+  (check-graph-protected! manager protected-graph-uri)
+  (new-managed-graph-statements protected-graph-uri))
+
+(defn- new-draft-graph-statements
+  "Returns the quads required to create a new draft graph. The managed graph should already exist."
+  [live-graph-uri draft-graph-uri time draftset-ref]
+  (let [draftset-uri (url/->java-uri draftset-ref)
+        live-graph-triples [live-graph-uri
                             [drafter:hasDraft draft-graph-uri]]
         draft-graph-triples [draft-graph-uri
                              [rdf:a drafter:DraftGraph]
                              [drafter:createdAt time]
-                             [drafter:modifiedAt time]]
-        draft-graph-triples (cond-> draft-graph-triples
-                                    (some? draftset-uri) (conj [drafter:inDraftSet draftset-uri]))]
+                             [drafter:modifiedAt time]
+                             [drafter:inDraftSet draftset-uri]]]
     (apply mgmt/to-quads [live-graph-triples draft-graph-triples])))
+
+(defn new-draft-user-graph-statements
+  "Returns RDF statements representing a new draft graph for the user graph URI. Throws
+   an exception if the URI is not valid for user graphs."
+  [manager live-graph-uri draft-graph-uri time draftset-ref]
+  (check-graph-unprotected! manager live-graph-uri)
+  (new-draft-graph-statements live-graph-uri draft-graph-uri time draftset-ref))
+
+(defn new-draft-protected-graph-statements
+  "Returns RDF statements representing a new draft graph for a protected graph URI.
+   Throws an exception if the URI is not a protected graph."
+  [manager protected-graph-uri draft-graph-uri time draftset-ref]
+  (check-graph-protected! manager protected-graph-uri)
+  (new-draft-graph-statements protected-graph-uri draft-graph-uri time draftset-ref))
 
 (defn- ensure-managed-graph
   "Ensures a managed graph exists for the specified URI. Callers should check the
@@ -109,17 +132,6 @@
   (check-graph-unprotected! manager graph-uri)
   (ensure-managed-graph manager graph-uri))
 
-(defn- draft-graph-statements
-  [live-graph-uri draft-graph-uri time draftset-uri]
-  (let [live-graph-triples [live-graph-uri
-                            [drafter:hasDraft draft-graph-uri]]
-        draft-graph-triples [draft-graph-uri
-                             [rdf:a drafter:DraftGraph]
-                             [drafter:createdAt time]
-                             [drafter:modifiedAt time]
-                             [drafter:inDraftSet draftset-uri]]]
-    (apply mgmt/to-quads [live-graph-triples draft-graph-triples])))
-
 (defn- create-draft-graph
   "Creates a new draft graph with a unique graph name, expects the
   live graph to already be created. Returns the URI of the draft that
@@ -127,8 +139,7 @@
   [{:keys [repo clock] :as manager} draftset-ref live-graph-uri]
   (let [now (time/now clock)
         draft-graph-uri (mgmt/make-draft-graph-uri)
-        draftset-uri (url/->java-uri draftset-ref)
-        quads (draft-graph-statements live-graph-uri draft-graph-uri now draftset-uri)]
+        quads (new-draft-graph-statements live-graph-uri draft-graph-uri now draftset-ref)]
     (sparql/add repo quads)
     draft-graph-uri))
 
@@ -147,20 +158,31 @@
   (ensure-managed-graph manager protected-graph-uri)
   (create-draft-graph manager draftset-ref protected-graph-uri))
 
+(defn ensure-protected-graph-draft
+  "Ensures a draft exists for a protected graph within the given draftset. Returns
+   the draft graph URI for the "
+  [{:keys [repo] :as manager} draftset-ref protected-graph-uri]
+  (check-graph-protected! manager protected-graph-uri)
+  (let [live->draft (dsops/get-draftset-graph-mapping repo draftset-ref)]
+    (if-let [draft-graph-uri (get live->draft protected-graph-uri)]
+      draft-graph-uri
+      (do
+        (ensure-managed-graph manager protected-graph-uri)
+        (create-draft-graph manager draftset-ref protected-graph-uri)))))
+
 (defn delete-user-graph
   "Marks a user graph for deletion in live by removing its contents within a draft
    and returns the draft graph URI. If the graph doesn't exist in the draftset an
    empty draft graph is created for it, publishing the empty graph will then result
    in a deletion from live. Throws an exception if the graph-uri is not a valid
    user graph."
-  [{:keys [repo clock] :as manager} draftset-ref graph-uri]
+  [{:keys [repo] :as manager} draftset-ref graph-uri]
   (check-graph-unprotected! manager graph-uri)
   (when (mgmt/is-graph-managed? repo graph-uri)
-    (let [graph-mapping (dsops/get-draftset-graph-mapping repo draftset-ref)
-          modified-at (time/now clock)]
+    (let [graph-mapping (dsops/get-draftset-graph-mapping repo draftset-ref)]
       (if-let [draft-graph-uri (get graph-mapping graph-uri)]
         (do
-          (mgmt/delete-graph-contents! repo draft-graph-uri modified-at)
+          (mgmt/delete-graph-contents! repo draft-graph-uri)
           (mgmt/unrewrite-draftset! repo {:draftset-uri (ds/->draftset-uri draftset-ref)
                                           :live-graph-uris [graph-uri]})
           draft-graph-uri)

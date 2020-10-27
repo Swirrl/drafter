@@ -42,7 +42,7 @@
     (help/publish-quads-through-api handler quads)
     (copy-live-graph-into-draftset handler draftset-location test-editor live-graph)
 
-    (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "false")
+    (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor "false")
           expected-quads (help/eval-statements quads)]
       (is (= (set expected-quads) (set ds-quads))))))
 
@@ -95,7 +95,7 @@
     (copy-live-graph-into-draftset handler draftset-location test-editor live-graph)
 
     ;;draftset graph should contain only the publish quads
-    (let [graph-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "false")]
+    (let [graph-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor "false")]
       (is (= (set (help/eval-statements published)) (set graph-quads))))))
 
 (tc/deftest-system-with-keys copy-live-graph-into-unowned-draftset

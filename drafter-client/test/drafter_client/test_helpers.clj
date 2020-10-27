@@ -1,14 +1,17 @@
 (ns drafter-client.test-helpers
-  (:require [clojure.test :as t])
   (:require [clojure.spec.test.alpha :as st]
             [clojure.test :as t :refer :all]
             [drafter.main :as main]
             [drafter.middleware.auth0-auth]
             [drafter.middleware.auth]
+            [drafter-client.client :as client]
             [drafter-client.test-util.db :as db-util]
             [environ.core :refer [env]]
             [grafter-2.rdf4j.repository :as gr-repo]
-            [clojure.java.io :as io]))
+            [grafter-2.rdf4j.sparql :as sp]
+            [clojure.java.io :as io]
+            [grafter-2.rdf.protocols :as pr])
+  (:import [java.net URI]))
 
 (defn with-spec-instrumentation [f]
   (try
@@ -60,7 +63,17 @@
 (defn stop-drafter-server []
   (main/stop-system!))
 
-
 (def test-triples-filename
   "Some test data as a file of n-triples"
   "resources/specific_mappingbased_properties_bg.nt")
+
+(def modified-times-graph-uri (URI. "http://publishmydata.com/graphs/drafter/graph-modified-times"))
+
+(defn get-user-quads [client token draftset]
+  (letfn [(is-user-quad? [quad]
+            (not= modified-times-graph-uri (pr/context quad)))]
+    (let [all-quads (client/get client token draftset)]
+      (filter is-user-quad? all-quads))))
+
+(defn query-user-triples [conn]
+  (sp/query "construct_user_triples.sparql" {:systemgraph [modified-times-graph-uri]} conn))

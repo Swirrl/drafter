@@ -4,22 +4,17 @@
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [clojure.test :as t :refer [is testing]]
-            [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.draftset-data.append :as sut]
-            [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-publisher]]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.async.jobs :as async]
             [grafter-2.rdf4j.formats :as formats]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.feature.endpoint.public :as pub]
             [grafter-2.rdf.protocols :as pr]
             [drafter.rdf.sesame :as ses]
-            [drafter.manager :as manager]
-            [grafter-2.rdf4j.io :as gio]
-            [drafter.time :as time])
+            [grafter-2.rdf4j.io :as gio])
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
 
@@ -33,31 +28,6 @@
   (let [source (ses/->FormatStatementSource nt-file RDFFormat/NTRIPLES)]
     (ses/->GraphTripleStatementSource source graph)))
 
-(t/deftest append-data-to-draftset-job-test
-  (tc/with-system
-    [{:keys [:drafter/backend :drafter.backend.draftset.graphs/manager]} "drafter/rdf/draftset-management/jobs.edn"]
-    (let [initial-time (time/parse "2017-01-01T01:01:01Z")
-          clock (tc/manual-clock initial-time)
-          update-time (time/parse "2018-01-01T01:01:01Z")
-          ds (dsops/create-draftset! backend test-editor)
-          manager (manager/create-manager backend {:clock clock})]
-      (tc/exec-and-await-job-success (sut/append-data-to-draftset-job manager
-                                                                      dummy
-                                                                      ds
-                                                                      (get-source (io/file "./test/test-triple.nt") (URI. "http://foo/graph"))
-                                                                      nil))
-      (let [ts-1 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-        (t/is (= ts-1 initial-time) "Unexpected initial modification time")
-        (tc/set-now clock update-time)
-
-        (tc/exec-and-await-job-success (sut/append-data-to-draftset-job manager
-                                                                        dummy
-                                                                        ds
-                                                                        (get-source (io/file "./test/test-triple-2.nt") (URI. "http://foo/graph"))
-                                                                        nil))
-        (let [ts-2 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-          (t/is (= update-time ts-2) "Modified time is updated after append"))))))
-
 (def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
 
 (tc/deftest-system-with-keys append-quad-data-with-valid-content-type-to-draftset
@@ -68,7 +38,7 @@
         quads (statements data-file-path)
         draftset-location (help/create-draftset-through-api handler test-editor)]
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
-    (let [draftset-graphs (tc/key-set (:changes (help/get-draftset-info-through-api handler draftset-location test-editor)))
+    (let [draftset-graphs (tc/key-set (:changes (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)))
           graph-statements (group-by context quads)]
       (doseq [[live-graph graph-quads] graph-statements]
         (let [graph-triples (help/get-draftset-graph-triples-through-api handler draftset-location test-editor live-graph "false")
@@ -93,7 +63,7 @@
         append-response (handler append-request)]
     (tc/await-success (get-in append-response [:body :finished-job]))
 
-    (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor)]
+    (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
       (is (= (set (help/eval-statements (statements data-file))) (set ds-quads))))))
 
 (tc/deftest-system-with-keys append-quad-data-with-metadata
@@ -130,7 +100,7 @@
       ;;draftset itself should contain the live quads from the graph
       ;;added to along with the quads explicitly added. It should
       ;;not contain any quads from the other live graph.
-      (let [draftset-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "false")
+      (let [draftset-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor "false")
             expected-quads (help/eval-statements (second (first grouped-quads)))]
         (is (= (set expected-quads) (set draftset-quads)))))))
 

@@ -10,22 +10,21 @@
             [drafter.draftset :as ds]
             [drafter.requests :as req]
             [drafter.backend.draftset.graphs :as graphs]
-            [drafter.time :as time]
             [drafter.async.responses :as async-response]))
 
-(defn create-or-empty-draft-graph-for [repo graph-manager draftset-ref live-graph clock]
+(defn create-or-empty-draft-graph-for [repo graph-manager draftset-ref live-graph]
   (if-let [draft-graph-uri (ops/find-draftset-draft-graph repo draftset-ref live-graph)]
     (do
-      (mgmt/delete-graph-contents! repo draft-graph-uri (time/now clock))
+      (mgmt/delete-graph-contents! repo draft-graph-uri)
       draft-graph-uri)
     (graphs/create-user-graph-draft graph-manager draftset-ref live-graph)))
 
-(defn copy-live-graph-into-draftset-job [{:keys [backend graph-manager clock] :as manager} user-id draftset-id graph metadata]
+(defn copy-live-graph-into-draftset-job [{:keys [backend graph-manager] :as manager} user-id draftset-id graph metadata]
   (jobs/make-job user-id
                  :background-write
                  (jobs/job-metadata backend draftset-id 'copy-live-graph-into-draftset metadata)
                  (fn [job]
-                   (let [draft-graph-uri (create-or-empty-draft-graph-for backend graph-manager draftset-id graph clock)]
+                   (let [draft-graph-uri (create-or-empty-draft-graph-for backend graph-manager draftset-id graph)]
                      (ds-data-common/lock-writes-and-copy-graph manager graph draft-graph-uri {:silent true})
                      (mgmt/rewrite-draftset! backend
                                              {:draftset-uri (ds/->draftset-uri draftset-id)

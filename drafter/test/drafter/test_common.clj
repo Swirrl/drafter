@@ -192,7 +192,7 @@
 
 (defn ^{:deprecated "Use with-system instead."} wrap-system-setup
   "Start an integrant test system.  Uses dynamic bindings to support
-  old test suite style.  For new code please try the with-system maro
+  old test suite style.  For new code please try the with-system macro
   instead."
   [system start-keys]
   (fn [test-fn]
@@ -607,3 +607,22 @@
   [{:keys [current] :as manual-clock} period]
   (swap! current (fn [^OffsetDateTime t] (.plus t period)))
   nil)
+
+(defn get-graph-state
+  "Returns the state of the graph in the state graph:
+     :unmanaged - the graph is not a managed graph
+     :draft     - the graph is managed but exists only within drafts
+     :public    - the graph is live"
+  [repo graph-uri]
+  (let [q (str
+            "PREFIX drafter: <http://publishmydata.com/def/drafter/>"
+            "SELECT ?public WHERE {"
+            "  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {"
+            "    <" graph-uri "> drafter:isPublic ?public ."
+            "  }"
+            "}")
+        state-mapping {nil :unmanaged
+                       true :live
+                       false :draft}
+        state (:public (sparql/select-1 repo q))]
+    (get state-mapping state)))

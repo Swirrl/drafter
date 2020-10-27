@@ -4,7 +4,9 @@
              [string :as str]]
             [buddy.core.codecs.base64 :as base64]
             [buddy.core.codecs :as codecs]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [grafter-2.rdf.protocols :as pr]
+            [drafter.rdf.jena :as jena])
   (:import java.nio.charset.Charset
            [java.util UUID]
            [javax.mail.internet AddressException InternetAddress]
@@ -132,8 +134,25 @@
         kvs (remove nil? kvs)]
     (into {} kvs)))
 
-(defn make-quad-statement [triple graph]
-  (assoc triple :c graph))
+(defn make-quad
+  "Creates a quad from a graph and triple"
+  [graph triple]
+  (pr/map->Quad (assoc triple :c graph)))
+
+(defn make-quads
+  "Returns a sequence of quads from a graph and sequence of triples"
+  [graph triples]
+  (map #(make-quad graph %) triples))
+
+(defn quads->insert-data-query
+  "Returns an INSERT DATA update query for a set of quads"
+  [quads]
+  (jena/->update-string [(jena/insert-data-stmt quads)]))
+
+(defn quads->delete-data-query
+  "Returns a DELETE DATA update query for a set of quads"
+  [quads]
+  (jena/->update-string [(jena/delete-data-stmt quads)]))
 
 (defn seq-contains?
   "Returns whether a sequence contains a given value according to =."

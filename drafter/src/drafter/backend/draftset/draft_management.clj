@@ -127,12 +127,11 @@
   its modified time to the supplied instant.
 
   Note modified-at is an instant not a 0-arg clock-fn."
-  [db graph-uri modified-at]
-  (update! db (str (delete-graph-contents-query graph-uri) " ; "
-                   (set-timestamp graph-uri drafter:modifiedAt modified-at)))
+  [db graph-uri]
+  (update! db (delete-graph-contents-query graph-uri))
   (log/info (str "Deleted graph " graph-uri)))
 
-(defn- delete-draft-state-query [draft-graph-uri]
+(defn delete-draft-state-query [draft-graph-uri]
   ;; if the graph-uri is a draft graph uri,
   ;; remove the mention of this draft uri, but leave the live graph as a managed graph.
   (str
@@ -307,7 +306,7 @@
 (defn- migrate-live-queries [db draft-graph-uri transaction-at]
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (let [move-query (move-graph draft-graph-uri live-graph-uri)
-          update-timestamps-query (update-live-graph-timestamps-query draft-graph-uri transaction-at)
+          update-timestamps-query (update-live-graph-timestamps-query draft-graph-uri transaction-at) ;;TODO: don't need this?
           delete-state-query (delete-draft-state-query draft-graph-uri)
           live-public-query (set-isPublic-query live-graph-uri true)
           queries [update-timestamps-query move-query delete-state-query live-public-query]
