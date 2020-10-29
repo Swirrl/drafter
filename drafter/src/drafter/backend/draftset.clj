@@ -3,7 +3,7 @@
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as dsmgmt]
             [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
-            [drafter.backend.draftset.rewrite-result :refer [rewrite-query-results]]
+            [drafter.backend.draftset.rewrite-result :refer [rewriting-query]]
             [grafter-2.rdf.protocols :as proto]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
@@ -38,7 +38,7 @@
     (-> conn
         (bprot/prep-and-validate-query rewritten-query)
         (bprot/restrict-query user-restriction query-restriction graph-restriction)
-        (rewrite-query-results live->draft))))
+        (rewriting-query live->draft))))
 
 (defn- build-draftset-connection [{:keys [repo live->draft union-with-live?]}]
   (let [conn (repo/->connection repo)]
@@ -46,11 +46,11 @@
 
       #_bprot/SparqlExecutor
       #_(prepare-query [this sparql-string]
-        (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
+                       (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
               graph-restriction (mgmt/graph-mapping->graph-restriction inner live->draft union-with-live?)
               pquery (bprot/prep-and-validate-query inner rewritten-query-string)
               pquery (bprot/apply-restriction pquery graph-restriction)]
-          (rewrite-query-results pquery live->draft)))
+                         (rewriting-query pquery live->draft)))
 
       repo/IPrepareQuery
       (repo/prepare-query* [this sparql-string dataset]
