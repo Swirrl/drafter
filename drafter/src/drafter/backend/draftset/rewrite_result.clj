@@ -95,7 +95,7 @@
 (defn- rewrite-value [draft->live value]
   (get draft->live value value))
 
-(defn- rewrite-rdf4j-statement
+(defn rewrite-rdf4j-statement
   "Rewrites the values within a Statement according to the given mapping"
   [value-mapping ^Statement statement]
   (let [subj (rewrite-value value-mapping (.getSubject statement))

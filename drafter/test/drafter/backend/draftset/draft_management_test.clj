@@ -407,16 +407,16 @@
 ;;
 ;; These tests attempt to recreate the various permutations of what will happen
 ;; when union-with-live=true/false and when there are drafts specified or not.
-(deftest calculate-graph-restriction-test
+(deftest calculate-draft-raw-graphs-test
   (testing "union-with-live=true"
     (testing "with no drafts specified"
       (is (= #{:l1 :l2}
-             (calculate-graph-restriction #{:l1 :l2} #{} #{}))
+             (calculate-draft-raw-graphs #{:l1 :l2} #{} #{}))
           "Restriction should be the set of public live graphs"))
 
     (testing "with drafts specified"
       (is (= #{:l1 :d2 :d3 :d4}
-             (calculate-graph-restriction #{:l1 :l2} #{:l3 :l4 :l2} #{:d2 :d3 :d4}))
+             (calculate-draft-raw-graphs #{:l1 :l2} #{:l3 :l4 :l2} #{:d2 :d3 :d4}))
           "Restriction should be the set of live graphs plus drafts from the
             draftset.  Live graphs for the specified drafts should not be
             included as we want to use their draft graphs.")))
@@ -424,11 +424,11 @@
   (testing "union-with-live=false"
     (testing "with no drafts specified"
       (is (= #{}
-             (calculate-graph-restriction #{} #{} #{}))
+             (calculate-draft-raw-graphs #{} #{} #{}))
           "Restriction should be the set of public live graphs"))
     (testing "with drafts specified"
       (is (= #{:d1 :d2}
-             (calculate-graph-restriction #{} #{:l1 :l2} #{:d1 :d2}))
+             (calculate-draft-raw-graphs #{} #{:l1 :l2} #{:d1 :d2}))
           "Restriction should be the set of drafts (as live graph queries will be rewritten to their draft graphs)"))))
 
 (deftest set-timestamp-test

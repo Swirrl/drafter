@@ -1,21 +1,52 @@
 (ns drafter.rdf.sesame
-  (:require [clojure.tools.logging :as log]
-            [drafter.backend.common :refer [->sesame-repo]]
+  (:require [drafter.backend.common :refer [->sesame-repo]]
             [drafter.backend.draftset.arq :refer [sparql-string->arq-query]]
             [drafter.rdf.draftset-management.job-util :as jobs]
-            [grafter-2.rdf4j.io :refer [statements]]
-            [grafter-2.rdf4j.repository :as repo])
-  (:import [org.eclipse.rdf4j.query BindingSet BooleanQuery Dataset GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult Update]
+            [grafter-2.rdf4j.io :refer [statements] :as gio]
+            [grafter.url :as url])
+  (:import [org.eclipse.rdf4j.query BindingSet BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult Update Binding]
            [org.eclipse.rdf4j.query.resultio QueryResultIO QueryResultWriter]
-           org.eclipse.rdf4j.repository.Repository
-           org.eclipse.rdf4j.repository.sparql.SPARQLRepository
-           [org.eclipse.rdf4j.rio RDFHandler Rio]))
+           [org.eclipse.rdf4j.rio RDFHandler Rio RDFFormat]
+           [org.eclipse.rdf4j.common.iteration Iteration]
+           [org.eclipse.rdf4j.repository RepositoryConnection]
+           [org.eclipse.rdf4j.model Resource IRI Value]))
 
-(defn is-quads-format? [rdf-format]
+(defn is-quads-format? [^RDFFormat rdf-format]
   (.supportsContexts rdf-format))
 
 (defn is-triples-format? [rdf-format]
   (not (is-quads-format? rdf-format)))
+
+(extend-protocol url/IURIable
+  org.eclipse.rdf4j.model.URI
+  (->java-uri [rdf4j-uri]
+    (java.net.URI. (str rdf4j-uri))))
+
+(defn iteration-seq
+  "Returns lazy sequence over an RDF4j Iteration"
+  [^Iteration iter]
+  (lazy-seq
+    (when (.hasNext iter)
+      (let [v (.next iter)]
+        (cons v (iteration-seq iter))))))
+
+(defn get-statements
+  "Returns a sequence of all the RDF4j statements within "
+  [^RepositoryConnection conn infer graph-uris]
+  (let [resources (into-array Resource (map gio/->rdf4j-uri graph-uris))
+        ^Resource subj nil
+        ^IRI pred nil
+        ^Value obj nil
+        iter (.getStatements conn subj pred obj infer resources)]
+    (map gio/backend-quad->grafter-quad (iteration-seq iter))))
+
+(defn binding-set->map
+  "Converts an RDF4j BindingSet into a map"
+  [^BindingSet bindings]
+  (->> (.iterator bindings)
+       (iterator-seq)
+       (map (fn [^Binding b] [(.getName b) (.getValue b)]))
+       (into {})))
 
 (defn read-statements
   "Creates a lazy stream of statements from an input stream containing
@@ -38,12 +69,6 @@
       Update :update
       nil))
 
-
-
-
-
-
-
 (defn create-tuple-query-writer [os result-format]
   (QueryResultIO/createWriter result-format os))
 
@@ -60,7 +85,7 @@
           is)))
 
     (close [this]
-      ;; no-op can't call .close on writer's
+      ;; no-op can't call .close on writers
       )
 
     TupleQueryResultHandler
