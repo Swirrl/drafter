@@ -7,14 +7,12 @@
             [grafter-2.rdf.protocols :as proto]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
-            [schema.core :as sc]
             [clojure.tools.logging :as log]
             [clojure.set :as set]
             [drafter.rdf.sesame :as ses]
             [drafter.backend.draftset.arq :as arq]
             [drafter.rdf.dataset :as dataset])
   (:import java.io.Closeable
-           [org.eclipse.rdf4j.model URI]
            [org.eclipse.rdf4j.repository RepositoryConnection]
            [org.eclipse.rdf4j.query Query]))
 
@@ -81,9 +79,7 @@
               rewrite-statement (fn [stmt] (rer/rewrite-statement draft->live stmt))]
           (map rewrite-statement (ses/get-statements conn infer graphs)))))))
 
-(sc/defrecord RewritingSesameSparqlExecutor [repo :- (sc/protocol bprot/SparqlExecutor)
-                                             live->draft :- {URI URI}
-                                             union-with-live? :- Boolean]
+(defrecord RewritingSesameSparqlExecutor [repo live->draft union-with-live?]
   ;; TODO remove this
   bprot/ToRepository
   (->sesame-repo [_]

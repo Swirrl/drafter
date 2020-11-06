@@ -3,7 +3,6 @@
             [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.set :as set]
-            [drafter.backend.common :refer [prepare-query]]
             [drafter.backend.draftset.draft-management
              :refer
              [append-data-batch! create-draft-graph!]]
@@ -89,7 +88,7 @@
   [db query-str query-substitutions]
   (with-open [conn (repo/->connection db)]
     (let [rewritten-query (rewrite-sparql-string query-substitutions query-str)
-          prepared-query (prepare-query conn rewritten-query)]
+          prepared-query (repo/prepare-query conn rewritten-query)]
       (rewrite-graph-results query-substitutions prepared-query))))
 
 (defn first-result [results key]
@@ -251,7 +250,7 @@
       (testing "tuple query operations"
         (testing "bindings"
           (with-open [conn (repo/->connection repo)]
-            (let [query (rewriting-query (prepare-query conn select-spog) live->draft)]
+            (let [query (rewriting-query (repo/prepare-query conn select-spog) live->draft)]
               ;; This should result ?g being bound to <http://test.com/graph-1>
               (test-bindings query {"g" (gio/->rdf4j-uri "http://test.com/graph-1")
                                     "s" (gio/->rdf4j-uri "http://test.com/subject-1")} ["s"])
@@ -268,7 +267,7 @@
 
         (testing "dataset"
           (with-open [conn (repo/->connection repo)]
-            (let [query (rewriting-query (prepare-query conn select-spog) live->draft)
+            (let [query (rewriting-query (repo/prepare-query conn select-spog) live->draft)
                   restriction (dataset/create :named-graphs ["http://test.com/graph-1"
                                                              "http://test.com/graph-2"]
                                               :default-graphs ["http://test.com/graph-1"])]
@@ -287,7 +286,7 @@
       (testing "graph query operations"
         (testing "bindings"
           (with-open [conn (repo/->connection repo)]
-            (let [query (rewriting-query (prepare-query conn construct-spo) live->draft)]
+            (let [query (rewriting-query (repo/prepare-query conn construct-spo) live->draft)]
               ;; This should result in ?g being bound to <graph-1>
               (test-bindings query {"g" (gio/->rdf4j-uri "http://test.com/graph-1")
                                     "s" (gio/->rdf4j-uri "http://test.com/subject-1")} ["s"])
@@ -307,7 +306,7 @@
             (let [restriction (dataset/create :named-graphs ["http://test.com/graph-1"
                                                              "http://test.com/graph-2"]
                                               :default-graphs ["http://test.com/graph-1"])
-                  query (rewriting-query (prepare-query conn construct-spo) live->draft)]
+                  query (rewriting-query (repo/prepare-query conn construct-spo) live->draft)]
               (test-dataset query restriction)
 
               (let [results (repo/evaluate query)

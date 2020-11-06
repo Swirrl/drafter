@@ -1,6 +1,5 @@
 (ns drafter.stasher
-  (:require [clojure.java.io :as io]
-            [clojure.spec.alpha :as s]
+  (:require [clojure.spec.alpha :as s]
             [drafter.stasher.filecache :as fc]
             [drafter.stasher.cache-key :as ck]
             [drafter.stasher.timing :as timing]
@@ -10,7 +9,6 @@
             [integrant.core :as ig]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as dd]
-            [me.raynes.fs :as fs]
             [drafter.backend.common :as drpr]
             [grafter-2.rdf4j.repository.registry :as reg]
             [grafter-2.rdf4j.io :as rio]
@@ -37,12 +35,7 @@
 (extend-type Repository
   ;; TODO can probably remove this...
   drpr/ToRepository
-  (drpr/->sesame-repo [r] r))
-
-(extend-type RepositoryConnection
-  drpr/SparqlExecutor
-  (drpr/prepare-query [this sparql-string]
-    (drpr/prep-and-validate-query this sparql-string)))
+  (->sesame-repo [r] r))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)

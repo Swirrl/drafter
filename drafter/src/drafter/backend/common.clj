@@ -3,9 +3,6 @@
             [grafter-2.rdf4j.repository :as repo])
   (:import java.net.URI))
 
-(defprotocol SparqlExecutor
-  (prepare-query [this sparql-string]))
-
 (defprotocol ToRepository
   (->sesame-repo [this]
     "Gets the sesame repository for this backend"))
