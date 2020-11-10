@@ -85,21 +85,28 @@
     (let [token (fetch-fn {:auth0 auth0-client})]
       (reset! state-atom token))))
 
-(defrecord M2MProvider [auth0-client state-atom opts]
+(defrecord M2MProvider [auth0-client state-atom fetch-fn opts]
   dcpr/AuthorizationProvider
   (authorization-header [{:keys [auth0-client] :as t}]
     (str "Bearer " (:access_token (cache-token (assoc t :auth0 auth0-client)
-                                               get-client-id-token))))
+                                               fetch-fn))))
   (interceptor [t]
     (auth0-interceptor (dcpr/authorization-header t))))
 
-(defn build-m2m-auth-provider
+(defn build-auth-provider
   "Construct a new auth0 m2m auth-provider, use this in preference to
-  the ->Auth0Provider constructors. Requires an :auth0-client to be
-  set in the supplied opts."
+  the ->Auth0Provider constructors.  Expects a map with the keys:
+
+    :auth0-client (required)
+
+    :fetch-fn (optionally) a side effecting function that can fetch an
+               auth0 access-token. Defaults to get-client-id-token.
+
+    :state-atom (defaults to (atom nil))"
   [opts]
-  (-> opts
-      (assoc :state-atom (atom nil))
+  (-> (merge {:fetch-fn get-client-id-token
+              :state-atom (atom nil)}
+             opts)
       map->M2MProvider))
 
 (s/def ::auth0-client some?) ;; todo instance/satisfies check
@@ -108,4 +115,4 @@
   (s/keys :req-un [::auth0-client]))
 
 (defmethod ig/init-key :drafter-client.auth.auth0/m2m-provider [_ opts]
-  (build-m2m-auth-provider opts))
+  (build-auth-provider opts))
