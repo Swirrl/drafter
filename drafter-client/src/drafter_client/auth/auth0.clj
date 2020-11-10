@@ -53,18 +53,51 @@
         (martian/response-for :oauth-token body)
         (:body))))
 
+(defn- valid-token? [{:keys [state-atom]}]
+  ;; if token is nil return false
+  ;;
+  ;; In the future we may extend this predicate to also test for the
+  ;; freshness of the token.
+  (some? @state-atom))
 
-(defrecord Auth0Provider [auth0-client opts]
+(defn- cache-token
+  "Takes an auth-provider with a :state-atom and an :auth0-client and a
+  function fetch-fn that returns a token.
+
+  Stores the token in the state-atom, and returns the cached token on
+  subsequent calls."
+
+  ;; NOTE we could in principle have just memoized f here, but I
+  ;; figured it was better to write it out ourselves so we can more
+  ;; easily extend the implementation to support refreshing the token
+  ;; or fetching a new one on an authentication error etc.
+  [{:keys [auth0-client state-atom] :as auth-provider} fetch-fn]
+  (if (valid-token? auth-provider)
+    @state-atom
+    (let [token (fetch-fn {:auth0 auth0-client})]
+      (reset! state-atom token))))
+
+(defrecord M2MProvider [auth0-client state-atom opts]
   dcpr/AuthorizationProvider
   (authorization-header [{:keys [auth0-client] :as t}]
-    (str "Bearer " (:access_token (get-client-id-token {:auth0 auth0-client}))))
+    (str "Bearer " (:access_token (cache-token (assoc t :auth0 auth0-client)
+                                               get-client-id-token))))
   (interceptor [t]
     (auth0-interceptor (dcpr/authorization-header t))))
 
+(defn build-m2m-auth-provider
+  "Construct a new auth0 m2m auth-provider, use this in preference to
+  the ->Auth0Provider constructors. Requires an :auth0-client to be
+  set in the supplied opts."
+  [opts]
+  (-> opts
+      (assoc :state-atom (atom nil))
+      map->M2MProvider))
+
 (s/def ::auth0-client some?) ;; todo instance/satisfies check
 
-(defmethod ig/pre-init-spec :drafter-client.auth/auth0-provider [_]
+(defmethod ig/pre-init-spec :drafter-client.auth/auth0-m2m-provider [_]
   (s/keys :req-un [::auth0-client]))
 
-(defmethod ig/init-key :drafter-client.auth/auth0-provider [_ opts]
-  (map->Auth0Provider opts))
+(defmethod ig/init-key :drafter-client.auth/auth0-m2m-provider [_ opts]
+  (build-m2m-auth-provider opts))
