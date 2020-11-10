@@ -462,7 +462,6 @@
   (when (seq drafter-uri)
     (let [opts (apply concat (dissoc opts :drafter-uri))]
       (try
-        (println client opts)
         (apply client drafter-uri opts)
         (catch Throwable t
           (let [e (Throwable->map t)]
