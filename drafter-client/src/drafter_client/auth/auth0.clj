@@ -3,22 +3,7 @@
             [drafter-client.client.interceptors :as interceptor]
             [drafter-client.client.protocols :as dcpr]
             [integrant.core :as ig]
-            [martian.core :as martian]
-            [schema.core :as schema]))
-
-(def ^:private auth0-routes
-  [{:route-name :oauth-token
-    :path "/oauth/token"
-    :method :post
-    :path-parts ["/oauth/token"]
-    :consumes ["application/x-www-form-urlencoded"]
-    :produces ["application/json"]
-    :summary "Get a jwt auth token from auth0"
-    :body-schema {:credentials
-                  {:grant_type schema/Str
-                   :client_id schema/Str
-                   :client_secret schema/Str
-                   :audience schema/Str}}}])
+            [martian.core :as martian]))
 
 (deftype Auth0Client [martian client-id client-secret audience]
   clojure.lang.ILookup
@@ -30,10 +15,6 @@
       :client-secret client-secret
       :audience audience
       (.valAt martian k default))))
-
-#_(defn- client [endpoint client-id client-secret audience]
-  (let [api (martian/bootstrap endpoint auth0-routes {:interceptors i/default-interceptors})]
-    (->Auth0Client api client-id client-secret audience)))
 
 (defn- intercept
   {:style/indent :defn}
