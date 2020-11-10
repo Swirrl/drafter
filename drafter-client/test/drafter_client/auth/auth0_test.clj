@@ -1,6 +1,6 @@
 (ns drafter-client.auth.auth0-test
   (:require [clojure.test :as t :refer [deftest is testing]]
-            [drafter-client.auth.auth0 :as sut]))
+            [drafter-client.auth.auth0.m2m :as sut]))
 
 (deftest fetch-token-with-caching-test
   (let [state (atom {:call-count 0})

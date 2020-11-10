@@ -1,8 +1,7 @@
 (ns drafter-client.auth.legacy-default
-  (:require [drafter-client.client.protocols :as dcpr]
+  (:require [drafter-client.auth.auth0.m2m :as dc-auth0]
             [drafter-client.client.interceptors :as interceptor]
-            [drafter-client.auth.auth0 :as dc-auth0]))
-
+            [drafter-client.client.protocols :as dcpr]))
 
 (defn legacy-config-warning! [client]
   ;; We don't have to enable the warning just yet, this is just to

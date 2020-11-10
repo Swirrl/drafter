@@ -1,4 +1,12 @@
-(ns drafter-client.auth.auth0
+(ns drafter-client.auth.auth0.m2m
+  "A drafter-client auth-provider that supports the auth0 m2m flow.
+
+  This is suited to ETL flows etc, where a client wants to acquire a
+  token for a session and use it on all subsequent requests to
+  drafter.
+
+  Currently the tokens are not refreshed, but should be valid for
+  24hrs (see issue: https://github.com/Swirrl/drafter/issues/454)"
   (:require [clojure.spec.alpha :as s]
             [drafter-client.client.interceptors :as interceptor]
             [drafter-client.client.protocols :as dcpr]
@@ -96,8 +104,8 @@
 
 (s/def ::auth0-client some?) ;; todo instance/satisfies check
 
-(defmethod ig/pre-init-spec :drafter-client.auth/auth0-m2m-provider [_]
+(defmethod ig/pre-init-spec :drafter-client.auth.auth0/m2m-provider [_]
   (s/keys :req-un [::auth0-client]))
 
-(defmethod ig/init-key :drafter-client.auth/auth0-m2m-provider [_ opts]
+(defmethod ig/init-key :drafter-client.auth.auth0/m2m-provider [_ opts]
   (build-m2m-auth-provider opts))

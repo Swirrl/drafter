@@ -1,8 +1,8 @@
 (ns drafter-client.client.auth
-  (:require [drafter-client.auth.basic-auth :as ba]
-            [drafter-client.auth.auth0 :as dcauth0]))
+  (:require [drafter-client.auth.auth0.m2m :as dcauth0]
+            [drafter-client.auth.basic-auth :as ba]))
 
-(def ^{:deprecated "Moved to drafter-client.auth.auth0/get-client-id-token"}
+(def ^{:deprecated "Moved to drafter-client.auth.auth0.m2m/get-client-id-token"}
   get-client-id-token dcauth0/get-client-id-token)
 
 (defn ^{:deprecated "Use :drafter-client.auth/basic-auth auth provider instead"}
