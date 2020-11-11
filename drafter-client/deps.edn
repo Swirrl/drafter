@@ -31,8 +31,13 @@
                               lambdaisland/kaocha {:mvn/version "0.0-418"}
                               environ/environ {:mvn/version "1.0.3"}
                               integrant/repl {:mvn/version "0.3.1"}
-                              org.slf4j/slf4j-log4j12 {:mvn/version "1.7.25"}
                               com.auth0/java-jwt {:mvn/version "3.8.0"}
+
+                              org.apache.logging.log4j/log4j-api {:mvn/version "2.11.1"} ; Import log4j2 as the logging backend
+                              org.apache.logging.log4j/log4j-core {:mvn/version "2.11.1"} ; Import log4j2 as the logging backend
+                              org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.11.1"} ; Redirect all SLF4J logs over the log4j2 backend
+
+
                               }}
 
            :test {:extra-paths ["test" "test/resources"]
@@ -41,7 +46,6 @@
                                lambdaisland/kaocha {:mvn/version "1.0.629"}
                                environ/environ {:mvn/version "1.0.3"}
                                integrant/repl {:mvn/version "0.3.1"}
-                               org.slf4j/slf4j-log4j12 {:mvn/version "1.7.25"}
                                com.auth0/java-jwt {:mvn/version "3.8.0"}
                                }}
            }
