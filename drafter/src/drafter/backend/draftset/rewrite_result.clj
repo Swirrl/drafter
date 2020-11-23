@@ -221,6 +221,36 @@
       (setMaxExecutionTime [this max]
         (.setMaxExecutionTime inner-query max)))))
 
+(defn- rewriting-boolean-query
+  "Returns a BooleanQuery which rewrites bindings, datasets and query results according to
+   the given live->draft graph mapping."
+  [inner-query live->draft]
+  (let [draft->live (set/map-invert live->draft)]
+    (reify BooleanQuery
+      (evaluate [_this]
+        (.evaluate inner-query))
+      (setBinding [_this name value]
+        (.setBinding inner-query name (get live->draft value value)))
+      (removeBinding [_this name]
+        (.removeBinding inner-query name))
+      (clearBindings [_this]
+        (.clearBindings inner-query))
+      (getBindings [_this]
+        (rewrite-binding-set (.getBindings inner-query) draft->live))
+      (setDataset [_this dataset]
+        (.setDataset inner-query (rewrite-dataset live->draft dataset)))
+      (getDataset [_this]
+        (let [inner-dataset (.getDataset inner-query)]
+          (rewrite-dataset draft->live inner-dataset)))
+      (getIncludeInferred [this]
+        (.getIncludeInferred inner-query))
+      (setIncludeInferred [this include-inferred?]
+        (.setIncludeInferred inner-query include-inferred?))
+      (getMaxExecutionTime [this]
+        (.getMaxExecutionTime inner-query))
+      (setMaxExecutionTime [this max]
+        (.setMaxExecutionTime inner-query max)))))
+
 (defn- ->sesame-graph-mapping
   "Rewriting executors store the keys and values in their live -> draft
   graph mapping as java.net.URIs while query rewriting requires them to
@@ -241,4 +271,4 @@
    (rewriting-tuple-query inner-query (->sesame-graph-mapping live->draft))
 
    (instance? BooleanQuery inner-query)
-   inner-query))
+   (rewriting-boolean-query inner-query (->sesame-graph-mapping live->draft))))

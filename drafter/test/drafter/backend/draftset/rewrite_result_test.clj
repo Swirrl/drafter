@@ -247,6 +247,29 @@
           test-statements (set (gio/statements test-data))]
       (with-open [conn (repo/->connection repo)]
         (pr/add conn test-statements))
+      (testing "boolean query operations"
+        (testing "bindings"
+          (with-open [conn (repo/->connection repo)]
+            (let [query (rewriting-query (repo/prepare-query conn "ASK WHERE { GRAPH ?g { <http://test.com/subject-1> <http://test.com/p2> true . } }") live->draft)]
+              ;; This should result ?g being bound to <http://test.com/graph-1>
+              (test-bindings query {"g" (gio/->rdf4j-uri "http://test.com/graph-1")
+                                    "s" (gio/->rdf4j-uri "http://test.com/subject-1")} ["s"])
+
+              (testing "result"
+                (let [result (repo/evaluate query)]
+                  (is (= true result) "Unexpected query results"))))))
+
+        (testing "dataset"
+          (with-open [conn (repo/->connection repo)]
+            (let [query (rewriting-query (repo/prepare-query conn "ASK WHERE { <http://test.com/subject-1> <http://test.com/p2> true . }") live->draft)
+                  restriction (dataset/create :named-graphs ["http://test.com/graph-1"
+                                                             "http://test.com/graph-2"]
+                                              :default-graphs ["http://test.com/graph-1"])]
+              (test-dataset query restriction)
+
+              (let [result (repo/evaluate query)]
+                (is (= true result) "Unexpected results of restricted query"))))))
+
       (testing "tuple query operations"
         (testing "bindings"
           (with-open [conn (repo/->connection repo)]
