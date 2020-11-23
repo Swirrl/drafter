@@ -6,7 +6,7 @@
             [drafter.util :as util]
             [grafter-2.rdf.protocols :refer [map->Quad]])
   (:import [org.eclipse.rdf4j.model.impl ContextStatementImpl StatementImpl]
-           [org.eclipse.rdf4j.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult GraphQueryResult Dataset]
+           [org.eclipse.rdf4j.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult GraphQueryResult Dataset Query]
            [org.eclipse.rdf4j.query.impl BindingImpl MapBindingSet SimpleDataset]
            org.eclipse.rdf4j.rio.RDFHandler
            [org.eclipse.rdf4j.model Statement]))
@@ -137,40 +137,6 @@
     (close [_this]
       (.close result))))
 
-;;GraphQuery -> {LiveURI DraftURI} -> GraphQuery
-(defn- rewriting-graph-query
-  "Returns a GraphQuery which rewrites bindings, datasets and query results according to
-   the given live->draft graph mapping"
-  [inner-query live->draft]
-  (let [draft->live (set/map-invert live->draft)]
-    (reify GraphQuery
-      (evaluate [_this]
-        (let [inner-result (.evaluate inner-query)]
-          (rewriting-graph-query-result draft->live inner-result)))
-      (evaluate [this handler]
-        (.evaluate inner-query (rewriting-rdf-handler handler draft->live)))
-      (setBinding [_this name value]
-        (.setBinding inner-query name (get live->draft value value)))
-      (removeBinding [_this name]
-        (.removeBinding inner-query name))
-      (clearBindings [_this]
-        (.clearBindings inner-query))
-      (getBindings [this]
-        (rewrite-binding-set (.getBindings inner-query) draft->live))
-      (setDataset [_this dataset]
-        (.setDataset inner-query (rewrite-dataset live->draft dataset)))
-      (getDataset [_this]
-        (let [inner-dataset (.getDataset inner-query)]
-          (rewrite-dataset draft->live inner-dataset)))
-      (getIncludeInferred [this]
-        (.getIncludeInferred inner-query))
-      (setIncludeInferred [this include-inferred?]
-        (.setIncludeInferred inner-query include-inferred?))
-      (getMaxExecutionTime [this]
-        (.getMaxExecutionTime inner-query))
-      (setMaxExecutionTime [this max]
-        (.setMaxExecutionTime inner-query max)))))
-
 (defn- rewriting-tuple-query-result
   "Returns a TupleQueryResult which rewrites draft values within result binding sets to
    their corresponding live values according to the draft->live mapping"
@@ -188,12 +154,15 @@
     (close [_this]
       (.close result))))
 
-(defn- rewriting-tuple-query
-  "Returns a TupleQuery which rewrites bindings, datasets and query results according to
-   the given live->draft graph mapping."
-  [inner-query live->draft]
-  (let [draft->live (set/map-invert live->draft)]
-    (reify TupleQuery
+(defmacro def-rewriting-query-record
+  "Defines a record with the fields inner-query live->draft and draft->live which implements
+   the rdf4j Query interface and rewrites binding and datasets according to the given draftset
+   graph mapping. The optional specs should be specified as for defrecord i.e. a sequence of
+   interface/protocols and their implementation methods."
+  [name & specs]
+  (concat
+    ['defrecord name '[inner-query live->draft draft->live]]
+    '(Query
       (setBinding [_this name value]
         (.setBinding inner-query name (get live->draft value value)))
       (removeBinding [_this name]
@@ -207,11 +176,6 @@
       (getDataset [_this]
         (let [inner-dataset (.getDataset inner-query)]
           (rewrite-dataset draft->live inner-dataset)))
-      (evaluate [_this]
-        (let [inner-result (.evaluate inner-query)]
-          (rewriting-tuple-query-result draft->live inner-result)))
-      (evaluate [this handler]
-        (.evaluate inner-query (make-select-result-rewriter draft->live handler)))
       (getIncludeInferred [this]
         (.getIncludeInferred inner-query))
       (setIncludeInferred [this include-inferred?]
@@ -219,37 +183,29 @@
       (getMaxExecutionTime [this]
         (.getMaxExecutionTime inner-query))
       (setMaxExecutionTime [this max]
-        (.setMaxExecutionTime inner-query max)))))
+        (.setMaxExecutionTime inner-query max)))
+    specs))
 
-(defn- rewriting-boolean-query
-  "Returns a BooleanQuery which rewrites bindings, datasets and query results according to
-   the given live->draft graph mapping."
-  [inner-query live->draft]
-  (let [draft->live (set/map-invert live->draft)]
-    (reify BooleanQuery
-      (evaluate [_this]
-        (.evaluate inner-query))
-      (setBinding [_this name value]
-        (.setBinding inner-query name (get live->draft value value)))
-      (removeBinding [_this name]
-        (.removeBinding inner-query name))
-      (clearBindings [_this]
-        (.clearBindings inner-query))
-      (getBindings [_this]
-        (rewrite-binding-set (.getBindings inner-query) draft->live))
-      (setDataset [_this dataset]
-        (.setDataset inner-query (rewrite-dataset live->draft dataset)))
-      (getDataset [_this]
-        (let [inner-dataset (.getDataset inner-query)]
-          (rewrite-dataset draft->live inner-dataset)))
-      (getIncludeInferred [this]
-        (.getIncludeInferred inner-query))
-      (setIncludeInferred [this include-inferred?]
-        (.setIncludeInferred inner-query include-inferred?))
-      (getMaxExecutionTime [this]
-        (.getMaxExecutionTime inner-query))
-      (setMaxExecutionTime [this max]
-        (.setMaxExecutionTime inner-query max)))))
+(def-rewriting-query-record RewritingBooleanQuery
+  BooleanQuery
+  (evaluate [{:keys [inner-query] :as _this}]
+    (.evaluate inner-query)))
+
+(def-rewriting-query-record RewritingTupleQuery
+  TupleQuery
+  (evaluate [{:keys [inner-query draft->live] :as this}]
+    (let [inner-result (.evaluate inner-query)]
+      (rewriting-tuple-query-result draft->live inner-result)))
+  (evaluate [{:keys [inner-query draft->live] :as this} handler]
+    (.evaluate inner-query (make-select-result-rewriter draft->live handler))))
+
+(def-rewriting-query-record RewritingGraphQuery
+  GraphQuery
+  (evaluate [{:keys [inner-query draft->live] :as this}]
+    (let [inner-result (.evaluate inner-query)]
+      (rewriting-graph-query-result draft->live inner-result)))
+  (evaluate [{:keys [inner-query draft->live]} handler]
+    (.evaluate inner-query (rewriting-rdf-handler handler draft->live))))
 
 (defn- ->sesame-graph-mapping
   "Rewriting executors store the keys and values in their live -> draft
@@ -259,16 +215,26 @@
   [uri-mapping]
   (util/map-all util/uri->sesame-uri uri-mapping))
 
+(defprotocol ToRewritingQuery
+  (->rewriting-query [this live->draft draft->live]))
+
+(extend-protocol ToRewritingQuery
+  GraphQuery
+  (->rewriting-query [this live->draft draft->live]
+    (->RewritingGraphQuery this live->draft draft->live))
+
+  TupleQuery
+  (->rewriting-query [this live->draft draft->live]
+    (->RewritingTupleQuery this live->draft draft->live))
+
+  BooleanQuery
+  (->rewriting-query [this live->draft draft->live]
+    (->RewritingBooleanQuery this live->draft draft->live)))
+
 (defn rewriting-query
   "Returns a query of the same type as which rewrites bindings, dataset and query results
    according to the given live->draft graph mapping"
   [inner-query live->draft]
-  (cond
-   (instance? GraphQuery inner-query)
-   (rewriting-graph-query inner-query (->sesame-graph-mapping live->draft))
-
-   (instance? TupleQuery inner-query)
-   (rewriting-tuple-query inner-query (->sesame-graph-mapping live->draft))
-
-   (instance? BooleanQuery inner-query)
-   (rewriting-boolean-query inner-query (->sesame-graph-mapping live->draft))))
+  (let [live->draft (->sesame-graph-mapping live->draft)
+        draft->live (set/map-invert live->draft)]
+    (->rewriting-query inner-query live->draft draft->live)))
