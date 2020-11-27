@@ -2,7 +2,10 @@
   (:require [drafter.backend.draftset.arq :refer [sparql-string->arq-query]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [grafter-2.rdf4j.io :refer [statements] :as gio]
-            [grafter.url :as url])
+            [grafter.url :as url]
+            [grafter-2.rdf4j.io :refer [statements]]
+            [grafter-2.rdf.protocols :as pr]
+            [drafter.util :as util])
   (:import [org.eclipse.rdf4j.query BindingSet BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult Update Binding]
            [org.eclipse.rdf4j.query.resultio QueryResultIO QueryResultWriter]
            [org.eclipse.rdf4j.rio RDFHandler Rio RDFFormat]
@@ -55,6 +58,21 @@
    (statements input
                :format rdf-format
                :buffer-size batch-size)))
+
+(defrecord FormatStatementSource [inner-source format]
+  pr/ITripleReadable
+  (to-statements [_this _options]
+    (read-statements inner-source format)))
+
+(defrecord GraphTripleStatementSource [triple-source graph]
+  pr/ITripleReadable
+  (to-statements [_this options]
+    (map #(util/make-quad-statement % graph) (pr/to-statements triple-source options))))
+
+(defrecord CollectionStatementSource [statements]
+  pr/ITripleReadable
+  (to-statements [_this _options]
+    statements))
 
 (defn get-query-type
   "Returns a keyword indicating the type query represented by the

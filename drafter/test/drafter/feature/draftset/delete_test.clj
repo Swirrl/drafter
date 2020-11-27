@@ -217,20 +217,21 @@
         job-result (tc/await-completion (get-in delete-response [:body :finished-job]))]
     (is (jobs/failed-job-result? job-result))))
 
-(tc/deftest-system-with-keys delete-triples-from-graph-in-live
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api]} system]
-  (let [quads (statements "test/resources/test-draftset.trig")
-        grouped-quads (group-by context quads)
-        [live-graph graph-quads] (first grouped-quads)
-        draftset-location (help/create-draftset-through-api handler test-editor)]
+(t/deftest delete-triples-from-graph-in-live
+  (tc/with-system
+    keys-for-test
+    [{handler [:drafter/routes :draftset/api]} system]
+    (let [quads (statements "test/resources/test-draftset.trig")
+          grouped-quads (group-by context quads)
+          [live-graph graph-quads] (first grouped-quads)
+          draftset-location (help/create-draftset-through-api handler test-editor)]
 
-    (help/publish-quads-through-api handler quads)
-    (let [draftset-info (help/delete-quads-through-api handler test-editor draftset-location [(first graph-quads)])
-          draftset-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "false")
-          expected-quads (help/eval-statements (rest graph-quads))]
-      (is (= #{live-graph} (tc/key-set (:changes draftset-info))))
-      (is (= (set expected-quads) (set draftset-quads))))))
+      (help/publish-quads-through-api handler quads)
+      (let [draftset-info (help/delete-quads-through-api handler test-editor draftset-location [(first graph-quads)])
+            draftset-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "false")
+            expected-quads (help/eval-statements (rest graph-quads))]
+        (is (= #{live-graph} (tc/key-set (:changes draftset-info))))
+        (is (= (set expected-quads) (set draftset-quads)))))))
 
 (tc/deftest-system-with-keys delete-triples-from-graph-not-in-live
   keys-for-test

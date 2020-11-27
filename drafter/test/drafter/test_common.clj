@@ -6,7 +6,7 @@
             [clojure.spec.test.alpha :as st]
             [clojure.spec.alpha :as s]
             [ring.core.spec]
-            [clojure.test :refer :all]
+            [clojure.test :as t :refer :all]
             [drafter.backend.draftset.draft-management :refer [migrate-graphs-to-live!]]
             [drafter.main :as main]
             [drafter.rdf.sparql :as sparql]
