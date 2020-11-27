@@ -24,16 +24,23 @@
   params   - A map of extra parameters to pass to the endpoint. "
   [client endpoint token params]
   (let [params (update params :query (fnil identity ""))
-        [endpoint params] (if (draftset/live? endpoint)
-                            [:get-query-live params]
-                            [:get-query-draftset
-                             (assoc params
-                                    :id (str (draftset/id endpoint))
-                                    :union-with-live true)])
-        {:keys [url query-params headers]
-         :as req} (-> (i/with-authorization client token)
-                      (martian/request-for endpoint params))
+        [query-endpoint-key update-endpoint-key params] (if (draftset/live? endpoint)
+                                                          [:get-query-live nil params]
+                                                          [:get-query-draftset
+                                                           :post-update-draftset
+                                                           (assoc params
+                                                             :id (str (draftset/id endpoint))
+                                                             :union-with-live true)])
+        {query-url :url
+         query-params :query-params
+         headers :headers} (-> (i/with-authorization client token)
+                               (martian/request-for query-endpoint-key params))
 
-        query-params (dissoc query-params :query)]
-    (doto (repo/sparql-repo (str url \? (url/map->query query-params)))
-      (.setAdditionalHttpHeaders (select-keys headers ["Authorization"])))))
+        {update-url :url} (martian/request-for client update-endpoint-key (assoc params :update "_"))
+        query-params (dissoc query-params :query)
+        sparql-repo (if update-url
+                      (repo/sparql-repo (str query-url \? (url/map->query query-params))
+                                        (str update-url \? (url/map->query query-params)))
+                      (repo/sparql-repo (str query-url \? (url/map->query query-params))))]
+    (.setAdditionalHttpHeaders sparql-repo (select-keys headers ["Authorization"]))
+    sparql-repo))
