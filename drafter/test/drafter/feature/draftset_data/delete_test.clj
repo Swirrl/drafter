@@ -17,7 +17,8 @@
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints drafter:public drafter:Endpoint]]
             [grafter.vocabularies.rdf :refer [rdf:a]]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
-            [drafter.feature.endpoint.public :as pub])
+            [drafter.feature.endpoint.public :as pub]
+            [drafter.rdf.sesame :as ses])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -28,6 +29,10 @@
 
 (def dummy "dummy@user.com")
 
+(defn- get-source [nt-file graph]
+  (let [source (ses/->FormatStatementSource nt-file RDFFormat/NTRIPLES)]
+    (ses/->GraphTripleStatementSource source graph)))
+
 (t/deftest delete-draftset-data-test
   (tc/with-system
     [:drafter/backend :drafter/global-writes-lock :drafter/write-scheduler :drafter.fixture-data/loader
@@ -37,36 +42,36 @@
           delete-time (OffsetDateTime/parse "2019-01-01T01:01:01Z")
           clock (tc/manual-clock initial-time)
           ds (dsops/create-draftset! backend test-editor)
-          resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}]
-
-      (th/apply-job! (append/append-data-to-draftset-job (io/file "./test/test-triple.nt")
+          resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}
+          append-job (append/append-data-to-draftset-job (get-source (io/file "./test/test-triple.nt") (URI. "http://foo/graph"))
                                                          resources
                                                          dummy
-                                                         {:rdf-format  RDFFormat/NTRIPLES
-                                                          :graph       (URI. "http://foo/graph")
-                                                          :draftset-id ds}
-                                                         clock))
-
+                                                         ds
+                                                         clock
+                                                         nil)]
+      (tc/exec-and-await-job-success append-job)
+      (tc/set-now clock delete-time)
       (let [modified-1 (th/ensure-draftgraph-and-draftset-modified
                         backend
                         ds
+                        "http://foo/graph")
+            delete-job (sut/delete-data-from-draftset-job
+                        (get-source (io/file "./test/test-triple-2.nt")
+                                    (URI. "http://foo/graph"))
+                        dummy
+                        resources
+                        ds
+                        clock
+                        nil)
+            _  (tc/exec-and-await-job-success delete-job)
+            modified-2 (th/ensure-draftgraph-and-draftset-modified
+                        backend
+                        ds
                         "http://foo/graph")]
-        (tc/set-now clock delete-time)
-        (th/apply-job! (sut/delete-data-from-draftset-job (io/file "./test/test-triple-2.nt")
-                                                          dummy
-                                                          resources
-                                                          {:draftset-id ds
-                                                           :graph       (URI. "http://foo/graph")
-                                                           :rdf-format  RDFFormat/NTRIPLES}
-                                                          clock))
-        (let [modified-2 (th/ensure-draftgraph-and-draftset-modified
-                          backend
-                          ds
-                          "http://foo/graph")]
-          (t/is (= delete-time (:modified modified-2))
-                "Expected modified time to be updated after delete")
-          (t/is (not= (:version modified-1) (:version modified-2))
-                "Expected version to be updated after delete"))))))
+        (t/is (= delete-time (:modified modified-2))
+              "Expected modified time to be updated after delete")
+        (t/is (not= (:version modified-1) (:version modified-2))
+              "Expected version to be updated after delete")))))
 
 (t/deftest delete-public-endpoint-quads-test
   (tc/with-system
