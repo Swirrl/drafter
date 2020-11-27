@@ -6,13 +6,6 @@
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(defn apply-job!
-  "Execute the job in this thread"
-  [{fun :function :as job}]
-  (let [ret (fun job)]
-    (t/is (= true ret)
-          "Successful job (returns true doesn't return an exception/error)")))
-
 (defn ensure-draftgraph-and-draftset-modified
   "Test that the draftgraph and draftset modified times match, and return the
    draftset modified time and version. NOTE that because a draftset contains
