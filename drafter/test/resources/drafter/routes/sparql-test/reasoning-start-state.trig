@@ -9,6 +9,9 @@
 <http://publishmydata.com/graphs/drafter/drafts> {
   :PublicGraph a drafter:ManagedGraph ;
     drafter:isPublic true .
+
+  <http://publishmydata.com/graphs/reasoning-tbox> a drafter:ManagedGraph ;
+    drafter:isPublic true .
 }
 
 <http://publishmydata.com/graphs/reasoning-tbox> {

@@ -12,10 +12,11 @@
             [drafter.feature.draftset.test-helper :as help]
             [drafter.async.jobs :as async]
             [grafter-2.rdf4j.formats :as formats]
-            [drafter.fixture-data :as fd]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
             [drafter.feature.endpoint.public :as pub]
             [grafter-2.rdf.protocols :as pr]
+            [drafter.rdf.sesame :as ses]
+            [grafter-2.rdf4j.io :as gio]
             [drafter.time :as time])
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -26,6 +27,10 @@
 
 (def dummy "dummy@user.com")
 
+(defn- get-source [nt-file graph]
+  (let [source (ses/->FormatStatementSource nt-file RDFFormat/NTRIPLES)]
+    (ses/->GraphTripleStatementSource source graph)))
+
 (t/deftest append-data-to-draftset-job-test
   (tc/with-system
     [{:keys [:drafter/backend :drafter/global-writes-lock :drafter.backend.draftset.graphs/manager]} "drafter/rdf/draftset-management/jobs.edn"]
@@ -34,13 +39,14 @@
           update-time (time/parse "2018-01-01T01:01:01Z")
           ds (dsops/create-draftset! backend test-editor)
           resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}]
-      (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple.nt")
-                                                      resources
-                                                      dummy
-                                                      {:rdf-format  RDFFormat/NTRIPLES
-                                                       :graph       (URI. "http://foo/graph")
-                                                       :draftset-id ds}
-                                                      clock))
+      (tc/exec-and-await-job-success
+       (sut/append-data-to-draftset-job
+        (get-source (io/file "./test/test-triple.nt") (URI. "http://foo/graph"))
+        resources
+        dummy
+        ds
+        clock
+        nil))
       (let [modified-1 (th/ensure-draftgraph-and-draftset-modified
                         backend
                         ds
@@ -48,13 +54,15 @@
         (t/is (= initial-time (:modified modified-1))
               "Unexpected initial modification time")
         (tc/set-now clock update-time)
-        (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple-2.nt")
-                                                        resources
-                                                        dummy
-                                                        {:rdf-format  RDFFormat/NTRIPLES
-                                                         :graph       (URI. "http://foo/graph")
-                                                         :draftset-id ds}
-                                                        clock))
+
+        (tc/exec-and-await-job-success
+         (sut/append-data-to-draftset-job
+          (get-source (io/file "./test/test-triple-2.nt") (URI. "http://foo/graph"))
+          resources
+          dummy
+          ds
+          clock
+          nil))
         (let [modified-2 (th/ensure-draftgraph-and-draftset-modified
                           backend
                           ds
@@ -269,3 +277,23 @@
                                    (tc/await-completion))]
     (is (= type :error))
     (is (= message "Blank node as graph ID"))))
+
+(t/deftest validate-graph-source-test
+  (t/testing "No blank graph nodes"
+    (let [quads (mapv (fn [i]
+                        (pr/->Quad (URI. (str "http://s" i))
+                                   (URI. (str "http://p" i))
+                                   (str "o" i)
+                                   (URI. (str "http://g" i))))
+                      (range 1 10))
+          inner-source (ses/->CollectionStatementSource quads)
+          source (sut/validate-graph-source inner-source)]
+      (t/is (= quads (vec (gio/statements source))) "Unexpected output statements")))
+
+  (t/testing "Contains blank graph nodes"
+    (let [quads [(pr/->Quad (URI. "http://s1") (URI. "http://p1") "o1" (URI. "http://g1"))
+                 (pr/->Quad (URI. "http://s1") (URI. "http://p1") "o2" (pr/make-blank-node))
+                 (pr/->Quad (URI. "http://s3") (URI. "http://p3") "o3" (URI. "http://g1"))]
+          inner-source (ses/->CollectionStatementSource quads)
+          source (sut/validate-graph-source inner-source)]
+      (t/is (thrown? Exception (dorun (gio/statements source))) "Expected exception on blank graph node"))))
