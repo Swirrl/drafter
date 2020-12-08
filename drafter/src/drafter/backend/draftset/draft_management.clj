@@ -11,7 +11,8 @@
             [grafter.vocabularies.rdf :refer :all]
             [clojure.spec.alpha :as s]
             [grafter-2.rdf4j.io :as rio]
-            [clojure.string :as string])
+            [clojure.string :as string]
+            [drafter.time :as time])
   (:import java.net.URI
            [java.util UUID]))
 
@@ -364,13 +365,13 @@ WHERE {
   (->> (unrewrite-draftset-q opts)
        (sparql/update! conn)))
 
-(defn migrate-graphs-to-live! [repo graphs clock-fn]
+(defn migrate-graphs-to-live! [repo graphs clock]
   "Migrates a collection of draft graphs to live through a single
   compound SPARQL update statement. Explicit UPDATE statements do not
   take part in transactions on the remote sesame SPARQL client."
   (log/info "Starting make-live for graphs " graphs)
   (when (seq graphs)
-    (let [transaction-started-at (clock-fn)
+    (let [transaction-started-at (time/now clock)
           graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at))
                                         graphs)
           fixup-q (unrewrite-draftset-q {:draft-graph-uris graphs})

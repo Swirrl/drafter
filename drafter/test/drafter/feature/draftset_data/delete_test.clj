@@ -33,8 +33,9 @@
     [:drafter/backend :drafter/global-writes-lock :drafter/write-scheduler :drafter.fixture-data/loader
      :drafter.backend.draftset.graphs/manager]
     [{:keys [:drafter/backend :drafter/global-writes-lock :drafter.backend.draftset.graphs/manager]} system-config]
-    (let [initial-time (constantly (OffsetDateTime/parse "2017-01-01T01:01:01Z"))
-          delete-time (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
+    (let [initial-time (OffsetDateTime/parse "2017-01-01T01:01:01Z")
+          delete-time (OffsetDateTime/parse "2019-01-01T01:01:01Z")
+          clock (tc/manual-clock initial-time)
           ds (dsops/create-draftset! backend test-editor)
           resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}]
 
@@ -44,19 +45,18 @@
                                                          {:rdf-format  RDFFormat/NTRIPLES
                                                           :graph       (URI. "http://foo/graph")
                                                           :draftset-id ds}
-                                                         initial-time))
+                                                         clock))
 
+      (tc/set-now clock delete-time)
       (th/apply-job! (sut/delete-data-from-draftset-job (io/file "./test/test-triple-2.nt")
                                                         dummy
                                                         resources
                                                         {:draftset-id ds
                                                          :graph       (URI. "http://foo/graph")
                                                          :rdf-format  RDFFormat/NTRIPLES}
-                                                        delete-time))
+                                                        clock))
       (let [ts-3 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-        (t/is (.isEqual (delete-time)
-                        ts-3)
-              "Modified time is updated after delete")))))
+        (t/is (= delete-time ts-3) "Expected modified time to be updated after delete")))))
 
 (t/deftest delete-public-endpoint-quads-test
   (tc/with-system
@@ -116,30 +116,30 @@
             delete-response (handler delete-request)]
         (tc/assert-is-unsupported-media-type-response delete-response)))))
 
-(tc/deftest-system-with-keys
-  delete-gzipped-draftset-data-test
-  [:drafter.fixture-data/loader :drafter/write-scheduler [:drafter/routes :draftset/api]]
-  [system system-config]
-  (let [handler (get system [:drafter/routes :draftset/api])
-        data-file-path "test/resources/test-draftset.trig"
-        quads (gio/statements data-file-path)
-        draftset-location (help/create-draftset-through-api handler test-editor)]
-    (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
+(t/deftest delete-gzipped-draftset-data-test
+  (tc/with-system
+    [:drafter.fixture-data/loader :drafter/write-scheduler [:drafter/routes :draftset/api]]
+    [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          data-file-path "test/resources/test-draftset.trig"
+          quads (gio/statements data-file-path)
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
 
-    (let [quads-to-delete (map (fn [kvp] (first (val kvp))) (group-by :c quads))
-          fmt (formats/->rdf-format :nq)
-          ss (help/statements->gzipped-input-stream quads-to-delete fmt)
-          delete-request (help/create-delete-quads-request test-editor
-                                                           draftset-location
-                                                           ss
-                                                           {:content-type (.getDefaultMIMEType fmt)})
-          delete-request (assoc-in delete-request [:headers "content-encoding"] "gzip")
-          delete-response (handler delete-request)]
-      (tc/await-success (get-in delete-response [:body :finished-job]))
+      (let [quads-to-delete (map (fn [kvp] (first (val kvp))) (group-by :c quads))
+            fmt (formats/->rdf-format :nq)
+            ss (help/statements->gzipped-input-stream quads-to-delete fmt)
+            delete-request (help/create-delete-quads-request test-editor
+                                                             draftset-location
+                                                             ss
+                                                             {:content-type (.getDefaultMIMEType fmt)})
+            delete-request (assoc-in delete-request [:headers "content-encoding"] "gzip")
+            delete-response (handler delete-request)]
+        (tc/await-success (get-in delete-response [:body :finished-job]))
 
-      (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor)
-            expected (help/eval-statements (set/difference (set quads) (set quads-to-delete)))]
-        (t/is (= (set expected) (set ds-quads)))))))
+        (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor)
+              expected (help/eval-statements (set/difference (set quads) (set quads-to-delete)))]
+          (t/is (= (set expected) (set ds-quads))))))))
 
 (tc/deftest-system-with-keys delete-draftset-data-with-metadata-test
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]

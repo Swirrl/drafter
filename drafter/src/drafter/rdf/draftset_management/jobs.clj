@@ -17,19 +17,10 @@
                    (ops/delete-draftset! backend draftset-id)
                    (jobs/job-succeeded! job))))
 
-;; (defn touch-graph-in-draftset [draftset-ref draft-graph-uri modified-at]
-;;   (let [update-str (str (mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at) " ; "
-;;                         (mgmt/set-timestamp (ds/->draftset-uri draftset-ref) dcterms:modified modified-at))]
-;;     update-str))
-
-;; (defn touch-graph-in-draftset! [backend draftset-ref draft-graph-uri modified-at]
-;;   (sparql/update! backend
-;;                   (touch-graph-in-draftset draftset-ref draft-graph-uri modified-at)))
-
 (defn publish-draftset-job
   "Return a job that publishes the graphs in a draftset to live and
   then deletes the draftset."
-  [backend user-id {:keys [draftset-id metadata]} clock-fn]
+  [backend user-id {:keys [draftset-id metadata]} clock]
   ;; TODO combine these into a single job as priorities have now
   ;; changed how these will be applied.
 
@@ -38,7 +29,7 @@
                  (jobs/job-metadata backend draftset-id 'publish-draftset metadata)
                  (fn [job]
                    (try
-                     (ops/publish-draftset-graphs! backend draftset-id clock-fn)
+                     (ops/publish-draftset-graphs! backend draftset-id clock)
                      (ops/update-public-endpoint-modified-at! backend)
                      (ops/delete-draftset-statements! backend draftset-id)
                      (jobs/job-succeeded! job)

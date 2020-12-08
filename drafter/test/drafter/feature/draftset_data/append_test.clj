@@ -16,9 +16,9 @@
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
             [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.feature.endpoint.public :as pub]
-            [grafter-2.rdf.protocols :as pr])
+            [grafter-2.rdf.protocols :as pr]
+            [drafter.time :as time])
   (:import java.net.URI
-           java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -30,9 +30,9 @@
 (t/deftest append-data-to-draftset-job-test
   (tc/with-system
     [{:keys [:drafter/backend :drafter/global-writes-lock :drafter.backend.draftset.graphs/manager]} "drafter/rdf/draftset-management/jobs.edn"]
-    (let [initial-time (constantly (OffsetDateTime/parse "2017-01-01T01:01:01Z"))
-          update-time (constantly (OffsetDateTime/parse "2018-01-01T01:01:01Z"))
-          delete-time (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
+    (let [initial-time (time/parse "2017-01-01T01:01:01Z")
+          clock (tc/manual-clock initial-time)
+          update-time (time/parse "2018-01-01T01:01:01Z")
           ds (dsops/create-draftset! backend test-editor)
           resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}]
       (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple.nt")
@@ -41,21 +41,19 @@
                                                       {:rdf-format  RDFFormat/NTRIPLES
                                                        :graph       (URI. "http://foo/graph")
                                                        :draftset-id ds}
-                                                      initial-time))
+                                                      clock))
       (let [ts-1 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-        (t/is (= (.toEpochSecond (initial-time))
-                 (.toEpochSecond ts-1)))
+        (t/is (= ts-1 initial-time) "Unexpected initial modification time")
+        (tc/set-now clock update-time)
         (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple-2.nt")
                                                         resources
                                                         dummy
                                                         {:rdf-format  RDFFormat/NTRIPLES
                                                          :graph       (URI. "http://foo/graph")
                                                          :draftset-id ds}
-                                                        update-time))
+                                                        clock))
         (let [ts-2 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-          (t/is (= (.toEpochSecond (update-time))
-                   (.toEpochSecond ts-2))
-                "Modified time is updated after append"))))))
+          (t/is (= update-time ts-2) "Modified time is updated after append"))))))
 
 (def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
 

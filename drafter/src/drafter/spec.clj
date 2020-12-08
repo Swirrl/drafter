@@ -23,7 +23,8 @@
     drafter.backend.draftset.spec
     drafter.draftset.spec
     drafter.endpoint.spec
-    drafter.user.spec])
+    drafter.user.spec
+    drafter.time.spec])
 
 (defn load-spec-namespaces! []
   (doseq [ns spec-namespaces]

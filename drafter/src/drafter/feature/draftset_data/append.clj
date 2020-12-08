@@ -18,8 +18,8 @@
             [drafter.async.jobs :as ajobs]
             [drafter.requests :as req]
             [grafter-2.rdf4j.repository :as repo]
-            [drafter.backend.draftset.graphs :as graphs]))
-
+            [drafter.backend.draftset.graphs :as graphs]
+            [drafter.time :as time]))
 
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."
@@ -87,7 +87,7 @@
       quad)))
 
 (defn append-data-to-draftset-job
-  [tempfile {:keys [backend] :as resources} user-id {:keys [draftset-id metadata] :as params} clock-fn]
+  [tempfile {:keys [backend] :as resources} user-id {:keys [draftset-id metadata] :as params} clock]
   (let [quads (map validate-quad (get-quads tempfile params))]
     (jobs/make-job user-id
                    :background-write
@@ -95,7 +95,7 @@
                    (fn [job]
                      (let [graph-map (ops/get-draftset-graph-mapping backend draftset-id)
                            quad-batches (util/batch-partition-by quads pr/context jobs/batched-write-size)
-                           now (clock-fn)]
+                           now (time/now clock)]
                        (append-draftset-quads resources
                                               draftset-id
                                               graph-map
@@ -107,6 +107,7 @@
   "Ring handler to append data into a draftset."
   [{:keys [:drafter/backend :drafter/global-writes-lock
            :drafter.backend.draftset.graphs/manager
+           ::time/clock
            wrap-as-draftset-owner]}]
   (let [resources {:backend backend
                    :global-writes-lock global-writes-lock
@@ -118,7 +119,7 @@
          (inflate-gzipped
            (fn [{:keys [params body] :as request}]
              (let [user-id (req/user-id request)]
-               (let [append-job (append-data-to-draftset-job body resources user-id params util/get-current-time)]
+               (let [append-job (append-data-to-draftset-job body resources user-id params clock)]
                  (response/submit-async-job! append-job)))))))))))
 
 (defmethod ig/pre-init-spec ::data-handler [_]

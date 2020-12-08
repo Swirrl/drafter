@@ -6,17 +6,11 @@
             [buddy.core.codecs :as codecs]
             [integrant.core :as ig])
   (:import java.nio.charset.Charset
-           [java.util UUID Date]
-           [java.time OffsetDateTime]
+           [java.util UUID]
            [javax.mail.internet AddressException InternetAddress]
            org.eclipse.rdf4j.model.impl.URIImpl
            [java.net URI]
            [java.io IOException]))
-
-(defn get-current-time
-  "Function that get's the current time."
-  []
-  (OffsetDateTime/now))
 
 (defn create-uuid
   "Function that creates a UUID"
@@ -221,6 +215,3 @@
 
 (defmethod ig/init-key ::wait-for-connection [_ {:keys [uri timeout-seconds]}]
   (wait-for-connection uri timeout-seconds))
-
-(defn date? [x]
-  (instance? Date x))

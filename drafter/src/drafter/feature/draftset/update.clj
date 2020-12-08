@@ -18,7 +18,8 @@
             [ring.util.request :as request]
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf.protocols :as pr]
-            [drafter.backend.draftset.graphs :as graphs])
+            [drafter.backend.draftset.graphs :as graphs]
+            [drafter.time :as time])
   (:import java.net.URI
            org.apache.jena.graph.NodeFactory
            [org.apache.jena.sparql.algebra Algebra OpAsQuery]
@@ -166,9 +167,9 @@
         graph-meta))
 
 (defn- data-insert-delete-ops
-  [op {:keys [graph-manager max-update-size rewriter draftset-id graph-meta] :as opts}]
+  [op {:keys [graph-manager clock max-update-size rewriter draftset-id graph-meta] :as opts}]
   (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
-        timestamp (util/get-current-time)
+        timestamp (time/now clock)
         manage (graphs-to-manage graph-manager draftset-uri timestamp graph-meta)
         copy (graphs-to-copy graph-manager op draftset-uri timestamp max-update-size graph-meta)
         touch (graphs-to-touch op draftset-uri timestamp graph-meta)
@@ -290,11 +291,11 @@ GROUP BY ?lg ?dg")))
   (affected-graphs [op]
     #{(URI. (.getURI (.getGraph op)))})
   (size [op] 1)
-  (raw-operations [op {:keys [rewriter graph-manager draftset-id graph-meta max-update-size]}]
+  (raw-operations [op {:keys [rewriter graph-manager clock draftset-id graph-meta max-update-size]}]
     (let [g (URI. (.getURI (.getGraph op)))
           {:keys [live? draft? draft-graph-uri draft-size ops]} (graph-meta g)
           draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
-          now (util/get-current-time)
+          now (time/now clock)
           noop []]
       (cond (just-in-live? g graph-meta)
             [(manage-graph-stmt graph-manager draftset-uri now g draft-graph-uri)]
@@ -322,7 +323,7 @@ GROUP BY ?lg ?dg")))
        (map (juxt (comp str key) (comp str :draft-graph-uri val)))
        (into {})))
 
-(defn- update! [backend graph-manager max-update-size draftset-id update-request]
+(defn- update! [backend graph-manager clock max-update-size draftset-id update-request]
   (let [graph-meta (get-graph-meta backend draftset-id update-request)
         rewriter-map (rewriter-map graph-meta)
         rewriter (partial uri-constant-rewriter rewriter-map)
@@ -330,6 +331,7 @@ GROUP BY ?lg ?dg")))
               :rewriter rewriter
               :draftset-id draftset-id
               :graph-manager graph-manager
+              :clock clock
               :max-update-size max-update-size}
         update-request' (->> (.getOperations update-request)
                              (mapcat #(raw-operations % opts))
@@ -407,10 +409,10 @@ GROUP BY ?lg ?dg")))
                       {:error :method-not-allowed :method request-method})))))
 
 (defn- handler*
-  [{:keys [drafter/backend drafter.backend.draftset.graphs/manager max-update-size] :as opts} request]
+  [{:keys [drafter/backend drafter.backend.draftset.graphs/manager max-update-size ::time/clock] :as opts} request]
   ;; TODO: write-lock?
   (let [{:keys [update-request draftset-id]} (parse-update opts request max-update-size)]
-    (update! backend manager max-update-size draftset-id update-request)
+    (update! backend manager clock max-update-size draftset-id update-request)
     {:status 204}))
 
 (defn handler

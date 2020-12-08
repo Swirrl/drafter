@@ -24,10 +24,9 @@
             [drafter.util :as util]
             [drafter.test-common :as tc]
             [drafter.backend.draftset.graphs :as graphs]
-            [drafter.backend.draftset.operations :as dsops])
-  (:import java.net.URI
-           [java.util UUID]
-           [java.time OffsetDateTime]))
+            [drafter.backend.draftset.operations :as dsops]
+            [drafter.time :as time])
+  (:import java.net.URI))
 
 (use-fixtures :each validate-schemas tc/with-spec-instrumentation)
 
@@ -93,7 +92,7 @@
       (is (= false (is-graph-live? *test-backend* graph-uri)))))
 
   (testing "Live graph"
-    (let [graph-uri (make-graph-live! *test-backend* (URI. "http://live") (constantly (OffsetDateTime/parse "2015-01-01T00:00:00Z")))]
+    (let [graph-uri (make-graph-live! *test-backend* (URI. "http://live"))]
       (is (is-graph-live? *test-backend* graph-uri)))))
 
 (deftest append-data-batch!-test
@@ -110,8 +109,7 @@
     (testing "with live graph with existing data, copies data into draft"
       (let [live-uri (make-graph-live! *test-backend*
                                        (URI. "http://clones/original/data")
-                                       (triplify [(URI. "http://starting/data") [(URI. "http://starting/data") (URI. "http://starting/data")]])
-                                       (constantly (OffsetDateTime/parse "2015-01-01T00:00:00Z")))
+                                       (triplify [(URI. "http://starting/data") [(URI. "http://starting/data") (URI. "http://starting/data")]]))
             draft-graph-uri (create-managed-graph-with-draft! live-uri)]
 
         (clone-and-append-data! *test-backend* draft-graph-uri test-triples)
@@ -140,7 +138,7 @@
     (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)
           expected-triple-pattern "<http://test.com/data/one> <http://test.com/hasProperty> <http://test.com/data/1> ."]
       (append-data-batch! *test-backend* draft-graph-uri test-triples)
-      (migrate-graphs-to-live! *test-backend* [draft-graph-uri] (constantly (OffsetDateTime/parse "2015-01-01T00:00:00Z")))
+      (migrate-graphs-to-live! *test-backend* [draft-graph-uri] (time/parse "2015-01-01T00:00:00Z"))
       (is (not (ask? "GRAPH <" draft-graph-uri "> {"
                      expected-triple-pattern
                      "}"))
@@ -177,13 +175,13 @@
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-del-uri test-triples)
 
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri] (constantly (OffsetDateTime/parse "2015-01-01T00:00:00Z")))
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (constantly (OffsetDateTime/parse "2016-01-01T00:00:00Z")))
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri] (time/parse "2015-01-01T00:00:00Z"))
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (time/parse "2016-01-01T00:00:00Z"))
 
       ;; Draft for deletion has had data published. Now lets create a delete and publish
       (let [draft-graph-to-del-uri (create-managed-graph-with-draft! test-graph-to-delete-uri)]
         ;; We are migrating an empty graph, so this is deleting.
-        (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (constantly (OffsetDateTime/parse "2017-01-01T00:00:00Z")))
+        (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (time/parse "2017-01-01T00:00:00Z"))
         (let [managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
               keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri)]
           (is (not managed-found?)
@@ -207,11 +205,11 @@
 
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-keep-uri3 test-triples)
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri2] (constantly (OffsetDateTime/parse "2015-01-01T00:00:00Z")))
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri2] (time/parse "2015-01-01T00:00:00Z"))
       (is (graph-non-empty? *test-backend* graph-to-keep-uri2))
 
       ;; We are migrating an empty graph, so this is deleting.
-      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (constantly (OffsetDateTime/parse "2016-01-01T00:00:00Z")))
+      (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (time/parse "2016-01-01T00:00:00Z"))
       (let [draft-managed-found? (is-graph-managed? *test-backend* test-graph-to-delete-uri)
             keep-managed-found? (is-graph-managed? *test-backend* graph-to-keep-uri2)]
         (is draft-managed-found?

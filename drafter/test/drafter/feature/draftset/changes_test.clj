@@ -46,7 +46,7 @@
 (tc/deftest-system-with-keys revert-changes-from-graph-which-exists-in-live
   keys-for-test
   [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo graph-manager ::graphs/manager} system]
-  (let [live-graph-uri (tc/make-graph-live! backend (URI. "http://live") (constantly #inst "2017"))
+  (let [live-graph-uri (tc/make-graph-live! backend (URI. "http://live"))
         draftset-id (ops/create-draftset! backend test-editor)
         draft-graph-uri (graphs/delete-user-graph graph-manager draftset-id live-graph-uri)]
     (let [result (sut/revert-graph-changes! backend draftset-id live-graph-uri)]
@@ -58,10 +58,9 @@
   (tc/with-system
     keys-for-test
     [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo graph-manager ::graphs/manager} system]
-    (let [initial-time (constantly #inst "2017")
-          live-graph-uri (graphs/ensure-managed-user-graph graph-manager (URI. "http://live"))
-          ds1-id (ops/create-draftset! backend test-editor "ds 1" "description 1" util/create-uuid initial-time)
-          ds2-id (ops/create-draftset! backend test-publisher "ds 2" "description 2" util/create-uuid initial-time)
+    (let [live-graph-uri (graphs/ensure-managed-user-graph graph-manager (URI. "http://live"))
+          ds1-id (ops/create-draftset! backend test-editor "ds 1" "description 1")
+          ds2-id (ops/create-draftset! backend test-publisher "ds 2" "description 2")
           draft-graph1-uri (graphs/create-user-graph-draft graph-manager ds1-id live-graph-uri)
           draft-graph2-uri (graphs/create-user-graph-draft graph-manager ds2-id live-graph-uri)]
 
@@ -81,7 +80,7 @@
 (tc/deftest-system-with-keys revert-changes-in-non-existent-draftset
   keys-for-test
   [{handler [:drafter/routes :draftset/api] backend :drafter.stasher/repo} system]
-  (let [live-graph (tc/make-graph-live! backend (URI. "http://live") (constantly #inst "2017"))
+  (let [live-graph (tc/make-graph-live! backend (URI. "http://live"))
         result (sut/revert-graph-changes! backend (ds/->DraftsetId "missing") live-graph)]
     (t/is (= :not-found result))))
 

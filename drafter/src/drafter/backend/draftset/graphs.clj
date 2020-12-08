@@ -7,7 +7,8 @@
             [drafter.draftset :as ds]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.util :as util]
-            [grafter.url :as url])
+            [grafter.url :as url]
+            [drafter.time :as time])
   (:import [java.util.regex Pattern]
            [java.net URI]))
 
@@ -32,9 +33,11 @@
    the URIMatcher protocol. A graph is considered to be protected if it matches
    any of either the default or specified matchers."
   ([repo] (create-manager repo #{}))
-  ([repo protected-graphs]
+  ([repo protected-graphs] (create-manager repo protected-graphs time/system-clock))
+  ([repo protected-graphs clock]
    {:repo repo
-    :protected-graphs (into default-protected-graphs protected-graphs)}))
+    :protected-graphs (into default-protected-graphs protected-graphs)
+    :clock clock}))
 
 (defn protected-graph?
   "Whether the given graph URI is protected"
@@ -121,8 +124,8 @@
   "Creates a new draft graph with a unique graph name, expects the
   live graph to already be created. Returns the URI of the draft that
   was created."
-  [{:keys [repo] :as manager} draftset-ref live-graph-uri]
-  (let [now (util/get-current-time)
+  [{:keys [repo clock] :as manager} draftset-ref live-graph-uri]
+  (let [now (time/now clock)
         draft-graph-uri (mgmt/make-draft-graph-uri)
         draftset-uri (url/->java-uri draftset-ref)
         quads (draft-graph-statements live-graph-uri draft-graph-uri now draftset-uri)]
@@ -150,11 +153,11 @@
    empty draft graph is created for it, publishing the empty graph will then result
    in a deletion from live. Throws an exception if the graph-uri is not a valid
    user graph."
-  [{:keys [repo] :as manager} draftset-ref graph-uri]
+  [{:keys [repo clock] :as manager} draftset-ref graph-uri]
   (check-graph-unprotected! manager graph-uri)
   (when (mgmt/is-graph-managed? repo graph-uri)
     (let [graph-mapping (dsops/get-draftset-graph-mapping repo draftset-ref)
-          modified-at (util/get-current-time)]
+          modified-at (time/now clock)]
       (if-let [draft-graph-uri (get graph-mapping graph-uri)]
         (do
           (mgmt/delete-graph-contents! repo draft-graph-uri modified-at)
@@ -163,5 +166,5 @@
           draft-graph-uri)
         (create-draft-graph manager draftset-ref graph-uri)))))
 
-(defmethod ig/init-key ::manager [_ {:keys [repo protected-graphs] :as opts}]
-  (create-manager repo protected-graphs))
+(defmethod ig/init-key ::manager [_ {:keys [repo protected-graphs ::time/clock] :as opts}]
+  (create-manager repo protected-graphs clock))
