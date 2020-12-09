@@ -1,13 +1,12 @@
 (ns drafter.backend.live
   "A thin wrapper over a Repository/Connection that implements a graph
   restriction, hiding all but the set of live (ManagedGraph)'s."
-  (:require [clojure.spec.alpha :as s]
-            [drafter.backend.common :as bprot :refer [->sesame-repo]]
-            [drafter.backend.draftset.draft-management :as mgmt]
+  (:require [drafter.backend.draftset.draft-management :as mgmt]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [drafter.backend.common :as bprot])
   (:import java.io.Closeable
            [org.apache.jena.query QueryFactory Syntax]
            org.eclipse.rdf4j.model.impl.URIImpl
@@ -17,7 +16,7 @@
   (let [stasher-conn (repo/->connection inner)]
     (reify
       repo/IPrepareQuery
-      (repo/prepare-query* [this sparql-string dataset]
+      (prepare-query* [this sparql-string dataset]
         (let [query (QueryFactory/create sparql-string Syntax/syntaxSPARQL_11)
               user-restriction (some-> dataset bprot/dataset->restriction)
               query-restriction (bprot/query-dataset-restriction query)]
@@ -29,9 +28,9 @@
 
       ;; Currently restricted connections only support querying...
       pr/ISPARQLable
-      (pr/query-dataset [this sparql-string dataset]
+      (query-dataset [this sparql-string dataset]
         (pr/query-dataset this sparql-string dataset {}))
-      (pr/query-dataset [this sparql-string dataset opts]
+      (query-dataset [this sparql-string dataset opts]
         (let [pquery (repo/prepare-query this sparql-string dataset opts)]
           (repo/evaluate pquery)))
 
@@ -51,17 +50,8 @@
             (f iter)))))))
 
 (defrecord RestrictedExecutor [inner restriction]
-  ;; TODO Think we should get rid of this...
-  #_bprot/SparqlExecutor
-  #_(prepare-query [this query-string]
-    (let [pquery (bprot/prep-and-validate-query inner query-string)]
-      (bprot/apply-restriction pquery restriction)))
-
-  bprot/ToRepository
-  (->sesame-repo [_] (->sesame-repo inner))
-
   repo/ToConnection
-  (repo/->connection [this]
+  (->connection [this]
     (build-restricted-connection this)))
 
 (defn live-endpoint-with-stasher

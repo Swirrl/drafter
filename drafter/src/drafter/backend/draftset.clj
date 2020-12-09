@@ -1,5 +1,5 @@
 (ns drafter.backend.draftset
-  (:require [drafter.backend.common :as bprot :refer [->sesame-repo]]
+  (:require [drafter.backend.common :as bprot]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as dsmgmt]
             [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
@@ -8,8 +8,7 @@
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
-            [clojure.spec.alpha :as s]
-            [clojure.tools.logging :as log])
+            [clojure.spec.alpha :as s])
   (:import java.io.Closeable
            [org.apache.jena.query QueryFactory Syntax]
            [org.eclipse.rdf4j.model Resource URI]
@@ -45,7 +44,7 @@
   (let [conn (repo/->connection repo)]
     (reify
       repo/IPrepareQuery
-      (repo/prepare-query* [this sparql-string dataset]
+      (prepare-query* [this sparql-string dataset]
         (prepare-rewrite-query conn
                                live->draft
                                sparql-string
@@ -54,7 +53,7 @@
 
       ;; TODO fix this interface to work with pull queries.
       proto/ISPARQLable
-      (proto/query-dataset [this sparql-string _model]
+      (query-dataset [this sparql-string _model]
         (let [pquery (repo/prepare-query* this sparql-string _model)]
           (repo/evaluate pquery)))
 
@@ -74,13 +73,8 @@
             (f iter)))))))
 
 (defrecord RewritingSesameSparqlExecutor [repo live->draft union-with-live?]
-  bprot/ToRepository
-  (->sesame-repo [_]
-    (log/warn "DEPRECATED CALL TO ->sesame-repo.  TODO: remove call")
-    (->sesame-repo repo))
-
   repo/ToConnection
-  (repo/->connection [this]
+  (->connection [this]
     (build-draftset-connection this)))
 
 (defn build-draftset-endpoint

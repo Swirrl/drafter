@@ -2,7 +2,6 @@
   (:require [clojure.set :as set]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [drafter.backend.common :refer [->repo-connection ->sesame-repo]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql :refer [update!]]
             [drafter.util :as util]
@@ -524,12 +523,12 @@ WHERE {
 
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."
-  [backend graph-uri triple-batch]
+  [repo graph-uri triple-batch]
   ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
   ;;so only create one if there is data in the batch
   (if-not (empty? triple-batch)
     ;;WARNING: This assumes the backend is a sesame backend which is
     ;;true for all current backends.
-    (with-open [conn (->repo-connection backend)]
+    (with-open [conn (repo/->connection repo)]
       (repo/with-transaction conn
         (sparql/add conn graph-uri triple-batch)))))

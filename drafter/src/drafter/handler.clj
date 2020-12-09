@@ -1,7 +1,6 @@
 (ns drafter.handler
   (:require [compojure.core :refer [context defroutes GET]]
             [compojure.route :as route]
-            [drafter.backend.common :refer [stop-backend]]
             [drafter.env :as denv]
             [drafter.middleware :as middleware]
             [drafter.routes.pages :refer [pages-routes]]
@@ -75,12 +74,3 @@
 
 (defmethod ig/init-key :drafter.handler/app [k opts]
   (build-handler opts))
-
-;; TODO remove/replace
-#_(defn destroy
-  "destroy will be called when your application
-   shuts down, put any clean up code here"
-  []
-  (log/info "drafter is shutting down.  Please wait (this can take a minute)...")
-  (stop-backend backend)
-  (log/info "drafter has shut down."))

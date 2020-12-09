@@ -2,7 +2,6 @@
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.test :refer :all]
-            [drafter.backend.common :refer [prepare-query]]
             [drafter.backend.draftset.draft-management
              :refer
              [append-data-batch! create-draft-graph!]]
@@ -15,8 +14,7 @@
             [grafter-2.rdf4j.repository :as repo]
             [schema.test :refer [validate-schemas]]
             [drafter.test-common :as tc])
-  (:import java.net.URI
-           org.eclipse.rdf4j.model.impl.URIImpl))
+  (:import [java.net URI]))
 
 (use-fixtures :each
   validate-schemas
@@ -84,7 +82,7 @@
   [db query-str query-substitutions]
   (with-open [conn (repo/->connection db)]
     (let [rewritten-query (rewrite-sparql-string query-substitutions query-str)
-          prepared-query (prepare-query conn rewritten-query)]
+          prepared-query (repo/prepare-query conn rewritten-query)]
       (rewrite-graph-results query-substitutions prepared-query))))
 
 (defn first-result [results key]
