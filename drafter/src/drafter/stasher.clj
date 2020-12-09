@@ -25,12 +25,10 @@
            org.eclipse.rdf4j.query.resultio.helpers.BackgroundTupleResult
            (org.eclipse.rdf4j.query.resultio TupleQueryResultFormat BooleanQueryResultFormat QueryResultIO
                                              TupleQueryResultWriter BooleanQueryResultParserRegistry
-                                             TupleQueryResultParserRegistry)
-           org.eclipse.rdf4j.repository.Repository
-           org.eclipse.rdf4j.repository.RepositoryConnection
-           (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate)
+                                             TupleQueryResultParserRegistry TupleQueryResultParser BooleanQueryResultParser)
+           [org.eclipse.rdf4j.repository Repository RepositoryConnection]
+           (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate QueryStringUtil)
            (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry)
-           (org.eclipse.rdf4j.query.resultio TupleQueryResultParser BooleanQueryResultParser)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
            java.time.OffsetDateTime))
 
@@ -73,12 +71,6 @@
 
 (defmethod ig/halt-key! ::cache-thread-pool [k thread-pool]
   (.shutdown thread-pool))
-
-
-
-
-
-
 
 (defprotocol Stash
   (get-result [this cache-key base-uri-str]
@@ -478,7 +470,8 @@
     (evaluate
       ;; sync results
       ([]
-       (let [dataset (.getDataset this)]
+       (let [dataset (.getDataset this)
+             query-str (QueryStringUtil/getGraphQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
@@ -496,7 +489,8 @@
 
       ;; async results
       ([rdf-handler]
-       (let [dataset (.getDataset this)]
+       (let [dataset (.getDataset this)
+             query-str (QueryStringUtil/getGraphQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
@@ -518,7 +512,8 @@
     (evaluate
       ;; sync results
       ([]
-       (let [dataset (.getDataset this)]
+       (let [dataset (.getDataset this)
+             query-str (QueryStringUtil/getTupleQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (get-result cache cache-key base-uri-str)
@@ -536,7 +531,8 @@
                              (.getMaxExecutionTime this)
                              (.getBindingsArray this))))))
       ([tuple-handler]
-       (let [dataset (.getDataset this)]
+       (let [dataset (.getDataset this)
+             query-str (QueryStringUtil/getTupleQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
@@ -557,7 +553,8 @@
   [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
-      (let [dataset (.getDataset this)]
+      (let [dataset (.getDataset this)
+            query-str (QueryStringUtil/getBooleanQueryString query-str (.getBindings this))]
         (if cache?
           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
                 result (get-result cache cache-key base-uri-str)]
