@@ -8,12 +8,13 @@
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
-            [schema.core :as sc]
+            [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log])
   (:import java.io.Closeable
            [org.apache.jena.query QueryFactory Syntax]
            [org.eclipse.rdf4j.model Resource URI]
-           org.eclipse.rdf4j.model.impl.URIImpl))
+           org.eclipse.rdf4j.model.impl.URIImpl
+           [org.eclipse.rdf4j.common.iteration Iteration]))
 
 (defn- live->draft-remap-restriction [live->draft restriction]
   (let [dictionary (into {} (map (fn [[k v]] [(str k) v]) live->draft))
@@ -43,15 +44,6 @@
 (defn- build-draftset-connection [{:keys [repo live->draft union-with-live?]}]
   (let [conn (repo/->connection repo)]
     (reify
-
-      #_bprot/SparqlExecutor
-      #_(prepare-query [this sparql-string]
-        (let [rewritten-query-string (rewrite-sparql-string live->draft sparql-string)
-              graph-restriction (mgmt/graph-mapping->graph-restriction inner live->draft union-with-live?)
-              pquery (bprot/prep-and-validate-query inner rewritten-query-string)
-              pquery (bprot/apply-restriction pquery graph-restriction)]
-          (rewrite-query-results pquery live->draft)))
-
       repo/IPrepareQuery
       (repo/prepare-query* [this sparql-string dataset]
         (prepare-rewrite-query conn
@@ -74,22 +66,14 @@
       ;; enforces the graph restriction.
       proto/ITripleReadable
       (pr/to-statements [this {:keys [:grafter.repository/infer] :or {infer true}}]
-        (let [f (fn next-item [i]
+        (let [f (fn next-item [^Iteration i]
                   (when (.hasNext i)
                     (let [v (.next i)]
                       (lazy-seq (cons (rio/backend-quad->grafter-quad v) (next-item i))))))]
           (let [iter (.getStatements conn nil nil nil infer (into-array Resource (map #(URIImpl. (str %)) (vals live->draft))))]
             (f iter)))))))
 
-
-(sc/defrecord RewritingSesameSparqlExecutor [repo :- (sc/protocol bprot/SparqlExecutor)
-                                             live->draft :- {URI URI}
-                                             union-with-live? :- Boolean]
-  #_bprot/SparqlExecutor
-  #_(prepare-query [this sparql-string]
-    (prepare-rewrite-query live->draft sparql-string inner union-with-live?))
-
-  ;; TODO remove this
+(defrecord RewritingSesameSparqlExecutor [repo live->draft union-with-live?]
   bprot/ToRepository
   (->sesame-repo [_]
     (log/warn "DEPRECATED CALL TO ->sesame-repo.  TODO: remove call")
@@ -98,13 +82,6 @@
   repo/ToConnection
   (repo/->connection [this]
     (build-draftset-connection this)))
-
-;; TODO REMOVE THIS function
-#_(defn draftset-endpoint
-  "Build a SPARQL queryable repo representing the draftset"
-  [{:keys [backend draftset-ref union-with-live?]}]
-  (let [graph-mapping (dsmgmt/get-draftset-graph-mapping backend draftset-ref)]
-    (->RewritingSesameSparqlExecutor backend graph-mapping union-with-live?)))
 
 (defn build-draftset-endpoint
   "Build a SPARQL queryable repo representing the draftset"

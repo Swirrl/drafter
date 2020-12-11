@@ -1,38 +1,26 @@
 (ns ^:rest-api drafter.feature.draftset.create-test
-  (:require [drafter.feature.draftset.create :as sut]
-            [clojure.test :as t])
-  (:require [clojure.java.io :as io]
-            [clojure.set :as set]
+  (:require [clojure.test :as t]
             [clojure.test :refer :all :as t]
-            [drafter.middleware :as middleware]
             [drafter.rdf.drafter-ontology
              :refer
              [drafter:DraftGraph drafter:modifiedAt]]
-            [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.rdf.sparql :as sparql]
             [drafter.swagger :as swagger]
             [drafter.test-common :as tc]
-            [drafter.timeouts :as timeouts]
-            [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
-            [drafter.user.memory-repository :as memrepo]
-            [drafter.util :as util]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
-            [grafter-2.rdf4j.formats :as formats]
             [grafter-2.rdf4j.io :refer [statements rdf-writer]]
-            [schema.core :as s]))
+            [clojure.spec.alpha :as s]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
-(def see-other-response-schema
-  (merge tc/ring-response-schema
-         {:status (s/eq 303)
-          :headers {(s/required-key "Location") s/Str}}))
+(defn- contains-header? [header-name]
+  (fn [response] (contains? (:headers response) header-name)))
 
-
+(s/def :ring/see-other-response (s/and (tc/response-code-spec 303)
+                                       (contains-header? "Location")))
 
 (defn assert-is-see-other-response [response]
-  (tc/assert-schema see-other-response-schema response))
+  (tc/assert-spec :ring/see-other-response response))
 
 (defn valid-swagger-response?
   "Applies handler to request and validates the response against the

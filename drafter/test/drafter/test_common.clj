@@ -4,7 +4,8 @@
             [clojure.java.io :as io]
             [clojure.pprint :as pp]
             [clojure.spec.test.alpha :as st]
-            [clojure.spec.alpha :as sp]
+            [clojure.spec.alpha :as s]
+            [ring.core.spec]
             [clojure.test :refer :all]
             [drafter.backend.draftset.draft-management
              :refer
@@ -21,7 +22,6 @@
             [kaocha.plugin.auth-env-plugin :refer [*auth-env*]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
-            [schema.core :as s]
             [drafter.async.jobs :as async :refer [create-job]]
             [aero.core :as aero]
             [drafter.user :as user]
@@ -448,65 +448,59 @@
   [m]
   (set (keys m)))
 
-(defn assert-schema [schema value]
-  (let [errors (s/check schema value)]
-    (is (not errors) errors)))
-
 (defn assert-spec [spec x]
-  (is (nil? (sp/explain-data spec x))))
+  (is (nil? (s/explain-data spec x))))
 
 (defn deny-spec [spec x]
-  (is (some? (sp/explain-data spec x))))
+  (is (some? (s/explain-data spec x))))
 
-(def ring-response-schema
-  {:status s/Int
-   :headers {s/Str s/Str}
-   :body s/Any})
+(defn- status-matches? [status-code]
+  (fn [response] (= status-code (:status response))))
 
-(defn response-code-schema [code]
-  (assoc ring-response-schema :status (s/eq code)))
+(defn response-code-spec [code]
+  (s/and :ring/response (status-matches? code)))
 
 (defn assert-is-ok-response [response]
-  (assert-schema (response-code-schema 200) response))
+  (assert-spec (response-code-spec 200) response))
 
 (defn assert-is-accepted-response [response]
-  (assert-schema (response-code-schema 202) response))
+  (assert-spec (response-code-spec 202) response))
 
 (defn assert-is-no-content-response [response]
-  (assert-schema (response-code-schema 204) response))
+  (assert-spec (response-code-spec 204) response))
 
 (defn assert-is-not-found-response [response]
-  (assert-schema (response-code-schema 404) response))
+  (assert-spec (response-code-spec 404) response))
 
 (defn assert-is-not-acceptable-response [response]
-  (assert-schema (response-code-schema 406) response))
+  (assert-spec (response-code-spec 406) response))
 
 (defn assert-is-unprocessable-response [response]
-  (assert-schema (response-code-schema 422) response))
+  (assert-spec (response-code-spec 422) response))
 
 (defn assert-is-payload-too-large-response [response]
-  (assert-schema (response-code-schema 413) response))
+  (assert-spec (response-code-spec 413) response))
 
 (defn assert-is-unsupported-media-type-response [response]
-  (assert-schema (response-code-schema 415) response))
+  (assert-spec (response-code-spec 415) response))
 
 (defn assert-is-method-not-allowed-response [response]
-  (assert-schema (response-code-schema 405) response))
+  (assert-spec (response-code-spec 405) response))
 
 (defn assert-is-forbidden-response [response]
-  (assert-schema (response-code-schema 403) response))
+  (assert-spec (response-code-spec 403) response))
 
 (defn assert-is-unauthorised-response [response]
-  (assert-schema (response-code-schema 401) response))
+  (assert-spec (response-code-spec 401) response))
 
 (defn assert-is-bad-request-response [response]
-  (assert-schema (response-code-schema 400) response))
+  (assert-spec (response-code-spec 400) response))
 
 (defn assert-is-server-error [response]
-  (assert-schema (response-code-schema 500) response))
+  (assert-spec (response-code-spec 500) response))
 
 (defn assert-is-service-unavailable-response [response]
-  (assert-schema (response-code-schema 503) response))
+  (assert-spec (response-code-spec 503) response))
 
 (defn string->input-stream [s]
   (ByteArrayInputStream. (.getBytes s)))

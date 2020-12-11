@@ -1,16 +1,13 @@
 (ns drafter.user.mongo
-  (:require [clojure
-             [set :as set]
-             [string :as string]]
+  (:require [clojure.set :as set]
             [drafter.user :as user]
             [monger
              [collection :as mc]
              [core :as mg]]
-            [schema.core :as s]
+            [clojure.spec.alpha :as s]
             [integrant.core :as ig])
   (:import java.io.Closeable
-           org.bson.types.ObjectId
-           org.mindrot.jbcrypt.BCrypt))
+           org.bson.types.ObjectId))
 
 (def ^:private role-mappings
   {10 :editor
@@ -18,14 +15,18 @@
    30 :manager
    40 :system})
 
-(def ^:private mongo-user-schema
-  {(s/required-key :email) s/Str
-   (s/required-key :role_number) (apply s/enum (keys role-mappings))
-   (s/required-key :encrypted_password) s/Str
-   s/Any s/Any})
+(s/def :mongo/email string?)
+(s/def :mongo/role_number #(contains? role-mappings %))
+(s/def :mongo/encrypted_password string?)
+(s/def ::MongoUserSchema (s/keys :req-un [:mongo/email :mongo/role_number :mongo/encrypted_password]))
+
+(defn- validate-spec! [spec x]
+  (when-not (s/valid? spec x)
+    (throw (ex-info "Object did not satisfy spec" {:spec spec :object x}))))
 
 (defn- mongo-user->user [{:keys [role_number email encrypted_password] :as mongo-user}]
-  (s/validate mongo-user-schema mongo-user)
+  ;;TODO: check with instrumentation?
+  (validate-spec! ::MongoUserSchema mongo-user)
   (user/create-user email (role-mappings role_number) encrypted_password))
 
 (defrecord MongoUserRepository [conn db user-collection]
