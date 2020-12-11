@@ -1,6 +1,5 @@
 (ns drafter.feature.draftset-data.delete
   (:require [clojure.spec.alpha :as s]
-            [drafter.backend.common :refer [->sesame-repo]]
             [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as ops]
             [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
@@ -35,7 +34,7 @@
           (if (mgmt/is-graph-managed? repo live-graph)
             (if-let [draft-graph-uri (get live->draft live-graph)]
               (do
-                (with-open [conn (repo/->connection (->sesame-repo repo))]
+                (with-open [conn (repo/->connection repo)]
                   (touch-graph-in-draftset! conn draftset-ref draft-graph-uri job-started-at)
                   (let [rewritten-statements (map #(rewrite-statement live->draft %) batch)
                         sesame-statements (map quad->backend-quad rewritten-statements)

@@ -11,7 +11,6 @@
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as dd]
             [me.raynes.fs :as fs]
-            [drafter.backend.common :as drpr]
             [grafter-2.rdf4j.repository.registry :as reg]
             [grafter-2.rdf4j.io :as rio]
             [drafter.stasher.formats :as formats]
@@ -26,23 +25,12 @@
            (org.eclipse.rdf4j.query.resultio TupleQueryResultFormat BooleanQueryResultFormat QueryResultIO
                                              TupleQueryResultWriter BooleanQueryResultParserRegistry
                                              TupleQueryResultParserRegistry)
-           org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.repository.RepositoryConnection
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate)
            (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry)
            (org.eclipse.rdf4j.query.resultio TupleQueryResultParser BooleanQueryResultParser)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
            java.time.OffsetDateTime))
-
-(extend-type Repository
-  ;; TODO can probably remove this...
-  drpr/ToRepository
-  (drpr/->sesame-repo [r] r))
-
-(extend-type RepositoryConnection
-  drpr/SparqlExecutor
-  (drpr/prepare-query [this sparql-string]
-    (drpr/prep-and-validate-query this sparql-string)))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)
@@ -652,7 +640,7 @@
 
 (defmethod ig/halt-key! :drafter.stasher/repo [_ repo]
   (log/info "Shutting down stasher repo")
-  (drpr/stop-backend repo))
+  (repo/shutdown repo))
 
 
 (defmethod ig/init-key :drafter.stasher/cache [_ opts]
