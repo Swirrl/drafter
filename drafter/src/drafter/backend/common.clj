@@ -1,20 +1,35 @@
 (ns drafter.backend.common
   (:require [drafter.backend.draftset.arq :as arq]
-            [grafter-2.rdf4j.repository :as repo])
-  (:import java.net.URI))
+            [grafter-2.rdf4j.repository :as repo]
+            [clojure.set :as set])
+  (:import java.net.URI
+           org.eclipse.rdf4j.query.Dataset
+           org.apache.jena.sparql.core.DatasetDescription))
 
-(defprotocol ToRepository
-  (->sesame-repo [this]
-    "Gets the sesame repository for this backend"))
+(defn- get-restrictions [graph-restrictions]
+  (cond
+   (coll? graph-restrictions) graph-restrictions
+   (fn? graph-restrictions) (graph-restrictions)
+   :else nil))
 
-(defn stop-backend [backend]
-  (repo/shutdown (->sesame-repo backend)))
+(defn restricted-dataset
+  "Returns a restricted dataset or nil when given either a 0-arg
+  function or a collection of graph uris."
+  [graph-restrictions]
+  {:pre [(or (nil? graph-restrictions)
+             (coll? graph-restrictions)
+             (fn? graph-restrictions))]
+   :post [(or (instance? Dataset %)
+              (nil? %))]}
+  (when-let [graph-restrictions (get-restrictions graph-restrictions)]
+    (let [stringified-restriction (map str graph-restrictions)]
+      (repo/make-restricted-dataset :default-graph stringified-restriction
+                                    :named-graphs stringified-restriction))))
 
-(defn ->repo-connection
-  "Opens a connection to the underlying Sesame repository for the
-  given backend."
-  [backend]
-  (repo/->connection (->sesame-repo backend)))
+(defn apply-restriction [pquery restriction]
+  (let [dataset (restricted-dataset restriction)]
+    (.setDataset pquery dataset)
+    pquery))
 
 (defn validate-query
   "Validates a query by parsing it using ARQ. If the query is invalid

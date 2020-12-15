@@ -1,14 +1,24 @@
-{:drafter.user/memory-repository
- {:users [{:username "editor@swirrl.com" :password "password" :role :editor}
-          {:username "publisher@swirrl.com" :password "password" :role :publisher}
-          {:username "manager@swirrl.com" :password "password" :role :manager}
-          {:username "system@swirrl.com" :password "password" :role :system}]
-  :realm "Drafter Memory Repo"}
+{;; :drafter.user/memory-repository
+ ;; {:users [{:username "editor@swirrl.com" :password "password" :role :editor}
+ ;;          {:username "publisher@swirrl.com" :password "password" :role :publisher}
+ ;;          {:username "manager@swirrl.com" :password "password" :role :manager}
+ ;;          {:username "system@swirrl.com" :password "password" :role :system}]
+ ;;  :realm "Drafter Memory Repo"}
 
  :drafter.common.config/sparql-query-endpoint "http://localhost:5820/drafter-client-test/query"
  :drafter.common.config/sparql-update-endpoint "http://localhost:5820/drafter-client-test/update"
 
  :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
+
+ :drafter.user/auth0-repository {:auth0 #ig/ref :swirrl.auth0/client}
+
+ :swirrl.auth0/client {:endpoint #env AUTH0_DOMAIN
+                       :iss #env AUTH0_DOMAIN
+                       :aud #env AUTH0_AUD
+                       :api #join [#env AUTH0_DOMAIN "/api/v2/"]
+                       :swagger-json #resource "swirrl/auth0/swagger.json"
+                       :client-id #env AUTH0_CLIENT_ID
+                       :client-secret #env AUTH0_CLIENT_SECRET}
 
  :drafter.auth/auth0 {:iss #env AUTH0_DOMAIN
                       :aud #env AUTH0_AUD

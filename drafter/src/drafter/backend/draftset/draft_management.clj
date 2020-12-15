@@ -2,7 +2,6 @@
   (:require [clojure.set :as set]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [drafter.backend.common :refer [->repo-connection ->sesame-repo]]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql :refer [update!]]
             [drafter.util :as util]
@@ -11,11 +10,11 @@
             [grafter.url :as url]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
-            [schema.core :as s]
+            [clojure.spec.alpha :as s]
             [grafter-2.rdf4j.io :as rio]
             [clojure.string :as string])
   (:import java.net.URI
-           [java.util Date UUID]))
+           [java.util UUID]))
 
 (def drafter-state-graph (URI. "http://publishmydata.com/graphs/drafter/drafts"))
 
@@ -160,16 +159,15 @@
      "  }"
      "}")))
 
-(s/defn set-timestamp-on-resource!
+(defn set-timestamp-on-resource!
   "Sets the specified object on the specified subject/predicate.  It
   assumes the property has a cardinality of 1 or 0, so will delete all
   other values of \":subject :predicate ?object\" if present."
-  [predicate
-   repo
-   subject
-   date-time :- Date]
-
+  [predicate repo subject date-time]
   (update! repo (set-timestamp subject predicate date-time)))
+
+(s/fdef set-timestamp-on-resource!
+  :args (s/cat :predicate uri? :repo any? :subject uri? :date-time util/date?))
 
 (def ^{:doc "Set modified at time on a resource.  It is assumed the
   cardinality of modifiedAt is at most 1, and that it will be updated in
@@ -534,12 +532,12 @@ WHERE {
 
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."
-  [backend graph-uri triple-batch]
+  [repo graph-uri triple-batch]
   ;;NOTE: The remote sesame client throws an exception if an empty transaction is committed
   ;;so only create one if there is data in the batch
   (if-not (empty? triple-batch)
     ;;WARNING: This assumes the backend is a sesame backend which is
     ;;true for all current backends.
-    (with-open [conn (->repo-connection backend)]
+    (with-open [conn (repo/->connection repo)]
       (repo/with-transaction conn
         (sparql/add conn graph-uri triple-batch)))))

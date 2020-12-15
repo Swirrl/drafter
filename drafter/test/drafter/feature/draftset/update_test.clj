@@ -276,72 +276,73 @@ INSERT DATA { GRAPH <%s> { <http://s> <http://p> d: } }
           (tc/assert-is-payload-too-large-response response)
           (is (= (- (* 2 n) 2) (count res))))))))
 
-(tc/deftest-system-with-keys delete-from-live-test
-  keys-for-test [system system-config]
-  (with-open [conn (-> system
-                       :drafter.common.config/sparql-query-endpoint
-                       repo/sparql-repo
-                       repo/->connection)]
-    (let [handler (get system [:drafter/routes :draftset/api])
-          g (URI. (str "http://g/" (UUID/randomUUID)))]
-      (testing "Copies graph, deletes triple from it"
-        (let [draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 50
-              [quads1 more] (split-at n (valid-triples-g g))
-              stmt (insert-stmt-str quads1)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-              ;; There should now be 50 triples live in graph g
-              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
-              res (repo/query conn (format q g))
-              _ (is (= 50 ( count res)))
+(t/deftest delete-from-live-test
+  (tc/with-system
+    keys-for-test [system system-config]
+    (with-open [conn (-> system
+                         :drafter.common.config/sparql-query-endpoint
+                         repo/sparql-repo
+                         repo/->connection)]
+      (let [handler (get system [:drafter/routes :draftset/api])
+            g (URI. (str "http://g/" (UUID/randomUUID)))]
+        (testing "Copies graph, deletes triple from it"
+          (let [draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 50
+                [quads1 more] (split-at n (valid-triples-g g))
+                stmt (insert-stmt-str quads1)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+                ;; There should now be 50 triples live in graph g
+                q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+                res (repo/query conn (format q g))
+                _ (is (= 50 (count res)))
 
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
 
-              stmt (delete-stmt-str [(first quads1)])
-              response (update! stmt)
-              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
-          (tc/assert-is-no-content-response response)
-          (is (= 49 (count res)))))
+                stmt (delete-stmt-str [(first quads1)])
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+            (tc/assert-is-no-content-response response)
+            (is (= 49 (count res)))))
 
-      (testing "Fail on trying to copy large graphs"
-        (let [;; There should already be 50 triples in live
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
-              n 50
-              [quads1 more] (split-at n (drop 50 (valid-triples-g g)))
-              [quads2 more] (split-at n more)
-              stmt (insert-stmt-str quads1)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              stmt (insert-stmt-str quads2)
-              response (update! stmt)
-              _ (tc/assert-is-no-content-response response)
-              _ (help/publish-draftset-through-api handler draftset-location test-publisher)
-              q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
-              res (repo/query conn (format q g))
-              ;; There should now be 150 triples live in graph g
-              _ (is (= 150 (count res)))
+        (testing "Fail on trying to copy large graphs"
+          (let [;; There should already be 50 triples in live
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
+                n 50
+                [quads1 more] (split-at n (drop 50 (valid-triples-g g)))
+                [quads2 more] (split-at n more)
+                stmt (insert-stmt-str quads1)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                stmt (insert-stmt-str quads2)
+                response (update! stmt)
+                _ (tc/assert-is-no-content-response response)
+                _ (help/publish-draftset-through-api handler draftset-location test-publisher)
+                q "SELECT ?g ?s ?p ?o WHERE { BIND ( <%s> AS ?g ) GRAPH ?g { ?s ?p ?o } }"
+                res (repo/query conn (format q g))
+                ;; There should now be 150 triples live in graph g
+                _ (is (= 150 (count res)))
 
-              draftset-location (help/create-draftset-through-api handler test-publisher)
-              update! (fn [stmt]
-                        (handler (create-update-request
-                                  test-publisher draftset-location stmt)))
+                draftset-location (help/create-draftset-through-api handler test-publisher)
+                update! (fn [stmt]
+                          (handler (create-update-request
+                                     test-publisher draftset-location stmt)))
 
-              stmt (delete-stmt-str [(first quads1)])
-              response (update! stmt)
-              res (repo/query conn (draftset-quads-mapping-q draftset-location))]
-          (tc/assert-is-server-error response)
-          (is (zero? (count res))))))))
+                stmt (delete-stmt-str [(first quads1)])
+                response (update! stmt)
+                res (repo/query conn (draftset-quads-mapping-q draftset-location))]
+            (tc/assert-is-server-error response)
+            (is (zero? (count res)))))))))
 
 (tc/deftest-system-with-keys drop-graph-test
   keys-for-test [system system-config]

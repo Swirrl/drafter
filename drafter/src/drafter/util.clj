@@ -6,7 +6,7 @@
             [buddy.core.codecs :as codecs]
             [integrant.core :as ig])
   (:import java.nio.charset.Charset
-           [java.util UUID]
+           [java.util UUID Date]
            [java.time OffsetDateTime]
            [javax.mail.internet AddressException InternetAddress]
            org.eclipse.rdf4j.model.impl.URIImpl
@@ -229,3 +229,6 @@
 
 (defmethod ig/init-key ::wait-for-connection [_ {:keys [uri timeout-seconds]}]
   (wait-for-connection uri timeout-seconds))
+
+(defn date? [x]
+  (instance? Date x))

@@ -1,13 +1,11 @@
 (ns drafter.backend.draftset
-  (:require [drafter.backend.common :as bprot :refer [->sesame-repo]]
-            [drafter.backend.draftset.draft-management :as mgmt]
+  (:require [drafter.backend.draftset.draft-management :as mgmt]
             [drafter.backend.draftset.operations :as dsmgmt]
             [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
             [drafter.backend.draftset.rewrite-result :refer [rewriting-query] :as rer]
             [grafter-2.rdf.protocols :as proto]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
-            [clojure.tools.logging :as log]
             [clojure.set :as set]
             [drafter.rdf.sesame :as ses]
             [drafter.backend.draftset.arq :as arq]
@@ -80,12 +78,6 @@
           (map rewrite-statement (ses/get-statements conn infer graphs)))))))
 
 (defrecord RewritingSesameSparqlExecutor [repo live->draft union-with-live?]
-  ;; TODO remove this
-  bprot/ToRepository
-  (->sesame-repo [_]
-    (log/warn "DEPRECATED CALL TO ->sesame-repo.  TODO: remove call")
-    (->sesame-repo repo))
-
   repo/ToConnection
   (->connection [this]
     (build-draftset-connection this)))

@@ -1,8 +1,7 @@
 (ns drafter.backend.live
   "A thin wrapper over a Repository/Connection that implements a graph
   restriction, hiding all but the set of live (ManagedGraph)'s."
-  (:require [drafter.backend.common :as bprot :refer [->sesame-repo]]
-            [drafter.backend.draftset.draft-management :as mgmt]
+  (:require [drafter.backend.draftset.draft-management :as mgmt]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
@@ -44,10 +43,6 @@
           (ses/get-statements stasher-conn infer live-graphs))))))
 
 (defrecord RestrictedExecutor [inner restriction]
-  ;; TODO Think we should get rid of this...
-  bprot/ToRepository
-  (->sesame-repo [_] (->sesame-repo inner))
-
   repo/ToConnection
   (->connection [this]
     (build-restricted-connection this)))
