@@ -2,31 +2,20 @@
   "Thin wrapper over a SparqlRepository as a configurable integrant component."
   (:require [clojure.spec.alpha :as s]
             [drafter.backend :as backend]
-            [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [drafter.backend.common :as drpr]
-            [drafter.backend.draftset :as ds]
             [grafter-2.rdf4j.repository.registry :as reg]
-            [integrant.core :as ig])
+            [integrant.core :as ig]
+            [grafter-2.rdf4j.repository :as repo])
   (:import grafter_2.rdf.SPARQLRepository
            [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
            [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
            [org.eclipse.rdf4j.query.resultio.binary BinaryQueryResultParserFactory]
            org.eclipse.rdf4j.query.resultio.text.BooleanTextParserFactory
-           org.eclipse.rdf4j.repository.Repository
            org.eclipse.rdf4j.rio.nquads.NQuadsParserFactory
            org.eclipse.rdf4j.rio.ntriples.NTriplesParserFactory
            org.eclipse.rdf4j.rio.turtle.TurtleParserFactory
            org.eclipse.rdf4j.rio.trig.TriGParserFactory
            org.eclipse.rdf4j.rio.binary.BinaryRDFParserFactory))
-
-(extend-type Repository
-  drpr/SparqlExecutor
-  (drpr/prepare-query [this sparql-string]
-    (drpr/prep-and-validate-query this sparql-string))
-
-  drpr/ToRepository
-  (drpr/->sesame-repo [r] r))
 
 (defn create-sparql-repository
   "Creates a new SPARQL repository with the given query and update
@@ -37,7 +26,6 @@
     (.enableQuadMode repo true)
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     repo))
-
 
 ;; TODO:
 ;;
@@ -85,7 +73,6 @@
   (log/info "Initialising Backend")
   (get-backend opts))
 
-
-(defmethod ig/halt-key! :drafter.backend/rdf4j-repo [k backend]
+(defmethod ig/halt-key! :drafter.backend/rdf4j-repo [_k repo]
   (log/info "Halting Backend")
-  (drpr/stop-backend backend))
+  (repo/shutdown repo))

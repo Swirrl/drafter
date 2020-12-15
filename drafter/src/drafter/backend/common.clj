@@ -1,59 +1,10 @@
 (ns drafter.backend.common
   (:require [drafter.backend.draftset.arq :as arq]
-            [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.repository :as repo]
             [clojure.set :as set])
   (:import java.net.URI
            org.eclipse.rdf4j.query.Dataset
-           org.apache.jena.query.Query
            org.apache.jena.sparql.core.DatasetDescription))
-
-(defprotocol SparqlExecutor
-  (prepare-query [this sparql-string]))
-
-(defprotocol ToRepository
-  (->sesame-repo [this]
-    "Gets the sesame repository for this backend"))
-
-(defn stop-backend [backend]
-  (repo/shutdown (->sesame-repo backend)))
-
-(defn ->repo-connection
-  "Opens a connection to the underlying Sesame repository for the
-  given backend."
-  [backend]
-  (repo/->connection (->sesame-repo backend)))
-
-
-(def itriple-readable-delegate
-  {:to-statements (fn [this options]
-                    (pr/to-statements (->sesame-repo this) options))})
-
-(def isparqlable-delegate
-  {:query-dataset (fn [this sparql-string model]
-                    (pr/query-dataset (->sesame-repo this) sparql-string model))})
-
-(def isparql-updateable-delegate
-  {:update! (fn [this sparql-string]
-              (pr/update! (->sesame-repo this) sparql-string))})
-
-(def to-connection-delegate
-  {:->connection (fn [this]
-                   (repo/->connection (->sesame-repo this)))})
-
-(defn- add-delegate
-  ([this triples] (pr/add (->sesame-repo this) triples))
-  ([this graph triples] (pr/add (->sesame-repo this) graph triples))
-  ([this graph format triple-stream] (pr/add (->sesame-repo this) graph format triple-stream))
-  ([this graph base-uri format triple-stream] (pr/add (->sesame-repo this) graph base-uri format triple-stream)))
-
-(defn- add-statement-delegate
-  ([this statement] (pr/add-statement (->sesame-repo this) statement))
-  ([this graph statement] (pr/add-statement (->sesame-repo this) graph statement)))
-
-(def itriple-writeable-delegate
-  {:add add-delegate
-   :add-statement add-statement-delegate})
 
 (defn- get-restrictions [graph-restrictions]
   (cond
@@ -80,14 +31,12 @@
     (.setDataset pquery dataset)
     pquery))
 
-
 (defn validate-query
   "Validates a query by parsing it using ARQ. If the query is invalid
   a QueryParseException is thrown."
   [query-str]
   (arq/sparql-string->arq-query query-str)
   query-str)
-
 
 (defn prep-and-validate-query [conn sparql-string]
   (let [;;repo (->sesame-repo backend)

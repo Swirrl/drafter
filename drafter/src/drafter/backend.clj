@@ -52,7 +52,7 @@
   (draftsets/build-draftset-endpoint drafter draftset-ref union-with-live?))
 
 (defn drafter-repo
-  "Return a repository from the backend that has acccess to the
+  "Return a repository from the backend that has access to the
   drafter state graph and information."
   [{:keys [::repo]}]
   repo)

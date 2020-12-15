@@ -11,18 +11,24 @@
   overly-specific in your interpretation of the error."
   (:require [clojure.tools.logging :as log]
             [drafter.async.responses :as r]
-            [schema.core :as s]))
+            [clojure.spec.alpha :as s]
+            [drafter.async.spec :as async]
+            [drafter.util :as util]))
 
 (defmulti encode-error
   "Convert an Exception into an appropriate API error response object.
   Dispatches on either the exceptions class or if it's a
   clojure.lang.ExceptionInfo the value of its :error key."
-  (s/fn [err :- (s/either Throwable {s/Any s/Any})]
+  (fn [err]
     (cond
       (instance? clojure.lang.ExceptionInfo err) (if-let [error-type (-> err ex-data :error)]
                                                    error-type
                                                    (class err))
       (instance? Exception err) (class err))))
+
+(s/fdef encode-error
+  :args (s/cat :err util/throwable?)
+  :ret ::async/ring-swirrl-error-response)
 
 (defmethod encode-error Throwable [ex]
   ;; The generic catch any possible exception case
