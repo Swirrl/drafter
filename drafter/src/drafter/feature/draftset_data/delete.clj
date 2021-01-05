@@ -1,7 +1,6 @@
 (ns drafter.feature.draftset-data.delete
   (:require [clojure.spec.alpha :as s]
             [drafter.backend.draftset.draft-management :as mgmt]
-            [drafter.backend.draftset.graphs :as graphs]
             [drafter.backend.draftset.operations :as ops]
             [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
             [drafter.draftset :as ds]
@@ -17,7 +16,7 @@
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [drafter.requests :as req]
-            [drafter.time :as time])
+            [drafter.async.responses :as async-response])
   (:import org.eclipse.rdf4j.model.Resource))
 
 (defn- delete-quad-batch! [repo {:keys [draftset-ref job-started-at] :as context} live->draft draft-graph-uri batch]
@@ -70,34 +69,33 @@
 
 (defn delete-data-from-draftset-job
   "Creates a job to delete quads from a source into a draft on behalf of the given user"
-  [source user-id resources draftset-id clock metadata]
-  (let [repo (-> resources :backend :repo)
-        job-meta (jobs/job-metadata repo draftset-id 'delete-data-from-draftset metadata)
+  [{:keys [backend] :as manager} user-id draftset-id source metadata]
+  (let [job-meta (jobs/job-metadata backend draftset-id 'delete-data-from-draftset metadata)
         sm (delete-state-machine)]
-    (ds-data-common/create-state-machine-job resources user-id draftset-id source clock job-meta sm)))
+    (ds-data-common/create-state-machine-job manager user-id draftset-id source job-meta sm)))
+
+(defn delete-data
+  "Enqueues a job to delete the data within source from draftset on behalf of the given user"
+  [manager user-id draftset source metadata]
+  (let [job (delete-data-from-draftset-job manager user-id draftset source metadata)]
+    (response/enqueue-async-job! job)))
 
 (defn delete-draftset-data-handler
-  [{:keys [:drafter/backend :drafter/global-writes-lock
-           ::graphs/manager
-           ::time/clock wrap-as-draftset-owner]}]
-  (let [resources {:backend backend
-                   :global-writes-lock global-writes-lock
-                   :graph-manager manager}]
-    (-> (fn [{:keys [params] :as request}]
-          (let [{:keys [draftset-id metadata]} params
-                user-id (req/user-id request)
-                source (ds-data-common/get-request-statement-source request)
-                delete-job (delete-data-from-draftset-job source user-id resources draftset-id clock metadata)]
-            (response/submit-async-job! delete-job)))
-        inflate-gzipped
-        temp-file-body
-        deset-middleware/require-graph-for-triples-rdf-format
-        require-rdf-content-type
-        wrap-as-draftset-owner)))
+  [{:keys [:drafter/manager wrap-as-draftset-owner]}]
+  (-> (fn [{:keys [params] :as request}]
+        (let [user-id (req/user-id request)
+              {:keys [draftset-id metadata]} params
+              source (ds-data-common/get-request-statement-source request)
+              delete-job (delete-data manager user-id draftset-id source metadata)]
+          (async-response/submitted-job-response delete-job)))
+      inflate-gzipped
+      temp-file-body
+      deset-middleware/require-graph-for-triples-rdf-format
+      require-rdf-content-type
+      wrap-as-draftset-owner))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete/delete-data-handler [_]
-  (s/keys :req [:drafter/backend
-                :drafter/global-writes-lock]
+  (s/keys :req [:drafter/manager]
           :req-un [::wrap-as-draftset-owner]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete/delete-data-handler [_ opts]

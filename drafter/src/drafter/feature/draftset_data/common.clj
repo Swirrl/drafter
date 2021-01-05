@@ -72,30 +72,30 @@
   "Calls mgmt/copy-graph to copy a live graph into the draftset, but
   does so with the writes lock engaged.  This allows us to fail
   concurrent sync-writes fast."
-  [resources live-graph-uri draft-graph-uri opts]
-  (writes/with-lock (:global-writes-lock resources) :copy-graph
+  [manager live-graph-uri draft-graph-uri opts]
+  (writes/with-lock (:global-writes-lock manager) :copy-graph
     ;; Execute the graph copy inside the write-lock so we can
     ;; fail :blocking-write operations if they are waiting longer than
     ;; their timeout period for us to release it.  These writes would
     ;; likely be blocked inside the database anyway, so this way we
     ;; can fail them fast when they are run behind a long running op.
-    (mgmt/copy-graph (:backend resources) live-graph-uri draft-graph-uri opts)))
+    (mgmt/copy-graph (:backend manager) live-graph-uri draft-graph-uri opts)))
 
 (defn job-context
   "Creates a static 'context' for an update job. The context contains data that does not change
    throughout the execution of the job (in contrast to the state)."
-  [resources draftset-ref clock]
-  {:resources resources
+  [{:keys [clock] :as manager} draftset-ref]
+  {:manager manager
    :draftset-ref draftset-ref
    :job-started-at (time/now clock)})
 
 (defn get-repo
   "Fetch the repository from the job context"
   [context]
-  (get-in context [:resources :backend]))
+  (get-in context [:manager :backend]))
 
 (defn- graph-manager [context]
-  (get-in context [:resources :graph-manager]))
+  (get-in context [:manager :graph-manager]))
 
 (defn create-user-graph-draft
   "Creates a new draft for a live graph within the draft of the executing job"
@@ -104,9 +104,9 @@
 
 (defn copy-user-graph
   "Copies a live graph into a new draft graph within the draft of the executing job"
-  [{:keys [resources] :as context} live-graph-uri]
+  [{:keys [manager] :as context} live-graph-uri]
   (let [draft-graph-uri (create-user-graph-draft context live-graph-uri)]
-    (lock-writes-and-copy-graph resources live-graph-uri draft-graph-uri {:silent true})
+    (lock-writes-and-copy-graph manager live-graph-uri draft-graph-uri {:silent true})
     draft-graph-uri))
 
 (defn get-draft-graph
@@ -185,11 +185,11 @@
 (defn create-state-machine-job
   "Creates a draftset update job for a user within a draftset for a source of quads and an
    update state machine."
-  [{:keys [backend] :as resources} user-id draftset-ref source clock job-metadata sm]
+  [{:keys [backend] :as manager} user-id draftset-ref source job-metadata sm]
   (jobs/make-job user-id
                  :background-write
                  job-metadata
                  (fn [job]
                    (let [live->draft (ops/get-draftset-graph-mapping backend draftset-ref)
-                         context (job-context resources draftset-ref clock)]
+                         context (job-context manager draftset-ref)]
                      (exec-state-machine-job sm live->draft source context job)))))

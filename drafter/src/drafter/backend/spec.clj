@@ -17,14 +17,10 @@
 (s/def ::backend/repo (s/with-gen #(satisfies? repo/ToConnection %)
                           (fn [] (gen/return (repo/sail-repo)))))
 
-(s/def ::backend/DraftsetGraphMapping (s/map-of uri? uri?))
-
 (defmethod ig/pre-init-spec :drafter/backend [_]
   (s/keys :req-un [::backend/repo]))
 
+(s/def ::backend/DraftsetGraphMapping (s/map-of uri? uri?))
+
 (defmethod ig/pre-init-spec ::live/endpoint [_]
   (s/keys :req-un [::backend/repo]))
-
-(defmethod ig/pre-init-spec ::draftset/endpoint [_]
-  (s/keys :req-un [::backend/repo]))
-
