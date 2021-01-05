@@ -11,7 +11,6 @@
 
   Jobs can be added to the write queue using the queue-job! function."
   (:require
-   [clojure.spec.alpha :as s]
    [clojure.tools.logging :as log]
    [cognician.dogstatsd :as datadog]
    [drafter.async.jobs :as jobs]
@@ -43,13 +42,19 @@
    ;; :ns TimeUnit/NANOSECONDS  ; we're never going to use this, but they're
    :seconds TimeUnit/SECONDS})
 
+(defn create-writes-lock
+  "Creates a write lock with the specified fairness and lock acquire timeout"
+  ([] (create-writes-lock {:fairness true :time 10 :unit :seconds}))
+  ([{:keys [fairness time unit]}]
+   ;; Set `fairness` to true for a fair lock policy, false for unfair.  See
+   ;; ReentrantLock javadocs for details.
+   {:lock (ReentrantLock. fairness)
+    :time time
+    :unit (timeunit unit)}))
+
 (defmethod ig/init-key :drafter/global-writes-lock
-  [_ {:keys [fairness time unit]}]
-  ;; Set `fairness` to true for a fair lock policy, false for unfair.  See
-  ;; ReentrantLock javadocs for details.
-  {:lock (ReentrantLock. fairness)
-   :time time
-   :unit (timeunit unit)})
+  [_ opts]
+  (create-writes-lock opts))
 
 (defonce ^:private writes-queue (PriorityBlockingQueue. 11 compare-jobs))
 
@@ -127,8 +132,7 @@
     (when (.get flag)
       (when-let [{task-f! :function
                   priority :priority
-                  job-id :id
-                  promis :value-p :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS)]
+                  job-id :id :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS)]
         (datadog/gauge! "drafter.jobs_queue_size" (.size writes-queue))
         (with-logging-context (assoc
                                (meta job)
@@ -163,10 +167,6 @@
 (defn stop-writer! [{:keys [should-continue thread]}]
   (.set should-continue false)
   (.join thread))
-
-
-(defmethod ig/pre-init-spec :drafter/write-scheduler [_]
-  (s/keys :req [:drafter/global-writes-lock]))
 
 (defmethod ig/init-key :drafter/write-scheduler [_ opts]
   (start-writer! (:drafter/global-writes-lock opts)))

@@ -7,6 +7,8 @@
             [drafter.draftset.spec]
             [drafter.rdf.jena :as jena]
             [drafter.rdf.jena.spec]
+            [drafter.manager :as manager]
+            [drafter.manager.spec]
             [integrant.core :as ig]))
 
 (s/def ::update/UpdateOperation #(satisfies? update/UpdateOperation %))
@@ -105,6 +107,6 @@
 
 ;; handler
 (defmethod ig/pre-init-spec ::update/handler [_]
-  (s/keys :req [:drafter/backend]
+  (s/keys :req [:drafter/manager]
           :req-un [::wrap-as-draftset-owner ::max-update-size]))
 

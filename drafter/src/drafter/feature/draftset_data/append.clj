@@ -2,6 +2,7 @@
   "Appending quads & triples into a draftset."
   (:require
    [clojure.spec.alpha :as s]
+   [drafter.async.responses :as async-response]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.draftset :as ds]
    [drafter.feature.draftset-data.common :as ds-data-common]
@@ -103,34 +104,35 @@
 
 (defn append-data-to-draftset-job
   "Creates a job to append quads from a source into a draft on behalf of the given user"
-  [source {:keys [backend] :as resources} user-id draftset-id clock metadata]
+  [{:keys [backend] :as manager} user-id draftset-id source metadata]
   (let [job-meta (jobs/job-metadata backend draftset-id 'append-data-to-draftset metadata)
         sm (append-state-machine)]
-    (ds-data-common/create-state-machine-job resources user-id draftset-id source clock job-meta sm)))
+    (ds-data-common/create-state-machine-job manager user-id draftset-id source job-meta sm)))
+
+(defn append-data
+  "Enqueues a job to append quads from a data source into draftset on behalf of the given user"
+  [manager user-id draftset source metadata]
+  (let [job (append-data-to-draftset-job manager user-id draftset source metadata)]
+    (response/enqueue-async-job! job)))
 
 (defn data-handler
   "Ring handler to append data into a draftset."
-  [{:keys [:drafter/backend :drafter/global-writes-lock
-           :drafter.backend.draftset.graphs/manager
+  [{:keys [:drafter/manager
            ::time/clock wrap-as-draftset-owner]}]
-  (let [resources {:backend backend
-                   :global-writes-lock global-writes-lock
-                   :graph-manager manager}]
-    (wrap-as-draftset-owner
-     (require-rdf-content-type
+  (wrap-as-draftset-owner
+    (require-rdf-content-type
       (dset-middleware/require-graph-for-triples-rdf-format
-       (temp-file-body
-         (inflate-gzipped
-           (fn [{:keys [params] :as request}]
-             (let [{:keys [draftset-id metadata]} params
-                   user-id (req/user-id request)
-                   source (ds-data-common/get-request-statement-source request)
-                   append-job (append-data-to-draftset-job source resources user-id draftset-id clock metadata)]
-               (response/submit-async-job! append-job))))))))))
+        (temp-file-body
+          (inflate-gzipped
+            (fn [{:keys [params] :as request}]
+              (let [user-id (req/user-id request)
+                    {:keys [draftset-id metadata]} params
+                    source (ds-data-common/get-request-statement-source request)
+                    append-job (append-data manager user-id draftset-id source metadata)]
+                (async-response/submitted-job-response append-job)))))))))
 
 (defmethod ig/pre-init-spec ::data-handler [_]
-  (s/keys :req [:drafter/backend
-                :drafter/global-writes-lock]
+  (s/keys :req [:drafter/manager]
           :req-un [::wrap-as-draftset-owner]))
 
 (defmethod ig/init-key ::data-handler [_ opts]

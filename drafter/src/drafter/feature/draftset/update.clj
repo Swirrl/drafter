@@ -372,7 +372,7 @@
   (let [ops (mapcat (fn [op] (reify-operation op update-context)) operations)]
     (jena/->update-string ops)))
 
-(defn- update! [backend graph-manager clock max-update-size draftset-id ^UpdateRequest update-request]
+(defn update! [{:keys [backend graph-manager clock] :as manager} max-update-size draftset-id ^UpdateRequest update-request]
   (let [graph-meta (get-graph-meta backend
                                    draftset-id
                                    update-request
@@ -415,27 +415,19 @@
       (throw (ex-info "Parameter draftset-id must be provided"
                       {:error :bad-request}))))
 
-(defn- protected? [{:keys [drafter.backend.draftset.graphs/manager] :as opts} op]
-  (some (partial graphs/protected-graph? manager) (affected-graphs op)))
+(defn- protected? [{:keys [graph-manager] :as manager} op]
+  (some (partial graphs/protected-graph? graph-manager) (affected-graphs op)))
 
 (defn- ^UpdateRequest parse-update-string [^String update-string]
   (UpdateFactory/create update-string Syntax/syntaxSPARQL_11))
 
-(defn- parse-update-param [opts {:keys [update from]} max-update-size]
-  (let [update' (cond (string? update)
-                      update
-                      (instance? java.io.InputStream update)
-                      (slurp update)
-                      (coll? update)
-                      (throw (ex-info "Exactly one query parameter required"
-                                      {:error :unprocessable-request}))
-                      :else
-                      (throw (ex-info (str "Expected SPARQL query in " from)
-                                      {:error :unprocessable-request})))
-        update-request (parse-update-string update')
+(defn parse-update-query
+  "Parses and validates an UPDATE query string. Return the parsed query representation."
+  [manager update-query-string max-update-size]
+  (let [update-request (parse-update-string update-query-string)
         operations (.getOperations update-request)
         unprocessable (remove processable? operations)]
-    (cond (some (partial protected? opts) operations)
+    (cond (some (partial protected? manager) operations)
           (throw (forbidden-request "Protected graphs in update request"))
           (seq unprocessable)
           (throw (unprocessable-request unprocessable))
@@ -443,6 +435,20 @@
           (throw (payload-too-large operations))
           :else
           update-request)))
+
+(defn- get-update-query
+  "Extracts an UPDATE query string from a representation of the input request parameters"
+  [{:keys [update from]}]
+  (cond (string? update)
+        update
+        (instance? java.io.InputStream update)
+        (slurp update)
+        (coll? update)
+        (throw (ex-info "Exactly one query parameter required"
+                        {:error :unprocessable-request}))
+        :else
+        (throw (ex-info (str "Expected SPARQL query in " from)
+                        {:error :unprocessable-request}))))
 
 #_(defn- prepare-update [backend request]
   ;; NOTE: Currently unused. None of the Update types that we have implemented
@@ -456,21 +462,22 @@
       (doto (.prepareUpdate repo (:update params))
         (.setDataset dataset)))))
 
-(defn- parse-update [opts request max-update-size]
-  (let [{:keys [request-method body query-params form-params]} request]
+(defn- parse-update [manager request max-update-size]
+  (let [{:keys [request-method]} request]
     (if (= request-method :post)
       (let [draftset-id (parse-draftset-id request)
             params (parse-update-params request)
-            update-request (parse-update-param opts params max-update-size)]
+            update-query (get-update-query params)
+            update-request (parse-update-query manager update-query max-update-size)]
         (assoc params :update-request update-request :draftset-id draftset-id))
       (throw (ex-info "Method not supported"
                       {:error :method-not-allowed :method request-method})))))
 
 (defn- handler*
-  [{:keys [drafter/backend drafter.backend.draftset.graphs/manager max-update-size ::time/clock] :as opts} request]
+  [{:keys [drafter/manager max-update-size] :as opts} request]
   ;; TODO: write-lock?
-  (let [{:keys [update-request draftset-id]} (parse-update opts request max-update-size)]
-    (update! backend manager clock max-update-size draftset-id update-request)
+  (let [{:keys [update-request draftset-id]} (parse-update manager request max-update-size)]
+    (update! manager max-update-size draftset-id update-request)
     {:status 204}))
 
 (defn handler
