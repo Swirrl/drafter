@@ -30,10 +30,6 @@
  ;; [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout 30
  ;;                                                              :jws-signing-key "foo"}
 
- ;; :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.draftset/endpoint
- ;;                                                 :endpoint-timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
-
-
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
  [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
@@ -54,17 +50,13 @@
                                                        :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
 
- :drafter.feature.draftset.create/handler {:drafter/backend #ig/ref :drafter/backend
-                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                           :drafter.time/clock #ig/ref :drafter.time/system-clock
+ :drafter.feature.draftset.create/handler {:drafter/manager #ig/ref :drafter/manager
                                            :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.feature.middleware/wrap-as-draftset-owner {:drafter/backend #ig/ref :drafter/backend
                                                        :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
-                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                           :drafter.time/clock #ig/ref :drafter.time/system-clock
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.options/handler {:drafter/backend #ig/ref :drafter/backend
@@ -74,59 +66,41 @@
                                               :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
                                               :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
- :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/backend #ig/ref :drafter/backend
-                                                            :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                                            :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
-                                                            :drafter.time/clock #ig/ref :drafter.time/system-clock
+ :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/manager #ig/ref :drafter/manager
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler {:drafter/backend #ig/ref :drafter/backend
-                                                                      :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                                                      :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
+ :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler {:drafter/manager #ig/ref :drafter/manager
                                                                       :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset.changes/delete-changes-handler {:drafter/backend #ig/ref :drafter/backend
-                                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+ :drafter.feature.draftset.changes/delete-changes-handler {:drafter/manager #ig/ref :drafter/manager
                                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset-data.append/data-handler {:drafter/backend #ig/ref :drafter/backend
-                                                     :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                                     :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
-                                                     :drafter.time/clock #ig/ref :drafter.time/system-clock
+ :drafter.feature.draftset-data.append/data-handler {:drafter/manager #ig/ref :drafter/manager
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset-data.append-by-graph/handler {:drafter/backend #ig/ref :drafter/backend
-                                                         :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                                         :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
-                                                         :drafter.time/clock #ig/ref :drafter.time/system-clock
+ :drafter.feature.draftset-data.append-by-graph/handler {:drafter/manager #ig/ref :drafter/manager
                                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.query/handler {:drafter/backend #ig/ref :drafter/backend
                                           :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
                                           :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
- :drafter.feature.draftset.update/handler {:drafter/backend #ig/ref :drafter/backend
-                                           :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
-                                           :drafter.time/clock #ig/ref :drafter.time/system-clock
+ :drafter.feature.draftset.update/handler {:drafter/manager #ig/ref :drafter/manager
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
                                            :max-update-size 50}
 
- :drafter.feature.draftset.publish/handler {:drafter/backend #ig/ref :drafter/backend
-                                            :drafter.time/clock #ig/ref :drafter.time/system-clock
+ :drafter.feature.draftset.publish/handler {:drafter/manager #ig/ref :drafter/manager
                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset.set-metadata/handler {:drafter/backend #ig/ref :drafter/backend
-                                                 :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+ :drafter.feature.draftset.set-metadata/handler {:drafter/manager #ig/ref :drafter/manager
                                                  :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset.submit/handler {:drafter/backend #ig/ref :drafter/backend
-                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+ :drafter.feature.draftset.submit/handler {:drafter/manager #ig/ref :drafter/manager
                                            :drafter.user/repo #ig/ref :drafter.user/repo
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.claim/handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
-                                          :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                          :drafter/backend #ig/ref :drafter/backend}
+                                          :drafter/manager #ig/ref :drafter/manager}
 
  :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
                                                   :drafter.user/repo #ig/ref :drafter.user/repo}

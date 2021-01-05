@@ -20,7 +20,7 @@
 (defn publish-draftset-job
   "Return a job that publishes the graphs in a draftset to live and
   then deletes the draftset."
-  [backend user-id {:keys [draftset-id metadata]} clock]
+  [{:keys [backend clock] :as manager} user-id {:keys [draftset-id metadata]}]
   ;; TODO combine these into a single job as priorities have now
   ;; changed how these will be applied.
 

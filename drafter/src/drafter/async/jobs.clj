@@ -10,7 +10,8 @@
             [integrant.core :as ig])
   (:import clojure.lang.ExceptionInfo
            java.util.UUID
-           org.apache.log4j.MDC))
+           org.apache.log4j.MDC
+           [clojure.lang IDeref IBlockingDeref IPersistentMap]))
 
 (defrecord Job [id
                 user-id
@@ -22,7 +23,16 @@
                 draft-graph-id
                 metadata
                 function
-                value-p])
+                value-p]
+  IDeref
+  (deref [_] (deref value-p))
+
+  IBlockingDeref
+  (deref [_ timeout-ms timeout-val] (deref value-p timeout-ms timeout-val)))
+
+(defmethod print-method Job [job writer]
+  (let [m (get-method print-method IPersistentMap)]
+    (m job writer)))
 
 (def allowed-queue-keys
   #{:id :user-id :status :priority :start-time :finish-time

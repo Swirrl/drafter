@@ -21,12 +21,15 @@
     drafter.async.spec
     drafter.backend.spec
     drafter.backend.draftset.spec
+    drafter.backend.draftset.graphs.spec
     drafter.draftset.spec
     drafter.endpoint.spec
     drafter.user.spec
     drafter.time.spec
     drafter.rdf.jena.spec
-    drafter.feature.draftset.update.spec])
+    drafter.feature.draftset.update.spec
+    drafter.manager.spec
+    drafter.write-scheduler.spec])
 
 (defn load-spec-namespaces! []
   (doseq [ns spec-namespaces]

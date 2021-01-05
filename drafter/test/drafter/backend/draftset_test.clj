@@ -6,7 +6,8 @@
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf.protocols :as pr]
             [clojure.java.io :as io]
-            [clojure.set :as set])
+            [clojure.set :as set]
+            [drafter.fixture-data :as fd])
   (:import [java.net URI]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -23,60 +24,57 @@
 
 (t/deftest build-draftset-endpoint-test
   (with-system
-    [:drafter.backend.draftset/endpoint :drafter.fixture-data/loader]
-    [{:keys [:drafter.backend.draftset/endpoint] :as sys} "drafter/feature/empty-db-system.edn"]
-    (do
-      (let [repo (:drafter.stasher/repo sys)]
-        (with-open [conn (repo/->connection repo)]
-          (pr/add conn (rio/statements (io/resource "drafter/backend/draftset_test/drafter-state.trig")))))
+    [:drafter/backend :drafter.fixture-data/loader]
+    [sys "drafter/feature/empty-db-system.edn"]
+    (let [repo (:drafter/backend sys)]
+      (fd/load-fixture! {:repo repo :format :trig :fixtures [(io/resource "drafter/backend/draftset_test/drafter-state.trig")]})
       (t/testing "build-draftset-endpoint"
         (t/testing "draftset (union-with-live = true)"
-          (with-open [conn (-> endpoint
-                                      (sut/build-draftset-endpoint "ds-1" true)
-                                      repo/->connection)]
-            (t/testing "statements"
-              (let [expected (set/union live-drafted-ds1 unpublished-ds1 live-only)
-                    expected-triples (set (map pr/map->Triple expected))
-                    actual (set (rio/statements conn :grafter.repository/infer false))]
-                (t/is (= expected-triples actual))))
+          (let [draft-endpoint (sut/build-draftset-endpoint repo "ds-1" true)]
+            (with-open [conn (repo/->connection draft-endpoint)]
+              (t/testing "statements"
+                (let [expected (set/union live-drafted-ds1 unpublished-ds1 live-only)
+                      expected-triples (set (map pr/map->Triple expected))
+                      actual (set (rio/statements conn :grafter.repository/infer false))]
+                  (t/is (= expected-triples actual))))
 
-            (t/testing "queries"
-              (t/testing "SELECT"
-                (let [results (set (repo/query conn "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }"))
-                      expected-statements (set/union live-drafted-ds1 unpublished-ds1 live-only)
-                      expected-bindings (set (map statement->spog expected-statements))]
-                  (t/is (= expected-bindings results))))
+              (t/testing "queries"
+                (t/testing "SELECT"
+                  (let [results (set (repo/query conn "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }"))
+                        expected-statements (set/union live-drafted-ds1 unpublished-ds1 live-only)
+                        expected-bindings (set (map statement->spog expected-statements))]
+                    (t/is (= expected-bindings results))))
 
-              (t/testing "applies connection dataset"
-                (let [q "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }"
-                      results (set (repo/query conn q :named-graphs ["http://unpublished-graph-ds1"]))
-                      expected-bindings (set (map statement->spog unpublished-ds1))]
-                  (t/is (= expected-bindings results))))
+                (t/testing "applies connection dataset"
+                  (let [q "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }"
+                        results (set (repo/query conn q :named-graphs ["http://unpublished-graph-ds1"]))
+                        expected-bindings (set (map statement->spog unpublished-ds1))]
+                    (t/is (= expected-bindings results))))
 
-              (t/testing "applies query dataset"
-                (let [results (set (repo/query conn "SELECT * FROM NAMED <http://live-only> WHERE { GRAPH ?g { ?s ?p ?o } }"))
-                      expected-bindings (set (map statement->spog live-only))]
-                  (t/is (= expected-bindings results))))
+                (t/testing "applies query dataset"
+                  (let [results (set (repo/query conn "SELECT * FROM NAMED <http://live-only> WHERE { GRAPH ?g { ?s ?p ?o } }"))
+                        expected-bindings (set (map statement->spog live-only))]
+                    (t/is (= expected-bindings results))))
 
-              (t/testing "connection dataset should override query dataset"
-                (let [q "SELECT * FROM NAMED <http://live-drafted> WHERE { GRAPH ?g { ?s ?p ?o } }"
-                      results (set (repo/query conn q :named-graphs ["http://unpublished-graph-ds1"]))
-                      expected-bindings (set (map statement->spog unpublished-ds1))]
-                  (t/is (= expected-bindings results))))
+                (t/testing "connection dataset should override query dataset"
+                  (let [q "SELECT * FROM NAMED <http://live-drafted> WHERE { GRAPH ?g { ?s ?p ?o } }"
+                        results (set (repo/query conn q :named-graphs ["http://unpublished-graph-ds1"]))
+                        expected-bindings (set (map statement->spog unpublished-ds1))]
+                    (t/is (= expected-bindings results))))
 
-              (t/testing "CONSTRUCT"
-                (let [q "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH ?g { ?s ?p ?o } }"
-                      results (set (repo/query conn q))
-                      expected (set/union live-drafted-ds1 unpublished-ds1 live-only)
-                      expected-triples (set (map pr/map->Triple expected))]
-                  (t/is (= expected-triples results))))
+                (t/testing "CONSTRUCT"
+                  (let [q "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH ?g { ?s ?p ?o } }"
+                        results (set (repo/query conn q))
+                        expected (set/union live-drafted-ds1 unpublished-ds1 live-only)
+                        expected-triples (set (map pr/map->Triple expected))]
+                    (t/is (= expected-triples results))))
 
-              (t/testing "ASK"
-                (let [result (repo/query conn "ASK WHERE { GRAPH <http://live-only> { ?s ?p ?o } }")]
-                  (t/is (= true result)))))))
+                (t/testing "ASK"
+                  (let [result (repo/query conn "ASK WHERE { GRAPH <http://live-only> { ?s ?p ?o } }")]
+                    (t/is (= true result))))))))
 
         (t/testing "union-with-live = false"
-          (let [draft-endpoint (sut/build-draftset-endpoint endpoint "ds-1" false)]
+          (let [draft-endpoint (sut/build-draftset-endpoint repo "ds-1" false)]
             (with-open [conn (repo/->connection draft-endpoint)]
               (t/testing "statements"
                 (let [expected (set/union live-drafted-ds1 unpublished-ds1)

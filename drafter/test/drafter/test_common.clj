@@ -308,7 +308,7 @@
    (let [start (System/currentTimeMillis)]
      (loop [guid (job-path->job-id path)]
        (if-let [job (async/complete-job guid)]
-         @(:value-p job)
+         @job
          (if (> (System/currentTimeMillis) (+ start (or timeout default-timeout) ))
            (throw (RuntimeException. "Timed out awaiting test value"))
            (do
@@ -514,9 +514,9 @@
   "Executes a job and waits the specified timeout period for it to complete.
    Returns the result of the job if it completed within the timeout period."
   ([job] (exec-and-await-job job 10))
-  ([{:keys [value-p] :as job} timeout-seconds]
+  ([job timeout-seconds]
    (scheduler/queue-job! job)
-   (let [result (deref value-p (* 1000 timeout-seconds) ::timeout)]
+   (let [result (deref job (* 1000 timeout-seconds) ::timeout)]
      (when (= ::timeout result)
        (throw (ex-info (format "Job failed to complete after %d seconds" timeout-seconds)
                        {:job job})))

@@ -18,7 +18,8 @@
             [grafter.vocabularies.rdf :refer [rdf:a]]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [drafter.feature.endpoint.public :as pub]
-            [drafter.rdf.sesame :as ses])
+            [drafter.rdf.sesame :as ses]
+            [drafter.manager :as manager])
   (:import java.net.URI
            java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
@@ -37,25 +38,23 @@
   (tc/with-system
     [:drafter/backend :drafter/global-writes-lock :drafter/write-scheduler :drafter.fixture-data/loader
      :drafter.backend.draftset.graphs/manager]
-    [{:keys [:drafter/backend :drafter/global-writes-lock :drafter.backend.draftset.graphs/manager]} system-config]
+    [{:keys [:drafter/backend]} system-config]
     (let [initial-time (OffsetDateTime/parse "2017-01-01T01:01:01Z")
           delete-time (OffsetDateTime/parse "2019-01-01T01:01:01Z")
           clock (tc/manual-clock initial-time)
           ds (dsops/create-draftset! backend test-editor)
-          resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}
-          append-job (append/append-data-to-draftset-job (get-source (io/file "./test/test-triple.nt") (URI. "http://foo/graph"))
-                                                         resources
+          manager (manager/create-manager backend {:clock clock})
+          append-job (append/append-data-to-draftset-job manager
                                                          dummy
                                                          ds
-                                                         clock
+                                                         (get-source (io/file "./test/test-triple.nt") (URI. "http://foo/graph"))
                                                          nil)]
       (tc/exec-and-await-job-success append-job)
       (tc/set-now clock delete-time)
-      (let [delete-job (sut/delete-data-from-draftset-job (get-source (io/file "./test/test-triple-2.nt") (URI. "http://foo/graph"))
+      (let [delete-job (sut/delete-data-from-draftset-job manager
                                                           dummy
-                                                          resources
                                                           ds
-                                                          clock
+                                                          (get-source (io/file "./test/test-triple-2.nt") (URI. "http://foo/graph"))
                                                           nil)]
         (tc/exec-and-await-job-success delete-job))
 

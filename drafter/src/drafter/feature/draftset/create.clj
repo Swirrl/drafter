@@ -7,12 +7,11 @@
             [drafter.util :as util]
             [ring.util.response :as ring]
             [drafter.async.responses :as response]
-            [drafter.requests :as req]
-            [drafter.time :as time]))
+            [drafter.requests :as req]))
 
 (defn create-draftsets-handler
   [{wrap-authenticated :wrap-auth
-    :keys [:drafter/backend :drafter/global-writes-lock ::time/clock]}]
+    {:keys [backend global-writes-lock clock] :as manager} :drafter/manager}]
   (let [version "/v1"]
     (wrap-authenticated
      (fn [{{:keys [display-name description]} :params user :identity :as request}]
@@ -31,7 +30,7 @@
 (s/def ::wrap-auth fn?)
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset.create/handler [_]
-  (s/keys :req [:drafter/backend :drafter/global-writes-lock ::time/clock]
+  (s/keys :req [:drafter/manager]
           :req-un [::wrap-auth]))
 
 (defmethod ig/init-key ::handler [_ opts]
