@@ -1,11 +1,6 @@
 (ns drafter.backend.draftset.operations-test
-  (:require [clojure.java.io :as io]
-            [clojure.test :refer :all]
-            [drafter.backend.draftset.draft-management
-             :as
-             mgmt
-             :refer
-             [with-state-graph]]
+  (:require [clojure.test :as t :refer :all]
+            [drafter.backend.draftset.draft-management :refer [with-state-graph]]
             [drafter.backend.draftset.operations :as sut]
             [drafter.draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
             [drafter.rdf.drafter-ontology :refer :all]
@@ -22,22 +17,23 @@
             [drafter.test-helpers.draft-management-helpers :as mgmth]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
-            [drafter.util :as util]
-            [drafter.write-scheduler :as scheduler]
             [grafter-2.rdf4j.io :refer [statements]]
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf.protocols :refer [->Quad ->Triple context context]]
-            [grafter.url :as url]
             [grafter.vocabularies.rdf :refer :all]
-            [drafter.test-common :as tc])
-  (:import java.net.URI
-           org.eclipse.rdf4j.rio.RDFFormat))
+            [drafter.test-common :as tc]
+            [grafter-2.rdf4j.io :as gio]
+            [drafter.rdf.sesame :as ses]
+            [drafter.fixture-data :as fd]
+            [clojure.java.io :as io]
+            [drafter.stasher-test :as stasher-test]
+            [grafter-2.rdf.protocols :as pr]
+            [drafter.backend.draftset.query-impl :as query-impl]))
 
 (use-fixtures :each
   (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler])
   tc/with-spec-instrumentation)
 ;(use-fixtures :each wrap-clean-test-db)
-
 
 (defn- has-uri-object? [s p uri-o]
   (sparql/eager-query *test-backend* (str "ASK WHERE { <" s "> <" p "> <" uri-o "> }")))
@@ -306,3 +302,48 @@
   (testing "Draftset does not exist"
     (let [[result _] (sut/claim-draftset! *test-backend* (->DraftsetURI "http://missing-draftset") test-publisher)]
       (is (= :not-found result)))))
+
+(t/deftest all-quads-query-test
+  (t/testing "Operation methods"
+    (let [pquery (sut/all-quads-query *test-backend*)]
+      (query-impl/test-operation-methods pquery #{"s" "p" "o" "g"})))
+
+  (t/testing "evaluate"
+    (let [pquery (sut/all-quads-query *test-backend*)
+          test-data (io/resource "drafter/backend/draftset/operations_test/all_data_queries.trig")
+          expected-quads (set (gio/statements test-data))]
+      (fd/load-fixture! {:repo     *test-backend*
+                         :format   :trig
+                         :fixtures [test-data]})
+      (t/testing "pull"
+        (with-open [results (.evaluate pquery)]
+          (let [rs (ses/iteration-seq results)
+                quads (map gio/backend-quad->grafter-quad rs)]
+            (t/is (= expected-quads (set quads)) "Unexpected results from pull query"))))
+
+      (t/testing "push"
+        (let [[events handler] (stasher-test/recording-rdf-handler)]
+          (.evaluate pquery handler)
+          (t/is (= expected-quads (set (:data @events))) "Unexpected results from push query"))))))
+
+(t/deftest all-graph-triples-query-test
+  (let [test-data (io/resource "drafter/backend/draftset/operations_test/all_data_queries.trig")
+        quads (gio/statements test-data)
+        by-graph (group-by pr/context quads)]
+    (fd/load-fixture! {:repo     *test-backend*
+                       :format   :trig
+                       :fixtures [test-data]})
+
+    (doseq [[graph graph-quads] by-graph]
+      (let [pquery (sut/all-graph-triples-query *test-backend* graph)
+            graph-triples (set (map pr/map->Triple graph-quads))]
+        (t/testing "pull query"
+          (with-open [results (.evaluate pquery)]
+            (let [rs (ses/iteration-seq results)
+                  quads (map gio/backend-quad->grafter-quad rs)]
+              (t/is (= graph-triples (set quads)) "Unexpected results from pull query"))))
+
+        (t/testing "push query"
+          (let [[events handler] (stasher-test/recording-rdf-handler)]
+            (.evaluate pquery handler)
+            (t/is (= graph-triples (set (:data @events))) "Unexpected results from push query")))))))

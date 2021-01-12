@@ -14,7 +14,7 @@
             [grafter.vocabularies.rdf :refer :all]
             [clojure.java.io :as io])
   (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
-           [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler]
+           [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler BindingSet GraphQueryResult]
            org.eclipse.rdf4j.queryrender.RenderUtils
            org.eclipse.rdf4j.rio.RDFHandler))
 
@@ -480,6 +480,13 @@
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
     (mgmt/migrate-graphs-to-live! backend (vals graph-mapping) clock-fn)))
 
+(defn- spog-bindings->statement [^BindingSet bindings]
+  (let [subj (.getValue bindings "s")
+        pred (.getValue bindings "p")
+        obj (.getValue bindings "o")
+        graph (.getValue bindings "g")]
+    (ContextStatementImpl. subj pred obj graph)))
+
 (defn- rdf-handler->spog-tuple-handler [conn ^RDFHandler rdf-handler]
   (reify
     TupleQueryResult
@@ -489,11 +496,7 @@
 
     TupleQueryResultHandler
     (handleSolution [this bindings]
-      (let [subj (.getValue bindings "s")
-            pred (.getValue bindings "p")
-            obj (.getValue bindings "o")
-            graph (.getValue bindings "g")
-            stmt (ContextStatementImpl. subj pred obj graph)]
+      (let [stmt (spog-bindings->statement bindings)]
         (.handleStatement rdf-handler stmt)))
 
     (handleBoolean [this b])
@@ -504,10 +507,38 @@
       (.endRDF rdf-handler)
       (.close conn))))
 
-(defn- spog-tuple-query->graph-query [conn tuple-query]
+(defn- spog-tuple-query-result->graph-query-result
+  "Returns a GraphQueryResult which maps each ?s ?p ?o ?g binding from an inner
+   TupleQueryResult into a statement."
+  [^TupleQueryResult tqr]
+  (reify GraphQueryResult
+    (hasNext [_this] (.hasNext tqr))
+    (next [_this] (spog-bindings->statement (.next tqr)))
+    (remove [_this] (.remove tqr))
+    (close [_this] (.close tqr))))
+
+(defn- spog-tuple-query->graph-query
+  "Returns a GraphQuery which wraps a ?s ?p ?o ?g TupleQuery and converts each spog binding
+   into a statement."
+  [conn tuple-query]
   (reify GraphQuery
+    (evaluate [_this]
+      (let [inner-result (.evaluate tuple-query)]
+        (spog-tuple-query-result->graph-query-result inner-result)))
     (evaluate [this rdf-handler]
       (.evaluate tuple-query (rdf-handler->spog-tuple-handler conn rdf-handler)))
+    (setBinding [_this name value]
+      (.setBinding tuple-query name value))
+    (removeBinding [_this name]
+      (.removeBinding tuple-query name))
+    (clearBindings [_this]
+      (.clearBindings tuple-query))
+    (getBindings [_this]
+      (.getBindings tuple-query))
+    (setDataset [_this dataset]
+      (.setDataset tuple-query dataset))
+    (getDataset [_this]
+      (.getDataset tuple-query))
     (getIncludeInferred [this]
       (.getIncludeInferred tuple-query))
     (setIncludeInferred [this include-inferred?]
