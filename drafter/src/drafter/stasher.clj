@@ -1,6 +1,5 @@
 (ns drafter.stasher
-  (:require [clojure.java.io :as io]
-            [clojure.spec.alpha :as s]
+  (:require [clojure.spec.alpha :as s]
             [drafter.stasher.filecache :as fc]
             [drafter.stasher.cache-key :as ck]
             [drafter.stasher.timing :as timing]
@@ -10,7 +9,6 @@
             [integrant.core :as ig]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as dd]
-            [me.raynes.fs :as fs]
             [grafter-2.rdf4j.repository.registry :as reg]
             [grafter-2.rdf4j.io :as rio]
             [drafter.stasher.formats :as formats]

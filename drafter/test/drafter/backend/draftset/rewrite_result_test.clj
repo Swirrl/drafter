@@ -1,20 +1,26 @@
 (ns drafter.backend.draftset.rewrite-result-test
-  (:require [clojure.java.io :as io]
-            [clojure.set :as set]
+  (:require [drafter.backend.draftset.rewrite-result :refer :all]
             [clojure.test :refer :all]
+            [clojure.java.io :as io]
+            [clojure.set :as set]
             [drafter.backend.draftset.draft-management
              :refer
              [append-data-batch! create-draft-graph!]]
             [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
             [drafter.test-common
              :refer
-             [*test-backend* test-triples wrap-system-setup]]
+             [*test-backend* test-triples wrap-system-setup]
+             :as tc]
             [drafter.util :refer [map-values]]
             [grafter-2.rdf4j.templater :refer [triplify]]
             [grafter-2.rdf4j.repository :as repo]
             [schema.test :refer [validate-schemas]]
-            [drafter.test-common :as tc])
-  (:import [java.net URI]))
+            [grafter-2.rdf4j.io :as gio]
+            [grafter-2.rdf.protocols :as pr]
+            [drafter.rdf.dataset :as dataset]
+            [drafter.rdf.sesame :as ses])
+  (:import java.net.URI
+           [org.eclipse.rdf4j.query Operation]))
 
 (use-fixtures :each
   validate-schemas
@@ -190,6 +196,151 @@
             results (evaluate-with-graph-rewriting *test-backend* query graph-map)]
 
         (is (some #{live-triple} (map (juxt :s :p :o) results)))))))
+
+(defn- test-bindings
+  "Tests the get/set/remove/clear methods for bindings on an operation. If the
+   operations work correctly the result of calling this function is the binding
+   name keys in to-add which are not in to-remove will have their associated values
+   bound in the query."
+  [^Operation query to-add to-remove]
+  (letfn [(add-bindings []
+            (doseq [[binding-name value] to-add]
+              (.setBinding query binding-name value)))]
+    (testing ".setBinding"
+      (add-bindings)
+      (let [bindings (.getBindings query)]
+        (is (= to-add (ses/binding-set->map bindings)) "Unexpected bindings after add")))
+
+    (testing ".clearBindings"
+      (.clearBindings query)
+      (is (= {} (ses/binding-set->map (.getBindings query))) "Bindings remain after clear"))
+
+    (testing ".removeBinding"
+      (add-bindings)
+      (doseq [binding-name to-remove]
+        (.removeBinding query binding-name))
+
+      (let [bindings (.getBindings query)
+            expected-bindings (reduce (fn [m binding-name] (dissoc m binding-name)) to-add to-remove)]
+        (is (= expected-bindings (ses/binding-set->map bindings)) "Unexpected bindings after remove")))))
+
+(defn- test-dataset
+  "Tests a dataset can be set and retrieved from a query. The returned dataset should
+   match the supplied restriction"
+  [query dataset]
+  (let [rdf4j-dataset (dataset/->rdf4j-dataset dataset)]
+    (.setDataset query rdf4j-dataset)
+    (let [query-dataset (.getDataset query)]
+      (is (= dataset (dataset/->dataset query-dataset)) "Unexpected dataset restriction"))))
+
+(deftest rewritten-query-operations-test
+  (tc/with-system
+    [:drafter.stasher/repo]
+    [system "drafter/feature/empty-db-system.edn"]
+    (let [query-endpoint (:drafter.common.config/sparql-query-endpoint system)
+          update-endpoint (:drafter.common.config/sparql-update-endpoint system)
+          repo (repo/sparql-repo query-endpoint update-endpoint)
+          select-spog "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }"
+          construct-spo "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH ?g { ?s ?p ?o } }"
+          live->draft {(gio/->rdf4j-uri "http://test.com/graph-1") (gio/->rdf4j-uri "http://test.com/draft-1")}
+          test-data (io/resource "drafter/backend/draftset/rewrite_result_test/query-operations.trig")
+          test-statements (set (gio/statements test-data))]
+      (with-open [conn (repo/->connection repo)]
+        (pr/add conn test-statements))
+      (testing "boolean query operations"
+        (testing "bindings"
+          (with-open [conn (repo/->connection repo)]
+            (let [query (rewriting-query (repo/prepare-query conn "ASK WHERE { GRAPH ?g { <http://test.com/subject-1> <http://test.com/p2> true . } }") live->draft)]
+              ;; This should result ?g being bound to <http://test.com/graph-1>
+              (test-bindings query {"g" (gio/->rdf4j-uri "http://test.com/graph-1")
+                                    "s" (gio/->rdf4j-uri "http://test.com/subject-1")} ["s"])
+
+              (testing "result"
+                (let [result (repo/evaluate query)]
+                  (is (= true result) "Unexpected query results"))))))
+
+        (testing "dataset"
+          (with-open [conn (repo/->connection repo)]
+            (let [query (rewriting-query (repo/prepare-query conn "ASK WHERE { <http://test.com/subject-1> <http://test.com/p2> true . }") live->draft)
+                  restriction (dataset/create :named-graphs ["http://test.com/graph-1"
+                                                             "http://test.com/graph-2"]
+                                              :default-graphs ["http://test.com/graph-1"])]
+              (test-dataset query restriction)
+
+              (let [result (repo/evaluate query)]
+                (is (= true result) "Unexpected results of restricted query"))))))
+
+      (testing "tuple query operations"
+        (testing "bindings"
+          (with-open [conn (repo/->connection repo)]
+            (let [query (rewriting-query (repo/prepare-query conn select-spog) live->draft)]
+              ;; This should result ?g being bound to <http://test.com/graph-1>
+              (test-bindings query {"g" (gio/->rdf4j-uri "http://test.com/graph-1")
+                                    "s" (gio/->rdf4j-uri "http://test.com/subject-1")} ["s"])
+
+              (testing "results"
+                (let [results (repo/evaluate query)
+                      ;; should return data from draft-1 graph according to the mapping from <graph-1> bound to ?g
+                      ;; the <draft-1> object in the graph should be re-written to the corresponding live graph in the
+                      ;; graph mapping (<graph-1>)
+                      expected #{{:s (URI. "http://test.com/subject-1") :p (URI. "http://test.com/p1") :o "draft"}
+                                 {:s (URI. "http://test.com/subject-1") :p (URI. "http://test.com/g") :o (URI. "http://test.com/graph-1")}
+                                 {:s (URI. "http://test.com/subject-1") :p (URI. "http://test.com/p2") :o true}}]
+                  (is (= expected (set results)) "Unexpected query results"))))))
+
+        (testing "dataset"
+          (with-open [conn (repo/->connection repo)]
+            (let [query (rewriting-query (repo/prepare-query conn select-spog) live->draft)
+                  restriction (dataset/create :named-graphs ["http://test.com/graph-1"
+                                                             "http://test.com/graph-2"]
+                                              :default-graphs ["http://test.com/graph-1"])]
+              (test-dataset query restriction)
+
+              (let [results (repo/evaluate query)
+                    ;; only results from restricted graphs should be returned
+                    ;; restriction on <graph-1> should be converted to one on <draft-1> and the <graph-1> object in the
+                    ;; graph should be re-written in the results
+                    expected #{{:s (URI. "http://test.com/subject-1") :p (URI. "http://test.com/p1") :o "draft" :g (URI. "http://test.com/graph-1")}
+                               {:s (URI. "http://test.com/subject-1") :p (URI. "http://test.com/g") :o (URI. "http://test.com/graph-1") :g (URI. "http://test.com/graph-1")}
+                               {:s (URI. "http://test.com/subject-1") :p (URI. "http://test.com/p2") :o true :g (URI. "http://test.com/graph-1")}
+                               {:s (URI. "http://test.com/subject-2") :p (URI. "http://test.com/p1") :o "second" :g (URI. "http://test.com/graph-2")}}]
+                (is (= expected (set results)) "Unexpected results of restricted query"))))))
+
+      (testing "graph query operations"
+        (testing "bindings"
+          (with-open [conn (repo/->connection repo)]
+            (let [query (rewriting-query (repo/prepare-query conn construct-spo) live->draft)]
+              ;; This should result in ?g being bound to <graph-1>
+              (test-bindings query {"g" (gio/->rdf4j-uri "http://test.com/graph-1")
+                                    "s" (gio/->rdf4j-uri "http://test.com/subject-1")} ["s"])
+
+              (testing "results"
+                (let [results (repo/evaluate query)
+                      ;; should return data from <draft-1> graph according to the mapping from <graph-1> bound to ?g
+                      ;; the <draft-1> object in the graph should be re-written to the corresponding live graph in the
+                      ;; graph mapping (<graph-1>)
+                      expected #{(pr/->Triple (URI. "http://test.com/subject-1") (URI. "http://test.com/p1") "draft")
+                                 (pr/->Triple (URI. "http://test.com/subject-1") (URI. "http://test.com/g") (URI. "http://test.com/graph-1"))
+                                 (pr/->Triple (URI. "http://test.com/subject-1") (URI. "http://test.com/p2") true)}]
+                  (is (= expected (set results)) "Unexpected query results"))))))
+
+        (testing "dataset"
+          (with-open [conn (repo/->connection repo)]
+            (let [restriction (dataset/create :named-graphs ["http://test.com/graph-1"
+                                                             "http://test.com/graph-2"]
+                                              :default-graphs ["http://test.com/graph-1"])
+                  query (rewriting-query (repo/prepare-query conn construct-spo) live->draft)]
+              (test-dataset query restriction)
+
+              (let [results (repo/evaluate query)
+                    ;; only results from restricted graphs should be returned
+                    ;; restriction on <graph-1> should be converted to one on <draft-1> and the <graph-1> object in the
+                    ;; graph should be re-written in the results
+                    expected #{(pr/->Triple (URI. "http://test.com/subject-1") (URI. "http://test.com/p1") "draft")
+                               (pr/->Triple (URI. "http://test.com/subject-1") (URI. "http://test.com/g") (URI. "http://test.com/graph-1"))
+                               (pr/->Triple (URI. "http://test.com/subject-1") (URI. "http://test.com/p2") true)
+                               (pr/->Triple (URI. "http://test.com/subject-2") (URI. "http://test.com/p1") "second")}]
+                (is (= expected (set results)) "Unexpected results of restricted query")))))))))
 
 (use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler]))
 ;(use-fixtures :each wrap-clean-test-db)

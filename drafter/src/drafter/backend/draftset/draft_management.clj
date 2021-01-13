@@ -11,7 +11,8 @@
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
             [clojure.spec.alpha :as s]
-            [grafter-2.rdf4j.io :as rio])
+            [grafter-2.rdf4j.io :as rio]
+            [clojure.string :as string])
   (:import java.net.URI
            [java.util UUID]))
 
@@ -459,15 +460,15 @@
         ds-values (when draftset-uri (str "VALUES ?ds { <" draftset-uri "> }"))
         live-values (some->> (seq live-graph-uris)
                              (map #(str "<" % ">"))
-                             (str/join " ")
+                             (string/join " ")
                              (format "VALUES ?lg { %s }"))
         draft-values (some->> (seq draft-graph-uris)
                               (map #(str "<" % ">"))
-                              (str/join " ")
+                              (string/join " ")
                               (format "VALUES ?dg { %s }"))
         suffix (->> [filter ds-values live-values draft-values]
                     (remove nil?)
-                    (str/join "\n    ")
+                    (string/join "\n    ")
                     (str "\n    "))]
     (format "
 DELETE { GRAPH ?g { %1$s ?p1 ?o1 . ?s2 %1$s ?o2 . ?s3 ?p3 %1$s . } }
@@ -512,14 +513,22 @@ WHERE {
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
 
-(defn calculate-graph-restriction [public-live-graphs live-graph-drafts supplied-draft-graphs]
+(defn calculate-draft-raw-graphs
+  "Returns the set of draft data graphs given the set of all visible live graphs,
+  the set of graphs which have a draft graph in the draftset and the corresponding
+  set of draft graphs."
+  [public-live-graphs live-graph-drafts draft-graphs]
   (set/union
-   (set/difference (set public-live-graphs) (set live-graph-drafts))
-   (set supplied-draft-graphs)))
+    (set/difference (set public-live-graphs) (set live-graph-drafts))
+    (set draft-graphs)))
 
-(defn graph-mapping->graph-restriction [db graph-mapping union-with-live?]
+(defn draft-raw-graphs
+  "Returns a set of all the raw graphs within a draftset i.e. all the draft graphs and all the
+   visible live graphs. If union-with-live? is false there are no visible live graphs, otherwise
+   all the live graphs without a corresponding draft graph in the draftset are included."
+  [db graph-mapping union-with-live?]
   (let [live-graphs (if union-with-live? (live-graphs db) #{})]
-    (calculate-graph-restriction live-graphs (keys graph-mapping) (vals graph-mapping))))
+    (calculate-draft-raw-graphs live-graphs (keys graph-mapping) (vals graph-mapping))))
 
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."

@@ -1,6 +1,5 @@
 (ns drafter.backend.live-test
   (:require [clojure.test :as t]
-            [drafter.backend.common :as bcom]
             [drafter.backend.live :as sut]
             [drafter.stasher-test :as stasher-test]
             [drafter.test-common :as tc :refer [deftest-system]]

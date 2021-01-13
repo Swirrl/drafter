@@ -1,0 +1,31 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix animal: <http://example.org/animals/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+@base <http://test.com/> .
+
+<graph-1> {
+  <subject-1> <p1> "live" .
+  <subject-1> <g> <graph-1> .
+}
+
+<graph-2> {
+	<subject-2> <p1> "second" .
+}
+
+# draft of graph-1
+<draft-1> {
+  <subject-1> <p1> "draft" .
+  <subject-1> <g> <draft-1> .
+  <subject-1> <p2> true .
+}
+
+<draft-3> {
+  <subject-3> <p3> 45 .
+}

@@ -1,0 +1,85 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
+@prefix drafter: <http://publishmydata.com/def/drafter/> .
+@prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+## State is:
+#
+# 2 public graphs:
+#   - <http://live-drafted> exists in the draftset
+#   - <http://live-only> exists only in live
+#
+# 1 draftset:
+#   - draftset ds-1 contains two graphs:
+#     * <http://unpublished-graph-ds1> is a graph that exists only in the draftset
+#     * <http://live-drafted> is a modification of <http://live-drafted> containing one deletion and three additions, one of which references
+#       another graph in the draftset and should be re-written in the results
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+
+	########################################################################
+	# Live graphs
+	########################################################################
+
+	# Live graph with two changes in 2 draftsets
+	<http://live-drafted> a drafter:ManagedGraph ;
+		dcterms:modified "2017-01-01T01:01:01.000Z"^^xsd:dateTime ;
+		drafter:isPublic "true"^^xsd:boolean ;
+		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime ;
+		drafter:hasDraft draft:ds-1-dg-2 .
+
+	# a graph not in a draftset
+	<http://live-only> a drafter:ManagedGraph ;
+		dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
+		drafter:isPublic "true"^^xsd:boolean ;
+		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime .
+
+	########################################################################
+	# draftset with two draftgraphs in it.
+	# Changes on <http://live-drafted> and unpublished graph <http://b>
+	########################################################################
+	draftset:ds-1 a drafter:DraftSet ;
+		dcterms:created "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
+		dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
+		dcterms:creator <mailto:manager@swirrl.com> ;
+		drafter:hasOwner <mailto:manager@swirrl.com> .
+
+        # unpublished graph
+	<http://unpublished-graph-ds1> a drafter:ManagedGraph ;
+		drafter:isPublic "false"^^xsd:boolean ;
+		drafter:hasDraft draft:ds-1-dg-1 .
+
+	draft:ds-1-dg-1 a drafter:DraftGraph ;
+		dcterms:created "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
+		dcterms:modified "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
+		drafter:inDraftSet draftset:ds-1 .
+
+	draft:ds-1-dg-2 a drafter:DraftGraph ;
+		dcterms:created "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
+		dcterms:modified "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
+		drafter:inDraftSet draftset:ds-1 .
+}
+
+<http://live-drafted> {
+	<http://s1> <http://p1> <http://o1> .
+}
+
+# a live graph which currently has no draftset mods
+<http://live-only> {
+	<http://live-only-s> <http://live-only-p> <http://live-only-o> .
+}
+
+# the new un-published draft in draftset ds-1
+draft:ds-1-dg-1 {
+	<http://unpublished-s1> <http://unpublished-p1> <http://unpublished-o1> .
+}
+
+# a draft modification to one of the live graphs in ds-1
+draft:ds-1-dg-2 {
+	<http://s2> <http://p2> <http://o2> .     # modification (deletion and insertion) of live
+	<http://s3> <http://p3> draft:ds-1-dg-1 . # reference to other graph which should be re-written
+	<http://ds1> <http://dp1> <http://do1> .  # a drafted addition to live graph
+}
