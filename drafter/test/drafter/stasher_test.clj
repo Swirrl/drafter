@@ -10,7 +10,9 @@
             [drafter.stasher.formats :as formats]
             [grafter.url :as url]
             [integrant.core :as ig]
-            [me.raynes.fs :as fs])
+            [me.raynes.fs :as fs]
+            [grafter.vocabularies.rdf :refer [rdfs:label]]
+            [grafter-2.rdf4j.sparql :as sp])
   (:import [java.net URI]
            org.eclipse.rdf4j.model.impl.URIImpl
            org.eclipse.rdf4j.query.impl.SimpleDataset
@@ -411,6 +413,93 @@
                query-str))
       (t/is (= modified-times
                {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")})))))
+
+(defn- prepare-query
+  "Prepares an RDF4j query from a connection with the specified bindings set"
+  [conn query-string bindings]
+  (let [prepared (repo/prepare-query conn query-string)]
+    (doseq [[k value] bindings]
+      (.setBinding prepared (name k) (rio/->backend-type value)))
+    prepared))
+
+(defn- evaluate-with-bindings
+  "Evaluates the given SPARQL string with the specified bindings map"
+  [conn query-string bindings]
+  (let [prepared (prepare-query conn query-string bindings)]
+    (repo/evaluate prepared)))
+
+(t/deftest query-bindings-test
+  (tc/with-system
+    [system "drafter/stasher-test/stasher-repo-cache-and-serve-test.edn"]
+    (let [repo (:drafter.stasher/repo system)
+          ;;bindings that should match in the data
+          subject-uri (URI. "http://statistics.gov.scot/data/home-care-clients")
+          matching-object "Home Care Clients"
+          positive-bindings {:s subject-uri
+                             :p rdfs:label}
+          ;; bindings that should not match in the data
+          negative-bindings {:s subject-uri
+                             :o "Missing"}]
+      (with-open [conn (repo/->connection repo)]
+        (t/testing "boolean query"
+          (let [q "ASK WHERE { ?s ?p ?o }"]
+            (t/is (= true (evaluate-with-bindings conn q positive-bindings)) "Failed to match")
+            (t/is (= false (evaluate-with-bindings conn q negative-bindings)) "Matched unexpectedly")))
+
+        (t/testing "select query"
+          (let [q "SELECT * WHERE { ?s ?p ?o }"]
+            (t/testing "pull results"
+              (t/testing "matching"
+                (let [results (evaluate-with-bindings conn q positive-bindings)]
+                  (t/is (= [{:o matching-object}] results) "Unexpected results")))
+              (t/testing "non-matching"
+                (t/is (nil? (seq (evaluate-with-bindings conn q negative-bindings))))))
+
+            (t/testing "push results"
+              (t/testing "matching"
+                (let [[events handler] (recording-tuple-handler)
+                      prepared (prepare-query conn q positive-bindings)]
+                  (.evaluate prepared handler)
+                  (let [expected [{:o matching-object}]
+                        {:keys [data ended]} @events]
+                    (t/is ended "Expected results to be consumed")
+                    (t/is (= expected data) "Unexepcted bindings"))))
+              (t/testing "non-matching"
+                (let [[events handler] (recording-tuple-handler)
+                      prepared (prepare-query conn q negative-bindings)]
+                  (.evaluate prepared handler)
+                  (let [{:keys [data ended]} @events]
+                    (t/is ended "Expected results to be consumed")
+                    (t/is (nil? (seq data)) "Unexpected matches")))))))
+
+        (t/testing "construct query"
+          (let [q "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]
+            (t/testing "pull results"
+              (t/testing "matching"
+                (let [expected [(pr/->Triple subject-uri rdfs:label matching-object)]
+                      results (evaluate-with-bindings conn q positive-bindings)]
+                  (t/is (= expected results) "Unexpected results")))
+
+              (t/testing "non-matching"
+                (t/is (nil? (seq (evaluate-with-bindings conn q negative-bindings))))))
+
+            (t/testing "push results"
+              (t/testing "matching"
+                (let [[events handler] (recording-rdf-handler)
+                      prepared (prepare-query conn q positive-bindings)]
+                  (.evaluate prepared handler)
+                  (let [expected [(pr/->Triple subject-uri rdfs:label matching-object)]
+                        {:keys [data ended]} @events]
+                    (t/is ended "Expected results to be consumed")
+                    (t/is (= expected data) "Unexpected results"))))
+
+              (t/testing "non-matching"
+                (let [[events handler] (recording-rdf-handler)
+                      prepared (prepare-query conn q negative-bindings)]
+                  (.evaluate prepared handler)
+                  (let [{:keys [ended data]} @events]
+                    (t/is ended "Expected results to be consumed")
+                    (t/is (nil? (seq data)) "Unexpected matches")))))))))))
 
 
 (comment
