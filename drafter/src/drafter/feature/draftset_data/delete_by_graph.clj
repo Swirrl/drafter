@@ -27,24 +27,26 @@
                           #(feat-common/draftset-sync-write-response % backend draftset-id))))
 
 (defn async-job [{:keys [backend] :as resources}]
-  (fn [draftset-id graph user-id]
-    (-> backend
-        (jobs/make-job user-id 'delete-draftset-graph draftset-id :background-write
+  (fn [draftset-id graph user-id metadata]
+    (-> (jobs/make-job user-id :background-write
+          (jobs/job-metadata backend draftset-id 'delete-draftset-graph metadata)
           (fn [job]
             (let [result (dsops/delete-draftset-graph! backend
-                                                       draftset-id
-                                                       graph
-                                                       util/get-current-time)]
+                           draftset-id
+                           graph
+                           util/get-current-time)]
               (ajobs/job-succeeded! job result))))
-        (response/submit-async-job!))))
+      (response/submit-async-job!))))
 
 (defn request-handler
   [{:keys [:drafter/backend sync-job-handler async-job-handler] :as _resources}]
-  (fn [{{:keys [draftset-id graph silent]} :params
+  (fn [{{:keys [draftset-id graph silent metadata]} :params
        {:strs [perform-async] :or {perform-async "false"}} :headers
        :as request}]
     (let [perform-async? (Boolean/parseBoolean perform-async)
-          job-handler (if perform-async? async-job-handler sync-job-handler)]
+          job-handler (if perform-async?
+                        #(async-job-handler %1 %2 %3 metadata)
+                        sync-job-handler)]
       (if (mgmt/is-graph-managed? backend graph)
         (job-handler draftset-id graph (req/user-id request))
         (if silent

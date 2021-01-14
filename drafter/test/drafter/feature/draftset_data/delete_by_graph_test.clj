@@ -91,8 +91,8 @@
       (tc/assert-is-forbidden-response delete-response))))
 
 (tc/deftest-system-with-keys delete-live-graph-async-test
-  [:drafter.fixture-data/loader :drafter.routes/draftsets-api :drafter/write-scheduler]
-  [{handler :drafter.routes/draftsets-api} system]
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
   (let [quads (statements "test/resources/test-draftset.trig")
         graph-quads (group-by context quads)
         live-graphs (keys graph-quads)
