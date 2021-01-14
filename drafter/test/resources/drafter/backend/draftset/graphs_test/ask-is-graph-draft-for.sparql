@@ -1,0 +1,9 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+ASK WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?live a drafter:ManagedGraph .
+    ?live drafter:hasDraft ?draft .
+    ?draft drafter:inDraftSet ?ds .
+  }
+}

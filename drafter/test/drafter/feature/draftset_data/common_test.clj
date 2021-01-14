@@ -29,9 +29,7 @@
 
 (tc/deftest-system-with-keys protected-graphs-test
   keys-for-test [system system-config]
-  (let [handler (get system [:drafter/routes :draftset/api])
-        backend (:drafter/backend system)]
-
+  (let [handler (get system [:drafter/routes :draftset/api])]
     (testing "Cannot operate on drafter's graphs"
       (let [g (URI. "http://publishmydata.com/graphs/drafter/drafts")
             draftset-location (help/create-draftset-through-api handler test-editor)

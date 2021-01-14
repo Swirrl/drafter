@@ -7,9 +7,7 @@
             [clojure.spec.alpha :as s]
             [ring.core.spec]
             [clojure.test :refer :all]
-            [drafter.backend.draftset.draft-management
-             :refer
-             [create-draft-graph! create-managed-graph! migrate-graphs-to-live!]]
+            [drafter.backend.draftset.draft-management :refer [migrate-graphs-to-live!]]
             [drafter.main :as main]
             [drafter.rdf.sparql :as sparql]
             [drafter.util :as util]
@@ -17,17 +15,20 @@
             [environ.core :refer [env]]
             [grafter-2.rdf4j.repository.registry :as reg]
             [grafter-2.rdf4j.templater :refer [triplify]]
-            [grafter.url :as url]
             [integrant.core :as ig]
             [kaocha.plugin.auth-env-plugin :refer [*auth-env*]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.server.standalone :as ring-server]
             [drafter.async.jobs :as async :refer [create-job]]
+            [drafter.async.spec :as async-spec]
             [aero.core :as aero]
             [drafter.user :as user]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
             [grafter.vocabularies.dcterms :refer [dcterms:modified]]
-            [drafter.spec :refer [load-spec-namespaces!]])
+            [drafter.spec :refer [load-spec-namespaces!]]
+            [drafter.write-scheduler :as scheduler]
+            [drafter.backend.draftset.graphs :as graphs]
+            [drafter.backend.draftset.operations :as dsops])
   (:import [com.auth0.jwk Jwk JwkProvider]
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT
@@ -41,7 +42,9 @@
            [java.util.concurrent CountDownLatch TimeUnit]
            [org.apache.http.entity ContentLengthStrategy ContentType StringEntity]
            org.apache.http.impl.entity.StrictContentLengthStrategy
-           [org.apache.http.impl.io ChunkedOutputStream ContentLengthOutputStream DefaultHttpRequestParser DefaultHttpResponseWriter HttpTransportMetricsImpl IdentityOutputStream SessionInputBufferImpl SessionOutputBufferImpl]
+           [org.apache.http.impl.io ChunkedOutputStream ContentLengthOutputStream DefaultHttpRequestParser
+                                    DefaultHttpResponseWriter HttpTransportMetricsImpl IdentityOutputStream
+                                    SessionInputBufferImpl SessionOutputBufferImpl]
            org.apache.http.message.BasicHttpResponse
            org.apache.http.ProtocolVersion
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
@@ -215,21 +218,20 @@
 (defn import-data-to-draft!
   "Imports the data from the triples into a draft graph associated
   with the specified graph.  Returns the draft graph uri."
-  ([db graph triples] (import-data-to-draft! db graph triples nil util/get-current-time))
-  ([db graph triples draftset-ref clock-fn]
-
-   (create-managed-graph! db graph)
-   (let [draftset-uri (and draftset-ref (url/->java-uri draftset-ref))
-         draft-graph (create-draft-graph! db graph draftset-uri clock-fn)]
-     (sparql/add db draft-graph triples)
-     draft-graph)))
+  [db graph triples draftset-ref]
+  (let [graph-manager (graphs/create-manager db)
+        draft-graph (graphs/create-user-graph-draft graph-manager draftset-ref graph)]
+    (sparql/add db draft-graph triples)
+    draft-graph))
 
 (defn make-graph-live!
   ([db live-graph-uri clock-fn]
      (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1")) clock-fn))
 
   ([db live-graph-uri data clock-fn]
-     (let [draft-graph-uri (import-data-to-draft! db live-graph-uri data nil clock-fn)]
+     (let [test-publisher (user/create-user "publisher@swirrl.com" :publisher (user/get-digest "password"))
+           draftset-id (dsops/create-draftset! db test-publisher)
+           draft-graph-uri (import-data-to-draft! db live-graph-uri data draftset-id)]
        (migrate-graphs-to-live! db [draft-graph-uri] clock-fn))
      live-graph-uri))
 
@@ -501,6 +503,26 @@
 
 (defn assert-is-service-unavailable-response [response]
   (assert-spec (response-code-spec 503) response))
+
+(defn exec-and-await-job
+  "Executes a job and waits the specified timeout period for it to complete.
+   Returns the result of the job if it completed within the timeout period."
+  ([job] (exec-and-await-job job 10))
+  ([{:keys [value-p] :as job} timeout-seconds]
+   (scheduler/queue-job! job)
+   (let [result (deref value-p (* 1000 timeout-seconds) ::timeout)]
+     (when (= ::timeout result)
+       (throw (ex-info (format "Job failed to complete after %d seconds" timeout-seconds)
+                       {:job job})))
+     result)))
+
+(defn exec-and-await-job-success
+  "Executes a job, waits for it to finish and asserts the result was successful.
+   Waits the specified timeout period or 10 seconds if none is specified."
+  ([job] (exec-and-await-job-success job 10))
+  ([job timeout-seconds]
+   (let [result (exec-and-await-job job timeout-seconds)]
+     (assert-spec ::async-spec/success-job-result result))))
 
 (defn string->input-stream [s]
   (ByteArrayInputStream. (.getBytes s)))

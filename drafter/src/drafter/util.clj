@@ -82,14 +82,6 @@
   [queries]
   (str/join ";\n" queries))
 
-(defmacro conj-if
-  "Returns (conj col x) if test evaluates to true, otherwise returns
-  col."
-  [test col x]
-  `(if ~test
-     (conj ~col ~x)
-     ~col))
-
 (defn- create-partition-batches
   "Given a sequence of batches, creates an equivalence partition by partition-fn within each batch
   and then partitions each equivalence partition by output-batch-size. Processes each batch within

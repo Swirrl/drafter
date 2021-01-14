@@ -63,7 +63,6 @@
 
  :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
                                            :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                           :drafter/protected-graphs #ig/ref :drafter/protected-graphs
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.options/handler {:drafter/backend #ig/ref :drafter/backend
@@ -75,11 +74,12 @@
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/backend #ig/ref :drafter/backend
                                                             :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                                            :drafter/protected-graphs #ig/ref :drafter/protected-graphs
+                                                            :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler {:drafter/backend #ig/ref :drafter/backend
                                                                       :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                                                      :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
                                                                       :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.changes/delete-changes-handler {:drafter/backend #ig/ref :drafter/backend
@@ -88,11 +88,12 @@
 
  :drafter.feature.draftset-data.append/data-handler {:drafter/backend #ig/ref :drafter/backend
                                                      :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                                     :drafter/protected-graphs #ig/ref :drafter/protected-graphs
+                                                     :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/backend #ig/ref :drafter/backend
                                                          :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                                         :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
                                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.query/handler {:drafter/backend #ig/ref :drafter/backend
@@ -100,7 +101,7 @@
                                           :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset.update/handler {:drafter/backend #ig/ref :drafter/backend
-                                           :drafter/protected-graphs #ig/ref :drafter/protected-graphs
+                                           :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
                                            :max-update-size 50}
 

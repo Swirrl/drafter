@@ -28,34 +28,35 @@
 
 (def dummy "dummy@user.com")
 
-(tc/deftest-system-with-keys delete-draftset-data-test
-  [:drafter/backend :drafter/global-writes-lock :drafter/write-scheduler :drafter.fixture-data/loader]
-  [{:keys [:drafter/backend :drafter/global-writes-lock]} system-config]
-  (let [initial-time (constantly (OffsetDateTime/parse "2017-01-01T01:01:01Z"))
-        update-time (constantly (OffsetDateTime/parse "2018-01-01T01:01:01Z"))
-        delete-time (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
-        ds (dsops/create-draftset! backend test-editor)
-        resources {:backend backend :global-writes-lock global-writes-lock}]
+(t/deftest delete-draftset-data-test
+  (tc/with-system
+    [:drafter/backend :drafter/global-writes-lock :drafter/write-scheduler :drafter.fixture-data/loader
+     :drafter.backend.draftset.graphs/manager]
+    [{:keys [:drafter/backend :drafter/global-writes-lock :drafter.backend.draftset.graphs/manager]} system-config]
+    (let [initial-time (constantly (OffsetDateTime/parse "2017-01-01T01:01:01Z"))
+          delete-time (constantly (OffsetDateTime/parse "2019-01-01T01:01:01Z"))
+          ds (dsops/create-draftset! backend test-editor)
+          resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}]
 
-    (th/apply-job! (append/append-data-to-draftset-job (io/file "./test/test-triple.nt")
-                                                       resources
-                                                       dummy
-                                                       {:rdf-format RDFFormat/NTRIPLES
-                                                        :graph (URI. "http://foo/graph")
-                                                        :draftset-id ds}
-                                                       initial-time))
+      (th/apply-job! (append/append-data-to-draftset-job (io/file "./test/test-triple.nt")
+                                                         resources
+                                                         dummy
+                                                         {:rdf-format  RDFFormat/NTRIPLES
+                                                          :graph       (URI. "http://foo/graph")
+                                                          :draftset-id ds}
+                                                         initial-time))
 
-    (th/apply-job! (sut/delete-data-from-draftset-job (io/file "./test/test-triple-2.nt")
-                                                      dummy
-                                                      resources
-                                                      {:draftset-id ds
-                                                       :graph (URI. "http://foo/graph")
-                                                       :rdf-format RDFFormat/NTRIPLES}
-                                                      delete-time))
-    (let [ts-3 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-      (t/is (.isEqual (delete-time)
-                       ts-3)
-            "Modified time is updated after delete"))))
+      (th/apply-job! (sut/delete-data-from-draftset-job (io/file "./test/test-triple-2.nt")
+                                                        dummy
+                                                        resources
+                                                        {:draftset-id ds
+                                                         :graph       (URI. "http://foo/graph")
+                                                         :rdf-format  RDFFormat/NTRIPLES}
+                                                        delete-time))
+      (let [ts-3 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
+        (t/is (.isEqual (delete-time)
+                        ts-3)
+              "Modified time is updated after delete")))))
 
 (t/deftest delete-public-endpoint-quads-test
   (tc/with-system

@@ -24,9 +24,10 @@
             [drafter:createdAt created-date]
             [drafter:modifiedAt created-date]
             [drafter:createdBy user-uri]
-            [drafter:hasOwner user-uri]]
-        ss (util/conj-if (some? title) ss [rdfs:label title])]
-    (util/conj-if (some? description) ss [rdfs:comment description])))
+            [drafter:hasOwner user-uri]]]
+    (cond-> ss
+            (some? title) (conj [rdfs:label title])
+            (some? description) (conj [rdfs:comment description]))))
 
 (defn create-draftset!
   "Creates a new draftset in the given database and returns its id. If
@@ -273,24 +274,6 @@
         draft-graphs (graph-mapping-draft-graphs graph-mapping)
         delete-query (delete-draftset-query draftset-ref draft-graphs)]
     (sparql/update! db delete-query)))
-
-(defn delete-draftset-graph!
-  "Mark the graph for deletion in live by removing its contents.  If
-  the graph doesn't exist in the draftset we create an empty draft
-  graph for it.  Publishing the empty graph will then result in a
-  deletion from live.
-
-  modified-time-fn - A 0-arg function that returns the modified-time."
-  [db draftset-ref graph-uri modified-time-fn]
-  (when (mgmt/is-graph-managed? db graph-uri)
-    (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)]
-      (if-let [draft-graph-uri (get graph-mapping graph-uri)]
-        (let [modified-at (modified-time-fn)]
-          (mgmt/delete-graph-contents! db draft-graph-uri modified-at)
-          (mgmt/unrewrite-draftset! db {:draftset-uri (ds/->draftset-uri draftset-ref)
-                                        :live-graph-uris [graph-uri]})
-          draft-graph-uri)
-        (mgmt/create-draft-graph! db graph-uri draftset-ref modified-time-fn)))))
 
 (def ^:private draftset-param->predicate
   {:display-name rdfs:label
