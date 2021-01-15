@@ -182,27 +182,27 @@
              (draftset/id draftset) (str graph)))
 
 (defn delete-graph
-  "Schedules the deletion of the graph from live.
+  "Schedules the deletion of the graph from live. Returns an async job. Use
+   delete-graph-sync for a synchronous version
 
-  Takes an optional last argument of opts. Currently the supported
-  opts are:
+   Takes an optional last argument of opts. Currently the supported opts are:
 
-  :silent    - When true equivalent to SPARQL's DROP SILENT.  A
-               boolean indicating whether or not to raise an error
-               if the graph to be deleted doesn't exist.  If set to
-               true the function will succeed without error if the
-               graph being deleted doesn't exist.  Defaults to false.
-  "
+   :silent - When true equivalent to SPARQL's DROP SILENT.  A boolean
+   indicating whether or not to raise an error if the graph to be deleted
+   doesn't exist.  If set to true the function will succeed without error if
+   the graph being deleted doesn't exist.  Defaults to false."
   ([client access-token draftset graph]
    (delete-graph client access-token draftset graph {}))
-  ([client access-token draftset graph opts]
-   (apply i/request
-          client
-          i/delete-draftset-graph
-          access-token
-          (draftset/id draftset)
-          (str graph)
-          (apply concat opts))))
+  ([client access-token draftset graph {:keys [silent]}]
+   (->async-job
+     (i/request
+       client
+       i/delete-draftset-graph
+       access-token
+       (draftset/id draftset)
+       (str graph)
+       :perform-async true
+       :silent (boolean silent)))))
 
 (defn delete-quads
   ([client access-token draftset quads]
@@ -489,42 +489,24 @@
   (s/nilable (s/keys :req-un [::batch-size ::drafter-uri]
                      :opt-un [::auth0 ::version])))
 
-(defn- sync-body [fn-sym arg-list]
-  `(let [job# (~fn-sym ~@arg-list)]
-     (wait! ~(first arg-list) ~(second arg-list) job#)))
-
-(defn- build-args [arg-list]
-  (let [rest-index (.indexOf arg-list '&)]
-    (if (not= rest-index -1)
-      (->> rest-index
-           (subvec arg-list)
-           last
-           :keys
-           (mapcat (fn [key] [(keyword key) key]))
-           (into (subvec arg-list 0 rest-index)))
-      arg-list)))
-
 (defmacro gensync
   "Macro which defines a synchronous version of the specified async client function. The async function
    should have at least two parameters where the first is the drafter client and the second the access
    token to use. The resulting function for an async function 'operation' is called 'operation-sync'"
   [fn-sym]
   (let [sync-fn (symbol (str fn-sym "-sync"))
-        {:keys [arglists] :as fn-meta} (meta (ns-resolve *ns* fn-sym))
-        doc (str "Synchronous version of " fn-sym " i.e. calls " fn-sym " and waits for the resulting job to complete")]
-    (if (= 1 (count arglists))
-      (let [arg-list (first arglists)
-            args (build-args arg-list)]
-        `(defn ~sync-fn ~doc ~arg-list ~(sync-body fn-sym args)))
-      (let [arities (map (fn [arg-list]
-                           (list arg-list (sync-body fn-sym (build-args arg-list))))
-                         arglists)]
-        `(defn ~sync-fn ~doc ~@arities)))))
+        arglists (:arglists (meta (resolve fn-sym)))
+        doc (str "Synchronous version of " fn-sym " i.e. calls " fn-sym
+              " and waits for the resulting job to complete")]
+    `(defn ~sync-fn ~doc {:arglists '~arglists} [client# access-token# & more#]
+       (wait! client# access-token#
+         (apply ~fn-sym client# access-token# more#)))))
 
 (gensync remove-draftset)
 (gensync load-graph)
 (gensync delete-quads)
 (gensync delete-triples)
+(gensync delete-graph)
 (gensync add)
 (gensync add-data)
 (gensync publish)

@@ -564,7 +564,7 @@
         (sut/publish-sync client token draftset-1)
 
         (let [draftset-2 (sut/new-draftset client token name description)]
-          (sut/delete-graph client token draftset-2 graph-1)
+          (sut/delete-graph-sync client token draftset-2 graph-1)
           (sut/publish-sync client token draftset-2))
 
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
@@ -574,6 +574,21 @@
           (let [query (format "CONSTRUCT { ?s ?p ?o } WHERE { graph <%s> { ?s ?p ?o } }" (str graph-2))
                 triples-2* (gr-repo/query conn query)]
             (is (= (set triples-2) (set triples-2*)))))))))
+
+(t/deftest deleting-a-graph-from-a-draftset-silently
+  (let [client (drafter-client)
+        token (auth-util/system-token)
+        name "Draftset deleting"
+        description "Testing deleting a graph from a draftset silently"
+        draftset (sut/new-draftset client token name description)
+        non-graph (URI. "http://test.graph.com/non-graph")]
+    (t/testing "Can delete a graph that doesn't exist with :silent"
+      (sut/delete-graph-sync client token draftset non-graph
+        {:silent true}))
+    (t/testing "Can't delete a graph that doesn't exist without :silent"
+      (is (thrown-with-msg? ExceptionInfo #"status 422"
+            (sut/delete-graph-sync client token draftset non-graph
+              {:silent false}))))))
 
 (t/deftest job-status
   (let [client (drafter-client)
