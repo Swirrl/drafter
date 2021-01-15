@@ -18,40 +18,51 @@
             [clojure.set :as set]))
 
 (defn sync-job [{:keys [backend] :as resources}]
-  (fn [draftset-id graph user-id]
-    (feat-common/run-sync resources
-                          user-id
-                          'delete-draftset-graph
-                          draftset-id
-                          #(dsops/delete-draftset-graph! backend draftset-id graph util/get-current-time)
-                          #(feat-common/draftset-sync-write-response % backend draftset-id))))
+  (fn [draftset-id graph user-id silent]
+    (if (mgmt/is-graph-managed? backend graph)
+      (feat-common/run-sync
+        resources
+        user-id
+        'delete-draftset-graph
+        draftset-id
+        #(dsops/delete-draftset-graph! backend draftset-id graph util/get-current-time)
+        #(feat-common/draftset-sync-write-response % backend draftset-id))
+      (if silent
+        (ring/response (dsops/get-draftset-info backend draftset-id))
+        (drafter-response/unprocessable-entity-response (str "Graph not found"))))))
 
 (defn async-job [{:keys [backend] :as resources}]
-  (fn [draftset-id graph user-id metadata]
-    (-> (jobs/make-job user-id :background-write
-          (jobs/job-metadata backend draftset-id 'delete-draftset-graph metadata)
-          (fn [job]
-            (let [result (dsops/delete-draftset-graph! backend
-                           draftset-id
-                           graph
-                           util/get-current-time)]
-              (ajobs/job-succeeded! job result))))
-      (response/submit-async-job!))))
+  (fn [draftset-id graph user-id silent metadata]
+    (if (mgmt/is-graph-managed? backend graph)
+      (-> (jobs/make-job user-id :background-write
+            (jobs/job-metadata backend draftset-id
+              'delete-draftset-graph metadata)
+            (fn [job]
+              (let [result (dsops/delete-draftset-graph! backend
+                             draftset-id
+                             graph
+                             util/get-current-time)]
+                (ajobs/job-succeeded! job result))))
+        (response/submit-async-job!))
+      (if silent
+        (-> (jobs/make-job user-id :background-write
+              (jobs/job-metadata backend draftset-id
+                'delete-draftset-graph metadata)
+              (fn [job]
+                (let [result (dsops/get-draftset-info backend draftset-id)]
+                  (ajobs/job-succeeded! job result))))
+          (response/submit-async-job!))
+        (drafter-response/unprocessable-entity-response
+          (str "Graph not found"))))))
 
 (defn request-handler
   [{:keys [:drafter/backend sync-job-handler async-job-handler] :as _resources}]
   (fn [{{:keys [draftset-id graph silent metadata]} :params
        {:strs [perform-async] :or {perform-async "false"}} :headers
        :as request}]
-    (let [perform-async? (Boolean/parseBoolean perform-async)
-          job-handler (if perform-async?
-                        #(async-job-handler %1 %2 %3 metadata)
-                        sync-job-handler)]
-      (if (mgmt/is-graph-managed? backend graph)
-        (job-handler draftset-id graph (req/user-id request))
-        (if silent
-          (ring/response (dsops/get-draftset-info backend draftset-id))
-          (drafter-response/unprocessable-entity-response (str "Graph not found")))))))
+    (if (Boolean/parseBoolean perform-async)
+      (async-job-handler draftset-id graph (req/user-id request) silent metadata)
+      (sync-job-handler  draftset-id graph (req/user-id request) silent))))
 
 (defn remove-graph-from-draftset-handler
   "Remove a supplied graph from the draftset."
