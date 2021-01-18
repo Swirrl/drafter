@@ -3,9 +3,7 @@
             [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.set :as set]
-            [drafter.backend.draftset.draft-management
-             :refer
-             [append-data-batch! create-draft-graph!]]
+            [drafter.backend.draftset.draft-management :refer [append-data-batch!]]
             [drafter.backend.draftset.rewrite-query :refer [rewrite-sparql-string]]
             [drafter.test-common
              :refer
@@ -18,7 +16,10 @@
             [grafter-2.rdf4j.io :as gio]
             [grafter-2.rdf.protocols :as pr]
             [drafter.rdf.dataset :as dataset]
-            [drafter.rdf.sesame :as ses])
+            [drafter.rdf.sesame :as ses]
+            [drafter.backend.draftset.graphs :as graphs]
+            [drafter.user-test :refer [test-editor]]
+            [drafter.backend.draftset.operations :as dsops])
   (:import java.net.URI
            [org.eclipse.rdf4j.query Operation]))
 
@@ -98,8 +99,11 @@
   ((apply juxt ks) (first results)))
 
 (deftest query-and-result-rewriting-test
-  (let [draft-graph (create-draft-graph! *test-backend* (URI. "http://frogs.com/live-graph"))
-        graph-map {(URI. "http://frogs.com/live-graph") draft-graph}]
+  (let [draftset-id (dsops/create-draftset! *test-backend* test-editor)
+        graph-manager (graphs/create-manager *test-backend*)
+        live-graph (URI. "http://frogs.com/live-graph")
+        draft-graph (graphs/create-user-graph-draft graph-manager draftset-id live-graph)
+        graph-map {live-graph draft-graph}]
 
     (append-data-batch! *test-backend* draft-graph (test-triples (URI. "http://kermit.org/the-frog")))
 
@@ -184,7 +188,10 @@
 
 (deftest more-query-and-result-rewriting-test
   (testing "rewrites all result URIs"
-    (let [draft-graph (create-draft-graph! *test-backend* (URI. "http://frogs.com/live-graph"))
+    (let [graph-manager (graphs/create-manager *test-backend*)
+          draftset-id (dsops/create-draftset! *test-backend* test-editor)
+          live-graph-uri (URI. "http://frogs.com/live-graph")
+          draft-graph (graphs/create-user-graph-draft graph-manager draftset-id live-graph-uri)
           live-triple [(URI. "http://live-subject") (URI. "http://live-predicate") (URI. "http://live-object")]
           draft-triple [(URI. "http://draft-subject") (URI. "http://draft-predicate") (URI. "http://draft-object")]
           [draft-subject draft-predicate draft-object] draft-triple

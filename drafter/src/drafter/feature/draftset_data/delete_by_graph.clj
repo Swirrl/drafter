@@ -8,7 +8,7 @@
             [drafter.routes.draftsets-api
              :refer
              [parse-query-param-flag-handler]]
-            [drafter.util :as util]
+            [drafter.backend.draftset.graphs :as graphs]
             [integrant.core :as ig]
             [ring.util.response :as ring]
             [drafter.requests :as req]
@@ -17,7 +17,7 @@
             [drafter.async.jobs :as ajobs]
             [clojure.set :as set]))
 
-(defn sync-job [{:keys [backend] :as resources}]
+(defn sync-job [{:keys [backend] graph-manager ::graphs/manager :as resources}]
   (fn [draftset-id graph user-id silent]
     (if (mgmt/is-graph-managed? backend graph)
       (feat-common/run-sync
@@ -25,23 +25,23 @@
         user-id
         'delete-draftset-graph
         draftset-id
-        #(dsops/delete-draftset-graph! backend draftset-id graph util/get-current-time)
+        #(graphs/delete-user-graph graph-manager draftset-id graph)
         #(feat-common/draftset-sync-write-response % backend draftset-id))
       (if silent
         (ring/response (dsops/get-draftset-info backend draftset-id))
         (drafter-response/unprocessable-entity-response (str "Graph not found"))))))
 
-(defn async-job [{:keys [backend] :as resources}]
+(defn async-job [{:keys [backend] graph-manager ::graphs/manager :as resources}]
   (fn [draftset-id graph user-id silent metadata]
     (if (mgmt/is-graph-managed? backend graph)
       (-> (jobs/make-job user-id :background-write
             (jobs/job-metadata backend draftset-id
               'delete-draftset-graph metadata)
             (fn [job]
-              (let [result (dsops/delete-draftset-graph! backend
+              (let [result (graphs/delete-user-graph
+                             graph-manager
                              draftset-id
-                             graph
-                             util/get-current-time)]
+                             graph)]
                 (ajobs/job-succeeded! job result))))
         (response/submit-async-job!))
       (if silent
@@ -73,14 +73,18 @@
     (feat-middleware/parse-graph-param-handler true (request-handler resources)))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete-by-graph/sync-job-handler [_]
-  (s/keys :req-un [::backend ::global-writes-lock]))
+  (s/keys
+    :req [::graphs/manager]
+    :req-un [::backend ::global-writes-lock]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete-by-graph/sync-job-handler
   [_ {:keys [backend] :as resources}]
   (sync-job resources))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete-by-graph/async-job-handler [_]
-  (s/keys :req-un [::backend]))
+  (s/keys
+    :req [::graphs/manager]
+    :req-un [::backend]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete-by-graph/async-job-handler
   [_ {:keys [backend] :as resources}]

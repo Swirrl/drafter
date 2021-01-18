@@ -119,14 +119,14 @@
     (sut/delete-draftset-statements! *test-backend* draftset-id)
     (is (= false (ask? (str "<" (draftset-id->uri draftset-id) ">") "?p" "?o")))))
 
-(defn- import-data-to-draftset! [db draftset-id quads clock-fn]
+(defn- import-data-to-draftset! [db draftset-id quads]
   (let [graph-quads (group-by context quads)]
-    (doall (map (fn [[live qs]] (import-data-to-draft! db live qs draftset-id clock-fn)) graph-quads))))
+    (doall (map (fn [[live qs]] (import-data-to-draft! db live qs draftset-id)) graph-quads))))
 
 (deftest delete-draftset!-test
   (let [draftset-id (sut/create-draftset! *test-backend* test-editor "Test draftset")
         quads (statements "test/resources/test-draftset.trig")
-        draft-graphs (import-data-to-draftset! *test-backend* draftset-id quads (constantly #inst "2018"))]
+        draft-graphs (import-data-to-draftset! *test-backend* draftset-id quads)]
 
     (doseq [dg draft-graphs]
       (is (= true (mgmth/draft-exists? *test-backend* dg))))
@@ -137,65 +137,6 @@
 
     (doseq [dg draft-graphs]
       (is (= false (mgmth/draft-exists? *test-backend* dg))))))
-
-(deftest delete-draftest-graph!-test-1
-  (let [initial-time-fn (fn [] #inst "2017")
-        modified-time-fn (fn [] #inst "2018")
-        id-fn (constantly #uuid "00000000-0000-0000-0000-000000000000")
-        create-test-draftset! #(sut/create-draftset! *test-backend* test-editor "Test draftset" nil id-fn modified-time-fn)]
-    (testing "Delete non-existent live graph"
-      (let [draftset-id (create-test-draftset!)
-            graph-to-delete (URI. "http://missing")]
-
-        (sut/delete-draftset-graph! *test-backend* draftset-id graph-to-delete modified-time-fn)
-
-        (is (= false (mgmt/is-graph-managed? *test-backend* graph-to-delete)))
-        (is (empty? (sut/get-draftset-graph-mapping *test-backend* draftset-id)))))))
-
-(deftest delete-draftset-graph!-test-2
-  (let [initial-time-fn (fn [] #inst "2017")
-        modified-time-fn (fn [] #inst "2018")
-        id-fn (constantly #uuid "00000000-0000-0000-0000-000000000000")
-        create-test-draftset! #(sut/create-draftset! *test-backend* test-editor "Test draftset" nil id-fn modified-time-fn)]
-    (testing "Delete live graph not already in draftset"
-      (let [live-graph (URI. "http://live")
-            draftset-id (create-test-draftset!)]
-        (make-graph-live! *test-backend* live-graph initial-time-fn)
-        (sut/delete-draftset-graph! *test-backend* draftset-id live-graph modified-time-fn)
-
-        (is (mgmt/is-graph-managed? *test-backend* live-graph))
-
-        (let [graph-mapping (sut/get-draftset-graph-mapping *test-backend* draftset-id)]
-          (is (contains? graph-mapping live-graph))
-
-          (is (mgmth/draft-exists? *test-backend* (get graph-mapping live-graph))))))))
-
-(deftest delete-draftset-graph!-test-3
-  (let [initial-time-fn (fn [] #inst "2017")
-        modified-time-fn (fn [] #inst "2019")
-        id-fn (constantly #uuid "00000000-0000-0000-0000-000000000000")
-        create-test-draftset! #(sut/create-draftset! *test-backend* test-editor "Test draftset" nil id-fn initial-time-fn)]
-    (testing "Graph already in draftset"
-      (let [live-graph (URI. "http://live")
-            draftset-id (create-test-draftset!)]
-
-        (make-graph-live! *test-backend* live-graph initial-time-fn) ;; note this isn't actual a publish operation it's just setting up stategraph state
-
-        (let [draft-graph (import-data-to-draft! *test-backend* live-graph (test-triples (URI. "http://subject")) draftset-id initial-time-fn)
-              fetch-modified (fn [repo graph-uri] (:modified (first (repo/query (repo/->connection repo) (format "SELECT ?modified WHERE { <%s> <http://purl.org/dc/terms/modified> ?modified .}" graph-uri)))))
-              initially-modified-at (fetch-modified *test-backend* live-graph)]
-
-          (is (mgmth/draft-exists? *test-backend* draft-graph))
-
-          (sut/delete-draftset-graph! *test-backend* draftset-id live-graph modified-time-fn)
-
-          (let [subsequently-modified-at (fetch-modified (repo/->connection *test-backend*) draft-graph)]
-            (is (.isBefore initially-modified-at
-                           subsequently-modified-at)
-                "Modified time is updated"))
-
-          (is (mgmth/draft-exists? *test-backend* draft-graph))
-          (is (= false (ask? (format "GRAPH <%s> { ?s ?p ?o }" draft-graph)))))))))
 
 (defn- draftset-has-claim-role? [draftset-id role]
   (let [q (str

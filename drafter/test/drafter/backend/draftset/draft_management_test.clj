@@ -1,6 +1,5 @@
 (ns drafter.backend.draftset.draft-management-test
-  (:require [clojure.java.io :as io]
-            [clojure.test :refer :all]
+  (:require [clojure.test :refer :all]
             [drafter.backend.draftset.draft-management :refer :all]
             [drafter.backend.draftset.operations :refer [create-draftset!]]
             [drafter.draftset :refer [->DraftsetId]]
@@ -12,7 +11,6 @@
              :refer
              [*test-backend*
               ask?
-              import-data-to-draft!
               make-graph-live!
               wrap-system-setup]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
@@ -24,7 +22,9 @@
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
             [drafter.util :as util]
-            [drafter.test-common :as tc])
+            [drafter.test-common :as tc]
+            [drafter.backend.draftset.graphs :as graphs]
+            [drafter.backend.draftset.operations :as dsops])
   (:import java.net.URI
            [java.util UUID]
            [java.time OffsetDateTime]))
@@ -75,15 +75,14 @@
 
 (def test-graph-uri (URI. "http://example.org/my-graph"))
 
-(deftest create-managed-graph-test
-  (testing "Creates managed graph"
-    (is (create-managed-graph (URI. "http://example.org/my-graph"))))
+(defn- create-managed-graph! [db graph-uri]
+  (let [manager (graphs/create-manager db)]
+    (graphs/ensure-managed-user-graph manager graph-uri)))
 
-  (deftest create-managed-graph!-test
-    (testing "create-managed-graph!"
-      (testing "stores the details of the managed graph"
-        (create-managed-graph! *test-backend* test-graph-uri)
-        (is (is-graph-managed? *test-backend* test-graph-uri))))))
+(defn- create-managed-graph-with-draft! [test-graph-uri]
+  (let [manager (graphs/create-manager *test-backend*)
+        draftset-id (dsops/create-draftset! *test-backend* test-editor)]
+    (graphs/create-user-graph-draft manager draftset-id test-graph-uri)))
 
 (deftest is-graph-live?-test
   (testing "Non-existent graph"
@@ -97,32 +96,7 @@
     (let [graph-uri (make-graph-live! *test-backend* (URI. "http://live") (constantly (OffsetDateTime/parse "2015-01-01T00:00:00Z")))]
       (is (is-graph-live? *test-backend* graph-uri)))))
 
-(deftest create-draft-graph!-test
-  (testing "create-draft-graph!"
-
-    (create-managed-graph! *test-backend* test-graph-uri)
-
-    (testing "returns the draft-graph-uri, stores data about it and associates it with the live graph"
-      (let [new-graph-uri (create-draft-graph! *test-backend* test-graph-uri nil (constantly (OffsetDateTime/parse "2017-01-01T00:00:00Z")))]
-        (is (.startsWith (str new-graph-uri) (str staging-base)))
-        (is (ask? "<" test-graph-uri "> <" rdf:a "> <" drafter:ManagedGraph "> ; "
-                  "<" drafter:hasDraft "> <" new-graph-uri "> ."
-                  "<" new-graph-uri "> <" dcterms:modified ">" "\"2017-01-01T00:00:00Z\"^^xsd:dateTime . ")))))
-
-  (testing "within draft set"
-    (create-managed-graph! *test-backend* test-graph-uri)
-    (let [draftset-id (UUID/randomUUID)
-          ds-uri (url/append-path-segments draftset-uri draftset-id)
-          draft-graph-uri (create-draft-graph! *test-backend* test-graph-uri (->DraftsetId draftset-id) (constantly (OffsetDateTime/parse "2017-01-01T00:00:00Z")))]
-      (is (ask? "<" draft-graph-uri "> <" drafter:inDraftSet "> <" ds-uri "> ;"
-                "<" dcterms:modified ">" "\"2017-01-01T00:00:00Z\"^^xsd:dateTime . ")))))
-
-(defn create-managed-graph-with-draft! [test-graph-uri]
-  (create-managed-graph! *test-backend* test-graph-uri)
-  (create-draft-graph! *test-backend* test-graph-uri))
-
-(deftest
-  append-data-batch!-test
+(deftest append-data-batch!-test
   (testing "append-data-batch!"
     (testing "on an empty live graph"
       (let [draft-graph-uri (create-managed-graph-with-draft! test-graph-uri)]
@@ -234,7 +208,7 @@
       (append-data-batch! *test-backend* draft-graph-to-keep-uri2 test-triples)
       (append-data-batch! *test-backend* draft-graph-to-keep-uri3 test-triples)
       (migrate-graphs-to-live! *test-backend* [draft-graph-to-keep-uri2] (constantly (OffsetDateTime/parse "2015-01-01T00:00:00Z")))
-      (is (graph-exists? *test-backend* graph-to-keep-uri2))
+      (is (graph-non-empty? *test-backend* graph-to-keep-uri2))
 
       ;; We are migrating an empty graph, so this is deleting.
       (migrate-graphs-to-live! *test-backend* [draft-graph-to-del-uri] (constantly (OffsetDateTime/parse "2016-01-01T00:00:00Z")))
@@ -319,19 +293,6 @@
          (is (= #{live-1 live-2}
                 (live-graphs *test-backend* :online false))))))
 
-(deftest build-draft-map-test
-  (let [db (repo/sail-repo)]
-    (testing "graph-map associates live graphs with their drafts"
-      (create-managed-graph! db (URI. "http://frogs.com/"))
-      (create-managed-graph! db (URI. "http://dogs.com/"))
-      (let [frogs-draft (create-draft-graph! db (URI. "http://frogs.com/"))
-            dogs-draft (create-draft-graph! db (URI. "http://dogs.com/"))
-            gm (graph-map db #{frogs-draft dogs-draft})]
-
-        (is (= {(URI. "http://frogs.com/") frogs-draft
-                (URI. "http://dogs.com/")  dogs-draft}
-               gm))))))
-
 (deftest upsert-single-object-insert-test
   (let [db (repo/sail-repo)]
     (upsert-single-object! db "http://foo/" "http://bar/" "baz")
@@ -347,39 +308,10 @@
                        "<" subject "> <" predicate "> \"updated\""
                        "} }")))))
 
-(deftest ensure-draft-graph-exists-for-test
-  (testing "Draft graph already exists for live graph"
-    (let [draft-graph-uri (URI. "http://draft")
-          live-graph-uri (URI. "http://live")
-          ds-uri (URI. "http://draftset")
-          initial-mapping {live-graph-uri draft-graph-uri}
-          resources {:backend {:repo *test-backend*} :protected-graphs #{}}
-          {found-draft-uri :draft-graph-uri graph-map :graph-map} (ensure-draft-exists-for resources live-graph-uri initial-mapping ds-uri)]
-      (is (= draft-graph-uri found-draft-uri))
-      (is (= initial-mapping graph-map))))
-
-  (testing "Live graph exists without draft"
-    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
-          ds-uri (URI. "http://draftset")
-          resources {:backend {:repo *test-backend*} :protected-graphs #{}}
-          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for resources live-graph-uri {} ds-uri)]
-      (is (= {live-graph-uri draft-graph-uri} graph-map))
-      (is (is-graph-managed? *test-backend*  live-graph-uri))
-      (is (mgmt/draft-exists? *test-backend* draft-graph-uri))))
-
-  (testing "Live graph does not exist"
-    (let [live-graph-uri (URI. "http://live")
-          ds-uri (URI. "http://draftset")
-          resources {:backend {:repo *test-backend*} :protected-graphs #{}}
-          {:keys [draft-graph-uri graph-map]} (ensure-draft-exists-for resources live-graph-uri {} ds-uri)]
-      (is (= {live-graph-uri draft-graph-uri} graph-map))
-      (is (is-graph-managed? *test-backend* live-graph-uri))
-      (is (mgmt/draft-exists? *test-backend* draft-graph-uri)))))
-
 (deftest delete-draft-graph!-test
   (testing "With only draft for managed graph"
-    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
-          draft-graph-uri (create-draft-graph! *test-backend* live-graph-uri)]
+    (let [live-graph-uri (URI. "http://live")
+          draft-graph-uri (create-managed-graph-with-draft! live-graph-uri)]
       (append-data-batch! *test-backend* draft-graph-uri test-triples)
       (delete-draft-graph! *test-backend* draft-graph-uri)
 
@@ -393,9 +325,9 @@
         (is (= false (is-graph-managed? *test-backend* live-graph-uri))))))
 
   (testing "Draft for managed graph with other graphs"
-    (let [live-graph-uri (create-managed-graph! *test-backend* (URI. "http://live"))
-          draft-graph-1 (create-draft-graph! *test-backend* live-graph-uri)
-          draft-graph-2 (create-draft-graph! *test-backend* live-graph-uri)]
+    (let [live-graph-uri (URI. "http://live")
+          draft-graph-1 (create-managed-graph-with-draft! live-graph-uri)
+          draft-graph-2 (create-managed-graph-with-draft! live-graph-uri)]
 
       (delete-draft-graph! *test-backend* draft-graph-2)
 
@@ -430,19 +362,6 @@
       (is (= #{:d1 :d2}
              (calculate-draft-raw-graphs #{} #{:l1 :l2} #{:d1 :d2}))
           "Restriction should be the set of drafts (as live graph queries will be rewritten to their draft graphs)"))))
-
-(deftest set-timestamp-test
-  (let [draftset (create-draftset! *test-backend* test-editor)
-        triples (test/test-triples (URI. "http://test-subject"))
-        draft-graph-uri (import-data-to-draft! *test-backend* (URI. "http://foo/graph") triples draftset (constantly "2015"))]
-
-    (set-modifed-at-on-resource! *test-backend* draft-graph-uri (OffsetDateTime/now))
-
-    (is (sparql/eager-query *test-backend*
-               (str
-                "ASK {"
-                "<" draft-graph-uri "> <" drafter:modifiedAt "> ?modified . "
-                "}")))))
 
 (defn test-quads [g]
   (map #(assoc % :c g)

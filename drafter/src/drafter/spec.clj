@@ -1,8 +1,7 @@
 (ns drafter.spec
   (:require [clojure.spec.alpha :as s]
             [drafter.util :as util]
-            [clojure.spec.gen.alpha :as gen]
-            [integrant.core :as ig])
+            [clojure.spec.gen.alpha :as gen])
   (:import [java.net URI]))
 
 (s/def :drafter/URI #(instance? URI %))
@@ -16,15 +15,6 @@
   (s/coll-of (s/or :uri uri?
                    :regex (partial instance? java.util.regex.Pattern))
              :kind set?))
-
-(s/def :drafter/protected-graphs
-  (s/keys :req-un [::graphset]))
-
-(s/def :drafter/union-with-live? boolean?)
-
-(defmethod ig/init-key :drafter/protected-graphs [_ opts]
-  ;; :groan: :duct/const
-  opts)
 
 (def spec-namespaces
   '[drafter.spec

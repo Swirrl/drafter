@@ -17,7 +17,8 @@
             [integrant.core :as ig]
             [drafter.async.jobs :as ajobs]
             [drafter.requests :as req]
-            [grafter-2.rdf4j.repository :as repo]))
+            [grafter-2.rdf4j.repository :as repo]
+            [drafter.backend.draftset.graphs :as graphs]))
 
 
 (defn append-data-batch!
@@ -55,18 +56,13 @@
       (ajobs/job-succeeded! job))))
 
 (defn- copy-graph-for-append*
-  [state draftset-ref resources live->draft quad-batches job]
+  [state draftset-ref {:keys [graph-manager] :as resources} live->draft quad-batches job]
   (let [live-graph-uri (:graph state)
-        ds-uri (str (ds/->draftset-uri draftset-ref))
-        {:keys [draft-graph-uri graph-map]}
-        (-> resources
-            (update :protected-graphs :graphset)
-            (select-keys [:backend :protected-graphs])
-            (mgmt/ensure-draft-exists-for live-graph-uri live->draft ds-uri))]
-
+        draft-graph-uri (graphs/create-user-graph-draft graph-manager draftset-ref live-graph-uri)
+        live->draft (assoc live->draft live-graph-uri draft-graph-uri)]
     (ds-data-common/lock-writes-and-copy-graph resources live-graph-uri draft-graph-uri {:silent true})
     ;; Now resume appending the batch
-    (append-draftset-quads resources draftset-ref graph-map quad-batches (merge state {:op :append}) job)))
+    (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :append}) job)))
 
 (defn- append-draftset-quads
   [resources draftset-ref live->draft quad-batches state job]
@@ -109,11 +105,12 @@
 
 (defn data-handler
   "Ring handler to append data into a draftset."
-  [{:keys [:drafter/backend :drafter/global-writes-lock :drafter/protected-graphs
+  [{:keys [:drafter/backend :drafter/global-writes-lock
+           :drafter.backend.draftset.graphs/manager
            wrap-as-draftset-owner]}]
   (let [resources {:backend backend
                    :global-writes-lock global-writes-lock
-                   :protected-graphs protected-graphs}]
+                   :graph-manager manager}]
     (wrap-as-draftset-owner
      (require-rdf-content-type
       (dset-middleware/require-graph-for-triples-rdf-format
@@ -126,8 +123,7 @@
 
 (defmethod ig/pre-init-spec ::data-handler [_]
   (s/keys :req [:drafter/backend
-                :drafter/global-writes-lock
-                :drafter/protected-graphs]
+                :drafter/global-writes-lock]
           :req-un [::wrap-as-draftset-owner]))
 
 (defmethod ig/init-key ::data-handler [_ opts]

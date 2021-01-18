@@ -23,11 +23,6 @@
           outer (Exception. "noooooo" middle)]
       (is (= [outer middle innermost] (get-causes outer))))))
 
-(deftest conf-if-test
-  (are [test col item expected] (= expected (conj-if test col item))
-       true [] 1 [1]
-       false [] 1 []))
-
 (deftest batch-partition-by-test
   (are [seq partition-fn output-batch-size take-batch-size expected]
     (contains? (set (permutations expected)) (batch-partition-by seq partition-fn output-batch-size take-batch-size))

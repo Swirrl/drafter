@@ -9,24 +9,25 @@
             [integrant.core :as ig]
             [drafter.feature.draftset-data.common :as ds-data-common]
             [drafter.draftset :as ds]
-            [drafter.requests :as req]))
+            [drafter.requests :as req]
+            [drafter.backend.draftset.graphs :as graphs]))
 
-(defn create-or-empty-draft-graph-for [repo draftset-ref live-graph clock-fn]
+(defn create-or-empty-draft-graph-for [repo graph-manager draftset-ref live-graph clock-fn]
   (if-let [draft-graph-uri (ops/find-draftset-draft-graph repo draftset-ref live-graph)]
     (do
       (mgmt/delete-graph-contents! repo draft-graph-uri (clock-fn))
       draft-graph-uri)
-    (mgmt/create-draft-graph! repo live-graph draftset-ref clock-fn)))
+    (graphs/create-user-graph-draft graph-manager draftset-ref live-graph)))
 
 (defn copy-live-graph-into-draftset-job
   [resources user-id {:keys [draftset-id graph metadata]}]
-  (let [repo (-> resources :backend :repo)]
+  (let [repo (-> resources :backend :repo)
+        graph-manager (:graph-manager resources)]
     (jobs/make-job user-id
                    :background-write
                    (jobs/job-metadata repo draftset-id 'copy-live-graph-into-draftset metadata)
                    (fn [job]
-                     (let [draft-graph-uri (create-or-empty-draft-graph-for repo draftset-id graph util/get-current-time)
-                           mapping (ops/get-draftset-graph-mapping repo draftset-id)]
+                     (let [draft-graph-uri (create-or-empty-draft-graph-for repo graph-manager draftset-id graph util/get-current-time)]
                        (ds-data-common/lock-writes-and-copy-graph resources graph draft-graph-uri {:silent true})
                        (mgmt/rewrite-draftset! repo
                                                {:draftset-uri (ds/->draftset-uri draftset-id)
@@ -41,7 +42,7 @@
       (response/unprocessable-entity-response (str "Graph not found in live")))))
 
 (defn put-draftset-graph-handler
-  [{:keys [:drafter/backend :drafter/global-writes-lock wrap-as-draftset-owner]}]
+  [{:keys [:drafter/backend :drafter.backend.draftset.graphs/manager :drafter/global-writes-lock wrap-as-draftset-owner]}]
   (letfn [(required-live-graph-param [handler]
             (middleware/parse-graph-param-handler
              true
@@ -49,9 +50,11 @@
     (wrap-as-draftset-owner
      (required-live-graph-param
       (fn [{:keys [params] :as request}]
-        (-> {:backend backend :global-writes-lock global-writes-lock}
-            (copy-live-graph-into-draftset-job (req/user-id request) params)
-            (submit-async-job!)))))))
+        (let [resources {:backend backend
+                         :global-writes-lock global-writes-lock
+                         :graph-manager manager}
+              job (copy-live-graph-into-draftset-job resources (req/user-id request) params)]
+          (submit-async-job! job)))))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.append-by-graph/handler [_]
   (s/keys :req [:drafter/backend :drafter/global-writes-lock]
