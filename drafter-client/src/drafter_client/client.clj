@@ -190,10 +190,13 @@
    :silent - When true equivalent to SPARQL's DROP SILENT.  A boolean
    indicating whether or not to raise an error if the graph to be deleted
    doesn't exist.  If set to true the function will succeed without error if
-   the graph being deleted doesn't exist.  Defaults to false."
+   the graph being deleted doesn't exist.  Defaults to false.
+
+   :metadata - a map with arbitrary keys that will be included on the job for
+   future reference"
   ([client access-token draftset graph]
    (delete-graph client access-token draftset graph {}))
-  ([client access-token draftset graph {:keys [silent]}]
+  ([client access-token draftset graph {:keys [silent metadata]}]
    (->async-job
      (i/request
        client
@@ -202,7 +205,8 @@
        (draftset/id draftset)
        (str graph)
        :perform-async true
-       :silent (boolean silent)))))
+       :silent (boolean silent)
+       :metadata metadata))))
 
 (defn delete-quads
   ([client access-token draftset quads]

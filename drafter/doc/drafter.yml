@@ -357,6 +357,7 @@ paths:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/reqgraph'
         - $ref: '#/parameters/silent'
+        - $ref: '#/parameters/metadata'
         - $ref: '#/parameters/perform-async'
       tags:
         - Updating Data
