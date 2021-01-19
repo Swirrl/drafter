@@ -31,29 +31,19 @@
         (ring/response (dsops/get-draftset-info backend draftset-id))
         (drafter-response/unprocessable-entity-response (str "Graph not found"))))))
 
-(defn async-job [{:keys [backend] graph-manager ::graphs/manager :as resources}]
+(defn async-job [{:keys [backend] graph-manager ::graphs/manager}]
   (fn [draftset-id graph user-id silent metadata]
-    (if (mgmt/is-graph-managed? backend graph)
-      (-> (jobs/make-job user-id :background-write
-            (jobs/job-metadata backend draftset-id
-              'delete-draftset-graph metadata)
-            (fn [job]
-              (let [result (graphs/delete-user-graph
-                             graph-manager
-                             draftset-id
-                             graph)]
-                (ajobs/job-succeeded! job result))))
-        (response/submit-async-job!))
-      (if silent
-        (-> (jobs/make-job user-id :background-write
-              (jobs/job-metadata backend draftset-id
-                'delete-draftset-graph metadata)
-              (fn [job]
-                (let [result (dsops/get-draftset-info backend draftset-id)]
-                  (ajobs/job-succeeded! job result))))
-          (response/submit-async-job!))
-        (drafter-response/unprocessable-entity-response
-          (str "Graph not found"))))))
+    (let [response #(response/submit-async-job!
+                      (jobs/make-job user-id :background-write
+                        (jobs/job-metadata
+                          backend draftset-id 'delete-draftset-graph metadata)
+                        (fn [job] (ajobs/job-succeeded! job (%)))))]
+      (if (mgmt/is-graph-managed? backend graph)
+        (response #(graphs/delete-user-graph graph-manager draftset-id graph))
+        (if silent
+          (response #(dsops/get-draftset-info backend draftset-id))
+          (drafter-response/unprocessable-entity-response
+            (str "Graph not found")))))))
 
 (defn request-handler
   [{:keys [:drafter/backend sync-job-handler async-job-handler] :as _resources}]
