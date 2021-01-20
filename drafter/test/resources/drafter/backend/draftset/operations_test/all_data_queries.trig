@@ -1,0 +1,12 @@
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+<http://g1> {
+  <http://s1> <http://p1> "o1" .
+  <http://s1> rdfs:label "subject 1" .
+  <http://s2> a <http://TestThing> .
+}
+
+<http://g2> {
+  <http://s3> <http://p2> "o2" .
+  <http://s3> rdfs:label "subject 3" .
+}
