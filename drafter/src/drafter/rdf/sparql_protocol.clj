@@ -21,6 +21,7 @@
             [ring.util.request :as request])
   (:import clojure.lang.ExceptionInfo
            [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
+           java.net.SocketTimeoutException
            java.util.concurrent.TimeUnit
            [org.apache.jena.query QueryFactory QueryParseException Syntax]
            org.apache.jena.sparql.sse.Item
@@ -237,6 +238,11 @@
           (future-cancel query-f)
           (throw (QueryInterruptedException.)))))))
 
+(def timeout-response
+  {:status 503
+   :headers {"Content-Type" "text/plain; charset=utf-8"}
+   :body "Query execution timed out"})
+
 (defn- execute-prepared-query [pquery format response-content-type]
   (let [query-type (get-query-type pquery)]
     (try
@@ -244,9 +250,9 @@
         (execute-boolean-query pquery format response-content-type)
         (execute-streaming-query pquery format response-content-type))
       (catch QueryInterruptedException ex
-        {:status 503
-         :headers {"Content-Type" "text/plain; charset=utf-8"}
-         :body "Query execution timed out"}))))
+        timeout-response)
+      (catch SocketTimeoutException ex
+        timeout-response))))
 
 (defn sparql-execution-handler [{{:keys [prepared-query format response-content-type]} :sparql :as request}]
   (log/info (str "Running query\n" prepared-query "\nwith graph restrictions"))
