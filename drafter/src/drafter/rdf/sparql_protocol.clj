@@ -6,7 +6,6 @@
             [compojure.core :refer [make-route]]
             [drafter.backend.common :as bcom]
             [drafter.backend.draftset.arq :as arq]
-            [drafter.channels :refer :all]
             [drafter.rdf.content-negotiation :as conneg]
             [drafter.rdf.sesame
              :as
@@ -202,9 +201,12 @@
 (defn- execute-streaming-query [pquery result-format response-content-type]
   (let [is (PipedInputStream.)
         os (PipedOutputStream. is)
-        [send recv] (create-send-once-channel)
-        result-handler (create-signalling-query-handler pquery os result-format send)
-        timeout (inc (.getMaxExecutionTime pquery))
+        ;; Use a promise to signal that results have started streaming and the
+        ;; response headers should be written. Either deliver :ok or an error.
+        signal (promise)
+        result-handler (create-signalling-query-handler
+                         pquery os result-format signal)
+        timeout (* 1000 (inc (.getMaxExecutionTime pquery)))
         ;;start query execution in its own thread
         ;;once results have been recieved
         query-f (future
@@ -212,7 +214,7 @@
                     (try
                       (.evaluate pquery result-handler)
                       (catch Exception ex
-                        (send ex))
+                        (deliver signal ex))
                       (finally
                         (.close os)
                         (let [end-time (System/currentTimeMillis)]
@@ -220,23 +222,14 @@
     ;;wait for signal from query execution thread that the response has been received and begun streaming
     ;;results
     ;;NOTE: This could block for as long as the query execution timeout period
-    (let [result (recv timeout TimeUnit/SECONDS)]
-      (cond
-        ;;began streaming results
-        (channel-ok? result)
-        {:status 200 :headers {"Content-Type" response-content-type} :body is}
-
-        ;;error while executing query
-        (channel-error? result)
-        (throw result)
-
-        :else
+    (let [result (deref signal timeout (QueryInterruptedException.))]
+      (if (= :ok result)
+        {:status 200
+         :headers {"Content-Type" response-content-type}
+         :body is}
         (do
-          (assert (channel-timeout? result))
-          ;;.poll timed out without recieving a signal from the query thread
-          ;;cancel the operation and return a timeout response
           (future-cancel query-f)
-          (throw (QueryInterruptedException.)))))))
+          (throw result))))))
 
 (def timeout-response
   {:status 503

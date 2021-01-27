@@ -74,7 +74,8 @@
 (defn create-construct-query-writer [os result-format]
   (Rio/createWriter result-format os))
 
-(defn signalling-tuple-query-handler [send-channel ^BindingSet binding-set ^QueryResultWriter writer]
+(defn signalling-tuple-query-handler
+  [signal ^BindingSet binding-set ^QueryResultWriter writer]
   (reify
     TupleQueryResult
     (getBindingNames [this]
@@ -89,7 +90,7 @@
 
     TupleQueryResultHandler
     (startQueryResult [this binding-names]
-      (send-channel)
+      (deliver signal :ok)
       (.startQueryResult writer binding-names))
     (endQueryResult [this]
       (.endQueryResult writer))
@@ -100,10 +101,10 @@
     (handleLinks [this link-urls]
       (.handleLinks writer link-urls))))
 
-(defn signalling-rdf-handler [send-channel ^RDFHandler handler]
+(defn signalling-rdf-handler [signal ^RDFHandler handler]
   (reify RDFHandler
     (startRDF [this]
-      (send-channel)
+      (deliver signal :ok)
       (.startRDF handler))
     (endRDF [this]
       (.endRDF handler))
@@ -114,8 +115,14 @@
     (handleComment [this comment]
       (.handleComment handler comment))))
 
-(defn create-signalling-query-handler [pquery output-stream result-format send-channel]
+(defn create-signalling-query-handler
+  [pquery output-stream result-format signal]
   (case (get-query-type pquery)
-    :select (signalling-tuple-query-handler send-channel (.getBindings pquery) (create-tuple-query-writer output-stream result-format))
-    :construct (signalling-rdf-handler send-channel (create-construct-query-writer output-stream result-format))
+    :select (signalling-tuple-query-handler
+              signal
+              (.getBindings pquery)
+              (create-tuple-query-writer output-stream result-format))
+    :construct (signalling-rdf-handler
+                 signal
+                 (create-construct-query-writer output-stream result-format))
     (throw (IllegalArgumentException. "Query must be either a SELECT or CONSTRUCT query."))))
