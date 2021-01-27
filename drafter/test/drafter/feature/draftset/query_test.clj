@@ -1,5 +1,6 @@
 (ns ^:rest-api drafter.feature.draftset.query-test
-  (:require [clojure.test :as t :refer [is]]
+  (:require [clojure.string :as str]
+            [clojure.test :as t :refer [is]]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [drafter.test-common :as tc]
@@ -12,6 +13,7 @@
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system-config "drafter/feature/empty-db-system.edn")
+(def system-config-short-timeout "drafter/feature/empty-db-system-short-timeout.edn")
 
 (defn- result-set-handler [result-state]
   (reify QueryResultHandler
@@ -58,6 +60,34 @@
       (tc/assert-is-ok-response query-response)
 
       (is (= expected-triples response-triples)))))
+
+(def slow-query
+  "CONSTRUCT WHERE {
+     ?s0 ?p0 ?o0 . ?s1 ?p1 ?o1 . ?s2 ?p2 ?o2 . ?s3 ?p3 ?o3 .
+     ?s4 ?p4 ?o4 . ?s5 ?p5 ?o5 . ?s6 ?p6 ?o6 . ?s7 ?p7 ?o7 .
+   }")
+
+(tc/deftest-system-with-keys query-timeout
+  [:drafter.fixture-data/loader
+   [:drafter/routes :draftset/api]
+   :drafter/write-scheduler]
+  [system system-config-short-timeout]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
+        draftset-data-file "test/resources/test-draftset.trig"
+        append-response (help/make-append-data-to-draftset-request
+                          handler
+                          test-editor
+                          draftset-location
+                          draftset-data-file)]
+    (tc/await-success (:finished-job (:body append-response)) )
+    (let [query-request (create-query-request
+                          test-editor
+                          draftset-location
+                          slow-query
+                          "application/n-triples")
+          query-response (handler query-request)]
+      (tc/assert-is-service-unavailable-response query-response))))
 
 (tc/deftest-system-with-keys query-draftset-not-unioned-with-live-with-published-statements
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]

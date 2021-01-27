@@ -1,0 +1,9 @@
+#merge
+[#include "empty-db-system.edn"
+ {[:drafter.timeouts/timeout-query :drafter/live-timeout]
+  {:endpoint-timeout 1
+   :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
+
+  [:drafter.timeouts/timeout-query :drafter/draftset-timeout]
+  {:endpoint-timeout 1
+   :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }}]
