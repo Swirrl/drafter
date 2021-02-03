@@ -8,7 +8,6 @@
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.draftset :as ds]
             [drafter.rdf.sparql :as sparql]
-            [drafter.util :as util]
             [integrant.core :as ig]
             [ring.middleware.cors :as cors]
             [drafter.errors :refer [wrap-encode-errors]]
@@ -17,22 +16,18 @@
             [clojure.string :as string]
             [ring.util.request :as request]
             [grafter-2.rdf4j.repository :as repo]
-            [grafter-2.rdf.protocols :as pr]
             [drafter.backend.draftset.graphs :as graphs]
-            [drafter.time :as time])
+            [drafter.time :as time]
+            [drafter.rdf.jena :as jena])
   (:import java.net.URI
-           org.apache.jena.graph.NodeFactory
            [org.apache.jena.sparql.algebra Algebra OpAsQuery]
-           org.apache.jena.sparql.core.Quad
            [org.apache.jena.sparql.modify.request
             QuadDataAcc Target
             UpdateCopy UpdateDrop UpdateDataDelete UpdateDataInsert]
            org.apache.jena.sparql.sse.SSE
            org.apache.jena.sparql.sse.Item
            [org.apache.jena.query Syntax]
-           [org.apache.jena.update UpdateFactory UpdateRequest]
-           [java.time LocalDateTime]
-           java.time.format.DateTimeFormatter))
+           [org.apache.jena.update UpdateFactory]))
 
 (defn- rewrite-quad [rewriter quad]
   (-> quad SSE/str arq/->sse-item arq/sse-zipper rewriter str SSE/parseQuad))
@@ -46,36 +41,6 @@
                str
                SSE/parseOp)]
     (-> op  OpAsQuery/asQuery .getQueryPattern)))
-
-(def type-mapper
-  (doto (org.apache.jena.datatypes.TypeMapper.)
-    (org.apache.jena.datatypes.xsd.XSDDatatype/loadXSDSimpleTypes)))
-
-(defn- format-date-time [x]
-  (.format (DateTimeFormatter/ofPattern "uuuu-MM-dd'T'HH:mm:ss.SSS") x))
-
-(defn- value-str [x]
-  ;; if we have a `LocalDateTime` which should get mapped to XMLSchema#dateTime
-  ;; the default toString implementation may render an unparsable format, if
-  ;; the seconds/milliseconds fields read zero.
-  ;; See: https://docs.oracle.com/javase/8/docs/api/java/time/LocalDateTime.html#toString--
-  (if (instance? LocalDateTime x)
-    (format-date-time x)
-    (str (pr/raw-value x))))
-
-(defn- ->literal [x]
-  (let [t (.getSafeTypeByName type-mapper (str (pr/datatype-uri x)))
-        lang (when (satisfies? pr/IRDFString x)
-               (some-> x pr/lang name))]
-    (NodeFactory/createLiteral (value-str x) lang t)))
-
-(defn- ->jena-quad [{:keys [c s p o]}]
-  (letfn [(->node [x]
-            (if (uri? x)
-              (NodeFactory/createURI (str x))
-              (->literal x)))]
-    (let [[c s p o] (map ->node [c s p o])]
-      (Quad. c s p o))))
 
 (defprotocol UpdateOperation
   (affected-graphs [op])
@@ -92,12 +57,6 @@
 (defn- payload-too-large [operations]
   (ex-info "413 Payload Too Large." {:error :payload-too-large}))
 
-(defn- insert-data-stmt [quads]
-  (UpdateDataInsert. (QuadDataAcc. (map ->jena-quad quads))))
-
-(defn- delete-data-stmt [quads]
-  (UpdateDataDelete. (QuadDataAcc. (map ->jena-quad quads))))
-
 (defn- rewrite-draftset-ops [draftset-id]
   (-> {:draftset-uri (ds/->draftset-uri draftset-id)}
       dm/rewrite-draftset-q
@@ -106,13 +65,13 @@
 
 (defn- draft-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
   (-> (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri)
-      (insert-data-stmt)))
+      (jena/insert-data-stmt)))
 
 (defn- manage-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
   (-> (concat
         (graphs/new-managed-user-graph-statements graph-manager graph-uri)
         (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri))
-      (insert-data-stmt)))
+      (jena/insert-data-stmt)))
 
 (defn- copy-graph-stmt [graph-uri draft-graph-uri]
   (UpdateCopy. (Target/create (str graph-uri))
@@ -176,10 +135,6 @@
         rewrite-ds (when (seq copy) (rewrite-draftset-ops draftset-id))
         op [(rewrite op rewriter)]]
     (concat manage copy rewrite-ds touch op)))
-
-(defn- add-operations [update-request operations]
-  (doseq [op operations] (.add update-request op))
-  update-request)
 
 (defn- graph-meta-q [draftset-id live-graphs]
   (let [ds-uri (ds/->draftset-uri draftset-id)
@@ -335,8 +290,8 @@ GROUP BY ?lg ?dg")))
               :max-update-size max-update-size}
         update-request' (->> (.getOperations update-request)
                              (mapcat #(raw-operations % opts))
-                             (add-operations (UpdateRequest.)))]
-    (sparql/update! backend (str update-request'))))
+                             (jena/->update-string))]
+    (sparql/update! backend update-request')))
 
 
 ;; Handler

@@ -7,10 +7,10 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-publisher]]
             [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.repository :as repo])
+            [grafter-2.rdf4j.repository :as repo]
+            [drafter.rdf.jena :as jena])
   (:import java.net.URI
-           java.util.UUID
-           org.apache.jena.update.UpdateRequest))
+           java.util.UUID))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -725,21 +725,21 @@ SELECT * WHERE {
               quad (pr/->Quad (URI. "http://s") (URI. "http://p") (URI. "http://o") g)]
 
           (testing "INSERT DATA ..."
-            (let [stmt (#'update/insert-data-stmt [quad])
-                  update-request (#'update/add-operations (UpdateRequest.) [stmt])
+            (let [stmt (jena/insert-data-stmt [quad])
+                  update-request (jena/->update-string [stmt])
                   response (update! (str update-request))]
               (tc/assert-is-forbidden-response response)))
 
           (testing "DELETE DATA ..."
-            (let [stmt (#'update/delete-data-stmt [quad])
-                  update-request (#'update/add-operations (UpdateRequest.) [stmt])
+            (let [stmt (jena/delete-data-stmt [quad])
+                  update-request (jena/->update-string [stmt])
                   response (update! (str update-request))]
               (tc/assert-is-forbidden-response response)))
 
           (testing "DROP GRAPH ..."
             (let [stmt (format "DROP GRAPH <%s>" g)
-                  update-request (#'update/add-operations (UpdateRequest.) [stmt])
-                  response (update! (str update-request))]
+                  update-request (jena/->update-string [stmt])
+                  response (update! update-request)]
               (tc/assert-is-forbidden-response response))))))))
 
 (tc/deftest-system-with-keys access-forbidden-graphs-test
@@ -774,8 +774,8 @@ SELECT * WHERE {
               draftset-location (help/create-draftset-through-api handler test-editor)
               draftset-id (last (string/split draftset-location #"/"))
               quad (pr/->Quad (URI. "http://s") (URI. "http://p") (URI. "http://o") g)
-              stmt (#'update/insert-data-stmt [quad])
-              update-request (#'update/add-operations (UpdateRequest.) [stmt])
+              stmt (jena/insert-data-stmt [quad])
+              update-request (jena/->update [stmt])
               gmeta (#'update/get-graph-meta backend draftset-id update-request)
               draft-graph-uri (get-in gmeta [g :draft-graph-uri])]
           (is (not= dg draft-graph-uri))
