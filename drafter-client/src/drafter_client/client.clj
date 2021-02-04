@@ -181,9 +181,38 @@
   (i/request client i/delete-draftset-changes access-token
              (draftset/id draftset) (str graph)))
 
-(defn delete-graph
+(defn
+  ^{:deprecated
+    "Since drafter 2.4.1 - Please use async variant delete-graph-2 instead"}
+  delete-graph
+  "Schedules the deletion of the graph from live.
+
+  Takes an optional last argument of opts. Currently the supported
+  opts are:
+
+  :silent    - When true equivalent to SPARQL's DROP SILENT.  A
+               boolean indicating whether or not to raise an error
+               if the graph to be deleted doesn't exist.  If set to
+               true the function will succeed without error if the
+               graph being deleted doesn't exist.  Defaults to false.
+
+  NOTE deprecated since drafter 2.4.1 - Please use async variant delete-graph-2
+  instead"
+  ([client access-token draftset graph]
+   (delete-graph client access-token draftset graph {}))
+  ([client access-token draftset graph opts]
+   (apply i/request
+          client
+          i/delete-draftset-graph
+          access-token
+          (draftset/id draftset)
+          (str graph)
+          :perform-async false
+          (apply concat opts))))
+
+(defn delete-graph-2
   "Schedules the deletion of the graph from live. Returns an async job. Use
-   delete-graph-sync for a synchronous version
+   delete-graph-2-sync for a synchronous version.
 
    Takes an optional last argument of opts. Currently the supported opts are:
 
@@ -193,9 +222,11 @@
    the graph being deleted doesn't exist.  Defaults to false.
 
    :metadata - a map with arbitrary keys that will be included on the job for
-   future reference"
+   future reference
+
+   NOTE requires drafter v2.4.1 or later"
   ([client access-token draftset graph]
-   (delete-graph client access-token draftset graph {}))
+   (delete-graph-2 client access-token draftset graph {}))
   ([client access-token draftset graph {:keys [silent metadata]}]
    (->async-job
      (i/request
@@ -510,7 +541,7 @@
 (gensync load-graph)
 (gensync delete-quads)
 (gensync delete-triples)
-(gensync delete-graph)
+(gensync delete-graph-2)
 (gensync add)
 (gensync add-data)
 (gensync publish)

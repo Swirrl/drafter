@@ -564,7 +564,7 @@
         (sut/publish-sync client token draftset-1)
 
         (let [draftset-2 (sut/new-draftset client token name description)]
-          (sut/delete-graph-sync client token draftset-2 graph-1)
+          (sut/delete-graph-2-sync client token draftset-2 graph-1)
           (sut/publish-sync client token draftset-2))
 
         (with-open [conn (-> client (sut/->repo token sut/live) (gr-repo/->connection))]
@@ -583,11 +583,11 @@
         draftset (sut/new-draftset client token name description)
         non-graph (URI. "http://test.graph.com/non-graph")]
     (t/testing "Can delete a graph that doesn't exist with :silent"
-      (sut/delete-graph-sync client token draftset non-graph
+      (sut/delete-graph-2-sync client token draftset non-graph
         {:silent true}))
     (t/testing "Can't delete a graph that doesn't exist without :silent"
       (is (thrown-with-msg? ExceptionInfo #"status 422"
-            (sut/delete-graph-sync client token draftset non-graph
+            (sut/delete-graph-2-sync client token draftset non-graph
               {:silent false}))))))
 
 (t/deftest job-status

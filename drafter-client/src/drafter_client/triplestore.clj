@@ -178,7 +178,7 @@
   IGraphDrop
   (drop-graph [this graph]
     (with-ensure-draftset-tx [tx this]
-      (client/delete-graph client token tx graph))))
+      (client/delete-graph-2-sync client token tx graph))))
 
 ;; Don't use these, or the Class constructor, only use the constructor functions
 (ns-unmap *ns* '->DrafterConnection)
