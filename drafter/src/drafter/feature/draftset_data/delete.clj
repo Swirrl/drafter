@@ -22,7 +22,8 @@
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [drafter.async.jobs :as ajobs]
-            [drafter.requests :as req])
+            [drafter.requests :as req]
+            [drafter.time :as time])
   (:import org.eclipse.rdf4j.model.Resource))
 
 (defn- delete-quads-from-draftset
@@ -70,9 +71,9 @@
                (merge state {:op :delete})
                job)))))
 
-(defn batch-and-delete-quads-from-draftset [resources quads draftset-ref live->draft job clock-fn]
+(defn batch-and-delete-quads-from-draftset [resources quads draftset-ref live->draft job clock]
   (let [quad-batches (util/batch-partition-by quads context jobs/batched-write-size)
-        now (clock-fn)]
+        now (time/now clock)]
     (delete-quads-from-draftset resources quad-batches draftset-ref live->draft {:op :delete :job-started-at now} job)))
 
 (defn- get-quads [serialised {:keys [rdf-format graph]}]
@@ -82,7 +83,7 @@
       (map #(util/make-quad-statement % graph) statements))))
 
 (defn delete-data-from-draftset-job
-  [serialised user-id resources {:keys [draftset-id metadata] :as params} clock-fn]
+  [serialised user-id resources {:keys [draftset-id metadata] :as params} clock]
   (let [repo (-> resources :backend :repo)]
     (jobs/make-job user-id
                    :background-write
@@ -95,18 +96,19 @@
                                                              draftset-id
                                                              graph-mapping
                                                              job
-                                                             clock-fn))))))
+                                                             clock))))))
 
 (defn delete-draftset-data-handler
   [{:keys [:drafter/backend :drafter/global-writes-lock
            :drafter.backend.draftset.graphs/manager
+           ::time/clock
            wrap-as-draftset-owner]}]
   (let [resources {:backend backend
                    :global-writes-lock global-writes-lock
                    :graph-manager manager}]
     (-> (fn [{:keys [params body] :as request}]
           (let [user-id (req/user-id request)
-                delete-job (delete-data-from-draftset-job body user-id resources params util/get-current-time)]
+                delete-job (delete-data-from-draftset-job body user-id resources params clock)]
             (response/submit-async-job! delete-job)))
         inflate-gzipped
         temp-file-body

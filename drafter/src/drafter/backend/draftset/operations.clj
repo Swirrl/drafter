@@ -12,7 +12,8 @@
             [grafter-2.rdf4j.repository :as repo :refer [prepare-query]]
             [grafter.url :as url]
             [grafter.vocabularies.rdf :refer :all]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [drafter.time :as time])
   (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
            [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler BindingSet GraphQueryResult]
            org.eclipse.rdf4j.queryrender.RenderUtils
@@ -35,11 +36,11 @@
   for the new draftset."
   ([db creator] (create-draftset! db creator nil))
   ([db creator title] (create-draftset! db creator title nil))
-  ([db creator title description] (create-draftset! db creator title description util/create-uuid util/get-current-time))
-  ([db creator title description id-creator created-date-fn]
+  ([db creator title description] (create-draftset! db creator title description util/create-uuid time/system-clock))
+  ([db creator title description id-creator clock]
    (with-open [dbcon (repo/->connection db)]
      (let [draftset-id (id-creator)
-           created-date (created-date-fn)
+           created-date (time/now clock)
            user-uri (user/user->uri creator)
            template (create-draftset-statements user-uri title description (url/append-path-segments draftset-uri draftset-id) created-date)
            quads (to-quads template)]
@@ -476,9 +477,9 @@
   (let [q (update-public-endpoint-modified-at-query)]
     (sparql/update! backend q)))
 
-(defn publish-draftset-graphs! [backend draftset-ref clock-fn]
+(defn publish-draftset-graphs! [backend draftset-ref clock]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
-    (mgmt/migrate-graphs-to-live! backend (vals graph-mapping) clock-fn)))
+    (mgmt/migrate-graphs-to-live! backend (vals graph-mapping) clock)))
 
 (defn- spog-bindings->statement [^BindingSet bindings]
   (let [subj (.getValue bindings "s")

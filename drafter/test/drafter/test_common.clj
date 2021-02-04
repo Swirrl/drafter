@@ -1,6 +1,6 @@
 (ns drafter.test-common
   (:require [clj-time.coerce :refer [to-date]]
-            [clj-time.core :as time]
+            [clj-time.core :as clj-time]
             [clojure.java.io :as io]
             [clojure.pprint :as pp]
             [clojure.spec.test.alpha :as st]
@@ -28,7 +28,8 @@
             [drafter.spec :refer [load-spec-namespaces!]]
             [drafter.write-scheduler :as scheduler]
             [drafter.backend.draftset.graphs :as graphs]
-            [drafter.backend.draftset.operations :as dsops])
+            [drafter.backend.draftset.operations :as dsops]
+            [drafter.time :as time])
   (:import [com.auth0.jwk Jwk JwkProvider]
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT
@@ -50,7 +51,8 @@
            org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONWriter
            org.eclipse.rdf4j.rio.trig.TriGParserFactory
            [java.util.zip GZIPOutputStream]
-           [java.time.temporal Temporal]))
+           [java.time.temporal Temporal]
+           [java.time OffsetDateTime]))
 
 (defn with-spec-instrumentation [f]
   (try
@@ -74,10 +76,12 @@
 (def ^:dynamic *test-writer* nil)
 (def ^:dynamic *test-system* nil)
 
-(defn test-triples [subject-uri]
-  (triplify [subject-uri
-             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
-             [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]]))
+(defn test-triples
+  ([] (test-triples (URI. "http://test.com/subject-1")))
+  ([subject-uri]
+   (triplify [subject-uri
+              [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/1")]
+              [(URI. "http://test.com/hasProperty") (URI. "http://test.com/data/2")]])))
 
 (defn select-all-in-graph [graph-uri]
   (str "SELECT * WHERE {"
@@ -111,7 +115,7 @@
       (.withIssuer (str iss \/))
       (.withSubject sub)
       (.withAudience (into-array String [aud]))
-      (.withExpiresAt (to-date (time/plus (time/now) (time/minutes 10))))
+      (.withExpiresAt (to-date (clj-time/plus (clj-time/now) (clj-time/minutes 10))))
       (.withClaim "scope" role)
       (.sign alg)))
 
@@ -225,14 +229,16 @@
     draft-graph))
 
 (defn make-graph-live!
-  ([db live-graph-uri clock-fn]
-     (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1")) clock-fn))
+  ([db live-graph-uri] (make-graph-live! db live-graph-uri (test-triples (URI. "http://test.com/subject-1"))))
 
-  ([db live-graph-uri data clock-fn]
+  ([db live-graph-uri data]
+     (make-graph-live! db live-graph-uri data time/system-clock))
+
+  ([db live-graph-uri data clock]
      (let [test-publisher (user/create-user "publisher@swirrl.com" :publisher (user/get-digest "password"))
            draftset-id (dsops/create-draftset! db test-publisher)
            draft-graph-uri (import-data-to-draft! db live-graph-uri data draftset-id)]
-       (migrate-graphs-to-live! db [draft-graph-uri] clock-fn))
+       (migrate-graphs-to-live! db [draft-graph-uri] clock))
      live-graph-uri))
 
 (defn during-exclusive-write-f [global-writes-lock f]
@@ -571,3 +577,33 @@
     (let [triples-after# (get-public-endpoint-triples repo#)]
       (is (= (set (map :p triples-before#)) (set (map :p triples-after#))))
       (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#)))))))
+
+(defn incrementing-clock
+  "Returns a clock which returns a later time every time it is queried"
+  ([] (incrementing-clock (time/system-now)))
+  ([start-time]
+   (let [current (atom start-time)]
+     (reify time/Clock
+       (now [_] (swap! current (fn [^OffsetDateTime current] (.plusSeconds current 1))))))))
+
+(defrecord ManualClock [current]
+  time/Clock
+  (now [_this] @current))
+
+(defn manual-clock
+  "Creates a clock that continually returns the given time until updated with the set-now
+   and advance-by functions"
+  [initial-time]
+  (->ManualClock (atom initial-time)))
+
+(defn set-now
+  "Sets the time on the manual clock to the given instant"
+  [{:keys [current] :as manual-clock} now]
+  (reset! current now)
+  nil)
+
+(defn advance-by
+  "Advances the current time on the manual clock by the given period"
+  [{:keys [current] :as manual-clock} period]
+  (swap! current (fn [^OffsetDateTime t] (.plus t period)))
+  nil)

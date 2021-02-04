@@ -105,12 +105,11 @@
   (tc/with-system
     [:drafter/backend]
     [system "drafter/feature/empty-db-system.edn"]
-    (let [initial-time-fn (fn [] #inst "2017")
-          repo (:drafter/backend system)
+    (let [repo (:drafter/backend system)
           manager (create-manager repo)
           draftset-id (dsops/create-draftset! repo test-editor)
           live-graph (URI. "http://live")]
-      (tc/make-graph-live! repo live-graph initial-time-fn)
+      (tc/make-graph-live! repo live-graph)
       (delete-user-graph manager draftset-id live-graph)
 
       (t/is (mgmt/is-graph-managed? repo live-graph) "Graph should still be managed")
@@ -129,13 +128,13 @@
   (tc/with-system
     [:drafter/backend]
     [system "drafter/feature/empty-db-system.edn"]
-    (let [initial-time-fn (fn [] #inst "2017")
+    (let [clock (tc/incrementing-clock)
           repo (:drafter/backend system)
-          manager (create-manager repo)
+          manager (create-manager repo #{} clock)
           draftset-id (dsops/create-draftset! repo test-editor)
           live-graph (URI. "http://live")]
 
-      (tc/make-graph-live! repo live-graph initial-time-fn)
+      (tc/make-graph-live! repo live-graph (tc/test-triples) clock)
 
       (let [draft-graph (tc/import-data-to-draft! repo live-graph (tc/test-triples (URI. "http://subject")) draftset-id)
             initially-modified-at (get-modified-time repo live-graph)]
@@ -158,7 +157,7 @@
           protected-graph (URI. "http://cant-touch-this")
           manager (create-manager repo #{protected-graph})
           draftset-id (dsops/create-draftset! repo test-editor)]
-      (tc/make-graph-live! repo protected-graph util/get-current-time)
+      (tc/make-graph-live! repo protected-graph)
       (t/is (thrown? Exception (delete-user-graph manager draftset-id protected-graph)) "Should not delete protected graph")
       (let [live->draft (dsops/get-draftset-graph-mapping repo draftset-id)]
         (t/is (= false (contains? live->draft protected-graph)) "Should not create draft of protected graph")))))

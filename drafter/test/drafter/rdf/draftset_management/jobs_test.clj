@@ -7,7 +7,8 @@
             [drafter.user-test :refer [test-editor]]
             [grafter-2.rdf.protocols :refer [->Triple]]
             [drafter.backend.draftset.operations :as ops]
-            [drafter.backend.draftset.draft-management :as mgmt])
+            [drafter.backend.draftset.draft-management :as mgmt]
+            [drafter.time :as time])
   (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -29,12 +30,13 @@
     (let [resources (job-resources system)
           draftset-id (dsops/create-draftset! backend test-editor)
           live-triples (tc/test-triples (URI. "http://test-subject"))
-          live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples (constantly #inst "2015"))
+          live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples)
           copy-job (append-graph/copy-live-graph-into-draftset-job
                      resources
                      dummy
                      {:draftset-id draftset-id
-                      :graph       live-graph-uri})]
+                      :graph       live-graph-uri}
+                     time/system-clock)]
       (tc/exec-and-await-job-success copy-job)
       (let [draft-graph (dsops/find-draftset-draft-graph backend draftset-id live-graph-uri)
             draft-triples (get-graph-triples backend draft-graph)]
@@ -46,14 +48,15 @@
     (let [resources (job-resources system)
           draftset-id (dsops/create-draftset! backend test-editor)
           live-triples (tc/test-triples (URI. "http://test-subject"))
-          live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples (constantly #inst "2015"))
+          live-graph-uri (tc/make-graph-live! backend (URI. "http://live") live-triples)
           initial-draft-triples (tc/test-triples (URI. "http://temp-subject"))
           draft-graph-uri (tc/import-data-to-draft! backend live-graph-uri initial-draft-triples draftset-id)
           copy-job (append-graph/copy-live-graph-into-draftset-job
                      resources
                      dummy
                      {:draftset-id draftset-id
-                      :graph       live-graph-uri})]
+                      :graph       live-graph-uri}
+                     time/system-clock)]
       (tc/exec-and-await-job-success copy-job)
       (let [draft-triples (get-graph-triples backend draft-graph-uri)]
         (t/is (= (set live-triples) (set draft-triples)))))))
@@ -65,7 +68,7 @@
           draftset-id (dsops/create-draftset! backend test-editor)
           protected-graph mgmt/drafter-state-graph
           params {:draftset-id draftset-id :graph protected-graph}
-          job (append-graph/copy-live-graph-into-draftset-job resources dummy params)
+          job (append-graph/copy-live-graph-into-draftset-job resources dummy params time/system-clock)
           result (tc/exec-and-await-job job)
           draft-graph (ops/find-draftset-draft-graph backend draftset-id protected-graph)]
       (t/is (= :error (:type result)))

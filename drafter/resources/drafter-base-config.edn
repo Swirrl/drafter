@@ -40,8 +40,10 @@
 
  :drafter/backend {:repo #ig/ref :drafter.stasher/repo}
  :drafter/global-writes-lock {:fairness true :time 10 :unit :seconds}
- :drafter.backend.draftset.graphs/manager {:repo #ig/ref :drafter.stasher/repo}
+ :drafter.backend.draftset.graphs/manager {:repo #ig/ref :drafter.stasher/repo
+                                           :drafter.time/clock #ig/ref :drafter.time/system-clock}
 
+ :drafter.time/system-clock {}
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Web handlers
@@ -66,6 +68,7 @@
 
  :drafter.feature.draftset.create/handler {:drafter/backend #ig/ref :drafter/backend
                                            :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+                                           :drafter.time/clock #ig/ref :drafter.time/system-clock
                                            :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
  :drafter.feature.middleware/wrap-as-draftset-owner {:drafter/backend #ig/ref :drafter/backend
@@ -85,6 +88,7 @@
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/backend #ig/ref :drafter/backend
                                                             :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
                                                             :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
+                                                            :drafter.time/clock #ig/ref :drafter.time/system-clock
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler {:drafter/backend #ig/ref :drafter/backend
@@ -99,11 +103,13 @@
  :drafter.feature.draftset-data.append/data-handler {:drafter/backend #ig/ref :drafter/backend
                                                      :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
                                                      :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
+                                                     :drafter.time/clock #ig/ref :drafter.time/system-clock
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/backend #ig/ref :drafter/backend
                                                          :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
                                                          :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
+                                                         :drafter.time/clock #ig/ref :drafter.time/system-clock
                                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.query/handler {:drafter/backend #ig/ref :drafter/backend
@@ -112,10 +118,12 @@
 
  :drafter.feature.draftset.update/handler {:drafter/backend #ig/ref :drafter/backend
                                            :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
+                                           :drafter.time/clock #ig/ref :drafter.time/system-clock
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
                                            :max-update-size 5000}
 
  :drafter.feature.draftset.publish/handler {:drafter/backend #ig/ref :drafter/backend
+                                            :drafter.time/clock #ig/ref :drafter.time/system-clock
                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.set-metadata/handler {:drafter/backend #ig/ref :drafter/backend

@@ -7,11 +7,12 @@
             [drafter.util :as util]
             [ring.util.response :as ring]
             [drafter.async.responses :as response]
-            [drafter.requests :as req]))
+            [drafter.requests :as req]
+            [drafter.time :as time]))
 
 (defn create-draftsets-handler
   [{wrap-authenticated :wrap-auth
-    :keys [:drafter/backend :drafter/global-writes-lock]}]
+    :keys [:drafter/backend :drafter/global-writes-lock ::time/clock]}]
   (let [version "/v1"]
     (wrap-authenticated
      (fn [{{:keys [display-name description]} :params user :identity :as request}]
@@ -20,7 +21,7 @@
         (req/user-id request)
         'create-draftset
         nil ; because we're creating the draftset here
-        #(dsops/create-draftset! backend user display-name description util/create-uuid util/get-current-time)
+        #(dsops/create-draftset! backend user display-name description util/create-uuid clock)
         (fn [result]
           (if (jobutil/failed-job-result? result)
             (response/api-response 500 result)
@@ -30,7 +31,7 @@
 (s/def ::wrap-auth fn?)
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset.create/handler [_]
-  (s/keys :req [:drafter/backend :drafter/global-writes-lock]
+  (s/keys :req [:drafter/backend :drafter/global-writes-lock ::time/clock]
           :req-un [::wrap-auth]))
 
 (defmethod ig/init-key ::handler [_ opts]

@@ -10,7 +10,6 @@
              [*test-backend*
               ask?
               import-data-to-draft!
-              make-graph-live!
               select-all-in-graph
               test-triples
               wrap-system-setup]]
