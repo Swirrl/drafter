@@ -24,7 +24,9 @@
     drafter.draftset.spec
     drafter.endpoint.spec
     drafter.user.spec
-    drafter.time.spec])
+    drafter.time.spec
+    drafter.rdf.jena.spec
+    drafter.feature.draftset.update.spec])
 
 (defn load-spec-namespaces! []
   (doseq [ns spec-namespaces]
