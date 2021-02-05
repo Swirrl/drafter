@@ -14,7 +14,12 @@
             [drafter.endpoint :as ep]
             [clojure.java.io :as io]
             [drafter.util :as util]
-            [martian.encoders :as enc])
+            [martian.encoders :as enc]
+            [clojure.string :as string]
+            [drafter.backend.draftset :as draftset-backend]
+            [drafter.backend.draftset.operations :as dsops]
+            [grafter-2.rdf4j.repository :as repo]
+            [drafter.backend.live :as live])
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
            [java.util.zip GZIPOutputStream]))
 
@@ -247,3 +252,34 @@
   (let [request (statements->append-triples-request user draftset-location triples {:graph graph})
         response (handler request)]
     (tc/await-success (get-in response [:body :finished-job]))))
+
+(defn location->draftset-ref
+  "Returns a DraftsetRef from the path returned from the API"
+  [draftset-location]
+  (let [draftset-id (last (string/split draftset-location #"/"))]
+    (ds/->DraftsetId draftset-id)))
+
+(defn- get-draftset-repo [backend draftset-location]
+  (let [draftset-ref (location->draftset-ref draftset-location)]
+    (draftset-backend/build-draftset-endpoint backend draftset-ref false)))
+
+(defn get-draftset-quads
+  "Returns all the raw quads within a draftset"
+  [backend draftset-location]
+  (let [draft-repo (get-draftset-repo backend draftset-location)
+        query (dsops/all-quads-query draft-repo)]
+    (set (repo/evaluate query))))
+
+(defn get-draftset-graph-triples
+  "Returns all the triples within a graph in a draftset"
+  [backend draftset-location graph-uri]
+  (let [draft-repo (get-draftset-repo backend draftset-location)
+        query (dsops/all-graph-triples-query draft-repo graph-uri)]
+    (set (repo/evaluate query))))
+
+(defn get-live-graph-triples
+  "Returns all the triples within a live graph"
+  [repo graph-uri]
+  (let [live-repo (live/live-endpoint-with-stasher repo)
+        q (dsops/all-graph-triples-query live-repo graph-uri)]
+    (set (repo/evaluate q))))
