@@ -418,7 +418,8 @@
           :boolean (dd/measure!
                     "drafter.stasher.boolean_sync.cache_hit"
                     {}
-                    (.parse (get-parser :boolean fmt) in-stream)) ))))
+                    (with-open [is in-stream]
+                      (.parse (get-parser :boolean fmt) is)))))))
   (wrap-result [this cache-key query-result]
     (let [fmt (data-format formats cache-key)
           out-stream (fc/destination-stream cache-backend cache-key fmt)]
