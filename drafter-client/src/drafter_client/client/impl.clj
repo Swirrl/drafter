@@ -62,12 +62,12 @@
 
 (defn delete-draftset-graph
   "Delete the contents of a graph in this Draftset"
-  #:drafter-client.client.impl{:generated true}
-  [client id graph & {:keys [silent] :as opts}]
+  [client id graph & {:keys [silent metadata] :as opts}]
   (martian/response-for
    client
    :delete-draftset-graph
-   (merge {:id id :graph graph} opts)))
+   (cond-> (merge opts {:id id :graph graph})
+     metadata (merge {:metadata (enc/json-encode metadata)}))))
 
 (defn get-draftset
   "Get information about a Draftset"

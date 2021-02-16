@@ -91,10 +91,20 @@
                                                             :drafter.time/clock #ig/ref :drafter.time/system-clock
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler {:drafter/backend #ig/ref :drafter/backend
-                                                                      :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-                                                                      :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
-                                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+ :drafter.feature.draftset-data.delete-by-graph/sync-job-handler
+ {:backend #ig/ref :drafter/backend
+  :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
+  :global-writes-lock #ig/ref :drafter/global-writes-lock}
+
+ :drafter.feature.draftset-data.delete-by-graph/async-job-handler
+ {:backend #ig/ref :drafter/backend
+  :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager}
+
+ :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
+  :sync-job-handler #ig/ref :drafter.feature.draftset-data.delete-by-graph/sync-job-handler
+  :async-job-handler #ig/ref :drafter.feature.draftset-data.delete-by-graph/async-job-handler}
 
  :drafter.feature.draftset.changes/delete-changes-handler {:drafter/backend #ig/ref :drafter/backend
                                                            :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock

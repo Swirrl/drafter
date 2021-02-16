@@ -90,6 +90,32 @@
             delete-response (handler delete-request)]
         (tc/assert-is-unprocessable-response delete-response)))))
 
+(tc/deftest-system-with-keys delete-non-existent-live-graph-in-draftset-async
+  [:drafter.fixture-data/loader :drafter/routes :draftset/api]
+  [{handler [:drafter/routes :draftset/api]} system]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        graph-to-delete "http://live-graph"
+        delete-request (-> (help/delete-draftset-graph-request
+                             test-editor draftset-location
+                             "http://live-graph")
+                         (assoc-in [:headers "perform-async"] "true"))]
+
+    (testing "silent"
+      (let [delete-request (assoc-in delete-request [:params :silent] "true")
+            {:keys [status body]} (handler delete-request)]
+      (is (= 202 status))
+      (is (contains? body :finished-job))
+      (is (= :ok (:type body)))))
+
+    (testing "malformed silent flag"
+      (let [delete-request (assoc-in delete-request [:params :silent] "invalid")
+            delete-response (handler delete-request)]
+        (tc/assert-is-unprocessable-response delete-response)))
+
+    (testing "not silent"
+      (let [delete-request (help/delete-draftset-graph-request test-editor draftset-location "http://live-graph")
+            delete-response (handler delete-request)]
+        (tc/assert-is-unprocessable-response delete-response)))))
 
 (tc/deftest-system-with-keys delete-graph-by-non-owner
   keys-for-test

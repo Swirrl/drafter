@@ -349,12 +349,16 @@ paths:
         If the silent is true the request will always complete successfully,
         otherwise if the specified graph does not exist in live then a 422 error
         will be returned.
+
+        Calling this endpoint without perform-async: true is deprecated.
       security:
         - jws-auth: []
       parameters:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/reqgraph'
         - $ref: '#/parameters/silent'
+        - $ref: '#/parameters/metadata'
+        - $ref: '#/parameters/perform-async'
       tags:
         - Updating Data
       responses:
@@ -362,6 +366,12 @@ paths:
           schema:
             $ref: '#/definitions/Draftset'
           description: The graph was deleted successfully
+        '202':
+          description: |
+            The request to delete the graph was accepted. Applications should
+            poll for the completion of the AsyncJob.
+          schema:
+            $ref: '#/definitions/AsyncJob'
         '422':
           description: The graph does not exist in live and the silent is false
 
@@ -1080,6 +1090,13 @@ parameters:
     enum:
       - gzip
       - x-gzip
+  perform-async:
+    name: perform-async
+    in: header
+    required: false
+    type: boolean
+    allowEmptyValue: true
+    default: false
 
 definitions:
   Graph:

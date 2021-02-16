@@ -181,7 +181,10 @@
   (i/request client i/delete-draftset-changes access-token
              (draftset/id draftset) (str graph)))
 
-(defn delete-graph
+(defn
+  ^{:deprecated
+    "Since drafter 2.4.1 - Please use async variant delete-graph-2 instead"}
+  delete-graph
   "Schedules the deletion of the graph from live.
 
   Takes an optional last argument of opts. Currently the supported
@@ -192,7 +195,9 @@
                if the graph to be deleted doesn't exist.  If set to
                true the function will succeed without error if the
                graph being deleted doesn't exist.  Defaults to false.
-  "
+
+  NOTE deprecated since drafter 2.4.1 - Please use async variant delete-graph-2
+  instead"
   ([client access-token draftset graph]
    (delete-graph client access-token draftset graph {}))
   ([client access-token draftset graph opts]
@@ -202,7 +207,37 @@
           access-token
           (draftset/id draftset)
           (str graph)
+          :perform-async false
           (apply concat opts))))
+
+(defn delete-graph-2
+  "Schedules the deletion of the graph from live. Returns an async job. Use
+   delete-graph-2-sync for a synchronous version.
+
+   Takes an optional last argument of opts. Currently the supported opts are:
+
+   :silent - When true equivalent to SPARQL's DROP SILENT.  A boolean
+   indicating whether or not to raise an error if the graph to be deleted
+   doesn't exist.  If set to true the function will succeed without error if
+   the graph being deleted doesn't exist.  Defaults to false.
+
+   :metadata - a map with arbitrary keys that will be included on the job for
+   future reference
+
+   NOTE requires drafter v2.4.1 or later"
+  ([client access-token draftset graph]
+   (delete-graph-2 client access-token draftset graph {}))
+  ([client access-token draftset graph {:keys [silent metadata]}]
+   (->async-job
+     (i/request
+       client
+       i/delete-draftset-graph
+       access-token
+       (draftset/id draftset)
+       (str graph)
+       :perform-async true
+       :silent (boolean silent)
+       :metadata metadata))))
 
 (defn delete-quads
   ([client access-token draftset quads]
@@ -489,42 +524,24 @@
   (s/nilable (s/keys :req-un [::batch-size ::drafter-uri]
                      :opt-un [::auth0 ::version])))
 
-(defn- sync-body [fn-sym arg-list]
-  `(let [job# (~fn-sym ~@arg-list)]
-     (wait! ~(first arg-list) ~(second arg-list) job#)))
-
-(defn- build-args [arg-list]
-  (let [rest-index (.indexOf arg-list '&)]
-    (if (not= rest-index -1)
-      (->> rest-index
-           (subvec arg-list)
-           last
-           :keys
-           (mapcat (fn [key] [(keyword key) key]))
-           (into (subvec arg-list 0 rest-index)))
-      arg-list)))
-
 (defmacro gensync
   "Macro which defines a synchronous version of the specified async client function. The async function
    should have at least two parameters where the first is the drafter client and the second the access
    token to use. The resulting function for an async function 'operation' is called 'operation-sync'"
   [fn-sym]
   (let [sync-fn (symbol (str fn-sym "-sync"))
-        {:keys [arglists] :as fn-meta} (meta (ns-resolve *ns* fn-sym))
-        doc (str "Synchronous version of " fn-sym " i.e. calls " fn-sym " and waits for the resulting job to complete")]
-    (if (= 1 (count arglists))
-      (let [arg-list (first arglists)
-            args (build-args arg-list)]
-        `(defn ~sync-fn ~doc ~arg-list ~(sync-body fn-sym args)))
-      (let [arities (map (fn [arg-list]
-                           (list arg-list (sync-body fn-sym (build-args arg-list))))
-                         arglists)]
-        `(defn ~sync-fn ~doc ~@arities)))))
+        arglists (:arglists (meta (resolve fn-sym)))
+        doc (str "Synchronous version of " fn-sym " i.e. calls " fn-sym
+              " and waits for the resulting job to complete")]
+    `(defn ~sync-fn ~doc {:arglists '~arglists} [client# access-token# & more#]
+       (wait! client# access-token#
+         (apply ~fn-sym client# access-token# more#)))))
 
 (gensync remove-draftset)
 (gensync load-graph)
 (gensync delete-quads)
 (gensync delete-triples)
+(gensync delete-graph-2)
 (gensync add)
 (gensync add-data)
 (gensync publish)
