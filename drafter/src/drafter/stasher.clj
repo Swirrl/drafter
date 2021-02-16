@@ -340,9 +340,12 @@
    "drafter.stasher.graph_async.cache_hit"
    {}
    (let [parser (get-parser :graph fmt)]
-     (doto parser
-       (.setRDFHandler rdf-handler)
-       (.parse stream base-uri)))))
+     (try
+       (doto parser
+         (.setRDFHandler rdf-handler)
+         (.parse stream base-uri))
+       (finally
+         (.close stream))))))
 
 (defn- async-read-tuple-cache-stream [stream fmt tuple-handler]
   {:post [(some? %)]}
@@ -350,9 +353,12 @@
    "drafter.stasher.tuple_async.cache_hit"
    {}
    (let [parser (get-parser :tuple fmt)]
-     (doto parser
-       (.setQueryResultHandler tuple-handler)
-       (.parse stream)))))
+     (try
+       (doto parser
+         (.setQueryResultHandler tuple-handler)
+         (.parse stream))
+       (finally
+         (.close stream))))))
 
 (defn- wrap-graph-async-handler [inner-rdf-handler fmt out-stream]
   "Wrap an RDFHandler with one that will write the stream of RDF into
