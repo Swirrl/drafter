@@ -55,7 +55,10 @@
      (handleSolution [_ binding-set]
        (.handleSolution delegate binding-set))
      (startQueryResult [_ binding-names]
-       (.startQueryResult delegate binding-names)))))
+       (.startQueryResult delegate binding-names))
+     java.io.Closeable
+     (close [t]
+       (.close delegate)))))
 
 (defn rdf-handler
   ([metric-name ^RDFHandler delegate]
@@ -72,5 +75,9 @@
      (handleComment [_ comment]
        (.handleComment delegate comment))
      (handleNamespace [_ prefix-str uri-str]
-       (.handleNamespace delegate prefix-str uri-str)))))
+       (.handleNamespace delegate prefix-str uri-str))
 
+     java.io.Closeable
+     (close [t]
+       (.close delegate)))
+   ))

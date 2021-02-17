@@ -271,7 +271,11 @@
         (.handleSolution result-handler binding-set))
       (startQueryResult [this binding-names]
         (.startQueryResult cache-file-writer binding-names)
-        (.startQueryResult result-handler binding-names)))))
+        (.startQueryResult result-handler binding-names))
+
+      java.io.Closeable
+      (close [t]
+        (.close stream)))))
 
 (defn- stash-boolean-result [result fmt-kw stream]
   {:post [(some? %)]}
@@ -406,7 +410,11 @@
           (.handleNamespace inner-rdf-handler prefix-str uri-str)
           (catch Throwable ex
             (fc/cancel-and-close out-stream)
-            (throw ex)))))))
+            (throw ex))))
+
+      java.io.Closeable
+      (close [t]
+        (.close out-stream)))))
 
 (defn data-format [formats cache-key]
   {:post [(keyword? %)]}
@@ -477,9 +485,9 @@
            (timing/graph-result
             "drafter.stasher.graph_sync.no_cache"
             (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                                       query-str base-uri-str dataset
-                                                       (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                                       (.getBindingsArray this))))))
+                             query-str base-uri-str dataset
+                             (.getIncludeInferred this) (.getMaxExecutionTime this)
+                             (.getBindingsArray this))))))
 
       ;; async results
       ([rdf-handler]
@@ -489,10 +497,13 @@
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
                  (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
-                   (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                    query-str base-uri-str dataset
-                                    (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                    stashing-rdf-handler (.getBindingsArray this)))))
+                   (try
+                     (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                      query-str base-uri-str dataset
+                                      (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                      stashing-rdf-handler (.getBindingsArray this))
+                     (finally
+                       (.close stashing-rdf-handler))))))
            (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
              (.sendGraphQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
@@ -531,10 +542,14 @@
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
                  (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
-                   (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                                    query-str base-uri-str dataset
-                                    (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                    stashing-tuple-handler (.getBindingsArray this)))))
+                   (try
+                     (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                      query-str base-uri-str dataset
+                                      (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                      stashing-tuple-handler (.getBindingsArray this))
+                     (finally
+                       (.close stashing-tuple-handler))))
+                 ))
            (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
              (.sendTupleQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
