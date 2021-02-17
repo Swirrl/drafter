@@ -5,11 +5,14 @@
   (:import org.apache.logging.log4j.ThreadContext
            java.util.UUID))
 
+(defn capture-logging-context []
+  (into {} (ThreadContext/getContext)))
+
 ;; Modified from withdrawn library:
 ;; https://github.com/malcolmsparks/clj-logging-config/blob/master/src/main/clojure/clj_logging_config/log4j.clj
 (defmacro with-logging-context [x & body]
   `(let [x# ~x
-         ctx# (into {} (ThreadContext/getContext))]
+         ctx# (capture-logging-context)]
      (try
        (if (map? x#)
          (run! (fn [[k# v#]]
@@ -47,7 +50,7 @@
      (fn [req]
        (let [start-time (System/currentTimeMillis)]
          (with-logging-context {:reqId (str "req-" (-> (UUID/randomUUID) str (.substring 0 8)))
-                                    :start-time start-time}
+                                :start-time start-time}
            (let [logable-params (reduce scrub
                                         (:params req {})
                                         scrub-map)]

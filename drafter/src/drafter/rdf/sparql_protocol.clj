@@ -6,6 +6,7 @@
             [compojure.core :refer [make-route]]
             [drafter.backend.common :as bcom]
             [drafter.backend.draftset.arq :as arq]
+            [drafter.logging :refer [capture-logging-context with-logging-context]]
             [drafter.rdf.content-negotiation :as conneg]
             [drafter.rdf.sesame
              :as
@@ -21,6 +22,7 @@
   (:import clojure.lang.ExceptionInfo
            [java.io ByteArrayOutputStream PipedInputStream PipedOutputStream]
            java.net.SocketTimeoutException
+           org.apache.logging.log4j.ThreadContext
            java.util.concurrent.TimeUnit
            [org.apache.jena.query QueryFactory QueryParseException Syntax]
            org.apache.jena.sparql.sse.Item
@@ -198,6 +200,12 @@
      :headers {"Content-Type" response-content-type}
      :body (String. (.toByteArray os))}))
 
+(defn query-result-parse-exception? [ex]
+  (let [parse-exception-types #{'org.eclipse.rdf4j.query.resultio.QueryResultParseException
+                                'org.eclipse.rdf4j.rio.RDFParseException}
+        inner-exception-type (second (map :type (:via (Throwable->map ex))))]
+    (parse-exception-types inner-exception-type)))
+
 (defn- execute-streaming-query [pquery result-format response-content-type]
   (let [is (PipedInputStream.)
         os (PipedOutputStream. is)
@@ -205,20 +213,32 @@
         ;; response headers should be written. Either deliver :ok or an error.
         signal (promise)
         result-handler (create-signalling-query-handler
-                         pquery os result-format signal)
+                        pquery os result-format signal)
         timeout (* 1000 (inc (.getMaxExecutionTime pquery)))
         ;;start query execution in its own thread
         ;;once results have been recieved
+        logctx (capture-logging-context)
         query-f (future
-                  (let [start-time (System/currentTimeMillis)]
-                    (try
-                      (.evaluate pquery result-handler)
-                      (catch Exception ex
-                        (deliver signal ex))
-                      (finally
-                        (.close os)
-                        (let [end-time (System/currentTimeMillis)]
-                          (datadog/histogram! "drafter.sparql.query.time" (- end-time start-time)))))))]
+                  (with-logging-context logctx
+                    (let [start-time (System/currentTimeMillis)]
+                      (try
+                        (log/info "evaluating")
+                        (.evaluate pquery result-handler)
+                        (catch Exception ex
+                          (cond
+                            (and (realized? signal) (= :ok @signal))
+                            (if (query-result-parse-exception? ex)
+                              (log/warn ex "Error occurred after sending 200 OK whilst streaming results (upstream likely timed out)")
+                              (log/warn ex "Unknown error occurred after sending 200 OK whilst streaming results"))
+                            (and (realized? signal) (instance? java.lang.Throwable @signal))
+                            (log/warn ex "Error occurred after an initial error") ;; not sure what might cause this but good to know...
+                            :else
+                            (deliver signal ex) ;; handle it on  main thread
+                            ))
+                        (finally
+                          (.close os)
+                          (let [end-time (System/currentTimeMillis)]
+                            (datadog/histogram! "drafter.sparql.query.time" (- end-time start-time))))))))]
     ;;wait for signal from query execution thread that the response has been received and begun streaming
     ;;results
     ;;NOTE: This could block for as long as the query execution timeout period
