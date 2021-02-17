@@ -344,12 +344,9 @@
    "drafter.stasher.graph_async.cache_hit"
    {}
    (let [parser (get-parser :graph fmt)]
-     (try
-       (doto parser
-         (.setRDFHandler rdf-handler)
-         (.parse stream base-uri))
-       (finally
-         (.close stream))))))
+     (doto parser
+       (.setRDFHandler rdf-handler)
+       (.parse stream base-uri)))))
 
 (defn- async-read-tuple-cache-stream [stream fmt tuple-handler]
   {:post [(some? %)]}
@@ -357,18 +354,16 @@
    "drafter.stasher.tuple_async.cache_hit"
    {}
    (let [parser (get-parser :tuple fmt)]
-     (try
-       (doto parser
-         (.setQueryResultHandler tuple-handler)
-         (.parse stream))
-       (finally
-         (.close stream))))))
+     (doto parser
+       (.setQueryResultHandler tuple-handler)
+       (.parse stream)))))
 
-(defn- wrap-graph-async-handler [inner-rdf-handler fmt out-stream]
+(defn- wrap-graph-async-handler
   "Wrap an RDFHandler with one that will write the stream of RDF into
    the cache
 
   For RDF push query results."
+  [inner-rdf-handler fmt out-stream]
   (let [rdf-format  (get-in formats/supported-cache-formats [:graph fmt])
         ;; explicitly set prefixes to nil as gio/rdf-writer will write
         ;; the grafter default-prefixes otherwise.  By setting to nil,
@@ -450,9 +445,10 @@
     (let [fmt (data-format formats cache-key)]
       (when-let [in-stream (fc/source-stream cache-backend cache-key fmt)]
         (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
-        (case (:query-type cache-key)
-          :graph (async-read-graph-cache-stream in-stream fmt handler base-uri-str)
-          :tuple (async-read-tuple-cache-stream in-stream fmt handler))
+        (with-open [input-stream in-stream]
+          (case (:query-type cache-key)
+            :graph (async-read-graph-cache-stream input-stream fmt handler base-uri-str)
+            :tuple (async-read-tuple-cache-stream input-stream fmt handler)))
         :hit)))
   (wrap-async-handler [this cache-key handler]
     (let [fmt (data-format formats cache-key)
@@ -496,14 +492,11 @@
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
-                 (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
-                   (try
-                     (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                      query-str base-uri-str dataset
-                                      (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                      stashing-rdf-handler (.getBindingsArray this))
-                     (finally
-                       (.close stashing-rdf-handler))))))
+                 (with-open [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
+                   (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                    query-str base-uri-str dataset
+                                    (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                    stashing-rdf-handler (.getBindingsArray this)))))
            (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
              (.sendGraphQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
@@ -541,15 +534,11 @@
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
-                 (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
-                   (try
-                     (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                                      query-str base-uri-str dataset
-                                      (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                      stashing-tuple-handler (.getBindingsArray this))
-                     (finally
-                       (.close stashing-tuple-handler))))
-                 ))
+                 (with-open [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
+                   (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                    query-str base-uri-str dataset
+                                    (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                    stashing-tuple-handler (.getBindingsArray this)))))
            (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
              (.sendTupleQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
