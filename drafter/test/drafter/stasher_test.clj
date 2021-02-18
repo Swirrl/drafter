@@ -416,11 +416,13 @@
 
 (defn- prepare-query
   "Prepares an RDF4j query from a connection with the specified bindings set"
-  [conn query-string bindings]
-  (let [prepared (repo/prepare-query conn query-string)]
-    (doseq [[k value] bindings]
-      (.setBinding prepared (name k) (rio/->backend-type value)))
-    prepared))
+  ([conn query-string]
+   (prepare-query conn query-string {}))
+  ([conn query-string bindings]
+   (let [prepared (repo/prepare-query conn query-string)]
+     (doseq [[k value] bindings]
+       (.setBinding prepared (name k) (rio/->backend-type value)))
+     prepared)))
 
 (defn- evaluate-with-bindings
   "Evaluates the given SPARQL string with the specified bindings map"
@@ -501,36 +503,175 @@
                     (t/is ended "Expected results to be consumed")
                     (t/is (nil? (seq data)) "Unexpected matches")))))))))))
 
+  (defn- get-open-file-count
+    "Tries to get the number of file handles opened by this process"
+    []
+    (let [os-bean (java.lang.management.ManagementFactory/getOperatingSystemMXBean)]
+      (if (instance? com.sun.management.UnixOperatingSystemMXBean os-bean)
+        (.getOpenFileDescriptorCount os-bean)
+        (throw (RuntimeException. "Unsupported OS - expected Unix derivative")))))
+
+(defmacro with-file-handle-check [& body]
+  `(let [initial-open-file-count# (get-open-file-count)]
+     ;; try and trigger a GC incase a previous run has leaked file
+     ;; counts that might get gc'd during this run.
+     ;;
+     ;; NOTE we can't 100% rely on this, but if the GC occurs and the
+     ;; finalizers close any open files then it will make the numbers
+     ;; more useful if there's been a previous error.
+     ;;
+     ;; It may also make the test less brittle to false positives (it
+     ;; certainly shouldn't make it worse) by reducing the chance of
+     ;; GC's happening during the test run.
+     (.gc (Runtime/getRuntime))
+     ~@body
+     (t/is (>= initial-open-file-count# (get-open-file-count))
+           "One or more file handles appear to have been left open.")))
+
+
+(deftest-system closes-stasher-files-test
+  [{:keys [drafter.stasher/repo
+           drafter.stasher/filecache]} "drafter/stasher-test/drafter-state-1.edn"]
+
+  (t/testing "Don't leak file handles by query type"
+    ;; Here we perform each query twice to ensure we exercise both the
+    ;; first cache miss and second cache hit paths for each query
+    ;; type.
+
+    (t/testing "SELECT"
+      (let [select-query (fn [t] (with-open [conn (repo/->connection repo)]
+                                  (let [qstr "select * where { ?s ?p ?o } limit 1"]
+                                    (if (= :async t)
+                                      (let [[events handler] (recording-tuple-handler)
+                                            prepped-q (prepare-query conn qstr)]
+                                        (.evaluate prepped-q handler)
+                                        nil)
+                                      (do (into [] (evaluate-with-bindings conn qstr {}))
+                                          nil)))))]
+        (t/testing "async"
+          (t/testing "cache miss"
+            (with-file-handle-check
+              (select-query :async)))
+
+          (t/testing "cache hit"
+            (with-file-handle-check
+              (select-query :async))))
+
+        (t/testing "sync"
+          (t/testing "cache miss"
+            (with-file-handle-check
+              (select-query :sync)))
+
+          (t/testing "cache hit"
+            (with-file-handle-check
+              (select-query :sync))))))
+
+    (t/testing "CONSTRUCT"
+      (let [construct-query (fn [t] (with-open [conn (repo/->connection repo)]
+                                     (let [qstr "construct where { ?s ?p ?o }"]
+                                       (if (= :async t)
+                                         (let [[events handler] (recording-rdf-handler)
+                                               prepped-q (prepare-query conn qstr)]
+                                           (.evaluate prepped-q handler))
+                                         (into [] (evaluate-with-bindings conn qstr {}))))))]
+        (t/testing "async"
+          (t/testing "cache miss"
+            (with-file-handle-check
+              (construct-query :async)))
+
+          (t/testing "cache hit"
+            (with-file-handle-check
+              (construct-query :async))))
+
+        (t/testing "sync"
+          (t/testing "cache miss"
+            (with-file-handle-check
+              (construct-query :sync)))
+
+          (t/testing "cache hit"
+            (with-file-handle-check
+              (construct-query :sync))))))
+
+    (t/testing "CONSTRUCT with timeout/error"
+      (let [construct-query (fn [t] (with-open [conn (repo/->connection repo)]
+                                     (let [qstr "construct where { ?s ?p ?o .  ?s1 ?p1 ?o1 .  ?s2 ?p2 ?o2 .  ?s3 ?p3 ?o3 .  ?s4 ?p4 ?o4 .  ?s5 ?p5 ?o5 . }"]
+                                       (try
+                                         (if (= :async t)
+                                           (let [[events handler] (recording-rdf-handler)
+                                                 prepped-q (prepare-query conn qstr)]
+                                             (.evaluate prepped-q handler))
+                                           (into [] (evaluate-with-bindings conn qstr {})))
+                                         (catch org.eclipse.rdf4j.repository.RepositoryException ex
+                                           ;; expected exception
+                                           nil)
+                                         (catch clojure.lang.ExceptionInfo exi
+                                           ;; also raised by sync path
+                                           nil)))))]
+        (t/testing "async"
+          (t/testing "cache miss"
+            (with-file-handle-check
+              (construct-query :async)))
+
+          (t/testing "cache hit"
+            (with-file-handle-check
+              (construct-query :async))))
+
+        (t/testing "sync"
+          (t/testing "cache miss"
+            (with-file-handle-check
+              (construct-query :sync)))
+
+          (t/testing "cache hit"
+            (with-file-handle-check
+              (construct-query :sync))))))
+
+    (t/testing "ASK"
+      (t/testing "sync (no async variant for this query-type)"
+        (let [ask-query (fn [] (with-open [conn (repo/->connection repo)]
+                                (let [prepped-q (prepare-query conn "ask where { ?s ?p ?o }")]
+                                  (.evaluate prepped-q))))]
+          (with-file-handle-check
+            (dotimes [_n 2]
+              (ask-query))))))))
+
+
 
 (comment
 
   (let [at (atom [])
-      listener (reify RepositoryConnectionListener ;; todo can extract for in memory change detection
-                 (add [this conn sub pred obj graphs]
-                   #_(println "adding")
-                   (swap! at conj [:add sub pred obj graphs]))
-                 (begin [this conn]
-                   #_(println "begin")
-                   (swap! at conj [:begin]))
-                 (close [this conn]
-                   #_(println "close")
-                   (swap! at conj [:close]))
-                 (commit [this conn]
-                   #_(println "commit")
-                   (swap! at conj [:commit]))
-                 (execute [this conn ql updt-str base-uri operation]
-                   #_(println "execute")
-                   (swap! at conj [:execute ql updt-str base-uri operation])))
+        listener (reify RepositoryConnectionListener ;; todo can extract for in memory change detection
+                   (add [this conn sub pred obj graphs]
+                     #_(println "adding")
+                     (swap! at conj [:add sub pred obj graphs]))
+                   (begin [this conn]
+                     #_(println "begin")
+                     (swap! at conj [:begin]))
+                   (close [this conn]
+                     #_(println "close")
+                     (swap! at conj [:close]))
+                   (commit [this conn]
+                     #_(println "commit")
+                     (swap! at conj [:commit]))
+                   (execute [this conn ql updt-str base-uri operation]
+                     #_(println "execute")
+                     (swap! at conj [:execute ql updt-str base-uri operation])))
 
-      repo (doto (stasher-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
-             (.addRepositoryConnectionListener listener))]
+        repo (doto (stasher-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
+               (.addRepositoryConnectionListener listener))]
 
-  (with-open [conn (repo/->connection repo)]
-    (pr/add conn [(pr/->Quad (URI. "http://foo") (URI. "http://foo") (URI. "http://foo") (URI. "http://foo"))])
-    (println (doall (repo/query conn "construct { ?s ?p ?o } where { ?s ?p ?o } limit 10")))
+    (with-open [conn (repo/->connection repo)]
+      (pr/add conn [(pr/->Quad (URI. "http://foo") (URI. "http://foo") (URI. "http://foo") (URI. "http://foo"))])
+      (println (doall (repo/query conn "construct { ?s ?p ?o } where { ?s ?p ?o } limit 10")))
 
-    (pr/update! conn "drop all"))
+      (pr/update! conn "drop all"))
 
-  @at)
+    @at)
 
+  (import '[java.io.File
+            java.net.URI]
+          '[java.lang.management ManagementFactory]
+          '[com.sun.management UnixOperatingSystemMXBean]
+          '[java.lang.management ManagementFactory])
+
+  (get-open-file-count)
   )
