@@ -33,22 +33,6 @@
     (reset! a true)
     (ring/response "")))
 
-(deftest allowed-methods-handler-test
-  (testing "Allowed method"
-    (let [invoked-inner (atom false)
-          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
-          request {:uri "/test" :request-method :get}
-          response (wrapped-handler request)]
-      (is @invoked-inner)))
-
-  (testing "Disallowed method"
-    (let [invoked-inner (atom false)
-          wrapped-handler (allowed-methods-handler #{:get :post} (notifying-handler invoked-inner))
-          request {:uri "/test" :request-method :delete}
-          response (wrapped-handler request)]
-      (is (= false @invoked-inner))
-      (tc/assert-is-method-not-allowed-response response))))
-
 (deftest sparql-prepare-query-handler-test
   (let [r (repo/sail-repo)
         handler (sparql-prepare-query-handler r identity)]
