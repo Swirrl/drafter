@@ -11,15 +11,15 @@
 (defn- build-query
   [endpoint-path query {:keys [default-graph-uri named-graph-uri graphs]}]
   (-> default-sparql-query
-      (assoc-in [:query-params "query"] query)
+      (assoc-in [:params :query] query)
       (assoc :uri endpoint-path)
-      (assoc-in [:query-params "default-graph-uri"] default-graph-uri)
-      (assoc-in [:query-params "named-graph-uri"] named-graph-uri)))
+      (assoc-in [:params :default-graph-uri] default-graph-uri)
+      (assoc-in [:params :named-graph-uri] named-graph-uri)))
 
 (defn live-query [qstr & {:keys [reasoning] :as kwargs}]
   (-> "/v1/sparql/live"
       (build-query qstr kwargs)
-      (cond-> reasoning (assoc-in [:query-params "reasoning"] "true"))))
+      (cond-> reasoning (assoc-in [:params :reasoning] "true"))))
 
 (defn draftset-query
   [draftset qstr & {:keys [user union-with-live reasoning] :as kwargs}]
@@ -28,7 +28,7 @@
         (build-query qstr kwargs)
         (cond->
             union-with-live (assoc-in [:params :union-with-live] "true")
-            reasoning (assoc-in [:query-params "reasoning"] "true")))))
+            reasoning (assoc-in [:params :reasoning] "true")))))
 
 (defn- statements->input-stream [statements format]
   (let [bos (ByteArrayOutputStream.)

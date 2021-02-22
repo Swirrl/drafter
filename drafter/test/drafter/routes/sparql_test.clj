@@ -23,14 +23,14 @@
 
 (def default-sparql-query {:request-method :get
                            :uri "/sparql/live"
-                           :query-params {"query" "SELECT * WHERE { ?s ?p ?o }"}
+                           :params {:query "SELECT * WHERE { ?s ?p ?o }"}
                            :headers {"accept" "text/csv"}})
 
 (defn- build-query
   ([endpoint-path query] (build-query endpoint-path query))
   ([endpoint-path query graphs]
    (let [query-request (-> default-sparql-query
-                           (assoc-in [:query-params "query"] query)
+                           (assoc-in [:params :query] query)
                            (assoc :uri endpoint-path))]
 
      (reduce (fn [req graph]

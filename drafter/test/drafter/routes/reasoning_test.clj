@@ -47,7 +47,7 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
         (assoc :uri (str draftset "/data"))
         (cond->
             union-with-live (assoc-in [:params :union-with-live] "true")
-            reasoning (assoc-in [:query-params "reasoning"] true)))))
+            reasoning (assoc-in [:params :reasoning] true)))))
 
 (defn new-draftset [api quadstr]
   (let [req (create-test/create-draftset-request test-publisher nil nil)

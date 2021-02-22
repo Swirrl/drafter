@@ -27,8 +27,8 @@
            org.eclipse.rdf4j.query.QueryInterruptedException
            org.eclipse.rdf4j.query.resultio.QueryResultIO))
 
-(defn- parse-reasoning [{params :query-params :as request}]
-  (let [param (or (get params "reasoning") (get params "infer"))]
+(defn- parse-reasoning [{{:keys [reasoning infer]} :params}]
+  (let [param (or reasoning infer)]
     (if (string? param)
       (Boolean/parseBoolean param)
       false)))
@@ -98,47 +98,29 @@
           (response/not-acceptable-response))))))
 
 (defn sparql-query-parser-handler [inner-handler]
-  (fn [{:keys [request-method body query-params form-params] :as request}]
-    (letfn [(handle [query-string default-graph-uri named-graph-uri location]
-              (cond
-                (string? query-string)
-                (-> request
-                    (assoc-in [:sparql :query-string] query-string)
-                    (assoc-in [:sparql :default-graph-uri] default-graph-uri)
-                    (assoc-in [:sparql :named-graph-uri] named-graph-uri)
-                    (inner-handler))
+  (fn [{:keys [request-method body]
+        {:keys [default-graph-uri named-graph-uri] :as params} :params
+        :as request}]
+    (if (#{:get :post} request-method)
+      (let [query-string (case (request/content-type request)
+                           "application/sparql-query" (slurp body)
+                           (:query params))]
+        (cond
+          (string? query-string)
+          (-> request
+            (assoc-in [:sparql :query-string] query-string)
+            (assoc-in [:sparql :default-graph-uri] default-graph-uri)
+            (assoc-in [:sparql :named-graph-uri] named-graph-uri)
+            (inner-handler))
 
-                (instance? java.io.InputStream query-string)
-                (handle (slurp query-string) default-graph-uri named-graph-uri location)
+          (coll? query-string)
+          (response/unprocessable-entity-response
+            "Exactly one query parameter required")
 
-                (coll? query-string)
-                (response/unprocessable-entity-response "Exactly one query parameter required")
-
-                :else
-                (response/unprocessable-entity-response (str "Expected SPARQL query in " location))))]
-      (case request-method
-        :get (handle (get query-params "query")
-                     (get query-params "default-graph-uri")
-                     (get query-params "named-graph-uri")
-                     "'query' query string parameter")
-        :post (case (request/content-type request)
-                "application/x-www-form-urlencoded"
-                (handle (get form-params "query")
-                        (get form-params "default-graph-uri")
-                        (get form-params "named-graph-uri")
-                        "'query' form parameter")
-                "application/sparql-query"
-                (handle body
-                        (get query-params "default-graph-uri")
-                        (get query-params "named-graph-uri")
-                        "body")
-                (let [params (:params request)]
-                  (log/warn "Handling SPARQL POST query with missing content type")
-                  (handle (get params :query)
-                          (get params :default-graph-uri)
-                          (get params :named-graph-uri)
-                          "'query' form or query parameter")))
-        (response/method-not-allowed-response request-method)))))
+          :else
+          (response/unprocessable-entity-response
+            "Expected SPARQL query in 'query' form or query parameter")))
+      (response/method-not-allowed-response request-method))))
 
 (defn disallow-sparql-service-db-uri*
   [handler {{q :query-string} :sparql :as request}]

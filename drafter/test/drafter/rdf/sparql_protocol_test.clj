@@ -113,7 +113,7 @@
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
                                      :uri "/live/sparql"
-                                     :query-params {"query" "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
+                                     :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
                                      :headers {"accept" "text/csv"}})]
 
         (is (= 200 status))
@@ -133,7 +133,7 @@
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method           :get
                                                  :uri          "/live/sparql"
-                                                 :query-params {"query" "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
+                                                 :params {:query "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
                                                  :headers      {"accept" "text/csv;q=0.7,text/unknown,application/n-triples;q=0.9"}})]
 
         (is (= 200 status))
@@ -151,7 +151,7 @@
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
                                      :uri "/live/sparql"
-                                     :query-params {"query" "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
+                                     :params {:query "SELECT * WHERE { ?s ?p ?o } LIMIT 10"}
                                      :headers {"accept" "text/csv,application/sparql-results+json;q=0.9,*/*;q=0.8"}})]
 
         (is (= 200 status))
@@ -169,7 +169,7 @@
       (let [{:keys [status headers body]
              :as resp} (end-point {:request-method :get
                                    :uri "/live/sparql"
-                                   :query-params {"query" "ASK WHERE { ?s ?p ?o }"}
+                                   :params {:query "ASK WHERE { ?s ?p ?o }"}
                                    :headers {"accept" "text/plain,application/sparql-results+json;q=0.1,*/*;q=0.8"
                                              "Accept-Charset" "utf-8"}})]
         (is (= 200 status))
@@ -184,7 +184,7 @@
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
                                      :uri "/live/sparql"
-                                     :query-params {"query" "SELECT * WHERE { ?s ?p ?o }"}
+                                     :params {:query "SELECT * WHERE { ?s ?p ?o }"}
                                      :headers {"accept" "text/html"}})]
 
         (is (= 200 status))
@@ -195,7 +195,7 @@
     (let [endpoint (sparql-end-point "/live/sparql" tc/*test-backend*)
           request {:request-method :get
                    :uri "/live/sparql"
-                   :query-params {"query" "NOT A VALID SPARQL QUERY"}
+                   :params {:query "NOT A VALID SPARQL QUERY"}
                    :headers {"accept" "text/plain"}}
           {:keys [status]} (endpoint request)]
       (is (= 400 status)))))
@@ -209,7 +209,7 @@
         endpoint (sparql-end-point "/live/sparql" repo)
         test-request {:uri "/live/sparql"
                       :request-method :get
-                      :query-params {"query" "SELECT * WHERE { ?s ?p ?o }"}
+                      :params {:query "SELECT * WHERE { ?s ?p ?o }"}
                       :headers {"accept" "application/sparql-results+json"}}]
     (with-open [server (tc/latched-http-server test-port connection-latch release-latch (tc/get-spo-http-response))]
       (let [blocked-connections (doall (map (fn [i] (future (endpoint test-request))) (range 1 (inc max-connections))))]
@@ -227,3 +227,61 @@
             (doseq [f blocked-connections]
               (.get f 100 TimeUnit/MILLISECONDS)))
           (throw (RuntimeException. "Server failed to accept connections within timeout")))))))
+
+(deftest sparql-query-parser-handler-test
+  (let [handler (sparql-query-parser-handler identity)
+        query-string "SELECT * WHERE { ?s ?p ?o }"]
+    (testing "Valid GET request"
+      (let [req {:request-method :get :params {:query query-string}}
+            inner-req (handler req)]
+        (is (= query-string (get-in inner-req [:sparql :query-string])))))
+
+    (testing "Invalid GET request with missing query parameter"
+      (let [resp (handler {:request-method :get :params {}})]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Invalid GET request with multiple 'query' query parameters"
+      (let [req {:request-method :get
+                 :params {:query [query-string "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]}}
+            resp (handler req)]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Valid form POST request"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/x-www-form-urlencoded"}
+                 :params {:query query-string}}
+            inner-req (handler req)]
+        (is (= query-string (get-in inner-req [:sparql :query-string])))))
+
+    (testing "Invalid form POST request with missing query form parameter"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/x-www-form-urlencoded"}
+                 :params {}}
+            resp (handler req)]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Invalid form POST request with multiple query form parameters"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/x-www-form-urlencoded"}
+                 :params {:query [query-string "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]}}
+            resp (handler req)]
+        (tc/assert-is-unprocessable-response resp)))
+
+    (testing "Valid body POST request"
+      (let [req {:request-method :post
+                 :headers {"content-type" "application/sparql-query"}
+                 :body (char-array query-string)}
+            inner-req (handler req)]
+        (is (= query-string (get-in inner-req [:sparql :query-string])))))
+
+    (testing "POST request with invalid content type"
+      (let [req {:request-method :post
+                 :headers {"content-type" "text/plain"}
+                 :params {:query query-string}}
+            inner-req (handler req)]
+        (is (= query-string (get-in inner-req [:sparql :query-string])))))
+
+    (testing "Invalid request method"
+      (let [req {:request-method :put :body (char-array query-string)}
+            resp (handler req)]
+        (tc/assert-is-method-not-allowed-response resp)))))
