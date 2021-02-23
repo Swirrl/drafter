@@ -24,10 +24,12 @@
                                              TupleQueryResultWriter BooleanQueryResultParserRegistry
                                              TupleQueryResultParserRegistry TupleQueryResultParser BooleanQueryResultParser)
            [org.eclipse.rdf4j.repository RepositoryConnection]
+           org.eclipse.rdf4j.http.client.SPARQLProtocolSession
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate QueryStringUtil)
            (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
-           java.time.OffsetDateTime))
+           java.time.OffsetDateTime
+           java.io.Closeable))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)
@@ -56,7 +58,7 @@
         (proxy-super beforeExecute t r)
         (dd/histogram! "stasher_thread_pool_size" (.getPoolSize this))))))
 
-(defmethod ig/halt-key! ::cache-thread-pool [k thread-pool]
+(defmethod ig/halt-key! ::cache-thread-pool [k ^ThreadPoolExecutor thread-pool]
   (.shutdown thread-pool))
 
 (defprotocol Stash
@@ -73,7 +75,7 @@
 
 (defn dataset->graphs
   "Extract graphs from the dataset"
-  [?dataset]
+  [^Dataset ?dataset]
   (when ?dataset
     {:default-graphs (.getDefaultGraphs ?dataset)
      :named-graphs (.getNamedGraphs ?dataset)}))
@@ -85,7 +87,7 @@
   {:default-graphs (set (map str default-graphs))
    :named-graphs (set (map str named-graphs))})
 
-(defn is-state-graph? [dataset]
+(defn is-state-graph? [^Dataset dataset]
   (some #{(URI. "http://publishmydata.com/graphs/drafter/drafts")}
         (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
 
@@ -170,7 +172,7 @@
              :tuple-parser #(instance? TupleQueryResultParser %)
              :boolean-parser #(instance? BooleanQueryResultParser %)))
 
-(defn- wrap-graph-result [bg-graph-result format stream]
+(defn- wrap-graph-result [^GraphQueryResult bg-graph-result format ^Closeable stream]
   (let [prefixes (.getNamespaces bg-graph-result) ;; take prefixes from supplied result
         cache-file-writer ^RDFWriter (rio/rdf-writer
                                       stream
@@ -211,7 +213,7 @@
             (fc/cancel-and-close stream)
             (throw ex)))))))
 
-(defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt stream]
+(defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt ^Closeable stream]
   (let [bindings (.getBindingNames bg-tuple-result)
         tuple-format (get-in formats/supported-cache-formats [:tuple fmt])
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
@@ -249,7 +251,7 @@
             (throw ex)))))))
 
 (defn- wrap-tuple-result-push
-  [^TupleQueryResultHandler result-handler fmt stream]
+  [^TupleQueryResultHandler result-handler fmt ^Closeable stream]
   (let [tuple-format (get-in formats/supported-cache-formats [:tuple fmt])
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
     (reify
@@ -273,11 +275,11 @@
         (.startQueryResult cache-file-writer binding-names)
         (.startQueryResult result-handler binding-names))
 
-      java.io.Closeable
+      Closeable
       (close [t]
         (.close stream)))))
 
-(defn- stash-boolean-result [result fmt-kw stream]
+(defn- stash-boolean-result [result fmt-kw ^Closeable stream]
   {:post [(some? %)]}
   ;; return the actual result this will get returned to the
   ;; outer-most call to query.  NOTE that boolean's are different to
@@ -296,7 +298,7 @@
 
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
-  [thread-pool stream fmt]
+  [^ThreadPoolExecutor thread-pool stream fmt]
   (let [start-time (System/currentTimeMillis)
         bg-tuple-result (BackgroundTupleResult. (get-parser :tuple fmt) stream)]
 
@@ -318,7 +320,7 @@
 
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
-  [thread-pool base-uri-str stream fmt-kw]
+  [^ThreadPoolExecutor thread-pool base-uri-str stream fmt-kw]
   (let [start-time (System/currentTimeMillis)
         fmt (get-in formats/supported-cache-formats [:graph fmt-kw])
         charset (get-charset fmt)
@@ -363,7 +365,7 @@
    the cache
 
   For RDF push query results."
-  [inner-rdf-handler fmt out-stream]
+  [^RDFHandler inner-rdf-handler fmt ^Closeable out-stream]
   (let [rdf-format  (get-in formats/supported-cache-formats [:graph fmt])
         ;; explicitly set prefixes to nil as gio/rdf-writer will write
         ;; the grafter default-prefixes otherwise.  By setting to nil,
@@ -407,7 +409,7 @@
             (fc/cancel-and-close out-stream)
             (throw ex))))
 
-      java.io.Closeable
+      Closeable
       (close [t]
         (.close out-stream)))))
 
@@ -419,7 +421,7 @@
   Stash
   (get-result [this cache-key base-uri-str]
     (let [fmt (data-format formats cache-key)]
-      (when-let [in-stream (fc/source-stream cache-backend cache-key fmt)]
+      (when-let [^Closeable in-stream (fc/source-stream cache-backend cache-key fmt)]
         (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
         (case (ck/query-type cache-key)
           :graph (read-graph-cache-stream thread-pool base-uri-str in-stream fmt)
@@ -427,7 +429,7 @@
           :boolean (dd/measure!
                     "drafter.stasher.boolean_sync.cache_hit"
                     {}
-                    (with-open [is in-stream]
+                    (with-open [^Closeable is in-stream]
                       (.parse (get-parser :boolean fmt) is)))))))
   (wrap-result [this cache-key query-result]
     (let [fmt (data-format formats cache-key)
@@ -445,7 +447,7 @@
     (let [fmt (data-format formats cache-key)]
       (when-let [in-stream (fc/source-stream cache-backend cache-key fmt)]
         (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
-        (with-open [input-stream in-stream]
+        (with-open [^Closeable input-stream in-stream]
           (case (:query-type cache-key)
             :graph (async-read-graph-cache-stream input-stream fmt handler base-uri-str)
             :tuple (async-read-tuple-cache-stream input-stream fmt handler)))
@@ -463,12 +465,13 @@
 
 (defn stashing-graph-query
   "Construct a graph query that checks the stash before evaluating"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
+  [conn ^SPARQLProtocolSession httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLGraphQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
-       (let [dataset (.getDataset this)
+       (let [^SPARQLGraphQuery this this
+             ^Dataset dataset (.getDataset this)
              query-str (QueryStringUtil/getGraphQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
@@ -487,12 +490,13 @@
 
       ;; async results
       ([rdf-handler]
-       (let [dataset (.getDataset this)
+       (let [^SPARQLGraphQuery this this
+             dataset (.getDataset this)
              query-str (QueryStringUtil/getGraphQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
-                 (with-open [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
+                 (with-open [^Closeable stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
                                     query-str base-uri-str dataset
                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
@@ -505,12 +509,13 @@
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
+  [conn ^SPARQLProtocolSession httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
-       (let [dataset (.getDataset this)
+       (let [^SPARQLTupleQuery this this
+             ^Dataset dataset (.getDataset this)
              query-str (QueryStringUtil/getTupleQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
@@ -529,12 +534,13 @@
                              (.getMaxExecutionTime this)
                              (.getBindingsArray this))))))
       ([tuple-handler]
-       (let [dataset (.getDataset this)
+       (let [^SPARQLTupleQuery this this
+             dataset (.getDataset this)
              query-str (QueryStringUtil/getTupleQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
-                 (with-open [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
+                 (with-open [^Closeable stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
                                     query-str base-uri-str dataset
                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
@@ -548,10 +554,11 @@
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
   Boolean queries are sync only"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
+  [conn ^SPARQLProtocolSession httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
-      (let [dataset (.getDataset this)
+      (let [^SPARQLBooleanQuery this this
+            dataset (.getDataset this)
             query-str (QueryStringUtil/getBooleanQueryString query-str (.getBindings this))]
         (if cache?
           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
@@ -629,7 +636,9 @@
                             :state-graph-modified-time (atom (get-state-graph-modified-time)))
         repo (doto (proxy [SPARQLRepository] [query-endpoint update-endpoint]
                      (getConnection []
-                       (stasher-connection this (.createHTTPClient this) cache updated-opts)))
+                       (let [^SPARQLRepository this this
+                             http-client (.createHTTPClient this)]
+                         (stasher-connection this http-client cache updated-opts))))
                (.initialize))]
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     (log/infof "Stasher Caching enabled: %b" (get updated-opts :cache?))
