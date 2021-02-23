@@ -13,6 +13,7 @@
              ses
              :refer
              [create-signalling-query-handler get-query-type]]
+            [drafter.util :as util]
             [drafter.requests :as drafter-request]
             [drafter.responses :as response]
             [drafter.timeouts :as timeouts]
@@ -201,9 +202,9 @@
      :body (String. (.toByteArray os))}))
 
 (defn query-result-parse-exception? [ex]
-  (let [parse-exception-types #{'org.eclipse.rdf4j.query.resultio.QueryResultParseException
-                                'org.eclipse.rdf4j.rio.RDFParseException}
-        inner-exception-type (second (map :type (:via (Throwable->map ex))))]
+  (let [parse-exception-types #{org.eclipse.rdf4j.query.resultio.QueryResultParseException
+                                org.eclipse.rdf4j.rio.RDFParseException}
+        inner-exception-type (type (.getCause ex))]
     (parse-exception-types inner-exception-type)))
 
 (defn- execute-streaming-query [pquery result-format response-content-type]
@@ -230,7 +231,7 @@
                             (if (query-result-parse-exception? ex)
                               (log/warn ex "Error occurred after sending 200 OK whilst streaming results (upstream likely timed out)")
                               (log/warn ex "Unknown error occurred after sending 200 OK whilst streaming results"))
-                            (and (realized? signal) (instance? java.lang.Throwable @signal))
+                            (and (realized? signal) (util/throwable? @signal))
                             (log/warn ex "Error occurred after an initial error") ;; not sure what might cause this but good to know...
                             :else
                             (deliver signal ex) ;; handle it on  main thread
