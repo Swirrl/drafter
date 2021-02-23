@@ -10,17 +10,27 @@
 
 ## State is:
 #
-# - 1 Public graph "a"
+# - 1 Public graph <http://live-and-ds1-and-ds2>
 #
-# - 1 draftset 8d1e with 2 draft graphs in it.  One draftgraph in it
-#   is of the live graph "a".  The other is for an upublished graph "b".
+# - draftset ds-1 with 2 draft graphs in it.  One draftgraph in it
+#   is of the live graph <http://live-and-ds1-and-ds2>.  The other
+#   is for an unpublished graph <http://ds1-only>.
+#
+# - draftset ds-2 with 1 draft graph in it which is a draft of the live
+#   graph <http://live-and-ds1-and-ds2>
 # 
 # This should give us the following state combinations we need for
 # testing stasher:
 # 
 # - live only query (unionwithlive irrelevant)
 # - draftset only query (unionwithlive false)
-# - live+draftset (unionwithlive true) 
+# - live+draftset (unionwithlive true)
+
+<http://publishmydata.com/graphs/drafter/graph-modified-times> {
+  <http://publishmydata.com/graphs/drafter/graph-modified-times> dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime .
+  <http://live-only> dcterms:modified "2017-01-30T16:44:15.094Z"^^xsd:dateTime .
+  <http://live-and-ds1-and-ds2> dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime .
+}
 
 # Public endpoint, for the version of live.
 <http://publishmydata.com/graphs/drafter/endpoints> {
@@ -36,17 +46,28 @@
 	# Live graphs
 	########################################################################
 
+	# modifications graph
+	<http://publishmydata.com/graphs/drafter/graph-modified-times> a drafter:ManagedGraph ;
+	    drafter:isPublic "true"^^xsd:boolean ;
+	    drafter:hasDraft draft:ds-1-modified-times ;
+	    drafter:hasDraft draft:ds-2-modified-times .
+
 	# Live graph with two changes in 2 draftsets
 	<http://live-and-ds1-and-ds2> a drafter:ManagedGraph ;
-		dcterms:modified "2017-01-01T01:01:01.000Z"^^xsd:dateTime ;
 		drafter:isPublic "true"^^xsd:boolean ;
-		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime .
+		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime ;
+		drafter:hasDraft draft:ds-1-dg-2 ;
+		drafter:hasDraft draft:ds-2-dg-1 .
 
 	# a graph not in a draftset
 	<http://live-only> a drafter:ManagedGraph ;
-		dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
 		drafter:isPublic "true"^^xsd:boolean ;
 		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime .
+
+    # graph that only exists in draft ds-1
+    <http://ds-1-only> a drafter:ManagedGraph ;
+        drafter:isPublic "false"^^xsd:boolean ;
+        dcterms:issued "2017-02-03T10:40:02.599Z"^^xsd:dateTime .
 
 	########################################################################
 	# The first draftset with two draftgraphs in it.
@@ -54,8 +75,6 @@
 	########################################################################
 	draftset:ds-1 a drafter:DraftSet ;
 		dcterms:created "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
-		dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
-		drafter:version version:52099c51-5cab-496c-9aed-2bbcb3c36874 ;
 		dcterms:creator <mailto:manager@swirrl.com> ;
 		drafter:hasOwner <mailto:manager@swirrl.com> .
 
@@ -64,32 +83,34 @@
 		drafter:isPublic "false"^^xsd:boolean ;
 		drafter:hasDraft draft:ds-1-dg-1 .
 
+    draft:ds-1-modified-times a drafter:DraftGraph ;
+        dcterms:created "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
+        drafter:inDraftSet draftset:ds-1 .
+
 	draft:ds-1-dg-1 a drafter:DraftGraph ;
 		dcterms:created "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
-		dcterms:modified "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:ds-1 .
 
 	draft:ds-1-dg-2 a drafter:DraftGraph ;
 		dcterms:created "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
-		dcterms:modified "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:ds-1 .
 
 
 	########################################################################
 	# The second draftset, with a single change on <http://live-and-ds1-and-ds2>	
 	########################################################################
+	draft:ds-2-modified-times a drafter:DraftGraph ;
+        dcterms:created "2017-05-05T05:05:05.000Z"^^xsd:dateTime ;
+        drafter:inDraftSet draftset:ds-2 .
+
 	draftset:ds-2 a drafter:DraftSet ;
 		dcterms:created "2017-11-16T15:13:46.901Z"^^xsd:dateTime ;
-		dcterms:modified "2017-11-16T15:13:46.901Z"^^xsd:dateTime ;
-		drafter:version version:c7af52ba-b8ef-41f3-b116-11bfcd4ef353 ;
 		dcterms:creator <mailto:editor@swirrl.com> ;
 		drafter:hasOwner <mailto:editor@swirrl.com> .
 
 	draft:ds-2-dg-1 a drafter:DraftGraph ;
 		dcterms:created "2017-05-05T05:05:05.000Z"^^xsd:dateTime ;
-		dcterms:modified "2017-05-05T05:05:05.000Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:ds-2 .
- 
 }
 
 <http://live-and-ds1-and-ds2> {
@@ -101,6 +122,13 @@
 	<http://live-only> <http://live-only> <http://live-only> .   
 }
 
+# draft modified times graph in draftset ds-1
+draft:ds-1-modified-times {
+  draft:ds-1-modified-times dcterms:modified "2017-04-04T04:04:04.000Z"^^xsd:dateTime .
+  draft:ds-1-dg-1 dcterms:modified "2017-03-03T03:03:03.000Z"^^xsd:dateTime .
+  draft:ds-1-dg-2 dcterms:modified "2017-04-04T04:04:04.000Z"^^xsd:dateTime .
+}
+
 # the new un published draft in draftset ds-1
 draft:ds-1-dg-1 {
 	<http://unpublished-graph-ds1> <http://unpublished-graph-ds1> <http://unpublished-graph-ds1> .  
@@ -110,6 +138,12 @@ draft:ds-1-dg-1 {
 draft:ds-1-dg-2 {
 	<http://a> <http://a> <http://a> .
 	<http://ds1> <http://ds1> <http://ds1> . # a drafted addition to live graph
+}
+
+# draft modified times graph in draftset ds-2
+draft:ds-2-modified-times {
+  draft:ds-2-modified-times dcterms:modified "2017-05-05T05:05:05.000Z"^^xsd:dateTime .
+  draft:ds-2-dg-1 dcterms:modified "2017-05-05T05:05:05.000Z"^^xsd:dateTime .
 }
 
 # a modification to a live graph in ds-2 

@@ -8,7 +8,6 @@
             [drafter.backend.draftset.operations :as dsops]
             [drafter.user-test :refer [test-editor]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
-            [drafter.util :as util]
             [grafter-2.rdf4j.sparql :as sp]
             [grafter.url :as url])
   (:import [java.net URI]))
@@ -118,12 +117,6 @@
         (t/is (contains? graph-mapping live-graph) "Draft graph should exist for deleted graph")
         (t/is (mgmth/draft-exists? repo (get graph-mapping live-graph)) "Draft graph should exist for deleted graph")))))
 
-(defn- get-modified-time [repo subject]
-  (with-open [conn (repo/->connection repo)]
-    (let [q (format "SELECT ?modified WHERE { <%s> <http://purl.org/dc/terms/modified> ?modified .}" subject)
-          results (vec (repo/query conn q))]
-      (-> results first :modified))))
-
 (t/deftest delete-user-graph-in-draftset
   (tc/with-system
     [:drafter/backend]
@@ -136,15 +129,11 @@
 
       (tc/make-graph-live! repo live-graph (tc/test-triples) clock)
 
-      (let [draft-graph (tc/import-data-to-draft! repo live-graph (tc/test-triples (URI. "http://subject")) draftset-id)
-            initially-modified-at (get-modified-time repo live-graph)]
+      (let [draft-graph (tc/import-data-to-draft! repo live-graph (tc/test-triples (URI. "http://subject")) draftset-id)]
 
         (t/is (mgmth/draft-exists? repo draft-graph) "Graph should still be managed")
 
         (delete-user-graph manager draftset-id live-graph)
-
-        (let [subsequently-modified-at (get-modified-time repo draft-graph)]
-          (t/is (.isBefore initially-modified-at subsequently-modified-at) "Draft graph modified time should be updated"))
 
         (t/is (mgmth/draft-exists? repo draft-graph) "Draft graph should still exist")
         (t/is (= true (mgmt/graph-empty? repo draft-graph)) "Draft graph should be empty")))))
