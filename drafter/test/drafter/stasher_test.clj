@@ -539,94 +539,98 @@
     ;; type.
 
     (t/testing "SELECT"
-      (let [select-query (fn [t] (with-open [conn (repo/->connection repo)]
-                                  (let [qstr "select * where { ?s ?p ?o } limit 1"]
-                                    (if (= :async t)
-                                      (let [[events handler] (recording-tuple-handler)
-                                            prepped-q (prepare-query conn qstr)]
-                                        (.evaluate prepped-q handler)
-                                        nil)
-                                      (do (into [] (evaluate-with-bindings conn qstr {}))
-                                          nil)))))]
+      (let [select-query (fn [t qstr] (with-open [conn (repo/->connection repo)]
+                                       (if (= :async t)
+                                         (let [[events handler] (recording-tuple-handler)
+                                               prepped-q (prepare-query conn qstr)]
+                                           (.evaluate prepped-q handler)
+                                           nil)
+                                         (do (into [] (evaluate-with-bindings conn qstr {}))
+                                             nil))))]
         (t/testing "async"
-          (t/testing "cache miss"
-            (with-file-handle-check
-              (select-query :async)))
+          (let [qstr "select * where { ?s ?p ?o } limit 1"]
+            (t/testing "cache miss"
+              (with-file-handle-check
+                (select-query :async qstr)))
 
-          (t/testing "cache hit"
-            (with-file-handle-check
-              (select-query :async))))
+            (t/testing "cache hit"
+              (with-file-handle-check
+                (select-query :async qstr)))))
 
         (t/testing "sync"
-          (t/testing "cache miss"
-            (with-file-handle-check
-              (select-query :sync)))
+          (let [qstr "select * where { ?s ?p ?o } limit 2"]
+            (t/testing "cache miss"
+              (with-file-handle-check
+                (select-query :sync qstr)))
 
-          (t/testing "cache hit"
-            (with-file-handle-check
-              (select-query :sync))))))
+            (t/testing "cache hit"
+              (with-file-handle-check
+                (select-query :sync qstr)))))))
 
     (t/testing "CONSTRUCT"
-      (let [construct-query (fn [t] (with-open [conn (repo/->connection repo)]
-                                     (let [qstr "construct where { ?s ?p ?o }"]
-                                       (if (= :async t)
-                                         (let [[events handler] (recording-rdf-handler)
-                                               prepped-q (prepare-query conn qstr)]
-                                           (.evaluate prepped-q handler))
-                                         (into [] (evaluate-with-bindings conn qstr {}))))))]
+      (let [construct-query (fn [t qstr] (with-open [conn (repo/->connection repo)]
+                                          (if (= :async t)
+                                            (let [[events handler] (recording-rdf-handler)
+                                                  prepped-q (prepare-query conn qstr)]
+                                              (.evaluate prepped-q handler))
+                                            (into [] (evaluate-with-bindings conn qstr {})))))]
         (t/testing "async"
-          (t/testing "cache miss"
-            (with-file-handle-check
-              (construct-query :async)))
+          (let [qstr "construct where { ?sub ?pred ?obj }"]
+            (t/testing "cache miss"
+              (with-file-handle-check
+                (construct-query :async qstr)))
 
-          (t/testing "cache hit"
-            (with-file-handle-check
-              (construct-query :async))))
+            (t/testing "cache hit"
+              (with-file-handle-check
+                (construct-query :async qstr)))))
 
         (t/testing "sync"
-          (t/testing "cache miss"
-            (with-file-handle-check
-              (construct-query :sync)))
+          (let [qstr "construct where { ?s ?p ?o }"]
+            (t/testing "cache miss"
+              (with-file-handle-check
+                (construct-query :sync qstr)))
 
-          (t/testing "cache hit"
-            (with-file-handle-check
-              (construct-query :sync))))))
+            (t/testing "cache hit"
+              (with-file-handle-check
+                (construct-query :sync qstr)))))))
 
 
     ;; commented out because it fails on travis, works locally with
     ;; more resources
+
+
     #_(t/testing "CONSTRUCT with timeout/error"
-      (let [construct-query (fn [t] (with-open [conn (repo/->connection repo)]
-                                     (let [qstr "construct where { ?s ?p ?o .  ?s1 ?p1 ?o1 .  ?s2 ?p2 ?o2 .  ?s3 ?p3 ?o3 }"]
-                                       (try
-                                         (if (= :async t)
-                                           (let [[events handler] (recording-rdf-handler)
-                                                 prepped-q (prepare-query conn qstr)]
-                                             (.evaluate prepped-q handler))
-                                           (into [] (evaluate-with-bindings conn qstr {})))
-                                         (catch org.eclipse.rdf4j.repository.RepositoryException ex
-                                           ;; expected exception
-                                           nil)
-                                         (catch clojure.lang.ExceptionInfo exi
-                                           ;; also raised by sync path
-                                           nil)))))]
-        (t/testing "async"
-          (t/testing "cache miss"
-            (with-file-handle-check
-              (construct-query :async)))
+        (let [construct-query (fn [t] (with-open [conn (repo/->connection repo)]
+                                       (let [qstr "construct where { ?s ?p ?o .  ?s1 ?p1 ?o1 .  ?s2 ?p2 ?o2 .  ?s3 ?p3 ?o3 }"]
+                                         (try
+                                           (if (= :async t)
+                                             (let [[events handler] (recording-rdf-handler)
+                                                   prepped-q (prepare-query conn qstr)]
+                                               (.evaluate prepped-q handler))
+                                             (into [] (evaluate-with-bindings conn qstr {})))
+                                           (catch org.eclipse.rdf4j.repository.RepositoryException ex
+                                             ;; expected exception
+                                             nil)
+                                           (catch clojure.lang.ExceptionInfo exi
+                                             ;; also raised by sync path
+                                             nil)))))]
+          (t/testing "async"
+            (t/testing "cache miss"
+              (with-file-handle-check
+                (construct-query :async)))
 
-          (t/testing "cache hit"
-            (with-file-handle-check
-              (construct-query :async))))
+            (t/testing "cache hit"
+              (with-file-handle-check
+                (construct-query :async))))
 
-        (t/testing "sync"
-          (t/testing "cache miss"
-            (with-file-handle-check
-              (construct-query :sync)))
+          (t/testing "sync"
+            (t/testing "cache miss"
+              (with-file-handle-check
+                (construct-query :sync)))
 
-          (t/testing "cache hit"
-            (with-file-handle-check
-              (construct-query :sync))))))
+            (t/testing "cache hit"
+              (with-file-handle-check
+                (construct-query :sync))))))
 
     (t/testing "ASK"
       (t/testing "sync (no async variant for this query-type)"
