@@ -7,7 +7,7 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-publisher]]
             [grafter-2.rdf.protocols :as pr :refer [->Quad triple=]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified dcterms:issued]]
+            [grafter.vocabularies.dcterms :refer [dcterms:issued]]
             [grafter-2.rdf4j.repository :as repo]
             [drafter.rdf.sparql :as sparql])
   (:import java.net.URI))

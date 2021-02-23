@@ -10,8 +10,10 @@ SELECT ?livemod ?livever ?draftmod ?draftver WHERE {
       VALUES ?graph {}
       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
         ?graph a drafter:ManagedGraph ;
-               drafter:isPublic "true"^^xsd:boolean ;
-               dcterms:modified ?livemod .
+               drafter:isPublic true .
+      }
+      GRAPH <http://publishmydata.com/graphs/drafter/graph-modified-times> {
+          ?graph dcterms:modified ?livemod .
       }
       GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
         drafter:public drafter:version ?livever .
@@ -24,9 +26,15 @@ SELECT ?livemod ?livever ?draftmod ?draftver WHERE {
       VALUES ?graph {}
       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
         ?graph a drafter:DraftGraph ;
-               dcterms:modified ?draftmod .
-        ?graph drafter:inDraftSet ?ds .
+               drafter:inDraftSet ?ds .
         ?ds drafter:version ?draftver .
+        ?lg drafter:hasDraft ?graph .
+        <http://publishmydata.com/graphs/drafter/graph-modified-times> drafter:hasDraft ?dmg .
+        ?dmg drafter:inDraftSet ?ds .
+      }
+
+      GRAPH ?dmg {
+        ?graph dcterms:modified ?draftmod .
       }
     }
   }
