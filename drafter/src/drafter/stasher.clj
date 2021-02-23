@@ -5,7 +5,6 @@
             [drafter.stasher.timing :as timing]
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf4j.sparql :as sparql]
-            [grafter-2.rdf4j.io :as gio]
             [integrant.core :as ig]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as dd]
@@ -22,14 +21,16 @@
            org.eclipse.rdf4j.query.resultio.helpers.BackgroundTupleResult
            (org.eclipse.rdf4j.query.resultio TupleQueryResultFormat BooleanQueryResultFormat QueryResultIO
                                              TupleQueryResultWriter BooleanQueryResultParserRegistry
-                                             TupleQueryResultParserRegistry TupleQueryResultParser BooleanQueryResultParser)
+                                             TupleQueryResultParserRegistry TupleQueryResultParser BooleanQueryResultParser
+                                             TupleQueryResultParserFactory
+                                             BooleanQueryResultParserFactory)
            [org.eclipse.rdf4j.repository RepositoryConnection]
            org.eclipse.rdf4j.http.client.SPARQLProtocolSession
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate QueryStringUtil)
-           (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry)
+           (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry RDFParserFactory)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
            java.time.OffsetDateTime
-           java.io.Closeable))
+           (java.io InputStream Closeable)))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)
@@ -55,8 +56,9 @@
                                  TimeUnit/MILLISECONDS
                                  queue]
       (beforeExecute [t r]
-        (proxy-super beforeExecute t r)
-        (dd/histogram! "stasher_thread_pool_size" (.getPoolSize this))))))
+        (let [^ThreadPoolExecutor this this]
+          (proxy-super beforeExecute t r)
+          (dd/histogram! "stasher_thread_pool_size" (.getPoolSize this)))))))
 
 (defmethod ig/halt-key! ::cache-thread-pool [k ^ThreadPoolExecutor thread-pool]
   (.shutdown thread-pool))
@@ -144,18 +146,31 @@
   (when-not (#{RDFFormat/BINARY TupleQueryResultFormat/BINARY} format)
     (Charset/forName "UTF-8")))
 
+(defprotocol GetParser
+  (get-parser* [fmt]))
+
+(extend-protocol GetParser
+  RDFFormat
+  (get-parser* [fmt]
+    (when-let [^RDFParserFactory parser-factory (.orElse (.get (RDFParserRegistry/getInstance) fmt) nil)]
+      (.getParser parser-factory)))
+
+  BooleanQueryResultFormat
+  (get-parser* [fmt]
+    (when-let [^BooleanQueryResultParserFactory parser-factory (.orElse (.get (BooleanQueryResultParserRegistry/getInstance) fmt) nil)]
+      (.getParser parser-factory)))
+
+  TupleQueryResultFormat
+  (get-parser* [fmt]
+    (when-let [^TupleQueryResultParserFactory parser-factory (.orElse (.get (TupleQueryResultParserRegistry/getInstance) fmt) nil)]
+      (.getParser parser-factory))))
+
 (defn get-parser
   "Given a query type and format, find an RDF4j file format parser for that
   format."
   [query-type fmt-kw]
   (let [fmt (get-in formats/supported-cache-formats [query-type fmt-kw])
-        parser (when-let [parser-factory (.orElse (condp instance? fmt
-                                                    RDFFormat (.get (RDFParserRegistry/getInstance) fmt)
-                                                    BooleanQueryResultFormat (.get (BooleanQueryResultParserRegistry/getInstance) fmt)
-                                                    TupleQueryResultFormat (.get (TupleQueryResultParserRegistry/getInstance) fmt)
-                                                    (java.util.Optional/empty))
-                                                  nil)]
-                 (.getParser parser-factory))]
+        parser (get-parser* fmt)]
     (assert parser (str "Error could not find a parser for format:" fmt))
     parser))
 
@@ -340,12 +355,12 @@
 
     bg-graph-result))
 
-(defn- async-read-graph-cache-stream [stream fmt rdf-handler base-uri]
+(defn- async-read-graph-cache-stream [^InputStream stream fmt rdf-handler ^String base-uri]
   {:post [(some? %)]}
   (dd/measure!
    "drafter.stasher.graph_async.cache_hit"
    {}
-   (let [parser (get-parser :graph fmt)]
+   (let [^RDFParser parser (get-parser :graph fmt)]
      (doto parser
        (.setRDFHandler rdf-handler)
        (.parse stream base-uri)))))
@@ -355,7 +370,7 @@
   (dd/measure!
    "drafter.stasher.tuple_async.cache_hit"
    {}
-   (let [parser (get-parser :tuple fmt)]
+   (let [^TupleQueryResultParser parser (get-parser :tuple fmt)]
      (doto parser
        (.setQueryResultHandler tuple-handler)
        (.parse stream)))))
@@ -367,10 +382,10 @@
   For RDF push query results."
   [^RDFHandler inner-rdf-handler fmt ^Closeable out-stream]
   (let [rdf-format  (get-in formats/supported-cache-formats [:graph fmt])
-        ;; explicitly set prefixes to nil as gio/rdf-writer will write
+        ;; explicitly set prefixes to nil as rio/rdf-writer will write
         ;; the grafter default-prefixes otherwise.  By setting to nil,
         ;; use what comes from the stream instead.
-        cache-file-writer ^RDFWriter (gio/rdf-writer out-stream :format rdf-format :prefixes nil)]
+        cache-file-writer ^RDFWriter (rio/rdf-writer out-stream :format rdf-format :prefixes nil)]
     (reify RDFHandler
       (startRDF [this]
         (try
@@ -430,7 +445,8 @@
                     "drafter.stasher.boolean_sync.cache_hit"
                     {}
                     (with-open [^Closeable is in-stream]
-                      (.parse (get-parser :boolean fmt) is)))))))
+                      (let [^BooleanQueryResultParser parser (get-parser :boolean fmt)]
+                        (.parse parser is))))))))
   (wrap-result [this cache-key query-result]
     (let [fmt (data-format formats cache-key)
           out-stream (fc/destination-stream cache-backend cache-key fmt)]
@@ -592,7 +608,8 @@
   [httpclient query-str base-uri-str state-graph-modified-time]
   (proxy [SPARQLUpdate] [httpclient base-uri-str query-str]
     (execute []
-      (proxy-super execute)
+      (let [^SPARQLUpdate this this]
+        (proxy-super execute))
       (reset! state-graph-modified-time (get-state-graph-modified-time)))))
 
 
@@ -600,7 +617,8 @@
   (proxy [SPARQLConnection] [repo httpclient quad-mode]
 
     (commit []
-      (proxy-super commit)
+      (let [^SPARQLConnection this this]
+        (proxy-super commit))
       (reset! (:state-graph-modified-time opts) (get-state-graph-modified-time)))
     (prepareUpdate [_ query-str base-uri-str]
       (cache-busting-update-statement httpclient query-str (or base-uri-str base-uri) (:state-graph-modified-time opts)))
