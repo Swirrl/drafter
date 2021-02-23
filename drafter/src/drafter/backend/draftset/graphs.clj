@@ -94,7 +94,6 @@
         draft-graph-triples [draft-graph-uri
                              [rdf:a drafter:DraftGraph]
                              [drafter:createdAt time]
-                             [drafter:modifiedAt time]
                              [drafter:inDraftSet draftset-uri]]]
     (apply mgmt/to-quads [live-graph-triples draft-graph-triples])))
 

@@ -2,9 +2,6 @@
   (:require [clojure.set :as set]
             [clojure.test :as t :refer [is testing]]
             [drafter.feature.draftset.test-helper :as help]
-            [drafter.rdf.drafter-ontology
-             :refer
-             [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]

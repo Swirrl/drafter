@@ -7,9 +7,8 @@
             [grafter-2.rdf4j.templater :refer [add-properties graph]]
             [grafter-2.rdf4j.repository :as repo]
             [grafter.url :as url]
-            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
+            [grafter.vocabularies.dcterms :refer [dcterms:issued]]
             [grafter.vocabularies.rdf :refer :all]
-            [clojure.spec.alpha :as s]
             [grafter-2.rdf4j.io :as rio]
             [clojure.string :as string]
             [drafter.time :as time])
@@ -263,29 +262,7 @@
 (defn- update-live-graph-timestamps-query [draft-graph-uri now-ts]
   (let [issued-at (xsd-datetime now-ts)]
     (str
-      "# First remove the modified timestamp from the live graph\n"
-      "WITH <" drafter-state-graph "> DELETE {"
-      "  ?live <" dcterms:modified "> ?modified ."
-      "} WHERE {"
-      "  VALUES ?draft { <" draft-graph-uri "> }"
-      "  ?live a <" drafter:ManagedGraph "> ;"
-      "        <" drafter:hasDraft "> ?draft ;"
-      "        <" dcterms:modified "> ?modified ."
-      "  ?draft a <" drafter:DraftGraph "> ."
-      "};\n"
-
-      "# Then set the modified timestamp on the live graph to be that of the draft graph\n"
-      "WITH <" drafter-state-graph "> INSERT {"
-      "  ?live <" dcterms:modified "> ?modified ."
-      "} WHERE {"
-      "  VALUES ?draft { <" draft-graph-uri "> }"
-      "  ?live a <" drafter:ManagedGraph "> ;"
-      "        <" drafter:hasDraft "> ?draft ."
-      "  ?draft a <" drafter:DraftGraph "> ;"
-      "         <" dcterms:modified "> ?modified ."
-      "};\n"
-
-      "# And finally set a dcterms:issued timestamp if it doesn't have one already\n"
+      "# set a dcterms:issued timestamp if it doesn't have one already\n"
       "WITH <" drafter-state-graph "> INSERT {"
       "  ?live <" dcterms:issued "> " issued-at " ."
       "} WHERE {"
@@ -306,7 +283,7 @@
 (defn- migrate-live-queries [db draft-graph-uri transaction-at]
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (let [move-query (move-graph draft-graph-uri live-graph-uri)
-          update-timestamps-query (update-live-graph-timestamps-query draft-graph-uri transaction-at) ;;TODO: don't need this?
+          update-timestamps-query (update-live-graph-timestamps-query draft-graph-uri transaction-at)
           delete-state-query (delete-draft-state-query draft-graph-uri)
           live-public-query (set-isPublic-query live-graph-uri true)
           queries [update-timestamps-query move-query delete-state-query live-public-query]

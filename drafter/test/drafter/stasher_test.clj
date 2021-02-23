@@ -349,51 +349,53 @@
 
   )
 
-(deftest-system fetch-modified-state-test
-  [{repo :drafter.stasher/repo} "drafter/stasher-test/drafter-state-1.edn"]
-  (t/is (some? repo) "No repo!")
-  (with-open [conn (.getConnection repo)]
+(t/deftest fetch-modified-state-test
+  (with-system
+    [{repo :drafter.stasher/repo} "drafter/stasher-test/drafter-state-1.edn"]
+    (do
+      (t/is (some? repo) "No repo!")
+      (with-open [conn (.getConnection repo)]
 
-    (t/testing "Fetching draftset modified times"
-      (t/is (= ds-1-most-recently-modified
-               (sut/fetch-modified-state conn {:named-graphs ds-1 :default-graphs ds-1})))
+        (t/testing "Fetching draftset modified times"
+          (t/is (= ds-1-most-recently-modified
+                   (sut/fetch-modified-state conn {:named-graphs ds-1 :default-graphs ds-1})))
 
-      (t/is (= ds-2-most-recently-modified
-               (sut/fetch-modified-state conn {:named-graphs ds-2 :default-graphs ds-2}))))
+          (t/is (= ds-2-most-recently-modified
+                   (sut/fetch-modified-state conn {:named-graphs ds-2 :default-graphs ds-2}))))
 
-    (t/testing "Fetching live graph modified times"
-      (t/is (= liveset-most-recently-modified
-               (sut/fetch-modified-state conn {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]}))))
+        (t/testing "Fetching live graph modified times"
+          (t/is (= liveset-most-recently-modified
+                   (sut/fetch-modified-state conn {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]}))))
 
-    (t/testing "Fetching draftsets with union-with-live set"
-      ;; Union with live is at this low level equivalent to merging the
-      ;; set of live graphs in to :named-graphs and :default-graphs.
-      (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
-            dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}]
-        (t/is (= (merge liveset-most-recently-modified
-                        ds-1-most-recently-modified)
-                 (sut/fetch-modified-state conn dataset))))))
-  (with-open [conn (.getConnection repo)]
+        (t/testing "Fetching draftsets with union-with-live set"
+          ;; Union with live is at this low level equivalent to merging the
+          ;; set of live graphs in to :named-graphs and :default-graphs.
+          (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
+                dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}]
+            (t/is (= (merge liveset-most-recently-modified
+                            ds-1-most-recently-modified)
+                     (sut/fetch-modified-state conn dataset))))))
+      (with-open [conn (.getConnection repo)]
 
-    (t/testing "Fetching draftset modified times"
-      (t/is (= ds-1-most-recently-modified
-               (sut/fetch-modified-state conn {:named-graphs ds-1 :default-graphs ds-1})))
+        (t/testing "Fetching draftset modified times"
+          (t/is (= ds-1-most-recently-modified
+                   (sut/fetch-modified-state conn {:named-graphs ds-1 :default-graphs ds-1})))
 
-      (t/is (= ds-2-most-recently-modified
-               (sut/fetch-modified-state conn {:named-graphs ds-2 :default-graphs ds-2}))))
+          (t/is (= ds-2-most-recently-modified
+                   (sut/fetch-modified-state conn {:named-graphs ds-2 :default-graphs ds-2}))))
 
-    (t/testing "Fetching live graph modified times"
-      (t/is (= liveset-most-recently-modified
-               (sut/fetch-modified-state conn {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]}))))
+        (t/testing "Fetching live graph modified times"
+          (t/is (= liveset-most-recently-modified
+                   (sut/fetch-modified-state conn {:named-graphs [live-graph-1 live-graph-only] :default-graphs [live-graph-1 live-graph-only]}))))
 
-    (t/testing "Fetching draftsets with union-with-live set"
-      ;; Union with live is at this low level equivalent to merging the
-      ;; set of live graphs in to :named-graphs and :default-graphs.
-      (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
-            dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}]
-        (t/is (= (merge liveset-most-recently-modified
-                        ds-1-most-recently-modified)
-                 (sut/fetch-modified-state conn dataset)))))))
+        (t/testing "Fetching draftsets with union-with-live set"
+          ;; Union with live is at this low level equivalent to merging the
+          ;; set of live graphs in to :named-graphs and :default-graphs.
+          (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
+                dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}]
+            (t/is (= (merge liveset-most-recently-modified
+                            ds-1-most-recently-modified)
+                     (sut/fetch-modified-state conn dataset)))))))))
 
 (deftest-system generate-drafter-cache-key-test
   [{:keys [drafter.stasher/repo

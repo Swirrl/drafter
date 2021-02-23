@@ -14,22 +14,28 @@ SELECT ?livemod ?draftmod WHERE {
       
       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
         ?graph a drafter:ManagedGraph ;
-               drafter:isPublic "true"^^xsd:boolean ;
-               dcterms:modified ?livemod .
-        
+               drafter:isPublic true .
+      }
+
+      GRAPH <http://publishmydata.com/graphs/drafter/graph-modified-times> {
+          ?graph dcterms:modified ?livemod .
       }
     }
   } OPTIONAL {
     SELECT ?draftmod WHERE {
+      VALUES ?graph { }
+
       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
         ?graph a drafter:DraftGraph ;
-            dcterms:modified ?draftmod .      
+            drafter:inDraftSet ?ds .
+        ?lg drafter:hasDraft ?graph .
+        <http://publishmydata.com/graphs/drafter/graph-modified-times> drafter:hasDraft ?dmg .
+        ?dmg drafter:inDraftSet ?ds .
       }
-        
-      VALUES ?graph {
+
+      GRAPH ?dmg {
+        ?graph dcterms:modified ?draftmod .
       }
-      
     }
-    
   }
 } ORDER BY DESC(?livemod) DESC(?draftmod) LIMIT 1

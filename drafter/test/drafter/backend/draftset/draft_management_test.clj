@@ -156,8 +156,7 @@
           "Live graph reference shouldn't have been deleted from state graph")
 
       (is (ask? "GRAPH <" drafter-state-graph "> {"
-                "  <http://example.org/my-graph> <" dcterms:modified "> ?modified ;"
-                "                                <" dcterms:issued "> ?published ."
+                "  <http://example.org/my-graph> <" dcterms:issued "> ?published ."
                 "}")
           "Live graph should have a modified and issued time stamp"))))
 
