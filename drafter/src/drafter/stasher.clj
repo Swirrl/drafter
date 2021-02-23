@@ -5,7 +5,6 @@
             [drafter.stasher.timing :as timing]
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf4j.sparql :as sparql]
-            [grafter-2.rdf4j.io :as gio]
             [integrant.core :as ig]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as dd]
@@ -22,12 +21,16 @@
            org.eclipse.rdf4j.query.resultio.helpers.BackgroundTupleResult
            (org.eclipse.rdf4j.query.resultio TupleQueryResultFormat BooleanQueryResultFormat QueryResultIO
                                              TupleQueryResultWriter BooleanQueryResultParserRegistry
-                                             TupleQueryResultParserRegistry TupleQueryResultParser BooleanQueryResultParser)
+                                             TupleQueryResultParserRegistry TupleQueryResultParser BooleanQueryResultParser
+                                             TupleQueryResultParserFactory
+                                             BooleanQueryResultParserFactory)
            [org.eclipse.rdf4j.repository RepositoryConnection]
+           org.eclipse.rdf4j.http.client.SPARQLProtocolSession
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate QueryStringUtil)
-           (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry)
+           (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry RDFParserFactory)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
-           java.time.OffsetDateTime))
+           java.time.OffsetDateTime
+           (java.io InputStream Closeable)))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)
@@ -53,10 +56,11 @@
                                  TimeUnit/MILLISECONDS
                                  queue]
       (beforeExecute [t r]
-        (proxy-super beforeExecute t r)
-        (dd/histogram! "stasher_thread_pool_size" (.getPoolSize this))))))
+        (let [^ThreadPoolExecutor this this]
+          (proxy-super beforeExecute t r)
+          (dd/histogram! "stasher_thread_pool_size" (.getPoolSize this)))))))
 
-(defmethod ig/halt-key! ::cache-thread-pool [k thread-pool]
+(defmethod ig/halt-key! ::cache-thread-pool [k ^ThreadPoolExecutor thread-pool]
   (.shutdown thread-pool))
 
 (defprotocol Stash
@@ -73,7 +77,7 @@
 
 (defn dataset->graphs
   "Extract graphs from the dataset"
-  [?dataset]
+  [^Dataset ?dataset]
   (when ?dataset
     {:default-graphs (.getDefaultGraphs ?dataset)
      :named-graphs (.getNamedGraphs ?dataset)}))
@@ -85,7 +89,7 @@
   {:default-graphs (set (map str default-graphs))
    :named-graphs (set (map str named-graphs))})
 
-(defn is-state-graph? [dataset]
+(defn is-state-graph? [^Dataset dataset]
   (some #{(URI. "http://publishmydata.com/graphs/drafter/drafts")}
         (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
 
@@ -142,18 +146,31 @@
   (when-not (#{RDFFormat/BINARY TupleQueryResultFormat/BINARY} format)
     (Charset/forName "UTF-8")))
 
+(defprotocol GetParser
+  (get-parser* [fmt]))
+
+(extend-protocol GetParser
+  RDFFormat
+  (get-parser* [fmt]
+    (when-let [^RDFParserFactory parser-factory (.orElse (.get (RDFParserRegistry/getInstance) fmt) nil)]
+      (.getParser parser-factory)))
+
+  BooleanQueryResultFormat
+  (get-parser* [fmt]
+    (when-let [^BooleanQueryResultParserFactory parser-factory (.orElse (.get (BooleanQueryResultParserRegistry/getInstance) fmt) nil)]
+      (.getParser parser-factory)))
+
+  TupleQueryResultFormat
+  (get-parser* [fmt]
+    (when-let [^TupleQueryResultParserFactory parser-factory (.orElse (.get (TupleQueryResultParserRegistry/getInstance) fmt) nil)]
+      (.getParser parser-factory))))
+
 (defn get-parser
   "Given a query type and format, find an RDF4j file format parser for that
   format."
   [query-type fmt-kw]
   (let [fmt (get-in formats/supported-cache-formats [query-type fmt-kw])
-        parser (when-let [parser-factory (.orElse (condp instance? fmt
-                                                    RDFFormat (.get (RDFParserRegistry/getInstance) fmt)
-                                                    BooleanQueryResultFormat (.get (BooleanQueryResultParserRegistry/getInstance) fmt)
-                                                    TupleQueryResultFormat (.get (TupleQueryResultParserRegistry/getInstance) fmt)
-                                                    (java.util.Optional/empty))
-                                                  nil)]
-                 (.getParser parser-factory))]
+        parser (get-parser* fmt)]
     (assert parser (str "Error could not find a parser for format:" fmt))
     parser))
 
@@ -170,7 +187,7 @@
              :tuple-parser #(instance? TupleQueryResultParser %)
              :boolean-parser #(instance? BooleanQueryResultParser %)))
 
-(defn- wrap-graph-result [bg-graph-result format stream]
+(defn- wrap-graph-result [^GraphQueryResult bg-graph-result format ^Closeable stream]
   (let [prefixes (.getNamespaces bg-graph-result) ;; take prefixes from supplied result
         cache-file-writer ^RDFWriter (rio/rdf-writer
                                       stream
@@ -211,7 +228,7 @@
             (fc/cancel-and-close stream)
             (throw ex)))))))
 
-(defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt stream]
+(defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt ^Closeable stream]
   (let [bindings (.getBindingNames bg-tuple-result)
         tuple-format (get-in formats/supported-cache-formats [:tuple fmt])
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
@@ -249,7 +266,7 @@
             (throw ex)))))))
 
 (defn- wrap-tuple-result-push
-  [^TupleQueryResultHandler result-handler fmt stream]
+  [^TupleQueryResultHandler result-handler fmt ^Closeable stream]
   (let [tuple-format (get-in formats/supported-cache-formats [:tuple fmt])
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
     (reify
@@ -271,9 +288,13 @@
         (.handleSolution result-handler binding-set))
       (startQueryResult [this binding-names]
         (.startQueryResult cache-file-writer binding-names)
-        (.startQueryResult result-handler binding-names)))))
+        (.startQueryResult result-handler binding-names))
 
-(defn- stash-boolean-result [result fmt-kw stream]
+      Closeable
+      (close [t]
+        (.close stream)))))
+
+(defn- stash-boolean-result [result fmt-kw ^Closeable stream]
   {:post [(some? %)]}
   ;; return the actual result this will get returned to the
   ;; outer-most call to query.  NOTE that boolean's are different to
@@ -292,7 +313,7 @@
 
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
-  [thread-pool stream fmt]
+  [^ThreadPoolExecutor thread-pool stream fmt]
   (let [start-time (System/currentTimeMillis)
         bg-tuple-result (BackgroundTupleResult. (get-parser :tuple fmt) stream)]
 
@@ -314,7 +335,7 @@
 
   NOTE: there is no need to handle the RDF4j \"dataset\" as cache hits
   will already be on results where the dataset restriction was set."
-  [thread-pool base-uri-str stream fmt-kw]
+  [^ThreadPoolExecutor thread-pool base-uri-str stream fmt-kw]
   (let [start-time (System/currentTimeMillis)
         fmt (get-in formats/supported-cache-formats [:graph fmt-kw])
         charset (get-charset fmt)
@@ -334,12 +355,12 @@
 
     bg-graph-result))
 
-(defn- async-read-graph-cache-stream [stream fmt rdf-handler base-uri]
+(defn- async-read-graph-cache-stream [^InputStream stream fmt rdf-handler ^String base-uri]
   {:post [(some? %)]}
   (dd/measure!
    "drafter.stasher.graph_async.cache_hit"
    {}
-   (let [parser (get-parser :graph fmt)]
+   (let [^RDFParser parser (get-parser :graph fmt)]
      (doto parser
        (.setRDFHandler rdf-handler)
        (.parse stream base-uri)))))
@@ -349,21 +370,22 @@
   (dd/measure!
    "drafter.stasher.tuple_async.cache_hit"
    {}
-   (let [parser (get-parser :tuple fmt)]
+   (let [^TupleQueryResultParser parser (get-parser :tuple fmt)]
      (doto parser
        (.setQueryResultHandler tuple-handler)
        (.parse stream)))))
 
-(defn- wrap-graph-async-handler [inner-rdf-handler fmt out-stream]
+(defn- wrap-graph-async-handler
   "Wrap an RDFHandler with one that will write the stream of RDF into
    the cache
 
   For RDF push query results."
+  [^RDFHandler inner-rdf-handler fmt ^Closeable out-stream]
   (let [rdf-format  (get-in formats/supported-cache-formats [:graph fmt])
-        ;; explicitly set prefixes to nil as gio/rdf-writer will write
+        ;; explicitly set prefixes to nil as rio/rdf-writer will write
         ;; the grafter default-prefixes otherwise.  By setting to nil,
         ;; use what comes from the stream instead.
-        cache-file-writer ^RDFWriter (gio/rdf-writer out-stream :format rdf-format :prefixes nil)]
+        cache-file-writer ^RDFWriter (rio/rdf-writer out-stream :format rdf-format :prefixes nil)]
     (reify RDFHandler
       (startRDF [this]
         (try
@@ -400,7 +422,11 @@
           (.handleNamespace inner-rdf-handler prefix-str uri-str)
           (catch Throwable ex
             (fc/cancel-and-close out-stream)
-            (throw ex)))))))
+            (throw ex))))
+
+      Closeable
+      (close [t]
+        (.close out-stream)))))
 
 (defn data-format [formats cache-key]
   {:post [(keyword? %)]}
@@ -410,7 +436,7 @@
   Stash
   (get-result [this cache-key base-uri-str]
     (let [fmt (data-format formats cache-key)]
-      (when-let [in-stream (fc/source-stream cache-backend cache-key fmt)]
+      (when-let [^Closeable in-stream (fc/source-stream cache-backend cache-key fmt)]
         (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
         (case (ck/query-type cache-key)
           :graph (read-graph-cache-stream thread-pool base-uri-str in-stream fmt)
@@ -418,7 +444,9 @@
           :boolean (dd/measure!
                     "drafter.stasher.boolean_sync.cache_hit"
                     {}
-                    (.parse (get-parser :boolean fmt) in-stream)) ))))
+                    (with-open [^Closeable is in-stream]
+                      (let [^BooleanQueryResultParser parser (get-parser :boolean fmt)]
+                        (.parse parser is))))))))
   (wrap-result [this cache-key query-result]
     (let [fmt (data-format formats cache-key)
           out-stream (fc/destination-stream cache-backend cache-key fmt)]
@@ -435,9 +463,10 @@
     (let [fmt (data-format formats cache-key)]
       (when-let [in-stream (fc/source-stream cache-backend cache-key fmt)]
         (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
-        (case (:query-type cache-key)
-          :graph (async-read-graph-cache-stream in-stream fmt handler base-uri-str)
-          :tuple (async-read-tuple-cache-stream in-stream fmt handler))
+        (with-open [^Closeable input-stream in-stream]
+          (case (:query-type cache-key)
+            :graph (async-read-graph-cache-stream input-stream fmt handler base-uri-str)
+            :tuple (async-read-tuple-cache-stream input-stream fmt handler)))
         :hit)))
   (wrap-async-handler [this cache-key handler]
     (let [fmt (data-format formats cache-key)
@@ -452,12 +481,13 @@
 
 (defn stashing-graph-query
   "Construct a graph query that checks the stash before evaluating"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
+  [conn ^SPARQLProtocolSession httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLGraphQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
-       (let [dataset (.getDataset this)
+       (let [^SPARQLGraphQuery this this
+             ^Dataset dataset (.getDataset this)
              query-str (QueryStringUtil/getGraphQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
@@ -470,18 +500,19 @@
            (timing/graph-result
             "drafter.stasher.graph_sync.no_cache"
             (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                                       query-str base-uri-str dataset
-                                                       (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                                       (.getBindingsArray this))))))
+                             query-str base-uri-str dataset
+                             (.getIncludeInferred this) (.getMaxExecutionTime this)
+                             (.getBindingsArray this))))))
 
       ;; async results
       ([rdf-handler]
-       (let [dataset (.getDataset this)
+       (let [^SPARQLGraphQuery this this
+             dataset (.getDataset this)
              query-str (QueryStringUtil/getGraphQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
-                 (let [stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
+                 (with-open [^Closeable stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
                                     query-str base-uri-str dataset
                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
@@ -494,12 +525,13 @@
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
+  [conn ^SPARQLProtocolSession httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLTupleQuery] [httpclient base-uri-str query-str]
     (evaluate
       ;; sync results
       ([]
-       (let [dataset (.getDataset this)
+       (let [^SPARQLTupleQuery this this
+             ^Dataset dataset (.getDataset this)
              query-str (QueryStringUtil/getTupleQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
@@ -518,12 +550,13 @@
                              (.getMaxExecutionTime this)
                              (.getBindingsArray this))))))
       ([tuple-handler]
-       (let [dataset (.getDataset this)
+       (let [^SPARQLTupleQuery this this
+             dataset (.getDataset this)
              query-str (QueryStringUtil/getTupleQueryString query-str (.getBindings this))]
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
-                 (let [stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
+                 (with-open [^Closeable stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
                                     query-str base-uri-str dataset
                                     (.getIncludeInferred this) (.getMaxExecutionTime this)
@@ -537,10 +570,11 @@
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
   Boolean queries are sync only"
-  [conn httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
+  [conn ^SPARQLProtocolSession httpclient cache query-str base-uri-str {:keys [thread-pool cache?] :as opts}]
   (proxy [SPARQLBooleanQuery] [httpclient query-str base-uri-str]
     (evaluate []
-      (let [dataset (.getDataset this)
+      (let [^SPARQLBooleanQuery this this
+            dataset (.getDataset this)
             query-str (QueryStringUtil/getBooleanQueryString query-str (.getBindings this))]
         (if cache?
           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
@@ -574,7 +608,8 @@
   [httpclient query-str base-uri-str state-graph-modified-time]
   (proxy [SPARQLUpdate] [httpclient base-uri-str query-str]
     (execute []
-      (proxy-super execute)
+      (let [^SPARQLUpdate this this]
+        (proxy-super execute))
       (reset! state-graph-modified-time (get-state-graph-modified-time)))))
 
 
@@ -582,7 +617,8 @@
   (proxy [SPARQLConnection] [repo httpclient quad-mode]
 
     (commit []
-      (proxy-super commit)
+      (let [^SPARQLConnection this this]
+        (proxy-super commit))
       (reset! (:state-graph-modified-time opts) (get-state-graph-modified-time)))
     (prepareUpdate [_ query-str base-uri-str]
       (cache-busting-update-statement httpclient query-str (or base-uri-str base-uri) (:state-graph-modified-time opts)))
@@ -618,7 +654,9 @@
                             :state-graph-modified-time (atom (get-state-graph-modified-time)))
         repo (doto (proxy [SPARQLRepository] [query-endpoint update-endpoint]
                      (getConnection []
-                       (stasher-connection this (.createHTTPClient this) cache updated-opts)))
+                       (let [^SPARQLRepository this this
+                             http-client (.createHTTPClient this)]
+                         (stasher-connection this http-client cache updated-opts))))
                (.initialize))]
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     (log/infof "Stasher Caching enabled: %b" (get updated-opts :cache?))
