@@ -1,0 +1,77 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+# create live modifications graph
+INSERT DATA {
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        <http://publishmydata.com/graphs/drafter/graph-modified-times> a drafter:ManagedGraph ;
+                                                                       drafter:isPublic true .
+    }
+};
+
+# move live graph dcterms:modified timestamps from state graph into the new live modifications graph
+DELETE {
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        ?lg dcterms:modified ?existingmodified .
+    }
+}
+INSERT {
+    GRAPH <http://publishmydata.com/graphs/drafter/graph-modified-times> {
+        ?lg dcterms:modified ?modified .
+    }
+} WHERE {
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        ?lg a drafter:ManagedGraph ;
+            drafter:isPublic true .
+        OPTIONAL { ?lg dcterms:modified ?existingmodified }
+        BIND(COALESCE(?existingmodified, NOW()) AS ?modified)
+    }
+};
+
+# create draft modifications graphs in each draftset with changes
+# update the dcterms:modified of each affected draftset
+DELETE {
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        ?ds dcterms:modified ?dsmodified .
+    }
+}
+INSERT {
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        <http://publishmydata.com/graphs/drafter/graph-modified-times> drafter:hasDraft ?dmg .
+        ?dmg a drafter:DraftGraph ;
+             dcterms:created ?now ;
+             drafter:inDraftSet ?ds .
+        ?ds dcterms:modified ?now .
+    }
+} WHERE {
+    { SELECT DISTINCT ?ds WHERE {
+        GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        ?ds a drafter:DraftSet .
+        OPTIONAL { ?ds dcterms:modified ?dsmodified }
+        FILTER EXISTS {
+            ?dg a drafter:DraftGraph ;
+                drafter:inDraftSet ?ds
+        }
+    }
+    }}
+    BIND(IRI(CONCAT("http://publishmydata.com/graphs/drafter/draft/", STRUUID())) AS ?dmg)
+    BIND(NOW() AS ?now)
+};
+
+# add draft modification times for each draft graph in each draftset
+# NOTE: this includes the draft modifications graphs just created
+INSERT {
+    GRAPH ?dmg {
+        ?dg dcterms:modified ?modified .
+    }
+}
+WHERE {
+    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+        ?dg a drafter:DraftGraph ;
+            drafter:inDraftSet ?ds .
+        <http://publishmydata.com/graphs/drafter/graph-modified-times> drafter:hasDraft ?dmg .
+        ?dmg drafter:inDraftSet ?ds .
+        OPTIONAL { ?dg dcterms:modified ?existingmodified }
+        BIND(COALESCE(?existingmodified, NOW()) AS ?modified)
+    }
+}

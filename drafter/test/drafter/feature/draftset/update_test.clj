@@ -13,7 +13,7 @@
    [drafter.feature.middleware :as middleware]
    [drafter.generators
     :refer
-    [random-graph-uri generate-graph-triples gennerate-quads quad-gen]]
+    [random-graph-uri generate-graph-triples generate-quads quad-gen]]
    [drafter.rdf.jena :as jena]
    [drafter.test-common :as tc]
    [drafter.test-helpers.draft-management-helpers :as mgmt-helpers]

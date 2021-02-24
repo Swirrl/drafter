@@ -5,10 +5,10 @@
    [clojure.pprint :as pp]
    [clojure.string :as str]
    [drafter.rdf.drafter-ontology :refer [drafter:version]]
-   [drafter.rdf.jena :as jena])
+   [drafter.rdf.jena :as jena]
    [grafter-2.rdf.protocols :as pr]
    [grafter.url :as url]
-   [integrant.core :as ig]
+   [integrant.core :as ig])
   (:import
    [java.io IOException]
    [java.net URI]
