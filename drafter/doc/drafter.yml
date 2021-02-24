@@ -614,8 +614,6 @@ paths:
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
       security:
         - jws-auth: []
-      consumes:
-        - application/sparql-query
       produces:
         - application/n-triples
         - application/rdf+xml
@@ -645,10 +643,15 @@ paths:
         Query this Draftset via the SPARQL query language and protocol.
 
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+
+        Note that the parameters below are documented for the
+        application/x-www-form-urlencoded case. See the specification linked
+        above for the application/sparql-query case.
       security:
         - jws-auth: []
       consumes:
         - application/x-www-form-urlencoded
+        - application/sparql-query # See note in description.
       produces:
         - application/n-triples
         - application/rdf+xml
@@ -661,8 +664,8 @@ paths:
         - $ref: '#/parameters/post_query'
         - $ref: '#/parameters/union-with-live'
         - $ref: '#/parameters/timeout'
-        - $ref: '#/parameters/default-graph-uri'
-        - $ref: '#/parameters/named-graph-uri'
+        - $ref: '#/parameters/post_default-graph-uri'
+        - $ref: '#/parameters/post_named-graph-uri'
       tags:
         - Querying
       responses:
@@ -678,10 +681,15 @@ paths:
         Update this Draftset via the SPARQL update language and protocol.
 
         Please consult the SPARQL update protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+
+        Note that the parameters below are documented for the
+        application/x-www-form-urlencoded case. See the specification linked
+        above for the application/sparql-update case.
       security:
         - jws-auth: []
       consumes:
-        - application/sparql-update
+        - application/x-www-form-urlencoded
+        - application/sparql-update # See note in description.
       produces:
       parameters:
         - $ref: '#/parameters/id'
@@ -701,8 +709,6 @@ paths:
       description: |
         Query the live data via the SPARQL query langauge and protocol.
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
-      consumes:
-        - application/x-www-form-urlencoded
       produces:
         - application/n-triples
         - application/rdf+xml
@@ -728,9 +734,13 @@ paths:
       description: |
         Query the live data via the SPARQL query langauge and protocol.
         Please consult the SPARQL query protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+
+        Note that the parameters below are documented for the
+        application/x-www-form-urlencoded case. See the specification linked
+        above for the application/sparql-query case.
       consumes:
         - application/x-www-form-urlencoded
-        - application/sparql-query
+        - application/sparql-query # See note in description.
       produces:
         - application/n-triples
         - application/rdf+xml
@@ -740,8 +750,8 @@ paths:
         - text/csv
       parameters:
         - $ref: '#/parameters/post_query'
-        - $ref: '#/parameters/default-graph-uri'
-        - $ref: '#/parameters/named-graph-uri'
+        - $ref: '#/parameters/post_default-graph-uri'
+        - $ref: '#/parameters/post_named-graph-uri'
       tags:
         - SPARQL Endpoints
       responses:
@@ -939,6 +949,16 @@ parameters:
     items:
       type: string
 
+  post_default-graph-uri:
+    name: default-graph-uri
+    in: formData
+    description: Specify RDF default graph(s) to query against
+    required: false
+    type: array
+    collectionFormat: multi
+    items:
+      type: string
+
   named-graph-uri:
     name: named-graph-uri
     in: query
@@ -949,9 +969,19 @@ parameters:
     items:
       type: string
 
+  post_named-graph-uri:
+    name: named-graph-uri
+    in: formData
+    description: Specify RDF named graph(s) to query against
+    required: false
+    type: array
+    collectionFormat: multi
+    items:
+      type: string
+
   using-graph-uri:
     name: using-graph-uri
-    in: query
+    in: formData
     description: Specify RDF default graph(s) to update against
     required: false
     type: array
@@ -961,7 +991,7 @@ parameters:
 
   using-named-graph-uri:
     name: using-named-graph-uri
-    in: query
+    in: formData
     description: Specify RDF named graph(s) to update against
     required: false
     type: array
