@@ -171,20 +171,9 @@
                          :live? false}])
         affected-graphs (->> (.getOperations update-request)
                              (map (juxt identity affected-graphs)))
-        graph-op-order (reduce (fn [acc [op gs]]
-                                 (reduce (fn [acc g]
-                                           (if-let [ops (acc g)]
-                                             (update acc g conj op)
-                                             (assoc acc g [op])))
-                                         acc
-                                         gs))
-                               {}
-                               affected-graphs)
         affected-graphs (->> (map second affected-graphs)
                              (apply set/union)
                              (map new-graph)
-                             (map (fn [[lg m]]
-                                    [lg (assoc m :ops (graph-op-order lg))]))
                              (into {}))]
     (->> (merge-with merge
                      affected-graphs
