@@ -266,23 +266,9 @@
     (testing "Valid body POST request"
       (let [req {:request-method :post
                  :headers {"content-type" "application/sparql-query"}
-                 :body query-string}
+                 :body (char-array query-string)}
             inner-req (handler req)]
         (is (= query-string (get-in inner-req [:sparql :query-string])))))
-
-    (testing "Invalid body POST request missing body"
-      (let [req {:request-method :post
-                 :headers {"content-type" "application/sparql-query"}
-                 :body nil}
-            resp (handler req)]
-        (tc/assert-is-unprocessable-response resp)))
-
-    (testing "Invalid body POST request non-string body"
-      (let [req {:request-method :post
-                 :headers {"content-type" "application/sparql-query"}
-                 :body (ByteArrayInputStream. (byte-array [1 2 3]))}
-            resp (handler req)]
-        (tc/assert-is-unprocessable-response resp)))
 
     (testing "POST request with invalid content type"
       (let [req {:request-method :post

@@ -111,9 +111,6 @@
                     (assoc-in [:sparql :named-graph-uri] named-graph-uri)
                     (inner-handler))
 
-                (instance? java.io.InputStream query-string)
-                (handle (slurp query-string) default-graph-uri named-graph-uri location)
-
                 (coll? query-string)
                 (response/unprocessable-entity-response "Exactly one query parameter required")
 
@@ -131,7 +128,7 @@
                         (get form-params "named-graph-uri")
                         "'query' form parameter")
                 "application/sparql-query"
-                (handle body
+                (handle (slurp body)
                         (get query-params "default-graph-uri")
                         (get query-params "named-graph-uri")
                         "body")
