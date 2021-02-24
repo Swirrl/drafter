@@ -1,21 +1,40 @@
 (ns drafter.feature.draftset.update
-  "Handler for submitting (a limited subset of) SPARQL UPDATE queries within a draft. The
-   only permitted operations are INSERT DATA, DELETE DATA and DROP GRAPH. The incoming
-   UPDATE request is parsed and rejected if it contains any invalid operations. The current
-   state of all the graphs affected by the query is fetched which includes the live and
-   draft graph URIs, size of the associated live and draft graphs, and the state of the
-   graph within the draftset. From the perspective of the draft, graphs are either unmanaged,
-   only in the live graph or in the draft graph. Graphs that have existing draft graphs within
-   the draftset do not need special handling, but unmanaged or live-only graphs require prior
-   handling before the operation can be applied such as creating the draft graph, cloning and
-   rewriting live graphs etc.
+  "Handler for submitting (a limited subset of) SPARQL UPDATE queries
+  within a draft.
 
-   Each update operation is mapped to a set of 'abstract' operations which represent the high-level
-   operations required to perform the operation. Some of these may modify the state graph and
-   affect the state of the graph within the draft. The operations are collected into a data structure
-   which represent the entire UPDATE operation. This plan representation is then converted into
-   a collection of Jena update operations and collected into a compound SPARQL UPDATE string. This
-   update is then submitted for execution."
+  When interpreting a request the incoming UPDATE request is parsed as
+  a series of 'high-level' update operations with Jena, and rejected
+  if it contains any operations outside of the supported subset
+  `INSERT DATA`, `DELETE DATA` and `DROP GRAPH`.
+
+  Prior to planning an update, we first assemble some supporting
+  metadata for all of the graphs affected by the query. This is done
+  in `get-graph-meta`, this information includes the (live) :graph-uri
+  and :draft-graph-uri, along with information on the `:live-size` and
+  `:draft-size` and the `:state` of the graph within the draftset. The
+  graph size information is used to determine whether the update is
+  small enough to occur and not adversely affect the performance of
+  other operations. The `:state` is a reflection of that graphs state
+  in the system, i.e. whether it is `:unmanaged`, `:live` or `:draft`.
+  From the perspective of the draft, graphs are either `:unmanaged`,
+  only in the `:live` graph or in the `:draft` graph. Graphs that have
+  existing draft graphs within the draftset do not need special
+  handling, but unmanaged or live-only graphs require prior handling
+  before the operation can be applied such as creating the draft
+  graph, cloning and rewriting live graphs etc.
+
+  Using this metadata and state information, each high-level Jena
+  operation is then mapped to a planned 'intermediate-level' sequence
+  of 'abstract operations' which represent what effects need to happen
+  to correctly transition the drafter state graph and draft states
+  accordingly. Intermediate operations are things like
+  `:create-new-draft`, `:clone`, `:rewrite` etc...
+
+  These intermediate operations are reified with `reify-operation`
+  into low-level update fragments, that are concatenated into the
+  final SPARQL update string via the JENA APIs, with `build-update`.
+  Reified operations can be either a string or a JENA update object.
+  "
   (:require [clojure.set :as set]
             [drafter.backend.draftset.arq :as arq]
             [drafter.backend.draftset.draft-management :as dm]
@@ -386,6 +405,7 @@ GROUP BY ?lg ?dg ?public")))
                         :max-update-size max-update-size}
 
         update-request' (build-update update-plan update-context)]
+
     (sparql/update! backend update-request')))
 
 ;; Handler
