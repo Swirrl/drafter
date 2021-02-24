@@ -681,10 +681,15 @@ paths:
         Update this Draftset via the SPARQL update language and protocol.
 
         Please consult the SPARQL update protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+
+        Note that the parameters below are documented for the
+        application/x-www-form-urlencoded case. See the specification linked
+        above for the application/sparql-update case.
       security:
         - jws-auth: []
       consumes:
-        - application/sparql-update
+        - application/x-www-form-urlencoded
+        - application/sparql-update # See note in description.
       produces:
       parameters:
         - $ref: '#/parameters/id'
@@ -976,7 +981,7 @@ parameters:
 
   using-graph-uri:
     name: using-graph-uri
-    in: query
+    in: formData
     description: Specify RDF default graph(s) to update against
     required: false
     type: array
@@ -986,7 +991,7 @@ parameters:
 
   using-named-graph-uri:
     name: using-named-graph-uri
-    in: query
+    in: formData
     description: Specify RDF named graph(s) to update against
     required: false
     type: array
