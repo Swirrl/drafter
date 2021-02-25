@@ -5,7 +5,7 @@
             [drafter.test-common :as tc]
             [grafter-2.rdf4j.formats :as formats]
             [ring.util.response :refer [response]])
-  (:import [java.io ByteArrayInputStream File]
+  (:import [java.io File]
            org.eclipse.rdf4j.rio.RDFFormat
            [java.util.zip GZIPOutputStream]))
 
@@ -154,78 +154,6 @@
           body-stream (tc/string->input-stream body-text)
           result (handler {:uri "/test" :request-method :post :body body-stream})]
       (is (= body-text result)))))
-
-(deftest sparql-query-parser-handler-test
-  (let [handler (sparql-query-parser-handler identity)
-        query-string "SELECT * WHERE { ?s ?p ?o }"]
-    (testing "Valid GET request"
-      (let [req {:request-method :get :query-params {"query" query-string}}
-            inner-req (handler req)]
-        (is (= query-string (get-in inner-req [:sparql :query-string])))))
-
-    (testing "Invalid GET request with missing query parameter"
-      (let [resp (handler {:request-method :get :query-params {}})]
-        (tc/assert-is-unprocessable-response resp)))
-
-    (testing "Invalid GET request with multiple 'query' query parameters"
-      (let [req {:request-method :get
-                 :query-params {"query" [query-string "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]}}
-            resp (handler req)]
-        (tc/assert-is-unprocessable-response resp)))
-
-    (testing "Valid form POST request"
-      (let [req {:request-method :post
-                 :headers {"content-type" "application/x-www-form-urlencoded"}
-                 :form-params {"query" query-string}}
-            inner-req (handler req)]
-        (is (= query-string (get-in inner-req [:sparql :query-string])))))
-
-    (testing "Invalid form POST request with missing query form parameter"
-      (let [req {:request-method :post
-                 :headers {"content-type" "application/x-www-form-urlencoded"}
-                 :form-params {}}
-            resp (handler req)]
-        (tc/assert-is-unprocessable-response resp)))
-
-    (testing "Invalid form POST request with multiple query form parameters"
-      (let [req {:request-method :post
-                 :headers {"content-type" "application/x-www-form-urlencoded"}
-                 :form-params {"query" [query-string "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"]}}
-            resp (handler req)]
-        (tc/assert-is-unprocessable-response resp)))
-
-    (testing "Valid body POST request"
-      (let [req {:request-method :post
-                 :headers {"content-type" "application/sparql-query"}
-                 :body query-string}
-            inner-req (handler req)]
-        (is (= query-string (get-in inner-req [:sparql :query-string])))))
-
-    (testing "Invalid body POST request missing body"
-      (let [req {:request-method :post
-                 :headers {"content-type" "application/sparql-query"}
-                 :body nil}
-            resp (handler req)]
-        (tc/assert-is-unprocessable-response resp)))
-
-    (testing "Invalid body POST request non-string body"
-      (let [req {:request-method :post
-                 :headers {"content-type" "application/sparql-query"}
-                 :body (ByteArrayInputStream. (byte-array [1 2 3]))}
-            resp (handler req)]
-        (tc/assert-is-unprocessable-response resp)))
-
-    (testing "POST request with invalid content type"
-      (let [req {:request-method :post
-                 :headers {"content-type" "text/plain"}
-                 :params {:query query-string}}
-            inner-req (handler req)]
-        (is (= query-string (get-in inner-req [:sparql :query-string])))))
-
-    (testing "Invalid request method"
-      (let [req {:request-method :put :body query-string}
-            resp (handler req)]
-        (tc/assert-is-method-not-allowed-response resp)))))
 
 (deftest negotiate-sparql-results-content-type-with-test
   (testing "Negotiation succeeds"
