@@ -26,13 +26,13 @@
   "Executes the given SELECT query and returns the single expected result if present.
    Raises an exception if the query returns more than one solution."
   [repo query]
-  (let [bindings (with-open [conn (repo/->connection repo)]
-                   (vec (repo/query conn query)))]
-    (case (count bindings)
-      0 nil
-      1 (first bindings)
-      (throw (ex-info "Query returned multiple results - expected 0 or 1" {:query query
-                                                                           :results bindings})))))
+  (with-open [conn (repo/->connection repo)]
+    (let [bindings (take 2 (repo/query conn query))]
+      (case (count bindings)
+        0 nil
+        1 (first bindings)
+        (throw (ex-info "Query returned multiple results - expected 0 or 1" {:query query
+                                                                             :first-2-results bindings}))))))
 
 (defn update! [repo update-string]
   (log/info "Running update: " update-string)
