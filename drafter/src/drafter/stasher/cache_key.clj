@@ -58,10 +58,18 @@
 (s/def ::either-cache-key (s/or :cache-key ::cache-key
                                 :state-graph-cache-key ::state-graph-cache-key))
 
+(defn- deep-sort
+  "Recursively sort maps and sets"
+  [x]
+  (cond
+    (map? x) (sort (map (fn [[k v]] [k (deep-sort v)]) x))
+    (set? x) (sort (map deep-sort x))
+    (coll? x) (map deep-sort x)
+    :else x))
+
 (defn static-component [cache-key]
   (-> (dissoc cache-key :modified-times :modified-time)
-      (update :dataset (comp (partial sort-by str) (partial apply into) vals))
-      sort))
+    deep-sort))
 
 (s/fdef static-component
   :args (s/cat :cache-key ::either-cache-key))

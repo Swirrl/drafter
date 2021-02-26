@@ -118,7 +118,39 @@
         (let [csv-result (csv/parse-csv (tc/stream->string body))]
           (is (= ["s" "p" "o"] (first csv-result)))
           (is (= ["http://test.com/data/one" "http://test.com/hasProperty" "http://test.com/data/1"]
-                 (second csv-result))))))))
+                 (second csv-result))))))
+
+    (testing "Standard SPARQL query with dataset restrictions"
+      (let [{:keys [status headers body] :as result}
+            (end-point {:request-method :get
+                        :uri "/live/sparql"
+                        :query-params {"query" "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } } LIMIT 1"
+                                       "default-graph-uri" "http://foo.com/some-other-graph"
+                                       "named-graph-uri" "http://foo.com/my-graph"}
+                        :headers {"accept" "text/csv"}})]
+
+        (is (= 200 status))
+        (is (= "text/csv" (headers "Content-Type")))
+
+        (is (= [["g" "s" "p" "o"]
+                ["http://foo.com/my-graph"
+                 "http://test.com/data/one"
+                 "http://test.com/hasProperty"
+                 "http://test.com/data/1"]]
+              (take 2 (csv/parse-csv (tc/stream->string body))))))
+      (let [{:keys [status headers body] :as result}
+            (end-point {:request-method :get
+                        :uri "/live/sparql"
+                        :query-params {"query" "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } } LIMIT 1"
+                                       "default-graph-uri" "http://foo.com/my-graph"
+                                       "named-graph-uri" "http://foo.com/some-other-graph"}
+                        :headers {"accept" "text/csv"}})]
+
+        (is (= 200 status))
+        (is (= "text/csv" (headers "Content-Type")))
+
+        (is (= [["g" "s" "p" "o"]]
+              (csv/parse-csv (tc/stream->string body))))))))
 
 (defn get-spo-set [triples]
   (set (map (fn [{:keys [s p o]}] [s p o]) triples)))
