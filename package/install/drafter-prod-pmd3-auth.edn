@@ -13,7 +13,8 @@
  ;; User Database config
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
- :drafter.middleware.auth/wrap-auth {:drafter.user/repo #ig/ref :drafter.user/mongo}
+ :drafter.middleware.auth/wrap-auth {:drafter.user/repo #ig/ref :drafter.user/mongo
+                                     :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
 
  :drafter.middleware/wrap-auth {:middleware [#ig/ref :drafter.middleware.auth/wrap-auth]}
 
