@@ -1,6 +1,4 @@
 {
- :drafter/logging {:config "./test/resources/log-config.edn"}
-  
  :drafter.main/datadog {:statsd-address #or [#env DATADOG_STATSD_ADDRESS nil]
                         :tags {:service :drafter}}
  }

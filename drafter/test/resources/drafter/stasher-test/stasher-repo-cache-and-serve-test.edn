@@ -2,10 +2,6 @@
  :drafter.common.config/sparql-query-endpoint "http://localhost:5820/drafter-test-db/query"
  :drafter.common.config/sparql-update-endpoint "http://localhost:5820/drafter-test-db/update"
 
-
-
- :drafter/logging {:config "./test/resources/log-config.edn"}
-
  :drafter.stasher.filecache/file-backend {}
 
  :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend

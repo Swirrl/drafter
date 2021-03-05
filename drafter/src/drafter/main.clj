@@ -63,20 +63,13 @@
     (-> system-config
         aero/read-config)))
 
-
-
-(defn- inject-logging [system-config]
-  "Add logging to datadog, and add logging and datadog to everything else."
+(defn- inject-datadog [system-config]
+  "Add datadog to every other component"
   (merge-with
    mm/meta-merge
-   (zipmap (keys (dissoc system-config :drafter/logging :drafter.main/datadog))
-           (repeat (merge (when (contains? system-config :drafter/logging)
-                            {:logging (ig/->Ref :drafter/logging)})
-                          (when (contains? system-config :drafter.main/datadog)
-                            {:datadog (ig/->Ref :drafter.main/datadog)}))))
-   (when (and (contains? system-config :drafter.main/datadog)
-              (contains? system-config :drafter/logging))
-     {:drafter.main/datadog {:logging (ig/->Ref :drafter/logging)}})
+   (zipmap (keys (dissoc system-config :drafter.main/datadog))
+           (repeat (when (contains? system-config :drafter.main/datadog)
+                     {:datadog (ig/->Ref :drafter.main/datadog)})))
    system-config))
 
 (defn load-system
@@ -84,7 +77,7 @@
   [system-config sys-keys]
   (initialisation-side-effects! system-config)
   (let [start-keys (or sys-keys (keys system-config))
-        system-config (inject-logging system-config)]
+        system-config (inject-datadog system-config)]
     (ig/init system-config start-keys)))
 
 

@@ -19,9 +19,6 @@ RUN chmod +x /usr/bin/start-server-production
 
 ADD ./ /drafter
 
-# copy production log config
-ADD docker/log-config.edn /drafter/log-config.edn
-
 # Mount logs
 VOLUME ["/drafter/logs", "/data/drafter-database"]
 

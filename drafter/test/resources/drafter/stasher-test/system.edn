@@ -15,7 +15,4 @@
  :drafter.stasher/repo {:cache #ig/ref :drafter.stasher/cache
                         :sparql-query-endpoint #ig/ref :drafter.common.config/sparql-query-endpoint
                         :sparql-update-endpoint #ig/ref :drafter.common.config/sparql-update-endpoint }
-
- :drafter/logging {:config "./test/resources/log-config.edn"}
-
  }

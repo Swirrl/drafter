@@ -3,7 +3,7 @@
 <Configuration status="info" monitorInterval="10">
 
     <Properties>
-        <Property name="log-path">logs</Property>
+        <Property name="log-path">${env:DRAFTER_LOGS_DIR:-logs}</Property>
     </Properties>
 
     <Appenders>

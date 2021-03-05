@@ -3,9 +3,6 @@
  :drafter.common.config/sparql-query-endpoint "http://localhost:5820/drafter-test-db/query"
  :drafter.common.config/sparql-update-endpoint "http://localhost:5820/drafter-test-db/update"
 
-
- :drafter/logging {:config "./test/resources/log-config.edn"}
-
  :drafter.stasher/cache-thread-pool {:core-pool-size 1
                                      :max-pool-size 1
                                      :keep-alive-time-ms 1000

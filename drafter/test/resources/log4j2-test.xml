@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Properties>
+        <Property name="log-path">${env:DRAFTER_LOGS_DIR:-logs}</Property>
+    </Properties>
+
+    <Appenders>
+        <RollingFile name="sparql" fileName="${log-path}/sparql-test.log" filePattern="${log-path}/sparql-test-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %7X{method} %30X{route} %12X{user} %12X{jobId} %12X{reqId} :: %m%n" />
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB" />
+            </Policies>
+        </RollingFile>
+
+        <RollingFile name="drafter" fileName="${log-path}/drafter-test.log" filePattern="${log-path}/drafter-test-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %7X{method} %30X{route} %12X{user} %12X{jobId} %12X{reqId} :: %m%n" />
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB" />
+            </Policies>
+        </RollingFile>
+
+        <Null name="null" />
+    </Appenders>
+
+    <Loggers>
+        <Logger name="org.openrdf" level="debug">
+            <AppenderRef ref="drafter" />
+        </Logger>
+
+        <Logger name="drafter" level="debug">
+            <AppenderRef ref="drafter" />
+        </Logger>
+
+        <Logger name="drafter.rdf.sparql-protocol" level="debug">
+            <AppenderRef ref="sparql" />
+        </Logger>
+
+        <Logger name="drafter.routes.sparql" level="debug">
+            <AppenderRef ref="sparql" />
+        </Logger>
+
+        <Logger name="drafter.routes.sparql-update" level="debug">
+            <AppenderRef ref="sparql" />
+        </Logger>
+
+        <Root>
+            <!--don't log anything by default-->
+            <AppenderRef ref="null" />
+        </Root>
+    </Loggers>
+</Configuration>
