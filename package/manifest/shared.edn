@@ -30,11 +30,7 @@
                           :path "dev-stop.sh"
                           :mode "755"
                           :env #{:dev :ci}}
-                         {:type :selmer/template
-                          :path "log-config.edn.template"
-                          :dest-path "log-config.edn"
-                          :keys [:drafter/sparql-log-file-path
-                                 :drafter/drafter-log-file-path]}
+                         "log4j2.xml"
                          "init-public-endpoint.edn"]
                :systemd [{:type :selmer/template
                           :path "drafter.service"
@@ -87,10 +83,9 @@
                               :env-var STASHER_QUEUE_SIZE
                               :optional true}
 
- :drafter/drafter-log-file-path {:doc "Path to the drafter log file"
-                                 :default "drafter.log"}
- :drafter/sparql-log-file-path {:doc "Path to the sparql log file"
-                                :default "sparql.log"}
+             :drafter/logs-dir {:doc "Location of the drafter logs directory"
+                                :env-var DRAFTER_LOGS_DIR
+                                :optional true}
 
  :datadog/statsd-address {:doc "Address of the statsd service"
                           :env-var DATADOG_STATSD_ADDRESS

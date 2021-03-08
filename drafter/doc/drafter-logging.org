@@ -37,3 +37,10 @@ __deps.edn__
 ```
 
 And add the `:custom-logging` alias when starting the REPL. Alternatively an existing alias can be modified to include the required :jvm-opts.
+
+## Production logging
+
+In production drafter is run via the `drafter-start.sh` script. This script specifies the location of the log4j configuration file as a `log4j2.xml` in the
+drafter install directory via the `log4j.configurationFile` property. This allows the log configuration to be modified while drafter is running and allows
+the location of the drafter logs directory to be specified via the `DRAFTER_LOGS_DIR` environment variable. If `DRAFTER_LOGS_DIR` is not specified logs will 
+be written to a `logs` directory within the installation directory.

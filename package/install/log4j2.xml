@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Watch file for changes every 10 seconds -->
+<Configuration status="info" monitorInterval="10">
+  <Properties>
+    <Property name="log-path">${env:DRAFTER_LOGS_DIR:-logs}</Property>
+    <Property name="max-backups">7</Property>
+    <Property name="max-file-size">100 MB</Property>
+  </Properties>
+
+  <Appenders>
+    <RollingFile name="sparql" fileName="${log-path}/sparql.log" filePattern="${log-path}/sparql-%d{yyyy-MM-dd}-%i.log">
+      <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %5X{user} %12X{jobId} %12X{reqId} :: %m%n" />
+      <Policies>
+        <SizeBasedTriggeringPolicy size="${max-file-size}" />
+      </Policies>
+      <DefaultRolloverStrategy max="${max-backups}" />
+    </RollingFile>
+
+    <RollingFile name="drafter" fileName="${log-path}/drafter.log" filePattern="${log-path}/drafter-%d{yyyy-MM-dd}-%i.log">
+      <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %5X{user} %12X{jobId} %12X{reqId} :: %m%n" />
+      <Policies>
+        <SizeBasedTriggeringPolicy size="${max-file-size}" />
+      </Policies>
+      <DefaultRolloverStrategy max="${max-backups}" />
+    </RollingFile>
+
+    <Null name="null" />
+  </Appenders>
+
+  <Loggers>
+    <Logger name="org.openrdf" level="info">
+      <AppenderRef ref="drafter" />
+    </Logger>
+
+    <Logger name="drafter" level="info">
+      <AppenderRef ref="drafter" />
+    </Logger>
+
+    <Logger name="drafter.rdf.sparql-protocol" level="info">
+      <AppenderRef ref="sparql" />
+    </Logger>
+
+    <Logger name="drafter.routes.sparql-update" level="info">
+      <AppenderRef ref="sparql" />
+    </Logger>
+
+    <Root>
+      <!--Don't log from the root logger. NOTE: most namespaces are included in the drafter logger above-->
+      <AppenderRef ref="null" />
+    </Root>
+  </Loggers>
+</Configuration>
