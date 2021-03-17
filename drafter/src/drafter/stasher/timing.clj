@@ -2,7 +2,7 @@
   "Functions to create query results and result handlers instances that log
    timing metrics to DataDog"
   (:require [cognician.dogstatsd :as dd]
-            [drafter.stasher.cancellable :refer [Cancellable cancel]])
+            [drafter.stasher.cancellable :as c])
   (:import (org.eclipse.rdf4j.query GraphQueryResult TupleQueryResult
                                     TupleQueryResultHandler)
            (org.eclipse.rdf4j.rio RDFHandler)))
@@ -62,9 +62,9 @@
      (close [t]
        (.close delegate))
 
-     Cancellable
+     c/Cancellable
      (cancel [t]
-       (cancel delegate)))))
+       (c/cancel delegate)))))
 
 (defn rdf-handler
   ([metric-name ^RDFHandler delegate]
@@ -88,6 +88,6 @@
      (close [t]
        (.close delegate))
 
-     Cancellable
+     c/Cancellable
      (cancel [t]
-       (cancel delegate)))))
+       (c/cancel delegate)))))

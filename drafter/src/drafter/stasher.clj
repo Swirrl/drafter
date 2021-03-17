@@ -2,7 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [drafter.stasher.filecache :as fc]
             [drafter.stasher.cache-key :as ck]
-            [drafter.stasher.cancellable :refer [Cancellable cancel]]
+            [drafter.stasher.cancellable :as c]
             [drafter.stasher.timing :as timing]
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf4j.sparql :as sparql]
@@ -207,13 +207,13 @@
           (.endRDF cache-file-writer)
           (.close stream)
           (catch Throwable ex
-            (cancel stream)
+            (c/cancel stream)
             (throw ex))))
       (hasNext [this]
         (try
           (.hasNext bg-graph-result)
           (catch Throwable ex
-            (cancel stream)
+            (c/cancel stream)
             (throw ex))))
       (next [this]
         (try
@@ -221,13 +221,13 @@
             (.handleStatement cache-file-writer quad)
             quad)
           (catch Throwable ex
-            (cancel stream)
+            (c/cancel stream)
             (throw ex))))
       (remove [this]
         (try
           (.remove bg-graph-result)
           (catch Throwable ex
-            (cancel stream)
+            (c/cancel stream)
             (throw ex)))))))
 
 (defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt ^Closeable stream]
@@ -246,18 +246,18 @@
           (.close bg-tuple-result)
           (if (.hasNext this)
             (do (log/warn "Trying to close query result before consuming. Not writing cache")
-                (cancel stream))
+                (c/cancel stream))
             (do (.endQueryResult cache-file-writer)
                 (.close stream)))
           (catch Throwable ex
             (.printStackTrace ex)
-            (cancel stream)
+            (c/cancel stream)
             (throw ex))))
       (hasNext [this]
         (try
           (.hasNext bg-tuple-result)
           (catch Throwable ex
-            (cancel stream)
+            (c/cancel stream)
             (throw ex))))
       (next [this]
         (try
@@ -265,7 +265,7 @@
             (.handleSolution cache-file-writer solution)
             solution)
           (catch Throwable ex
-            (cancel stream)
+            (c/cancel stream)
             (throw ex)))))))
 
 (defn- wrap-tuple-result-push
@@ -295,9 +295,9 @@
       (close [t]
         (.close stream))
 
-      Cancellable
+      c/Cancellable
       (cancel [_]
-        (cancel stream)))))
+        (c/cancel stream)))))
 
 (defn- stash-boolean-result [result fmt-kw ^Closeable stream]
   {:post [(some? %)]}
@@ -413,9 +413,9 @@
       (close [t]
         (.close out-stream))
 
-      Cancellable
+      c/Cancellable
       (cancel [_]
-        (cancel out-stream)))))
+        (c/cancel out-stream)))))
 
 (defn data-format [formats cache-key]
   {:post [(keyword? %)]}
@@ -501,22 +501,16 @@
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
-                 (let [^Closeable stashing-rdf-handler (wrap-async-handler
-                                                        cache
-                                                        cache-key
-                                                        rdf-handler)]
-                   (try
-                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                     query-str base-uri-str dataset
-                                     (.getIncludeInferred this)
-                                     (.getMaxExecutionTime this)
-                                     stashing-rdf-handler
-                                     (.getBindingsArray this))
-                    (catch Throwable ex
-                      (cancel stashing-rdf-handler)
-                      (throw ex))
-                    (finally
-                     (.close stashing-rdf-handler))))))
+                 (c/with-open [^Closeable handler (wrap-async-handler
+                                                   cache
+                                                   cache-key
+                                                   rdf-handler)]
+                   (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                    query-str base-uri-str dataset
+                                    (.getIncludeInferred this)
+                                    (.getMaxExecutionTime this)
+                                    handler
+                                    (.getBindingsArray this)))))
            (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
              (.sendGraphQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
@@ -556,22 +550,16 @@
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
-                 (let [^Closeable stashing-tuple-handler (wrap-async-handler
-                                                          cache
-                                                          cache-key
-                                                          tuple-handler)]
-                   (try
-                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                                     query-str base-uri-str dataset
-                                     (.getIncludeInferred this)
-                                     (.getMaxExecutionTime this)
-                                     stashing-tuple-handler
-                                     (.getBindingsArray this))
-                    (catch Throwable ex
-                      (cancel stashing-tuple-handler)
-                      (throw ex))
-                    (finally
-                     (.close stashing-tuple-handler))))))
+                 (c/with-open [^Closeable handler (wrap-async-handler
+                                                   cache
+                                                   cache-key
+                                                   tuple-handler)]
+                   (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                    query-str base-uri-str dataset
+                                    (.getIncludeInferred this)
+                                    (.getMaxExecutionTime this)
+                                    handler
+                                    (.getBindingsArray this)))))
            (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
              (.sendTupleQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
