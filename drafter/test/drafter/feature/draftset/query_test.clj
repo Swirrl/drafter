@@ -85,13 +85,11 @@
                           test-editor
                           draftset-location
                           slow-query
-                          "application/n-triples")
-          query-response (handler query-request)
-          query-response* (handler query-request)]
-      (tc/assert-is-service-unavailable-response query-response)
-      ;; query-response* should be the same, but is actually a 500! Are we
-      ;; caching the 503?
-      (tc/assert-is-service-unavailable-response query-response*))))
+                          "application/n-triples")]
+      (tc/assert-is-service-unavailable-response (handler query-request))
+      ;; Run the same query again as a regression test to ensure the 503
+      ;; doesn't break the cache and give us a 500 the second time.
+      (tc/assert-is-service-unavailable-response (handler query-request)))))
 
 (tc/deftest-system-with-keys query-draftset-not-unioned-with-live-with-published-statements
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]

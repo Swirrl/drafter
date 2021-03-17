@@ -2,6 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [drafter.stasher.filecache :as fc]
             [drafter.stasher.cache-key :as ck]
+            [drafter.stasher.cancellable :refer [Cancellable cancel]]
             [drafter.stasher.timing :as timing]
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf4j.sparql :as sparql]
@@ -195,6 +196,7 @@
                                       :prefixes prefixes)]
     (.startRDF cache-file-writer)
 
+    ;; TODO I think all these try catches live one level up
     (reify GraphQueryResult
       (getNamespaces [this]
         prefixes)
@@ -205,13 +207,13 @@
           (.endRDF cache-file-writer)
           (.close stream)
           (catch Throwable ex
-            (fc/cancel-and-close stream)
+            (cancel stream)
             (throw ex))))
       (hasNext [this]
         (try
           (.hasNext bg-graph-result)
           (catch Throwable ex
-            (fc/cancel-and-close stream)
+            (cancel stream)
             (throw ex))))
       (next [this]
         (try
@@ -219,13 +221,13 @@
             (.handleStatement cache-file-writer quad)
             quad)
           (catch Throwable ex
-            (fc/cancel-and-close stream)
+            (cancel stream)
             (throw ex))))
       (remove [this]
         (try
           (.remove bg-graph-result)
           (catch Throwable ex
-            (fc/cancel-and-close stream)
+            (cancel stream)
             (throw ex)))))))
 
 (defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt ^Closeable stream]
@@ -234,6 +236,7 @@
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
     (.startQueryResult cache-file-writer bindings)
     ;; pull interface
+    ;; TODO I think all these try catches live one level up
     (reify TupleQueryResult
       (getBindingNames [this]
         (.getBindingNames bg-tuple-result))
@@ -243,18 +246,18 @@
           (.close bg-tuple-result)
           (if (.hasNext this)
             (do (log/warn "Trying to close query result before consuming. Not writing cache")
-                (fc/cancel-and-close stream))
+                (cancel stream))
             (do (.endQueryResult cache-file-writer)
                 (.close stream)))
           (catch Throwable ex
             (.printStackTrace ex)
-            (fc/cancel-and-close stream)
+            (cancel stream)
             (throw ex))))
       (hasNext [this]
         (try
           (.hasNext bg-tuple-result)
           (catch Throwable ex
-            (fc/cancel-and-close stream)
+            (cancel stream)
             (throw ex))))
       (next [this]
         (try
@@ -262,7 +265,7 @@
             (.handleSolution cache-file-writer solution)
             solution)
           (catch Throwable ex
-            (fc/cancel-and-close stream)
+            (cancel stream)
             (throw ex)))))))
 
 (defn- wrap-tuple-result-push
@@ -273,10 +276,8 @@
       ;; Push interface...
       TupleQueryResultHandler
       (endQueryResult [this]
-        (log/infof "Result ended, closing tuple writer")
         (.endQueryResult cache-file-writer)
-        (.endQueryResult result-handler)
-        (.close stream))
+        (.endQueryResult result-handler))
       (handleLinks [this links]
         (.handleLinks cache-file-writer links)
         (.handleLinks result-handler links))
@@ -292,7 +293,11 @@
 
       Closeable
       (close [t]
-        (.close stream)))))
+        (.close stream))
+
+      Cancellable
+      (cancel [_]
+        (cancel stream)))))
 
 (defn- stash-boolean-result [result fmt-kw ^Closeable stream]
   {:post [(some? %)]}
@@ -386,47 +391,31 @@
         ;; the grafter default-prefixes otherwise.  By setting to nil,
         ;; use what comes from the stream instead.
         cache-file-writer ^RDFWriter (rio/rdf-writer out-stream :format rdf-format :prefixes nil)]
-    (reify RDFHandler
+    (reify
+      RDFHandler
       (startRDF [this]
-        (try
-          (.startRDF cache-file-writer)
-          (.startRDF inner-rdf-handler)
-          (catch Throwable ex
-            (fc/cancel-and-close out-stream)
-            (throw ex))))
+        (.startRDF cache-file-writer)
+        (.startRDF inner-rdf-handler))
       (endRDF [this]
-        (try
-          (.endRDF cache-file-writer)
-          (.endRDF inner-rdf-handler)
-          (.close out-stream)
-          (catch Throwable ex
-            (fc/cancel-and-close out-stream)
-            (throw ex))))
+        (.endRDF cache-file-writer)
+        (.endRDF inner-rdf-handler))
       (handleStatement [this statement]
-        (try
-          (.handleStatement cache-file-writer statement)
-          (.handleStatement inner-rdf-handler statement)
-          (catch Throwable ex
-            (fc/cancel-and-close out-stream)
-            (throw ex))))
+         (.handleStatement cache-file-writer statement)
+         (.handleStatement inner-rdf-handler statement))
       (handleComment [this comment]
-        (try
-          (.handleComment cache-file-writer comment)
-          (.handleComment inner-rdf-handler comment)
-          (catch Throwable ex
-            (fc/cancel-and-close out-stream)
-            (throw ex))))
+        (.handleComment cache-file-writer comment)
+        (.handleComment inner-rdf-handler comment))
       (handleNamespace [this prefix-str uri-str]
-        (try
-          (.handleNamespace cache-file-writer prefix-str uri-str)
-          (.handleNamespace inner-rdf-handler prefix-str uri-str)
-          (catch Throwable ex
-            (fc/cancel-and-close out-stream)
-            (throw ex))))
+        (.handleNamespace cache-file-writer prefix-str uri-str)
+        (.handleNamespace inner-rdf-handler prefix-str uri-str))
 
       Closeable
       (close [t]
-        (.close out-stream)))))
+        (.close out-stream))
+
+      Cancellable
+      (cancel [_]
+        (cancel out-stream)))))
 
 (defn data-format [formats cache-key]
   {:post [(keyword? %)]}
@@ -512,11 +501,22 @@
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
-                 (with-open [^Closeable stashing-rdf-handler (wrap-async-handler cache cache-key rdf-handler)]
-                   (.sendGraphQuery httpclient QueryLanguage/SPARQL
-                                    query-str base-uri-str dataset
-                                    (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                    stashing-rdf-handler (.getBindingsArray this)))))
+                 (let [^Closeable stashing-rdf-handler (wrap-async-handler
+                                                        cache
+                                                        cache-key
+                                                        rdf-handler)]
+                   (try
+                    (.sendGraphQuery httpclient QueryLanguage/SPARQL
+                                     query-str base-uri-str dataset
+                                     (.getIncludeInferred this)
+                                     (.getMaxExecutionTime this)
+                                     stashing-rdf-handler
+                                     (.getBindingsArray this))
+                    (catch Throwable ex
+                      (cancel stashing-rdf-handler)
+                      (throw ex))
+                    (finally
+                     (.close stashing-rdf-handler))))))
            (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
              (.sendGraphQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
@@ -556,11 +556,22 @@
          (if cache?
            (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
-                 (with-open [^Closeable stashing-tuple-handler (wrap-async-handler cache cache-key tuple-handler)]
-                   (.sendTupleQuery httpclient QueryLanguage/SPARQL
-                                    query-str base-uri-str dataset
-                                    (.getIncludeInferred this) (.getMaxExecutionTime this)
-                                    stashing-tuple-handler (.getBindingsArray this)))))
+                 (let [^Closeable stashing-tuple-handler (wrap-async-handler
+                                                          cache
+                                                          cache-key
+                                                          tuple-handler)]
+                   (try
+                    (.sendTupleQuery httpclient QueryLanguage/SPARQL
+                                     query-str base-uri-str dataset
+                                     (.getIncludeInferred this)
+                                     (.getMaxExecutionTime this)
+                                     stashing-tuple-handler
+                                     (.getBindingsArray this))
+                    (catch Throwable ex
+                      (cancel stashing-tuple-handler)
+                      (throw ex))
+                    (finally
+                     (.close stashing-tuple-handler))))))
            (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
              (.sendTupleQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset

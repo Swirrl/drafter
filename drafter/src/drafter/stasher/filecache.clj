@@ -4,6 +4,7 @@
             [clojure.spec.gen.alpha :as g]
             [clojure.tools.logging :as log]
             [drafter.stasher.cache-key :as ck]
+            [drafter.stasher.cancellable]
             [integrant.core :as ig]
             [me.raynes.fs :as fs])
   (:import [java.io BufferedOutputStream File FileOutputStream]
@@ -95,9 +96,6 @@
   (destination-stream [this cache-key fmt])
   (source-stream [this cache-key fmt]))
 
-(defprotocol DestinationOutputStream
-  (cancel-and-close [this]))
-
 (defrecord FileBackend [dir buffer-size]
   StashBackend
   (destination-stream [this cache-key fmt]
@@ -109,19 +107,18 @@
                   temp-file
                   (ck/query-type cache-key)
                   (cache-key->query-id cache-key))
-      (proxy [BufferedOutputStream drafter.stasher.filecache.DestinationOutputStream]
+      (proxy [BufferedOutputStream drafter.stasher.cancellable.Cancellable]
           [(FileOutputStream. temp-file) buffer-size]
         (close []
           (proxy-super close)
           (when (fs/exists? temp-file)
             (move-file-to-cache! dir fmt cache-key temp-file)))
-        (cancel-and-close []
+        (cancel []
           (when (fs/exists? temp-file)
             (log/errorf "Deleting temp file without moving into the cache for %s query %s"
                         (ck/query-type cache-key)
                         (cache-key->query-id cache-key))
-            (.delete temp-file))
-          (.close this)))))
+            (.delete temp-file))))))
   (source-stream [this cache-key fmt]
     (some-> (lookup dir fmt cache-key)
             fs/touch
