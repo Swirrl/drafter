@@ -18,4 +18,4 @@
                                 (finally
                                   (. ~(bindings 0) close))))
     :else (throw (IllegalArgumentException.
-                  "with-open-cancellable only allows Symbols in bindings"))))
+                  "with-open only allows Symbols in bindings"))))
