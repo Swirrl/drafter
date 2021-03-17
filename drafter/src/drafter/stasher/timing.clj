@@ -1,7 +1,8 @@
 (ns drafter.stasher.timing
   "Functions to create query results and result handlers instances that log
    timing metrics to DataDog"
-  (:require [cognician.dogstatsd :as dd])
+  (:require [cognician.dogstatsd :as dd]
+            [drafter.stasher.cancellable :as c])
   (:import (org.eclipse.rdf4j.query GraphQueryResult TupleQueryResult
                                     TupleQueryResultHandler)
            (org.eclipse.rdf4j.rio RDFHandler)))
@@ -56,15 +57,21 @@
        (.handleSolution delegate binding-set))
      (startQueryResult [_ binding-names]
        (.startQueryResult delegate binding-names))
+
      java.io.Closeable
      (close [t]
-       (.close delegate)))))
+       (.close delegate))
+
+     c/Cancellable
+     (cancel [t]
+       (c/cancel delegate)))))
 
 (defn rdf-handler
   ([metric-name ^RDFHandler delegate]
    (rdf-handler metric-name delegate (System/currentTimeMillis)))
   ([metric-name ^RDFHandler delegate start-time]
-   (reify RDFHandler
+   (reify
+     RDFHandler
      (startRDF [_]
        (.startRDF delegate))
      (endRDF [_]
@@ -79,5 +86,8 @@
 
      java.io.Closeable
      (close [t]
-       (.close delegate)))
-   ))
+       (.close delegate))
+
+     c/Cancellable
+     (cancel [t]
+       (c/cancel delegate)))))
