@@ -196,7 +196,6 @@
                                       :prefixes prefixes)]
     (.startRDF cache-file-writer)
 
-    ;; TODO I think all these try catches live one level up
     (reify GraphQueryResult
       (getNamespaces [this]
         prefixes)
@@ -205,15 +204,17 @@
           (log/infof "Result finished, closing graph writer")
           (.close bg-graph-result)
           (.endRDF cache-file-writer)
-          (.close stream)
           (catch Throwable ex
             (c/cancel stream)
-            (throw ex))))
+            (throw ex))
+          (finally
+            (.close stream))))
       (hasNext [this]
         (try
           (.hasNext bg-graph-result)
           (catch Throwable ex
             (c/cancel stream)
+            (.close stream)
             (throw ex))))
       (next [this]
         (try
@@ -222,12 +223,14 @@
             quad)
           (catch Throwable ex
             (c/cancel stream)
+            (.close stream)
             (throw ex))))
       (remove [this]
         (try
           (.remove bg-graph-result)
           (catch Throwable ex
             (c/cancel stream)
+            (.close stream)
             (throw ex)))))))
 
 (defn- wrap-tuple-result-pull [^TupleQueryResult bg-tuple-result fmt ^Closeable stream]
@@ -236,7 +239,6 @@
         cache-file-writer ^TupleQueryResultWriter (QueryResultIO/createTupleWriter tuple-format stream)]
     (.startQueryResult cache-file-writer bindings)
     ;; pull interface
-    ;; TODO I think all these try catches live one level up
     (reify TupleQueryResult
       (getBindingNames [this]
         (.getBindingNames bg-tuple-result))
@@ -247,17 +249,19 @@
           (if (.hasNext this)
             (do (log/warn "Trying to close query result before consuming. Not writing cache")
                 (c/cancel stream))
-            (do (.endQueryResult cache-file-writer)
-                (.close stream)))
+            (.endQueryResult cache-file-writer))
           (catch Throwable ex
             (.printStackTrace ex)
             (c/cancel stream)
-            (throw ex))))
+            (throw ex))
+          (finally
+            (.close stream))))
       (hasNext [this]
         (try
           (.hasNext bg-tuple-result)
           (catch Throwable ex
             (c/cancel stream)
+            (.close stream)
             (throw ex))))
       (next [this]
         (try
@@ -266,6 +270,7 @@
             solution)
           (catch Throwable ex
             (c/cancel stream)
+            (.close stream)
             (throw ex)))))))
 
 (defn- wrap-tuple-result-push
