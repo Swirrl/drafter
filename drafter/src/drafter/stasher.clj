@@ -251,7 +251,6 @@
                 (c/cancel stream))
             (.endQueryResult cache-file-writer))
           (catch Throwable ex
-            (.printStackTrace ex)
             (c/cancel stream)
             (throw ex))
           (finally
