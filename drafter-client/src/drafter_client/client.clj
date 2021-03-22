@@ -369,7 +369,8 @@
   (-> e ex-data :type (= ::job-timeout)))
 
 (defn- wait-opts [client]
-  {:job-timeout (or (:job-timeout client) ##Inf)})
+  {:job-timeout (or (:job-timeout client) ##Inf)
+   :poll-time-ms (or (:poll-time-ms client) 500)})
 
 (defn wait-result!
   "Waits for an async job to complete and returns the result map if it
@@ -385,17 +386,17 @@
   side and the job itself will be left running against drafter."
   ([client access-token job]
    (wait-result! client access-token job (wait-opts client)))
-  ([client access-token job {:keys [job-timeout]}]
+  ([client access-token job {:keys [job-timeout poll-time-ms]}]
    (loop [waited 0]
      (if-let [state (refresh-job client access-token job)]
-       (let [status (job-status job state)
-             wait 500]
+       (let [status (job-status job state)]
          (cond (>= waited job-timeout)
                (job-timeout-exception job)
                (= ::pending status)
-               (do (Thread/sleep wait) (recur (+ waited wait)))
+               (do (Thread/sleep poll-time-ms) (recur (+ waited poll-time-ms)))
                :else
-               status))
+               (do (log/info (:job-id job) "took" (str  waited "ms") "to complete")
+                   status)))
        (ex-info "Job not found" job)))))
 
 (defn wait-results!
@@ -519,10 +520,11 @@
 (s/def ::drafter-uri (s/nilable string?))
 (s/def ::version (s/nilable pos-int?))
 (s/def ::auth0 auth/client?)
+(s/def ::poll-time-ms pos-int?)
 
 (defmethod ig/pre-init-spec :drafter-client/client [_]
   (s/nilable (s/keys :req-un [::batch-size ::drafter-uri]
-                     :opt-un [::auth0 ::version])))
+                     :opt-un [::auth0 ::version ::poll-time-ms])))
 
 (defmacro gensync
   "Macro which defines a synchronous version of the specified async client function. The async function

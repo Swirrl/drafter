@@ -12,6 +12,7 @@
       :martian martian
       :auth0 auth0
       :auth-provider auth-provider
+      :opts opts
       (or (get opts k)
           (.valAt martian k default)))))
 
