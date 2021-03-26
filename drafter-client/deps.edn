@@ -17,9 +17,7 @@
         grafter.db/grafter.db {:mvn/version "0.8.5"}
         com.cemerick/url {:mvn/version "0.1.1"}
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
-                      :sha "11fbe37324ab238752502f275d3a321fd012a65b"
-                      :exclusions [com.auth0/jwks-rsa com.auth0/java-jwt]
-                      }
+                      :sha "11fbe37324ab238752502f275d3a321fd012a65b"}
         }
 
  :mvn/repos
@@ -31,7 +29,6 @@
                               lambdaisland/kaocha {:mvn/version "0.0-418"}
                               environ/environ {:mvn/version "1.0.3"}
                               integrant/repl {:mvn/version "0.3.1"}
-                              com.auth0/java-jwt {:mvn/version "3.8.0"}
 
                               org.apache.logging.log4j/log4j-api {:mvn/version "2.11.1"} ; Import log4j2 as the logging backend
                               org.apache.logging.log4j/log4j-core {:mvn/version "2.11.1"} ; Import log4j2 as the logging backend
@@ -46,7 +43,7 @@
                                lambdaisland/kaocha {:mvn/version "1.0.629"}
                                environ/environ {:mvn/version "1.0.3"}
                                integrant/repl {:mvn/version "0.3.1"}
-                               com.auth0/java-jwt {:mvn/version "3.8.0"}
+
                                }}
            }
  }
