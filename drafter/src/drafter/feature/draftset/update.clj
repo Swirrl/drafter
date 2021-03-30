@@ -1,24 +1,26 @@
 (ns drafter.feature.draftset.update
-  (:require [clojure.set :as set]
-            [clojure.spec.alpha :as s]
-            [drafter.backend.draftset.arq :as arq]
-            [drafter.backend.draftset.draft-management :as dm]
-            [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
-            [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.draftset :as ds]
-            [drafter.rdf.sparql :as sparql]
-            [integrant.core :as ig]
-            [ring.middleware.cors :as cors]
-            [drafter.errors :refer [wrap-encode-errors]]
-            [grafter.vocabularies.rdf :refer :all]
-            [grafter.url :as url]
-            [clojure.string :as string]
-            [ring.util.request :as request]
-            [grafter-2.rdf4j.repository :as repo]
-            [drafter.backend.draftset.graphs :as graphs]
-            [drafter.time :as time]
-            [drafter.rdf.jena :as jena])
+  (:require
+   [clojure.set :as set]
+   [clojure.spec.alpha :as s]
+   [clojure.string :as string]
+   [drafter.backend.draftset.arq :as arq]
+   [drafter.backend.draftset.draft-management :as dm]
+   [drafter.backend.draftset.graphs :as graphs]
+   [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
+   [drafter.draftset :as ds]
+   [drafter.errors :refer [wrap-encode-errors]]
+   [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
+   [drafter.rdf.drafter-ontology :refer :all]
+   [drafter.rdf.jena :as jena]
+   [drafter.rdf.sparql :as sparql]
+   [drafter.time :as time]
+   [drafter.write-scheduler :refer [with-lock]]
+   [grafter-2.rdf4j.repository :as repo]
+   [grafter.url :as url]
+   [grafter.vocabularies.rdf :refer :all]
+   [integrant.core :as ig]
+   [ring.middleware.cors :as cors]
+   [ring.util.request :as request])
   (:import java.net.URI
            [org.apache.jena.sparql.algebra Algebra OpAsQuery]
            [org.apache.jena.sparql.modify.request
@@ -278,21 +280,30 @@ GROUP BY ?lg ?dg")))
        (map (juxt (comp str key) (comp str :draft-graph-uri val)))
        (into {})))
 
-(defn- update! [backend graph-manager clock max-update-size draftset-id update-request]
-  (let [graph-meta (get-graph-meta backend draftset-id update-request)
-        rewriter-map (rewriter-map graph-meta)
-        rewriter (partial uri-constant-rewriter rewriter-map)
-        opts {:graph-meta graph-meta
-              :rewriter rewriter
-              :draftset-id draftset-id
-              :graph-manager graph-manager
-              :clock clock
-              :max-update-size max-update-size}
-        update-request' (->> (.getOperations update-request)
-                             (mapcat #(raw-operations % opts))
-                             (jena/->update-string))]
-    (sparql/update! backend update-request')))
-
+(defn- update! [global-writes-lock
+                backend
+                graph-manager
+                clock
+                max-update-size
+                draftset-id
+                update-request]
+  ;; We have to take a global lock here because we read from the database to
+  ;; determine how to rewrite the query, so if the data changes underneath us
+  ;; the rewriting is invalid.
+  (with-lock global-writes-lock :update
+    (let [graph-meta (get-graph-meta backend draftset-id update-request)
+          rewriter-map (rewriter-map graph-meta)
+          rewriter (partial uri-constant-rewriter rewriter-map)
+          opts {:graph-meta graph-meta
+                :rewriter rewriter
+                :draftset-id draftset-id
+                :graph-manager graph-manager
+                :clock clock
+                :max-update-size max-update-size}
+          update-request' (->> (.getOperations update-request)
+                               (mapcat #(raw-operations % opts))
+                               (jena/->update-string))]
+      (sparql/update! backend update-request'))))
 
 ;; Handler
 
@@ -364,10 +375,22 @@ GROUP BY ?lg ?dg")))
                       {:error :method-not-allowed :method request-method})))))
 
 (defn- handler*
-  [{:keys [drafter/backend drafter.backend.draftset.graphs/manager max-update-size ::time/clock] :as opts} request]
-  ;; TODO: write-lock?
-  (let [{:keys [update-request draftset-id]} (parse-update opts request max-update-size)]
-    (update! backend manager clock max-update-size draftset-id update-request)
+  [{:keys [drafter/backend
+           drafter.backend.draftset.graphs/manager
+           max-update-size
+           :drafter/global-writes-lock
+           ::time/clock]
+    :as opts}
+   request]
+  (let [{:keys [update-request draftset-id]}
+        (parse-update opts request max-update-size)]
+    (update! global-writes-lock
+             backend
+             manager
+             clock
+             max-update-size
+             draftset-id
+             update-request)
     {:status 204}))
 
 (defn handler

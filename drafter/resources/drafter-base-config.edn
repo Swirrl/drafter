@@ -130,7 +130,8 @@
                                            :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
                                            :drafter.time/clock #ig/ref :drafter.time/system-clock
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                           :max-update-size 5000}
+                                           :max-update-size 5000
+                                           :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock}
 
  :drafter.feature.draftset.publish/handler {:drafter/backend #ig/ref :drafter/backend
                                             :drafter.time/clock #ig/ref :drafter.time/system-clock
