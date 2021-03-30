@@ -1,16 +1,20 @@
 (ns ^:rest-api drafter.feature.draftset.update-test
-  (:require [clojure.string :as string]
-            [clojure.test :as t :refer [is testing]]
-            [drafter.draftset :as ds]
-            [drafter.feature.draftset.test-helper :as help]
-            [drafter.feature.draftset.update :as update]
-            [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor test-publisher]]
-            [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.repository :as repo]
-            [drafter.rdf.jena :as jena])
-  (:import java.net.URI
-           java.util.UUID))
+  (:require
+   [drafter.feature.middleware :as middleware]
+   [clojure.string :as string]
+   [clojure.test :as t :refer [is testing]]
+   [drafter.draftset :as ds]
+   [drafter.feature.draftset.query-test :refer [create-query-request]]
+   [drafter.feature.draftset.test-helper :as help]
+   [drafter.feature.draftset.update :as update]
+   [drafter.rdf.jena :as jena]
+   [drafter.test-common :as tc]
+   [drafter.user-test :refer [test-editor test-publisher]]
+   [grafter-2.rdf.protocols :as pr]
+   [grafter-2.rdf4j.repository :as repo])
+  (:import
+   java.net.URI
+   java.util.UUID))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -780,3 +784,42 @@ SELECT * WHERE {
               draft-graph-uri (get-in gmeta [g :draft-graph-uri])]
           (is (not= dg draft-graph-uri))
           (is (not (nil? draft-graph-uri))))))))
+
+(tc/deftest-system-with-keys updates-in-quick-succession
+  keys-for-test [system system-config]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
+        update! (fn [stmt]
+                  (handler (create-update-request
+                            test-editor draftset-location stmt)))
+        count-query (fn [g]
+                      (handler
+                       (create-query-request
+                        test-editor
+                        draftset-location
+                        (format "SELECT (COUNT(*) AS ?count) WHERE {
+                                 GRAPH <%s> { ?s ?p ?o }
+                                 }"
+                                g)
+                        "text/csv")))]
+    (dotimes [_ 10]
+      (let [g (URI. (str "http://g/" (UUID/randomUUID)))]
+        (doall
+         (pmap
+          #(%)
+          [#(tc/assert-is-no-content-response
+             (update!
+              (format "INSERT DATA {
+                       GRAPH <%s> { <http://s1> <http://p1> <http://o1> }
+                       }"
+                      g)))
+           #(tc/assert-is-no-content-response
+             (update!
+              (format "INSERT DATA {
+                       GRAPH <%s> { <http://s2> <http://p2> <http://o2> }
+                       }"
+                      g)))]))
+        (let [res (count-query g)
+              count (-> res :body slurp string/split-lines second read-string)]
+          (tc/assert-is-ok-response res)
+          (is (= 2 count)))))))
