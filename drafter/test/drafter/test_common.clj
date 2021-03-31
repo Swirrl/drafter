@@ -587,11 +587,12 @@
 
 (defrecord ManualClock [current]
   time/Clock
-  (now [_this] @current))
+  (now [_this] (or @current (time/system-now))))
 
 (defn manual-clock
-  "Creates a clock that continually returns the given time until updated with the set-now
-   and advance-by functions"
+  "Creates a clock that continually returns the given time until updated with
+   the set-now and advance-by functions. If the current time is nil, delegates
+   to the system clock."
   [initial-time]
   (->ManualClock (atom initial-time)))
 
@@ -606,3 +607,16 @@
   [{:keys [current] :as manual-clock} period]
   (swap! current (fn [^OffsetDateTime t] (.plus t period)))
   nil)
+
+(defn stop
+  "Stop the clock, and return the current system time until told otherwise"
+  [manual-clock]
+  (set-now manual-clock (time/system-now)))
+
+(defn resume
+  "Resume the clock, delegating to the system clock until told otherwise"
+  [manual-clock]
+  (set-now manual-clock nil))
+
+(defmethod ig/init-key ::manual-clock [_ _opts]
+  (manual-clock nil))
