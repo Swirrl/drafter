@@ -1,18 +1,20 @@
 (ns drafter.stasher
-  (:require [clojure.spec.alpha :as s]
-            [drafter.stasher.filecache :as fc]
-            [drafter.stasher.cache-key :as ck]
-            [drafter.stasher.cancellable :as c]
-            [drafter.stasher.timing :as timing]
-            [grafter-2.rdf4j.repository :as repo]
-            [grafter-2.rdf4j.sparql :as sparql]
-            [integrant.core :as ig]
-            [clojure.tools.logging :as log]
-            [cognician.dogstatsd :as dd]
-            [grafter-2.rdf4j.repository.registry :as reg]
-            [grafter-2.rdf4j.io :as rio]
-            [drafter.stasher.formats :as formats]
-            [clojure.spec.gen.alpha :as g])
+  (:require
+   [clojure.spec.alpha :as s]
+   [clojure.spec.gen.alpha :as g]
+   [clojure.tools.logging :as log]
+   [cognician.dogstatsd :as dd]
+   [drafter.stasher.cache-key :as ck]
+   [drafter.stasher.cancellable :as c]
+   [drafter.stasher.filecache :as fc]
+   [drafter.stasher.formats :as formats]
+   [drafter.stasher.timing :as timing]
+   [drafter.util :as util]
+   [grafter-2.rdf4j.io :as rio]
+   [grafter-2.rdf4j.repository :as repo]
+   [grafter-2.rdf4j.repository.registry :as reg]
+   [grafter-2.rdf4j.sparql :as sparql]
+   [integrant.core :as ig])
   (:import java.net.URI
            (grafter_2.rdf SPARQLConnection SPARQLRepository)
            java.nio.charset.Charset
@@ -94,9 +96,9 @@
   (some #{(URI. "http://publishmydata.com/graphs/drafter/drafts")}
         (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
 
-(defn fetch-modified-state [conn {:keys [named-graphs default-graphs] :as graphs}]
+(defn fetch-last-modified [conn {:keys [named-graphs default-graphs] :as graphs}]
   (let [values {:graph (distinct (concat default-graphs named-graphs))}]
-    (->> (first (doall (sparql/query "drafter/stasher/modified-state.sparql" values conn)))
+    (->> (first (doall (sparql/query "drafter/stasher/last-modified.sparql" values conn)))
          (remove (comp nil? second))
          (into {}))))
 
@@ -106,23 +108,28 @@
 
 (defn generate-cache-key [query-type query-str ?dataset conn]
   (let [graphs (dataset->graphs ?dataset)
-        modified-state (fetch-modified-state conn graphs)]
+        last-modified (fetch-last-modified conn graphs)]
     {:dataset (graphs->edn graphs)
      :query-type query-type
      :query-str query-str
-     :modified-times modified-state}))
+     :last-modified last-modified}))
 
 
-(defn generate-state-graph-cache-key [query-type query-str ?dataset state-graph-modified-time]
+(defn generate-state-graph-cache-key
+  [query-type query-str ?dataset state-graph-last-modified]
   (let [graphs (dataset->graphs ?dataset)]
     {:dataset (graphs->edn graphs)
      :query-type query-type
      :query-str query-str
-     :modified-time state-graph-modified-time}))
+     :state-graph-last-modified state-graph-last-modified}))
 
-(defn generate-drafter-cache-key [state-graph-modified-time query-type _cache query-str ?dataset conn]
+(defn generate-drafter-cache-key
+  [state-graph-last-modified query-type _cache query-str ?dataset conn]
   (or (and (use-state-graph-key? ?dataset)
-           (generate-state-graph-cache-key query-type query-str ?dataset state-graph-modified-time))
+           (generate-state-graph-cache-key query-type
+                                           query-str
+                                           ?dataset
+                                           state-graph-last-modified))
       (generate-cache-key query-type query-str ?dataset conn)))
 
 (s/def ::dataset (s/with-gen (s/nilable #(instance? Dataset %))
@@ -134,7 +141,7 @@
                         (repo/->connection (repo/sparql-repo "http://localhost:1234/dummy-connection/query")))))
 
 (s/fdef generate-drafter-cache-key
-  :args (s/cat :modtime :drafter.stasher.cache-key/datetime-with-tz
+  :args (s/cat :state-graph-last-modified :drafter.stasher.cache-key/state-graph-last-modified
                :query-type :drafter.stasher.cache-key/query-type
                :cache any?
                :query-str string?
@@ -483,7 +490,12 @@
              ^Dataset dataset (.getDataset this)
              query-str (QueryStringUtil/getGraphQueryString query-str (.getBindings this))]
          (if cache?
-           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
+           (let [cache-key (generate-drafter-cache-key @(:state-graph-last-modified opts)
+                                                       :graph
+                                                       cache
+                                                       query-str
+                                                       dataset
+                                                       conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendGraphQuery httpclient QueryLanguage/SPARQL
@@ -503,7 +515,12 @@
              dataset (.getDataset this)
              query-str (QueryStringUtil/getGraphQueryString query-str (.getBindings this))]
          (if cache?
-           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :graph cache query-str dataset conn)]
+           (let [cache-key (generate-drafter-cache-key @(:state-graph-last-modified opts)
+                                                       :graph
+                                                       cache
+                                                       query-str
+                                                       dataset
+                                                       conn)]
              (or (async-read cache cache-key rdf-handler base-uri-str)
                  (c/with-open [^Closeable handler (wrap-async-handler
                                                    cache
@@ -532,7 +549,12 @@
              ^Dataset dataset (.getDataset this)
              query-str (QueryStringUtil/getTupleQueryString query-str (.getBindings this))]
          (if cache?
-           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
+           (let [cache-key (generate-drafter-cache-key @(:state-graph-last-modified opts)
+                                                       :tuple
+                                                       cache
+                                                       query-str
+                                                       dataset
+                                                       conn)]
              (or (get-result cache cache-key base-uri-str)
                  (wrap-result cache cache-key
                               (.sendTupleQuery httpclient QueryLanguage/SPARQL
@@ -552,7 +574,12 @@
              dataset (.getDataset this)
              query-str (QueryStringUtil/getTupleQueryString query-str (.getBindings this))]
          (if cache?
-           (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :tuple cache query-str dataset conn)]
+           (let [cache-key (generate-drafter-cache-key @(:state-graph-last-modified opts)
+                                                       :tuple
+                                                       cache
+                                                       query-str
+                                                       dataset
+                                                       conn)]
              (or (async-read cache cache-key tuple-handler base-uri-str)
                  (c/with-open [^Closeable handler (wrap-async-handler
                                                    cache
@@ -580,7 +607,12 @@
             dataset (.getDataset this)
             query-str (QueryStringUtil/getBooleanQueryString query-str (.getBindings this))]
         (if cache?
-          (let [cache-key (generate-drafter-cache-key @(:state-graph-modified-time opts) :boolean cache query-str dataset conn)
+          (let [cache-key (generate-drafter-cache-key @(:state-graph-last-modified opts)
+                                                      :boolean
+                                                      cache
+                                                      query-str
+                                                      dataset
+                                                      conn)
                 result (get-result cache cache-key base-uri-str)]
             (if (some? result)
               result
@@ -602,18 +634,20 @@
                               (.getMaxExecutionTime this)
                               (.getBindingsArray this))))))))
 
-(defn- get-state-graph-modified-time []
-  (let [state-graph-modified-time (OffsetDateTime/now)]
-    (log/infof "Using new state graph modified time of: %s" state-graph-modified-time)
-    state-graph-modified-time))
+(defn- get-state-graph-last-modified []
+  (let [time (OffsetDateTime/now)
+        version (util/urn-uuid)]
+    (log/infof "Using new state graph last modified of: %s_%s" time version)
+    {:time time
+     :version version}))
 
 (defn cache-busting-update-statement
-  [httpclient query-str base-uri-str state-graph-modified-time]
+  [httpclient query-str base-uri-str state-graph-last-modified]
   (proxy [SPARQLUpdate] [httpclient base-uri-str query-str]
     (execute []
       (let [^SPARQLUpdate this this]
         (proxy-super execute))
-      (reset! state-graph-modified-time (get-state-graph-modified-time)))))
+      (reset! state-graph-last-modified (get-state-graph-last-modified)))))
 
 
 (defn- stasher-connection [repo httpclient cache {:keys [quad-mode base-uri] :or {quad-mode false} :as opts}]
@@ -622,9 +656,13 @@
     (commit []
       (let [^SPARQLConnection this this]
         (proxy-super commit))
-      (reset! (:state-graph-modified-time opts) (get-state-graph-modified-time)))
+      (reset! (:state-graph-last-modified opts)
+              (get-state-graph-last-modified)))
     (prepareUpdate [_ query-str base-uri-str]
-      (cache-busting-update-statement httpclient query-str (or base-uri-str base-uri) (:state-graph-modified-time opts)))
+      (cache-busting-update-statement httpclient
+                                      query-str
+                                      (or base-uri-str base-uri)
+                                      (:state-graph-last-modified opts)))
 
     (prepareTupleQuery [_ query-str base-uri-str]
       (stashing-select-query this httpclient cache query-str (or base-uri-str base-uri) opts))
@@ -654,7 +692,7 @@
                             :cache? (get opts :cache? true)
                             :base-uri (or (:base-uri opts)
                                           "http://publishmydata.com/id/")
-                            :state-graph-modified-time (atom (get-state-graph-modified-time)))
+                            :state-graph-last-modified (atom (get-state-graph-last-modified)))
         repo (doto (proxy [SPARQLRepository] [query-endpoint update-endpoint]
                      (getConnection []
                        (let [^SPARQLRepository this this

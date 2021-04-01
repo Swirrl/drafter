@@ -77,14 +77,15 @@
 (defn new-draft-user-graph-statements
   "Returns RDF statements representing a new draft graph for the user graph URI. Throws
    and exception if the URI is not valid for user graphs."
-  [manager live-graph-uri draft-graph-uri time draftset-uri]
+  [manager live-graph-uri draft-graph-uri time version draftset-uri]
   (check-graph-unprotected! manager live-graph-uri)
   (let [live-graph-triples [live-graph-uri
                             [drafter:hasDraft draft-graph-uri]]
         draft-graph-triples [draft-graph-uri
                              [rdf:a drafter:DraftGraph]
                              [drafter:createdAt time]
-                             [drafter:modifiedAt time]]
+                             [drafter:modifiedAt time]
+                             [drafter:version version]]
         draft-graph-triples (cond-> draft-graph-triples
                                     (some? draftset-uri) (conj [drafter:inDraftSet draftset-uri]))]
     (apply mgmt/to-quads [live-graph-triples draft-graph-triples])))
@@ -110,13 +111,14 @@
   (ensure-managed-graph manager graph-uri))
 
 (defn- draft-graph-statements
-  [live-graph-uri draft-graph-uri time draftset-uri]
+  [live-graph-uri draft-graph-uri time version draftset-uri]
   (let [live-graph-triples [live-graph-uri
                             [drafter:hasDraft draft-graph-uri]]
         draft-graph-triples [draft-graph-uri
                              [rdf:a drafter:DraftGraph]
                              [drafter:createdAt time]
                              [drafter:modifiedAt time]
+                             [drafter:version version]
                              [drafter:inDraftSet draftset-uri]]]
     (apply mgmt/to-quads [live-graph-triples draft-graph-triples])))
 
@@ -126,9 +128,14 @@
   was created."
   [{:keys [repo clock] :as manager} draftset-ref live-graph-uri]
   (let [now (time/now clock)
+        version (util/urn-uuid)
         draft-graph-uri (mgmt/make-draft-graph-uri)
         draftset-uri (url/->java-uri draftset-ref)
-        quads (draft-graph-statements live-graph-uri draft-graph-uri now draftset-uri)]
+        quads (draft-graph-statements live-graph-uri
+                                      draft-graph-uri
+                                      now
+                                      version
+                                      draftset-uri)]
     (sparql/add repo quads)
     draft-graph-uri))
 

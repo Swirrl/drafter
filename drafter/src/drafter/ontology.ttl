@@ -30,3 +30,6 @@
 
     :Draft rdf:type :State ;
     rdfs:label "A ManagedGraph in the Draft state is considered to not yet be live." .
+
+    :version rdf:type rdf:Property ;
+    rdfs:label "The version of a resource." .

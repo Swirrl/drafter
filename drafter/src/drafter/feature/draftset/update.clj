@@ -1,33 +1,35 @@
 (ns drafter.feature.draftset.update
-  (:require [clojure.set :as set]
-            [clojure.spec.alpha :as s]
-            [drafter.backend.draftset.arq :as arq]
-            [drafter.backend.draftset.draft-management :as dm]
-            [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
-            [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.draftset :as ds]
-            [drafter.rdf.sparql :as sparql]
-            [integrant.core :as ig]
-            [ring.middleware.cors :as cors]
-            [drafter.errors :refer [wrap-encode-errors]]
-            [grafter.vocabularies.rdf :refer :all]
-            [grafter.url :as url]
-            [clojure.string :as string]
-            [ring.util.request :as request]
-            [grafter-2.rdf4j.repository :as repo]
-            [drafter.backend.draftset.graphs :as graphs]
-            [drafter.time :as time]
-            [drafter.rdf.jena :as jena])
-  (:import java.net.URI
-           [org.apache.jena.sparql.algebra Algebra OpAsQuery]
-           [org.apache.jena.sparql.modify.request
-            QuadDataAcc Target
-            UpdateCopy UpdateDrop UpdateDataDelete UpdateDataInsert]
-           org.apache.jena.sparql.sse.SSE
-           org.apache.jena.sparql.sse.Item
-           [org.apache.jena.query Syntax]
-           [org.apache.jena.update UpdateFactory]))
+  (:require
+   [clojure.set :as set]
+   [clojure.spec.alpha :as s]
+   [clojure.string :as string]
+   [drafter.backend.draftset.arq :as arq]
+   [drafter.backend.draftset.draft-management :as dm]
+   [drafter.backend.draftset.graphs :as graphs]
+   [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
+   [drafter.draftset :as ds]
+   [drafter.errors :refer [wrap-encode-errors]]
+   [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
+   [drafter.rdf.drafter-ontology :refer :all]
+   [drafter.rdf.jena :as jena]
+   [drafter.rdf.sparql :as sparql]
+   [drafter.time :as time]
+   [drafter.util :as util]
+   [grafter-2.rdf4j.repository :as repo]
+   [grafter.url :as url]
+   [grafter.vocabularies.rdf :refer :all]
+   [integrant.core :as ig]
+   [ring.middleware.cors :as cors]
+   [ring.util.request :as request])
+  (:import
+   [org.apache.jena.query Syntax]
+   [org.apache.jena.sparql.algebra Algebra OpAsQuery]
+   [org.apache.jena.sparql.modify.request
+    QuadDataAcc Target UpdateCopy UpdateDrop UpdateDataDelete UpdateDataInsert]
+   [org.apache.jena.update UpdateFactory]
+   java.net.URI
+   org.apache.jena.sparql.sse.Item
+   org.apache.jena.sparql.sse.SSE))
 
 (defn- rewrite-quad [rewriter quad]
   (-> quad SSE/str arq/->sse-item arq/sse-zipper rewriter str SSE/parseQuad))
@@ -63,14 +65,26 @@
       UpdateFactory/create
       .getOperations))
 
-(defn- draft-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
-  (-> (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri)
+(defn- draft-graph-stmt
+  [graph-manager draftset-uri timestamp version graph-uri draft-graph-uri]
+  (-> (graphs/new-draft-user-graph-statements graph-manager
+                                              graph-uri
+                                              draft-graph-uri
+                                              timestamp
+                                              version
+                                              draftset-uri)
       (jena/insert-data-stmt)))
 
-(defn- manage-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
+(defn- manage-graph-stmt
+  [graph-manager draftset-uri timestamp version graph-uri draft-graph-uri]
   (-> (concat
         (graphs/new-managed-user-graph-statements graph-manager graph-uri)
-        (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri))
+        (graphs/new-draft-user-graph-statements graph-manager
+                                                graph-uri
+                                                draft-graph-uri
+                                                timestamp
+                                                version
+                                                draftset-uri))
       (jena/insert-data-stmt)))
 
 (defn- copy-graph-stmt [graph-uri draft-graph-uri]
@@ -80,7 +94,12 @@
 (defn- graphs-to-manage [graph-manager draftset-uri timestamp graph-meta]
   (keep (fn [[lg {:keys [live? draft? draft-graph-uri]}]]
           (when (and (not live?) (not draft?))
-            (manage-graph-stmt graph-manager draftset-uri timestamp lg draft-graph-uri)))
+            (manage-graph-stmt graph-manager
+                               draftset-uri
+                               timestamp
+                               (util/urn-uuid)
+                               lg
+                               draft-graph-uri)))
         graph-meta))
 
 (defn- within-limit? [operations max-update-size]
@@ -114,6 +133,7 @@
                    [(draft-graph-stmt graph-manager
                                       draftset-uri
                                       timestamp
+                                      (util/urn-uuid)
                                       lg
                                       draft-graph-uri)
                     (copy-graph-stmt lg draft-graph-uri)]))))
@@ -251,9 +271,15 @@ GROUP BY ?lg ?dg")))
           {:keys [live? draft? draft-graph-uri draft-size ops]} (graph-meta g)
           draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
           now (time/now clock)
+          version (util/urn-uuid)
           noop []]
       (cond (just-in-live? g graph-meta)
-            [(manage-graph-stmt graph-manager draftset-uri now g draft-graph-uri)]
+            [(manage-graph-stmt graph-manager
+                                draftset-uri
+                                now
+                                version
+                                g
+                                draft-graph-uri)]
             (in-draftset? g graph-meta)
             (if (<= draft-size max-update-size)
               [(touch-graph-in-draftset draftset-uri draft-graph-uri now)

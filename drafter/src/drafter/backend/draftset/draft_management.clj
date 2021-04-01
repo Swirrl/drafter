@@ -1,18 +1,19 @@
 (ns drafter.backend.draftset.draft-management
-  (:require [clojure.set :as set]
-            [clojure.tools.logging :as log]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.sparql :as sparql :refer [update!]]
-            [drafter.util :as util]
-            [grafter-2.rdf4j.templater :refer [add-properties graph]]
-            [grafter-2.rdf4j.repository :as repo]
-            [grafter.url :as url]
-            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
-            [grafter.vocabularies.rdf :refer :all]
-            [clojure.spec.alpha :as s]
-            [grafter-2.rdf4j.io :as rio]
-            [clojure.string :as string]
-            [drafter.time :as time])
+  (:require
+   [clojure.set :as set]
+   [clojure.spec.alpha :as s]
+   [clojure.string :as str]
+   [clojure.tools.logging :as log]
+   [drafter.rdf.drafter-ontology :refer :all]
+   [drafter.rdf.sparql :as sparql :refer [update!]]
+   [drafter.time :as time]
+   [drafter.util :as util]
+   [grafter-2.rdf4j.io :as rio]
+   [grafter-2.rdf4j.repository :as repo]
+   [grafter-2.rdf4j.templater :refer [add-properties graph]]
+   [grafter.url :as url]
+   [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
+   [grafter.vocabularies.rdf :refer :all])
   (:import java.net.URI
            [java.util UUID]))
 
@@ -27,7 +28,7 @@
 
 (defn with-state-graph
   "Wraps the string in a SPARQL
-   GRAPH <http://publishmydata.com/graphs/drafter/draft> {
+   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
      <<sparql-fragment>>
    } clause."
 
@@ -91,6 +92,25 @@
      "  }"
      "}")))
 
+(defn set-version
+  "Returns an update string to update the given subject/resource with
+   the supplied version."
+  [subject version]
+  (str
+   "WITH <http://publishmydata.com/graphs/drafter/drafts>"
+   "DELETE {"
+   "   <" subject "> <" drafter:version "> ?lastvalue ."
+   "}"
+   "INSERT { "
+   "   <" subject "> <" drafter:version "> <" version "> ."
+   "}"
+   "WHERE {"
+   "   <" subject "> ?p ?o . "
+   "  OPTIONAL {"
+   "     <" subject "> <" drafter:version "> ?lastvalue ."
+   "  }"
+   "}"))
+
 (defn- escape-sparql-value [val]
   (if (string? val)
     (str "\"" val "\"")
@@ -123,13 +143,16 @@
   (str "DROP SILENT GRAPH <" graph-uri ">"))
 
 (defn delete-graph-contents!
-  "Transactionally delete the contents of the supplied graph and set
-  its modified time to the supplied instant.
+  "Transactionally delete the contents of the supplied graph, set its modified
+   time to the supplied instant, and bump the version.
 
-  Note modified-at is an instant not a 0-arg clock-fn."
+   Note modified-at is an instant not a 0-arg clock-fn."
   [db graph-uri modified-at]
-  (update! db (str (delete-graph-contents-query graph-uri) " ; "
-                   (set-timestamp graph-uri drafter:modifiedAt modified-at)))
+  (update! db (str/join
+               " ; "
+               [(delete-graph-contents-query graph-uri)
+                (set-timestamp graph-uri drafter:modifiedAt modified-at)
+                (set-version graph-uri (util/urn-uuid))]))
   (log/info (str "Deleted graph " graph-uri)))
 
 (defn- delete-draft-state-query [draft-graph-uri]
@@ -264,26 +287,30 @@
 (defn- update-live-graph-timestamps-query [draft-graph-uri now-ts]
   (let [issued-at (xsd-datetime now-ts)]
     (str
-      "# First remove the modified timestamp from the live graph\n"
+      "# First remove the modified timestamp and version from the live graph\n"
       "WITH <" drafter-state-graph "> DELETE {"
       "  ?live <" dcterms:modified "> ?modified ."
+      "  ?live <" drafter:version "> ?version ."
       "} WHERE {"
       "  VALUES ?draft { <" draft-graph-uri "> }"
       "  ?live a <" drafter:ManagedGraph "> ;"
       "        <" drafter:hasDraft "> ?draft ;"
-      "        <" dcterms:modified "> ?modified ."
+      "        <" dcterms:modified "> ?modified ;"
+      "        <" drafter:version "> ?version ."
       "  ?draft a <" drafter:DraftGraph "> ."
       "};\n"
 
-      "# Then set the modified timestamp on the live graph to be that of the draft graph\n"
+      "# Then set the modified timestamp and version on the live graph to be that of the draft graph\n"
       "WITH <" drafter-state-graph "> INSERT {"
       "  ?live <" dcterms:modified "> ?modified ."
+      "  ?live <" drafter:version "> ?version ."
       "} WHERE {"
       "  VALUES ?draft { <" draft-graph-uri "> }"
       "  ?live a <" drafter:ManagedGraph "> ;"
       "        <" drafter:hasDraft "> ?draft ."
       "  ?draft a <" drafter:DraftGraph "> ;"
-      "         <" dcterms:modified "> ?modified ."
+      "         <" dcterms:modified "> ?modified ;"
+      "         <" drafter:version "> ?version ."
       "};\n"
 
       "# And finally set a dcterms:issued timestamp if it doesn't have one already\n"
@@ -326,15 +353,15 @@
         ds-values (when draftset-uri (str "VALUES ?ds { <" draftset-uri "> }"))
         live-values (some->> (seq live-graph-uris)
                              (map #(str "<" % ">"))
-                             (string/join " ")
+                             (str/join " ")
                              (format "VALUES ?lg { %s }"))
         draft-values (some->> (seq draft-graph-uris)
                               (map #(str "<" % ">"))
-                              (string/join " ")
+                              (str/join " ")
                               (format "VALUES ?dg { %s }"))
         suffix (->> [filter ds-values live-values draft-values]
                     (remove nil?)
-                    (string/join "\n    ")
+                    (str/join "\n    ")
                     (str "\n    "))]
     (format "
 DELETE { GRAPH ?g { %1$s ?p1 ?o1 . ?s2 %1$s ?o2 . ?s3 ?p3 %1$s . } }

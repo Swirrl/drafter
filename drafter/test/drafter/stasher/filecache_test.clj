@@ -35,8 +35,8 @@
                                          "http://graphs/8"}},
                :query-type :graph,
                :query-str "7ACswxwR95kCP743"
-               :modified-times {:livemod (OffsetDateTime/parse "2018-01-01T10:03:18.000-00:00")
-                                :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")}}]
+               :last-modified {:livemod (OffsetDateTime/parse "2018-01-01T10:03:18.000-00:00")
+                               :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")}}]
       ;; Note hash-maps are unordered, so they print differently
       ;; depending on their construction order.  This essentially tests
       ;; the implementation sorts the keys before generating an md5
@@ -49,8 +49,8 @@
                                                       (update-in [:dataset :default-graphs]
                                                                  (comp set shuffle))))
                (sut/cache-key->cache-path dir ext (-> key
-                                                      (update :modified-times dissoc :livemod)
-                                                      (assoc-in [:modified-times :livemod]
+                                                      (update :last-modified dissoc :livemod)
+                                                      (assoc-in [:last-modified :livemod]
                                                                 (OffsetDateTime/parse "2018-01-01T10:03:18.000-00:00"))))
                (sut/cache-key->cache-path dir ext
                                           (into {} (map (fn [[k v]] (if (map? v)
@@ -67,7 +67,7 @@
                           :query-str "an uncached query"
                           :dataset {:default-graphs #{"http://graphs/test-graph"}
                                     :named-graphs #{}}
-                          :modified-times {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}]
+                          :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}]
         (t/is (nil? (sut/source-stream cache uncached-key :srj)))))))
 
 (t/deftest writing-and-reading
@@ -78,7 +78,7 @@
                      :query-str (str "cache me" (.nextInt (java.util.Random.) 100000000))
                      :dataset {:default-graphs #{"http://graphs/test-graph"}
                                :named-graphs #{}}
-                     :modified-times {}}
+                     :last-modified {}}
           to-write (.getBytes "blablabla")]
       (with-open  [write-stream (sut/destination-stream cache cache-key fmt)]
         (.write write-stream to-write 0 9))
@@ -102,7 +102,7 @@
                        :query-str "stored entries have a last access set"
                        :dataset {:default-graphs #{"http://graphs/test-graph"}
                                  :named-graphs #{}}
-                       :modified-times {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}]
+                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}]
         (let [before-ms (System/currentTimeMillis)
               _ (with-open [write-stream (sut/destination-stream cache cache-key fmt)]
                   (.write write-stream (.getBytes "hello") 0 5))
@@ -118,7 +118,7 @@
                        :query-str "cache hit bumps access time"
                        :dataset {:default-graphs #{"http://graphs/test-graph"}
                                  :named-graphs #{}}
-                       :modified-times {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}
+                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}
             fake-last-access-time (- (System/currentTimeMillis) 10000)]
         (with-open [write-stream (sut/destination-stream cache cache-key fmt)])
         (fs/touch (sut/cache-key->cache-path dir fmt cache-key) fake-last-access-time)
@@ -133,7 +133,7 @@
                        :query-str "cache lookup bumps access time"
                        :dataset {:default-graphs #{"http://graphs/test-graph"}
                                  :named-graphs #{}}
-                       :modified-times {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}
+                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}
             fake-last-access-time (- (System/currentTimeMillis) 10000)]
         (with-open [write-stream (sut/destination-stream cache cache-key fmt)])
         (fs/touch (sut/cache-key->cache-path dir fmt cache-key) fake-last-access-time)

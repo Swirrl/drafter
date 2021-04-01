@@ -4,7 +4,6 @@
              :refer [to-quads with-state-graph]]
             [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.rdf.sparql :as sparql]
             [drafter.user :as user]
             [drafter.util :as util]
@@ -19,11 +18,13 @@
            org.eclipse.rdf4j.queryrender.RenderUtils
            org.eclipse.rdf4j.rio.RDFHandler))
 
-(defn- create-draftset-statements [user-uri title description draftset-uri created-date]
+(defn- create-draftset-statements
+  [user-uri title description draftset-uri created-date version]
   (let [ss [draftset-uri
             [rdf:a drafter:DraftSet]
             [drafter:createdAt created-date]
             [drafter:modifiedAt created-date]
+            [drafter:version version]
             [drafter:createdBy user-uri]
             [drafter:hasOwner user-uri]]]
     (cond-> ss
@@ -42,7 +43,13 @@
      (let [draftset-id (id-creator)
            created-date (time/now clock)
            user-uri (user/user->uri creator)
-           template (create-draftset-statements user-uri title description (url/append-path-segments draftset-uri draftset-id) created-date)
+           template (create-draftset-statements
+                     user-uri
+                     title
+                     description
+                     (url/append-path-segments draftset-uri draftset-id)
+                     created-date
+                     (util/urn-uuid))
            quads (to-quads template)]
        (rdf/add dbcon quads)
        (ds/->DraftsetId (str draftset-id))))))

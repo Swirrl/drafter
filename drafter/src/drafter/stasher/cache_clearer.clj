@@ -7,6 +7,8 @@
             [clojure.spec.alpha :as s])
   (:import [java.util.concurrent Executors ScheduledExecutorService TimeUnit]))
 
+;; TODO presumably this is broken by the addition of version
+
 (defn ->entry-meta-data [file]
   (let [file (fs/file file)
         filename (fs/name file)
