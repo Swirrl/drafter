@@ -1,56 +1,46 @@
 * Configuring Logging
 
-Logging on the JVM can be awkward due to Java's legacy, however we've
-tried to keep it as simple as possible by supporting:
+Logging on the JVM is awkward due to Java's legacy. Logging in drafter uses three library
+layers (from highest to lowest):
 
-- Logging config via our log-config.edn file, which supports pure
-  Clojure configuration (No XML or Log4J Property Files).
-- Logging both Java and Clojure code (meaning it's easy to output
-  sesame's log messages with the same config)
-- A logging configuration fallback chain (log-config.edn -> default
-  config in drafter.jar!log-config.edn)
+1. [[https://github.com/clojure/tools.logging][clojure.tools.logging]] is used for writing all log statements
+2. [slf4j](http://www.slf4j.org/) as the logging backend used by `clojure.logging`
+3. [log4j2](https://logging.apache.org/log4j/2.x/) as the logging implementation used by `slf4j`
 
-This is achieved by through the use of various logging libraries:
+The use of `slf4j` is arguably unnecessary since `clojure.tools.logging` can wrap `log4j2` directly but it is commonly
+used by java libraries to configure their logging and will log its own diagnostic messages if not configured with a
+backend so configuring it directly is cleaner.
 
-- [[https://github.com/clojure/tools.logging][clojure.tools.logging]] with the [[http://logging.apache.org/log4j/2.x/][Log4J]] logging
+Logging is configured by configuring log4j directly using the methods defined in the [log4j manual](https://logging.apache.org/log4j/2.x/manual/configuration.html).
+There are two log4j configuration files defined - which one is used depends on how the classpath is configured. You can override the location of the logs directory
+using an environment variable or specify your own configuration file explicitly by setting a system property.
 
-- [[https://github.com/malcolmsparks/clj-logging-config][clj-logging-config]] for the configuration DSL to provide simple Log4J
-  configuration to configure logging in different namespaces, Java
-  packages and setup your own log appenders.
+1. `resources/log4j2.xml` - This is packaged in the jar and will be used by default in the REPL _unless you specified the `:test` alias during startup_ (see below)
+2. `test/resources/log4j2-test.xml` - As described in the [log4j manual](https://logging.apache.org/log4j/2.x/manual/configuration.html) a `log4j2-test.xml` file
+    is given priority over a `log4j2.xml` file when searching for log configuration files. The `log4j2-test.xml` file will therefore be used if the `test/resources`
+    directory is on the classpath. This is the case when the `:test` alias is provided to the `clojure` command such as when running the tests. Be aware if you
+    specify this alias when running the repl this is the configuration that will be loaded
+3. Both the `log4j2.xml` and `log4j2-test.xml` allow the location of the logs directory to be specified by setting the `DRAFTER_LOGS_DIR` environment variable
+4. The location of the configuration file can be specified by the `log4j.configurationFile` system property. System properties can be specified as JVM options of the
+   form `-Dname=value`. To set the file location from the REPL you can start it with an alias that includes such an entry in its `:jvm-opts` list e.g.
 
-To configure logging in Drafter you should create a file called
-=log-config.edn= by copying the example =log-config.edn.example=.
+__deps.edn__
+```language clojure
+{ ...
+  {:aliases {:dev { ...
+                  }
+             ...
+             :custom-logging {:jvm-opts ["-Dlog4j.configurationFile=file:///path/to/custom/log4j2.xml"]}
+             }
+  }
+}
+```
 
-An example of a drafter =log-config.edn= file is here:
+And add the `:custom-logging` alias when starting the REPL. Alternatively an existing alias can be modified to include the required :jvm-opts.
 
-#+BEGIN_SRC clojure :exports code
-(let [log-pattern "%d{ABSOLUTE} %-5p %.20c{1} %-10.10X{reqId} :: %m%n"]
-       (set-loggers!
-        ["org.openrdf" "drafter"]
-        {:name "drafter"
-         :level :trace
-         :out (DailyRollingFileAppender.
-               (EnhancedPatternLayout. log-pattern)
-               "logs/drafter.log" "'.'YYYY-MM")}
+## Production logging
 
-        "drafter.rdf.sparql-protocol"
-        {:name "sparql"
-         :level :info
-         :out (DailyRollingFileAppender.
-               (EnhancedPatternLayout. log-pattern)
-               "logs/sparql.log" "'.'YYYY-MM")}))
-#+END_SRC
-
-The first thing to note is that this [[https://github.com/edn-format/edn][edn]] file must contain a Clojure
-form to be evaluated.
-
-When drafter starts it first looks at the environment for a variable
-called `LOG_CONFIG_FILE` if this is defined then the file at the
-location is evaluated, and if no file is found then Drafter will
-fallback to a file in its working directory named `log-config.edn`.
-Finally if this file is not found then drafter will configure its
-logging by using a default `log-config.edn` file contained in its Jar
-file.
-
-To configure the logging these forms should then contain a call to
-[[https://github.com/malcolmsparks/clj-logging-config][clj-logging-config's]] =set-loggers!= macro.
+In production drafter is run via the `drafter-start.sh` script. This script specifies the location of the log4j configuration file as a `log4j2.xml` in the
+drafter install directory via the `log4j.configurationFile` property. This allows the log configuration to be modified while drafter is running and allows
+the location of the drafter logs directory to be specified via the `DRAFTER_LOGS_DIR` environment variable. If `DRAFTER_LOGS_DIR` is not specified logs will 
+be written to a `logs` directory within the installation directory.

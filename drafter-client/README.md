@@ -25,14 +25,7 @@ export DRAFTER_ENDPOINT=http://localhost:3001
 export AUTH0_AUD=https://pmd
 ```
 
-3. Ensure you have a `log-config.edn` in the directory you're running the tests
-   from.
-
-``` shell
-cp ../drafter/log-config.edn.example ./log-config.edn
-```
-
-4. Run `drafter-client` tests from `drafter-client` directory
+3. Run `drafter-client` tests from `drafter-client` directory
 
 ``` shell
 .../drafter/drafter-client $ ./bin/kaocha

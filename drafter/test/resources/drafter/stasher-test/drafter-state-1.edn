@@ -1,7 +1,4 @@
 {
-
- :drafter/logging {:config "./test/resources/log-config.edn"}
-
  :drafter.stasher/cache-thread-pool {:core-pool-size 1
                                      :max-pool-size 1
                                      :keep-alive-time-ms 1000

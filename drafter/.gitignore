@@ -15,7 +15,6 @@ user_repl.clj
 .DS_Store
 /drafter-db/
 /logs/
-/log-config.edn
 .idea/
 drafter.iml
 /profiles.clj

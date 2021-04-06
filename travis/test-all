@@ -14,15 +14,11 @@ cd `dirname $0`
 
 cd ../drafter-client
 
-[ -f log-config.edn ] || cp ../drafter/log-config.edn.example log-config.edn
-
 ./bin/kaocha --fail-fast
 
 ## TEST DRAFTER
 
 cd ../drafter
-
-[ -f log-config.edn ] || cp log-config.edn.example log-config.edn2
 
 ./bin/kaocha --reporter documentation --fail-fast
 

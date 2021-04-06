@@ -40,10 +40,7 @@ Some working example files to run drafter can be found in the omni configuration
 
 * Logging
 
-You may also wish to configure drafter logging by putting
-=log-config.edn= file in drafter's working directory. We provide an
-example file you can modify at [[log-config.edn.example][/drafter/log-config.edn.example]]
-
+See [drafter-logging](https://github.com/Swirrl/drafter/blob/master/drafter/doc/drafter-logging.org) for a description of how to configure logging.
 
 * Env vars
 

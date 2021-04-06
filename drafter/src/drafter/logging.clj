@@ -63,12 +63,3 @@
                (log/info "RESPONSE " (:status resp) "finished.  It took" (str headers-time "ms") "to execute"))
 
              resp)))))))
-
-(defmethod ig/init-key :drafter/logging [_ {:keys [config]}]
-  ;; (configure-logging! config)
-  ;; Nothing to do here?
-  )
-
-(defmethod ig/halt-key! :drafter/logging [_ _]
-  ;; (clj-logging-config.log4j/reset-logging!)
-  )

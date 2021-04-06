@@ -219,8 +219,4 @@
 
  :drafter.main/datadog {:statsd-address #or [#env DATADOG_STATSD_ADDRESS nil]
                         :tags {:service :drafter}}
-
-
- :drafter/logging {:config "log-config.edn"}
-
  }
