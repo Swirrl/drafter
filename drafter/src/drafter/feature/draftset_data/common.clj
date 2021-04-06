@@ -18,12 +18,13 @@
   "Builds and returns an update string to update the dcterms:modified and
    drafter:version of the supplied resource draft-graph/draftset."
   [draftset-ref draft-graph-uri modified-at]
-  (str/join
-   " ; "
-   [(mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at)
-    (mgmt/set-timestamp (ds/->draftset-uri draftset-ref) dcterms:modified modified-at)
-    (mgmt/set-version draft-graph-uri (util/urn-uuid))
-    (mgmt/set-version (ds/->draftset-uri draftset-ref) (util/urn-uuid))]))
+  (let [version (util/urn-uuid)]
+    (str/join
+     " ; "
+     [(mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at)
+      (mgmt/set-timestamp (ds/->draftset-uri draftset-ref) dcterms:modified modified-at)
+      (mgmt/set-version draft-graph-uri version)
+      (mgmt/set-version (ds/->draftset-uri draftset-ref) version)])))
 
 (defn touch-graph-in-draftset!
   "Updates the dcterms:modified and drafter:version on the given draftgraph and
