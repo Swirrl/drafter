@@ -159,7 +159,12 @@
                 "  <http://example.org/my-graph> <" dcterms:modified "> ?modified ;"
                 "                                <" dcterms:issued "> ?published ."
                 "}")
-          "Live graph should have a modified and issued time stamp"))))
+          "Live graph should have a modified and issued time stamp")
+
+      (is (ask? "GRAPH <" drafter-state-graph "> {"
+                "  <http://example.org/my-graph> <" drafter:version "> ?version ."
+                "}")
+          "Live graph should have a version"))))
 
 (deftest migrate-graphs-to-live!-remove-live-aswell-test
   (testing "migrate-graphs-to-live! DELETION: Deleted draft removes live graph from state graph"
