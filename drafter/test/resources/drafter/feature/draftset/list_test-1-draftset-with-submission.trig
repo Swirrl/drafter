@@ -13,6 +13,7 @@
 
 draftset:4e7f444f-3e34-420e-9126-f9691aeb986b a drafter:DraftSet ;
 	dcterms:modified "2018-01-16T15:07:20.946Z"^^xsd:dateTime ;
+	drafter:version <urn:uuid:cdeb7b42-b02d-49f4-9d81-637ef2b9cdec> ;
 	dcterms:created "2018-01-16T15:07:20.946Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/ab08a82b-f6ea-4baf-9b98-e5dbb80b6bc9> ;

@@ -12,6 +12,7 @@
 <http://publishmydata.com/graphs/drafter/drafts> {
 	<http://graph1> a drafter:ManagedGraph ;
 		dcterms:modified "2018-01-16T15:50:27.296Z"^^xsd:dateTime ;
+		drafter:version <urn:uuid:c661b771-683c-4f7f-9e09-2e229aa34aa7> ;
 		drafter:isPublic true ;
 		dcterms:issued "2018-01-16T15:50:27.475Z"^^xsd:dateTime ;
 		drafter:hasDraft draft:dg-1 .
@@ -22,6 +23,7 @@
 	
 	draftset:ds-1 a drafter:DraftSet ;
 		dcterms:modified "2018-01-16T15:50:26.339Z"^^xsd:dateTime ;
+		drafter:version <urn:uuid:39b28a38-42f2-406c-a3fc-c0ee94c32c0b> ;
 		dcterms:created "2018-01-16T15:50:26.339Z"^^xsd:dateTime ;
 		dcterms:creator <mailto:editor@swirrl.com> ;
 		rdfs:label "ds1" ;
@@ -30,6 +32,7 @@
 	
 	draftset:ds-2 a drafter:DraftSet ;
 		dcterms:modified "2018-01-16T15:50:30.589Z"^^xsd:dateTime ;
+		drafter:version <urn:uuid:0e30fb89-f5f1-4b4c-b6a2-39220195719d> ;
 		dcterms:created "2018-01-16T15:50:26.727Z"^^xsd:dateTime ;
 		dcterms:creator <mailto:editor@swirrl.com> ;
 		rdfs:label "ds2" ;
@@ -38,11 +41,13 @@
 	
 	draft:dg-1 a drafter:DraftGraph ;
 		dcterms:modified "2018-01-16T15:50:28.957Z"^^xsd:dateTime ;
+		drafter:version <urn:uuid:a1291c57-5181-42dd-8ef5-dbe6b52f60e7> ;
 		dcterms:created "2018-01-16T15:50:28.957Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:ds-1 .
 	
 	draft:dg-2 a drafter:DraftGraph ;
 		dcterms:modified "2018-01-16T15:50:30.589Z"^^xsd:dateTime ;
+		drafter:version <urn:uuid:ec2f7e16-a467-4b23-b120-cdc3f5a6d31c> ;
 		dcterms:created "2018-01-16T15:50:30.602Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:ds-2 .
 	
