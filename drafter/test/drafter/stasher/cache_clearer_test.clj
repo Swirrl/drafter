@@ -1,9 +1,11 @@
 (ns drafter.stasher.cache-clearer-test
-  (:require [clojure.java.io :as io]
-            [clojure.test :as t]
-            [drafter.stasher.cache-clearer :as sut]
-            [drafter.test-common :as tc]
-            [me.raynes.fs :as fs])
+  (:require
+   [clojure.java.io :as io]
+   [clojure.test :as t]
+   [drafter.stasher.cache-clearer :as sut]
+   [drafter.test-common :as tc]
+   [drafter.util :as util]
+   [me.raynes.fs :as fs])
   (:import java.security.MessageDigest
            java.time.OffsetDateTime
            org.apache.commons.codec.binary.Hex))
@@ -12,13 +14,13 @@
 
 (t/deftest build-cache-entry-meta-data
   (t/testing "Cache of a draft"
-    (t/is (= (-> (sut/->entry-meta-data "/cache/66/3b/663b62da5c46f6d1fece1a1a1b30fa63/1514800998000-1523895798000.test")
+    (t/is (= (-> (sut/->entry-meta-data "/cache/66/3b/663b62da5c46f6d1fece1a1a1b30fa63/1514800998000-1523895798000_1f326997-aa3d-4e32-919a-904f224f875c_fbd95452-6af6-4156-a2b5-2562f11c9d38.test")
                  (select-keys [:hash :livemod :draftmod]))
              {:hash "663b62da5c46f6d1fece1a1a1b30fa63"
               :livemod 1514800998000
               :draftmod 1523895798000})))
   (t/testing "Cache of a live query"
-    (t/is (= (-> (sut/->entry-meta-data "/cache/66/3b/663b62da5c46f6d1fece1a1a1b30fa63/1514800998000.test")
+    (t/is (= (-> (sut/->entry-meta-data "/cache/66/3b/663b62da5c46f6d1fece1a1a1b30fa63/1514800998000_1f326997-aa3d-4e32-919a-904f224f875c.test")
                  (select-keys [:hash :livemod :draftmod]))
              {:hash "663b62da5c46f6d1fece1a1a1b30fa63"
               :livemod 1514800998000
@@ -34,10 +36,16 @@
                      :exception)))
   (t/testing "Meta data contains the last modified date"
     (let [cache-dir (fs/temp-dir "stasher/testing-modified-date")
-          file (fs/file cache-dir "66" "3b" "663b62da5c46f6d1fece1a1a1b30fa63" "1514800998000-1523895798000.test")]
+          file (fs/file cache-dir "66" "3b" "663b62da5c46f6d1fece1a1a1b30fa63" "1514800998000-1523895798000_1f326997-aa3d-4e32-919a-904f224f875c_fbd95452-6af6-4156-a2b5-2562f11c9d38.test")]
       (io/make-parents file)
       (fs/create file)
-      (t/is (< 0 (:last-access (sut/->entry-meta-data file)))))))
+      (t/is (< 0 (:last-access (sut/->entry-meta-data file))))))
+  (t/testing "Missing version"
+    (t/is (= (-> (sut/->entry-meta-data "/cache/66/3b/663b62da5c46f6d1fece1a1a1b30fa63/1514800998000-1523895798000.test")
+                 (select-keys [:hash :livemod :draftmod]))
+             {:hash "663b62da5c46f6d1fece1a1a1b30fa63"
+              :livemod 1514800998000
+              :draftmod 1523895798000}))))
 
 (defn- add-to-cache
   "Sneak a file into the cache using the correct filename format"
@@ -48,7 +56,12 @@
                    hash
                    (str
                     (or ?livemod "empty")
-                    (or (and ?draftmod (str "-" ?draftmod)) "")
+                    (when ?draftmod
+                      (str "-" ?draftmod))
+                    (when ?livemod
+                      (str "_" (util/create-uuid)))
+                    (when ?draftmod
+                      (str "_" (util/create-uuid)))
                     ".test"))]
     (io/make-parents f)
     (fs/create f)))

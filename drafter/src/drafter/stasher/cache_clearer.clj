@@ -7,12 +7,10 @@
             [clojure.spec.alpha :as s])
   (:import [java.util.concurrent Executors ScheduledExecutorService TimeUnit]))
 
-;; TODO presumably this is broken by the addition of version
-
 (defn ->entry-meta-data [file]
   (let [file (fs/file file)
         filename (fs/name file)
-        [livemod draftmod] (str/split filename #"-")
+        [livemod draftmod] (-> filename (str/split #"_") first (str/split #"-"))
         parent (fs/parent file)
         hash (fs/name parent)
         ext (fs/extension file)
