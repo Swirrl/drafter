@@ -1,8 +1,10 @@
 (ns drafter.stasher.filecache-test
-  (:require [clojure.test :as t]
-            [drafter.stasher.filecache :as sut]
-            [drafter.test-common :as tc]
-            [me.raynes.fs :as fs])
+  (:require
+   [clojure.test :as t]
+   [drafter.stasher.filecache :as sut]
+   [drafter.test-common :as tc]
+   [drafter.util :as util]
+   [me.raynes.fs :as fs])
   (:import java.time.OffsetDateTime))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -36,28 +38,72 @@
                :query-type :graph,
                :query-str "7ACswxwR95kCP743"
                :last-modified {:livemod (OffsetDateTime/parse "2018-01-01T10:03:18.000-00:00")
-                               :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")}}]
+                               :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
+                               :livever (util/urn-uuid "bc0bc9e6-c494-4014-be8e-89073f40bb61")
+                               :draftver (util/urn-uuid "246152a4-b282-4fe2-9559-be5f3b127203")}}]
       ;; Note hash-maps are unordered, so they print differently
       ;; depending on their construction order.  This essentially tests
       ;; the implementation sorts the keys before generating an md5
       ;; hash.
       (t/is (= (sut/cache-key->cache-path dir ext key)
-               (sut/cache-key->cache-path dir ext (-> key
-                                                      (dissoc :query-type)
-                                                      (assoc :query-type :graph)))
-               (sut/cache-key->cache-path dir ext (-> key
-                                                      (update-in [:dataset :default-graphs]
-                                                                 (comp set shuffle))))
-               (sut/cache-key->cache-path dir ext (-> key
-                                                      (update :last-modified dissoc :livemod)
-                                                      (assoc-in [:last-modified :livemod]
-                                                                (OffsetDateTime/parse "2018-01-01T10:03:18.000-00:00"))))
-               (sut/cache-key->cache-path dir ext
-                                          (into {} (map (fn [[k v]] (if (map? v)
-                                                                     [k (into {} (shuffle (vec v)))]
-                                                                     [k v]))
-                                                        key))))))))
+               (sut/cache-key->cache-path dir
+                                          ext
+                                          (assoc key :query-type :graph))
+               (sut/cache-key->cache-path dir
+                                          ext
+                                          (update-in key
+                                                     [:dataset :default-graphs]
+                                                     (comp set shuffle)))
+               (sut/cache-key->cache-path dir
+                                          ext
+                                          (assoc-in
+                                           key
+                                           [:last-modified :livemod]
+                                           (OffsetDateTime/parse
+                                            "2018-01-01T10:03:18.000-00:00")))
+               (sut/cache-key->cache-path
+                dir
+                ext
+                (assoc-in key
+                          [:last-modified :draftver]
+                          (util/urn-uuid
+                           "246152a4-b282-4fe2-9559-be5f3b127203")))
+               (sut/cache-key->cache-path dir
+                                          ext
+                                          (into
+                                           {}
+                                                (map
+                                                 (fn [[k v]]
+                                                   (if (map? v)
+                                                     [k (into {} (shuffle (vec v)))]
+                                                     [k v]))
+                                                 key)))))))
 
+  (t/testing "Values that differ only in version should generate different hash"
+    (let [dir "tmp/test-stasher-cache"
+          ext :nt
+          key {:dataset {:default-graphs #{"http://graphs/2"
+                                           "http://graphs/1"
+                                           "http://graphs/3"
+                                           "http://graphs/4"
+                                           "http://graphs/5"},
+                         :named-graphs #{"http://graphs/3"
+                                         "http://graphs/4"
+                                         "http://graphs/5"
+                                         "http://graphs/6"
+                                         "http://graphs/7"
+                                         "http://graphs/8"}},
+               :query-type :graph,
+               :query-str "7ACswxwR95kCP743"
+               :last-modified {:livemod (OffsetDateTime/parse "2018-01-01T10:03:18.000-00:00")
+                               :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
+                               :livever (util/urn-uuid "bc0bc9e6-c494-4014-be8e-89073f40bb61")
+                               :draftver (util/urn-uuid "246152a4-b282-4fe2-9559-be5f3b127203")}}]
+      (t/is (not= (sut/cache-key->cache-path dir ext key)
+                  (sut/cache-key->cache-path dir ext (assoc-in
+                                                      key
+                                                      [:last-modified :draftver]
+                                                      (util/urn-uuid))))))))
 
 (t/deftest lookup-file-cache
   (let [cache (sut/make-file-backend {:dir test-path})
@@ -67,7 +113,8 @@
                           :query-str "an uncached query"
                           :dataset {:default-graphs #{"http://graphs/test-graph"}
                                     :named-graphs #{}}
-                          :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}]
+                          :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
+                                          :livever (util/urn-uuid)}}]
         (t/is (nil? (sut/source-stream cache uncached-key :srj)))))))
 
 (t/deftest writing-and-reading
@@ -102,7 +149,8 @@
                        :query-str "stored entries have a last access set"
                        :dataset {:default-graphs #{"http://graphs/test-graph"}
                                  :named-graphs #{}}
-                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}]
+                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
+                                       :livever (util/urn-uuid)}}]
         (let [before-ms (System/currentTimeMillis)
               _ (with-open [write-stream (sut/destination-stream cache cache-key fmt)]
                   (.write write-stream (.getBytes "hello") 0 5))
@@ -118,7 +166,8 @@
                        :query-str "cache hit bumps access time"
                        :dataset {:default-graphs #{"http://graphs/test-graph"}
                                  :named-graphs #{}}
-                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}
+                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
+                                       :livever (util/urn-uuid)}}
             fake-last-access-time (- (System/currentTimeMillis) 10000)]
         (with-open [write-stream (sut/destination-stream cache cache-key fmt)])
         (fs/touch (sut/cache-key->cache-path dir fmt cache-key) fake-last-access-time)
@@ -133,7 +182,8 @@
                        :query-str "cache lookup bumps access time"
                        :dataset {:default-graphs #{"http://graphs/test-graph"}
                                  :named-graphs #{}}
-                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")}}
+                       :last-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
+                                       :livever (util/urn-uuid)}}
             fake-last-access-time (- (System/currentTimeMillis) 10000)]
         (with-open [write-stream (sut/destination-stream cache cache-key fmt)])
         (fs/touch (sut/cache-key->cache-path dir fmt cache-key) fake-last-access-time)
