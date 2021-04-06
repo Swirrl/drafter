@@ -318,14 +318,17 @@
 (def live-graph-1 (URIImpl. "http://live-and-ds1-and-ds2"))
 (def live-graph-only (URIImpl. "http://live-only"))
 
-(def liveset-most-recently-modified {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")})
+(def liveset-most-recently-modified
+  {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
+   :livever (util/urn-uuid "819a18bc-f832-48b9-81f0-082609da44e8")})
 
 (def ds-1-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
 (def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
 (def ds-1 "draftset-1 is made of dg-1 dg-2" #{ds-1-dg-1 ds-1-dg-2})
 
 (def ds-1-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
-  {:draftmod (OffsetDateTime/parse "2017-04-04T04:04:04.000-00:00")})
+  {:draftmod (OffsetDateTime/parse "2017-04-04T04:04:04.000-00:00")
+   :draftver (util/urn-uuid "54fc8b22-fe2c-4352-97f2-5af0f71d3cb2")})
 
 
 (def ds-2-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
@@ -333,7 +336,8 @@
 (def ds-2 #{ds-2-dg-1})
 
 (def ds-2-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
-  {:draftmod (OffsetDateTime/parse "2017-05-05T05:05:05.000-00:00")})
+  {:draftmod (OffsetDateTime/parse "2017-05-05T05:05:05.000-00:00")
+   :draftver (util/urn-uuid "3e757edc-2720-43dc-86e5-317168ae4cf2")})
 
 
 (defn edn->dataset [{:keys [default-graphs named-graphs]}]
@@ -431,7 +435,8 @@
       (t/is (= basic-construct-query
                query-str))
       (t/is (= last-modified
-               {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")})))))
+               {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
+                :livever (util/urn-uuid "819a18bc-f832-48b9-81f0-082609da44e8")})))))
 
 (defn- prepare-query
   "Prepares an RDF4j query from a connection with the specified bindings set"

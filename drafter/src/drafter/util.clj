@@ -17,8 +17,11 @@
   []
   (UUID/randomUUID))
 
-(defn urn-uuid []
-  (URI. (str "urn:uuid:" (create-uuid))))
+(defn urn-uuid
+  ([]
+   (urn-uuid (create-uuid)))
+  ([uuid]
+   (URI. (str "urn:uuid:" uuid))))
 
 (defn str->base64 [s]
   (codecs/bytes->str (base64/encode s)))
