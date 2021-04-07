@@ -6,47 +6,24 @@ prefix draftset: <http://publishmydata.com/def/drafter/draftset/>
 
 SELECT ?livemod ?livever ?draftmod ?draftver WHERE {
   OPTIONAL {
-    SELECT ?livemod WHERE {
+    SELECT ?livemod ?livever WHERE {
+      VALUES ?graph {}
       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
         ?graph a drafter:ManagedGraph ;
                drafter:isPublic "true"^^xsd:boolean ;
                dcterms:modified ?livemod .
-      }
-      VALUES ?graph {
-      }
-    }
-  }
-
-  OPTIONAL {
-    SELECT ?livever WHERE {
-      GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-        ?graph a drafter:ManagedGraph ;
-               drafter:isPublic "true"^^xsd:boolean ;
-               drafter:version ?livever .
-      }
-      VALUES ?graph {
+        OPTIONAL { ?graph drafter:version ?livever . }
       }
     }
   }
 
   OPTIONAL {
-    SELECT ?draftmod WHERE {
+    SELECT ?draftmod ?draftver WHERE {
+      VALUES ?graph {}
       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
         ?graph a drafter:DraftGraph ;
                dcterms:modified ?draftmod .
-      }
-      VALUES ?graph {
-      }
-    }
-  }
-
-  OPTIONAL {
-    SELECT ?draftver WHERE {
-      GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-        ?graph a drafter:DraftGraph ;
-               drafter:version ?draftver .
-      }
-      VALUES ?graph {
+        OPTIONAL { ?graph drafter:version ?draftver . }
       }
     }
   }
