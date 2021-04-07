@@ -72,12 +72,12 @@
                                           ext
                                           (into
                                            {}
-                                                (map
-                                                 (fn [[k v]]
-                                                   (if (map? v)
-                                                     [k (into {} (shuffle (vec v)))]
-                                                     [k v]))
-                                                 key)))))))
+                                           (map
+                                            (fn [[k v]]
+                                              (if (map? v)
+                                                [k (into {} (shuffle (vec v)))]
+                                                [k v]))
+                                            key)))))))
 
   (t/testing "Values that differ only in version should generate different hash"
     (let [dir "tmp/test-stasher-cache"
