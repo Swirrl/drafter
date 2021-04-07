@@ -14,7 +14,6 @@
    [drafter.rdf.jena :as jena]
    [drafter.rdf.sparql :as sparql]
    [drafter.time :as time]
-   [drafter.util :as util]
    [grafter-2.rdf4j.repository :as repo]
    [grafter.url :as url]
    [grafter.vocabularies.rdf :refer :all]
@@ -65,26 +64,14 @@
       UpdateFactory/create
       .getOperations))
 
-(defn- draft-graph-stmt
-  [graph-manager draftset-uri timestamp version graph-uri draft-graph-uri]
-  (-> (graphs/new-draft-user-graph-statements graph-manager
-                                              graph-uri
-                                              draft-graph-uri
-                                              timestamp
-                                              version
-                                              draftset-uri)
+(defn- draft-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
+  (-> (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri)
       (jena/insert-data-stmt)))
 
-(defn- manage-graph-stmt
-  [graph-manager draftset-uri timestamp version graph-uri draft-graph-uri]
+(defn- manage-graph-stmt [graph-manager draftset-uri timestamp graph-uri draft-graph-uri]
   (-> (concat
         (graphs/new-managed-user-graph-statements graph-manager graph-uri)
-        (graphs/new-draft-user-graph-statements graph-manager
-                                                graph-uri
-                                                draft-graph-uri
-                                                timestamp
-                                                version
-                                                draftset-uri))
+        (graphs/new-draft-user-graph-statements graph-manager graph-uri draft-graph-uri timestamp draftset-uri))
       (jena/insert-data-stmt)))
 
 (defn- copy-graph-stmt [graph-uri draft-graph-uri]
@@ -94,12 +81,7 @@
 (defn- graphs-to-manage [graph-manager draftset-uri timestamp graph-meta]
   (keep (fn [[lg {:keys [live? draft? draft-graph-uri]}]]
           (when (and (not live?) (not draft?))
-            (manage-graph-stmt graph-manager
-                               draftset-uri
-                               timestamp
-                               (util/urn-uuid)
-                               lg
-                               draft-graph-uri)))
+            (manage-graph-stmt graph-manager draftset-uri timestamp lg draft-graph-uri)))
         graph-meta))
 
 (defn- within-limit? [operations max-update-size]
@@ -133,7 +115,6 @@
                    [(draft-graph-stmt graph-manager
                                       draftset-uri
                                       timestamp
-                                      (util/urn-uuid)
                                       lg
                                       draft-graph-uri)
                     (copy-graph-stmt lg draft-graph-uri)]))))
@@ -271,15 +252,9 @@ GROUP BY ?lg ?dg")))
           {:keys [live? draft? draft-graph-uri draft-size ops]} (graph-meta g)
           draftset-uri (url/->java-uri (ds/->draftset-uri draftset-id))
           now (time/now clock)
-          version (util/urn-uuid)
           noop []]
       (cond (just-in-live? g graph-meta)
-            [(manage-graph-stmt graph-manager
-                                draftset-uri
-                                now
-                                version
-                                g
-                                draft-graph-uri)]
+            [(manage-graph-stmt graph-manager draftset-uri now g draft-graph-uri)]
             (in-draftset? g graph-meta)
             (if (<= draft-size max-update-size)
               [(touch-graph-in-draftset draftset-uri draft-graph-uri now)
