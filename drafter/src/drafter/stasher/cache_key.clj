@@ -17,7 +17,6 @@
                                 (.atOffset (.toInstant inst) java.time.ZoneOffset/UTC))
                               (s/gen inst?))) )
 
-
 (s/def ::uri-string (s/with-gen string?
                       #(g/fmap
                         (partial str "http://")
@@ -116,13 +115,14 @@
        "_"
        (urn-uuid->str-uuid version)))
 
-(s/def ::cache-key-time-component (s/or :empty-with-draft-mod #(re-find #"^(empty-)?\-?[0-9]+" %)
-                                        :draft-and-live-mod #(re-find #"^\-?[0-9]+\-\-?[0-9]+" %)
-                                        :empty (fn [s]
-                                                 (str/starts-with? s "empty"))))
+(s/def ::cache-key-time-component
+  (s/or :empty-with-draft-mod #(re-matches #"empty-[0-9]+_[0-9a-f-]+" %)
+        :draft-and-live-mod #(re-matches #"[0-9]+-[0-9]+_[0-9a-f-]+_[0-9a-f-]+" %)
+        :empty #{"empty"}))
 
-(s/def ::time-component (s/or :cache-key-time-component ::cache-key-time-component
-                              :state-graph-time-component #(re-find #"^\-?[0-9]+" %)))
+(s/def ::time-component
+  (s/or :cache-key-time-component ::cache-key-time-component
+        :state-graph-time-component #(re-matches #"[0-9]+_[0-9a-f-]+" %)))
 
 (s/fdef time-component
   :args (s/cat :cache-key ::either-cache-key)
