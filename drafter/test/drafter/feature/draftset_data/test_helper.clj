@@ -35,4 +35,4 @@
 
       (assert (= 1 (count res)) "There were multiple modifiedAt timestamps, we expect just one.")
 
-      (-> res first))))
+      (first res))))
