@@ -14,7 +14,6 @@
             [grafter-2.rdf4j.formats :as formats]
             [drafter.fixture-data :as fd]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.feature.endpoint.public :as pub]
             [grafter-2.rdf.protocols :as pr]
             [drafter.time :as time])
@@ -62,7 +61,7 @@
                           "http://foo/graph")]
           (t/is (= update-time (:modified modified-2))
                 "Modified time is updated after append")
-          (t/is (= (:version modified-1) (:version modified-2))
+          (t/is (not= (:version modified-1) (:version modified-2))
                 "Version is updated after append"))))))
 
 (def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])

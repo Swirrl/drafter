@@ -12,6 +12,7 @@
 <http://publishmydata.com/graphs/drafter/endpoints> {
     drafter:public rdf:type drafter:Endpoint ;
                    dcterms:modified "2020-07-03T11:43:02.373Z"^^xsd:dateTime ;
+                   drafter:version <urn:uuid:17ac35c9-f9ea-4366-a70f-69f2cbd6181d> ;
                    dcterms:issued "2020-06-23T12:25:12.264Z"^^xsd:dateTime .
 }
 

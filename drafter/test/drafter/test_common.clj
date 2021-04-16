@@ -22,7 +22,7 @@
             [drafter.async.spec :as async-spec]
             [aero.core :as aero]
             [drafter.user :as user]
-            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
+            [drafter.rdf.drafter-ontology :refer :all]
             [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.spec :refer [load-spec-namespaces!]]
             [drafter.write-scheduler :as scheduler]
@@ -561,8 +561,12 @@
 (defn is-modified-statement? [s]
   (= dcterms:modified (:p s)))
 
+(defn is-version-statement? [s]
+  (= drafter:version (:p s)))
+
 (defn remove-updated [endpoint-triples]
-  (remove is-modified-statement? endpoint-triples))
+  (remove (some-fn is-modified-statement? is-version-statement?)
+          endpoint-triples))
 
 (defmacro check-endpoint-graph-consistent
   "Macro to check the public endpoints graph is not corrupted by the actions executed

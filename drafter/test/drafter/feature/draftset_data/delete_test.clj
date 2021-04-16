@@ -65,7 +65,7 @@
                           "http://foo/graph")]
           (t/is (= delete-time (:modified modified-2))
                 "Expected modified time to be updated after delete")
-          (t/is (= (:version modified-1) (:version modified-2))
+          (t/is (not= (:version modified-1) (:version modified-2))
                 "Expected version to be updated after delete"))))))
 
 (t/deftest delete-public-endpoint-quads-test

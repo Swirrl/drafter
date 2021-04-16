@@ -6,15 +6,22 @@ INSERT {
     GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
         drafter:public rdf:type drafter:Endpoint ;
                        dcterms:modified ?n ;
-                       dcterms:issued ?n .
+                       dcterms:issued ?n ;
+                       drafter:version ?u .
     }
 } WHERE {
     GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
-        { SELECT ?n WHERE { BIND(now() AS ?n) } }
+        {
+          SELECT ?n ?u WHERE {
+            BIND(now() AS ?n)
+            BIND(uuid() AS ?u)
+          }
+        }
         FILTER NOT EXISTS {
             drafter:public rdf:type drafter:Endpoint ;
                            dcterms:modified ?modified ;
-                           dcterms:issued ?created .
+                           dcterms:issued ?created ;
+                           drafter:version ?version .
         }
     }
 }

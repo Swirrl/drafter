@@ -23,7 +23,6 @@
      " ; "
      [(mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at)
       (mgmt/set-timestamp (ds/->draftset-uri draftset-ref) dcterms:modified modified-at)
-      (mgmt/set-version draft-graph-uri version)
       (mgmt/set-version (ds/->draftset-uri draftset-ref) version)])))
 
 (defn touch-graph-in-draftset!

@@ -1,0 +1,16 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+DELETE {
+  GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public drafter:version ?old .
+  }
+} INSERT {
+  GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public drafter:version ?new .
+  }
+} WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public drafter:version ?old .
+  }
+  BIND(uuid() AS ?new)
+}

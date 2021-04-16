@@ -8,7 +8,6 @@
 <http://publishmydata.com/graphs/drafter/drafts> {
 	<http://test.com/made-live-and-deleted-1> a drafter:ManagedGraph ;
 		dcterms:modified "2017-11-29T09:58:36.715Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:53521dc1-325d-435c-b52e-aa1344d68a25> ;
 		drafter:isPublic true ;
 		dcterms:issued "2017-11-29T09:58:36.969Z"^^xsd:dateTime .
 	
@@ -22,12 +21,10 @@
 	
 	draft:dg-1 a drafter:DraftGraph ;
 		dcterms:modified "2017-11-29T09:58:36.833Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:c97333a1-b575-4e82-8ec7-b8d6db699194> ;
 		dcterms:created "2017-11-29T09:58:36.833Z"^^xsd:dateTime .
 	
 	draft:dg-2 a drafter:DraftGraph ;
 		dcterms:modified "2017-11-29T09:58:36.913Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:620ab79f-f3a4-4b8f-ac68-f753b33607c2> ;
 		dcterms:created "2017-11-29T09:58:36.913Z"^^xsd:dateTime .
 }
 

@@ -326,18 +326,18 @@
 (def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
 (def ds-1 "draftset-1 is made of dg-1 dg-2" #{ds-1-dg-1 ds-1-dg-2})
 
-(def ds-1-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
+(def ds-1-most-recently-modified "modified time of ds-1-dg-2 the most recently modified graph in ds-1"
   {:draftmod (OffsetDateTime/parse "2017-04-04T04:04:04.000-00:00")
-   :draftver (util/urn-uuid "54fc8b22-fe2c-4352-97f2-5af0f71d3cb2")})
+   :draftver (util/urn-uuid "52099c51-5cab-496c-9aed-2bbcb3c36874")})
 
 
 (def ds-2-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
 
 (def ds-2 #{ds-2-dg-1})
 
-(def ds-2-most-recently-modified "modified time of dg-2 the most recently modified graph in ds1"
+(def ds-2-most-recently-modified "modified time of ds-2-dg-1 the most recently modified graph in ds-22"
   {:draftmod (OffsetDateTime/parse "2017-05-05T05:05:05.000-00:00")
-   :draftver (util/urn-uuid "3e757edc-2720-43dc-86e5-317168ae4cf2")})
+   :draftver (util/urn-uuid "c7af52ba-b8ef-41f3-b116-11bfcd4ef353")})
 
 
 (defn edn->dataset [{:keys [default-graphs named-graphs]}]

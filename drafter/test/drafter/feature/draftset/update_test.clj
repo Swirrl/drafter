@@ -576,7 +576,6 @@ SELECT * WHERE {
     ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
     ?dg <http://purl.org/dc/terms/created> ?dg_created .
     ?dg <http://purl.org/dc/terms/modified> ?dg_modified .
-    ?dg <http://publishmydata.com/def/drafter/version> ?dg_version .
     ?ds <http://purl.org/dc/terms/created> ?ds_created .
     ?ds <http://purl.org/dc/terms/modified> ?ds_modified .
     ?ds <http://publishmydata.com/def/drafter/version> ?ds_version .
@@ -633,7 +632,6 @@ SELECT * WHERE {
               (repo/query conn (metadata-q draftset-uri))]
           (is (.isAfter ds_modified ds_created))
           (is (.isAfter dg_modified dg_created))
-          (is (not= (:dg_version ds-meta-1) (:dg_version ds-meta-2)))
           (is (not= (:ds_version ds-meta-1) (:ds_version ds-meta-2)))))
 
       (testing "Live graph g; INSERT DATA into g; check metadata"
@@ -680,7 +678,6 @@ SELECT * WHERE {
               (repo/query conn (metadata-q draftset-uri))]
           (is (.isAfter ds_modified ds_created))
           (is (.isAfter dg_modified dg_created))
-          (is (not= (:dg_version ds-meta-1) (:dg_version ds-meta-2)))
           (is (not= (:ds_version ds-meta-1) (:ds_version ds-meta-2)))))
 
       (testing "Live graph g, with draft graph; DROP GRAPH g; check metadata"
@@ -723,7 +720,6 @@ SELECT * WHERE {
               (repo/query conn (metadata-q draftset-uri))]
           (is (.isAfter ds_modified ds_created))
           (is (.isAfter dg_modified dg_created))
-          (is (not= (:dg_version ds-meta-1) (:dg_version ds-meta-2)))
           (is (not= (:ds_version ds-meta-1) (:ds_version ds-meta-2))))))))
 
 (t/deftest protected-graphs-test

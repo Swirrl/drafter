@@ -7,6 +7,7 @@
     <http://s> <http://p> <http://o> .
     drafter:public rdfs:label "Public endpoint" ;
                    dcterms:modified "2020-01-01T00:00:00.000Z"^^xsd:dateTime ;
+                   drafter:version <urn:uuid:c7771916-c578-4ae9-82b1-00283ac1d96e> ;
                    dcterms:issued "2019-12-31T04:38:15.542Z"^^xsd:dateTime .
 
 }

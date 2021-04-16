@@ -14,18 +14,18 @@
           "Successful job (returns true doesn't return an exception/error)")))
 
 (defn ensure-draftgraph-and-draftset-modified
-  "Test that the draftgraph and draftset modified times and versions match.
-   NOTE that because a draftset contains multiple draft graphs these and we
-   expect the cardinality of modifiedAt to be 1 per resource this should only
-   be applied after modifying a specific graph."
+  "Test that the draftgraph and draftset modified times match, and return the
+   draftset modified time and version. NOTE that because a draftset contains
+   multiple draft graphs these and we expect the cardinality of modifiedAt to
+   be 1 per resource this should only be applied after modifying a specific
+   graph."
   [backend draftset live-graph]
   (let [ds-uri (draftset-id->uri (:id draftset))
-        modified-query (str "SELECT ?modified {"
+        modified-query (str "SELECT ?modified ?version {"
                             "   <" live-graph "> <" drafter:hasDraft "> ?draftgraph ."
                             "   ?draftgraph a <" drafter:DraftGraph "> ;"
                             "                 <" drafter:inDraftSet "> <" ds-uri "> ;"
-                            "                 <" drafter:modifiedAt "> ?modified ;"
-                            "                 <" drafter:version "> ?version ."
+                            "                 <" drafter:modifiedAt "> ?modified ."
                             "<" ds-uri ">" "<" drafter:modifiedAt "> ?modified ;"
                             "                 <" drafter:version "> ?version ."
                             "} LIMIT 2")]

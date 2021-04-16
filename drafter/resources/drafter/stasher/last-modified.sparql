@@ -12,7 +12,13 @@ SELECT ?livemod ?livever ?draftmod ?draftver WHERE {
         ?graph a drafter:ManagedGraph ;
                drafter:isPublic "true"^^xsd:boolean ;
                dcterms:modified ?livemod .
-        OPTIONAL { ?graph drafter:version ?livever . }
+      }
+      # TODO we don't really want this to be optional, it would be better to
+      # ensure it always exists.
+      OPTIONAL {
+        GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+          drafter:public drafter:version ?livever .
+        }
       }
     }
   }
@@ -23,7 +29,8 @@ SELECT ?livemod ?livever ?draftmod ?draftver WHERE {
       GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
         ?graph a drafter:DraftGraph ;
                dcterms:modified ?draftmod .
-        OPTIONAL { ?graph drafter:version ?draftver . }
+        ?graph drafter:inDraftSet ?ds .
+        ?ds drafter:version ?draftver .
       }
     }
   }

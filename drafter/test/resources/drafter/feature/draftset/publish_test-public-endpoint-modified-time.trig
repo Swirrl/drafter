@@ -12,6 +12,7 @@
 <http://publishmydata.com/graphs/drafter/endpoints> {
     drafter:public rdf:type drafter:Endpoint ;
                    dcterms:modified "2020-07-01T09:02:43.859Z"^^xsd:dateTime ;
+                   drafter:version <urn:uuid:31ef8ded-f8fd-452f-826e-57517041dc9f> ;
                    dcterms:issued "2020-06-03T11:53:38.893Z"^^xsd:dateTime .
 }
 
@@ -33,6 +34,5 @@ draftset:efc3169b-887a-4bd0-aa2c-30922539cde1 a drafter:DraftSet ;
     rdf:a drafter:DraftGraph ;
     drafter:inDraftSet draftset:efc3169b-887a-4bd0-aa2c-30922539cde1 ;
     dcterms:created "2020-07-02T12:47:35.406Z"^^xsd:dateTime ;
-    dcterms:modified "2020-07-03T16:21:43.045Z"^^xsd:dateTime ;
-    drafter:version <urn:uuid:483cb07f-03de-49fc-8efa-7235c4baccb4> .
+    dcterms:modified "2020-07-03T16:21:43.045Z"^^xsd:dateTime .
 }

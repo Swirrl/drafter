@@ -20,6 +20,14 @@
 # - draftset only query (unionwithlive false)
 # - live+draftset (unionwithlive true) 
 
+# Public endpoint, for the version of live.
+<http://publishmydata.com/graphs/drafter/endpoints> {
+    drafter:public rdf:type drafter:Endpoint ;
+                   dcterms:modified "2020-06-19T10:01:45.036Z"^^xsd:dateTime ;
+                   drafter:version <urn:uuid:819a18bc-f832-48b9-81f0-082609da44e8> ;
+                   dcterms:issued "2020-06-18T17:18:06.406Z"^^xsd:dateTime .
+}
+
 <http://publishmydata.com/graphs/drafter/drafts> {
 
 	########################################################################
@@ -29,14 +37,12 @@
 	# Live graph with two changes in 2 draftsets
 	<http://live-and-ds1-and-ds2> a drafter:ManagedGraph ;
 		dcterms:modified "2017-01-01T01:01:01.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:f437eab4-cbb5-4f04-b1ba-8bf8c96c0904> ;
 		drafter:isPublic "true"^^xsd:boolean ;
 		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime .
 
 	# a graph not in a draftset
 	<http://live-only> a drafter:ManagedGraph ;
 		dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:819a18bc-f832-48b9-81f0-082609da44e8> ;
 		drafter:isPublic "true"^^xsd:boolean ;
 		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime .
 
@@ -59,13 +65,11 @@
 	draft:ds-1-dg-1 a drafter:DraftGraph ;
 		dcterms:created "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
 		dcterms:modified "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:fbb1f6c4-0337-4a2c-a026-224513330c51> ;
 		drafter:inDraftSet draftset:ds-1 .
 
 	draft:ds-1-dg-2 a drafter:DraftGraph ;
 		dcterms:created "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
 		dcterms:modified "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:54fc8b22-fe2c-4352-97f2-5af0f71d3cb2> ;
 		drafter:inDraftSet draftset:ds-1 .
 
 
@@ -82,7 +86,6 @@
 	draft:ds-2-dg-1 a drafter:DraftGraph ;
 		dcterms:created "2017-05-05T05:05:05.000Z"^^xsd:dateTime ;
 		dcterms:modified "2017-05-05T05:05:05.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:3e757edc-2720-43dc-86e5-317168ae4cf2> ;
 		drafter:inDraftSet draftset:ds-2 .
  
 }

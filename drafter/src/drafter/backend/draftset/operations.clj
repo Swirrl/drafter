@@ -477,6 +477,18 @@
   (let [q (update-public-endpoint-modified-at-query)]
     (sparql/update! backend q)))
 
+(defn- update-public-endpoint-version-query []
+  (->
+   "drafter/backend/draftset/operations/update-public-endpoint-version.sparql"
+   io/resource
+   slurp))
+
+(defn update-public-endpoint-version!
+  "Updates the modified time of the public endpoint to the current time"
+  [backend]
+  (let [q (update-public-endpoint-version-query)]
+    (sparql/update! backend q)))
+
 (defn publish-draftset-graphs! [backend draftset-ref clock]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
     (mgmt/migrate-graphs-to-live! backend (vals graph-mapping) clock)))

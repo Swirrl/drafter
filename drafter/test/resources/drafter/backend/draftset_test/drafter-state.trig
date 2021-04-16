@@ -27,7 +27,6 @@
 	# Live graph with two changes in 2 draftsets
 	<http://live-drafted> a drafter:ManagedGraph ;
 		dcterms:modified "2017-01-01T01:01:01.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:39b5ba81-6841-4c62-b073-c77b0caaaa47> ;
 		drafter:isPublic "true"^^xsd:boolean ;
 		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime ;
 		drafter:hasDraft draft:ds-1-dg-2 .
@@ -35,7 +34,6 @@
 	# a graph not in a draftset
 	<http://live-only> a drafter:ManagedGraph ;
 		dcterms:modified "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:c0337a42-a70d-4315-b89a-053ddba82e8d> ;
 		drafter:isPublic "true"^^xsd:boolean ;
 		dcterms:issued "2017-01-01T01:01:01.000Z"^^xsd:dateTime .
 
@@ -58,13 +56,11 @@
 	draft:ds-1-dg-1 a drafter:DraftGraph ;
 		dcterms:created "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
 		dcterms:modified "2017-03-03T03:03:03.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:2078d3a3-1703-43dd-ba00-613c7f662eeb> ;
 		drafter:inDraftSet draftset:ds-1 .
 
 	draft:ds-1-dg-2 a drafter:DraftGraph ;
 		dcterms:created "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
 		dcterms:modified "2017-04-04T04:04:04.000Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:cc61df37-8cc9-4ee8-981f-fbaa6ae70344> ;
 		drafter:inDraftSet draftset:ds-1 .
 }
 

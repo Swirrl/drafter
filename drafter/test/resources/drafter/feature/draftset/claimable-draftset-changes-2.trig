@@ -13,7 +13,6 @@
 	
 	<http://graph1> a drafter:ManagedGraph ;
 		dcterms:modified "2018-01-16T16:31:53.968Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:13596179-4bdf-4d66-b6c7-073d15231a9c> ;
 		drafter:isPublic true ;
 		dcterms:issued "2018-01-16T15:50:27.475Z"^^xsd:dateTime ;
 		drafter:hasDraft draft:dg-1 , draft:delete-on-g1 .
@@ -36,13 +35,11 @@
 	
 	draft:delete-on-g1 a drafter:DraftGraph ;
 		dcterms:modified "2018-01-16T16:31:54.296Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:970af93a-451a-43dd-8fbe-82572b0be443> ;
 		dcterms:created "2018-01-16T16:31:54.296Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:draftset-under-test .
 	
 	draft:append-on-g2 a drafter:DraftGraph ;
 		dcterms:modified "2018-01-16T16:31:54.436Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:4c98c601-0dd7-4778-b2bc-3bbfe30122c1> ;
 		dcterms:created "2018-01-16T16:31:54.440Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:draftset-under-test .
 }
@@ -88,13 +85,11 @@ draft:append-on-g2 {
 
 	draft:dg-1 a drafter:DraftGraph ;
 		dcterms:modified "2018-01-16T15:50:28.957Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:b93a79ad-2f01-4e94-a130-0cf148940a1c> ;
 		dcterms:created "2018-01-16T15:50:28.957Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:ds-1 .
 	
 	draft:dg-2 a drafter:DraftGraph ;
 		dcterms:modified "2018-01-16T15:50:30.589Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:37dc4367-2016-4999-b7c6-ba031c074585> ;
 		dcterms:created "2018-01-16T15:50:30.602Z"^^xsd:dateTime ;
 		drafter:inDraftSet draftset:ds-2 .
 

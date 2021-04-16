@@ -84,8 +84,7 @@
         draft-graph-triples [draft-graph-uri
                              [rdf:a drafter:DraftGraph]
                              [drafter:createdAt time]
-                             [drafter:modifiedAt time]
-                             [drafter:version (util/urn-uuid)]]
+                             [drafter:modifiedAt time]]
         draft-graph-triples (cond-> draft-graph-triples
                                     (some? draftset-uri) (conj [drafter:inDraftSet draftset-uri]))]
     (apply mgmt/to-quads [live-graph-triples draft-graph-triples])))
@@ -118,7 +117,6 @@
                              [rdf:a drafter:DraftGraph]
                              [drafter:createdAt time]
                              [drafter:modifiedAt time]
-                             [drafter:version (util/urn-uuid)]
                              [drafter:inDraftSet draftset-uri]]]
     (apply mgmt/to-quads [live-graph-triples draft-graph-triples])))
 

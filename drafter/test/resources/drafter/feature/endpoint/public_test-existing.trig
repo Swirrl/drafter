@@ -5,5 +5,6 @@
 <http://publishmydata.com/graphs/drafter/endpoints> {
     drafter:public rdf:type drafter:Endpoint ;
                    dcterms:modified "2020-06-19T10:01:45.036Z"^^xsd:dateTime ;
+                   drafter:version <urn:uuid:ed0b710c-92f1-4a8b-822e-1bf48daeaa6d> ;
                    dcterms:issued "2020-06-18T17:18:06.406Z"^^xsd:dateTime .
 }

@@ -30,6 +30,7 @@
                    (try
                      (ops/publish-draftset-graphs! backend draftset-id clock)
                      (ops/update-public-endpoint-modified-at! backend)
+                     (ops/update-public-endpoint-version! backend)
                      (ops/delete-draftset-statements! backend draftset-id)
                      (jobs/job-succeeded! job)
                      (catch Exception ex
