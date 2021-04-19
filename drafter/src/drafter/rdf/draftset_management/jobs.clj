@@ -1,12 +1,14 @@
 (ns drafter.rdf.draftset-management.jobs
-  (:require [drafter.backend.common :refer :all]
-            [drafter.backend.draftset.operations :as ops]
-            [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
-            [drafter.draftset :as ds]
-            [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.rdf.sesame :refer [read-statements]]
-            [grafter-2.rdf.protocols :as rdf :refer [context map->Quad]]
-            [grafter-2.rdf4j.io :refer [quad->backend-quad]]))
+  (:require
+   [drafter.backend.common :refer :all]
+   [drafter.backend.draftset.operations :as ops]
+   [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
+   [drafter.draftset :as ds]
+   [drafter.feature.endpoint.public :as pub]
+   [drafter.rdf.draftset-management.job-util :as jobs]
+   [drafter.rdf.sesame :refer [read-statements]]
+   [grafter-2.rdf.protocols :as rdf :refer [context map->Quad]]
+   [grafter-2.rdf4j.io :refer [quad->backend-quad]]))
 
 (defn delete-draftset-job [backend user-id {:keys [draftset-id metadata]}]
   (jobs/make-job user-id
@@ -29,6 +31,7 @@
                  (fn [job]
                    (try
                      (ops/publish-draftset-graphs! backend draftset-id clock)
+                     (pub/ensure-public-endpoint backend)
                      (ops/update-public-endpoint-modified-at! backend)
                      (ops/update-public-endpoint-version! backend)
                      (ops/delete-draftset-statements! backend draftset-id)

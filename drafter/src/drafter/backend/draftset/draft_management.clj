@@ -72,7 +72,6 @@
   [offset-datetime]
   (str (rio/->backend-type offset-datetime)))
 
-;; TODO surely both of these can be written in terms of upsert-single-object!
 (defn set-timestamp
   "Returns an update string to update the given subject/resource with
   the supplied a timestamp."

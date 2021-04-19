@@ -13,12 +13,8 @@ SELECT ?livemod ?livever ?draftmod ?draftver WHERE {
                drafter:isPublic "true"^^xsd:boolean ;
                dcterms:modified ?livemod .
       }
-      # TODO we don't really want this to be optional, it would be better to
-      # ensure it always exists.
-      OPTIONAL {
-        GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
-          drafter:public drafter:version ?livever .
-        }
+      GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
+        drafter:public drafter:version ?livever .
       }
     }
   }
