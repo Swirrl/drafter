@@ -1,6 +1,6 @@
 language: java
 sudo: required
-dist: trusty
+dist: bionic
 lein: 2.9.1
 jdk:
   - openjdk8
