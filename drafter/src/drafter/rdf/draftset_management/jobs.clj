@@ -31,7 +31,6 @@
                  (fn [job]
                    (try
                      (ops/publish-draftset-graphs! backend draftset-id clock)
-                     (pub/ensure-public-endpoint backend)
                      (ops/update-public-endpoint-modified-at! backend)
                      (ops/update-public-endpoint-version! backend)
                      (ops/delete-draftset-statements! backend draftset-id)
