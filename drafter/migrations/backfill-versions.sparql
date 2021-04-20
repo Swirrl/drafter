@@ -1,0 +1,16 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+WITH <http://publishmydata.com/graphs/drafter/endpoints>
+INSERT {
+    drafter:public drafter:version ?version
+} WHERE {
+    BIND(uuid() AS ?version)
+};
+
+WITH <http://publishmydata.com/graphs/drafter/drafts>
+INSERT {
+    ?ds drafter:version ?version
+} WHERE {
+    BIND(uuid() AS ?version)
+    ?ds a drafter:DraftSet
+}
