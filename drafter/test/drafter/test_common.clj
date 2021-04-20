@@ -578,7 +578,6 @@
         triples-before# (get-public-endpoint-triples repo#)]
     ~@forms
     (let [triples-after# (get-public-endpoint-triples repo#)]
-      (is (= (set (map :p triples-before#)) (set (map :p triples-after#))))
       (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#)))))))
 
 (defn incrementing-clock
