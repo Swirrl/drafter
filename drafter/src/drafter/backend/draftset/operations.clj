@@ -468,16 +468,18 @@
         [result] (sparql/eager-query backend q)]
     (:dg result)))
 
-(defn- update-public-endpoint-modified-at-query []
-  (slurp (io/resource "drafter/backend/draftset/operations/update-public-endpoint-modified-at.sparql")))
+(def update-public-endpoint-modified-at-query
+  (->
+   "drafter/backend/draftset/operations/update-public-endpoint-modified-at.sparql"
+   io/resource
+   slurp))
 
 (defn update-public-endpoint-modified-at!
   "Updates the modified time of the public endpoint to the current time"
   [backend]
-  (let [q (update-public-endpoint-modified-at-query)]
-    (sparql/update! backend q)))
+  (sparql/update! backend update-public-endpoint-modified-at-query))
 
-(defn- update-public-endpoint-version-query []
+(def update-public-endpoint-version-query
   (->
    "drafter/backend/draftset/operations/update-public-endpoint-version.sparql"
    io/resource
@@ -486,8 +488,7 @@
 (defn update-public-endpoint-version!
   "Updates the modified time of the public endpoint to the current time"
   [backend]
-  (let [q (update-public-endpoint-version-query)]
-    (sparql/update! backend q)))
+  (sparql/update! backend update-public-endpoint-version-query))
 
 (defn publish-draftset-graphs! [backend draftset-ref clock]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
