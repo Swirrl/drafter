@@ -678,9 +678,23 @@ paths:
       operationId: post-update-draftset
       summary: Update this Draftset with SPARQL
       description: |
-        Update this Draftset via the SPARQL update language and protocol.
+        Update this Draftset via a limited subset of the [SPARQL update](https://www.w3.org/TR/2013/REC-sparql11-update-20130321/)
+        language and protocol.
+        
+        NOTE we only support the following sparql update statements:
+        
+        - DROP GRAPH <g>
+        - INSERT DATA { ... } 
+        - DELETE DATA { ... }
 
-        Please consult the SPARQL update protocol specification http://www.w3.org/TR/sparql11-protocol/ for a description of this endpoint.
+        These statements may be combined in any order or combination.
+        
+        Additionally there are size restrictions on the amount of data this
+        endpoint will operate on.  It is intended to operate on small amounts 
+        of data only i.e. typically no more than 5000 triples will be allowed 
+        to be modified through this method.
+
+        Please consult the SPARQL [update protocol specification](http://www.w3.org/TR/sparql11-protocol/) for a description of this endpoint.
 
         Note that the parameters below are documented for the
         application/x-www-form-urlencoded case. See the specification linked
