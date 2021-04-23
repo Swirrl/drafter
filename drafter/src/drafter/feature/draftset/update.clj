@@ -1,34 +1,33 @@
 (ns drafter.feature.draftset.update
-  (:require
-   [clojure.set :as set]
-   [clojure.spec.alpha :as s]
-   [clojure.string :as string]
-   [drafter.backend.draftset.arq :as arq]
-   [drafter.backend.draftset.draft-management :as dm]
-   [drafter.backend.draftset.graphs :as graphs]
-   [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
-   [drafter.draftset :as ds]
-   [drafter.errors :refer [wrap-encode-errors]]
-   [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
-   [drafter.rdf.drafter-ontology :refer :all]
-   [drafter.rdf.jena :as jena]
-   [drafter.rdf.sparql :as sparql]
-   [drafter.time :as time]
-   [grafter-2.rdf4j.repository :as repo]
-   [grafter.url :as url]
-   [grafter.vocabularies.rdf :refer :all]
-   [integrant.core :as ig]
-   [ring.middleware.cors :as cors]
-   [ring.util.request :as request])
-  (:import
-   [org.apache.jena.query Syntax]
-   [org.apache.jena.sparql.algebra Algebra OpAsQuery]
-   [org.apache.jena.sparql.modify.request
-    QuadDataAcc Target UpdateCopy UpdateDrop UpdateDataDelete UpdateDataInsert]
-   [org.apache.jena.update UpdateFactory]
-   java.net.URI
-   org.apache.jena.sparql.sse.Item
-   org.apache.jena.sparql.sse.SSE))
+  (:require [clojure.set :as set]
+            [clojure.spec.alpha :as s]
+            [drafter.backend.draftset.arq :as arq]
+            [drafter.backend.draftset.draft-management :as dm]
+            [drafter.backend.draftset.rewrite-query :refer [uri-constant-rewriter]]
+            [drafter.feature.draftset-data.common :refer [touch-graph-in-draftset]]
+            [drafter.rdf.drafter-ontology :refer :all]
+            [drafter.draftset :as ds]
+            [drafter.rdf.sparql :as sparql]
+            [integrant.core :as ig]
+            [ring.middleware.cors :as cors]
+            [drafter.errors :refer [wrap-encode-errors]]
+            [grafter.vocabularies.rdf :refer :all]
+            [grafter.url :as url]
+            [clojure.string :as string]
+            [ring.util.request :as request]
+            [grafter-2.rdf4j.repository :as repo]
+            [drafter.backend.draftset.graphs :as graphs]
+            [drafter.time :as time]
+            [drafter.rdf.jena :as jena])
+  (:import java.net.URI
+           [org.apache.jena.sparql.algebra Algebra OpAsQuery]
+           [org.apache.jena.sparql.modify.request
+            QuadDataAcc Target
+            UpdateCopy UpdateDrop UpdateDataDelete UpdateDataInsert]
+           org.apache.jena.sparql.sse.SSE
+           org.apache.jena.sparql.sse.Item
+           [org.apache.jena.query Syntax]
+           [org.apache.jena.update UpdateFactory]))
 
 (defn- rewrite-quad [rewriter quad]
   (-> quad SSE/str arq/->sse-item arq/sse-zipper rewriter str SSE/parseQuad))
