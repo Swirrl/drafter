@@ -558,15 +558,8 @@
 (defn get-public-endpoint-triples [repo]
   (sparql/eager-query repo (select-all-in-graph drafter:endpoints)))
 
-(defn is-modified-statement? [s]
-  (= dcterms:modified (:p s)))
-
-(defn is-version-statement? [s]
-  (= drafter:version (:p s)))
-
 (defn remove-updated [endpoint-triples]
-  (remove (some-fn is-modified-statement? is-version-statement?)
-          endpoint-triples))
+  (remove (comp #{dcterms:modified drafter:version} :p) endpoint-triples))
 
 (defmacro check-endpoint-graph-consistent
   "Macro to check the public endpoints graph is not corrupted by the actions executed
