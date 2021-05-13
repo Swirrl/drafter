@@ -1,27 +1,40 @@
 PREFIX drafter: <http://publishmydata.com/def/drafter/>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 
+# Ensure we have a representation of the public endpoint with modified
+# issued and a version set.
+#
+# If for any reason some of these aren't set they will be created.
+#
+# In the unlikely case where we have a modified but not an issued
+# time, we will use the modified for the issued time.
+#
+# In the cases where they don't exist we use now(), and coin a UUID
+# for the version.
 INSERT {
     GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
         drafter:public rdf:type drafter:Endpoint ;
-                       dcterms:modified ?n ;
-                       dcterms:issued ?n ;
-                       drafter:version ?u .
+                       dcterms:modified ?modified ;
+                       dcterms:issued ?issued ;
+                       drafter:version ?version .
     }
 } WHERE {
     GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
-        {
-          SELECT ?n ?u WHERE {
-            BIND(now() AS ?n)
-            BIND(uuid() AS ?u)
-          }
-        }
-        FILTER NOT EXISTS {
-            drafter:public rdf:type drafter:Endpoint ;
-                           dcterms:modified ?modified ;
-                           dcterms:issued ?created ;
-                           drafter:version ?version .
-        }
+      OPTIONAL {
+        drafter:public dcterms:modified ?m .
+      }
+      OPTIONAL {
+        drafter:public dcterms:issued ?i .
+      }
+      OPTIONAL {
+        drafter:public drafter:version ?v .
+
+      }
+      BIND(now() AS ?now)
+      BIND(COALESCE(?m, ?now) AS ?modified)
+      BIND(COALESCE(?i, ?m, ?now) AS ?issued)
+      BIND(COALESCE(?v, uuid()) AS ?version)
     }
 }
