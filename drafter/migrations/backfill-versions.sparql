@@ -1,16 +1,15 @@
 PREFIX drafter: <http://publishmydata.com/def/drafter/>
 
-WITH <http://publishmydata.com/graphs/drafter/endpoints>
-INSERT {
-    drafter:public drafter:version ?version
-} WHERE {
-    BIND(uuid() AS ?version)
-};
+# Migration to backfill versions on DraftSets and the public Endpoint
 
 WITH <http://publishmydata.com/graphs/drafter/drafts>
 INSERT {
-    ?ds drafter:version ?version
+  ?ds drafter:version ?version
 } WHERE {
-    BIND(uuid() AS ?version)
-    ?ds a drafter:DraftSet
+  VALUES ?endpoint_type { drafter:Endpoint drafter:DraftSet }
+
+  ?ds a ?endpoint_type .
+  OPTIONAL { ?ds drafter:version ?existing_version }
+  BIND(uuid() AS ?new_version )
+  BIND(COALESCE(?existing_version, ?new_version) AS ?version)
 }
