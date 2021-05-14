@@ -16,6 +16,7 @@
   (let [id (UUID/randomUUID)
         created-at (time/minus (time/now) (time/days 1))
         updated-at (time/plus created-at (time/hours 4))
+        version (str "urn:uuid:" (UUID/randomUUID))
         display-name "Test draftset"
         description "Draftset description"
         json {:id (str id)
@@ -24,6 +25,7 @@
               :description description
               :created-at (str created-at)
               :updated-at (str updated-at)
+              :version version
               :changes {"http://g1" {:status :updated}
                         "http://g2" {:status :created}}}
         ds (sut/from-json json)]
@@ -32,4 +34,5 @@
     (t/is (= display-name (sut/name ds)))
     (t/is (= description (sut/description ds)))
     (t/is (= created-at (endpoint/created-at ds)))
-    (t/is (= updated-at (endpoint/updated-at ds)))))
+    (t/is (= updated-at (endpoint/updated-at ds)))
+    (t/is (= version (endpoint/version ds)))))

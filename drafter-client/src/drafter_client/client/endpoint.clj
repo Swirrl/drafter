@@ -10,14 +10,16 @@
 
 (defprotocol IEndpoint
   (created-at [this])
-  (updated-at [this]))
+  (updated-at [this])
+  (version [this]))
 
-(defrecord Endpoint [id created-at updated-at]
+(defrecord Endpoint [id created-at updated-at version]
   IEndpointRef
   (endpoint-id [this] id)
   IEndpoint
   (created-at [this] created-at)
-  (updated-at [this] updated-at))
+  (updated-at [this] updated-at)
+  (version [this] version))
 
 (defn- ->ref [id] (->EndpointRef id))
 (def public (->ref "public"))

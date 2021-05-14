@@ -178,7 +178,12 @@
           (let [endpoint (sut/get-endpoint client token ds {:union-with-live true})
                 public-endpoint (sut/get-public-endpoint client)]
             (t/is (= (endpoint/endpoint-id ds) (endpoint/endpoint-id endpoint)))
-            (t/is (= (endpoint/updated-at public-endpoint) (endpoint/updated-at endpoint)))))
+            (t/is (= (endpoint/updated-at public-endpoint)
+                     (endpoint/updated-at endpoint)))
+            (t/is (= (endpoint/version ds)
+                     (endpoint/version endpoint)))
+            (t/is (= (endpoint/version public-endpoint)
+                     (draftset/public-version endpoint)))))
 
         (t/testing "default"
           (let [endpoint (sut/get-endpoint client token ds)]
@@ -239,13 +244,22 @@
       (let [draftsets (sut/draftsets client token)]
         (is (= 1 (count draftsets)))
         (is (= (draftset/id ds) (draftset/id (first draftsets))))
-        (is (= (endpoint/updated-at ds) (endpoint/updated-at (first draftsets))))))
+        (is (= (endpoint/updated-at ds)
+               (endpoint/updated-at (first draftsets))))
+        (is (= (endpoint/version ds)
+               (endpoint/version (first draftsets))))
+        (is (nil? (draftset/public-version (first draftsets))))))
     (t/testing "true"
       (let [draftsets (sut/draftsets client token {:union-with-live true})
             public-endpoint (sut/get-public-endpoint client)]
         (is (= 1 (count draftsets)))
         (is (= (draftset/id ds) (draftset/id (first draftsets))))
-        (is (= (endpoint/updated-at public-endpoint) (endpoint/updated-at (first draftsets))))))))
+        (is (= (endpoint/updated-at public-endpoint)
+               (endpoint/updated-at (first draftsets))))
+        (is (= (endpoint/version ds)
+               (endpoint/version (first draftsets))))
+        (is (= (endpoint/version public-endpoint)
+               (draftset/public-version (first draftsets))))))))
 
 (t/deftest get-draftset-test
   (let [client (drafter-client)
@@ -260,7 +274,12 @@
       (let [public-endpoint (sut/get-public-endpoint client)
             result (sut/get-draftset client token (draftset/id ds) {:union-with-live true})]
         (is (= (draftset/id ds) (draftset/id result)))
-        (is (= (endpoint/updated-at public-endpoint) (endpoint/updated-at result)))))))
+        (is (= (endpoint/updated-at public-endpoint)
+               (endpoint/updated-at result)))
+        (is (= (endpoint/version ds)
+               (endpoint/version result)))
+        (is (= (endpoint/version public-endpoint)
+               (draftset/public-version result)))))))
 
 (t/deftest adding-to-a-draftset
   (let [client (drafter-client)

@@ -9,20 +9,23 @@
 (defprotocol IDraftset
   (id [this])
   (name [this])
-  (description [this]))
+  (description [this])
+  (public-version [this]))
 
-(defrecord Draftset [id name description created-at updated-at]
+(defrecord Draftset [id name description created-at updated-at version public-version]
   IDraftset
   (id [this] id)
   (name [this] name)
   (description [this] description)
+  (public-version [this] public-version)
 
   endpoint/IEndpointRef
   (endpoint-id [this] id)
 
   endpoint/IEndpoint
   (created-at [this] created-at)
-  (updated-at [this] updated-at))
+  (updated-at [this] updated-at)
+  (version [this] version))
 
 (defn ->draftset
   ([] (->draftset (UUID/randomUUID) nil nil))
@@ -31,7 +34,12 @@
   ([id name description] (->draftset id name description (util/now) (util/now)))
   ([id name description created-at] (->draftset id name description created-at created-at))
   ([id name description created-at updated-at]
-   (->Draftset id name description created-at updated-at)))
+   (let [version (str "urn:uuid:" (UUID/randomUUID))]
+     (->draftset id name description created-at updated-at version)))
+  ([id name description created-at updated-at version]
+   (->draftset id name description created-at updated-at version nil))
+  ([id name description created-at updated-at version public-version]
+   (->Draftset id name description created-at updated-at version public-version)))
 
 (defn from-json [ds]
   (-> ds
