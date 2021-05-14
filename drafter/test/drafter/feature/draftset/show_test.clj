@@ -1,14 +1,16 @@
 (ns ^:rest-api drafter.feature.draftset.show-test
-  (:require [clojure.test :as t :refer [is]]
-            [drafter.draftset :as ds]
-            [drafter.draftset.spec]
-            [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
-            [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
-            [grafter-2.rdf4j.io :refer [rdf-writer statements]]
-            [drafter.test-common :as tc]
-            [drafter.feature.draftset.test-helper :as help]
-            [drafter.fixture-data :as fd]
-            [clojure.java.io :as io])
+  (:require
+   [clojure.java.io :as io]
+   [clojure.test :as t :refer [is]]
+   [drafter.draftset :as ds]
+   [drafter.draftset.spec]
+   [drafter.feature.draftset.test-helper :as help]
+   [drafter.fixture-data :as fd]
+   [drafter.test-common :as tc]
+   [drafter.user-test :refer [test-editor test-publisher]]
+   [drafter.util :as util]
+   [grafter-2.rdf.protocols :refer [context]]
+   [grafter-2.rdf4j.io :refer [statements]])
   (:import [java.time OffsetDateTime]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -108,7 +110,12 @@
                       (let [{:keys [body] :as response} (handler request)]
                         (tc/assert-is-ok-response response)
                         (tc/assert-spec ::ds/OwnedDraftset body)
-                        (is (= (OffsetDateTime/parse "2020-07-03T10:03:58.994Z") (:updated-at body)))))))
+                        (is (= (OffsetDateTime/parse "2020-07-03T10:03:58.994Z")
+                               (:updated-at body)))
+                        (is (= (util/urn-uuid "e3cb1aee-7ca5-486d-928b-003be7be409c")
+                               (:version body)))
+                        (is (= (util/urn-uuid "98a03936-7dfc-4ff4-b5f4-ea036b7daaec")
+                               (:public-version body)))))))
 
   (t/testing "public endpoint modified after"
     (tc/with-system
@@ -122,7 +129,12 @@
         (let [{:keys [body] :as response} (handler request)]
           (tc/assert-is-ok-response response)
           (tc/assert-spec ::ds/OwnedDraftset body)
-          (is (= (OffsetDateTime/parse "2020-07-03T11:43:02.373Z") (:updated-at body)))))))
+          (is (= (OffsetDateTime/parse "2020-07-03T11:43:02.373Z")
+                 (:updated-at body)))
+          (is (= (util/urn-uuid "c8fdd311-342e-431a-a95e-c47c2352cf3e")
+                 (:version body)))
+          (is (= (util/urn-uuid "17ac35c9-f9ea-4366-a70f-69f2cbd6181d")
+                 (:public-version body)))))))
 
   (t/testing "no public endpoint"
     (tc/with-system
@@ -137,7 +149,11 @@
         (let [{:keys [body] :as response} (handler request)]
           (tc/assert-is-ok-response response)
           (tc/assert-spec ::ds/OwnedDraftset body)
-          (is (= (OffsetDateTime/parse "2020-07-07T16:17:45.539Z") (:updated-at body))))))))
+          (is (= (OffsetDateTime/parse "2020-07-07T16:17:45.539Z")
+                 (:updated-at body)))
+          (is (= (util/urn-uuid "8d220df2-b1e7-418d-835c-04d9b09abb53")
+                 (:version body)))
+          (is (nil? (:public-version body))))))))
 
 (tc/deftest-system-with-keys get-draftset-request-for-non-existent-draftset
   keys-for-test

@@ -1,14 +1,14 @@
 (ns ^:rest-api drafter.feature.draftset.list-test
-  (:require [clojure.test :as t]
-            [drafter.feature.draftset.list :as sut]
-            [drafter.draftset :as ds]
-            [drafter.draftset.spec :as dss]
-            [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor test-manager test-publisher]]
-            [drafter.util :as dutil]
-            [clojure.spec.alpha :as s]
-            [clojure.java.io :as io]
-            [drafter.fixture-data :as fd])
+  (:require
+   [clojure.java.io :as io]
+   [clojure.spec.alpha :as s]
+   [clojure.test :as t]
+   [drafter.draftset :as ds]
+   [drafter.feature.draftset.list :as sut]
+   [drafter.fixture-data :as fd]
+   [drafter.test-common :as tc]
+   [drafter.user-test :refer [test-editor test-manager test-publisher]]
+   [drafter.util :as dutil])
   (:import java.net.URI
            [java.time OffsetDateTime]))
 
@@ -79,13 +79,29 @@
       (fd/load-fixture! {:repo repo :fixtures fixture-resources :format :trig})
       (let [response (handler request)
             draftsets (ok-response->specced-body (s/coll-of ::ds/Draftset) response)
-            ds-times (map (fn [ds] (select-keys ds [:id :created-at :updated-at])) draftsets)
-            expected [{:id         "e06cf827-de24-47ae-8a43-2a1a37c5be4e"
-                       :created-at (OffsetDateTime/parse "2020-07-03T12:12:53.223Z")
-                       :updated-at (OffsetDateTime/parse "2020-07-08T17:40:25.688Z")}
-                      {:id         "7f94456f-8a92-4d40-8691-2c32f89e9741"
-                       :created-at (OffsetDateTime/parse "2020-07-01T09:55:42.147Z")
-                       :updated-at (OffsetDateTime/parse "2020-07-10T08:04:53.787Z")}]]
+            ds-times (map
+                      #(select-keys
+                        %
+                        [:id :created-at :updated-at :version :public-version])
+                      draftsets)
+            expected [{:id "e06cf827-de24-47ae-8a43-2a1a37c5be4e"
+                       :created-at (OffsetDateTime/parse
+                                    "2020-07-03T12:12:53.223Z")
+                       :updated-at (OffsetDateTime/parse
+                                    "2020-07-08T17:40:25.688Z")
+                       :version (dutil/urn-uuid
+                                 "d2b6a883-cace-4a34-ab75-343f323c12a2")
+                       :public-version (dutil/urn-uuid
+                                        "f3871cc6-9cd0-4808-a81b-cb07bc041141")}
+                      {:id "7f94456f-8a92-4d40-8691-2c32f89e9741"
+                       :created-at (OffsetDateTime/parse
+                                    "2020-07-01T09:55:42.147Z")
+                       :updated-at (OffsetDateTime/parse
+                                    "2020-07-10T08:04:53.787Z")
+                       :version (dutil/urn-uuid
+                                 "d1384065-30c8-4a2d-9784-32dfac6d0fa5")
+                       :public-version (dutil/urn-uuid
+                                        "f3871cc6-9cd0-4808-a81b-cb07bc041141")}]]
         (t/is (= (set ds-times) (set expected)))))))
 
 ;; NOTE many of these tests are likely dupes of others in this file
