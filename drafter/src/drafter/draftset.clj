@@ -1,8 +1,10 @@
 (ns drafter.draftset
   "In memory clojure representations of Draftset objects and functions
   to operate on them."
-  (:require [drafter.rdf.drafter-ontology :as ont]
-            [grafter.url :as url])
+  (:require
+   [drafter.rdf.drafter-ontology :as ont]
+   [drafter.util :as util]
+   [grafter.url :as url])
   (:import java.net.URI
            [java.util UUID]
            [java.time OffsetDateTime]))
@@ -62,6 +64,7 @@
       :created-by creator
       :created-at created-at
       :updated-at created-at
+      :version (util/urn-uuid)
       :current-owner creator}))
   ([creator display-name]
    (assoc (create-draftset creator) :display-name display-name))

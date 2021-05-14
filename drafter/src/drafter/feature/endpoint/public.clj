@@ -20,8 +20,12 @@
     (let [bindings (vec (sp/query "drafter/feature/endpoint/get_public_endpoint.sparql" conn))]
       (case (count bindings)
         0 nil
-        1 (let [{:keys [created modified]} (first bindings)]
-            {:id "public" :type "Endpoint" :created-at created :updated-at modified})
+        1 (let [{:keys [created modified version]} (first bindings)]
+            {:id "public"
+             :type "Endpoint"
+             :created-at created
+             :updated-at modified
+             :version version})
         (throw (ex-info "Found multiple public endpoints - expected at most one" {:bindings bindings}))))))
 
 (defmethod ig/init-key ::init [_ {:keys [repo]}]

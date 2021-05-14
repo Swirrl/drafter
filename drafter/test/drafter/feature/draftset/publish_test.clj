@@ -1,15 +1,17 @@
 (ns ^:rest-api drafter.feature.draftset.publish-test
-  (:require [clojure.set :as set]
-            [clojure.test :as t :refer :all]
-            [drafter.feature.draftset.test-helper :as help]
-            [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor test-manager test-publisher]]
-            [grafter-2.rdf.protocols :refer [context]]
-            [grafter-2.rdf4j.io :refer [statements]]
-            [drafter.async.jobs :as async]
-            [martian.encoders :as enc]
-            [drafter.fixture-data :as fd]
-            [clojure.java.io :as io])
+  (:require
+   [clojure.java.io :as io]
+   [clojure.set :as set]
+   [clojure.test :as t :refer :all]
+   [drafter.async.jobs :as async]
+   [drafter.feature.draftset.test-helper :as help]
+   [drafter.fixture-data :as fd]
+   [drafter.test-common :as tc]
+   [drafter.user-test :refer [test-editor test-manager test-publisher]]
+   [drafter.util :as util]
+   [grafter-2.rdf.protocols :refer [context]]
+   [grafter-2.rdf4j.io :refer [statements]]
+   [martian.encoders :as enc])
   (:import [java.time OffsetDateTime]
            [java.time.temporal ChronoUnit]))
 
@@ -143,7 +145,7 @@
         (help/append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
         (help/publish-draftset-through-api handler draftset-location test-publisher)))))
 
-(t/deftest publish-updates-live-endpoint-modified-time
+(t/deftest publish-updates-live-endpoint-modified-time-and-version
   (tc/with-system
     [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
     [system system-config]
@@ -154,9 +156,13 @@
       (fd/load-fixture! {:repo repo :fixtures fixture-files :format :trig})
       (help/publish-draftset-through-api handler draftset-location test-publisher)
 
-      (let [{:keys [updated-at] :as public-endpoint} (help/get-public-endpoint-through-api handler)]
+      (let [{:keys [updated-at version] :as public-endpoint}
+            (help/get-public-endpoint-through-api handler)]
         ;;endpoint is updated with the current time on publish so this should be within the last minute
-        (tc/equal-up-to (OffsetDateTime/now) updated-at 1 ChronoUnit/MINUTES)))))
+        (tc/equal-up-to (OffsetDateTime/now) updated-at 1 ChronoUnit/MINUTES)
+        (is (and version (not= version
+                               (util/urn-uuid
+                                "31ef8ded-f8fd-452f-826e-57517041dc9f"))))))))
 
 (tc/deftest-system-with-keys publish-non-existent-draftset
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]

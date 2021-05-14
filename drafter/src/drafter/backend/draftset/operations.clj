@@ -159,6 +159,7 @@
     (with-state-graph
       "?ds <" drafter:createdAt "> ?created ."
       "?ds <" drafter:modifiedAt "> ?modified ."
+      "?ds <" drafter:version "> ?version ."
       "?ds <" drafter:createdBy "> ?creator ."
       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
       "OPTIONAL { ?ds <" drafter:hasOwner "> ?owner . }"
@@ -213,12 +214,24 @@
       "  FILTER (" user-role-score " >= ?rv)"
       "}")))
 
-(defn- draftset-properties-result->properties [draftset-ref {:keys [created title description creator owner role claimuser submitter modified] :as ds}]
+(defn- draftset-properties-result->properties
+  [draftset-ref
+   {:keys [created
+           title
+           description
+           creator
+           owner
+           role
+           claimuser
+           submitter
+           modified
+           version] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :type "Draftset"
                          :created-at created
                          :created-by (user/uri->username creator)
-                         :updated-at modified}
+                         :updated-at modified
+                         :version version}
         optional-fields {:display-name title
                          :description description
                          :current-owner (some-> owner (user/uri->username))

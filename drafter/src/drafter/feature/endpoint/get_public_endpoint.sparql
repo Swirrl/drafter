@@ -6,6 +6,7 @@ SELECT * WHERE {
     GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
         drafter:public a drafter:Endpoint ;
                        dcterms:modified ?modified ;
-                       dcterms:issued ?created .
+                       dcterms:issued ?created ;
+                       drafter:version ?version .
     }
 }
