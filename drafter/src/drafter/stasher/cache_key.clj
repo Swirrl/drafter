@@ -98,26 +98,21 @@
 
 (defmulti time-component key-type)
 
-(defn version->str [urn]
-  (re-find
-   #"(?<=^http://publishmydata.com/def/drafter/version/)[0-9a-f-]+$"
-   (str urn)))
-
 (defmethod time-component ::cache-key
   [{{:keys [livemod draftmod livever draftver]} :last-modified}]
   (str (or (some-> livemod inst-ms) "empty")
        (when draftmod
          (str "-" (inst-ms draftmod)))
        (when livever
-         (str "_" (version->str livever)))
+         (str "_" (util/version->str livever)))
        (when draftver
-         (str "_" (version->str draftver)))))
+         (str "_" (util/version->str draftver)))))
 
 (defmethod time-component ::state-graph-cache-key
   [{{:keys [time version]} :state-graph-last-modified}]
   (str (inst-ms time)
        "_"
-       (version->str version)))
+       (util/version->str version)))
 
 (s/def ::time-component
   #(re-matches #"(empty|[0-9]+)(-[0-9]+)?(_[0-9a-f-]+){0,2}" %))

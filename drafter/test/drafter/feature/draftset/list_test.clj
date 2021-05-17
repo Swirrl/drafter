@@ -82,26 +82,28 @@
             ds-times (map
                       #(select-keys
                         %
-                        [:id :created-at :updated-at :version :public-version])
+                        [:id :created-at :updated-at :version])
                       draftsets)
             expected [{:id "e06cf827-de24-47ae-8a43-2a1a37c5be4e"
                        :created-at (OffsetDateTime/parse
                                     "2020-07-03T12:12:53.223Z")
                        :updated-at (OffsetDateTime/parse
                                     "2020-07-08T17:40:25.688Z")
-                       :version (dutil/version
+                       :version (dutil/merge-versions
+                                 (dutil/version
                                  "d2b6a883-cace-4a34-ab75-343f323c12a2")
-                       :public-version (dutil/version
-                                        "f3871cc6-9cd0-4808-a81b-cb07bc041141")}
+                                 (dutil/version
+                                  "f3871cc6-9cd0-4808-a81b-cb07bc041141"))}
                       {:id "7f94456f-8a92-4d40-8691-2c32f89e9741"
                        :created-at (OffsetDateTime/parse
                                     "2020-07-01T09:55:42.147Z")
                        :updated-at (OffsetDateTime/parse
                                     "2020-07-10T08:04:53.787Z")
-                       :version (dutil/version
-                                 "d1384065-30c8-4a2d-9784-32dfac6d0fa5")
-                       :public-version (dutil/version
-                                        "f3871cc6-9cd0-4808-a81b-cb07bc041141")}]]
+                       :version (dutil/merge-versions
+                                 (dutil/version
+                                  "d1384065-30c8-4a2d-9784-32dfac6d0fa5")
+                                 (dutil/version
+                                  "f3871cc6-9cd0-4808-a81b-cb07bc041141"))}]]
         (t/is (= (set ds-times) (set expected)))))))
 
 ;; NOTE many of these tests are likely dupes of others in this file

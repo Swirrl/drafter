@@ -112,10 +112,10 @@
                         (tc/assert-spec ::ds/OwnedDraftset body)
                         (is (= (OffsetDateTime/parse "2020-07-03T10:03:58.994Z")
                                (:updated-at body)))
-                        (is (= (util/version "e3cb1aee-7ca5-486d-928b-003be7be409c")
-                               (:version body)))
-                        (is (= (util/version "98a03936-7dfc-4ff4-b5f4-ea036b7daaec")
-                               (:public-version body)))))))
+                        (is (= (util/merge-versions
+                                (util/version "e3cb1aee-7ca5-486d-928b-003be7be409c")
+                                (util/version "98a03936-7dfc-4ff4-b5f4-ea036b7daaec"))
+                               (:version body)))))))
 
   (t/testing "public endpoint modified after"
     (tc/with-system
@@ -131,10 +131,10 @@
           (tc/assert-spec ::ds/OwnedDraftset body)
           (is (= (OffsetDateTime/parse "2020-07-03T11:43:02.373Z")
                  (:updated-at body)))
-          (is (= (util/version "c8fdd311-342e-431a-a95e-c47c2352cf3e")
-                 (:version body)))
-          (is (= (util/version "17ac35c9-f9ea-4366-a70f-69f2cbd6181d")
-                 (:public-version body)))))))
+          (is (= (util/merge-versions
+                  (util/version "c8fdd311-342e-431a-a95e-c47c2352cf3e")
+                  (util/version "17ac35c9-f9ea-4366-a70f-69f2cbd6181d"))
+                 (:version body)))))))
 
   (t/testing "no public endpoint"
     (tc/with-system
@@ -152,8 +152,7 @@
           (is (= (OffsetDateTime/parse "2020-07-07T16:17:45.539Z")
                  (:updated-at body)))
           (is (= (util/version "8d220df2-b1e7-418d-835c-04d9b09abb53")
-                 (:version body)))
-          (is (nil? (:public-version body))))))))
+                 (:version body))))))))
 
 (tc/deftest-system-with-keys get-draftset-request-for-non-existent-draftset
   keys-for-test
