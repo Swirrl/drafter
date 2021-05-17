@@ -1,10 +1,11 @@
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix version: <http://publishmydata.com/def/drafter/version/> .
 
 <http://publishmydata.com/graphs/drafter/endpoints> {
     drafter:public rdf:type drafter:Endpoint ;
                    dcterms:modified "2020-07-06T15:32:52.583Z"^^xsd:dateTime ;
-                   drafter:version <urn:uuid:4a5c8625-4080-471f-a5f0-bddbfce36b51> ;
+                   drafter:version version:4a5c8625-4080-471f-a5f0-bddbfce36b51 ;
                    dcterms:issued "2020-07-03T10:11:46.993Z"^^xsd:dateTime .
 }

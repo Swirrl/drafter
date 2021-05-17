@@ -10,6 +10,9 @@ INSERT {
 
   ?ds a ?endpoint_type .
   OPTIONAL { ?ds drafter:version ?existing_version }
-  BIND(uuid() AS ?new_version )
+  BIND(
+    IRI(CONCAT("http://publishmydata.com/def/drafter/version/", STRUUID()))
+    AS ?new_version
+  )
   BIND(COALESCE(?existing_version, ?new_version) AS ?version)
 }

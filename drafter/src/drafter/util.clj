@@ -2,8 +2,10 @@
   (:require [clojure
              [pprint :as pp]
              [string :as str]]
-            [buddy.core.codecs.base64 :as base64]
             [buddy.core.codecs :as codecs]
+            [buddy.core.codecs.base64 :as base64]
+            [drafter.rdf.drafter-ontology :refer [drafter:version]]
+            [grafter.url :as url]
             [integrant.core :as ig])
   (:import java.nio.charset.Charset
            [java.util UUID]
@@ -17,11 +19,11 @@
   []
   (UUID/randomUUID))
 
-(defn urn-uuid
+(defn version
   ([]
-   (urn-uuid (create-uuid)))
-  ([uuid]
-   (URI. (str "urn:uuid:" uuid))))
+   (version (create-uuid)))
+  ([id]
+   (url/->java-uri (url/append-path-segments drafter:version id))))
 
 (defn str->base64 [s]
   (codecs/bytes->str (base64/encode s)))

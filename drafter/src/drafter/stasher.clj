@@ -636,7 +636,7 @@
 
 (defn- get-state-graph-last-modified []
   (let [time (OffsetDateTime/now)
-        version (util/urn-uuid)]
+        version (util/version)]
     (log/infof "Using new state graph last modified of: %s_%s" time version)
     {:time time
      :version version}))

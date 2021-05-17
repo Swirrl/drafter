@@ -8,11 +8,12 @@
 @prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix version: <http://publishmydata.com/def/drafter/version/> .
 
 <http://publishmydata.com/graphs/drafter/endpoints> {
     drafter:public rdf:type drafter:Endpoint ;
                    dcterms:modified "2020-07-01T09:02:43.859Z"^^xsd:dateTime ;
-                   drafter:version <urn:uuid:98a03936-7dfc-4ff4-b5f4-ea036b7daaec> ;
+                   drafter:version version:98a03936-7dfc-4ff4-b5f4-ea036b7daaec ;
                    dcterms:issued "2020-06-23T12:25:12.264Z"^^xsd:dateTime .
 }
 
@@ -20,7 +21,7 @@
 
 draftset:e2607255-96f7-4687-b365-b1efe9b6ace9 a drafter:DraftSet ;
 	dcterms:modified "2020-07-03T10:03:58.994Z"^^xsd:dateTime ;
-	drafter:version <urn:uuid:e3cb1aee-7ca5-486d-928b-003be7be409c> ;
+	drafter:version version:e3cb1aee-7ca5-486d-928b-003be7be409c ;
 	dcterms:created "2020-06-27T16:15:27.523Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	drafter:hasOwner <mailto:editor@swirrl.com> ;

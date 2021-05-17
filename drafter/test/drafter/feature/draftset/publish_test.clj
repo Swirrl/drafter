@@ -161,7 +161,7 @@
         ;;endpoint is updated with the current time on publish so this should be within the last minute
         (tc/equal-up-to (OffsetDateTime/now) updated-at 1 ChronoUnit/MINUTES)
         (is (and version (not= version
-                               (util/urn-uuid
+                               (util/version
                                 "31ef8ded-f8fd-452f-826e-57517041dc9f"))))))))
 
 (tc/deftest-system-with-keys publish-non-existent-draftset

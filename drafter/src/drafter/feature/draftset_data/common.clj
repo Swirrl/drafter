@@ -18,7 +18,7 @@
   "Builds and returns an update string to update the dcterms:modified and
    drafter:version of the supplied resource draft-graph/draftset."
   [draftset-ref draft-graph-uri modified-at]
-  (let [version (util/urn-uuid)]
+  (let [version (util/version)]
     (str/join
      " ; "
      [(mgmt/set-timestamp draft-graph-uri dcterms:modified modified-at)

@@ -37,7 +37,7 @@
 (def fixed-last-modified
   "A fixed modified-state to ensure queries are cached with a known cache key (for testing)"
   {:time (java.time.OffsetDateTime/parse "2019-01-25T01:01:01Z")
-   :version (util/urn-uuid)})
+   :version (util/version)})
 
 (defn- sneak-rdf-file-into-cache!
   "Force the creation of an entry in the cache via the backdoor "
@@ -320,7 +320,7 @@
 
 (def liveset-most-recently-modified
   {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
-   :livever (util/urn-uuid "819a18bc-f832-48b9-81f0-082609da44e8")})
+   :livever (util/version "819a18bc-f832-48b9-81f0-082609da44e8")})
 
 (def ds-1-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
 (def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
@@ -328,7 +328,7 @@
 
 (def ds-1-most-recently-modified "modified time of ds-1-dg-2 the most recently modified graph in ds-1"
   {:draftmod (OffsetDateTime/parse "2017-04-04T04:04:04.000-00:00")
-   :draftver (util/urn-uuid "52099c51-5cab-496c-9aed-2bbcb3c36874")})
+   :draftver (util/version "52099c51-5cab-496c-9aed-2bbcb3c36874")})
 
 
 (def ds-2-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
@@ -337,7 +337,7 @@
 
 (def ds-2-most-recently-modified "modified time of ds-2-dg-1 the most recently modified graph in ds-22"
   {:draftmod (OffsetDateTime/parse "2017-05-05T05:05:05.000-00:00")
-   :draftver (util/urn-uuid "c7af52ba-b8ef-41f3-b116-11bfcd4ef353")})
+   :draftver (util/version "c7af52ba-b8ef-41f3-b116-11bfcd4ef353")})
 
 
 (defn edn->dataset [{:keys [default-graphs named-graphs]}]
@@ -436,7 +436,7 @@
                query-str))
       (t/is (= last-modified
                {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
-                :livever (util/urn-uuid "819a18bc-f832-48b9-81f0-082609da44e8")})))))
+                :livever (util/version "819a18bc-f832-48b9-81f0-082609da44e8")})))))
 
 (defn- prepare-query
   "Prepares an RDF4j query from a connection with the specified bindings set"

@@ -35,7 +35,7 @@
                     :type "Endpoint"
                     :created-at (OffsetDateTime/parse "2020-04-01T12:09:57.043Z")
                     :updated-at (OffsetDateTime/parse "2020-04-06T09:18:37.839Z")
-                    :version (util/urn-uuid
+                    :version (util/version
                               "4a5c8625-4080-471f-a5f0-bddbfce36b51")}]
       (fd/load-fixture! {:repo repo
                          :fixtures [(io/resource "drafter/feature/endpoint/list_test-no-login.trig")]
@@ -73,7 +73,7 @@
                                         "2020-06-10T11:17:46.205Z")
                            :updated-at (OffsetDateTime/parse
                                         "2020-06-12T08:45:20.902Z")
-                           :version (util/urn-uuid
+                           :version (util/version
                                      "c0f5a908-7327-465d-bb12-1ab110404d99")}]
       (fd/load-fixture! {:repo (:drafter.stasher/repo system)
                          :fixtures [(io/resource "drafter/feature/endpoint/list_test-with-login.trig")]

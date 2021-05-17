@@ -8,11 +8,12 @@
 @prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix version: <http://publishmydata.com/def/drafter/version/> .
 
 <http://publishmydata.com/graphs/drafter/drafts> {
 	draftset:owned a drafter:DraftSet ;
 		dcterms:modified "2017-11-30T14:15:17.233Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:a32c08b3-5ff3-4755-8ca2-aad5e7931c15> ;
+		drafter:version version:a32c08b3-5ff3-4755-8ca2-aad5e7931c15 ;
 		dcterms:created "2017-11-30T14:15:17.233Z"^^xsd:dateTime ;
 		dcterms:creator <mailto:publisher@swirrl.com> ;
 		drafter:hasOwner <mailto:publisher@swirrl.com> ;
@@ -21,7 +22,7 @@
         # This draftset should be claimable by publisher@swirrl.com (or anyone in publisher role)
 	draftset:claimable a drafter:DraftSet ;
 		dcterms:modified "2017-11-30T14:15:18.348Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:16bd5568-df31-4d15-931a-681e86c391e2> ;
+		drafter:version version:16bd5568-df31-4d15-931a-681e86c391e2 ;
 		dcterms:created "2017-11-30T14:15:18.348Z"^^xsd:dateTime ;
 		dcterms:creator <mailto:editor@swirrl.com> ;
 		rdfs:label "claimable" ;
@@ -31,7 +32,7 @@
         # This draftset should be unclaimable by publisher@swirrl.com (or anyone else)
 	draftset:unclaimable a drafter:DraftSet ;
 		dcterms:modified "2017-11-30T14:15:19.486Z"^^xsd:dateTime ;
-		drafter:version <urn:uuid:b2fa8ef8-ac80-4a22-a96c-0a8d340e038a> ;
+		drafter:version version:b2fa8ef8-ac80-4a22-a96c-0a8d340e038a ;
 		dcterms:created "2017-11-30T14:15:19.486Z"^^xsd:dateTime ;
 		dcterms:creator <mailto:editor@swirrl.com> ;
 		drafter:hasOwner <mailto:editor@swirrl.com> .

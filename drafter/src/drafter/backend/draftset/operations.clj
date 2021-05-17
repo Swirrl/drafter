@@ -23,7 +23,7 @@
             [rdf:a drafter:DraftSet]
             [drafter:createdAt created-date]
             [drafter:modifiedAt created-date]
-            [drafter:version (util/urn-uuid)]
+            [drafter:version (util/version)]
             [drafter:createdBy user-uri]
             [drafter:hasOwner user-uri]]]
     (cond-> ss

@@ -112,9 +112,9 @@
                         (tc/assert-spec ::ds/OwnedDraftset body)
                         (is (= (OffsetDateTime/parse "2020-07-03T10:03:58.994Z")
                                (:updated-at body)))
-                        (is (= (util/urn-uuid "e3cb1aee-7ca5-486d-928b-003be7be409c")
+                        (is (= (util/version "e3cb1aee-7ca5-486d-928b-003be7be409c")
                                (:version body)))
-                        (is (= (util/urn-uuid "98a03936-7dfc-4ff4-b5f4-ea036b7daaec")
+                        (is (= (util/version "98a03936-7dfc-4ff4-b5f4-ea036b7daaec")
                                (:public-version body)))))))
 
   (t/testing "public endpoint modified after"
@@ -131,9 +131,9 @@
           (tc/assert-spec ::ds/OwnedDraftset body)
           (is (= (OffsetDateTime/parse "2020-07-03T11:43:02.373Z")
                  (:updated-at body)))
-          (is (= (util/urn-uuid "c8fdd311-342e-431a-a95e-c47c2352cf3e")
+          (is (= (util/version "c8fdd311-342e-431a-a95e-c47c2352cf3e")
                  (:version body)))
-          (is (= (util/urn-uuid "17ac35c9-f9ea-4366-a70f-69f2cbd6181d")
+          (is (= (util/version "17ac35c9-f9ea-4366-a70f-69f2cbd6181d")
                  (:public-version body)))))))
 
   (t/testing "no public endpoint"
@@ -151,7 +151,7 @@
           (tc/assert-spec ::ds/OwnedDraftset body)
           (is (= (OffsetDateTime/parse "2020-07-07T16:17:45.539Z")
                  (:updated-at body)))
-          (is (= (util/urn-uuid "8d220df2-b1e7-418d-835c-04d9b09abb53")
+          (is (= (util/version "8d220df2-b1e7-418d-835c-04d9b09abb53")
                  (:version body)))
           (is (nil? (:public-version body))))))))
 

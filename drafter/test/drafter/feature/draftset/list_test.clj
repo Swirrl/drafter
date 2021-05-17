@@ -89,18 +89,18 @@
                                     "2020-07-03T12:12:53.223Z")
                        :updated-at (OffsetDateTime/parse
                                     "2020-07-08T17:40:25.688Z")
-                       :version (dutil/urn-uuid
+                       :version (dutil/version
                                  "d2b6a883-cace-4a34-ab75-343f323c12a2")
-                       :public-version (dutil/urn-uuid
+                       :public-version (dutil/version
                                         "f3871cc6-9cd0-4808-a81b-cb07bc041141")}
                       {:id "7f94456f-8a92-4d40-8691-2c32f89e9741"
                        :created-at (OffsetDateTime/parse
                                     "2020-07-01T09:55:42.147Z")
                        :updated-at (OffsetDateTime/parse
                                     "2020-07-10T08:04:53.787Z")
-                       :version (dutil/urn-uuid
+                       :version (dutil/version
                                  "d1384065-30c8-4a2d-9784-32dfac6d0fa5")
-                       :public-version (dutil/urn-uuid
+                       :public-version (dutil/version
                                         "f3871cc6-9cd0-4808-a81b-cb07bc041141")}]]
         (t/is (= (set ds-times) (set expected)))))))
 

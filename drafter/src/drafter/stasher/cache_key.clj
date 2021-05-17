@@ -1,7 +1,6 @@
 (ns drafter.stasher.cache-key
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as g]
-            [clojure.string :as str]
             [drafter.util :as util])
   (:import [java.time OffsetDateTime]
            java.net.URI))
@@ -39,16 +38,18 @@
                        :java-uris (s/coll-of ::java-uri)
                        :rdf4j-uris (s/coll-of ::rdf4j-uri)))
 
-(s/def ::urn-uuid
+(s/def ::version
   (s/with-gen
     (s/and ::java-uri
-           #(re-matches #"urn:uuid:[0-9a-f-]+" (str %)))
+           #(re-matches
+             #"http://publishmydata.com/def/drafter/version/[0-9a-f-]+"
+             (str %)))
     #(g/fmap
-      (fn [uuid] (URI. (str "urn:uuid:" uuid)))
+      (fn [uuid]
+        (URI. (str "http://publishmydata.com/def/drafter/version/" uuid)))
       (g/uuid))))
 
 (s/def ::time ::datetime-with-tz)
-(s/def ::version ::urn-uuid)
 
 (s/def ::livemod ::time)
 (s/def ::draftmod ::time)
@@ -97,8 +98,10 @@
 
 (defmulti time-component key-type)
 
-(defn urn-uuid->str-uuid [urn]
-  (re-find #"[^:]*$" (str urn)))
+(defn version->str [urn]
+  (re-find
+   #"(?<=^http://publishmydata.com/def/drafter/version/)[0-9a-f-]+$"
+   (str urn)))
 
 (defmethod time-component ::cache-key
   [{{:keys [livemod draftmod livever draftver]} :last-modified}]
@@ -106,15 +109,15 @@
        (when draftmod
          (str "-" (inst-ms draftmod)))
        (when livever
-         (str "_" (urn-uuid->str-uuid livever)))
+         (str "_" (version->str livever)))
        (when draftver
-         (str "_" (urn-uuid->str-uuid draftver)))))
+         (str "_" (version->str draftver)))))
 
 (defmethod time-component ::state-graph-cache-key
   [{{:keys [time version]} :state-graph-last-modified}]
   (str (inst-ms time)
        "_"
-       (urn-uuid->str-uuid version)))
+       (version->str version)))
 
 (s/def ::time-component
   #(re-matches #"(empty|[0-9]+)(-[0-9]+)?(_[0-9a-f-]+){0,2}" %))
@@ -141,8 +144,8 @@
                   :query-str "select adf"
                   :last-modified {:livemod  (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
                                   :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
-                                  :livever (util/urn-uuid)
-                                  :draftver (util/urn-uuid)}})
+                                  :livever (util/version)
+                                  :draftver (util/version)}})
 
   (s/explain-str ::cache-key
                  {:dataset {:default-graphs #{}
@@ -157,7 +160,7 @@
                   :query-type :tuple
                   :query-str "select adf"
                   :state-graph-last-modified {:time (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
-                                              :version (util/urn-uuid)}})
+                                              :version (util/version)}})
 
 
   (time-component {:dataset {:default-graphs #{}
@@ -165,7 +168,7 @@
                    :query-type :tuple
                    :query-str "select adf"
                    :state-graph-last-modified {:time (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
-                                               :version (util/urn-uuid)}})
+                                               :version (util/version)}})
 
 
   (time-component {:dataset {:default-graphs #{}
@@ -174,8 +177,8 @@
                    :query-str "select adf"
                    :last-modified {:livemod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
                                    :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
-                                   :livever (util/urn-uuid)
-                                   :draftver (util/urn-uuid)}})
+                                   :livever (util/version)
+                                   :draftver (util/version)}})
 
   ;; (ns-unmap *ns* 'time-component)
 

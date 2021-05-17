@@ -64,7 +64,7 @@
       :created-by creator
       :created-at created-at
       :updated-at created-at
-      :version (util/urn-uuid)
+      :version (util/version)
       :current-owner creator}))
   ([creator display-name]
    (assoc (create-draftset creator) :display-name display-name))

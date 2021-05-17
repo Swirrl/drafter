@@ -8,12 +8,13 @@
 @prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix version: <http://publishmydata.com/def/drafter/version/> .
 
 <http://publishmydata.com/graphs/drafter/drafts> {
 
 draftset:35d0ddb6-e8eb-4672-aab4-a3f53d14c6fe a drafter:DraftSet ;
 	dcterms:modified "2018-01-16T12:31:23.516Z"^^xsd:dateTime ;
-	drafter:version <urn:uuid:af5b52d4-1c9a-4415-9aa8-08a448eae564> ;
+	drafter:version version:af5b52d4-1c9a-4415-9aa8-08a448eae564 ;
 	dcterms:created "2018-01-16T12:31:23.516Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:publisher@swirrl.com> ;
 	drafter:hasOwner <mailto:publisher@swirrl.com> ;
@@ -21,7 +22,7 @@ draftset:35d0ddb6-e8eb-4672-aab4-a3f53d14c6fe a drafter:DraftSet ;
 
 draftset:32159abf-d2ca-4f8b-8cc0-9609704c2553 a drafter:DraftSet ;
 	dcterms:modified "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
-	drafter:version <urn:uuid:d5f3935d-56b6-4d91-8f4f-9ea59d7fa0b0> ;
+	drafter:version version:d5f3935d-56b6-4d91-8f4f-9ea59d7fa0b0 ;
 	dcterms:created "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	drafter:hasOwner <mailto:editor@swirrl.com> ;
@@ -29,7 +30,7 @@ draftset:32159abf-d2ca-4f8b-8cc0-9609704c2553 a drafter:DraftSet ;
 
 draftset:a1fa84aa-59a7-4faf-8211-3985870cc3eb a drafter:DraftSet ;
 	dcterms:modified "2018-01-16T12:31:33.487Z"^^xsd:dateTime ;
-	drafter:version <urn:uuid:1f64c5a0-51c3-4288-b34d-e10750e06def> ;
+	drafter:version version:1f64c5a0-51c3-4288-b34d-e10750e06def ;
 	dcterms:created "2018-01-16T12:31:33.487Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	rdfs:label "publishing" ;
@@ -38,7 +39,7 @@ draftset:a1fa84aa-59a7-4faf-8211-3985870cc3eb a drafter:DraftSet ;
 
 draftset:55660038-da9e-42d0-a40f-00d5fa4ef44d a drafter:DraftSet ;
 	dcterms:modified "2018-01-16T12:31:34.855Z"^^xsd:dateTime ;
-	drafter:version <urn:uuid:52c6638a-c514-443a-adc1-2fdb172d3e90> ;
+	drafter:version version:52c6638a-c514-443a-adc1-2fdb172d3e90 ;
 	dcterms:created "2018-01-16T12:31:34.855Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	rdfs:label "admining" ;

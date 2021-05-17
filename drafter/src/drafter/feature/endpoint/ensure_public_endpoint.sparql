@@ -35,6 +35,10 @@ INSERT {
       BIND(now() AS ?now)
       BIND(COALESCE(?m, ?now) AS ?modified)
       BIND(COALESCE(?i, ?m, ?now) AS ?issued)
-      BIND(COALESCE(?v, uuid()) AS ?version)
+      BIND(
+        IRI(CONCAT("http://publishmydata.com/def/drafter/version/", STRUUID()))
+        AS ?new_version
+      )
+      BIND(COALESCE(?v, ?new_version) AS ?version)
     }
 }

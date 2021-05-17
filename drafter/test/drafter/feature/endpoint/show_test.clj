@@ -36,6 +36,6 @@
                                      "2020-07-03T10:11:46.993Z")
                         :updated-at (OffsetDateTime/parse
                                      "2020-07-06T15:32:52.583Z")
-                        :version (util/urn-uuid
+                        :version (util/version
                                   "4a5c8625-4080-471f-a5f0-bddbfce36b51")}]
           (is (= expected endpoint)))))))

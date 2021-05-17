@@ -41,7 +41,7 @@
                                  "2020-06-18T17:18:06.406Z")
                     :updated-at (OffsetDateTime/parse
                                  "2020-06-19T10:01:45.036Z")
-                    :version (util/urn-uuid
+                    :version (util/version
                               "ed0b710c-92f1-4a8b-822e-1bf48daeaa6d")}]
       (fd/load-fixture! {:repo     repo
                          :fixtures [(io/resource "drafter/feature/endpoint/public_test-existing.trig")]

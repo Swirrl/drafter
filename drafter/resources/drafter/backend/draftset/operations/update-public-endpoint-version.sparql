@@ -6,7 +6,10 @@ DELETE {
 } INSERT {
   drafter:public drafter:version ?new .
 } WHERE {
-  BIND(uuid() AS ?new)
+  BIND(
+    IRI(CONCAT("http://publishmydata.com/def/drafter/version/", STRUUID()))
+    AS ?new
+  )
   # Insert a version even if there isn't an old one to delete.
   OPTIONAL {
     drafter:public drafter:version ?old .
