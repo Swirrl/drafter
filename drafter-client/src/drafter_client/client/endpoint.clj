@@ -1,5 +1,6 @@
 (ns drafter-client.client.endpoint
-  (:require [drafter-client.client.util :as util]))
+  (:require [drafter-client.client.util :as util])
+  (:import java.net.URI))
 
 (defprotocol IEndpointRef
   (endpoint-id [this]))
@@ -33,6 +34,7 @@
   (-> json
       (update :created-at util/date-time)
       (update :updated-at util/date-time)
+      (update :version #(URI. %))
       (map->Endpoint)))
 
 

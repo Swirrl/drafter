@@ -1,7 +1,8 @@
 (ns drafter-client.client.util
   (:require [clj-time.format :refer [formatters parse]]
             [clj-time.core :as t])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           java.net.URI))
 
 (defn- parse-legacy-drafter-date-time
   "Try parsing iso date-time without ms. This format was returned by
@@ -28,3 +29,9 @@
 
 (defn uuid [s]
   (some-> s UUID/fromString (try (catch Throwable _))))
+
+(defn version
+  ([]
+   (version (UUID/randomUUID)))
+  ([id]
+   (URI. (str "http://publishmydata.com/def/drafter/version/" id))))

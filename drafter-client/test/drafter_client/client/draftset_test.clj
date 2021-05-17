@@ -1,6 +1,6 @@
 (ns drafter-client.client.draftset-test
   (:require [drafter-client.client.draftset :as sut]
-            [drafter-client.client.util :refer [uuid date-time]]
+            [drafter-client.client.util :as util]
             [clj-time.core :as time]
             [clojure.test :as t]
             [drafter-client.client.endpoint :as endpoint])
@@ -16,7 +16,7 @@
   (let [id (UUID/randomUUID)
         created-at (time/minus (time/now) (time/days 1))
         updated-at (time/plus created-at (time/hours 4))
-        version (str "urn:uuid:" (UUID/randomUUID))
+        version (util/version)
         display-name "Test draftset"
         description "Draftset description"
         json {:id (str id)
@@ -25,7 +25,7 @@
               :description description
               :created-at (str created-at)
               :updated-at (str updated-at)
-              :version version
+              :version (str version)
               :changes {"http://g1" {:status :updated}
                         "http://g2" {:status :created}}}
         ds (sut/from-json json)]

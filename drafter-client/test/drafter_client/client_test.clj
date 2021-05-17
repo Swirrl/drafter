@@ -1,22 +1,24 @@
 (ns drafter-client.client-test
-  (:require [clojure.test :as t :refer :all]
-            [drafter.main :as drafter]
-            [drafter.middleware.auth0-auth]
-            [drafter.middleware.auth]
-            [drafter-client.client :as sut]
-            [drafter-client.client-spec]
-            [drafter-client.client.draftset :as draftset]
-            [drafter-client.test-util.auth :as auth-util]
-            [drafter-client.test-util.jwt :as jwt]
-            [environ.core :refer [env]]
-            [grafter-2.rdf4j.io :as rio]
-            [grafter-2.rdf4j.repository :as gr-repo]
-            [integrant.core :as ig]
-            [clojure.java.io :as io]
-            [grafter-2.rdf.protocols :as pr]
-            [clj-time.core :as time]
-            [drafter-client.client.endpoint :as endpoint]
-            [drafter-client.test-helpers :as h])
+  (:require
+   [clj-time.core :as time]
+   [clojure.java.io :as io]
+   [clojure.test :as t :refer :all]
+   [drafter-client.client :as sut]
+   [drafter-client.client-spec]
+   [drafter-client.client.draftset :as draftset]
+   [drafter-client.client.endpoint :as endpoint]
+   [drafter-client.test-helpers :as h]
+   [drafter-client.test-util.auth :as auth-util]
+   [drafter-client.test-util.jwt :as jwt]
+   [drafter.main :as drafter]
+   [drafter.middleware.auth0-auth]
+   [drafter.middleware.auth]
+   [drafter.util :as util]
+   [environ.core :refer [env]]
+   [grafter-2.rdf.protocols :as pr]
+   [grafter-2.rdf4j.io :as rio]
+   [grafter-2.rdf4j.repository :as gr-repo]
+   [integrant.core :as ig])
   (:import clojure.lang.ExceptionInfo
            java.net.URI
            [java.util UUID]
@@ -180,10 +182,9 @@
             (t/is (= (endpoint/endpoint-id ds) (endpoint/endpoint-id endpoint)))
             (t/is (= (endpoint/updated-at public-endpoint)
                      (endpoint/updated-at endpoint)))
-            (t/is (= (endpoint/version ds)
-                     (endpoint/version endpoint)))
-            (t/is (= (endpoint/version public-endpoint)
-                     (draftset/public-version endpoint)))))
+            (t/is (= (util/merge-versions (endpoint/version ds)
+                                          (endpoint/version public-endpoint))
+                     (endpoint/version endpoint)))))
 
         (t/testing "default"
           (let [endpoint (sut/get-endpoint client token ds)]
@@ -247,8 +248,7 @@
         (is (= (endpoint/updated-at ds)
                (endpoint/updated-at (first draftsets))))
         (is (= (endpoint/version ds)
-               (endpoint/version (first draftsets))))
-        (is (nil? (draftset/public-version (first draftsets))))))
+               (endpoint/version (first draftsets))))))
     (t/testing "true"
       (let [draftsets (sut/draftsets client token {:union-with-live true})
             public-endpoint (sut/get-public-endpoint client)]
@@ -256,10 +256,9 @@
         (is (= (draftset/id ds) (draftset/id (first draftsets))))
         (is (= (endpoint/updated-at public-endpoint)
                (endpoint/updated-at (first draftsets))))
-        (is (= (endpoint/version ds)
-               (endpoint/version (first draftsets))))
-        (is (= (endpoint/version public-endpoint)
-               (draftset/public-version (first draftsets))))))))
+        (is (= (util/merge-versions (endpoint/version ds)
+                                    (endpoint/version public-endpoint))
+               (endpoint/version (first draftsets))))))))
 
 (t/deftest get-draftset-test
   (let [client (drafter-client)
@@ -276,10 +275,9 @@
         (is (= (draftset/id ds) (draftset/id result)))
         (is (= (endpoint/updated-at public-endpoint)
                (endpoint/updated-at result)))
-        (is (= (endpoint/version ds)
-               (endpoint/version result)))
-        (is (= (endpoint/version public-endpoint)
-               (draftset/public-version result)))))))
+        (is (= (util/merge-versions (endpoint/version ds)
+                                    (endpoint/version public-endpoint))
+               (endpoint/version result)))))))
 
 (t/deftest adding-to-a-draftset
   (let [client (drafter-client)
