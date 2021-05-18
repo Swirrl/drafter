@@ -320,7 +320,7 @@
 
 (def liveset-most-recently-modified
   {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
-   :livever (util/version "819a18bc-f832-48b9-81f0-082609da44e8")})
+   :version (util/version "819a18bc-f832-48b9-81f0-082609da44e8")})
 
 (def ds-1-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
 (def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
@@ -328,7 +328,7 @@
 
 (def ds-1-most-recently-modified "modified time of ds-1-dg-2 the most recently modified graph in ds-1"
   {:draftmod (OffsetDateTime/parse "2017-04-04T04:04:04.000-00:00")
-   :draftver (util/version "52099c51-5cab-496c-9aed-2bbcb3c36874")})
+   :version (util/version "52099c51-5cab-496c-9aed-2bbcb3c36874")})
 
 
 (def ds-2-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
@@ -337,7 +337,7 @@
 
 (def ds-2-most-recently-modified "modified time of ds-2-dg-1 the most recently modified graph in ds-22"
   {:draftmod (OffsetDateTime/parse "2017-05-05T05:05:05.000-00:00")
-   :draftver (util/version "c7af52ba-b8ef-41f3-b116-11bfcd4ef353")})
+   :version (util/version "c7af52ba-b8ef-41f3-b116-11bfcd4ef353")})
 
 
 (defn edn->dataset [{:keys [default-graphs named-graphs]}]
@@ -388,8 +388,9 @@
       ;; set of live graphs in to :named-graphs and :default-graphs.
       (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
             dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}]
-        (t/is (= (merge liveset-most-recently-modified
-                        ds-1-most-recently-modified)
+        (t/is (= (merge-with util/merge-versions
+                             liveset-most-recently-modified
+                             ds-1-most-recently-modified)
                  (sut/fetch-last-modified conn dataset))))))
   (with-open [conn (.getConnection repo)]
 
@@ -409,8 +410,9 @@
       ;; set of live graphs in to :named-graphs and :default-graphs.
       (let [ds-1-union-with-live (conj ds-1 live-graph-1 live-graph-only)
             dataset {:named-graphs ds-1-union-with-live :default-graphs ds-1-union-with-live}]
-        (t/is (= (merge liveset-most-recently-modified
-                        ds-1-most-recently-modified)
+        (t/is (= (merge-with util/merge-versions
+                             liveset-most-recently-modified
+                             ds-1-most-recently-modified)
                  (sut/fetch-last-modified conn dataset)))))))
 
 (deftest-system generate-drafter-cache-key-test
@@ -436,7 +438,7 @@
                query-str))
       (t/is (= last-modified
                {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
-                :livever (util/version "819a18bc-f832-48b9-81f0-082609da44e8")})))))
+                :version (util/version "819a18bc-f832-48b9-81f0-082609da44e8")})))))
 
 (defn- prepare-query
   "Prepares an RDF4j query from a connection with the specified bindings set"

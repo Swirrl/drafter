@@ -53,8 +53,6 @@
 
 (s/def ::livemod ::time)
 (s/def ::draftmod ::time)
-(s/def ::livever ::version)
-(s/def ::draftver ::version)
 
 (s/def ::default-graphs ::uri-set)
 (s/def ::named-graphs ::uri-set)
@@ -62,7 +60,7 @@
 (s/def ::dataset (s/keys :req-un [::default-graphs ::named-graphs]))
 (s/def ::query-type #{:graph :tuple :boolean})
 (s/def ::query-str string?)
-(s/def ::last-modified (s/keys :opt-un [::livemod ::draftmod ::livever ::draftver]))
+(s/def ::last-modified (s/keys :opt-un [::livemod ::draftmod ::version]))
 (s/def ::state-graph-last-modified (s/keys :req-un [::time ::version]))
 
 (s/def ::cache-key
@@ -99,14 +97,12 @@
 (defmulti time-component key-type)
 
 (defmethod time-component ::cache-key
-  [{{:keys [livemod draftmod livever draftver]} :last-modified}]
+  [{{:keys [livemod draftmod version]} :last-modified}]
   (str (or (some-> livemod inst-ms) "empty")
        (when draftmod
          (str "-" (inst-ms draftmod)))
-       (when livever
-         (str "_" (util/version->str livever)))
-       (when draftver
-         (str "_" (util/version->str draftver)))))
+       (when version
+         (str "_" (util/version->str version)))))
 
 (defmethod time-component ::state-graph-cache-key
   [{{:keys [time version]} :state-graph-last-modified}]
@@ -139,8 +135,7 @@
                   :query-str "select adf"
                   :last-modified {:livemod  (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
                                   :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
-                                  :livever (util/version)
-                                  :draftver (util/version)}})
+                                  :version (util/version)}})
 
   (s/explain-str ::cache-key
                  {:dataset {:default-graphs #{}
@@ -172,8 +167,7 @@
                    :query-str "select adf"
                    :last-modified {:livemod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
                                    :draftmod (OffsetDateTime/parse "2018-04-16T16:23:18.000-00:00")
-                                   :livever (util/version)
-                                   :draftver (util/version)}})
+                                   :version (util/version)}})
 
   ;; (ns-unmap *ns* 'time-component)
 

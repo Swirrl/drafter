@@ -96,11 +96,24 @@
   (some #{(URI. "http://publishmydata.com/graphs/drafter/drafts")}
         (concat (.getDefaultGraphs dataset) (.getNamedGraphs dataset))))
 
+(defn- merge-draftver-and-livever [{:keys [draftver livever] :as m}]
+  (let [m (dissoc m :draftver :livever)]
+    (cond
+      (and draftver livever)
+      (assoc m :version (util/merge-versions draftver livever))
+
+      (or draftver livever)
+      (assoc m :version (or draftver livever))
+
+      :else
+      m)))
+
 (defn fetch-last-modified [conn {:keys [named-graphs default-graphs] :as graphs}]
   (let [values {:graph (distinct (concat default-graphs named-graphs))}]
     (->> (first (doall (sparql/query "drafter/stasher/last-modified.sparql" values conn)))
          (remove (comp nil? second))
-         (into {}))))
+         (into {})
+         merge-draftver-and-livever)))
 
 (defn- use-state-graph-key? [dataset]
   (or (nil? dataset)
