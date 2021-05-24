@@ -680,18 +680,18 @@ paths:
       description: |
         Update this Draftset via a limited subset of the [SPARQL update](https://www.w3.org/TR/2013/REC-sparql11-update-20130321/)
         language and protocol.
-        
+
         NOTE we only support the following sparql update statements:
-        
+
         - DROP GRAPH <g>
-        - INSERT DATA { ... } 
+        - INSERT DATA { ... }
         - DELETE DATA { ... }
 
         These statements may be combined in any order or combination.
-        
+
         Additionally there are size restrictions on the amount of data this
-        endpoint will operate on.  It is intended to operate on small amounts 
-        of data only i.e. typically no more than 5000 triples will be allowed 
+        endpoint will operate on.  It is intended to operate on small amounts
+        of data only i.e. typically no more than 5000 triples will be allowed
         to be modified through this method.
 
         Please consult the SPARQL [update protocol specification](http://www.w3.org/TR/sparql11-protocol/) for a description of this endpoint.
@@ -764,6 +764,7 @@ paths:
         - text/csv
       parameters:
         - $ref: '#/parameters/post_query'
+        - $ref: '#/parameters/timeout'
         - $ref: '#/parameters/post_default-graph-uri'
         - $ref: '#/parameters/post_named-graph-uri'
       tags:
