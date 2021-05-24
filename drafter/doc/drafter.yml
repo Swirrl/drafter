@@ -890,7 +890,7 @@ paths:
         creates writes may 503.
 
         Returns a boolean true if the system is locked for writes and
-        false if it isn't.'
+        false if it isn't.
       tags:
           - Jobs
       responses:
