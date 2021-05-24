@@ -22,7 +22,7 @@
             [drafter.async.spec :as async-spec]
             [aero.core :as aero]
             [drafter.user :as user]
-            [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
+            [drafter.rdf.drafter-ontology :refer :all]
             [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.spec :refer [load-spec-namespaces!]]
             [drafter.write-scheduler :as scheduler]
@@ -558,11 +558,8 @@
 (defn get-public-endpoint-triples [repo]
   (sparql/eager-query repo (select-all-in-graph drafter:endpoints)))
 
-(defn is-modified-statement? [s]
-  (= dcterms:modified (:p s)))
-
 (defn remove-updated [endpoint-triples]
-  (remove is-modified-statement? endpoint-triples))
+  (remove (comp #{dcterms:modified drafter:version} :p) endpoint-triples))
 
 (defmacro check-endpoint-graph-consistent
   "Macro to check the public endpoints graph is not corrupted by the actions executed
@@ -574,7 +571,6 @@
         triples-before# (get-public-endpoint-triples repo#)]
     ~@forms
     (let [triples-after# (get-public-endpoint-triples repo#)]
-      (is (= (set (map :p triples-before#)) (set (map :p triples-after#))))
       (is (= (set (remove-updated triples-before#)) (set (remove-updated triples-after#)))))))
 
 (defn incrementing-clock
@@ -587,11 +583,12 @@
 
 (defrecord ManualClock [current]
   time/Clock
-  (now [_this] @current))
+  (now [_this] (or @current (time/system-now))))
 
 (defn manual-clock
-  "Creates a clock that continually returns the given time until updated with the set-now
-   and advance-by functions"
+  "Creates a clock that continually returns the given time until updated with
+   the set-now and advance-by functions. If the current time is nil, delegates
+   to the system clock."
   [initial-time]
   (->ManualClock (atom initial-time)))
 
@@ -606,3 +603,16 @@
   [{:keys [current] :as manual-clock} period]
   (swap! current (fn [^OffsetDateTime t] (.plus t period)))
   nil)
+
+(defn stop
+  "Stop the clock, and return the current system time until told otherwise"
+  [manual-clock]
+  (set-now manual-clock (time/system-now)))
+
+(defn resume
+  "Resume the clock, delegating to the system clock until told otherwise"
+  [manual-clock]
+  (set-now manual-clock nil))
+
+(defmethod ig/init-key ::manual-clock [_ _opts]
+  (manual-clock nil))

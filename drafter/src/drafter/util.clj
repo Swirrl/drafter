@@ -2,20 +2,46 @@
   (:require [clojure
              [pprint :as pp]
              [string :as str]]
-            [buddy.core.codecs.base64 :as base64]
             [buddy.core.codecs :as codecs]
+            [buddy.core.codecs.base64 :as base64]
+            [drafter.rdf.drafter-ontology :refer [drafter:version]]
+            [grafter.url :as url]
             [integrant.core :as ig])
-  (:import java.nio.charset.Charset
-           [java.util UUID]
-           [javax.mail.internet AddressException InternetAddress]
-           org.eclipse.rdf4j.model.impl.URIImpl
-           [java.net URI]
-           [java.io IOException]))
+  (:import
+   [java.io IOException]
+   [java.net URI]
+   [java.util UUID]
+   [javax.mail.internet AddressException InternetAddress]
+   java.nio.charset.Charset
+   java.security.MessageDigest
+   org.apache.commons.codec.binary.Hex
+   org.eclipse.rdf4j.model.impl.URIImpl))
 
 (defn create-uuid
   "Function that creates a UUID"
   []
   (UUID/randomUUID))
+
+(defn version
+  ([]
+   (version (create-uuid)))
+  ([id]
+   (url/->java-uri (url/append-path-segments drafter:version id))))
+
+(defn version->str [v]
+  (re-find
+   #"(?<=^http://publishmydata.com/def/drafter/version/)[0-9a-f-]+$"
+   (str v)))
+
+(defn merge-versions [& vs]
+  (->> vs
+       (map version->str)
+       sort
+       (apply str)
+       .getBytes
+       (.digest (MessageDigest/getInstance "MD5"))
+       Hex/encodeHexString
+       version))
 
 (defn str->base64 [s]
   (codecs/bytes->str (base64/encode s)))

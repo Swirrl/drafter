@@ -1,20 +1,27 @@
 (ns ^:rest-api drafter.feature.draftset.update-test
-  (:require [clojure.string :as string]
-            [clojure.test :as t :refer [is testing]]
-            [drafter.draftset :as ds]
-            [drafter.feature.draftset.test-helper :as help]
-            [drafter.feature.draftset.update :as update]
-            [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor test-publisher]]
-            [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.repository :as repo]
-            [drafter.rdf.jena :as jena])
-  (:import java.net.URI
-           java.util.UUID))
+  (:require
+   [drafter.feature.middleware :as middleware]
+   [clojure.string :as string]
+   [clojure.test :as t :refer [is testing]]
+   [drafter.draftset :as ds]
+   [drafter.feature.draftset.query-test :refer [create-query-request]]
+   [drafter.feature.draftset.test-helper :as help]
+   [drafter.feature.draftset.update :as update]
+   [drafter.rdf.jena :as jena]
+   [drafter.test-common :as tc]
+   [drafter.time :as time]
+   [drafter.user-test :refer [test-editor test-publisher]]
+   [grafter-2.rdf.protocols :as pr]
+   [grafter-2.rdf4j.repository :as repo])
+  (:import
+   java.net.URI
+   java.time.Duration
+   java.util.UUID))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system-config "drafter/feature/empty-db-system.edn")
+(def manual-clock-config "drafter/feature/empty-db-system-manual-clock.edn")
 
 (def keys-for-test
   [[:drafter/routes :draftset/api]
@@ -571,6 +578,7 @@ SELECT * WHERE {
     ?dg <http://purl.org/dc/terms/modified> ?dg_modified .
     ?ds <http://purl.org/dc/terms/created> ?ds_created .
     ?ds <http://purl.org/dc/terms/modified> ?ds_modified .
+    ?ds <http://publishmydata.com/def/drafter/version> ?ds_version .
   }
   VALUES ?ds { <%s> }
 }" draftset-uri))
@@ -609,21 +617,22 @@ SELECT * WHERE {
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
               [{:keys [dg_created dg_modified
-                       ds_created ds_modified] :as ds-meta}]
+                       ds_created ds_modified] :as ds-meta-1}]
               (repo/query conn (metadata-q draftset-uri))
               _ (is (= ds_modified ds_created))
               _ (is (= dg_modified dg_created))
 
-              ;; 2nd go, now the graph will already be copied, so modified
-              ;; should update.
+              ;; 2nd go, now the graph will already be copied, so modified and
+              ;; version should update.
               stmt (delete-stmt-str (take 5 quads1))
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
               [{:keys [dg_created dg_modified
-                       ds_created ds_modified] :as ds-meta}]
+                       ds_created ds_modified] :as ds-meta-2}]
               (repo/query conn (metadata-q draftset-uri))]
           (is (.isAfter ds_modified ds_created))
-          (is (.isAfter dg_modified dg_created))))
+          (is (.isAfter dg_modified dg_created))
+          (is (not= (:ds_version ds-meta-1) (:ds_version ds-meta-2)))))
 
       (testing "Live graph g; INSERT DATA into g; check metadata"
         ;; Almost identical code path to DELETE, but here for completeness
@@ -653,7 +662,7 @@ SELECT * WHERE {
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
               [{:keys [dg_created dg_modified
-                       ds_created ds_modified] :as ds-meta}]
+                       ds_created ds_modified] :as ds-meta-1}]
               (repo/query conn (metadata-q draftset-uri))
               _ (is (= ds_modified ds_created))
               _ (is (= dg_modified dg_created))
@@ -665,10 +674,11 @@ SELECT * WHERE {
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
               [{:keys [dg_created dg_modified
-                       ds_created ds_modified] :as ds-meta}]
+                       ds_created ds_modified] :as ds-meta-2}]
               (repo/query conn (metadata-q draftset-uri))]
           (is (.isAfter ds_modified ds_created))
-          (is (.isAfter dg_modified dg_created))))
+          (is (.isAfter dg_modified dg_created))
+          (is (not= (:ds_version ds-meta-1) (:ds_version ds-meta-2)))))
 
       (testing "Live graph g, with draft graph; DROP GRAPH g; check metadata"
         (let [g (URI. (str "http://g/" (UUID/randomUUID)))
@@ -697,7 +707,7 @@ SELECT * WHERE {
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
               [{:keys [dg_created dg_modified
-                       ds_created ds_modified] :as ds-meta}]
+                       ds_created ds_modified] :as ds-meta-1}]
               (repo/query conn (metadata-q draftset-uri))
               _ (is (= ds_modified ds_created))
               _ (is (= dg_modified dg_created))
@@ -706,10 +716,11 @@ SELECT * WHERE {
               response (update! stmt)
               _ (tc/assert-is-no-content-response response)
               [{:keys [dg_created dg_modified
-                       ds_created ds_modified] :as ds-meta}]
+                       ds_created ds_modified] :as ds-meta-2}]
               (repo/query conn (metadata-q draftset-uri))]
           (is (.isAfter ds_modified ds_created))
-          (is (.isAfter dg_modified dg_created)))))))
+          (is (.isAfter dg_modified dg_created))
+          (is (not= (:ds_version ds-meta-1) (:ds_version ds-meta-2))))))))
 
 (t/deftest protected-graphs-test
   (tc/with-system
@@ -780,3 +791,46 @@ SELECT * WHERE {
               draft-graph-uri (get-in gmeta [g :draft-graph-uri])]
           (is (not= dg draft-graph-uri))
           (is (not (nil? draft-graph-uri))))))))
+
+(tc/deftest-system-with-keys interleaved-updates-and-queries
+  keys-for-test [system manual-clock-config]
+  (let [clock (:drafter.test-common/manual-clock system)
+        handler (get system [:drafter/routes :draftset/api])
+        draftset-location (help/create-draftset-through-api handler test-editor)
+        update! (fn [stmt]
+                  (handler (create-update-request
+                            test-editor draftset-location stmt)))
+        g (URI. (str "http://g/" (UUID/randomUUID)))
+        count-query (fn []
+                      (handler
+                       (create-query-request
+                        test-editor
+                        draftset-location
+                        (format "SELECT (COUNT(*) AS ?count) WHERE {
+                                 GRAPH <%s> { ?s ?p ?o }
+                                 }"
+                                g)
+                        "text/csv")))]
+    ;; Stop the clock, so all three of the following take place "within a
+    ;; millisecond".
+    (tc/stop clock)
+    (tc/assert-is-no-content-response
+     (update!
+      (format "INSERT DATA {
+               GRAPH <%s> { <http://s1> <http://p1> <http://o1> }
+               }"
+              g)))
+    (tc/assert-is-ok-response (count-query))
+    (tc/assert-is-no-content-response
+     (update!
+      (format "INSERT DATA {
+               GRAPH <%s> { <http://s2> <http://p2> <http://o2> }
+               }"
+              g)))
+    (tc/resume clock)
+    ;; If the cache only uses millisecond precision, the preceeding count-query
+    ;; will have been cached and the following will fail.
+    (let [res (count-query)
+          count (-> res :body slurp string/split-lines second read-string)]
+      (tc/assert-is-ok-response res)
+      (is (= 2 count)))))

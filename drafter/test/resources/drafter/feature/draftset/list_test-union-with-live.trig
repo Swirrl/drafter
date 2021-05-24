@@ -8,10 +8,12 @@
 @prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix version: <http://publishmydata.com/def/drafter/version/> .
 
 <http://publishmydata.com/graphs/drafter/endpoints> {
     drafter:public rdf:type drafter:Endpoint ;
                    dcterms:modified "2020-07-08T17:40:25.688Z"^^xsd:dateTime ;
+                   drafter:version version:f3871cc6-9cd0-4808-a81b-cb07bc041141 ;
                    dcterms:issued "2020-06-26T13:37:34.683Z"^^xsd:dateTime .
 }
 
@@ -20,6 +22,7 @@
 draftset:e06cf827-de24-47ae-8a43-2a1a37c5be4e a drafter:DraftSet ;
     dcterms:created "2020-07-03T12:12:53.223Z"^^xsd:dateTime ;
 	dcterms:modified "2020-07-05T10:44:26.905Z"^^xsd:dateTime ;
+	drafter:version version:d2b6a883-cace-4a34-ab75-343f323c12a2 ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	drafter:hasOwner <mailto:editor@swirrl.com> ;
 	rdfs:label "modified before public" .
@@ -27,6 +30,7 @@ draftset:e06cf827-de24-47ae-8a43-2a1a37c5be4e a drafter:DraftSet ;
 draftset:7f94456f-8a92-4d40-8691-2c32f89e9741 a drafter:DraftSet ;
     dcterms:created "2020-07-01T09:55:42.147Z"^^xsd:dateTime ;
 	dcterms:modified "2020-07-10T08:04:53.787Z"^^xsd:dateTime ;
+	drafter:version version:d1384065-30c8-4a2d-9784-32dfac6d0fa5 ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	rdfs:label "modified after public" ;
 	drafter:hasSubmission <http://publishmydata.com/def/drafter/submission/1414fd7a-62dc-4aa4-8b3c-d0059883bbee> ;

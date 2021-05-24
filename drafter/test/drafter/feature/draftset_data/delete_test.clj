@@ -47,16 +47,26 @@
                                                           :draftset-id ds}
                                                          clock))
 
-      (tc/set-now clock delete-time)
-      (th/apply-job! (sut/delete-data-from-draftset-job (io/file "./test/test-triple-2.nt")
-                                                        dummy
-                                                        resources
-                                                        {:draftset-id ds
-                                                         :graph       (URI. "http://foo/graph")
-                                                         :rdf-format  RDFFormat/NTRIPLES}
-                                                        clock))
-      (let [ts-3 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-        (t/is (= delete-time ts-3) "Expected modified time to be updated after delete")))))
+      (let [modified-1 (th/ensure-draftgraph-and-draftset-modified
+                        backend
+                        ds
+                        "http://foo/graph")]
+        (tc/set-now clock delete-time)
+        (th/apply-job! (sut/delete-data-from-draftset-job (io/file "./test/test-triple-2.nt")
+                                                          dummy
+                                                          resources
+                                                          {:draftset-id ds
+                                                           :graph       (URI. "http://foo/graph")
+                                                           :rdf-format  RDFFormat/NTRIPLES}
+                                                          clock))
+        (let [modified-2 (th/ensure-draftgraph-and-draftset-modified
+                          backend
+                          ds
+                          "http://foo/graph")]
+          (t/is (= delete-time (:modified modified-2))
+                "Expected modified time to be updated after delete")
+          (t/is (not= (:version modified-1) (:version modified-2))
+                "Expected version to be updated after delete"))))))
 
 (t/deftest delete-public-endpoint-quads-test
   (tc/with-system

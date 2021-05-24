@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [name])
   (:require [drafter-client.client.endpoint :as endpoint]
             [drafter-client.client.util :refer [uuid date-time] :as util])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           java.net.URI))
 
 (def live ::live)
 
@@ -11,7 +12,7 @@
   (name [this])
   (description [this]))
 
-(defrecord Draftset [id name description created-at updated-at]
+(defrecord Draftset [id name description created-at updated-at version]
   IDraftset
   (id [this] id)
   (name [this] name)
@@ -22,7 +23,8 @@
 
   endpoint/IEndpoint
   (created-at [this] created-at)
-  (updated-at [this] updated-at))
+  (updated-at [this] updated-at)
+  (version [this] version))
 
 (defn ->draftset
   ([] (->draftset (UUID/randomUUID) nil nil))
@@ -31,13 +33,17 @@
   ([id name description] (->draftset id name description (util/now) (util/now)))
   ([id name description created-at] (->draftset id name description created-at created-at))
   ([id name description created-at updated-at]
-   (->Draftset id name description created-at updated-at)))
+   (let [version (util/version)]
+     (->draftset id name description created-at updated-at version)))
+  ([id name description created-at updated-at version]
+   (->Draftset id name description created-at updated-at version)))
 
 (defn from-json [ds]
   (-> ds
       (update :id uuid)
       (update :created-at date-time)
       (update :updated-at date-time)
+      (update :version #(URI. %))
       (assoc :name (:display-name ds))
       (dissoc :display-name)
       (map->Draftset)))

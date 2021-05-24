@@ -1,0 +1,10 @@
+#merge
+[#include "empty-db-system.edn"
+ {:drafter.test-common/manual-clock {}
+  :drafter.feature.draftset.update/handler
+  {:drafter/backend #ig/ref :drafter/backend
+   :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager
+   :drafter.time/clock #ig/ref :drafter.test-common/manual-clock
+   :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
+   :max-update-size 50
+   :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock}}]

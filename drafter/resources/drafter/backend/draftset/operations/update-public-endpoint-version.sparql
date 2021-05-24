@@ -1,0 +1,17 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+WITH <http://publishmydata.com/graphs/drafter/endpoints>
+DELETE {
+  drafter:public drafter:version ?old .
+} INSERT {
+  drafter:public drafter:version ?new .
+} WHERE {
+  BIND(
+    IRI(CONCAT("http://publishmydata.com/def/drafter/version/", STRUUID()))
+    AS ?new
+  )
+  # Insert a version even if there isn't an old one to delete.
+  OPTIONAL {
+    drafter:public drafter:version ?old .
+  }
+}

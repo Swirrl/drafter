@@ -1,6 +1,7 @@
 (ns drafter.rdf.drafter-ontology
-  (:require [grafter.url :as url]
-            [grafter.vocabularies.dcterms :refer :all])
+  (:require
+   [grafter.url :as url]
+   [grafter.vocabularies.dcterms :refer :all])
   (:import [java.net URI]))
 
 (def pmd-graphs (URI. "http://publishmydata.com/graphs/"))
@@ -52,6 +53,8 @@
 (def drafter:draft (url/append-path-segments drafter))
 
 (def drafter:public (url/append-path-segments drafter "public"))
+
+(def drafter:version (url/append-path-segments drafter "version"))
 
 (def drafter:drafts (url/append-path-segments pmd-graphs "drafter" "drafts"))
 

@@ -1,9 +1,6 @@
 (ns ^:rest-api drafter.feature.draftset.create-test
   (:require [clojure.test :as t]
             [clojure.test :refer :all :as t]
-            [drafter.rdf.drafter-ontology
-             :refer
-             [drafter:DraftGraph drafter:modifiedAt]]
             [drafter.swagger :as swagger]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]

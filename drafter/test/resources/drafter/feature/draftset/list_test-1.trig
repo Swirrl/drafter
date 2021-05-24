@@ -8,11 +8,13 @@
 @prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix version: <http://publishmydata.com/def/drafter/version/> .
 
 <http://publishmydata.com/graphs/drafter/drafts> {
 
 draftset:32159abf-d2ca-4f8b-8cc0-9609704c2553 a drafter:DraftSet ;
 	dcterms:modified "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
+	drafter:version version:08c601d0-eb81-436a-b3ba-fce1bb7a6dc1 ;
 	dcterms:created "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:editor@swirrl.com> ;
 	drafter:hasOwner <mailto:editor@swirrl.com> ;

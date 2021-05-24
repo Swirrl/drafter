@@ -1,0 +1,33 @@
+# Migration to backfill versions on DraftSets and the public Endpoint
+#
+# Run me with
+#
+#     stardog query <database-name> backfill-versions.sparql
+
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+WITH <http://publishmydata.com/graphs/drafter/drafts>
+INSERT {
+  ?ds drafter:version ?version
+} WHERE {
+  ?ds a drafter:DraftSet .
+  OPTIONAL { ?ds drafter:version ?existing_version }
+  BIND(
+    IRI(CONCAT("http://publishmydata.com/def/drafter/version/", STRUUID()))
+    AS ?new_version
+  )
+  BIND(COALESCE(?existing_version, ?new_version) AS ?version)
+};
+
+WITH <http://publishmydata.com/graphs/drafter/endpoints>
+INSERT {
+  ?endpoint drafter:version ?version
+} WHERE {
+  ?endpoint a drafter:Endpoint .
+  OPTIONAL { ?endpoint drafter:version ?existing_version }
+  BIND(
+    IRI(CONCAT("http://publishmydata.com/def/drafter/version/", STRUUID()))
+    AS ?new_version
+  )
+  BIND(COALESCE(?existing_version, ?new_version) AS ?version)
+};

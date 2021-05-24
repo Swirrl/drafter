@@ -75,8 +75,8 @@
   (new-managed-graph-statements graph-uri))
 
 (defn new-draft-user-graph-statements
-  "Returns RDF statements representing a new draft graph for the user graph URI. Throws
-   and exception if the URI is not valid for user graphs."
+  "Returns RDF statements representing a new draft graph for the user graph
+   URI. Throws an exception if the URI is not valid for user graphs."
   [manager live-graph-uri draft-graph-uri time draftset-uri]
   (check-graph-unprotected! manager live-graph-uri)
   (let [live-graph-triples [live-graph-uri

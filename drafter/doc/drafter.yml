@@ -1170,7 +1170,7 @@ definitions:
 
   Endpoint:
     type: object
-    required: [id, type, created-at, updated-at]
+    required: [id, type, created-at, updated-at, version]
     discriminator: "type"
     properties:
       id:
@@ -1190,6 +1190,10 @@ definitions:
         type: string
         format: date-time
         description: 'IS0 8601 DateTime representing the time the contents or metadata of the endnpoint was last updated'
+      version:
+        type: string
+        format: uri
+        description: 'A URI identifying the version of the endpoint.'
   Draftset:
     allOf:
       - $ref: '#/definitions/Endpoint'
@@ -1245,6 +1249,7 @@ definitions:
       created-at: 2016-01-01T13:35:21+00:00
       current-owner: admin@opendatacommunities.org
       submitted-by: editor@opendatacommunities.org
+      version: 'http://publishmydata.com/def/drafter/version/ad6e911c-fd8d-4644-9303-8ddc4855a4fc'
 
   Error:
     type: object

@@ -8,6 +8,7 @@
 @prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix version: <http://publishmydata.com/def/drafter/version/> .
 
 <http://publishmydata.com/graphs/drafter/drafts> {
 	<http://graph1> a drafter:ManagedGraph ;
@@ -22,6 +23,7 @@
 	
 	draftset:ds-1 a drafter:DraftSet ;
 		dcterms:modified "2018-01-16T15:50:26.339Z"^^xsd:dateTime ;
+		drafter:version version:39b28a38-42f2-406c-a3fc-c0ee94c32c0b ;
 		dcterms:created "2018-01-16T15:50:26.339Z"^^xsd:dateTime ;
 		dcterms:creator <mailto:editor@swirrl.com> ;
 		rdfs:label "ds1" ;
@@ -30,6 +32,7 @@
 	
 	draftset:ds-2 a drafter:DraftSet ;
 		dcterms:modified "2018-01-16T15:50:30.589Z"^^xsd:dateTime ;
+		drafter:version version:0e30fb89-f5f1-4b4c-b6a2-39220195719d ;
 		dcterms:created "2018-01-16T15:50:26.727Z"^^xsd:dateTime ;
 		dcterms:creator <mailto:editor@swirrl.com> ;
 		rdfs:label "ds2" ;

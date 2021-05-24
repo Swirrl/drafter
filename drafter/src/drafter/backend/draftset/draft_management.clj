@@ -1,18 +1,19 @@
 (ns drafter.backend.draftset.draft-management
-  (:require [clojure.set :as set]
-            [clojure.tools.logging :as log]
-            [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.rdf.sparql :as sparql :refer [update!]]
-            [drafter.util :as util]
-            [grafter-2.rdf4j.templater :refer [add-properties graph]]
-            [grafter-2.rdf4j.repository :as repo]
-            [grafter.url :as url]
-            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
-            [grafter.vocabularies.rdf :refer :all]
-            [clojure.spec.alpha :as s]
-            [grafter-2.rdf4j.io :as rio]
-            [clojure.string :as string]
-            [drafter.time :as time])
+  (:require
+   [clojure.set :as set]
+   [clojure.spec.alpha :as s]
+   [clojure.string :as string]
+   [clojure.tools.logging :as log]
+   [drafter.rdf.drafter-ontology :refer :all]
+   [drafter.rdf.sparql :as sparql :refer [update!]]
+   [drafter.time :as time]
+   [drafter.util :as util]
+   [grafter-2.rdf4j.io :as rio]
+   [grafter-2.rdf4j.repository :as repo]
+   [grafter-2.rdf4j.templater :refer [add-properties graph]]
+   [grafter.url :as url]
+   [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
+   [grafter.vocabularies.rdf :refer :all])
   (:import java.net.URI
            [java.util UUID]))
 
@@ -27,7 +28,7 @@
 
 (defn with-state-graph
   "Wraps the string in a SPARQL
-   GRAPH <http://publishmydata.com/graphs/drafter/draft> {
+   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
      <<sparql-fragment>>
    } clause."
 
@@ -90,6 +91,25 @@
      "     <" subject "> <" time-predicate "> ?lastvalue ."
      "  }"
      "}")))
+
+(defn set-version
+  "Returns an update string to update the given subject/resource with
+   the supplied version."
+  [subject version]
+  (str
+   "WITH <http://publishmydata.com/graphs/drafter/drafts>"
+   "DELETE {"
+   "   <" subject "> <" drafter:version "> ?lastvalue ."
+   "}"
+   "INSERT { "
+   "   <" subject "> <" drafter:version "> <" version "> ."
+   "}"
+   "WHERE {"
+   "   <" subject "> ?p ?o . "
+   "  OPTIONAL {"
+   "     <" subject "> <" drafter:version "> ?lastvalue ."
+   "  }"
+   "}"))
 
 (defn- escape-sparql-value [val]
   (if (string? val)

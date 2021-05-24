@@ -29,3 +29,15 @@ If you don't have a running drafter and wish to consult the
 documentation you will need to inspect the Yaml file from which the above is generated.
 
 This can be found in [/drafter/doc/drafter.yml](/drafter/doc/drafter.yml).
+
+## Migrations
+
+Migrations live in [./migrations](./migrations), and for now are run manually
+with e.g.
+
+```
+$ stardog query <database-name> <path-to-migration>
+```
+
+If a version bump requires a migration to be run, it should be noted in the
+release notes.

@@ -1,14 +1,16 @@
 (ns drafter.feature.endpoint.list-test
-  (:require [clojure.test :refer :all :as t]
-            [drafter.feature.endpoint.list :refer :all]
-            [drafter.endpoint :as ep]
-            [drafter.endpoint.spec]
-            [drafter.test-common :as tc]
-            [drafter.fixture-data :as fd]
-            [drafter.user-test :refer [test-publisher]]
-            [drafter.feature.draftset.list-test :refer [get-draftsets-request]]
-            [clojure.spec.alpha :as s]
-            [clojure.java.io :as io])
+  (:require
+   [clojure.java.io :as io]
+   [clojure.spec.alpha :as s]
+   [clojure.test :refer :all :as t]
+   [drafter.endpoint :as ep]
+   [drafter.endpoint.spec]
+   [drafter.feature.draftset.list-test :refer [get-draftsets-request]]
+   [drafter.feature.endpoint.list :refer :all]
+   [drafter.fixture-data :as fd]
+   [drafter.test-common :as tc]
+   [drafter.user-test :refer [test-publisher]]
+   [drafter.util :as util])
   (:import [java.time OffsetDateTime]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -32,7 +34,9 @@
           expected {:id "public"
                     :type "Endpoint"
                     :created-at (OffsetDateTime/parse "2020-04-01T12:09:57.043Z")
-                    :updated-at (OffsetDateTime/parse "2020-04-06T09:18:37.839Z")}]
+                    :updated-at (OffsetDateTime/parse "2020-04-06T09:18:37.839Z")
+                    :version (util/version
+                              "4a5c8625-4080-471f-a5f0-bddbfce36b51")}]
       (fd/load-fixture! {:repo repo
                          :fixtures [(io/resource "drafter/feature/endpoint/list_test-no-login.trig")]
                          :format :trig})
@@ -63,8 +67,14 @@
     [:drafter.stasher/repo [:drafter/routes :draftset/api] :drafter.fixture-data/loader :drafter/write-scheduler]
     [system "drafter/feature/empty-db-system.edn"]
     (let [handler (get system [:drafter/routes :draftset/api])
-          expected-public (ep/public (OffsetDateTime/parse "2020-06-10T11:17:46.205Z")
-                                     (OffsetDateTime/parse "2020-06-12T08:45:20.902Z"))]
+          expected-public {:id "public"
+                           :type "Endpoint"
+                           :created-at (OffsetDateTime/parse
+                                        "2020-06-10T11:17:46.205Z")
+                           :updated-at (OffsetDateTime/parse
+                                        "2020-06-12T08:45:20.902Z")
+                           :version (util/version
+                                     "c0f5a908-7327-465d-bb12-1ab110404d99")}]
       (fd/load-fixture! {:repo (:drafter.stasher/repo system)
                          :fixtures [(io/resource "drafter/feature/endpoint/list_test-with-login.trig")]
                          :format :trig})

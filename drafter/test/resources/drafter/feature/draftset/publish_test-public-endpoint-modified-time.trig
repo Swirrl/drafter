@@ -8,10 +8,12 @@
 @prefix draft: <http://publishmydata.com/graphs/drafter/draft/> .
 @prefix drafter: <http://publishmydata.com/def/drafter/> .
 @prefix draftset: <http://publishmydata.com/def/drafter/draftset/> .
+@prefix version: <http://publishmydata.com/def/drafter/version/> .
 
 <http://publishmydata.com/graphs/drafter/endpoints> {
     drafter:public rdf:type drafter:Endpoint ;
                    dcterms:modified "2020-07-01T09:02:43.859Z"^^xsd:dateTime ;
+                   drafter:version version:31ef8ded-f8fd-452f-826e-57517041dc9f ;
                    dcterms:issued "2020-06-03T11:53:38.893Z"^^xsd:dateTime .
 }
 
@@ -19,6 +21,7 @@
 
 draftset:efc3169b-887a-4bd0-aa2c-30922539cde1 a drafter:DraftSet ;
 	dcterms:modified "2020-07-03T16:21:43.045Z"^^xsd:dateTime ;
+	drafter:version version:e55c5155-1349-4e2d-bb15-e07b9cac7737 ;
 	dcterms:created "2020-06-29T08:45:21.842Z"^^xsd:dateTime ;
 	dcterms:creator <mailto:publisher@swirrl.com> ;
 	drafter:hasOwner <mailto:publisher@swirrl.com> ;
@@ -28,8 +31,9 @@ draftset:efc3169b-887a-4bd0-aa2c-30922539cde1 a drafter:DraftSet ;
                 drafter:isPublic false ;
                 drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/7feed06c-dd4c-46ef-8568-2e52e0bab0a5> .
 
-<http://publishmydata.com/graphs/drafter/draft/7feed06c-dd4c-46ef-8568-2e52e0bab0a5> rdf:a drafter:DraftGraph ;
-                                                                                     drafter:inDraftSet draftset:efc3169b-887a-4bd0-aa2c-30922539cde1 ;
-                                                                                     dcterms:created "2020-07-02T12:47:35.406Z"^^xsd:dateTime ;
-                                                                                     dcterms:modified "2020-07-03T16:21:43.045Z"^^xsd:dateTime .
+<http://publishmydata.com/graphs/drafter/draft/7feed06c-dd4c-46ef-8568-2e52e0bab0a5>
+    rdf:a drafter:DraftGraph ;
+    drafter:inDraftSet draftset:efc3169b-887a-4bd0-aa2c-30922539cde1 ;
+    dcterms:created "2020-07-02T12:47:35.406Z"^^xsd:dateTime ;
+    dcterms:modified "2020-07-03T16:21:43.045Z"^^xsd:dateTime .
 }

@@ -4,7 +4,6 @@
              :refer [to-quads with-state-graph]]
             [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.rdf.sparql :as sparql]
             [drafter.user :as user]
             [drafter.util :as util]
@@ -24,6 +23,7 @@
             [rdf:a drafter:DraftSet]
             [drafter:createdAt created-date]
             [drafter:modifiedAt created-date]
+            [drafter:version (util/version)]
             [drafter:createdBy user-uri]
             [drafter:hasOwner user-uri]]]
     (cond-> ss
@@ -159,6 +159,7 @@
     (with-state-graph
       "?ds <" drafter:createdAt "> ?created ."
       "?ds <" drafter:modifiedAt "> ?modified ."
+      "?ds <" drafter:version "> ?version ."
       "?ds <" drafter:createdBy "> ?creator ."
       "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
       "OPTIONAL { ?ds <" drafter:hasOwner "> ?owner . }"
@@ -213,12 +214,24 @@
       "  FILTER (" user-role-score " >= ?rv)"
       "}")))
 
-(defn- draftset-properties-result->properties [draftset-ref {:keys [created title description creator owner role claimuser submitter modified] :as ds}]
+(defn- draftset-properties-result->properties
+  [draftset-ref
+   {:keys [created
+           title
+           description
+           creator
+           owner
+           role
+           claimuser
+           submitter
+           modified
+           version] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :type "Draftset"
                          :created-at created
                          :created-by (user/uri->username creator)
-                         :updated-at modified}
+                         :updated-at modified
+                         :version version}
         optional-fields {:display-name title
                          :description description
                          :current-owner (some-> owner (user/uri->username))
@@ -468,14 +481,27 @@
         [result] (sparql/eager-query backend q)]
     (:dg result)))
 
-(defn- update-public-endpoint-modified-at-query []
-  (slurp (io/resource "drafter/backend/draftset/operations/update-public-endpoint-modified-at.sparql")))
+(def update-public-endpoint-modified-at-query
+  (->
+   "drafter/backend/draftset/operations/update-public-endpoint-modified-at.sparql"
+   io/resource
+   slurp))
 
 (defn update-public-endpoint-modified-at!
   "Updates the modified time of the public endpoint to the current time"
   [backend]
-  (let [q (update-public-endpoint-modified-at-query)]
-    (sparql/update! backend q)))
+  (sparql/update! backend update-public-endpoint-modified-at-query))
+
+(def update-public-endpoint-version-query
+  (->
+   "drafter/backend/draftset/operations/update-public-endpoint-version.sparql"
+   io/resource
+   slurp))
+
+(defn update-public-endpoint-version!
+  "Updates the modified time of the public endpoint to the current time"
+  [backend]
+  (sparql/update! backend update-public-endpoint-version-query))
 
 (defn publish-draftset-graphs! [backend draftset-ref clock]
   (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]

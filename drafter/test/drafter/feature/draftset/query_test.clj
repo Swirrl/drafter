@@ -26,7 +26,9 @@
             binding-map (into {} binding-pairs)]
         (swap! result-state conj binding-map)))))
 
-(defn- create-query-request [user draftset-location query accept-content-type & {:keys [union-with-live?]}]
+(defn create-query-request
+  [user draftset-location query accept-content-type
+   & {:keys [union-with-live?]}]
   (tc/with-identity user
     {:uri (str draftset-location "/query")
      :headers {"accept" accept-content-type}

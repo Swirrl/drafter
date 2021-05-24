@@ -14,7 +14,6 @@
             [grafter-2.rdf4j.formats :as formats]
             [drafter.fixture-data :as fd]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
-            [grafter.vocabularies.dcterms :refer [dcterms:modified]]
             [drafter.feature.endpoint.public :as pub]
             [grafter-2.rdf.protocols :as pr]
             [drafter.time :as time])
@@ -42,8 +41,12 @@
                                                        :graph       (URI. "http://foo/graph")
                                                        :draftset-id ds}
                                                       clock))
-      (let [ts-1 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-        (t/is (= ts-1 initial-time) "Unexpected initial modification time")
+      (let [modified-1 (th/ensure-draftgraph-and-draftset-modified
+                        backend
+                        ds
+                        "http://foo/graph")]
+        (t/is (= initial-time (:modified modified-1))
+              "Unexpected initial modification time")
         (tc/set-now clock update-time)
         (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple-2.nt")
                                                         resources
@@ -52,8 +55,14 @@
                                                          :graph       (URI. "http://foo/graph")
                                                          :draftset-id ds}
                                                         clock))
-        (let [ts-2 (th/ensure-draftgraph-and-draftset-modified backend ds "http://foo/graph")]
-          (t/is (= update-time ts-2) "Modified time is updated after append"))))))
+        (let [modified-2 (th/ensure-draftgraph-and-draftset-modified
+                          backend
+                          ds
+                          "http://foo/graph")]
+          (t/is (= update-time (:modified modified-2))
+                "Modified time is updated after append")
+          (t/is (not= (:version modified-1) (:version modified-2))
+                "Version is updated after append"))))))
 
 (def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
 
