@@ -35,7 +35,11 @@
 (defn- record-job-stats!
   "Log a job completion to datadog"
   [job suffix]
-  (datadog/increment! (util/statsd-name "drafter.job" (:priority job) suffix) 1))
+  (datadog/increment! (util/statsd-name "drafter.job"
+                                        (-> job :metadata :operation)
+                                        (:priority job)
+                                        suffix)
+                      1))
 
 (defn job-failed!
   "Wrap drafter.async.jobs/job-failed! with a datadog counter."
