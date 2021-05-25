@@ -55,7 +55,7 @@
             ;;which does not exist in live
             (recur resources (rest quad-batches) draftset-ref live->draft state job)))
         (let [draftset-info (ops/get-draftset-info repo draftset-ref)]
-          (ajobs/job-succeeded! job {:draftset draftset-info})))
+          (jobs/job-succeeded! job {:draftset draftset-info})))
 
       :copy-graph
       (let [{:keys [live-graph]} state

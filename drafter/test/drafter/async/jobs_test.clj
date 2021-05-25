@@ -50,19 +50,19 @@
     (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
       (is (= false (jobs/job-completed? job))))))
 
-(deftest job-failed-test
+(deftest mark-job-failed-test
   (testing "Java exception"
     (let [msg "Failed :("
           ex (IllegalArgumentException. msg)]
       (testing "without details"
         (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
-          (jobs/job-failed! job ex)
+          (jobs/mark-job-failed! job ex)
           (assert-failure-result job msg IllegalArgumentException nil)))
 
       (testing "with details"
         (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))
               details {:more :info}]
-          (jobs/job-failed! job ex details)
+          (jobs/mark-job-failed! job ex details)
           (assert-failure-result job msg IllegalArgumentException details)))))
 
   (testing "ExceptionInfo"
@@ -72,27 +72,27 @@
 
       (testing "without details"
         (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
-          (jobs/job-failed! job ex)
+          (jobs/mark-job-failed! job ex)
           (assert-failure-result job msg ExceptionInfo ex-details)))
 
       (testing "with other details"
         (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))
               details {:other :info}]
-          (jobs/job-failed! job ex details)
+          (jobs/mark-job-failed! job ex details)
           (assert-failure-result job msg ExceptionInfo details))))))
 
-(deftest job-succeeded-test
+(deftest mark-job-succeeded-test
   (testing "With details"
     (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))
           details {:foo :bar}]
-      (jobs/job-succeeded! job details)
+      (jobs/mark-job-succeeded! job details)
       (let [result (get-job-result job)]
         (is (s/valid? ::spec/success-job-result result))
         (is (= details (:details result))))))
 
   (testing "Without details"
     (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn []))]
-      (jobs/job-succeeded! job)
+      (jobs/mark-job-succeeded! job)
       (let [result (get-job-result job)]
         (is (s/valid? ::spec/success-job-result result))
         (is (= false (contains? result :details)))))))
@@ -154,7 +154,7 @@
         (is (= :pending (:status body)))))
 
     (testing "Finished job is present, status: :complete"
-      (jobs/job-succeeded! job)
+      (jobs/mark-job-succeeded! job)
 
       (let [{:keys [body status] :as response}
             (handler (tc/with-identity test-editor (request :get path)))]
@@ -207,7 +207,7 @@
 
       (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (constantly nil))
             _ (jobs/submit-async-job! job)
-            _ (jobs/job-succeeded! job)
+            _ (jobs/mark-job-succeeded! job)
             job-path (finished-job-path job)
             {:keys [body status]}
             (handler (tc/with-identity test-editor (request :get job-path)))]

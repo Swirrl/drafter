@@ -1,11 +1,11 @@
 (ns drafter.write-scheduler-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [drafter
              [responses :as resp]
-             [write-scheduler :refer :all]]
+             [write-scheduler :refer [compare-jobs]]]
             [drafter.test-helpers.lock-manager :as lm]
             [schema.test :refer [validate-schemas]]
-            [drafter.async.jobs :refer [->Job create-job job-succeeded!]]
+            [drafter.async.jobs :refer [->Job create-job mark-job-succeeded!]]
             [drafter.test-common :as tc]))
 
 (use-fixtures :each validate-schemas
@@ -21,7 +21,10 @@
   (->Job id mock-user-id nil type submit-time nil nil nil {:operation 'test-job} t (promise)))
 
 (defn const-job [priority ret]
-  (create-job mock-user-id {:operation 'test-job} priority (fn [job] (job-succeeded! job ret))))
+  (create-job mock-user-id
+              {:operation 'test-job}
+              priority
+              (fn [job] (mark-job-succeeded! job ret))))
 
 (deftest job-sort-order-test
   (let [unordered-jobs [(mock-job 4 :publish-write 2)

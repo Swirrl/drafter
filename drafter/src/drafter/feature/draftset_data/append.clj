@@ -1,25 +1,25 @@
 (ns drafter.feature.draftset-data.append
   "Appending quads & triples into a draftset."
-  (:require [clojure.spec.alpha :as s]
-            [drafter.backend.draftset.draft-management :as mgmt]
-            [drafter.backend.draftset.operations :as ops]
-            [drafter.draftset :as ds]
-            [drafter.feature.draftset-data.common :as ds-data-common]
-            [drafter.feature.draftset-data.middleware :as dset-middleware]
-            [drafter.middleware :refer [require-rdf-content-type temp-file-body inflate-gzipped]]
-            [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.rdf.sesame :as dses :refer [is-quads-format?]]
-            [drafter.rdf.sparql :as sparql]
-            [drafter.responses :as response]
-            [drafter.util :as util]
-            [drafter.write-scheduler :as writes]
-            [grafter-2.rdf.protocols :as pr]
-            [integrant.core :as ig]
-            [drafter.async.jobs :as ajobs]
-            [drafter.requests :as req]
-            [grafter-2.rdf4j.repository :as repo]
-            [drafter.backend.draftset.graphs :as graphs]
-            [drafter.time :as time]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [drafter.async.jobs :as ajobs]
+   [drafter.backend.draftset.draft-management :as mgmt]
+   [drafter.backend.draftset.graphs :as graphs]
+   [drafter.backend.draftset.operations :as ops]
+   [drafter.draftset :as ds]
+   [drafter.feature.draftset-data.common :as ds-data-common]
+   [drafter.feature.draftset-data.middleware :as dset-middleware]
+   [drafter.middleware :refer [require-rdf-content-type temp-file-body inflate-gzipped]]
+   [drafter.rdf.draftset-management.job-util :as jobs]
+   [drafter.rdf.sesame :as dses :refer [is-quads-format?]]
+   [drafter.requests :as req]
+   [drafter.responses :as response]
+   [drafter.time :as time]
+   [drafter.util :as util]
+   [drafter.write-scheduler :as writes]
+   [grafter-2.rdf.protocols :as pr]
+   [grafter-2.rdf4j.repository :as repo]
+   [integrant.core :as ig]))
 
 (defn append-data-batch!
   "Appends a sequence of triples to the given draft graph."
@@ -53,7 +53,7 @@
           ;;NOTE: do this immediately instead of scheduling a
           ;;continuation since we haven't done any real work yet
           (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-      (ajobs/job-succeeded! job))))
+      (jobs/job-succeeded! job))))
 
 (defn- copy-graph-for-append*
   [state draftset-ref {:keys [graph-manager] :as resources} live->draft quad-batches job]

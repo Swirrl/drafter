@@ -162,24 +162,24 @@
       (assoc result :details details)
       result)))
 
-(defn job-failed!
+(defn mark-job-failed!
   "Mark the given job as failed. If a details map is provided it will
   be associated with the job result under the :details key. If no map
   is provided and ex is an instance of ExceptionInfo the ex-data of
-  the exception will be used as the details."
+  the exception will be used as the details. Use via job-util/job-failed!."
   ([job ex]
-   (job-failed! job ex (when (instance? ExceptionInfo ex)
+   (mark-job-failed! job ex (when (instance? ExceptionInfo ex)
                         (ex-data ex))))
   ([job ex details]
    {:pre [(not (job-completed? job))]
     :post [(job-completed? job)]}
    (complete-job! job (failed-job-result ex details))))
 
-(defn job-succeeded!
+(defn mark-job-succeeded!
   "Complete's the job with complete-job! and sets it's response :type
   as \"ok\" indicating that it completed without error.  If a details
   value is provided it will be added to the job result map under
-  the :details key."
+  the :details key. Use via job-util/job-succeeded!."
   ([job]
    {:pre [(not (job-completed? job))]
     :post [(job-completed? job)]}

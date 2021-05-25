@@ -1,14 +1,7 @@
 (ns drafter.rdf.draftset-management.jobs
   (:require
-   [drafter.backend.common :refer :all]
    [drafter.backend.draftset.operations :as ops]
-   [drafter.backend.draftset.rewrite-result :refer [rewrite-statement]]
-   [drafter.draftset :as ds]
-   [drafter.feature.endpoint.public :as pub]
-   [drafter.rdf.draftset-management.job-util :as jobs]
-   [drafter.rdf.sesame :refer [read-statements]]
-   [grafter-2.rdf.protocols :as rdf :refer [context map->Quad]]
-   [grafter-2.rdf4j.io :refer [quad->backend-quad]]))
+   [drafter.rdf.draftset-management.job-util :as jobs]))
 
 (defn delete-draftset-job [backend user-id {:keys [draftset-id metadata]}]
   (jobs/make-job user-id
