@@ -34,7 +34,7 @@
   (-> json
       (update :created-at util/date-time)
       (update :updated-at util/date-time)
-      (update :version #(URI. %))
+      (update :version #(when % (URI. %)))
       (map->Endpoint)))
 
 

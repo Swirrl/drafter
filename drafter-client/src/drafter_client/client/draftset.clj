@@ -43,7 +43,7 @@
       (update :id uuid)
       (update :created-at date-time)
       (update :updated-at date-time)
-      (update :version #(URI. %))
+      (update :version #(when % (URI. %)))
       (assoc :name (:display-name ds))
       (dissoc :display-name)
       (map->Draftset)))
