@@ -1,0 +1,30 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix : <http://publishmydata.com/graph/turtles> .
+
+<http://turtle-vocab> {
+  :TeenageMutantNinjaTurtle a rdfs:Class ;
+    rdfs:label "Hero in a half shell" .
+
+  :Weapon a rdfs:Class .
+  
+  :wields a rdfs:Property ;
+    rdfs:domain :TeenageMutantNinjaTurtle ;
+    rdfs:range :Weapon .
+
+  :Nunchaku a :Weapon ;
+    rdfs:label "Nunchucks!" .
+
+  :Splinter a rdfs:Resource ;
+    rdfs:label "Splinter" .
+
+  :TheShredder a rdfs:Resource ;
+    rdfs:label "The Shredder" .
+
+  :Michelangelo a :TeenageMutantNinjaTurtle ;
+    rdfs:label "Michelangelo" ;
+    foaf:knows :Splinter ;
+    foaf:nemesis :TheShredder ;
+    :wields :Nunchaku .
+}
