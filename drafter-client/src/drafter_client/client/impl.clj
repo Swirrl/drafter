@@ -11,10 +11,10 @@
             [martian.interceptors :as interceptors]
             [ring.util.codec :refer [form-decode form-encode]]
             [martian.encoders :as enc]
-            [drafter-client.client.protocols :as dcpr])
-  (:import (java.io InputStream File PipedInputStream PipedOutputStream)))
-
-
+            [drafter-client.client.protocols :as dcpr]
+            [clojure.java.io :as io])
+  (:import (java.io InputStream File PipedInputStream PipedOutputStream)
+           [java.util.zip GZIPInputStream GZIPOutputStream]))
 
 (def ^{:deprecated "Use drafter-client.client.protocols/->DrafterClient instead"}
   ->DrafterClient dcpr/->DrafterClient)
@@ -206,42 +206,79 @@
     {:input input
      :worker worker}))
 
-(defn n*->stream [format n*]
-  (piped-input-stream
-    (fn [output-stream]
-      (pr/add (rio/rdf-writer output-stream :format format) n*))))
+(defn- n*-output-stream-writer
+  "Returns a function which writes the given data to its argument output stream in the given
+   RDF format"
+  [format data]
+  (fn [output-stream]
+    (pr/add (rio/rdf-writer output-stream :format format) data)
+    (.flush output-stream)))
 
 (defn grafter->format-stream [content-type data]
   (let [format (mimetype->rdf-format content-type)]
-    (n*->stream format data)))
+    (piped-input-stream
+      (n*-output-stream-writer format data))))
 
 (defn- legacy-auth-call? [access-token]
   (some? access-token))
 
+(defn- pipe-gzipped [data]
+  (piped-input-stream (fn [output-stream]
+                            (with-open [os (GZIPOutputStream. output-stream)]
+                              (io/copy data os)))))
+
+(defn quads-write-f [data format gzip]
+  (let [rdf-format (mimetype->rdf-format format)
+        write-f (n*-output-stream-writer rdf-format data)]
+    (if (true? gzip)
+      (fn [output-stream]
+        (with-open [gos (GZIPOutputStream. output-stream)]
+          (write-f gos)))
+      write-f)))
+
+(defn format-body [data format gzip]
+  (cond
+    (instance? File data)
+    (if (true? gzip)
+      (pipe-gzipped data)
+      {:input data})
+
+    (instance? InputStream data)
+    (if
+      (true? gzip)
+      (pipe-gzipped data)
+      {:input data})
+
+    :else
+    (let [write-f (quads-write-f data format gzip)]
+      (piped-input-stream write-f))))
+
 (defn append-via-http-stream
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
-  [access-token url statements {:keys [auth-provider graph format metadata] :as opts}]
-  (let [{input-stream :input worker :worker}
-        (if (some #(instance? % statements) [InputStream File])
-          {:input statements}
-          (grafter->format-stream format statements))
+  [access-token url statements {:keys [auth-provider graph format metadata gzip] :as opts}]
+  (let [{:keys [input worker owned]} (format-body statements format gzip)
         headers {:Content-Type format
                  :Accept "application/json"
                  :Authorization (if (legacy-auth-call? access-token)
                                   (str "Bearer " access-token)
                                   (dcpr/authorization-header auth-provider))}
+        headers (cond-> headers
+                  gzip (assoc :Content-Encoding "gzip"))
         params (cond-> nil
-                       graph (merge {:graph (.toString graph)})
-                       metadata (merge {:metadata (enc/json-encode metadata)}))
+                 graph (merge {:graph (.toString graph)})
+                 metadata (merge {:metadata (enc/json-encode metadata)}))
         request {:url url
                  :query-params params
                  :method :put
-                 :body input-stream
+                 :body input
                  :headers headers
                  :as :json}
         {:keys [body] :as _resp} (http/request request)]
     (when worker @worker)
+    (when owned
+      (.close input))
+    
     body))
 
 (defn put-draftset-graph
