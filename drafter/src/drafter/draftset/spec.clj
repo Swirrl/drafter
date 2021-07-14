@@ -6,6 +6,8 @@
             [drafter.endpoint.spec]
             [clojure.spec.test.alpha :as st]))
 
+(s/def ::ds/draftset-ref #(satisfies? ds/DraftsetRef %))
+
 (s/def ::ds/status #{:created :updated :deleted})
 (s/def ::ds/changes (s/map-of :drafter/URI (s/keys :req-un [::status])))
 (s/def ::ds/created-by :drafter/EmailAddress)
