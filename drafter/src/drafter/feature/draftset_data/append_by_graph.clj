@@ -1,17 +1,18 @@
 (ns drafter.feature.draftset-data.append-by-graph
-  (:require [clojure.spec.alpha :as s]
-            [drafter.backend.draftset.draft-management :as mgmt]
-            [drafter.backend.draftset.operations :as ops]
-            [drafter.feature.middleware :as middleware]
-            [drafter.rdf.draftset-management.job-util :as jobs]
-            [drafter.responses :as response :refer [submit-async-job!]]
-            [drafter.util :as util]
-            [integrant.core :as ig]
-            [drafter.feature.draftset-data.common :as ds-data-common]
-            [drafter.draftset :as ds]
-            [drafter.requests :as req]
-            [drafter.backend.draftset.graphs :as graphs]
-            [drafter.time :as time]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [drafter.async.jobs :as ajobs]
+   [drafter.backend.draftset.draft-management :as mgmt]
+   [drafter.backend.draftset.graphs :as graphs]
+   [drafter.backend.draftset.operations :as ops]
+   [drafter.draftset :as ds]
+   [drafter.feature.draftset-data.common :as ds-data-common]
+   [drafter.feature.middleware :as middleware]
+   [drafter.rdf.draftset-management.job-util :as jobs]
+   [drafter.requests :as req]
+   [drafter.responses :as response :refer [submit-async-job!]]
+   [drafter.time :as time]
+   [integrant.core :as ig]))
 
 (defn create-or-empty-draft-graph-for [repo graph-manager draftset-ref live-graph clock]
   (if-let [draft-graph-uri (ops/find-draftset-draft-graph repo draftset-ref live-graph)]
@@ -33,7 +34,7 @@
                                                {:draftset-uri (ds/->draftset-uri draftset-id)
                                                ; :live-graph-uris [graph]
                                                 })
-                       (jobs/job-succeeded! job))))))
+                       (ajobs/job-succeeded! job))))))
 
 (defn- required-live-graph-param-handler [repo inner-handler]
   (fn [{{:keys [graph]} :params :as request}]

@@ -10,14 +10,14 @@
   waiting for their results.
 
   Jobs can be added to the write queue using the queue-job! function."
-  (:require [cognician.dogstatsd :as datadog]
-            [clojure.tools.logging :as log]
-            [drafter.util :refer [log-time-taken]]
-            [drafter.async.jobs :refer [job-failed!]]
-            [drafter.logging :refer [with-logging-context]]
-            [integrant.core :as ig]
-            [clojure.string :as string]
-            [clojure.spec.alpha :as s])
+  (:require
+   [clojure.spec.alpha :as s]
+   [clojure.tools.logging :as log]
+   [cognician.dogstatsd :as datadog]
+   [drafter.async.jobs :as jobs]
+   [drafter.logging :refer [with-logging-context]]
+   [drafter.util :refer [log-time-taken]]
+   [integrant.core :as ig])
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
            java.util.concurrent.atomic.AtomicBoolean
            java.util.concurrent.locks.ReentrantLock
@@ -149,7 +149,7 @@
             (catch Throwable ex
               (log/warn ex "A task raised an error.  Delivering error to promise")
               ;; TODO improve error returned
-              (job-failed! job ex)))))
+              (jobs/job-failed! job ex)))))
       (log/debug "Writer waiting for tasks")
       (recur))))
 

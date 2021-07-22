@@ -1,7 +1,6 @@
 (ns drafter.rdf.draftset-management.job-util
   (:require [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
-            [clojure.string :as str]
             [drafter.util :as util]
             [drafter.async.jobs :as ajobs]
             [drafter.backend.draftset.operations :as dsops]
@@ -32,30 +31,6 @@
 ;; |               200 |        62 |              5570 |              6730 |              8811 |          10781 | 7m 18s     |           28011 |
 
 (def batched-write-size 75000)
-
-(defn- record-job-stats!
-  "Log a job completion to datadog"
-  [job suffix]
-  (datadog/increment! (util/statsd-name "drafter.job." (:priority job) suffix) 1))
-
-(defn job-failed!
-  "Wrap drafter.async.jobs/job-failed! with a datadog counter."
-  ([job ex]
-   (record-job-stats! job :failed)
-   (ajobs/job-failed! job ex))
-
-  ([job ex details]
-   (record-job-stats! job :failed)
-   (ajobs/job-failed! job ex details)))
-
-(defn job-succeeded!
-  "Wrap drafter.async.jobs/job-succeeded! with a datadog counter."
-  ([job]
-   (record-job-stats! job :succeeded)
-   (ajobs/job-succeeded! job))
-  ([job details]
-   (record-job-stats! job :succeeded)
-   (ajobs/job-succeeded! job details)))
 
 (defn init-job-settings!
   "Initialised job settings from the given configuration map."

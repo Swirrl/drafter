@@ -2,11 +2,13 @@
   (:require [clj-time.coerce :refer [from-long]]
             [clj-time.format :refer [formatters unparse]]
             [clojure.spec.alpha :as s]
+            [cognician.dogstatsd :as datadog]
             [compojure.core :refer [context GET routes]]
             [drafter.async.responses :as r]
             [drafter.async.spec :as spec]
             [drafter.draftset :as ds]
             [drafter.logging :refer [with-logging-context]]
+            [drafter.util :as util]
             [integrant.core :as ig])
   (:import clojure.lang.ExceptionInfo
            java.util.UUID
@@ -162,6 +164,15 @@
       (assoc result :details details)
       result)))
 
+(defn- record-job-stats!
+  "Log a job completion to datadog"
+  [job suffix]
+  (datadog/increment! (util/statsd-name "drafter.job"
+                                        (-> job :metadata :operation)
+                                        (:priority job)
+                                        suffix)
+                      1))
+
 (defn job-failed!
   "Mark the given job as failed. If a details map is provided it will
   be associated with the job result under the :details key. If no map
@@ -169,10 +180,11 @@
   the exception will be used as the details."
   ([job ex]
    (job-failed! job ex (when (instance? ExceptionInfo ex)
-                        (ex-data ex))))
+                         (ex-data ex))))
   ([job ex details]
    {:pre [(not (job-completed? job))]
     :post [(job-completed? job)]}
+   (record-job-stats! job :failed)
    (complete-job! job (failed-job-result ex details))))
 
 (defn job-succeeded!
@@ -183,8 +195,10 @@
   ([job]
    {:pre [(not (job-completed? job))]
     :post [(job-completed? job)]}
+   (record-job-stats! job :succeeded)
    (complete-job! job {:type :ok}))
   ([job details]
    {:pre [(not (job-completed? job))]
     :post [(job-completed? job)]}
+   (record-job-stats! job :succeeded)
    (complete-job! job {:type :ok :details details})))
