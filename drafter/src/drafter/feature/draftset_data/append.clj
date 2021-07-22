@@ -53,7 +53,7 @@
           ;;NOTE: do this immediately instead of scheduling a
           ;;continuation since we haven't done any real work yet
           (append-draftset-quads resources draftset-ref live->draft quad-batches (merge state {:op :copy-graph :graph graph-uri}) job)))
-      (jobs/job-succeeded! job))))
+      (ajobs/job-succeeded! job))))
 
 (defn- copy-graph-for-append*
   [state draftset-ref {:keys [graph-manager] :as resources} live->draft quad-batches job]

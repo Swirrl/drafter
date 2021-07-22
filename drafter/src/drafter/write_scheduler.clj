@@ -14,8 +14,8 @@
    [clojure.spec.alpha :as s]
    [clojure.tools.logging :as log]
    [cognician.dogstatsd :as datadog]
+   [drafter.async.jobs :as jobs]
    [drafter.logging :refer [with-logging-context]]
-   [drafter.rdf.draftset-management.job-util :as jobs]
    [drafter.util :refer [log-time-taken]]
    [integrant.core :as ig])
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]

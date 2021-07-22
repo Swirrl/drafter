@@ -1,6 +1,7 @@
 (ns drafter.feature.draftset-data.append-by-graph
   (:require
    [clojure.spec.alpha :as s]
+   [drafter.async.jobs :as ajobs]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.backend.draftset.graphs :as graphs]
    [drafter.backend.draftset.operations :as ops]
@@ -33,7 +34,7 @@
                                                {:draftset-uri (ds/->draftset-uri draftset-id)
                                                ; :live-graph-uris [graph]
                                                 })
-                       (jobs/job-succeeded! job))))))
+                       (ajobs/job-succeeded! job))))))
 
 (defn- required-live-graph-param-handler [repo inner-handler]
   (fn [{{:keys [graph]} :params :as request}]

@@ -1,5 +1,6 @@
 (ns drafter.feature.common
   (:require
+   [drafter.async.jobs :as ajobs]
    [drafter.async.responses :as r]
    [drafter.backend.draftset.operations :as dsops]
    [drafter.rdf.draftset-management.job-util :as jobs]
@@ -17,7 +18,7 @@
                     (jobs/job-metadata backend draftset-id operation nil)
                     (fn [job]
                       (let [result (f)]
-                        (jobs/job-succeeded! job result)))))
+                        (ajobs/job-succeeded! job result)))))
 
 (defn run-sync
   ([{:keys [backend global-writes-lock]} user-id operation draftset-id api-call-fn]

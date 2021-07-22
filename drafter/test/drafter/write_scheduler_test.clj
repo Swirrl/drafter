@@ -5,7 +5,7 @@
              [write-scheduler :refer [compare-jobs]]]
             [drafter.test-helpers.lock-manager :as lm]
             [schema.test :refer [validate-schemas]]
-            [drafter.async.jobs :refer [->Job create-job mark-job-succeeded!]]
+            [drafter.async.jobs :refer [->Job create-job job-succeeded!]]
             [drafter.test-common :as tc]))
 
 (use-fixtures :each validate-schemas
@@ -24,7 +24,7 @@
   (create-job mock-user-id
               {:operation 'test-job}
               priority
-              (fn [job] (mark-job-succeeded! job ret))))
+              (fn [job] (job-succeeded! job ret))))
 
 (deftest job-sort-order-test
   (let [unordered-jobs [(mock-job 4 :publish-write 2)

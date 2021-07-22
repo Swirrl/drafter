@@ -1,6 +1,7 @@
 (ns drafter.feature.draftset-data.delete-by-graph
   (:require
    [clojure.spec.alpha :as s]
+   [drafter.async.jobs :as ajobs]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.backend.draftset.graphs :as graphs]
    [drafter.backend.draftset.operations :as dsops]
@@ -33,7 +34,7 @@
                       (jobs/make-job user-id :background-write
                         (jobs/job-metadata
                           backend draftset-id 'delete-draftset-graph metadata)
-                        (fn [job] (jobs/job-succeeded! job (%)))))]
+                        (fn [job] (ajobs/job-succeeded! job (%)))))]
       (if (mgmt/is-graph-managed? backend graph)
         (response #(graphs/delete-user-graph graph-manager draftset-id graph))
         (if silent
