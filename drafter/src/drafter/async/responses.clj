@@ -44,16 +44,13 @@
    (json-response code (assoc default-response-map :details map))))
 
 (s/fdef submitted-job-response
-  :args (s/or :ary-1 (s/cat :job ::async/job)
-              :ary-2 (s/cat :prefix-path string? :job ::async/job))
+  :args (s/cat :job ::async/job)
   :ret :submitted-job/response)
 
-(defn submitted-job-response
-  ([job] (submitted-job-response "" job))
-  ([prefix-path {:keys [id] :as job}]
-   (json-response 202 {:type :ok
-                       :finished-job (format "/v1/status/finished-jobs/%s" id)
-                       :restart-id restart-id})))
+(defn submitted-job-response [{:keys [id] :as job}]
+  (json-response 202 {:type         :ok
+                      :finished-job (format "/v1/status/finished-jobs/%s" id)
+                      :restart-id   restart-id}))
 
 (s/fdef job-not-finished-response
   :args (s/cat :restart-id ::async/restart-id)

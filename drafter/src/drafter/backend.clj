@@ -24,7 +24,7 @@
 ;; client etc...
 (defrecord DrafterService [repo]
   repo/ToConnection
-  (repo/->connection [this]
+  (->connection [_this]
     ;; Note calling ->connection on DrafterService returns an
     ;; unrestricted endpoint, that has access to the state graph
     ;; and can perform updates etc...

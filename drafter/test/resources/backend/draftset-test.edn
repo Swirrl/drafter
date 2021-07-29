@@ -1,7 +1,0 @@
-#merge [{:drafter.backend.draftset/endpoint {:repo #ig/ref :drafter.stasher/repo }}
-        #include "../repo.edn"
-        #include "../user-repo.edn"
-        #include "../log-system.edn"
-        #include "../web.edn"
-        {:drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo
-                                       :fixtures [#resource "drafter/stasher-test/drafter-state-1.trig"]}}]

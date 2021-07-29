@@ -16,6 +16,7 @@
             [drafter.feature.endpoint.public :as pub]
             [grafter-2.rdf.protocols :as pr]
             [drafter.rdf.sesame :as ses]
+            [drafter.manager :as manager]
             [grafter-2.rdf4j.io :as gio]
             [drafter.time :as time])
   (:import java.net.URI
@@ -33,19 +34,18 @@
 
 (t/deftest append-data-to-draftset-job-test
   (tc/with-system
-    [{:keys [:drafter/backend :drafter/global-writes-lock :drafter.backend.draftset.graphs/manager]} "drafter/rdf/draftset-management/jobs.edn"]
+    [{:keys [:drafter/backend :drafter.backend.draftset.graphs/manager]} "drafter/rdf/draftset-management/jobs.edn"]
     (let [initial-time (time/parse "2017-01-01T01:01:01Z")
           clock (tc/manual-clock initial-time)
           update-time (time/parse "2018-01-01T01:01:01Z")
           ds (dsops/create-draftset! backend test-editor)
-          resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}]
+          manager (manager/create-manager backend {:clock clock})]
       (tc/exec-and-await-job-success
        (sut/append-data-to-draftset-job
-        (get-source (io/file "./test/test-triple.nt") (URI. "http://foo/graph"))
-        resources
+        manager
         dummy
         ds
-        clock
+        (get-source (io/file "./test/test-triple.nt") (URI. "http://foo/graph"))
         nil))
       (let [modified-1 (th/ensure-draftgraph-and-draftset-modified
                         backend
@@ -57,11 +57,10 @@
 
         (tc/exec-and-await-job-success
          (sut/append-data-to-draftset-job
-          (get-source (io/file "./test/test-triple-2.nt") (URI. "http://foo/graph"))
-          resources
+          manager
           dummy
           ds
-          clock
+          (get-source (io/file "./test/test-triple-2.nt") (URI. "http://foo/graph"))
           nil))
         (let [modified-2 (th/ensure-draftgraph-and-draftset-modified
                           backend

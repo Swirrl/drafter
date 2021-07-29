@@ -2,6 +2,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [drafter.async.jobs :as ajobs]
+   [drafter.async.responses :as async-responses]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.backend.draftset.graphs :as graphs]
    [drafter.backend.draftset.operations :as dsops]
@@ -14,33 +15,61 @@
    [integrant.core :as ig]
    [ring.util.response :as ring]))
 
-(defn sync-job [{:keys [backend] graph-manager ::graphs/manager :as resources}]
-  (fn [draftset-id graph user-id silent]
-    (if (mgmt/is-graph-managed? backend graph)
-      (feat-common/run-sync
-        resources
-        user-id
-        'delete-draftset-graph
-        draftset-id
-        #(graphs/delete-user-graph graph-manager draftset-id graph)
-        #(feat-common/draftset-sync-write-response % backend draftset-id))
-      (if silent
-        (ring/response (dsops/get-draftset-info backend draftset-id))
-        (response/unprocessable-entity-response (str "Graph not found"))))))
+(defn delete-graph
+  "Deletes the given live graph within a draftset. Returns the draftset summary for the
+   new draft state. The graph to delete must exist in the live graph unless silent? is
+   false. An exception will be thrown if silent? is falsey and the graph does not exist,
+   or if the delete operation fails for some reason. In these cases the ex-info of the
+   exception will be a map containing a :type key indicating the reason for the error."
+  [{:keys [backend graph-manager] :as manager} user-id draftset-ref graph silent?]
+  (cond
+    (mgmt/is-graph-managed? backend graph)
+    (let [job-result (feat-common/run-sync
+                      manager
+                      user-id
+                      'delete-draftset-graph
+                      draftset-ref
+                      #(graphs/delete-user-graph graph-manager draftset-ref graph)
+                      identity)]
+      (if (jobs/failed-job-result? job-result)
+        (throw (ex-info "Delete job failed" {:type ::delete-job-failed
+                                             :result job-result}))
+        (dsops/get-draftset-info backend draftset-ref)))
 
-(defn async-job [{:keys [backend] graph-manager ::graphs/manager}]
+    silent?
+    (dsops/get-draftset-info backend draftset-ref)
+
+    :else
+    (throw (ex-info "Graph not found" {:type ::graph-not-found :graph graph}))))
+
+(defn sync-job [{:keys [drafter/manager]}]
+  (fn [draftset-id graph user-id silent]
+    (try
+      (let [ds-info (delete-graph manager user-id draftset-id graph silent)]
+        (ring/response ds-info))
+      (catch Exception exi
+        (case (:type (ex-data exi))
+          ::graph-not-found (response/unprocessable-entity-response
+                             "Graph not found")
+          ::delete-job-failed (let [job-result (:result (ex-data exi))]
+                                (async-responses/api-response 500 job-result))
+          ;;unknown failure
+          (throw exi))))))
+
+(defn async-job [{:keys [drafter/manager]}]
   (fn [draftset-id graph user-id silent metadata]
     (let [response #(response/submit-async-job!
                       (jobs/make-job user-id :background-write
                         (jobs/job-metadata
-                          backend draftset-id 'delete-draftset-graph metadata)
+                          (:backend manager) draftset-id 'delete-draftset-graph metadata)
                         (fn [job] (ajobs/job-succeeded! job (%)))))]
-      (if (mgmt/is-graph-managed? backend graph)
-        (response #(graphs/delete-user-graph graph-manager draftset-id graph))
+      (if (mgmt/is-graph-managed? (:backend manager) graph)
+        (response #(graphs/delete-user-graph (:graph-manager manager)
+                                             draftset-id
+                                             graph))
         (if silent
-          (response #(dsops/get-draftset-info backend draftset-id))
-          (response/unprocessable-entity-response
-            (str "Graph not found")))))))
+          (response #(dsops/get-draftset-info (:backend manager) draftset-id))
+          (response/unprocessable-entity-response "Graph not found"))))))
 
 (defn request-handler
   [{:keys [:drafter/backend sync-job-handler async-job-handler] :as _resources}]
@@ -61,27 +90,25 @@
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete-by-graph/sync-job-handler [_]
   (s/keys
-    :req [::graphs/manager]
-    :req-un [::backend ::global-writes-lock]))
+    :req [:drafter/manager]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete-by-graph/sync-job-handler
-  [_ {:keys [backend] :as resources}]
-  (sync-job resources))
+  [_ opts]
+  (sync-job opts))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete-by-graph/async-job-handler [_]
   (s/keys
-    :req [::graphs/manager]
-    :req-un [::backend]))
+    :req [:drafter/manager]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete-by-graph/async-job-handler
-  [_ {:keys [backend] :as resources}]
-  (async-job resources))
+  [_ opts]
+  (async-job opts))
 
 (s/def ::sync-job-handler fn?)
 (s/def ::async-job-handler fn?)
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler [_]
-  (s/keys :req [:drafter/backend]
+  (s/keys :req [:drafter/manager]
           :req-un [::wrap-as-draftset-owner ::sync-job-handler ::async-job-handler]))
 
 (defmethod ig/init-key :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler [_ opts]
