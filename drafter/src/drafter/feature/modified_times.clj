@@ -30,8 +30,14 @@
 (defn- update-draftset-timestamp-query [draftset-ref modified-at]
   (mgmt/set-timestamp (url/->java-uri draftset-ref) dcterms:modified modified-at))
 
+(defn- update-draftset-version-query [draftset-ref]
+  (mgmt/set-version (url/->java-uri draftset-ref) (util/version)))
+
 (defn- update-draftset-timestamp! [conn draftset-ref modified-at]
   (sparql/update! conn (update-draftset-timestamp-query draftset-ref modified-at)))
+
+(defn- update-draftset-version! [conn draftset-ref]
+  (sparql/update! conn (update-draftset-version-query draftset-ref)))
 
 (defn- update-draft-graph-modified [repo draftset-ref draft-modified-graph-uri draft-graph-uri modified-at]
   (let [bindings {:dmg draft-modified-graph-uri
@@ -40,7 +46,8 @@
         q (io/resource "drafter/feature/modified_times/update-graph-modified-at.sparql")]
     (with-open [conn (repo/->connection repo)]
       (exec-update-with-bindings conn q bindings)
-      (update-draftset-timestamp! conn draftset-ref modified-at))))
+      (update-draftset-timestamp! conn draftset-ref modified-at)
+      (update-draftset-version! conn draftset-ref))))
 
 (defn draft-graph-appended! [repo draftset-ref draft-modified-graph-uri draft-graph-uri modified-at]
   (update-draft-graph-modified repo draftset-ref draft-modified-graph-uri draft-graph-uri modified-at))
@@ -78,7 +85,8 @@
   [repo graph-manager draftset-ref live->draft draft-graph-uri removed-at]
   (let [live->draft (remove-draft-graph-modified repo graph-manager live->draft draft-graph-uri removed-at)]
     (with-open [conn (repo/->connection repo)]
-      (update-draftset-timestamp! conn draftset-ref removed-at))
+      (update-draftset-timestamp! conn draftset-ref removed-at)
+      (update-draftset-version! conn draftset-ref))
     live->draft))
 
 (defn draft-graph-reverted!
@@ -193,12 +201,14 @@
        (insert-graph-modifications-query draft-modifications-graph draft->modified)
        (remove-empty-draft-only-graft-modifications draftset-ref draft-modifications-graph)
        (remove-empty-draft-modifications-graph draft-modifications-graph)
-       (update-draftset-timestamp-query draftset-ref now)]
+       (update-draftset-timestamp-query draftset-ref now)
+       (update-draftset-version-query draftset-ref)]
       [(create-draft-modifications-graph-update graph-manager draftset-ref (:state modifications-graph-state) draft-modifications-graph now)
        (insert-graph-modifications-query draft-modifications-graph draft->modified)
        (remove-empty-draft-only-graft-modifications draftset-ref draft-modifications-graph)
        (remove-empty-draft-modifications-graph draft-modifications-graph)
-       (update-draftset-timestamp-query draftset-ref now)])))
+       (update-draftset-timestamp-query draftset-ref now)
+       (update-draftset-version-query draftset-ref)])))
 
 (defn publish-modified-times [repo graph->modified]
   (let [q (publish-modified-times-query graph->modified)]
