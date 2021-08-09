@@ -75,6 +75,7 @@
 	########################################################################
 	draftset:ds-1 a drafter:DraftSet ;
 		dcterms:created "2017-02-02T02:02:02.000Z"^^xsd:dateTime ;
+		drafter:version version:52099c51-5cab-496c-9aed-2bbcb3c36874 ;
 		dcterms:creator <mailto:manager@swirrl.com> ;
 		drafter:hasOwner <mailto:manager@swirrl.com> .
 
@@ -105,6 +106,7 @@
 
 	draftset:ds-2 a drafter:DraftSet ;
 		dcterms:created "2017-11-16T15:13:46.901Z"^^xsd:dateTime ;
+		drafter:version version:c7af52ba-b8ef-41f3-b116-11bfcd4ef353 ;
 		dcterms:creator <mailto:editor@swirrl.com> ;
 		drafter:hasOwner <mailto:editor@swirrl.com> .
 
