@@ -31,9 +31,21 @@
   (let [q (update-public-endpoint-modified-at-query)]
     (sparql/update! backend q)))
 
+(def update-public-endpoint-version-query
+  (->
+   "drafter/backend/draftset/operations/update-public-endpoint-version.sparql"
+   io/resource
+   slurp))
+
+(defn update-public-endpoint-version!
+  "Updates the modified time of the public endpoint to the current time"
+  [backend]
+  (sparql/update! backend update-public-endpoint-version-query))
+
 (defn publish-draftset!
   "Publishes the referenced draftset at the time returned by clock"
   [{:keys [backend graph-manager clock] :as manager} draftset-ref]
   (publish-draftset-graphs! backend graph-manager draftset-ref clock)
   (update-public-endpoint-modified-at! backend)
+  (update-public-endpoint-version! backend)
   (dsops/delete-draftset-statements! backend draftset-ref))
