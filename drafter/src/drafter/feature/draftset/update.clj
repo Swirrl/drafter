@@ -168,13 +168,15 @@
        (into {})))
 
 (defn- graph-size [backend graph-uri max-update-size]
-  ;; Bizarrely, selecting every triple and counting the results is much faster
-  ;; than doing a COUNT(*). The query planner is clearly confused.
-  (->> (format "SELECT * FROM <%s> WHERE { ?s ?p ?o } LIMIT %d"
-               graph-uri
-               (inc max-update-size))
-       (sparql/eager-query backend)
-       count))
+  (:c (first (sparql/eager-query backend (format "SELECT (COUNT(*) AS ?c)
+                                                  FROM <%s>
+                                                  WHERE {
+                                                    SELECT *
+                                                    WHERE { ?s ?p ?o }
+                                                    LIMIT %d
+                                                  }"
+                                                 graph-uri
+                                                 (inc max-update-size))))))
 
 (defn- get-graph-meta [backend draftset-id update-request max-update-size]
   (let [new-graph (fn [lg]
