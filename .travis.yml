@@ -23,6 +23,7 @@ cache:
     - .cpcache # tools.deps classpath cache
     - drafter/.cpcache # tools.deps classpath cache
 before_install:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
   - "sudo ./travis/install_base.sh"
   - "./travis/install_services.sh"
 install:
