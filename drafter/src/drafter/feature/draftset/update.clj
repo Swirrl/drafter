@@ -13,7 +13,7 @@
             [drafter.errors :refer [wrap-encode-errors]]
             [grafter.vocabularies.rdf :refer :all]
             [grafter.url :as url]
-            [clojure.string :as string]
+            [clojure.string :as str]
             [ring.util.request :as request]
             [grafter-2.rdf4j.repository :as repo]
             [drafter.backend.draftset.graphs :as graphs]
@@ -136,54 +136,53 @@
         op [(rewrite op rewriter)]]
     (concat manage copy rewrite-ds touch op)))
 
-(defn- graph-meta-q [draftset-id live-graphs]
-  (let [ds-uri (ds/->draftset-uri draftset-id)
-        live-only-values (string/join " " (map #(str "( <" % "> <" ds-uri "> )") live-graphs))]
-    ;; TODO: Surely there's a better query than this to do the same? At least
-    ;; the first two?
-    (str "
-SELECT ?lg ?dg (COUNT(DISTINCT ?s1) AS ?c1) (COUNT(DISTINCT ?s2) AS ?c2) WHERE {
-  { GRAPH ?dg { ?s1 ?p1 ?o1 }
-    GRAPH ?lg { ?s2 ?p2 ?o2 }
-    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-      ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
-      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-    }
-    VALUES ?ds { <" ds-uri "> }
-  } UNION {
-    GRAPH ?dg { ?s1 ?p1 ?o1 }
-    FILTER NOT EXISTS { GRAPH ?lg { ?s2 ?p2 ?o2 } }
-    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-      ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
-      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-    }
-    VALUES ?ds { <" ds-uri "> }
-  } UNION {
-    GRAPH ?lg { ?s2 ?p2 ?o2 }
-    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-      ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
-      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-      FILTER NOT EXISTS {
-        ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-        ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-      }
-    }
-    VALUES ( ?lg ?ds ) { " live-only-values " }
-  }
-}
-GROUP BY ?lg ?dg")))
+(defn- get-live-graphs [backend graphs]
+  (->> (format "SELECT ?lg
+                FROM <http://publishmydata.com/graphs/drafter/drafts>
+                WHERE {
+                  VALUES ?lg { %s }
+                  ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+                }"
+               (str/join " " (map #(str "<" % ">") graphs)))
+       (sparql/eager-query backend)
+       (map (fn [{lg :lg}]
+              [lg {:draft-graph-uri (dm/make-draft-graph-uri)
+                   :draft? false
+                   :live? true}]))
+       (into {})))
 
-(defn- get-graph-meta [backend draftset-id update-request]
+(defn- get-draft-graphs [backend draftset-id]
+  (->> (format "SELECT ?lg ?dg
+                FROM <http://publishmydata.com/graphs/drafter/drafts>
+                WHERE {
+                  ?dg <http://publishmydata.com/def/drafter/inDraftSet> <%s> .
+                  ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> ;
+                      <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+                }"
+               (ds/->draftset-uri draftset-id))
+       (sparql/eager-query backend)
+       (map (fn [{:keys [lg dg]}]
+              [lg {:draft-graph-uri dg
+                   :draft? true
+                   :live? true}]))
+       (into {})))
+
+(defn- graph-size [backend graph-uri max-update-size]
+  (:c (first (sparql/eager-query backend (format "SELECT (COUNT(*) AS ?c)
+                                                  FROM <%s>
+                                                  WHERE {
+                                                    SELECT *
+                                                    WHERE { ?s ?p ?o }
+                                                    LIMIT %d
+                                                  }"
+                                                 graph-uri
+                                                 (inc max-update-size))))))
+
+(defn- get-graph-meta [backend draftset-id update-request max-update-size]
   (let [new-graph (fn [lg]
                     [lg {:draft-graph-uri (dm/make-draft-graph-uri)
                          :draft? false
-                         :live? false
-                         :draft-size 0
-                         :live-size 0}])
+                         :live? false}])
         affected-graphs (->> (.getOperations update-request)
                              (map (juxt identity affected-graphs)))
         graph-op-order (reduce (fn [acc [op gs]]
@@ -200,19 +199,16 @@ GROUP BY ?lg ?dg")))
                              (map new-graph)
                              (map (fn [[lg m]]
                                     [lg (assoc m :ops (graph-op-order lg))]))
-                             (into {}))
-        db-graphs (->> (graph-meta-q draftset-id (keys affected-graphs))
-                       (sparql/eager-query backend))]
-    (->> db-graphs
-         (filter (fn [{:keys [dg lg]}] (or dg lg)))
-         (map (fn [{:keys [dg lg c1 c2]}]
-                [lg {:draft-graph-uri (or dg (dm/make-draft-graph-uri))
-                     :draft? (boolean dg)
-                     :live? (boolean lg)
-                     :draft-size c1
-                     :live-size c2}]))
-         (into {})
-         (merge-with merge affected-graphs))))
+                             (into {}))]
+    (->> (merge-with merge
+                     affected-graphs
+                     (get-live-graphs backend (keys affected-graphs))
+                     (get-draft-graphs backend draftset-id))
+         (map (fn [[lg {dg :draft-graph-uri :as meta}]]
+                [lg (assoc meta
+                           :draft-size (graph-size backend dg max-update-size)
+                           :live-size (graph-size backend lg max-update-size))]))
+         (into {}))))
 
 
 (extend-protocol UpdateOperation
@@ -279,7 +275,10 @@ GROUP BY ?lg ?dg")))
        (into {})))
 
 (defn- update! [backend graph-manager clock max-update-size draftset-id update-request]
-  (let [graph-meta (get-graph-meta backend draftset-id update-request)
+  (let [graph-meta (get-graph-meta backend
+                                   draftset-id
+                                   update-request
+                                   max-update-size)
         rewriter-map (rewriter-map graph-meta)
         rewriter (partial uri-constant-rewriter rewriter-map)
         opts {:graph-meta graph-meta

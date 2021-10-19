@@ -787,7 +787,10 @@ SELECT * WHERE {
               quad (pr/->Quad (URI. "http://s") (URI. "http://p") (URI. "http://o") g)
               stmt (jena/insert-data-stmt [quad])
               update-request (jena/->update [stmt])
-              gmeta (#'update/get-graph-meta backend draftset-id update-request)
+              gmeta (#'update/get-graph-meta backend
+                                             draftset-id
+                                             update-request
+                                             50)
               draft-graph-uri (get-in gmeta [g :draft-graph-uri])]
           (is (not= dg draft-graph-uri))
           (is (not (nil? draft-graph-uri))))))))
