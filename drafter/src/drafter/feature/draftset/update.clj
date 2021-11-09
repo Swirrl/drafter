@@ -118,6 +118,7 @@
                 WHERE {
                   VALUES ?lg { %s }
                   ?lg a <http://publishmydata.com/def/drafter/ManagedGraph> .
+                  ?lg <http://publishmydata.com/def/drafter/isPublic> true .
                 }"
                (str/join " " (map #(str "<" % ">") graphs)))
        (sparql/eager-query backend)
