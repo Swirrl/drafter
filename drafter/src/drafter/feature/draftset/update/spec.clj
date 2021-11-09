@@ -33,7 +33,10 @@
 (s/def ::update/GraphsMeta (s/map-of uri? ::update/GraphMeta))
 
 (s/fdef update/get-graph-meta
-  :args (s/cat :backend any? :draftset-ref any? :update-request ::jena/UpdateRequest)
+  :args (s/cat :backend any?
+               :draftset-ref any?
+               :update-request ::jena/UpdateRequest
+               :max-update-size ::update/max-update-size)
   :ret ::update/GraphMeta)
 
 ;; update context
