@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Watch file for changes every 10 seconds -->
-<Configuration status="info" monitorInterval="10">
+<!-- Watch config file for changes every 30 seconds -->
+<Configuration status="info" monitorInterval="30">
 
     <Properties>
         <Property name="log-path">${env:DRAFTER_LOGS_DIR:-logs}</Property>
@@ -8,14 +8,14 @@
 
     <Appenders>
         <RollingFile name="file-log" fileName="${log-path}/drafter.log"
-                     filePattern="${log-path}/drafter-%d{yyyy-MM-dd}-%i.log">
+                     filePattern="${log-path}/drafter.%i.log.gz">
             <PatternLayout>
                 <pattern>%d{ISO8601} %-5p %20.20c{1} %12X{user} %12X{jobId} %12X{reqId} :: %m%n</pattern>
             </PatternLayout>
             <Policies>
-                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
-                <SizeBasedTriggeringPolicy size="100 MB" />
+                <SizeBasedTriggeringPolicy size="50 MB" />
             </Policies>
+            <DefaultRolloverStrategy max="20"/>
         </RollingFile>
 
         <Console name="console" target="SYSTEM_OUT">
