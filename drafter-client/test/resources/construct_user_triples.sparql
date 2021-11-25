@@ -1,0 +1,6 @@
+CONSTRUCT { ?s ?p ?o }
+WHERE {
+  GRAPH ?g { ?s ?p ?o }
+  VALUES ?systemgraph { }
+  FILTER(?g != ?systemgraph)
+}

@@ -1,0 +1,17 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+<http://publishmydata.com/graphs/drafter/drafts> {
+
+  # user graph-2
+  <http://example.com/graphs/2> a drafter:ManagedGraph ;
+      drafter:isPublic true ;
+      drafter:hasDraft <http://publishmydata.com/graphs/drafter/draft/7e8547d5-86f4-4893-9378-b37ad6ffafbb> .
+
+  <http://publishmydata.com/def/drafter/draftset/10a4a58a-2c10-42e3-bd38-bf990aa34d78> a drafter:DraftSet ;
+      dcterms:modified "2021-01-22T08:23:14.490Z"^^xsd:dateTime .
+
+  # draft of user graph-2
+    <http://publishmydata.com/graphs/drafter/draft/7e8547d5-86f4-4893-9378-b37ad6ffafbb> a drafter:DraftGraph ;
+        drafter:inDraftSet <http://publishmydata.com/def/drafter/draftset/10a4a58a-2c10-42e3-bd38-bf990aa34d78> .
+}

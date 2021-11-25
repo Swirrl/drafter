@@ -5,14 +5,15 @@
             [drafter.test-common :as tc :refer [deftest-system]]
             [drafter.user-test :refer [test-editor test-publisher]]
             [grafter-2.rdf.protocols :refer [add context]]
-            [grafter-2.rdf4j.io :refer [rdf-writer statements]]
+            [grafter-2.rdf4j.io :as gio :refer [rdf-writer statements]]
             [schema.test :refer [validate-schemas]]
             [clojure.string :as string]
             [drafter.routes.common
              :refer [default-sparql-query live-query
                      draftset-query append-quads-to-draftset-through-api
                      publish-draftset]]
-            [clojure.set :as set]))
+            [clojure.set :as set]
+            [drafter.feature.draftset.test-helper :as help]))
 
 (use-fixtures :each (join-fixtures [validate-schemas tc/with-spec-instrumentation]))
 
@@ -43,7 +44,7 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
 (defn draftset-get-data
   [draftset & {:keys [union-with-live reasoning] :as kwargs}]
   (tc/with-identity test-publisher
-    (-> default-sparql-query
+    (-> {:request-method :get :headers {"accept" "application/n-quads"}}
         (assoc :uri (str draftset "/data"))
         (cond->
             union-with-live (assoc-in [:params :union-with-live] "true")
@@ -64,8 +65,12 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
        (let [request (apply draftset-query draftset (str q-prefixes q) :user test-publisher kwargs)]
          (-> request api :body io/reader line-seq rest process set)))
      (fn get-data [& kwargs]
-       (let [request (apply draftset-get-data draftset kwargs)]
-         (-> request api :body io/reader line-seq rest process set)))]))
+       (let [request (apply draftset-get-data draftset kwargs)
+             {:keys [body]} (api request)
+             quads (gio/statements body :format :nq)
+             user-quads (filter help/is-user-quad? quads)
+             user-quads (help/eval-statements user-quads)]
+         (set (map (juxt :s :p :o) user-quads))))]))
 
 (deftest-system live-sparql-reasoning-test
   [{endpoint :drafter.routes.sparql/live-sparql-query-route :as system}
@@ -185,73 +190,74 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
                  ["http://test.com/Tigger"]}
                (draftq-2 dog-no-label-q :union-with-live true :reasoning true)))))))
 
-(deftest-system draftset-get-data-reasoning-test
-  [system system-config]
-  (let [api (get system [:drafter/routes :draftset/api])
-        draft-1 "tbox: { :Whippet a rdfs:Class ; rdfs:subClassOf :Dog . }"
-        [add-to-draft-1! publish-1! _ get-data-1] (new-draftset api draft-1)
-        draft-2 ":PublicGraph {
+(deftest draftset-get-data-reasoning-test
+  (tc/with-system
+    [system system-config]
+    (let [api (get system [:drafter/routes :draftset/api])
+          draft-1 "tbox: { :Whippet a rdfs:Class ; rdfs:subClassOf :Dog . }"
+          [add-to-draft-1! publish-1! _ get-data-1] (new-draftset api draft-1)
+          draft-2 ":PublicGraph {
                    :Whippet
                      rdfs:label \"Whippet\" ;
                      rdfs:comment \"A whippet.\".
                    :Snappy a :Whippet .
                  }"
-        [add-to-draft-2! publish-2! _ get-data-2] (new-draftset api draft-2)
-        info #{["http://test.com/Lifeform" "http://www.w3.org/2000/01/rdf-schema#label" "Lifeform"]
-               ["http://test.com/Lifeform" "http://www.w3.org/2000/01/rdf-schema#comment" "A living thing."]
-               ["http://test.com/Animal" "http://www.w3.org/2000/01/rdf-schema#comment" "An animal."]
-               ["http://test.com/Animal" "http://www.w3.org/2000/01/rdf-schema#label" "Animal"]
-               ["http://test.com/Mammal" "http://www.w3.org/2000/01/rdf-schema#label" "Mammal"]
-               ["http://test.com/Mammal" "http://www.w3.org/2000/01/rdf-schema#comment" "A mammal."]
-               ["http://test.com/Dog" "http://www.w3.org/2000/01/rdf-schema#comment" "A dog."]
-               ["http://test.com/Dog" "http://www.w3.org/2000/01/rdf-schema#label" "Dog"]
-               ["http://test.com/Whippet" "http://www.w3.org/2000/01/rdf-schema#label" "Whippet"]
-               ["http://test.com/Whippet" "http://www.w3.org/2000/01/rdf-schema#comment" "A whippet."]
-               ["http://test.com/Snappy" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://test.com/Whippet"]
-               ["http://test.com/WestHighlandTerrier" "http://www.w3.org/2000/01/rdf-schema#comment" "A west highland terrier."]
-               ["http://test.com/WestHighlandTerrier" "http://www.w3.org/2000/01/rdf-schema#label" "West Highland Terrier"]
-               ["http://test.com/Stevie" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://test.com/WestHighlandTerrier"]
-               ["http://test.com/Cat" "http://www.w3.org/2000/01/rdf-schema#label" "Cat"]
-               ["http://test.com/Cat" "http://www.w3.org/2000/01/rdf-schema#comment" "A cat."]
-               ["http://test.com/Tiger" "http://www.w3.org/2000/01/rdf-schema#label" "Tiger"]
-               ["http://test.com/Tiger" "http://www.w3.org/2000/01/rdf-schema#comment" "A tiger."]
-               ["http://test.com/Tigger" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://test.com/Tiger"]}
-        hierarchy #{["http://test.com/Lifeform" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
-                    ["http://test.com/Animal" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
-                    ["http://test.com/Animal" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Lifeform"]
-                    ["http://test.com/Mammal" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Animal"]
-                    ["http://test.com/Mammal" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
-                    ["http://test.com/Dog" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Mammal"]
-                    ["http://test.com/Dog" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
-                    ["http://test.com/Whippet" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Dog"]
-                    ["http://test.com/Whippet" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
-                    ["http://test.com/WestHighlandTerrier" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
-                    ["http://test.com/WestHighlandTerrier" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Dog"]
-                    ["http://test.com/Cat" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
-                    ["http://test.com/Cat" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Mammal"]
-                    ["http://test.com/Tiger" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Cat"]
-                    ["http://test.com/Tiger" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]}]
+          [add-to-draft-2! publish-2! _ get-data-2] (new-draftset api draft-2)
+          info #{["http://test.com/Lifeform" "http://www.w3.org/2000/01/rdf-schema#label" "Lifeform"]
+                 ["http://test.com/Lifeform" "http://www.w3.org/2000/01/rdf-schema#comment" "A living thing."]
+                 ["http://test.com/Animal" "http://www.w3.org/2000/01/rdf-schema#comment" "An animal."]
+                 ["http://test.com/Animal" "http://www.w3.org/2000/01/rdf-schema#label" "Animal"]
+                 ["http://test.com/Mammal" "http://www.w3.org/2000/01/rdf-schema#label" "Mammal"]
+                 ["http://test.com/Mammal" "http://www.w3.org/2000/01/rdf-schema#comment" "A mammal."]
+                 ["http://test.com/Dog" "http://www.w3.org/2000/01/rdf-schema#comment" "A dog."]
+                 ["http://test.com/Dog" "http://www.w3.org/2000/01/rdf-schema#label" "Dog"]
+                 ["http://test.com/Whippet" "http://www.w3.org/2000/01/rdf-schema#label" "Whippet"]
+                 ["http://test.com/Whippet" "http://www.w3.org/2000/01/rdf-schema#comment" "A whippet."]
+                 ["http://test.com/Snappy" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://test.com/Whippet"]
+                 ["http://test.com/WestHighlandTerrier" "http://www.w3.org/2000/01/rdf-schema#comment" "A west highland terrier."]
+                 ["http://test.com/WestHighlandTerrier" "http://www.w3.org/2000/01/rdf-schema#label" "West Highland Terrier"]
+                 ["http://test.com/Stevie" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://test.com/WestHighlandTerrier"]
+                 ["http://test.com/Cat" "http://www.w3.org/2000/01/rdf-schema#label" "Cat"]
+                 ["http://test.com/Cat" "http://www.w3.org/2000/01/rdf-schema#comment" "A cat."]
+                 ["http://test.com/Tiger" "http://www.w3.org/2000/01/rdf-schema#label" "Tiger"]
+                 ["http://test.com/Tiger" "http://www.w3.org/2000/01/rdf-schema#comment" "A tiger."]
+                 ["http://test.com/Tigger" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://test.com/Tiger"]}
+          hierarchy #{["http://test.com/Lifeform" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
+                      ["http://test.com/Animal" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
+                      ["http://test.com/Animal" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Lifeform"]
+                      ["http://test.com/Mammal" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Animal"]
+                      ["http://test.com/Mammal" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
+                      ["http://test.com/Dog" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Mammal"]
+                      ["http://test.com/Dog" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
+                      ["http://test.com/Whippet" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Dog"]
+                      ["http://test.com/Whippet" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
+                      ["http://test.com/WestHighlandTerrier" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
+                      ["http://test.com/WestHighlandTerrier" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Dog"]
+                      ["http://test.com/Cat" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]
+                      ["http://test.com/Cat" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Mammal"]
+                      ["http://test.com/Tiger" "http://www.w3.org/2000/01/rdf-schema#subClassOf" "http://test.com/Cat"]
+                      ["http://test.com/Tiger" "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" "http://www.w3.org/2000/01/rdf-schema#Class"]}]
 
-    (add-to-draft-1!)
-    (publish-1!)
-    (add-to-draft-2!)
+      (add-to-draft-1!)
+      (publish-1!)
+      (add-to-draft-2!)
 
-    (testing "Reasoning in get graph data is passed through"
-      (testing "Graph data without reasoning"
-        (is (= info
-               (get-data-2))))
+      (testing "Reasoning in get graph data is passed through"
+        (testing "Graph data without reasoning"
+          (is (= info
+                 (get-data-2))))
 
-      (testing "Graph data with reasoning"
-        (is (= info
-               (get-data-2 :reasoning true))))
+        (testing "Graph data with reasoning"
+          (is (= info
+                 (get-data-2 :reasoning true))))
 
-      (testing "Graph data without reasoning (union w/live)"
-        (is (= (set/union info hierarchy)
-               (get-data-2 :union-with-live true))))
+        (testing "Graph data without reasoning (union w/live)"
+          (is (= (set/union info hierarchy)
+                 (get-data-2 :union-with-live true))))
 
-      (testing "Graph data with reasoning (union w/live)"
-        (is (= (set/union info hierarchy)
-               (get-data-2 :union-with-live true :reasoning true)))))))
+        (testing "Graph data with reasoning (union w/live)"
+          (is (= (set/union info hierarchy)
+                 (get-data-2 :union-with-live true :reasoning true))))))))
 
 (deftest-system draftset-non-leaky-tbox-test
   [{live :drafter.routes.sparql/live-sparql-query-route :as system}

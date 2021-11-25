@@ -60,7 +60,7 @@
     (r/api-response 200 result)))
 
 ;; run-sync-job! :: WriteLock -> Job -> RingResponse
-;; run-sync-job! :: WriteLock -> Job -> (ApiResponse -> RingResponse) -> RingResponse
+;; run-sync-job! :: WriteLock -> Job -> (ApiResponse -> T) -> T
 (defn run-sync-job!
   "Runs a sync job, blocks waiting for it to complete and returns a
   ring response using the given handler function. The handler function
@@ -76,12 +76,18 @@
      (let [job-result (exec-sync-job! global-writes-lock job)]
        (resp-fn job-result)))))
 
-;; submit-async-job! :: Job -> RingResponse
-(defn submit-async-job!
-  "Submits an async job and returns a ring response indiciating the
-  result of the submit operation."
+(defn enqueue-async-job!
+  "Submits an async job for execution. Returns the submitted job."
   [job]
   (log/info "Submitting async job: " job)
   (writes/queue-job! job)
   (jobs/submit-async-job! job)
-  (submitted-job-response "/v1" job))
+  job)
+
+;; submit-async-job! :: Job -> RingResponse
+(defn submit-async-job!
+  "Submits an async job and returns a ring response indicating the
+  result of the submit operation."
+  [job]
+  (enqueue-async-job! job)
+  (submitted-job-response job))

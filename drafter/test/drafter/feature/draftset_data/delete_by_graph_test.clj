@@ -14,48 +14,54 @@
 
 (def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
 
-(tc/deftest-system-with-keys delete-live-graph-not-in-draftset
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api]} system]
-  (let [quads (statements "test/resources/test-draftset.trig")
-        graph-quads (group-by context quads)
-        live-graphs (keys graph-quads)
-        graph-to-delete (first live-graphs)
-        draftset-location (help/create-draftset-through-api handler test-editor)]
-    (help/publish-quads-through-api handler quads)
-    (let [{draftset-graphs :changes} (help/delete-draftset-graph-through-api handler test-editor draftset-location graph-to-delete)]
-      (is (= #{graph-to-delete} (set (keys draftset-graphs)))))))
+(t/deftest delete-live-graph-not-in-draftset
+  (tc/with-system
+    keys-for-test
+    [{handler [:drafter/routes :draftset/api]} system]
+    (let [quads (statements "test/resources/test-draftset.trig")
+          graph-quads (group-by context quads)
+          live-graphs (keys graph-quads)
+          graph-to-delete (first live-graphs)
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/publish-quads-through-api handler quads)
+      (let [system-draftset-info (help/delete-draftset-graph-through-api handler test-editor draftset-location graph-to-delete)
+            {draftset-graphs :changes} (help/user-draftset-info-view system-draftset-info)]
+        (is (= #{graph-to-delete} (set (keys draftset-graphs))))))))
 
-(tc/deftest-system-with-keys delete-graph-with-changes-in-draftset
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api]} system]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
-        [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
-        published-quad (first graph-quads)
-        added-quads (rest graph-quads)]
-    (help/publish-quads-through-api handler [published-quad])
-    (help/append-quads-to-draftset-through-api handler test-editor draftset-location added-quads)
+(t/deftest delete-graph-with-changes-in-draftset
+  (tc/with-system
+    keys-for-test
+    [{handler [:drafter/routes :draftset/api]} system]
+    (let [draftset-location (help/create-draftset-through-api handler test-editor)
+          [graph graph-quads] (first (group-by context (statements "test/resources/test-draftset.trig")))
+          published-quad (first graph-quads)
+          added-quads (rest graph-quads)]
+      (help/publish-quads-through-api handler [published-quad])
+      (help/append-quads-to-draftset-through-api handler test-editor draftset-location added-quads)
 
-    (let [{draftset-graphs :changes} (help/delete-draftset-graph-through-api handler test-editor draftset-location graph)]
-      (is (= #{graph} (set (keys draftset-graphs)))))))
+      (let [system-draftset-info (help/delete-draftset-graph-through-api handler test-editor draftset-location graph)
+            {draftset-graphs :changes} (help/user-draftset-info-view system-draftset-info)]
+        (is (= #{graph} (set (keys draftset-graphs))))))))
 
-(tc/deftest-system-with-keys delete-graph-only-in-draftset
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api]} system]
-  (let [rdf-data-file "test/resources/test-draftset.trig"
-        draftset-location (help/create-draftset-through-api handler test-editor)
-        draftset-quads (statements rdf-data-file)
-        grouped-quads (group-by context draftset-quads)
-        [graph _] (first grouped-quads)]
-    (help/append-data-to-draftset-through-api handler test-editor draftset-location rdf-data-file)
+(t/deftest delete-graph-only-in-draftset
+  (tc/with-system
+    keys-for-test
+    [{handler [:drafter/routes :draftset/api]} system]
+    (let [rdf-data-file "test/resources/test-draftset.trig"
+          draftset-location (help/create-draftset-through-api handler test-editor)
+          draftset-quads (statements rdf-data-file)
+          grouped-quads (group-by context draftset-quads)
+          [graph _] (first grouped-quads)]
+      (help/append-data-to-draftset-through-api handler test-editor draftset-location rdf-data-file)
 
-    (let [{:keys [changes]} (help/delete-draftset-graph-through-api handler test-editor draftset-location graph)
-          draftset-graphs (keys changes)
-          remaining-quads (help/eval-statements (help/get-draftset-quads-through-api handler draftset-location test-editor))
-          expected-quads (help/eval-statements (mapcat second (rest grouped-quads)))
-          expected-graphs (keys grouped-quads)]
-      (is (= (set expected-quads) (set remaining-quads)))
-      (is (= (set expected-graphs) (set draftset-graphs))))))
+      (let [system-draftset-info (help/delete-draftset-graph-through-api handler test-editor draftset-location graph)
+            {:keys [changes]} (help/user-draftset-info-view system-draftset-info)
+            draftset-graphs (keys changes)
+            remaining-quads (help/eval-statements (help/get-user-draftset-quads-through-api handler draftset-location test-editor))
+            expected-quads (help/eval-statements (mapcat second (rest grouped-quads)))
+            expected-graphs (keys grouped-quads)]
+        (is (= (set expected-quads) (set remaining-quads)))
+        (is (= (set expected-graphs) (set draftset-graphs)))))))
 
 (t/deftest delete-endpoints-graph-test
   (tc/with-system

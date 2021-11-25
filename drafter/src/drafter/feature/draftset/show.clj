@@ -10,6 +10,16 @@
             [integrant.core :as ig]
             [ring.util.response :as ring]))
 
+(defn get-draftset [backend user draftset-id union-with-live?]
+  (if-let [info (dsops/get-draftset-info backend draftset-id)]
+    (if (user/can-view? user info)
+      (if union-with-live?
+        (let [public-endpoint (pub/get-public-endpoint backend)]
+          (ep/merge-endpoints public-endpoint info))
+        info)
+      ::inaccessible)
+    ::not-found))
+
 (defn handler
   [{wrap-authenticated :wrap-auth backend :drafter/backend}]
   (wrap-authenticated
@@ -17,15 +27,11 @@
     backend
     (parse-union-with-live-handler
       (fn [{{:keys [draftset-id union-with-live]} :params user :identity :as request}]
-        (if-let [info (dsops/get-draftset-info backend draftset-id)]
-          (if (user/can-view? user info)
-            (if union-with-live
-              (let [public-endpoint (pub/get-public-endpoint backend)
-                    info (ep/merge-endpoints public-endpoint info)]
-                (ring/response info))
-              (ring/response info))
-            (forbidden-response "Draftset not in accessible state"))
-          (ring/not-found "")))))))
+        (let [ds-info-or-reason (get-draftset backend user draftset-id union-with-live)]
+          (case ds-info-or-reason
+            ::not-found (ring/not-found "")
+            ::inaccessible (forbidden-response "Draftset not in accessible state")
+            (ring/response ds-info-or-reason))))))))
 
 (defmethod ig/pre-init-spec ::handler [_]
   (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))

@@ -11,7 +11,7 @@
   (:import [java.io Closeable]
            [org.eclipse.rdf4j.query Query]))
 
-(defn- build-restricted-connection [{:keys [inner restriction]}]
+(defn- build-restricted-connection [inner restriction]
   (let [stasher-conn (repo/->connection inner)]
     (reify
       repo/IPrepareQuery
@@ -44,13 +44,13 @@
 
 (defrecord RestrictedExecutor [inner restriction]
   repo/ToConnection
-  (->connection [this]
-    (build-restricted-connection this)))
+  (->connection [_this]
+    (build-restricted-connection inner restriction)))
 
 (defn live-endpoint-with-stasher
   "Creates a backend restricted to the live graphs."
-  [{:keys [repo]}]
+  [repo]
   (->RestrictedExecutor repo (partial mgmt/live-graphs repo)))
 
-(defmethod ig/init-key ::endpoint [_ opts]
-  (live-endpoint-with-stasher opts))
+(defmethod ig/init-key ::endpoint [_ {:keys [repo] :as opts}]
+  (live-endpoint-with-stasher repo))

@@ -1,14 +1,10 @@
 (ns drafter.routes.sparql-test
   (:require [clojure-csv.core :as csv]
-            [clojure.test :refer :all]
+            [clojure.test :as t :refer :all]
             [clojure.tools.logging :as log]
             [drafter.backend.draftset.draft-management :refer :all]
             [drafter.rdf.drafter-ontology :refer :all]
-            [drafter.test-common
-             :as
-             tc
-             :refer
-             [deftest-system select-all-in-graph stream->string]]
+            [drafter.test-common :as tc :refer [select-all-in-graph stream->string]]
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI))
 
@@ -48,33 +44,34 @@
   "Parse a response into a CSV"
   (-> body stream->string csv/parse-csv))
 
-(deftest-system live-sparql-routes-test
-  [{endpoint :drafter.routes.sparql/live-sparql-query-route
-    :keys [drafter.stasher/repo] :as system} "drafter/routes/sparql-test/system.edn"]
-  (let [{:keys [status headers body]
-         :as result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
-        csv-result (csv-> result)]
+(t/deftest live-sparql-routes-test
+  (tc/with-system
+    [{endpoint :drafter.routes.sparql/live-sparql-query-route
+      :keys    [drafter.stasher/repo] :as system} "drafter/routes/sparql-test/system.edn"]
+    (let [{:keys [status headers body]
+           :as   result} (endpoint (live-query (select-all-in-graph "http://test.com/made-live-and-deleted-1")))
+          csv-result (csv-> result)]
 
-    (is (= "text/csv" (headers "Content-Type"))
-        "Returns content-type")
+      (is (= "text/csv" (headers "Content-Type"))
+          "Returns content-type")
 
-    (is (= ["s" "p" "o"] (first csv-result))
-        "Returns CSV")
+      (is (= ["s" "p" "o"] (first csv-result))
+          "Returns CSV")
 
-    (is (= graph-1-result (map #(URI. %) (second csv-result)))
-        "Named (live) graph is publicly queryable")
+      (is (= graph-1-result (map #(URI. %) (second csv-result)))
+          "Named (live) graph is publicly queryable")
 
-    (testing "Draft graphs are not exposed"
-      (let [csv-result (csv-> (endpoint
-                               (live-query (select-all-in-graph draft-graph-2))))]
-        (is (empty? (second csv-result)))))
+      (testing "Draft graphs are not exposed"
+        (let [csv-result (csv-> (endpoint
+                                  (live-query (select-all-in-graph draft-graph-2))))]
+          (is (empty? (second csv-result)))))
 
-    (testing "Offline public graphs are not exposed"
-      (set-isPublic! repo "http://test.com/made-live-and-deleted-1" false)
-      (let [csv-result (csv-> (endpoint
-                               (live-query
-                                (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
-        (is (not= graph-1-result (second csv-result)))))))
+      (testing "Offline public graphs are not exposed"
+        (set-isPublic! repo "http://test.com/made-live-and-deleted-1" false)
+        (let [csv-result (csv-> (endpoint
+                                  (live-query
+                                    (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
+          (is (not= graph-1-result (second csv-result))))))))
 
 (tc/deftest-system-with-keys query-draftset-disallowed-with-service-query
   [:drafter.routes.sparql/live-sparql-query-route]

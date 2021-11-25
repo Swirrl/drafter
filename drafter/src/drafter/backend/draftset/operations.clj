@@ -481,32 +481,6 @@
         [result] (sparql/eager-query backend q)]
     (:dg result)))
 
-(def update-public-endpoint-modified-at-query
-  (->
-   "drafter/backend/draftset/operations/update-public-endpoint-modified-at.sparql"
-   io/resource
-   slurp))
-
-(defn update-public-endpoint-modified-at!
-  "Updates the modified time of the public endpoint to the current time"
-  [backend]
-  (sparql/update! backend update-public-endpoint-modified-at-query))
-
-(def update-public-endpoint-version-query
-  (->
-   "drafter/backend/draftset/operations/update-public-endpoint-version.sparql"
-   io/resource
-   slurp))
-
-(defn update-public-endpoint-version!
-  "Updates the modified time of the public endpoint to the current time"
-  [backend]
-  (sparql/update! backend update-public-endpoint-version-query))
-
-(defn publish-draftset-graphs! [backend draftset-ref clock]
-  (let [graph-mapping (get-draftset-graph-mapping backend draftset-ref)]
-    (mgmt/migrate-graphs-to-live! backend (vals graph-mapping) clock)))
-
 (defn- spog-bindings->statement [^BindingSet bindings]
   (let [subj (.getValue bindings "s")
         pred (.getValue bindings "p")

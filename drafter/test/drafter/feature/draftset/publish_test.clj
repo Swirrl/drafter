@@ -28,7 +28,7 @@
     (help/append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
     (help/publish-draftset-through-api handler draftset-location test-publisher)
 
-    (let [live-quads (help/get-live-quads-through-api handler)]
+    (let [live-quads (help/get-live-user-quads-through-api handler)]
       (is (= (set (help/eval-statements quads)) (set live-quads))))))
 
 (tc/deftest-system-with-keys publish-with-metadata-on-job
@@ -63,7 +63,7 @@
     (help/append-quads-to-draftset-through-api handler test-publisher draftset-location appended-quads)
     (help/publish-draftset-through-api handler draftset-location test-publisher)
 
-    (let [after-publish-quads (help/get-live-quads-through-api handler)]
+    (let [after-publish-quads (help/get-live-user-quads-through-api handler)]
       (is (= (set (help/eval-statements quads)) (set after-publish-quads))))))
 
 (tc/deftest-system-with-keys publish-draftset-with-statements-deleted-from-graphs-in-live
@@ -78,60 +78,66 @@
     (help/delete-quads-through-api handler test-publisher draftset-location to-delete)
     (help/publish-draftset-through-api handler draftset-location test-publisher)
 
-    (let [after-publish-quads (help/get-live-quads-through-api handler)
+    (let [after-publish-quads (help/get-live-user-quads-through-api handler)
           expected-quads (help/eval-statements (mapcat (comp rest second) grouped-quads))]
       (is (= (set expected-quads) (set after-publish-quads))))))
 
-(tc/deftest-system-with-keys publish-draftset-with-graph-deleted-from-live
-  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
-  [system system-config]
-  (let [handler (get system [:drafter/routes :draftset/api])
-        quads (statements "test/resources/test-draftset.trig")
-        grouped-quads (group-by context quads)
-        draftset-location (help/create-draftset-through-api handler test-publisher)
-        graph-to-delete (ffirst grouped-quads)
-        expected-quads (help/eval-statements (mapcat second (rest grouped-quads)))]
-    (help/publish-quads-through-api handler quads)
-    (help/delete-draftset-graph-through-api handler test-publisher draftset-location graph-to-delete)
-    (help/publish-draftset-through-api handler draftset-location test-publisher)
-    (help/assert-live-quads handler expected-quads)))
+(t/deftest publish-draftset-with-graph-deleted-from-live
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          quads (statements "test/resources/test-draftset.trig")
+          grouped-quads (group-by context quads)
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          graph-to-delete (ffirst grouped-quads)
+          expected-quads (help/eval-statements (mapcat second (rest grouped-quads)))]
+      (help/publish-quads-through-api handler quads)
+      (help/delete-draftset-graph-through-api handler test-publisher draftset-location graph-to-delete)
+      (help/publish-draftset-through-api handler draftset-location test-publisher)
+      (let [live-quads (help/get-live-user-quads-through-api handler)]
+        (t/is (= (set (help/eval-statements expected-quads)) (set live-quads)))))))
 
-(tc/deftest-system-with-keys publish-draftset-with-deletes-and-appends-from-live
-  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
-  [system system-config]
-  (let [handler (get system [:drafter/routes :draftset/api])
-        quads (statements "test/resources/test-draftset.trig")
-        grouped-quads (group-by context quads)
-        [live-graph initial-quads] (first grouped-quads)
-        draftset-location (help/create-draftset-through-api handler test-publisher)
-        to-add (take 2 (second (second grouped-quads)))
-        to-delete (take 1 initial-quads)
-        expected-quads (set/difference (set/union (set initial-quads) (set to-add)) (set to-delete))]
-    (help/publish-quads-through-api handler initial-quads)
-    (help/append-quads-to-draftset-through-api handler test-publisher draftset-location to-add)
-    (help/delete-quads-through-api handler test-publisher draftset-location to-delete)
-    (help/publish-draftset-through-api handler draftset-location test-publisher)
+(t/deftest publish-draftset-with-deletes-and-appends-from-live
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          quads (statements "test/resources/test-draftset.trig")
+          grouped-quads (group-by context quads)
+          [live-graph initial-quads] (first grouped-quads)
+          draftset-location (help/create-draftset-through-api handler test-publisher)
+          to-add (take 2 (second (second grouped-quads)))
+          to-delete (take 1 initial-quads)
+          expected-quads (set/difference (set/union (set initial-quads) (set to-add)) (set to-delete))]
+      (help/publish-quads-through-api handler initial-quads)
+      (help/append-quads-to-draftset-through-api handler test-publisher draftset-location to-add)
+      (help/delete-quads-through-api handler test-publisher draftset-location to-delete)
+      (help/publish-draftset-through-api handler draftset-location test-publisher)
 
-    (help/assert-live-quads handler expected-quads)))
+      (let [live-quads (help/get-live-user-quads-through-api handler)]
+        (t/is (= (set (help/eval-statements expected-quads)) (set live-quads)))))))
 
-(tc/deftest-system-with-keys publish-draftest-with-deletions-from-graphs-not-yet-in-live
-  [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
-  [system system-config]
-  (let [handler (get system [:drafter/routes :draftset/api])
-        quads (statements "test/resources/test-draftset.trig")
-        grouped-quads (group-by context quads)
-        [graph graph-quads] (first grouped-quads)
-        draftset-location (help/create-draftset-through-api handler test-publisher)]
+(t/deftest publish-draftest-with-deletions-from-graphs-not-yet-in-live
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          quads (statements "test/resources/test-draftset.trig")
+          grouped-quads (group-by context quads)
+          [graph graph-quads] (first grouped-quads)
+          draftset-location (help/create-draftset-through-api handler test-publisher)]
 
-    ;;delete quads in draftset before they exist in live
-    (help/delete-quads-through-api handler test-publisher draftset-location graph-quads)
+      ;;delete quads in draftset before they exist in live
+      (help/delete-quads-through-api handler test-publisher draftset-location graph-quads)
 
-    ;;add to live then publish draftset
-    (help/publish-quads-through-api handler graph-quads)
-    (help/publish-draftset-through-api handler draftset-location test-publisher)
+      ;;add to live then publish draftset
+      (help/publish-quads-through-api handler graph-quads)
+      (help/publish-draftset-through-api handler draftset-location test-publisher)
 
-    ;;graph should still exist in live
-    (help/assert-live-quads handler graph-quads)))
+      ;;graph should still exist in live
+      (let [live-quads (help/get-live-user-quads-through-api handler)]
+        (t/is (= (set (help/eval-statements graph-quads)) (set live-quads)))))))
 
 (t/deftest publish-does-not-create-public-endpoint
   (tc/with-system

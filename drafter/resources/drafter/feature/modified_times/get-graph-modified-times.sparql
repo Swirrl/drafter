@@ -1,0 +1,8 @@
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+SELECT ?lg ?modified WHERE {
+    GRAPH <http://publishmydata.com/graphs/drafter/graph-modified-times> {
+        ?lg dcterms:modified ?modified .
+    }
+}

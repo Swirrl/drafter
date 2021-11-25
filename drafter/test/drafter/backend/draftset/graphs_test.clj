@@ -8,7 +8,6 @@
             [drafter.backend.draftset.operations :as dsops]
             [drafter.user-test :refer [test-editor]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
-            [drafter.util :as util]
             [grafter-2.rdf4j.sparql :as sp]
             [grafter.url :as url])
   (:import [java.net URI]))
@@ -118,12 +117,6 @@
         (t/is (contains? graph-mapping live-graph) "Draft graph should exist for deleted graph")
         (t/is (mgmth/draft-exists? repo (get graph-mapping live-graph)) "Draft graph should exist for deleted graph")))))
 
-(defn- get-modified-time [repo subject]
-  (with-open [conn (repo/->connection repo)]
-    (let [q (format "SELECT ?modified WHERE { <%s> <http://purl.org/dc/terms/modified> ?modified .}" subject)
-          results (vec (repo/query conn q))]
-      (-> results first :modified))))
-
 (t/deftest delete-user-graph-in-draftset
   (tc/with-system
     [:drafter/backend]
@@ -136,15 +129,11 @@
 
       (tc/make-graph-live! repo live-graph (tc/test-triples) clock)
 
-      (let [draft-graph (tc/import-data-to-draft! repo live-graph (tc/test-triples (URI. "http://subject")) draftset-id)
-            initially-modified-at (get-modified-time repo live-graph)]
+      (let [draft-graph (tc/import-data-to-draft! repo live-graph (tc/test-triples (URI. "http://subject")) draftset-id)]
 
         (t/is (mgmth/draft-exists? repo draft-graph) "Graph should still be managed")
 
         (delete-user-graph manager draftset-id live-graph)
-
-        (let [subsequently-modified-at (get-modified-time repo draft-graph)]
-          (t/is (.isBefore initially-modified-at subsequently-modified-at) "Draft graph modified time should be updated"))
 
         (t/is (mgmth/draft-exists? repo draft-graph) "Draft graph should still exist")
         (t/is (= true (mgmt/graph-empty? repo draft-graph)) "Draft graph should be empty")))))
@@ -161,3 +150,38 @@
       (t/is (thrown? Exception (delete-user-graph manager draftset-id protected-graph)) "Should not delete protected graph")
       (let [live->draft (dsops/get-draftset-graph-mapping repo draftset-id)]
         (t/is (= false (contains? live->draft protected-graph)) "Should not create draft of protected graph")))))
+
+(t/deftest ensure-protected-graph-draft-empty-test
+  (tc/with-system
+    [:drafter/backend]
+    [system "drafter/feature/empty-db-system.edn"]
+    (let [repo (:drafter/backend system)
+          protected-graph (URI. "http://protected")
+          manager (create-manager repo #{protected-graph})
+          draftset-id (dsops/create-draftset! repo test-editor)]
+      (let [draft-graph-uri (ensure-protected-graph-draft manager draftset-id protected-graph)]
+        (t/is (mgmt/is-graph-managed? repo protected-graph) "Expected managed graph to be created")
+        (t/is (is-draft-of? repo draftset-id protected-graph draft-graph-uri) "Expected draft graph to be created")))))
+
+(t/deftest ensure-protected-graph-draft-graph-exists-test
+  ;; ensuring an existing draft graph exists should return the existing draft graph
+  (tc/with-system
+    [:drafter/backend]
+    [system "drafter/feature/empty-db-system.edn"]
+    (let [repo (:drafter/backend system)
+          protected-graph (URI. "http://protected")
+          manager (create-manager repo #{protected-graph})
+          draftset-id (dsops/create-draftset! repo test-editor)]
+      (let [draft-graph-uri-1 (ensure-protected-graph-draft manager draftset-id protected-graph)
+            draft-graph-uri-2 (ensure-protected-graph-draft manager draftset-id protected-graph)]
+        (t/is (= draft-graph-uri-1 draft-graph-uri-2) "Expected existing draft to be returned")))))
+
+(t/deftest ensure-protected-graph-draft-invalid-protected-graph-test
+  (tc/with-system
+    [:drafter/backend]
+    [system "drafter/feature/empty-db-system.edn"]
+    (let [repo (:drafter/backend system)
+          graph (URI. "http://not-protected")
+          manager (create-manager repo)
+          draftset-id (dsops/create-draftset! repo test-editor)]
+      (t/is (thrown? Exception (ensure-protected-graph-draft manager draftset-id graph)) "Graph should not be protected"))))

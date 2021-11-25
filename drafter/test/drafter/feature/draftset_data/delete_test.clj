@@ -2,10 +2,6 @@
   (:require [clojure.java.io :as io]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [clojure.test :as t]
-            [drafter.backend.draftset.operations :as dsops]
-            [drafter.feature.draftset-data.append :as append]
-            [drafter.feature.draftset-data.delete :as sut]
-            [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor]]
             [drafter.feature.draftset.test-helper :as help]
@@ -17,9 +13,9 @@
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints drafter:public drafter:Endpoint]]
             [grafter.vocabularies.rdf :refer [rdf:a]]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
-            [drafter.feature.endpoint.public :as pub])
+            [drafter.feature.endpoint.public :as pub]
+            [drafter.rdf.sesame :as ses])
   (:import java.net.URI
-           java.time.OffsetDateTime
            org.eclipse.rdf4j.rio.RDFFormat))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -28,45 +24,9 @@
 
 (def dummy "dummy@user.com")
 
-(t/deftest delete-draftset-data-test
-  (tc/with-system
-    [:drafter/backend :drafter/global-writes-lock :drafter/write-scheduler :drafter.fixture-data/loader
-     :drafter.backend.draftset.graphs/manager]
-    [{:keys [:drafter/backend :drafter/global-writes-lock :drafter.backend.draftset.graphs/manager]} system-config]
-    (let [initial-time (OffsetDateTime/parse "2017-01-01T01:01:01Z")
-          delete-time (OffsetDateTime/parse "2019-01-01T01:01:01Z")
-          clock (tc/manual-clock initial-time)
-          ds (dsops/create-draftset! backend test-editor)
-          resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}]
-
-      (th/apply-job! (append/append-data-to-draftset-job (io/file "./test/test-triple.nt")
-                                                         resources
-                                                         dummy
-                                                         {:rdf-format  RDFFormat/NTRIPLES
-                                                          :graph       (URI. "http://foo/graph")
-                                                          :draftset-id ds}
-                                                         clock))
-
-      (let [modified-1 (th/ensure-draftgraph-and-draftset-modified
-                        backend
-                        ds
-                        "http://foo/graph")]
-        (tc/set-now clock delete-time)
-        (th/apply-job! (sut/delete-data-from-draftset-job (io/file "./test/test-triple-2.nt")
-                                                          dummy
-                                                          resources
-                                                          {:draftset-id ds
-                                                           :graph       (URI. "http://foo/graph")
-                                                           :rdf-format  RDFFormat/NTRIPLES}
-                                                          clock))
-        (let [modified-2 (th/ensure-draftgraph-and-draftset-modified
-                          backend
-                          ds
-                          "http://foo/graph")]
-          (t/is (= delete-time (:modified modified-2))
-                "Expected modified time to be updated after delete")
-          (t/is (not= (:version modified-1) (:version modified-2))
-                "Expected version to be updated after delete"))))))
+(defn- get-source [nt-file graph]
+  (let [source (ses/->FormatStatementSource nt-file RDFFormat/NTRIPLES)]
+    (ses/->GraphTripleStatementSource source graph)))
 
 (t/deftest delete-public-endpoint-quads-test
   (tc/with-system
@@ -147,7 +107,7 @@
             delete-response (handler delete-request)]
         (tc/await-success (get-in delete-response [:body :finished-job]))
 
-        (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor)
+        (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)
               expected (help/eval-statements (set/difference (set quads) (set quads-to-delete)))]
           (t/is (= (set expected) (set ds-quads))))))))
 

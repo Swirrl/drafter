@@ -1,7 +1,6 @@
 (ns drafter.backend.draftset.draft-management
   (:require
    [clojure.set :as set]
-   [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [clojure.tools.logging :as log]
    [drafter.rdf.drafter-ontology :refer :all]
@@ -12,7 +11,7 @@
    [grafter-2.rdf4j.repository :as repo]
    [grafter-2.rdf4j.templater :refer [add-properties graph]]
    [grafter.url :as url]
-   [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
+   [grafter.vocabularies.dcterms :refer [dcterms:issued]]
    [grafter.vocabularies.rdf :refer :all])
   (:import java.net.URI
            [java.util UUID]))
@@ -147,12 +146,11 @@
   its modified time to the supplied instant.
 
   Note modified-at is an instant not a 0-arg clock-fn."
-  [db graph-uri modified-at]
-  (update! db (str (delete-graph-contents-query graph-uri) " ; "
-                   (set-timestamp graph-uri drafter:modifiedAt modified-at)))
+  [db graph-uri]
+  (update! db (delete-graph-contents-query graph-uri))
   (log/info (str "Deleted graph " graph-uri)))
 
-(defn- delete-draft-state-query [draft-graph-uri]
+(defn delete-draft-state-query [draft-graph-uri]
   ;; if the graph-uri is a draft graph uri,
   ;; remove the mention of this draft uri, but leave the live graph as a managed graph.
   (str
@@ -284,29 +282,7 @@
 (defn- update-live-graph-timestamps-query [draft-graph-uri now-ts]
   (let [issued-at (xsd-datetime now-ts)]
     (str
-      "# First remove the modified timestamp from the live graph\n"
-      "WITH <" drafter-state-graph "> DELETE {"
-      "  ?live <" dcterms:modified "> ?modified ."
-      "} WHERE {"
-      "  VALUES ?draft { <" draft-graph-uri "> }"
-      "  ?live a <" drafter:ManagedGraph "> ;"
-      "        <" drafter:hasDraft "> ?draft ;"
-      "        <" dcterms:modified "> ?modified ."
-      "  ?draft a <" drafter:DraftGraph "> ."
-      "};\n"
-
-      "# Then set the modified timestamp on the live graph to be that of the draft graph\n"
-      "WITH <" drafter-state-graph "> INSERT {"
-      "  ?live <" dcterms:modified "> ?modified ."
-      "} WHERE {"
-      "  VALUES ?draft { <" draft-graph-uri "> }"
-      "  ?live a <" drafter:ManagedGraph "> ;"
-      "        <" drafter:hasDraft "> ?draft ."
-      "  ?draft a <" drafter:DraftGraph "> ;"
-      "         <" dcterms:modified "> ?modified ."
-      "};\n"
-
-      "# And finally set a dcterms:issued timestamp if it doesn't have one already\n"
+      "# set a dcterms:issued timestamp if it doesn't have one already\n"
       "WITH <" drafter-state-graph "> INSERT {"
       "  ?live <" dcterms:issued "> " issued-at " ."
       "} WHERE {"

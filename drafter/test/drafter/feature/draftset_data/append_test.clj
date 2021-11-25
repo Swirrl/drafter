@@ -4,19 +4,17 @@
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [clojure.test :as t :refer [is testing]]
-            [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.draftset-data.append :as sut]
-            [drafter.feature.draftset-data.test-helper :as th]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-publisher]]
             [drafter.feature.draftset.test-helper :as help]
             [drafter.async.jobs :as async]
             [grafter-2.rdf4j.formats :as formats]
-            [drafter.fixture-data :as fd]
             [drafter.rdf.drafter-ontology :refer [drafter:endpoints]]
             [drafter.feature.endpoint.public :as pub]
             [grafter-2.rdf.protocols :as pr]
-            [drafter.time :as time])
+            [drafter.rdf.sesame :as ses]
+            [grafter-2.rdf4j.io :as gio])
   (:import java.net.URI
            org.eclipse.rdf4j.rio.RDFFormat))
 
@@ -26,43 +24,9 @@
 
 (def dummy "dummy@user.com")
 
-(t/deftest append-data-to-draftset-job-test
-  (tc/with-system
-    [{:keys [:drafter/backend :drafter/global-writes-lock :drafter.backend.draftset.graphs/manager]} "drafter/rdf/draftset-management/jobs.edn"]
-    (let [initial-time (time/parse "2017-01-01T01:01:01Z")
-          clock (tc/manual-clock initial-time)
-          update-time (time/parse "2018-01-01T01:01:01Z")
-          ds (dsops/create-draftset! backend test-editor)
-          resources {:backend backend :global-writes-lock global-writes-lock :graph-manager manager}]
-      (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple.nt")
-                                                      resources
-                                                      dummy
-                                                      {:rdf-format  RDFFormat/NTRIPLES
-                                                       :graph       (URI. "http://foo/graph")
-                                                       :draftset-id ds}
-                                                      clock))
-      (let [modified-1 (th/ensure-draftgraph-and-draftset-modified
-                        backend
-                        ds
-                        "http://foo/graph")]
-        (t/is (= initial-time (:modified modified-1))
-              "Unexpected initial modification time")
-        (tc/set-now clock update-time)
-        (th/apply-job! (sut/append-data-to-draftset-job (io/file "./test/test-triple-2.nt")
-                                                        resources
-                                                        dummy
-                                                        {:rdf-format  RDFFormat/NTRIPLES
-                                                         :graph       (URI. "http://foo/graph")
-                                                         :draftset-id ds}
-                                                        clock))
-        (let [modified-2 (th/ensure-draftgraph-and-draftset-modified
-                          backend
-                          ds
-                          "http://foo/graph")]
-          (t/is (= update-time (:modified modified-2))
-                "Modified time is updated after append")
-          (t/is (not= (:version modified-1) (:version modified-2))
-                "Version is updated after append"))))))
+(defn- get-source [nt-file graph]
+  (let [source (ses/->FormatStatementSource nt-file RDFFormat/NTRIPLES)]
+    (ses/->GraphTripleStatementSource source graph)))
 
 (def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
 
@@ -74,7 +38,7 @@
         quads (statements data-file-path)
         draftset-location (help/create-draftset-through-api handler test-editor)]
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location quads)
-    (let [draftset-graphs (tc/key-set (:changes (help/get-draftset-info-through-api handler draftset-location test-editor)))
+    (let [draftset-graphs (tc/key-set (:changes (help/get-user-draftset-info-view-through-api handler draftset-location test-editor)))
           graph-statements (group-by context quads)]
       (doseq [[live-graph graph-quads] graph-statements]
         (let [graph-triples (help/get-draftset-graph-triples-through-api handler draftset-location test-editor live-graph "false")
@@ -99,7 +63,7 @@
         append-response (handler append-request)]
     (tc/await-success (get-in append-response [:body :finished-job]))
 
-    (let [ds-quads (help/get-draftset-quads-through-api handler draftset-location test-editor)]
+    (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
       (is (= (set (help/eval-statements (statements data-file))) (set ds-quads))))))
 
 (tc/deftest-system-with-keys append-quad-data-with-metadata
@@ -136,7 +100,7 @@
       ;;draftset itself should contain the live quads from the graph
       ;;added to along with the quads explicitly added. It should
       ;;not contain any quads from the other live graph.
-      (let [draftset-quads (help/get-draftset-quads-through-api handler draftset-location test-editor "false")
+      (let [draftset-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor "false")
             expected-quads (help/eval-statements (second (first grouped-quads)))]
         (is (= (set expected-quads) (set draftset-quads)))))))
 
@@ -269,3 +233,23 @@
                                    (tc/await-completion))]
     (is (= type :error))
     (is (= message "Blank node as graph ID"))))
+
+(t/deftest validate-graph-source-test
+  (t/testing "No blank graph nodes"
+    (let [quads (mapv (fn [i]
+                        (pr/->Quad (URI. (str "http://s" i))
+                                   (URI. (str "http://p" i))
+                                   (str "o" i)
+                                   (URI. (str "http://g" i))))
+                      (range 1 10))
+          inner-source (ses/->CollectionStatementSource quads)
+          source (sut/validate-graph-source inner-source)]
+      (t/is (= quads (vec (gio/statements source))) "Unexpected output statements")))
+
+  (t/testing "Contains blank graph nodes"
+    (let [quads [(pr/->Quad (URI. "http://s1") (URI. "http://p1") "o1" (URI. "http://g1"))
+                 (pr/->Quad (URI. "http://s1") (URI. "http://p1") "o2" (pr/make-blank-node))
+                 (pr/->Quad (URI. "http://s3") (URI. "http://p3") "o3" (URI. "http://g1"))]
+          inner-source (ses/->CollectionStatementSource quads)
+          source (sut/validate-graph-source inner-source)]
+      (t/is (thrown? Exception (dorun (gio/statements source))) "Expected exception on blank graph node"))))

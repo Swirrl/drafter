@@ -59,7 +59,9 @@
                        :drafter.common.config/sparql-query-endpoint
                        repo/sparql-repo
                        repo/->connection)]
-    (let [ds-graphs (keys (:changes (ops/get-draftset-info conn draftset-id)))
+    (let [system-draftset-info (ops/get-draftset-info conn draftset-id)
+          draftset-info (help/user-draftset-info-view system-draftset-info)
+          ds-graphs (keys (:changes draftset-info))
           draft-graphs (mapv (partial draft-graph-uri-for conn) ds-graphs)]
       (set (mapv (juxt :s :p :o :c) (ds-quads conn draft-graphs))))))
 
@@ -239,23 +241,25 @@
      | 4 | append!    | #{q2}    | #{[s2 p2 g1 g2']} |
      | 5 | publish!   | g1 g2    | #{[s2 p2 g1 g2 ]} |)))
 
-(tc/deftest-system-with-keys *_3_undo-append-after-other-append-test
-  keys-for-test [system system-config]
-  ;; Undoing append later on
-  (let [{:keys [append! delete! publish! graph']} (draftset-functions system)
+(t/deftest *_3_undo-append-after-other-append-test
+  (tc/with-system
+    keys-for-test [system system-config]
+    ;; Undoing append later on
+    (let [{:keys [append! delete! publish! graph']} (draftset-functions system)
 
-        g1  (random-uri 'g)
-        g2  (random-uri 'g)
-        q1  [s1 p1 o1 g1]
-        q2  [s2 p2 g1 g2]]
-    ;; Similar to 2 except delete happens later on, g1' -> g1 when g1 is deleted
-    (test-table
-     |;T | Operation  | Args     | Expected State                    |
-     |;1 | create-ds! | ...      | ...                               |
-     | 2 | append!    | #{q1}    | #{[s1 p1 o1 g1']}                 |
-     | 3 | append!    | #{q2}    | #{[s1 p1 o1 g1'] [s2 p2 g1' g2']} |
-     | 4 | delete!    | #{q1}    | #{[s2 p2 g1 g2']}                 |
-     | 5 | publish!   | g1 g2    | #{[s2 p2 g1 g2]}                  |)))
+          g1  (random-uri 'g)
+          g2  (random-uri 'g)
+          q1  [s1 p1 o1 g1]
+          q2  [s2 p2 g1 g2]]
+      ;; Similar to 2 except delete happens later on, g1' -> g1 when g1 is deleted
+      (test-table
+        |;T | Operation  | Args     | Expected State                    |
+        |;1 | create-ds! | ...      | ...                               |
+        | 2 | append!    | #{q1}    | #{[s1 p1 o1 g1']}                 |
+        | 3 | append!    | #{q2}    | #{[s1 p1 o1 g1'] [s2 p2 g1' g2']} |
+        | 4 | delete!    | #{q1}    | #{[s2 p2 g1 g2']}                 |
+        | 5 | publish!   | g1 g2    | #{[s2 p2 g1 g2]}                  |))))
+
 
 (tc/deftest-system-with-keys *_4_delete-without-graph-deletion-test
   keys-for-test [system system-config]

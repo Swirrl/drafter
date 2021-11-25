@@ -1,14 +1,15 @@
 (ns ^:rest-api drafter.feature.draftset.query-test
-  (:require [clojure.string :as str]
-            [clojure.test :as t :refer [is]]
+  (:require [clojure.test :as t :refer [is]]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-password test-publisher]]
             [drafter.feature.draftset.test-helper :as help]
-            [drafter.util :as util])
+            [drafter.util :as util]
+            [clojure.set :as set])
   (:import org.eclipse.rdf4j.query.QueryResultHandler
-           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser))
+           org.eclipse.rdf4j.query.resultio.sparqljson.SPARQLResultsJSONParser
+           [java.net URI]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -57,11 +58,12 @@
     (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
           query-request (create-query-request test-editor draftset-location query "application/n-triples")
           query-response (handler query-request)
-          response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format :nt)) )
+          response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format :nt)))
           expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
       (tc/assert-is-ok-response query-response)
 
-      (is (= expected-triples response-triples)))))
+      ;; NOTE: query may return statements from system graphs which should be ignored
+      (is (set/subset? expected-triples response-triples)))))
 
 (def slow-query
   "CONSTRUCT WHERE {
@@ -105,6 +107,7 @@
     (help/append-quads-to-draftset-through-api handler test-editor draftset-location ds-quads)
     (let [q "SELECT * WHERE { GRAPH ?c { ?s ?p ?o } }"
           results (select-query-draftset-through-api handler test-editor draftset-location q :union-with-live? "false")
+          results (filter (fn [{:keys [c]}] (help/is-default-user-graph? c)) results)
           expected-quads (help/eval-statements ds-quads)]
       (is (= (set expected-quads) (set results))))))
 
@@ -140,8 +143,9 @@
 
       (.parse parser body)
 
-      (let [expected-quads (set (help/eval-statements test-quads))]
-        (is (= expected-quads @result-state))))))
+      (let [expected-quads (set (help/eval-statements test-quads))
+            user-bindings (set (filter (fn [{:keys [c]}] (help/is-default-user-graph? (URI. c))) @result-state))]
+        (is (= expected-quads user-bindings))))))
 
 (tc/deftest-system-with-keys query-non-existent-draftset
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]

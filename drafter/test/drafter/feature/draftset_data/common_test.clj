@@ -2,9 +2,14 @@
   (:require [clojure.test :as t :refer [is testing]]
             [drafter.feature.draftset-data.common :as sut]
             [drafter.feature.draftset.test-helper :as help]
+            [drafter.rdf.drafter-ontology :refer [modified-times-graph-uri]]
+            [drafter.backend.draftset.draft-management :refer [drafter-state-graph]]
             [drafter.test-common :as tc]
-            [drafter.user-test :refer [test-editor]]
-            [grafter-2.rdf.protocols :as pr :refer [->Quad triple=]])
+            [drafter.user-test :refer [test-editor test-publisher]]
+            [grafter-2.rdf.protocols :as pr :refer [->Quad triple=]]
+            [grafter.vocabularies.dcterms :refer [dcterms:issued]]
+            [grafter-2.rdf4j.repository :as repo]
+            [drafter.rdf.sparql :as sparql])
   (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
@@ -21,6 +26,15 @@
           {:keys [graph-uri triples]} (sut/quad-batch->graph-triples quads)]
       (t/is (= guri graph-uri))
       (t/is (every? identity (map triple= quads triples))))))
+
+(defn- raw-repo [system]
+  (repo/sparql-repo (:drafter.common.config/sparql-query-endpoint system)
+                    (:drafter.common.config/sparql-update-endpoint system)))
+
+(defn- get-state-graph-issued-for [repo subject]
+  (let [q (format "SELECT ?issued WHERE { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <%s> <%s> ?issued } }" subject dcterms:issued)
+        binding (sparql/select-1 repo q)]
+    (:issued binding)))
 
 (def system-config "test-system.edn")
 

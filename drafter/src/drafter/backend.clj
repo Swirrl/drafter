@@ -24,7 +24,7 @@
 ;; client etc...
 (defrecord DrafterService [repo]
   repo/ToConnection
-  (repo/->connection [this]
+  (->connection [_this]
     ;; Note calling ->connection on DrafterService returns an
     ;; unrestricted endpoint, that has access to the state graph
     ;; and can perform updates etc...
@@ -66,6 +66,9 @@
    (endpoint-repo* drafter endpoint-id {}))
   ([drafter endpoint-id opts]
    (endpoint-repo* drafter endpoint-id opts)))
+
+(defn live-endpoint-repo [repo]
+  (endpoint-repo repo ::live))
 
 (defmethod ig/init-key :drafter/backend [_ opts]
   (map->DrafterService opts))
