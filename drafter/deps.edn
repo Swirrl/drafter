@@ -35,7 +35,7 @@
         com.sun.mail/javax.mail {:mvn/version "1.6.2"}
         ;;[com.taoensso/tower "2.0.2"]
 
-        grafter/grafter {:mvn/version "2.1.2"}
+        grafter/grafter {:mvn/version "2.1.15"}
 
         org.apache.tika/tika-core {:mvn/version "1.23"} ;; mime types
         org.eclipse.rdf4j/rdf4j-runtime {:mvn/version "3.0.0"
