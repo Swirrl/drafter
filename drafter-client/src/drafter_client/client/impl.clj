@@ -14,7 +14,7 @@
             [drafter-client.client.protocols :as dcpr]
             [clojure.java.io :as io])
   (:import (java.io InputStream File PipedInputStream PipedOutputStream)
-           [java.util.zip GZIPInputStream GZIPOutputStream]))
+           [java.util.zip GZIPOutputStream]))
 
 (def ^{:deprecated "Use drafter-client.client.protocols/->DrafterClient instead"}
   ->DrafterClient dcpr/->DrafterClient)
@@ -227,7 +227,11 @@
                             (with-open [os (GZIPOutputStream. output-stream)]
                               (io/copy data os)))))
 
-(defn quads-write-f [data format gzip]
+(defn- quads-write-f
+  "Returns a function (OutputStream -> ()) which when invoked writes the quads in data to
+   the output stream in the specified format. If gzip is true the serialised data will be
+   compressed with gzip as it is written to the output stream."
+  [data format gzip]
   (let [rdf-format (mimetype->rdf-format format)
         write-f (n*-output-stream-writer rdf-format data)]
     (if (true? gzip)
@@ -244,8 +248,7 @@
       {:input data})
 
     (instance? InputStream data)
-    (if
-      (true? gzip)
+    (if (true? gzip)
       (pipe-gzipped data)
       {:input data})
 
@@ -257,7 +260,7 @@
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
   [access-token url statements {:keys [auth-provider graph format metadata gzip] :as opts}]
-  (let [{:keys [input worker owned]} (format-body statements format gzip)
+  (let [{:keys [input worker]} (format-body statements format gzip)
         headers {:Content-Type format
                  :Accept "application/json"
                  :Authorization (if (legacy-auth-call? access-token)
@@ -276,8 +279,6 @@
                  :as :json}
         {:keys [body] :as _resp} (http/request request)]
     (when worker @worker)
-    (when owned
-      (.close input))
     
     body))
 
