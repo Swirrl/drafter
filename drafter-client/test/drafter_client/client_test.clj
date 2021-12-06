@@ -23,7 +23,9 @@
   (:import clojure.lang.ExceptionInfo
            java.net.URI
            [java.util UUID]
-           [java.util.concurrent ExecutionException]))
+           [java.util.concurrent ExecutionException]
+           [java.util.zip GZIPOutputStream]
+           [java.io File]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setup ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -81,8 +83,6 @@
                          i
                          graph)))))
 
-
-
 (defn mock-job-with-kvs [& kvs]
   (let [job {:id (UUID/randomUUID)
              :user-id "abc@def.ghi"
@@ -91,6 +91,11 @@
              :start-time (time/now)
              :finish-time (time/now)}]
     (apply assoc job kvs)))
+
+(defn- write-gzipped-file [source dest]
+  (with-open [gos (GZIPOutputStream. (io/output-stream dest))
+              is (io/input-stream source)]
+    (io/copy is gos)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tests ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -382,9 +387,45 @@
           (let [f (io/file "test/resources/test_data.trig")
                 draftset (sut/new-draftset client token name description)
                 _ (sut/add-data-sync client token draftset f {:gzip gzip?})
-                quads* (sut/get client token draftset)
+                quads* (h/get-user-quads client token draftset)
                 expected-quads (set (gio/statements f))]
             (t/is (= expected-quads (set quads*)))))))
+
+    (t/testing "Add quads from a gzipped file"
+      (let [source (io/file "test/resources/test_data.trig")
+            expected-quads (set (gio/statements source))]
+        (t/testing "with format and gzip extension"
+          (let [f (File/createTempFile "drafter-client" ".trig.gz")]
+            (try
+              (write-gzipped-file source f)
+              (let [draftset (sut/new-draftset client token name description)
+                    _ (sut/add-data-sync client token draftset f)
+                    quads* (set (h/get-user-quads client token draftset))]
+                (t/is (= expected-quads quads*)))
+              (finally
+                (.delete f)))))
+
+        (t/testing "with gzip extension and specified format"
+          (let [f (File/createTempFile "drafter-client" ".gz")]
+            (try
+              (write-gzipped-file source f)
+              (let [draftset (sut/new-draftset client token name description)
+                    _ (sut/add-data-sync client token draftset f {:format :trig})
+                    quads* (set (h/get-user-quads client token draftset))]
+                (t/is (= expected-quads quads*)))
+              (finally
+                (.delete f)))))
+
+        (t/testing "with unknown extension"
+          (let [f (File/createTempFile "drafter-client" ".mysterious")]
+            (try
+              (write-gzipped-file source f)
+              (let [draftset (sut/new-draftset client token name description)
+                    _ (sut/add-data-sync client token draftset f {:format :trig :gzip :applied})
+                    quads* (set (h/get-user-quads client token draftset))]
+                (t/is (= expected-quads quads*)))
+              (finally
+                (.delete f)))))))
 
     (testing "Custom metadata gets passed on to job"
       (let [graph (URI. "http://test.graph.com/triple-graph")
