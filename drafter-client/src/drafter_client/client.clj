@@ -268,20 +268,23 @@
   - `statements` can be a sequence of quads or triples, a File, or an InputStream
   - `opts` is a map of optional arguments, which may include:
     - `graph`: required if the statements are triples
-    - `metadata`: a map with arbitrary keys that will be included on the job for future reference"
+    - `metadata`: a map with arbitrary keys that will be included on the job for future reference
+    - `format`: the RDF format of the input data
+    - `gzip`: How to handle GZip compression of the input. The supported values are:
+        `apply`: The data should be compressed with GZip when sending on the request. This expects the input data to be currently uncompressed.
+        `applied`: The data is already in a compressed format and should be sent unmodified to the server with the 'Content-Encoding: gzip' header
+        `none` (default): The input is uncompressed and should be sent to the server unmodified"
   ([client access-token draftset statements]
    (add-data client access-token draftset statements {}))
   ([client access-token draftset statements opts]
    (let [url (martian/url-for client
                               :put-draftset-data
-                              {:id (draftset/id draftset)})
-         format (i/get-format statements (opts :graph))]
+                              {:id (draftset/id draftset)})]
      (-> (i/append-via-http-stream access-token
                                    url
                                    statements
                                    (assoc opts
-                                          :format format
-                                          :auth-provider (:auth-provider client)))
+                                     :auth-provider (:auth-provider client)))
          (->async-job)))))
 
 (defn add

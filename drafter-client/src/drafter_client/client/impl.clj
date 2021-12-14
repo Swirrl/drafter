@@ -3,18 +3,20 @@
             [drafter-client.auth.legacy-default :as default-auth]
             [drafter-client.client.interceptors :as interceptor]
             [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.formats :refer [mimetype->rdf-format
-                                             filename->rdf-format]]
+            [grafter-2.rdf4j.formats :as formats :refer [mimetype->rdf-format
+                                                         filename->rdf-format]]
             [grafter-2.rdf4j.io :as rio]
             [clj-http.client :as http]
             [martian.core :as martian]
             [martian.interceptors :as interceptors]
             [ring.util.codec :refer [form-decode form-encode]]
             [martian.encoders :as enc]
-            [drafter-client.client.protocols :as dcpr])
-  (:import (java.io InputStream File PipedInputStream PipedOutputStream)))
-
-
+            [drafter-client.client.protocols :as dcpr]
+            [clojure.java.io :as io]
+            [clojure.tools.logging :as log])
+  (:import (java.io InputStream File PipedInputStream PipedOutputStream)
+           [java.util.zip GZIPOutputStream]
+           [org.eclipse.rdf4j.rio RDFFormat]))
 
 (def ^{:deprecated "Use drafter-client.client.protocols/->DrafterClient instead"}
   ->DrafterClient dcpr/->DrafterClient)
@@ -206,42 +208,134 @@
     {:input input
      :worker worker}))
 
-(defn n*->stream [format n*]
-  (piped-input-stream
-    (fn [output-stream]
-      (pr/add (rio/rdf-writer output-stream :format format) n*))))
+(defn- n*-output-stream-writer
+  "Returns a function which writes the given data to its argument output stream in the given
+   RDF format"
+  [format data]
+  (fn [output-stream]
+    (pr/add (rio/rdf-writer output-stream :format format) data)
+    (.flush output-stream)))
 
 (defn grafter->format-stream [content-type data]
   (let [format (mimetype->rdf-format content-type)]
-    (n*->stream format data)))
+    (piped-input-stream
+      (n*-output-stream-writer format data))))
 
 (defn- legacy-auth-call? [access-token]
   (some? access-token))
 
+(defn- pipe-gzipped [data]
+  (piped-input-stream (fn [output-stream]
+                            (with-open [os (GZIPOutputStream. output-stream)]
+                              (io/copy data os)))))
+
+(defn- quads-write-f
+  "Returns a function (OutputStream -> ()) which when invoked writes the quads in data to
+   the output stream in the specified format. If should-compress? is true the serialised data will be
+   compressed with gzip as it is written to the output stream."
+  [data rdf-format should-compress?]
+  (let [write-f (n*-output-stream-writer rdf-format data)]
+    (if should-compress?
+      (fn [output-stream]
+        (with-open [gos (GZIPOutputStream. output-stream)]
+          (write-f gos)))
+      write-f)))
+
+(defn format-body
+  "Converts rdf data in the given format into a form suitable for use as the body in a clj-http request. If
+   should-compress? is true the input will be compressed with GZip.
+   Returns a map containing the following keys
+     :input - The RDF request entity to add to the request
+     :worker - if present this is an implementation of IDeref which should be awaited to ensure all data has been written to the request "
+  [data format should-compress?]
+  (cond
+    (instance? File data)
+    (if (true? should-compress?)
+      (pipe-gzipped data)
+      {:input data})
+
+    (instance? InputStream data)
+    (if (true? should-compress?)
+      (pipe-gzipped data)
+      {:input data})
+
+    :else
+    (let [write-f (quads-write-f data format should-compress?)]
+      (piped-input-stream write-f))))
+
+(defn- infer-file-properties [^File f]
+  (let [file-name (.getName f)
+        gzip-ext (first (filter (fn [ext] (.endsWith file-name ext)) [".gz" ".gzip"]))
+        is-gzipped? (some? gzip-ext)
+        rdf-file-name (if is-gzipped?
+                        (.substring file-name 0 (- (.length file-name) (.length gzip-ext)))
+                        file-name)]
+    {:format (formats/filename->rdf-format rdf-file-name)
+     :gzip   (if is-gzipped? :applied)}))
+
+(defn- infer-input-properties [statements]
+  (if (instance? File statements)
+    (infer-file-properties statements)
+    {}))
+
+(defn- resolve-input-properties [{input-gzip :gzip :as inferred} {:keys [graph gzip] :as opts}]
+  (let [format (or (formats/->rdf-format (:format opts))
+                   (:format inferred)
+                   (when graph RDFFormat/NTRIPLES)
+                   RDFFormat/NQUADS)
+        gzip (if (true? gzip)
+               (do
+                 (log/warn "Using 'true' for option 'gzip' is deprecated - use :apply instead")
+                 :apply)
+                gzip)]
+    {:format format :gzip (or gzip input-gzip :none)}))
+
+(defn rdf-request-properties
+  "Calculates the properties of an RDF request given a data source and collection of options. The data source
+   is expected to be either a file, InputStream or sequence of grafter quads or triples. The options are those
+   supported by client/add-data. This function inspects the data source and combines the result with the user
+   options to return a map containing the following keys:
+     :format - An instance of RDFFormat representing the expected RDF format
+     :gzip - Indicates whether gzip compression has been or should be applied to the input. One of:
+       :none - Input is uncompressed and should not be compressed
+       :applied - Input is in a compressed format
+       :apply - Input is uncompressed and should be compressed in the outgoing request
+     :should-compress - Whether the data source needs to be compressed before being added to the request"
+  [statements opts]
+  (let [inferred (infer-input-properties statements)]
+    (resolve-input-properties inferred opts)))
+
+(defn rdf-input-request-headers
+  "Returns a collection of request headers about the RDF entity with the given properties"
+  [{:keys [^RDFFormat format gzip]}]
+  ;; request entity is gzipped if input is already compressed or compression is to be applied
+  (let [request-gzipped? (contains? #{:apply :applied} gzip)]
+    (cond-> {:Content-Type (.getDefaultMIMEType format)}
+            request-gzipped? (assoc :Content-Encoding "gzip"))))
+
 (defn append-via-http-stream
   "Write statements (quads, triples, File, InputStream) to a URL, as a
   an input stream by virtue of an HTTP PUT"
-  [access-token url statements {:keys [auth-provider graph format metadata] :as opts}]
-  (let [{input-stream :input worker :worker}
-        (if (some #(instance? % statements) [InputStream File])
-          {:input statements}
-          (grafter->format-stream format statements))
-        headers {:Content-Type format
-                 :Accept "application/json"
+  [access-token url statements {:keys [auth-provider graph metadata] :as opts}]
+  (let [{:keys [format gzip] :as props} (rdf-request-properties statements opts)
+        {:keys [input worker]} (format-body statements format (= :apply gzip))
+        headers {:Accept "application/json"
                  :Authorization (if (legacy-auth-call? access-token)
                                   (str "Bearer " access-token)
                                   (dcpr/authorization-header auth-provider))}
+        headers (merge headers (rdf-input-request-headers props))
         params (cond-> nil
-                       graph (merge {:graph (.toString graph)})
-                       metadata (merge {:metadata (enc/json-encode metadata)}))
+                 graph (merge {:graph (.toString graph)})
+                 metadata (merge {:metadata (enc/json-encode metadata)}))
         request {:url url
                  :query-params params
                  :method :put
-                 :body input-stream
+                 :body input
                  :headers headers
                  :as :json}
         {:keys [body] :as _resp} (http/request request)]
     (when worker @worker)
+    
     body))
 
 (defn put-draftset-graph
