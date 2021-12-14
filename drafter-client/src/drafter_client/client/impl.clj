@@ -12,7 +12,8 @@
             [ring.util.codec :refer [form-decode form-encode]]
             [martian.encoders :as enc]
             [drafter-client.client.protocols :as dcpr]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clojure.tools.logging :as log])
   (:import (java.io InputStream File PipedInputStream PipedOutputStream)
            [java.util.zip GZIPOutputStream]
            [org.eclipse.rdf4j.rio RDFFormat]))
@@ -282,7 +283,11 @@
                    (:format inferred)
                    (when graph RDFFormat/NTRIPLES)
                    RDFFormat/NQUADS)
-        gzip (if (true? gzip) :apply gzip)]
+        gzip (if (true? gzip)
+               (do
+                 (log/warn "Using 'true' for option 'gzip' is deprecated - use :apply instead")
+                 :apply)
+                gzip)]
     {:format format :gzip (or gzip input-gzip :none)}))
 
 (defn rdf-request-properties

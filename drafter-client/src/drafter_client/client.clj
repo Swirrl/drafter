@@ -272,7 +272,6 @@
     - `format`: the RDF format of the input data
     - `gzip`: How to handle GZip compression of the input. The supported values are:
         `apply`: The data should be compressed with GZip when sending on the request. This expects the input data to be currently uncompressed.
-                 The boolean literal 'true' can also be used equivalently for this setting.
         `applied`: The data is already in a compressed format and should be sent unmodified to the server with the 'Content-Encoding: gzip' header
         `none` (default): The input is uncompressed and should be sent to the server unmodified"
   ([client access-token draftset statements]
