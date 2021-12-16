@@ -11,7 +11,7 @@
         martian/martian {:mvn/version "0.1.10"}
         martian-clj-http/martian-clj-http {:mvn/version "0.1.10"}
         org.clojure/clojure {:mvn/version "1.9.0"}
-        org.clojure/tools.logging {:mvn/version "0.4.1"}
+        org.clojure/tools.logging {:mvn/version "1.2.2"}
         ring/ring-core {:mvn/version "1.6.3"}
         clj-time/clj-time {:mvn/version "0.15.1"}
         grafter.db/grafter.db {:mvn/version "0.8.5"}
@@ -30,9 +30,9 @@
                               environ/environ {:mvn/version "1.0.3"}
                               integrant/repl {:mvn/version "0.3.1"}
 
-                              org.apache.logging.log4j/log4j-api {:mvn/version "2.11.1"} ; Import log4j2 as the logging backend
-                              org.apache.logging.log4j/log4j-core {:mvn/version "2.11.1"} ; Import log4j2 as the logging backend
-                              org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.11.1"} ; Redirect all SLF4J logs over the log4j2 backend
+                              org.apache.logging.log4j/log4j-api {:mvn/version "2.16.0"} ; Import log4j2 as the logging backend
+                              org.apache.logging.log4j/log4j-core {:mvn/version "2.16.0"} ; Import log4j2 as the logging backend
+                              org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.16.0"} ; Redirect all SLF4J logs over the log4j2 backend
 
 
                               }}
