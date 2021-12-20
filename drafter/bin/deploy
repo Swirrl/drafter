@@ -14,7 +14,7 @@ fi
 
 echo Deploying drafter version $DRAFTER_VERSION to repository $REPOSITORY
 
-clojure -A:krunk krunk.edn \
+clojure -M:krunk krunk.edn \
       :repository-id "\"$REPOSITORY\"" \
       :group-id drafter \
       :artifact-id drafter \
