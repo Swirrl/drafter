@@ -28,6 +28,15 @@
         grafter/grafter {:mvn/version "2.1.17"}
         org.eclipse.rdf4j/rdf4j-queryrender {:mvn/version "3.1.4"}
 
+        ;; The beanutils dep below is a transitive dep of grafter ->
+        ;; rdf4j -> com.opencsv/opencsv. However 1.9.3 has
+        ;; CVE-2019-10086 against it, so bumping the dep here until we
+        ;; can upgrade rdf4j or other deps such that we no longer need
+        ;; to.
+        commons-beanutils/commons-beanutils {:mvn/version "1.9.4"}
+
+
+
         org.apache.tika/tika-core {:mvn/version "1.27"} ;; mime types
 
         grafter/url {:mvn/version "0.2.5"}
