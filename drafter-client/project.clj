@@ -12,7 +12,7 @@
                  [martian "0.1.16"]
                  [martian-clj-http "0.1.16"]
                  [org.clojure/clojure "1.10.3"]
-                 [org.clojure/tools.logging "1.2.3"]
+                 [org.clojure/tools.logging "1.2.2"]
                  [ring/ring-core "1.9.4"]]
   :profiles
   {:dev {:dependencies [[environ "1.2.0"]
