@@ -1,5 +1,5 @@
 (ns drafter-client.client.repo
-  (:require [cemerick.url :as url]
+  (:require [cemerick.uri :as uri]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.client.impl :as i]
             [grafter-2.rdf4j.repository :as repo]
@@ -45,8 +45,8 @@
                                (get-query-request query-endpoint-key params :query))
         sparql-repo (if update-endpoint-key
                       (let [{update-url :url update-params :query-params} (get-query-request client update-endpoint-key params :update)]
-                        (repo/sparql-repo (str query-url \? (url/map->query query-params))
-                                          (str update-url \? (url/map->query update-params))))
-                      (repo/sparql-repo (str query-url \? (url/map->query query-params))))]
+                        (repo/sparql-repo (str query-url \? (uri/map->query query-params))
+                                          (str update-url \? (uri/map->query update-params))))
+                      (repo/sparql-repo (str query-url \? (uri/map->query query-params))))]
     (.setAdditionalHttpHeaders sparql-repo (select-keys headers ["Authorization"]))
     sparql-repo))
