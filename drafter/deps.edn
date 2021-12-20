@@ -47,6 +47,13 @@
                                                org.slf4j/jcl-over-slf4j
                                                org.apache.httpcomponents/httpclient]}
 
+        ;; libthrift is a transitive dep of jena-arq, override version
+        ;; to mitigate CVEs: CVE-2019-0205, CVE-2020-13949,
+        ;; CVE-2019-0210, CVE-2018-1320, CVE-2018-11798.
+        ;;
+        ;; We may be able to remove this when we upgrade jena
+        org.apache.thrift/libthrift {:mvn/version "0.15.0"}
+
         org.apache.jena/jena-base {:mvn/version "3.17.0" :exclusions [org.slf4j/slf4j-api]}
         org.apache.jena/jena-core {:mvn/version "3.17.0" :exclusions [org.slf4j/slf4j-api]}
         org.apache.jena/jena-iri {:mvn/version "3.17.0" :exclusions [org.slf4j/slf4j-api]}
