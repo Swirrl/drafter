@@ -20,17 +20,6 @@
         integrant/integrant {:mvn/version "0.8.0"}
         meta-merge/meta-merge {:mvn/version "1.0.0"}
 
-        ;; Lock dependency of jackson to a version that
-        ;; works with sesame's sparql json results renderer
-        ;; and the scjsv json schema validator.
-        ;;
-        ;; NOTE: When we upgrade sesame to RDF4j we can possibly
-        ;; drop this override.
-        ;;
-        ;; Without this you get errors like:
-        ;; java.lang.NoClassDefFoundError: com/fasterxml/jackson/core/FormatFeature, compiling:(cheshire/factory.clj:54:7)
-        com.fasterxml.jackson.core/jackson-core {:mvn/version "2.13.1"}
-
         com.novemberain/monger {:mvn/version "3.5.0"}
 
         com.sun.mail/javax.mail {:mvn/version "1.6.2"}
