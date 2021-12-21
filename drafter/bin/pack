@@ -27,4 +27,4 @@ fi
 pushd "${DRAFTER_DIR}" || exit
 trap "popd" EXIT
 
-clojure -M:pack:prod -m mach.pack.alpha.skinny -e env/prod/clj --lib-dir "${LIB_DIR}" --project-path "${DRAFTER_JAR}"
+clojure -M:prod:pack -e env/prod/clj --lib-dir "${LIB_DIR}" --project-path "${DRAFTER_JAR}"
