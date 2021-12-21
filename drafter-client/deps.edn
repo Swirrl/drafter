@@ -4,7 +4,7 @@
         buddy/buddy-sign {:mvn/version "3.4.1"}
         cheshire/cheshire {:mvn/version "5.10.1"}
         clj-http/clj-http {:mvn/version "3.12.3"}
-        grafter/grafter {:mvn/version "2.1.17"}
+        grafter/grafter {:mvn/version "2.1.18"}
         grafter/url {:mvn/version "0.2.5"}
         grafter/vocabularies {:mvn/version "0.3.8"}
         integrant/integrant {:mvn/version "0.8.0"}
