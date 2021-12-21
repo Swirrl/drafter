@@ -3,6 +3,17 @@
  :deps {buddy/buddy-auth {:mvn/version "3.0.1"}
         buddy/buddy-core {:mvn/version "1.10.1"}
 
+        ;; override cheshire a transitive dep of buddy-core which
+        ;; otherwise introduces CVE-2020-28491 via its
+        ;; jackson-dataformat-cbor dep.
+        ;;
+        ;; The cbor dep can't be excluded as cheshire has a hard
+        ;; dependency on it, so we bump cheshire here.
+        ;;
+        ;; NOTE: If we bump buddy-core from 1.10.1 we may be able to
+        ;; remove this dep.
+        cheshire/cheshire {:mvn/version "5.10.1"}
+
         org.clojure/clojure {:mvn/version "1.10.3"}
 
         org.clojure/math.combinatorics {:mvn/version "0.1.6"}
