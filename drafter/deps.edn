@@ -134,7 +134,8 @@
                    :main-opts ["-m" "krunk.deploy"]}
 
            :pack {:extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
-                                                :sha "9fd4a63ddeec3bedcbc819422de5a40ccb9eb8c9"}}}
+                                                :sha "53544484a2594b90432075f1efb73268de1f7e1f"}}
+                  :main-opts ["-m" "mach.pack.alpha.skinny"]}
 
            :java9 {:jvm-opts ["--add-modules" "java.xml.bind"]}
 
