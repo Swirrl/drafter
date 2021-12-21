@@ -5,7 +5,7 @@
   :dependencies [[buddy/buddy-sign "3.4.1"]
                  [cheshire "5.10.1"]
                  [clj-http "3.12.3"]
-                 [grafter "2.1.17"]
+                 [grafter "2.1.18"]
                  [grafter/url "0.2.5"]
                  [grafter/vocabularies "0.3.8"]
                  [integrant "0.8.0"]
