@@ -54,7 +54,10 @@
                      (add-routes (denv/env-specific-routes backend))
                      (add-route app-routes))
 
-                 :ring-defaults (assoc-in api-defaults [:params :multipart] true)
+                 :ring-defaults (-> (assoc-in api-defaults [:params :multipart] true)
+                                    ;; Enables wrap-forwarded-scheme middleware. Essential in prod
+                                    ;; env when scheme needs to be passed through from load balancer
+                                    (assoc :proxy true))
                  ;; add custom middleware here
                  :middleware [#(wrap-resource % "swagger-ui")
                               wrap-verbs
