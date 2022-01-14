@@ -16,8 +16,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: "hello"
-          command: "echo Hello world!"
+          name: "Install Stardog"
+          command: ".circleci/install_services.sh"
 
 
 
@@ -28,4 +28,5 @@ workflows:
     jobs:
       - test:
           context:
+            - swirrl-s3-jars-consumer
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
