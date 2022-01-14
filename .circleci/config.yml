@@ -15,9 +15,12 @@ jobs:
     # See: https://circleci.com/docs/2.0/configuration-reference/#steps
     steps:
       - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - "ad:6e:f1:7b:fa:ee:89:09:bf:2e:7b:31:a4:4e:e1:f8"
       - run:
-          name: "hello"
-          command: "echo Hello world!"
+          name: "Install Stardog"
+          command: ".circleci/install_services.sh"
 
 
 
@@ -28,4 +31,5 @@ workflows:
     jobs:
       - test:
           context:
+            - swirrl-s3-jars-consumer
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
