@@ -2,245 +2,30 @@
 # See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 
-executors:
-  tests-executor:
-    docker: # run the steps with Docker
-      - image: swirrl/cimg-clojure:1.10-browsers
-        auth:
-          username: $DOCKERHUB_USERNAME # can specify string literal values
-          password: $DOCKERHUB_PASSWORD # or project environment variable reference
-      - image: mongo:3.2
-        auth:
-          username: $DOCKERHUB_USERNAME # can specify string literal values
-          password: $DOCKERHUB_PASSWORD # or project environment variable reference
-      - image: swirrl/stardog:6.2.3
-        environment:
-          CREATE_DATABASE: drafter-test-db
-        auth:
-          username: $DOCKERHUB_USERNAME # can specify string literal values
-          password: $DOCKERHUB_PASSWORD # or project environment variable reference
-
-    resource_class: medium
-
-    environment:
-      # Customize the JVM maximum heap limit
-      STARDOG_SERVER_JAVA_ARGS: -Xmx2g -XX:MaxDirectMemorySize=2g
-      SPARQL_QUERY_ENDPOINT: "http://localhost:5820/muttnik-test/query"
-      SPARQL_UPDATE_ENDPOINT: "http://localhost:5820/muttnik-test/update"
-      STARDOG_HOME: .omni_cache/install/stardog/install/stardog-home/
-
-
-  build-executor:
-    docker: # run the steps with Docker
-      - image: swirrl/cimg-clojure:1.10-browsers
-        auth:
-          username: $DOCKERHUB_USERNAME # can specify string literal values
-          password: $DOCKERHUB_PASSWORD # or project environment variable reference
-
-
-    resource_class: medium
-    working_directory: ~/repo
-
-
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  test-drafter-auth0:
-    executor: tests-executor
-    steps:
-      - run-tests:
-          project-dir: drafter
-          kaocha-flags: "--focus :auth0"
-
-  test-drafter-basic-auth:
-    executor: tests-executor
-    steps:
-      - run-tests:
-          project-dir: drafter
-          kaocha-flags: "--focus :basic-auth"
-
-  test-drafter-non-api:
-    executor: tests-executor
-    steps:
-      - run-tests:
-          project-dir: drafter
-          kaocha-flags: "--focus :non-api"
-
-  test-drafterclient:
-    executor: tests-executor
-    steps:
-      - run-tests:
-          project-dir: drafter-client
-
-  build-artifacts:
-    executor: build-executor
+  test:
+    docker:
+      - image: clojure:openjdk-8-tools-deps-1.10.3.1058-buster
+        auth:
+          username: $DOCKERHUB_USERNAME # can specify string literal values
+          password: $DOCKERHUB_PASSWORD # or project environment variable reference
+    # Add steps to the job
+    # See: https://circleci.com/docs/2.0/configuration-reference/#steps
     steps:
       - checkout
       - run:
-          name: Package Jars
-          command: cd drafter && ./bin/pack
-      - run:
-          name: Make omni package
-          command: cd drafter && source ./bin/set-environment && ./bin/package
-      - run:
-          name: Deploy Build Artifacts
-          command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ] || [ -n "${CIRCLE_TAG}" ]; then
-              echo "Deploying main artifact release"
-              cd drafter && source ./bin/set-environment && ./bin/publish-packages
-            else
-              echo Not deploying as this is not main branch
-            fi
-
-      - setup_remote_docker # necessary to build/deploy docker image in step below
-      - run:
-          name: Build (and potentially Deploy) swirrl/drafter-pmd4 docker
-          command: |
-            cd drafter
-            clojure -T:build pmd4-docker-build :image-type :registry
-
-commands:
-  setup-services:
-    description: "Setup background services (stardog/mongo)"
-    steps:
-      - checkout
-      - restore-all-caches
-      - resolve-clj-deps
-      # - run:
-      #     name: "Install Stardog / Mongo Deps"
-      #     command: clojure -M:omni install-dependencies --dependencies dependencies.edn  #-vvv # for more debugging info
-
-  run-tests:
-    parameters:
-      project-dir:
-        type: string
-      kaocha-flags:
-        type: string
-        default: ""
-    steps:
-      - setup-services
-
-      - run:
-          name: Run tests
-          environment:
-            SPARQL_QUERY_ENDPOINT: "http://localhost:5820/drafter-test-db/query"
-            SPARQL_UPDATE_ENDPOINT: "http://localhost:5820/drafter-test-db/update"
-            DRAFTER_ENDPOINT: "http://localhost:3001"
-            DRAFTER_JWS_SIGNING_KEY: "foo"
-            AUTH0_DOMAIN: "https://dev-kkt-m758.eu.auth0.com"
-            AUTH0_AUD: "https://pmd"
-            AUTH0_CLIENT_ID: "7klE25HUY333vTEx7rM1dmsnO6vHkaSG"
-            AUTH0_CLIENT_SECRET: "QYoWNwf11dzWNh6XYd3jH8-j5j8r36UKuoFgrPakE_aw_Gy_EwWSppvqSULRICY4"
-          command: |
-            cd <<parameters.project-dir>>
-            ./bin/kaocha --reporter documentation --fail-fast <<parameters.kaocha-flags>>
-
-      - save-caches
-
-
-  resolve-clj-deps:
-    description: "Resolve clj dependencies"
-    steps:
-      - run:
-          name: Resolve deps
-          command: clojure -P -M:omni
-
-      - run:
-          name: Resolve drafter deps
-          command: |
-            cd drafter
-            clojure -P -A:dev:test:pack
-
-      - run:
-          name: Resolve drafter-client deps
-          command: |
-            cd drafter-client
-            clojure -P -A:dev:test
-
-  restore-clj-cache:
-    steps:
-      - restore_cache:
-          keys:
-            - v1-tdeps-dependencies-{{ checksum "deps.edn" }}
-            # note no fallback due to parallel running
-
-  restore-omni-cache:
-    steps:
-      - restore_cache:
-          keys:
-            - v1-omni-cache-{{ checksum "dependencies.edn" }}
-            # note no fallback here as omni can't deal with partial caches.
-
-  restore-all-caches:
-    description: "restore caches"
-    steps:
-      - restore-clj-cache
-      - restore-omni-cache
-
-  save-caches:
-    description: "save caches"
-    steps:
-      - save_cache:
-          paths:
-            - ~/.m2
-            - ~/repo/.cpcache
-            - ~/.gitlibs
-          key: v1-tdeps-dependencies-{{ checksum "deps.edn" }}
-
-      - save_cache:
-          paths:
-            - ~/repo/.omni_cache
-          key: v1-omni-cache-{{ checksum "dependencies.edn" }}
+          name: "hello"
+          command: "echo Hello world!"
 
 
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
-# See also: https://circleci.com/docs/2.0/workflows/#executing-workflows-for-a-git-tag for how tags work
 workflows:
   build-workflow:
     jobs:
-      - test-drafter-auth0:
-          filters:
-            tags:
-              only: /^v\d*\.\d*\z/ # tags that look like v0.0
+      - test:
           context:
-            - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
-            - swirrl-dockerhub-consumer
-            - stardog-jfrog-repository
-      - test-drafter-basic-auth:
-          filters:
-            tags:
-              only: /^v\d*\.\d*\z/ # tags that look like v0.0
-          context:
-            - swirrl-jar-and-omni-user
-            - drafter-auth0-dev-creds # creds for our auth0 dev setup
-            - swirrl-dockerhub-consumer
-            - stardog-jfrog-repository
-      - test-drafter-non-api:
-          filters:
-            tags:
-              only: /^v\d*\.\d*\z/ # tags that look like v0.0
-          context:
-            - swirrl-jar-and-omni-user
-            - drafter-auth0-dev-creds # creds for our auth0 dev setup
-            - swirrl-dockerhub-consumer
-            - stardog-jfrog-repository
-      - test-drafterclient:
-          filters:
-            tags:
-              only: /^v\d*\.\d*\z/ # tags that look like v0.0
-          context:
-            - swirrl-jar-and-omni-user
-            - drafter-auth0-dev-creds # creds for our auth0 dev setup
-            - swirrl-dockerhub-consumer
-            - stardog-jfrog-repository
-      - build-artifacts:
-          filters:
-            tags:
-              only: /^v\d*\.\d*\z/ # tags that look like v0.0
-          context:
-            - swirrl-jar-and-omni-user
-            - swirrl-dockerhub-publisher
-            - gcp-artifact-registry
