@@ -19,5 +19,5 @@ echo "Done omni install dependencies"
 # start services
 ./.omni_cache/install/stardog/install/dev-start.sh
 if [[ -d ./.omni_cache/install/mongodb ]]; then
-    ./.omni_cache/install/mongodb/install/dev-start.sh
+#    ./.omni_cache/install/mongodb/install/dev-start.sh
 fi
