@@ -31,5 +31,6 @@ workflows:
     jobs:
       - test:
           context:
-            - swirrl-s3-jars-consumer
+            - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
+            - swirrl-dockerhub-consumer
