@@ -7,9 +7,14 @@ set -o errexit
 # ssh-add
 
 # install service dependencies
+
+echo AWS access key: $AWS_ACCESS_KEY_ID
+
 clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn -vvv
 
 echo "Done omni install dependencies"
+
+
 
 # start services
 ./.omni_cache/install/stardog/install/dev-start.sh
