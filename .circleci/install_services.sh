@@ -7,7 +7,9 @@ set -o errexit
 # ssh-add
 
 # install service dependencies
-clojure -A:omni install-dependencies --dependencies dependencies-mongo-auth.edn
+clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn -vvv
+
+echo "Done omni install dependencies"
 
 # start services
 ./.omni_cache/install/stardog/install/dev-start.sh
