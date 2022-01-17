@@ -21,9 +21,11 @@ jobs:
       - setup_remote_docker:
           version: 19.03.13
       - run:
-          name: "Install Stardog"
-          command: ".circleci/install_services.sh"
-
+          name: "Install Stardog / Mongo Deps"
+          command: clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn  #-vvv # for more debugging info
+      - run:
+          name: Start background service dependencies (stardog/mongo)
+          command: ./.circleci/start-stardog-and-mongo
 
 
 # Invoke jobs via workflows
