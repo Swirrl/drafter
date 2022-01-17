@@ -9,6 +9,8 @@ set -o errexit
 # install service dependencies
 clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn
 
+echo "Done omni install dependencies"
+
 # start services
 ./.omni_cache/install/stardog/install/dev-start.sh
 if [[ -d ./.omni_cache/install/mongodb ]]; then
