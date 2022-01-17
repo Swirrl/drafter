@@ -7,7 +7,7 @@ set -o errexit
 # ssh-add
 
 # install service dependencies
-clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn
+clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn -vvv
 
 echo "Done omni install dependencies"
 
