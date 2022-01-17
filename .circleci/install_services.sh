@@ -14,7 +14,7 @@ clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn 
 
 echo "Done omni install dependencies"
 
-
+ls -laR ./.omni_cache/
 
 # start services
 # ./.omni_cache/install/stardog/install/dev-start.sh
