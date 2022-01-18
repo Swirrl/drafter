@@ -78,7 +78,7 @@ commands:
       - run:
           name: Setup Stardog Database
           command: |
-            sleep 30
+            sleep 15
 
             ps -ef | grep stardog
 
