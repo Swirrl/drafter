@@ -8,6 +8,8 @@ $STARDOG_HOME/../stardog/bin/stardog-admin server start --disable-security --for
 
 # .circleci/wait-for-service localhost:5820
 
+.circleci/wait-for-service localhost:5820
+
 echo Stardog up
 
 if [[ -d ./.omni_cache/install/mongodb ]]; then

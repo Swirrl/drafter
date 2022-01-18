@@ -75,8 +75,7 @@ commands:
           name: Start background service dependencies (stardog/mongo)
           command: |
             echo $STARDOG_HOME
-            $STARDOG_HOME/../stardog/bin/stardog-admin server start --disable-security
-            #./.circleci/start-stardog-and-mongo
+            ./.circleci/start-stardog-and-mongo
             sleep 15
 
       - run:
