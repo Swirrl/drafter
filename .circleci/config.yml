@@ -74,15 +74,17 @@ commands:
           name: Start background service dependencies (stardog/mongo)
           command: ./.circleci/start-stardog-and-mongo
 
-      - run: |
-          sleep 15
+      - run:
+          name: Setup Stardog Database
+          command: |
+            sleep 30
 
-          env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java \
-          ./.omni_cache/install/stardog/install/stardog/bin/stardog-admin db create \
-          -n <<parameters.project-dir>>-test \
-          -c ./.circleci/stardog.properties
+            env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java \
+            ./.omni_cache/install/stardog/install/stardog/bin/stardog-admin db create \
+            -n <<parameters.project-dir>>-test \
+            -c ./.circleci/stardog.properties
 
-          sleep 5
+            sleep 5
 
       - run:
           name: Run tests
