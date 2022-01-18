@@ -19,9 +19,11 @@ jobs:
           fingerprints:
             - "ad:6e:f1:7b:fa:ee:89:09:bf:2e:7b:31:a4:4e:e1:f8"
       - run:
-          name: "Install Stardog"
-          command: ".circleci/install_services.sh"
-
+          name: "Install Stardog / Mongo Deps"
+          command: clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn  #-vvv # for more debugging info
+      - run:
+          name: Start background service dependencies (stardog/mongo)
+          command: ./.circleci/start-stardog-and-mongo
 
 
 # Invoke jobs via workflows
