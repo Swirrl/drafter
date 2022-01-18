@@ -63,9 +63,6 @@ commands:
       - run:
           name: "Install Stardog / Mongo Deps"
           command: clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn  #-vvv # for more debugging info
-      - run:
-          name: Start background service dependencies (stardog/mongo)
-          command: ./.circleci/start-stardog-and-mongo
 
   run-tests:
     parameters:
@@ -73,6 +70,20 @@ commands:
         type: string
     steps:
       - setup-services
+      - run:
+          name: Start background service dependencies (stardog/mongo)
+          command: ./.circleci/start-stardog-and-mongo
+
+      - run: |
+          sleep 15
+
+          env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java \
+          ./.omni_cache/install/stardog/install/stardog/bin/stardog-admin db create \
+          -n <<parameters.project-dir>>-test \
+          -c ./.circleci/stardog.properties
+
+          sleep 5
+
       - run:
           name: Run tests
           environment:
