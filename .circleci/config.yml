@@ -36,14 +36,23 @@ executors:
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  test-drafter:
+  test-drafter-auth0:
     executor: tests-executor
     steps:
       - run-tests:
           project-dir: drafter
           database-name: drafter-test-db
+          kaocha-flags: "--focus :auth0"
 
-  test-drafter-client:
+  test-drafter-basic-auth:
+    executor: tests-executor
+    steps:
+      - run-tests:
+          project-dir: drafter
+          database-name: drafter-test-db
+          kaocha-flags: "--focus :basic-auth --focus :non-api"
+
+  test-drafterclient:
     executor: tests-executor
     steps:
       - run-tests:
@@ -72,6 +81,9 @@ commands:
         type: string
       database-name:
         type: string
+      kaocha-flags:
+        type: string
+        default: ""
     steps:
       - setup-services
       - run:
@@ -115,7 +127,7 @@ commands:
             AUTH0_CLIENT_SECRET: "QYoWNwf11dzWNh6XYd3jH8-j5j8r36UKuoFgrPakE_aw_Gy_EwWSppvqSULRICY4"
           command: |
             cd <<parameters.project-dir>>
-            ./bin/kaocha --reporter documentation --fail-fast
+            ./bin/kaocha --reporter documentation --fail-fast <<parameters.kaocha-flags>>
 
       - save-caches
 
@@ -181,12 +193,17 @@ commands:
 workflows:
   build-workflow:
     jobs:
-      - test-drafter:
+      - test-drafter-auth0:
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
-      - test-drafter-client:
+      - test-drafter-basic-auth:
+          context:
+            - swirrl-jar-and-omni-user
+            - drafter-auth0-dev-creds # creds for our auth0 dev setup
+            - swirrl-dockerhub-consumer
+      - test-drafterclient:
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
