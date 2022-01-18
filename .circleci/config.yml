@@ -79,7 +79,6 @@ commands:
           command: |
             sleep 30
 
-            env JAVA_HOME=/usr/lib/jvm/java-8-oracle/bin/java \
             ./.omni_cache/install/stardog/install/stardog/bin/stardog-admin db create \
             -n <<parameters.project-dir>>-test \
             -c ./.circleci/stardog.properties
