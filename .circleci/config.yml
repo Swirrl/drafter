@@ -72,21 +72,26 @@ commands:
     steps:
       - setup-services
       - run:
+          background: true
           name: Start background service dependencies (stardog/mongo)
           command: |
             echo $STARDOG_HOME
-            ./.circleci/start-stardog-and-mongo
+            $STARDOG_HOME/../stardog/bin/stardog-admin server start --disable-security --foreground
+
+      - run:
+          name: Wait for Stardog to start
+          command: |
+            .circleci/wait-for-service localhost:5820
 
       - run:
           name: Setup Stardog Database
           command: |
+
             ps -ef | grep stardog
 
             ./.omni_cache/install/stardog/install/stardog/bin/stardog-admin db create \
             -n <<parameters.project-dir>>-test \
             -c ./.circleci/stardog.properties
-
-            sleep 5
 
       - run:
           name: Run tests
