@@ -3,11 +3,14 @@
 set -o errexit
 
 # start services
-./.omni_cache/install/stardog/install/dev-start.sh
+#./.omni_cache/install/stardog/install/dev-start.sh
+$STARDOG_HOME/../stardog/bin/stardog-admin server start --disable-security --foreground
+
+# .circleci/wait-for-service localhost:5820
 
 echo Stardog up
 
-if [[ -d ./.omni_cache/install/mongodb ]]; then
-    ./.omni_cache/install/mongodb/install/dev-start.sh
-    echo Mongo up
-fi
+# if [[ -d ./.omni_cache/install/mongodb ]]; then
+#     ./.omni_cache/install/mongodb/install/dev-start.sh
+#     echo Mongo up
+# fi
