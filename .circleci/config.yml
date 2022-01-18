@@ -50,7 +50,15 @@ jobs:
       - run-tests:
           project-dir: drafter
           database-name: drafter-test-db
-          kaocha-flags: "--focus :basic-auth --focus :non-api"
+          kaocha-flags: "--focus :basic-auth"
+
+  test-drafter-non-api:
+    executor: tests-executor
+    steps:
+      - run-tests:
+          project-dir: drafter
+          database-name: drafter-test-db
+          kaocha-flags: "--focus :non-api"
 
   test-drafterclient:
     executor: tests-executor
@@ -199,6 +207,11 @@ workflows:
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
       - test-drafter-basic-auth:
+          context:
+            - swirrl-jar-and-omni-user
+            - drafter-auth0-dev-creds # creds for our auth0 dev setup
+            - swirrl-dockerhub-consumer
+      - test-drafter-non-api:
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
