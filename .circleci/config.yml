@@ -19,6 +19,7 @@ executors:
       STARDOG_SERVER_JAVA_ARGS: -Xmx2g -XX:MaxDirectMemorySize=2g
       SPARQL_QUERY_ENDPOINT: "http://localhost:5820/muttnik-test/query"
       SPARQL_UPDATE_ENDPOINT: "http://localhost:5820/muttnik-test/update"
+      STARDOG_HOME: .omni_cache/install/stardog/install/stardog-home/
 
 
   build-executor:
