@@ -5,10 +5,10 @@ version: 2.1
 executors:
   tests-executor:
     docker: # run the steps with Docker
-      - image: swirrl/cimg-clojure:1.10-browsers #clojure:openjdk-8-tools-deps-1.10.3.1058-buster
-        auth:
-          username: $DOCKERHUB_USERNAME # can specify string literal values
-          password: $DOCKERHUB_PASSWORD # or project environment variable reference
+    - image: swirrl/cimg-clojure:1.10-browsers
+      auth:
+        username: $DOCKERHUB_USERNAME # can specify string literal values
+        password: $DOCKERHUB_PASSWORD # or project environment variable reference
 
     resource_class: large
     working_directory: ~/repo
@@ -24,7 +24,7 @@ executors:
 
   build-executor:
     docker: # run the steps with Docker
-      - image: swirrl/cimg-clojure:1.10-browsers #clojure:openjdk-8-tools-deps-1.10.3.1058-buster
+      - image: swirrl/cimg-clojure:1.10-browsers
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
@@ -50,10 +50,8 @@ jobs:
 
 
 commands:
-  run-tests:
-    parameters:
-      project-dir:
-        type: string
+  setup-services:
+    description: "Setup background services (stardog/mongo)"
     steps:
       - checkout
       - add_ssh_keys:
@@ -70,6 +68,12 @@ commands:
           name: Start background service dependencies (stardog/mongo)
           command: ./.circleci/start-stardog-and-mongo
 
+  run-tests:
+    parameters:
+      project-dir:
+        type: string
+    steps:
+      - setup-services
       - run:
           name: Run tests
           command: |
