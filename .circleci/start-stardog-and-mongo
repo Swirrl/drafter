@@ -10,7 +10,7 @@ $STARDOG_HOME/../stardog/bin/stardog-admin server start --disable-security --for
 
 echo Stardog up
 
-# if [[ -d ./.omni_cache/install/mongodb ]]; then
-#     ./.omni_cache/install/mongodb/install/dev-start.sh
-#     echo Mongo up
-# fi
+if [[ -d ./.omni_cache/install/mongodb ]]; then
+    ./.omni_cache/install/mongodb/install/dev-start.sh
+    echo Mongo up
+fi

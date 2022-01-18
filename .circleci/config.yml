@@ -76,6 +76,12 @@ commands:
       - setup-services
       - run:
           background: true
+          name: Start MongoDB
+          command: |
+            ./.omni_cache/install/mongodb/install/dev-start.sh
+
+      - run:
+          background: true
           name: Start background service dependencies (stardog/mongo)
           command: |
             echo $STARDOG_HOME
