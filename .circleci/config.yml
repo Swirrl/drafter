@@ -41,13 +41,14 @@ jobs:
     steps:
       - run-tests:
           project-dir: drafter
+          database-name: drafter-test-db
 
   test-drafter-client:
     executor: tests-executor
     steps:
       - run-tests:
           project-dir: drafter-client
-
+          database-name: drafter-client-test
 
 commands:
   setup-services:
@@ -68,6 +69,8 @@ commands:
   run-tests:
     parameters:
       project-dir:
+        type: string
+      database-name:
         type: string
     steps:
       - setup-services
@@ -90,7 +93,7 @@ commands:
             ps -ef | grep stardog
 
             ./.omni_cache/install/stardog/install/stardog/bin/stardog-admin db create \
-            -n <<parameters.project-dir>>-test \
+            -n <<parameters.database-name>> \
             -c ./.circleci/stardog.properties
 
       - run:
