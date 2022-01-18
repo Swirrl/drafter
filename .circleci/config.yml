@@ -98,7 +98,10 @@ commands:
           background: true
           name: Start MongoDB
           command: |
-            ./.omni_cache/install/mongodb/install/dev-start.sh
+            docker run -p 27017:27017 --name mongodb-dev \
+            -v /Users/rick/repos/drafter/.omni_cache/install/mongodb/install/data:/data/db \
+            -v /Users/rick/repos/drafter/.omni_cache/install/mongodb/install/dump:/dump \
+            mongo:3.2
 
       - run:
           background: true
