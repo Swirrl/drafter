@@ -20,12 +20,74 @@ jobs:
             - "ad:6e:f1:7b:fa:ee:89:09:bf:2e:7b:31:a4:4e:e1:f8"
       - setup_remote_docker:
           version: 19.03.13
+      - restore-all-caches
+      - resolve-clj-deps
       - run:
           name: "Install Stardog / Mongo Deps"
           command: clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn  #-vvv # for more debugging info
       - run:
           name: Start background service dependencies (stardog/mongo)
           command: ./.circleci/start-stardog-and-mongo
+
+
+
+
+commands:
+  resolve-clj-deps:
+    description: "resolve clj dependencies"
+    steps:
+      - run:
+          name: resolve deps
+          # force tools.deps to resolve with `-Sthreads 1` to avoid parallel resolution bug
+          command: clojure -P -M:omni
+
+      - run:
+          name: resolve drafter deps
+          command: |
+            cd drafter
+            clojure -P -A:dev:test:krunk:pack
+
+      - run:
+          name: resolve drafter-client deps
+          command: |
+            cd drafter-client
+            clojure -P -A:dev:test
+
+  restore-clj-cache:
+    steps:
+      - restore_cache:
+          keys:
+            - v1-tdeps-dependencies-{{ checksum "deps.edn" }}
+            # note no fallback due to parallel running
+
+  restore-omni-cache:
+    steps:
+      - restore_cache:
+          keys:
+            - v1-omni-cache-{{ checksum "dependencies.edn" }}
+            # note no fallback here as omni can't deal with partial caches.
+
+  restore-all-caches:
+    description: "restore caches"
+    steps:
+      - restore-clj-cache
+      - restore-omni-cache
+
+  save-caches:
+    description: "save caches"
+    steps:
+      - save_cache:
+          paths:
+            - ~/.m2
+            - ~/repo/.cpcache
+            - ~/.gitlibs
+          key: v1-tdeps-dependencies-{{ checksum "deps.edn" }}
+
+      - save_cache:
+          paths:
+            - ~/repo/.omni_cache
+          key: v1-omni-cache-{{ checksum "dependencies.edn" }}
+
 
 
 # Invoke jobs via workflows
