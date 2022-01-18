@@ -76,7 +76,6 @@ commands:
           command: |
             echo $STARDOG_HOME
             ./.circleci/start-stardog-and-mongo
-            sleep 15
 
       - run:
           name: Setup Stardog Database
