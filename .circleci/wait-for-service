@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+# script to wait for a HTTP endpoint to become available. The location
+# of the endpoint is specified as the single argument in the format
+# host:port
+SCRIPT_NAME=$(basename ${BASH_SOURCE})
+
+if [[ -z "$1" ]]; then
+   printf "Usage: ${SCRIPT_NAME} <service-port>\n\ne.g. ${SCRIPT_NAME} localhost:3001\n" 1>&2
+   exit 1
+fi
+
+SERVICE_PORT=$1
+
+echo "Waiting for service to start on port ${SERVICE_PORT}"
+
+# waits up to 55 seconds
+wget -q --retry-connrefused --tries 11 --waitretry=10 $SERVICE_PORT
+
+STATUS=$?
+
+if [[ $STATUS -eq 0 ]]; then
+    echo "Service started on port ${SERVICE_PORT}"
+    exit 0    
+else
+    echo "Timed out or errored waiting for service to start on port ${SERVICE_PORT}" 1>&2
+    exit 1
+fi
