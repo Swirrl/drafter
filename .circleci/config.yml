@@ -13,7 +13,7 @@ executors:
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
-      - image: stardog-eps-docker.jfrog.io/stardog:6.2.3
+      - image: stardog.jfrog.io/eps-docker/stardog:6.2.3
         auth:
           username: swirrldev
           password: $STARDOG_JFROG_PASSWORD
