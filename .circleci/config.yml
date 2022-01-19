@@ -67,6 +67,38 @@ jobs:
           project-dir: drafter-client
           database-name: drafter-client-test
 
+  build-artifacts:
+    executor: build-executor
+    steps:
+      - checkout
+      - run:
+          name: Package Jars
+          command: cd drafter && ./bin/pack
+      - run:
+          name: Make omni package
+          command: cd drafter && ./bin/package
+      - run:
+          name: Deploy Build Artifacts
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+
+              echo Deploying main artifact release
+              clojure -M:omni publish -f drafter/target/drafter-pmd3-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+              clojure -M:omni publish -f drafter/target/drafter-pmd4-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+
+
+            else
+              echo Not deploying as this is not main branch
+              # clojure -M:omni publish -f drafter/target/drafter-pmd3-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+              # clojure -M:omni publish -f drafter/target/drafter-pmd4-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+
+
+            fi
+
+
+
+
+
 commands:
   setup-services:
     description: "Setup background services (stardog/mongo)"
@@ -212,4 +244,8 @@ workflows:
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
+            - swirrl-dockerhub-consumer
+      - build-artifacts:
+          context:
+            - swirrl-jar-and-omni-user
             - swirrl-dockerhub-consumer
