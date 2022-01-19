@@ -5,10 +5,14 @@ version: 2.1
 executors:
   tests-executor:
     docker: # run the steps with Docker
-    - image: swirrl/cimg-clojure:1.10-browsers
-      auth:
-        username: $DOCKERHUB_USERNAME # can specify string literal values
-        password: $DOCKERHUB_PASSWORD # or project environment variable reference
+      - image: swirrl/cimg-clojure:1.10-browsers
+        auth:
+          username: $DOCKERHUB_USERNAME # can specify string literal values
+          password: $DOCKERHUB_PASSWORD # or project environment variable reference
+      - image: mongo-dev
+        auth:
+          username: $DOCKERHUB_USERNAME # can specify string literal values
+          password: $DOCKERHUB_PASSWORD # or project environment variable reference
 
     resource_class: large
     working_directory: ~/repo
@@ -94,14 +98,6 @@ commands:
         default: ""
     steps:
       - setup-services
-      - run:
-          background: true
-          name: Start MongoDB
-          command: |
-            docker run -p 27017:27017 --name mongodb-dev \
-            -v ~/repo/.omni_cache/install/mongodb/install/data:/data/db \
-            -v ~/repo/.omni_cache/install/mongodb/install/dump:/dump \
-            mongo:3.2
 
       - run:
           background: true
