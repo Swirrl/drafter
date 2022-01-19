@@ -13,6 +13,10 @@ executors:
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
+      - image: stardog-eps-docker.jfrog.io/stardog:6.2.3
+        auth:
+          username: swirrldev
+          password: $STARDOG_JFROG_PASSWORD
 
     resource_class: large
     working_directory: ~/repo
@@ -85,7 +89,7 @@ commands:
       - resolve-clj-deps
       - run:
           name: "Install Stardog / Mongo Deps"
-          command: clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn  #-vvv # for more debugging info
+          command: clojure -M:omni install-dependencies --dependencies dependencies.edn  #-vvv # for more debugging info
 
   run-tests:
     parameters:
