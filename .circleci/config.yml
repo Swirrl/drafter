@@ -13,10 +13,14 @@ executors:
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
+      - image: swirrl/stardog:6.2.3
+        environment:
+          CREATE_DATABASE: drafter-test-db
+        auth:
+          username: $DOCKERHUB_USERNAME # can specify string literal values
+          password: $DOCKERHUB_PASSWORD # or project environment variable reference
 
-    resource_class: large
-    working_directory: ~/repo
-    # resource_class: xlarge
+    resource_class: medium
 
     environment:
       # Customize the JVM maximum heap limit
@@ -32,6 +36,7 @@ executors:
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
+
 
     resource_class: medium
     working_directory: ~/repo
@@ -90,34 +95,23 @@ jobs:
               clojure -M:omni publish -f drafter/target/drafter-pmd3-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
               clojure -M:omni publish -f drafter/target/drafter-pmd4-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
 
-
             else
               echo Not deploying as this is not main branch
               # clojure -M:omni publish -f drafter/target/drafter-pmd3-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
               # clojure -M:omni publish -f drafter/target/drafter-pmd4-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
 
-
             fi
-
-
-
-
 
 commands:
   setup-services:
     description: "Setup background services (stardog/mongo)"
     steps:
       - checkout
-      - add_ssh_keys:
-          fingerprints:
-            - "ad:6e:f1:7b:fa:ee:89:09:bf:2e:7b:31:a4:4e:e1:f8"
-      - setup_remote_docker:
-          version: 19.03.13
       - restore-all-caches
       - resolve-clj-deps
-      - run:
-          name: "Install Stardog / Mongo Deps"
-          command: clojure -M:omni install-dependencies --dependencies dependencies-mongo-auth.edn  #-vvv # for more debugging info
+      # - run:
+      #     name: "Install Stardog / Mongo Deps"
+      #     command: clojure -M:omni install-dependencies --dependencies dependencies.edn  #-vvv # for more debugging info
 
   run-tests:
     parameters:
@@ -130,26 +124,6 @@ commands:
         default: ""
     steps:
       - setup-services
-
-      - run:
-          background: true
-          name: Start background service dependencies (stardog/mongo)
-          command: |
-            echo $STARDOG_HOME
-            $STARDOG_HOME/../stardog/bin/stardog-admin server start --disable-security --foreground
-
-      - run:
-          name: Wait for Stardog to start
-          command: |
-            .circleci/wait-for-service localhost:5820
-
-      - run:
-          name: Setup Stardog Database
-          command: |
-
-            ./.omni_cache/install/stardog/install/stardog/bin/stardog-admin db create \
-            -n <<parameters.database-name>> \
-            -c ./.circleci/stardog.properties
 
       - run:
           name: Run tests
@@ -235,21 +209,25 @@ workflows:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
+            - stardog-jfrog-repository
       - test-drafter-basic-auth:
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
+            - stardog-jfrog-repository
       - test-drafter-non-api:
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
+            - stardog-jfrog-repository
       - test-drafterclient:
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
+            - stardog-jfrog-repository
       - build-artifacts:
           context:
             - swirrl-jar-and-omni-user
