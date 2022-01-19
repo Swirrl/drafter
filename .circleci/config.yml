@@ -99,8 +99,8 @@ commands:
           name: Start MongoDB
           command: |
             docker run -p 27017:27017 --name mongodb-dev \
-            -v /Users/rick/repos/drafter/.omni_cache/install/mongodb/install/data:/data/db \
-            -v /Users/rick/repos/drafter/.omni_cache/install/mongodb/install/dump:/dump \
+            -v ~/repo/.omni_cache/install/mongodb/install/data:/data/db \
+            -v ~/repo/.omni_cache/install/mongodb/install/dump:/dump \
             mongo:3.2
 
       - run:
