@@ -442,6 +442,7 @@ paths:
         - application/trix
         - application/n-triples
         - application/rdf+xml
+        - application/ld+json
         - text/turtle
       produces:
         - application/json
@@ -485,6 +486,7 @@ paths:
         - application/trix
         - application/n-triples
         - application/rdf+xml
+        - application/ld+json
         - text/turtle
       produces:
         - application/json
