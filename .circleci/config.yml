@@ -57,7 +57,7 @@ jobs:
   build-artifacts:
     executor: build-executor
     steps:
-      - setup-services
+      - checkout
       - run:
           name: Package Jars
           command: cd drafter && ./bin/pack
@@ -65,10 +65,8 @@ jobs:
           name: Make omni package
           command: cd drafter && ./bin/package
       - run:
-          environment:
-            CI_BRANCH: ${CIRCLE_BRANCH//\//_}
           name: Deploy
-          command: echo clojure -M:omni publish -f drafter/target/drafter-pmd3-${CI_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+          command: echo clojure -M:omni publish -f drafter/target/drafter-pmd3-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
 
 
 commands:
