@@ -65,8 +65,10 @@ jobs:
           name: Make omni package
           command: cd drafter && ./bin/package
       - run:
+          environment:
+            CI_BRANCH: ${CIRCLE_BRANCH//\//_}
           name: Deploy
-          command: echo clojure -M:omni publish -f drafter/target/drafter-pmd3-${TRAVIS_BRANCH_ESC}-${TRAVIS_BUILD_NUMBER}.zip
+          command: echo clojure -M:omni publish -f drafter/target/drafter-pmd3-${CI_BRANCH}-${CIRCLE_BUILD_NUM}.zip
 
 
 commands:
