@@ -1,23 +1,23 @@
 {:paths ["src" "resources/base"]
 
  :deps {
-        buddy/buddy-sign {:mvn/version "3.0.0"}
-        cheshire/cheshire {:mvn/version "5.8.0"}
-        clj-http/clj-http {:mvn/version "3.9.0"}
-        grafter/grafter {:mvn/version "2.1.2"}
+        buddy/buddy-sign {:mvn/version "3.4.1"}
+        cheshire/cheshire {:mvn/version "5.10.1"}
+        clj-http/clj-http {:mvn/version "3.12.3"}
+        grafter/grafter {:mvn/version "2.1.18"}
         grafter/url {:mvn/version "0.2.5"}
-        grafter/vocabularies {:mvn/version "0.2.6"}
-        integrant/integrant {:mvn/version "0.6.3"}
-        martian/martian {:mvn/version "0.1.10"}
-        martian-clj-http/martian-clj-http {:mvn/version "0.1.10"}
-        org.clojure/clojure {:mvn/version "1.9.0"}
+        grafter/vocabularies {:mvn/version "0.3.8"}
+        integrant/integrant {:mvn/version "0.8.0"}
+        martian/martian {:mvn/version "0.1.16"}
+        martian-clj-http/martian-clj-http {:mvn/version "0.1.16"}
+        org.clojure/clojure {:mvn/version "1.10.3"}
         org.clojure/tools.logging {:mvn/version "1.2.2"}
-        ring/ring-core {:mvn/version "1.6.3"}
-        clj-time/clj-time {:mvn/version "0.15.1"}
-        grafter.db/grafter.db {:mvn/version "0.8.5"}
-        com.cemerick/url {:mvn/version "0.1.1"}
+        ring/ring-core {:mvn/version "1.9.4"}
+        clj-time/clj-time {:mvn/version "0.15.2"}
+        grafter.db/grafter.db {:mvn/version "0.8.8"}
+        com.widdindustries/uri {:mvn/version "0.1.3"} ;; fork of com.cemerick/url
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
-                      :sha "11fbe37324ab238752502f275d3a321fd012a65b"}
+                      :sha "8f0694b6449bb2ec7d7a4b8b2d09acb67dc8dab4"}
         }
 
  :mvn/repos
@@ -26,23 +26,23 @@
 
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
                  :extra-deps {
-                              lambdaisland/kaocha {:mvn/version "0.0-418"}
-                              environ/environ {:mvn/version "1.0.3"}
-                              integrant/repl {:mvn/version "0.3.1"}
+                              lambdaisland/kaocha {:mvn/version "1.60.972"}
+                              environ/environ {:mvn/version "1.2.0"}
+                              integrant/repl {:mvn/version "0.3.2"}
 
-                              org.apache.logging.log4j/log4j-api {:mvn/version "2.16.0"} ; Import log4j2 as the logging backend
-                              org.apache.logging.log4j/log4j-core {:mvn/version "2.16.0"} ; Import log4j2 as the logging backend
-                              org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.16.0"} ; Redirect all SLF4J logs over the log4j2 backend
+                              org.apache.logging.log4j/log4j-api {:mvn/version "2.17.0"} ; Import log4j2 as the logging backend
+                              org.apache.logging.log4j/log4j-core {:mvn/version "2.17.0"} ; Import log4j2 as the logging backend
+                              org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.17.0"} ; Redirect all SLF4J logs over the log4j2 backend
 
 
                               }}
 
            :test {:extra-paths ["test" "test/resources"]
                   :extra-deps {drafter/drafter {:local/root "../drafter"}
-                               org.clojure/test.check {:mvn/version "0.9.0"}
-                               lambdaisland/kaocha {:mvn/version "1.0.629"}
-                               environ/environ {:mvn/version "1.0.3"}
-                               integrant/repl {:mvn/version "0.3.1"}
+                               org.clojure/test.check {:mvn/version "1.1.1"}
+                               lambdaisland/kaocha {:mvn/version "1.60.972"}
+                               environ/environ {:mvn/version "1.2.0"}
+                               integrant/repl {:mvn/version "0.3.2"}
 
                                }}
            }

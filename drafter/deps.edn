@@ -1,46 +1,54 @@
 {:paths ["src" "resources"]
 
- :deps {buddy/buddy-auth {:mvn/version "2.2.0"}
-        buddy/buddy-core {:mvn/version "1.5.0"}
+ :deps {buddy/buddy-auth {:mvn/version "3.0.1"}
+        buddy/buddy-core {:mvn/version "1.10.1"}
 
-        org.clojure/clojure {:mvn/version "1.10.1"}
+        ;; override cheshire a transitive dep of buddy-core which
+        ;; otherwise introduces CVE-2020-28491 via its
+        ;; jackson-dataformat-cbor dep.
+        ;;
+        ;; The cbor dep can't be excluded as cheshire has a hard
+        ;; dependency on it, so we bump cheshire here.
+        ;;
+        ;; NOTE: If we bump buddy-core from 1.10.1 we may be able to
+        ;; remove this dep.
+        cheshire/cheshire {:mvn/version "5.10.1"}
 
-        org.clojure/math.combinatorics {:mvn/version "0.1.4"}
+        org.clojure/clojure {:mvn/version "1.10.3"}
+
+        org.clojure/math.combinatorics {:mvn/version "0.1.6"}
 
         cognician/dogstatsd-clj {:mvn/version "0.1.2"}
 
-        commons-codec/commons-codec {:mvn/version "1.12"}
+        commons-codec/commons-codec {:mvn/version "1.15"}
 
-        clj-commons/clj-yaml {:mvn/version "0.7.0"} ;; for loading our Swagger schemas
-        metosin/scjsv {:mvn/version "0.5.0"} ;; for validating our Swagger/JSON schemas
+        clj-time/clj-time {:mvn/version "0.15.2"}
+        clj-commons/clj-yaml {:mvn/version "0.7.107"} ;; for loading our Swagger schemas
+        metosin/scjsv {:mvn/version "0.6.2"} ;; for validating our Swagger/JSON schemas
 
-        aero/aero {:mvn/version "1.1.3"}
+        aero/aero {:mvn/version "1.1.6"}
 
-        integrant/integrant {:mvn/version "0.7.0"}
+        integrant/integrant {:mvn/version "0.8.0"}
         meta-merge/meta-merge {:mvn/version "1.0.0"}
-
-        ;; Lock dependency of jackson to a version that
-        ;; works with sesame's sparql json results renderer
-        ;; and the scjsv json schema validator.
-        ;;
-        ;; NOTE: When we upgrade sesame to RDF4j we can possibly
-        ;; drop this override.
-        ;;
-        ;; Without this you get errors like:
-        ;; java.lang.NoClassDefFoundError: com/fasterxml/jackson/core/FormatFeature, compiling:(cheshire/factory.clj:54:7)
-        com.fasterxml.jackson.core/jackson-core {:mvn/version "2.9.8"}
 
         com.novemberain/monger {:mvn/version "3.5.0"}
 
         com.sun.mail/javax.mail {:mvn/version "1.6.2"}
         ;;[com.taoensso/tower "2.0.2"]
 
-        grafter/grafter {:mvn/version "2.1.15"}
+        grafter/grafter {:mvn/version "2.1.18"}
+        org.eclipse.rdf4j/rdf4j-queryrender {:mvn/version "3.1.4"}
 
-        org.apache.tika/tika-core {:mvn/version "1.23"} ;; mime types
-        org.eclipse.rdf4j/rdf4j-runtime {:mvn/version "3.0.0"
-                                         :exclusions [ch.qos.logback/logback-classic]}
+        ;; The beanutils dep below is a transitive dep of grafter ->
+        ;; rdf4j -> com.opencsv/opencsv. However 1.9.3 has
+        ;; CVE-2019-10086 against it, so bumping the dep here until we
+        ;; can upgrade rdf4j or other deps such that we no longer need
+        ;; to.
+        commons-beanutils/commons-beanutils {:mvn/version "1.9.4"}
 
+        org.apache.tika/tika-core {:mvn/version "1.27"} ;; mime types
+
+        org.apache.commons/commons-compress {:mvn/version "1.21"}
 
         grafter/url {:mvn/version "0.2.5"}
 
@@ -54,45 +62,53 @@
         metosin/ring-swagger-ui {:mvn/version "3.20.1"}
 
         ;; Use JENA for our query rewriting
-        org.apache.jena/jena-arq {:mvn/version "3.10.0"
+        org.apache.jena/jena-arq {:mvn/version "3.17.0"
                                   :exclusions [org.slf4j/slf4j-api
                                                org.slf4j/jcl-over-slf4j
                                                org.apache.httpcomponents/httpclient]}
 
-        org.apache.jena/jena-base {:mvn/version "3.10.0" :exclusions [org.slf4j/slf4j-api]}
-        org.apache.jena/jena-core {:mvn/version "3.10.0" :exclusions [org.slf4j/slf4j-api]}
-        org.apache.jena/jena-iri {:mvn/version "3.10.0" :exclusions [org.slf4j/slf4j-api]}
+        ;; libthrift is a transitive dep of jena-arq, override version
+        ;; to mitigate CVEs: CVE-2019-0205, CVE-2020-13949,
+        ;; CVE-2019-0210, CVE-2018-1320, CVE-2018-11798.
+        ;;
+        ;; We may be able to remove this when we upgrade jena
+        org.apache.thrift/libthrift {:mvn/version "0.15.0"}
+
+        org.apache.jena/jena-base {:mvn/version "3.17.0" :exclusions [org.slf4j/slf4j-api]}
+        org.apache.jena/jena-core {:mvn/version "3.17.0" :exclusions [org.slf4j/slf4j-api]}
+        org.apache.jena/jena-iri {:mvn/version "3.17.0" :exclusions [org.slf4j/slf4j-api]}
 
         org.mindrot/jbcrypt {:mvn/version "0.4"}
 
         org.clojure/tools.logging {:mvn/version "1.2.2"}
-        org.apache.logging.log4j/log4j-api {:mvn/version "2.16.0"} ; Import log4j2 as the logging backend
-        org.apache.logging.log4j/log4j-core {:mvn/version "2.16.0"} ; Import log4j2 as the logging backend
-        org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.16.0"} ; Redirect all SLF4J logs over the log4j2 backend
+        org.apache.logging.log4j/log4j-api {:mvn/version "2.17.0"} ; Import log4j2 as the logging backend
+        org.apache.logging.log4j/log4j-core {:mvn/version "2.17.0"} ; Import log4j2 as the logging backend
+        org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.17.0"} ; Redirect all SLF4J logs over the log4j2 backend
 
-        org.slf4j/log4j-over-slf4j {:mvn/version "1.7.25"} ; redirect log4j 1.x logs
-        org.slf4j/jcl-over-slf4j {:mvn/version "1.7.25"} ; redirect commons logging
-        org.slf4j/jul-to-slf4j {:mvn/version "1.7.25"}
+        org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"} ; redirect log4j 1.x logs
+        org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"} ; redirect commons logging
+        org.slf4j/jul-to-slf4j {:mvn/version "1.7.32"}
 
         ring-middleware-format/ring-middleware-format {:mvn/version "0.7.4"}
-        ring/ring {:mvn/version "1.7.1" :exclusions [org.clojure/java.classpath]}
+        ring/ring {:mvn/version "1.9.4" :exclusions [org.clojure/java.classpath]}
+        org.eclipse.jetty/jetty-server {:mvn/version "9.4.44.v20210927"}
+
         ring-middleware-accept/ring-middleware-accept {:mvn/version "2.0.3"}
         ring-server/ring-server {:mvn/version "0.5.0"}
-        ring/ring-core {:mvn/version "1.7.1"}
+        ring/ring-core {:mvn/version "1.9.4"}
         ring-cors/ring-cors {:mvn/version "0.1.13"}
 
         wrap-verbs/wrap-verbs {:mvn/version "0.1.1"}
 
-        com.auth0/jwks-rsa {:mvn/version "0.8.1"}
-        com.auth0/java-jwt {:mvn/version "3.8.0"}
-        martian/martian {:mvn/version "0.1.10"}
-        martian-clj-http/martian-clj-http {:mvn/version "0.1.10"
+        com.auth0/jwks-rsa {:mvn/version "0.20.0"}
+        com.auth0/java-jwt {:mvn/version "3.18.2"}
+        martian/martian {:mvn/version "0.1.16"}
+        martian-clj-http/martian-clj-http {:mvn/version "0.1.16"
                                            :exclusions [clj-http/clj-http]}
         medley/medley {:mvn/version "1.3.0"}
-        clj-http/clj-http {:mvn/version "3.10.0"}
+        clj-http/clj-http {:mvn/version "3.12.3"}
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
-                      :sha "11fbe37324ab238752502f275d3a321fd012a65b"}
-        }
+                      :sha "8f0694b6449bb2ec7d7a4b8b2d09acb67dc8dab4"}}
 
  :mvn/repos
  {"swirrl-jars-releases" {:url "s3://swirrl-jars/releases/"}
@@ -102,25 +118,25 @@
 
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
                  :extra-deps {clojure-csv/clojure-csv {:mvn/version "2.0.2"}
-                              environ/environ {:mvn/version "1.0.3"}
-                              lambdaisland/kaocha {:mvn/version "1.0.629"}
-                              org.clojure/data.json {:mvn/version "0.2.6"}
-                              org.clojure/test.check {:mvn/version "0.9.0"}
+                              environ/environ {:mvn/version "1.2.0"}
+                              lambdaisland/kaocha {:mvn/version "1.60.972"}
+                              org.clojure/data.json {:mvn/version "2.4.0"}
+                              org.clojure/test.check {:mvn/version "1.1.1"}
                               ring-mock/ring-mock {:mvn/version "0.1.5"}
-                              ring/ring-devel {:mvn/version "1.7.1" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]}}}
+                              ring/ring-devel {:mvn/version "1.9.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]}}}
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}
 
            :prod {:extra-paths ["env/prod/clj" "env/prod/resources"]}
 
            :krunk {:extra-deps {swirrl/krunk {:git/url "git@github.com:Swirrl/krunk.git"
-                                              :sha "dc2666a4550c219a8ce1eea326c82d9871d6908f"}}
+                                              :sha "3cdfae90133eef26dc32090d5d555871c49a529b"}}
                    :main-opts ["-m" "krunk.deploy"]}
 
            :pack {:extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
-                                                :sha "81b9e47d992b17aa3e3af1a47aed1f0287ebe9b8"}}}
+                                                :sha "53544484a2594b90432075f1efb73268de1f7e1f"}}
+                  :main-opts ["-m" "mach.pack.alpha.skinny"]}
 
            :java9 {:jvm-opts ["--add-modules" "java.xml.bind"]}
 
-           :spec {:main-opts ["-m" "drafter.check-specs" "100" "true"]}
-           }}
+           :spec {:main-opts ["-m" "drafter.check-specs" "100" "true"]}}}
