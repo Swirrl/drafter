@@ -50,7 +50,6 @@ jobs:
     steps:
       - run-tests:
           project-dir: drafter
-          database-name: drafter-test-db
           kaocha-flags: "--focus :auth0"
 
   test-drafter-basic-auth:
@@ -58,7 +57,6 @@ jobs:
     steps:
       - run-tests:
           project-dir: drafter
-          database-name: drafter-test-db
           kaocha-flags: "--focus :basic-auth"
 
   test-drafter-non-api:
@@ -66,7 +64,6 @@ jobs:
     steps:
       - run-tests:
           project-dir: drafter
-          database-name: drafter-test-db
           kaocha-flags: "--focus :non-api"
 
   test-drafterclient:
@@ -74,7 +71,6 @@ jobs:
     steps:
       - run-tests:
           project-dir: drafter-client
-          database-name: drafter-client-test
 
   build-artifacts:
     executor: build-executor
@@ -117,8 +113,6 @@ commands:
     parameters:
       project-dir:
         type: string
-      database-name:
-        type: string
       kaocha-flags:
         type: string
         default: ""
@@ -128,8 +122,8 @@ commands:
       - run:
           name: Run tests
           environment:
-            SPARQL_QUERY_ENDPOINT: "http://localhost:5820/drafter-client-test/query"
-            SPARQL_UPDATE_ENDPOINT: "http://localhost:5820/drafter-client-test/update"
+            SPARQL_QUERY_ENDPOINT: "http://localhost:5820/drafter-test-db/query"
+            SPARQL_UPDATE_ENDPOINT: "http://localhost:5820/drafter-test-db/update"
             DRAFTER_ENDPOINT: "http://localhost:3001"
             DRAFTER_JWS_SIGNING_KEY: "foo"
             AUTH0_DOMAIN: "https://dev-kkt-m758.eu.auth0.com"
