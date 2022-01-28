@@ -98,6 +98,13 @@ jobs:
 
             fi
 
+      - setup_remote_docker # necessary to build/deploy docker image in step below
+      - run:
+          name: Build (and potentially Deploy) swirrl/drafter-pmd4 docker
+          command: |
+            cd drafter
+            clojure -T:build pmd4-docker-build
+
 commands:
   setup-services:
     description: "Setup background services (stardog/mongo)"
