@@ -76,11 +76,6 @@
        {:a 1 :b 2} {:b 1 :c 5} vector {:b [2 1]}
        {:a 1 :b 2} {:c 3 :d 4} = {}))
 
-(deftest seq-contains?-test
-  (are [col value expected] (= expected (seq-contains? col value))
-       [:a :b :c] :a true
-       [:a :b :c] :d false))
-
 (deftest implies-test
   (are [p q expected] (= expected (implies p q))
        true true true

@@ -181,11 +181,6 @@
   [quads]
   (jena/->update-string [(jena/delete-data-stmt quads)]))
 
-(defn seq-contains?
-  "Returns whether a sequence contains a given value according to =."
-  [col value]
-  (boolean (some #(= value %) col)))
-
 (defn implies [p q]
   (or (not p) q))
 

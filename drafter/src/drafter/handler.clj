@@ -42,7 +42,8 @@
     live-sparql-route :live-sparql-query-route
     draftset-api-routes :draftset-api-routes
     jobs-status-routes :jobs-status-routes
-    global-writes-lock :drafter/global-writes-lock}]
+    global-writes-lock :drafter/global-writes-lock
+    wrap-auth :wrap-auth}]
   (wrap-handler (app-handler
                  ;; add your application routes here
                  (-> []
@@ -59,14 +60,13 @@
                                     ;; env when scheme needs to be passed through from load balancer
                                     (assoc :proxy true))
                  ;; add custom middleware here
-                 :middleware [#(wrap-resource % "swagger-ui")
-                              wrap-verbs
-                              wrap-encode-errors
-                              middleware/wrap-total-requests-counter
-                              middleware/wrap-request-timer
-                              #(log-request % {:query "<scrubbed>"})
-                              ;;wrap-file-info       ;; Content-Type, Content-Length, and Last Modified headers for files in body
-                              ]
+                 :middleware (cond-> [#(wrap-resource % "swagger-ui")
+                                      wrap-verbs
+                                      wrap-encode-errors
+                                      middleware/wrap-total-requests-counter
+                                      middleware/wrap-request-timer
+                                      #(log-request % {:query "<scrubbed>"})]
+                               wrap-auth (conj wrap-auth))
                  ;; add access rules here
                  :access-rules []
                  ;; serialize/deserialize the following data formats
