@@ -1,7 +1,8 @@
 ;; This file is meta-merged over drafter-base-config.edn when the
 ;; system is launched via drafter.main.
 
-{:swirrl.auth0/client {:endpoint #env AUTH0_DOMAIN
+{
+ :swirrl.auth0/client {:endpoint #env AUTH0_DOMAIN
                        :iss #env AUTH0_DOMAIN
                        :aud #env AUTH0_AUD
                        :api #join [#env AUTH0_DOMAIN "/api/v2/"]
