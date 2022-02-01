@@ -41,7 +41,7 @@
  :drafter.auth/read-role {}
  :swirrl.auth0.middleware/normalize-roles {:role-reader #ig/ref :drafter.auth/read-role}
 
- :drafter.middleware/wrap-auth
+ :drafter.middleware/wrap-authenticate
  {:middleware [#ig/ref :swirrl.auth0.middleware/bearer-token
                #ig/ref :swirrl.auth0.middleware/normalize-roles
                #ig/ref :drafter.middleware.auth0-auth/identify
