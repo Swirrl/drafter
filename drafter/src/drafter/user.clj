@@ -97,7 +97,8 @@
   "Takes a user and a role keyword and tests whether the user is
   authorised to operate in that role."
   [{:keys [role] :as user} requested]
-  (<= (role->permission-level requested) (role->permission-level role)))
+  (and (is-known-role? role)
+       (<= (role->permission-level requested) (role->permission-level role))))
 
 (defn- user-token-invalid [token invalid-key info]
   (let [msg (str "User token invalid: " info " (" invalid-key " = '" (invalid-key token) "')")]

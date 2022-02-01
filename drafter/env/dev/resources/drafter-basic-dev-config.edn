@@ -10,11 +10,9 @@
  ;; Web Middleware
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
- :drafter.middleware.auth/wrap-auth
+ :drafter.middleware.auth/wrap-authenticate
  {:drafter.user/repo #ig/ref :drafter.user/repo
   :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
 
- :drafter.middleware/wrap-auth
- {:middleware [#ig/ref :drafter.middleware.auth/wrap-auth]}
-
- }
+ :drafter.middleware/wrap-authenticate
+ {:middleware [#ig/ref :drafter.middleware.auth/wrap-authenticate]}}

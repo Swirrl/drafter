@@ -8,6 +8,7 @@
             [drafter.async.spec :as spec]
             [drafter.draftset :as ds]
             [drafter.logging :refer [with-logging-context]]
+            [drafter.middleware :as middleware]
             [drafter.util :as util]
             [integrant.core :as ig])
   (:import clojure.lang.ExceptionInfo
@@ -71,10 +72,10 @@
                    (= :error (:type @value-p)))
         (assoc :error @value-p))))
 
-(defmethod ig/init-key :drafter.routes/jobs-status [_ {:keys [wrap-auth]}]
+(defmethod ig/init-key :drafter.routes/jobs-status [_ _]
   (context
    "/v1/status" []
-   (wrap-auth
+   (middleware/wrap-authorize :editor
     (routes
      (GET "/jobs/:id" [id]
           (or (when-let [job (some-> id r/try-parse-uuid get-job)]

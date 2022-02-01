@@ -1,5 +1,5 @@
 (ns drafter.feature.draftset.list
-  (:require [drafter.middleware :refer [include-endpoints-param]]
+  (:require [drafter.middleware :as middleware]
             [ring.util.response :as ring]
             [drafter.backend.draftset.operations :as dsops]
             [clojure.spec.alpha :as s]
@@ -74,15 +74,15 @@
 
 (defn get-draftsets-handler
   ":get /draftsets"
-  [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (wrap-authenticated
-    (include-endpoints-param
+  [{backend :drafter/backend}]
+  (middleware/wrap-authorize :editor
+    (middleware/include-endpoints-param
       (parse-union-with-live-handler
         (fn [{user :identity {:keys [include union-with-live]} :params :as request}]
           (ring/response (get-draftsets backend user include union-with-live)))))))
 
 (defmethod ig/pre-init-spec ::get-draftsets-handler [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
+  (s/keys :req [:drafter/backend]))
 
 (defmethod ig/init-key ::get-draftsets-handler [_ opts]
   (get-draftsets-handler opts))

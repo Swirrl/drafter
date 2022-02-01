@@ -22,7 +22,7 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-publisher test-editor]]
             [drafter.rdf.sesame :as ses]
-            [drafter.responses :as responses]
+            [drafter.job-responses :as responses]
             [drafter.rdf.draftset-management.jobs :as dsjobs]
             [martian.encoders :as enc]
             [drafter.write-scheduler :as writes]

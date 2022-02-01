@@ -11,7 +11,8 @@
    [drafter.feature.middleware :as middleware]
    [drafter.rdf.draftset-management.job-util :as jobs]
    [drafter.requests :as req]
-   [drafter.responses :as response :refer [submit-async-job!]]
+   [drafter.responses :as response]
+   [drafter.job-responses :as job-response]
    [integrant.core :as ig]))
 
 (defn create-or-empty-draft-graph-for [repo graph-manager draftset-ref live-graph]
@@ -44,7 +45,7 @@
   "Enqueues a job to copy graph into draftest on behalf of the given user"
   [manager draftset user-id graph metadata]
   (let [job (copy-live-graph-into-draftset-job manager user-id draftset graph metadata)]
-    (response/enqueue-async-job! job)))
+    (job-response/enqueue-async-job! job)))
 
 (defn put-draftset-graph-handler
   [{:keys [wrap-as-draftset-owner] {:keys [backend] :as manager} :drafter/manager}]

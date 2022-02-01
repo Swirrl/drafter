@@ -43,7 +43,8 @@
     draftset-api-routes :draftset-api-routes
     jobs-status-routes :jobs-status-routes
     global-writes-lock :drafter/global-writes-lock
-    wrap-auth :wrap-auth}]
+    wrap-authenticate :wrap-authenticate
+    global-auth? :global-auth?}]
   (wrap-handler (app-handler
                  ;; add your application routes here
                  (-> []
@@ -65,8 +66,9 @@
                                       wrap-encode-errors
                                       middleware/wrap-total-requests-counter
                                       middleware/wrap-request-timer
-                                      #(log-request % {:query "<scrubbed>"})]
-                               wrap-auth (conj wrap-auth))
+                                      #(log-request % {:query "<scrubbed>"})
+                                      wrap-authenticate]
+                               global-auth? (conj #(middleware/wrap-authorize :reader %)))
                  ;; add access rules here
                  :access-rules []
                  ;; serialize/deserialize the following data formats
@@ -74,6 +76,7 @@
                  ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                  :formats [:json-kw :edn])))
 
+(defmethod ig/init-key :drafter/global-auth? [_ v] v)
 
 (defmethod ig/init-key :drafter.handler/app [k opts]
   (build-handler opts))

@@ -1,10 +1,12 @@
 (ns drafter.feature.draftset.publish
-  (:require [clojure.spec.alpha :as s]
-            [drafter.rdf.draftset-management.jobs :as dsjobs]
-            [drafter.responses :refer [forbidden-response submit-async-job!]]
-            [drafter.user :as user]
-            [integrant.core :as ig]
-            [drafter.requests :as req]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [drafter.job-responses :refer [submit-async-job!]]
+   [drafter.rdf.draftset-management.jobs :as dsjobs]
+   [drafter.requests :as req]
+   [drafter.responses :refer [forbidden-response]]
+   [drafter.user :as user]
+   [integrant.core :as ig]))
 
 (defn handler
   [{manager :drafter/manager :keys [wrap-as-draftset-owner]}]

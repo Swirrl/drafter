@@ -3,6 +3,7 @@
   (:require [clojure.spec.alpha :as s]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.draftset :as ds]
+            [drafter.middleware :as middleware]
             [drafter.responses :as response :refer [unprocessable-entity-response]]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
@@ -51,15 +52,16 @@
       (inner-handler request)
       (response/forbidden-response "Operation only permitted by draftset owner"))))
 
-(defn wrap-as-draftset-owner [{wrap-authenticated :wrap-auth backend :drafter/backend}]
+(defn wrap-as-draftset-owner
+  [{backend :drafter/backend}]
   (fn [handler]
-    (wrap-authenticated
+    (middleware/wrap-authorize :editor
      (existing-draftset-handler
       backend
       (restrict-to-draftset-owner backend handler)))))
 
 (defmethod ig/pre-init-spec ::wrap-as-draftset-owner [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
+  (s/keys :req [:drafter/backend]))
 
 (defmethod ig/init-key ::wrap-as-draftset-owner [_ opts]
   (wrap-as-draftset-owner opts))

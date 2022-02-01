@@ -1,7 +1,7 @@
 (ns drafter.write-scheduler-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [drafter
-             [responses :as resp]
+             [job-responses :as resp]
              [write-scheduler :refer [compare-jobs]]]
             [drafter.test-helpers.lock-manager :as lm]
             [schema.test :refer [validate-schemas]]

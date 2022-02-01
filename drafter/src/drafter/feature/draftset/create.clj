@@ -1,19 +1,20 @@
 (ns drafter.feature.draftset.create
-  (:require [drafter.backend.draftset.operations :as dsops]
-            [clojure.spec.alpha :as s]
-            [integrant.core :as ig]
-            [drafter.feature.common :as feat-common]
-            [drafter.rdf.draftset-management.job-util :as jobutil]
-            [drafter.util :as util]
-            [ring.util.response :as ring]
-            [drafter.async.responses :as response]
-            [drafter.requests :as req]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [drafter.async.responses :as response]
+   [drafter.backend.draftset.operations :as dsops]
+   [drafter.feature.common :as feat-common]
+   [drafter.middleware :as middleware]
+   [drafter.rdf.draftset-management.job-util :as jobutil]
+   [drafter.requests :as req]
+   [drafter.util :as util]
+   [integrant.core :as ig]
+   [ring.util.response :as ring]))
 
 (defn create-draftsets-handler
-  [{wrap-authenticated :wrap-auth
-    {:keys [backend global-writes-lock clock] :as manager} :drafter/manager}]
+  [{{:keys [backend global-writes-lock clock] :as manager} :drafter/manager}]
   (let [version "/v1"]
-    (wrap-authenticated
+    (middleware/wrap-authorize :editor
      (fn [{{:keys [display-name description]} :params user :identity :as request}]
        (feat-common/run-sync
         {:backend backend :global-writes-lock global-writes-lock}
@@ -27,11 +28,8 @@
             (ring/redirect-after-post (str version "/draftset/"
                                            (get-in result [:details :id]))))))))))
 
-(s/def ::wrap-auth fn?)
-
 (defmethod ig/pre-init-spec :drafter.feature.draftset.create/handler [_]
-  (s/keys :req [:drafter/manager]
-          :req-un [::wrap-auth]))
+  (s/keys :req [:drafter/manager]))
 
 (defmethod ig/init-key ::handler [_ opts]
   (create-draftsets-handler opts))

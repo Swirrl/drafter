@@ -1,11 +1,12 @@
 (ns drafter.feature.draftset.show
   (:require [clojure.spec.alpha :as s]
             [drafter.backend.draftset.operations :as dsops]
-            [drafter.feature.middleware :as feat-middleware]
-            [drafter.feature.endpoint.public :as pub]
-            [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
-            [drafter.responses :refer [forbidden-response]]
             [drafter.endpoint :as ep]
+            [drafter.feature.endpoint.public :as pub]
+            [drafter.feature.middleware :as feat-middleware]
+            [drafter.middleware :as middleware]
+            [drafter.responses :refer [forbidden-response]]
+            [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
             [drafter.user :as user]
             [integrant.core :as ig]
             [ring.util.response :as ring]))
@@ -21,8 +22,8 @@
     ::not-found))
 
 (defn handler
-  [{wrap-authenticated :wrap-auth backend :drafter/backend}]
-  (wrap-authenticated
+  [{backend :drafter/backend}]
+  (middleware/wrap-authorize :editor
    (feat-middleware/existing-draftset-handler
     backend
     (parse-union-with-live-handler
@@ -34,7 +35,7 @@
             (ring/response ds-info-or-reason))))))))
 
 (defmethod ig/pre-init-spec ::handler [_]
-  (s/keys :req [:drafter/backend] :req-un [::wrap-auth]))
+  (s/keys :req [:drafter/backend]))
 
 (defmethod ig/init-key ::handler [_ opts]
   (handler opts))

@@ -8,6 +8,7 @@
             [drafter.requests :as drafter-request]
             [drafter.responses :as response]
             [drafter.endpoint :as ep]
+            [drafter.user :as user]
             [drafter.util :as util]
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
             [ring.util.request :as request]
@@ -17,9 +18,26 @@
            (org.apache.tika.mime MediaType)
            (java.util.zip GZIPInputStream)))
 
-(defmethod ig/init-key :drafter.middleware/wrap-auth
+;; Attempts to authenticates a request if it has an authorization header.
+;; NOTE allows requests without an authorization header through unchanged, so
+;; wrap-authorize is required to actually restrict access to a route.
+(defmethod ig/init-key :drafter.middleware/wrap-authenticate
   [_ {:keys [middleware] :as opts}]
-  (apply comp middleware))
+  (fn [handler]
+    (fn [request]
+      (if-let [_ (http/-get-header request "authorization")]
+        (((apply comp middleware) handler) request)
+        (handler request)))))
+
+(defn wrap-authorize [required-role handler]
+  (fn [request]
+    (if-let [user (:identity request)]
+      (if (user/has-role? (:identity request) required-role)
+        (handler request)
+        (response/forbidden-response (str "You require the "
+                                          (name required-role)
+                                          " role to perform this action")))
+      (response/unauthorized-response "Not authenticated"))))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]
@@ -154,18 +172,6 @@
   (fn [req]
     (datadog/increment! "drafter.requests.total" 1)
     (handler req)))
-
-(defn maybe-authenticated
-  "Returns a handler which optionally allows the incoming request to be authenticated.
-   If an Authorization header exists on incoming requests it will be authenticated as normal
-   before being passed to the inner handler. If no such header exists the inner handler will
-   be executed directly. Handlers are required to handle cases where a user does and does not
-   exist in the incoming request map."
-  [wrap-authenticated handler]
-  (fn [request]
-    (if-let [_ (http/-get-header request "authorization")]
-      ((wrap-authenticated handler) request)
-      (handler request))))
 
 (defn wrap-request-timer [handler]
   (fn [req]

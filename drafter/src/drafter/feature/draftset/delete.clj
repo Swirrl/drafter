@@ -2,7 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
             [drafter.rdf.draftset-management.jobs :as dsjobs]
-            [drafter.responses :refer [submit-async-job!]]
+            [drafter.job-responses :refer [submit-async-job!]]
             [integrant.core :as ig]
             [drafter.requests :as req]))
 

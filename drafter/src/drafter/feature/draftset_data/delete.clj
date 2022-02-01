@@ -9,7 +9,7 @@
             [drafter.middleware :refer [require-rdf-content-type temp-file-body inflate-gzipped]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sesame :refer [is-quads-format? read-statements]]
-            [drafter.responses :as response]
+            [drafter.job-responses :as response]
             [drafter.util :as util]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.io :as gio]

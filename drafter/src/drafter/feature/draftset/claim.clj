@@ -3,6 +3,7 @@
             [drafter.backend.draftset.operations :as dsops]
             [drafter.feature.common :as feat-common]
             [drafter.feature.middleware :as feat-middleware]
+            [drafter.middleware :as middleware]
             [drafter.rdf.draftset-management.job-util :as jobutil]
             [drafter.requests :as req]
             [drafter.responses
@@ -34,14 +35,14 @@
       (forbidden-response "User not in role for draftset claim"))
     (ring/not-found "Draftset not found")))
 
-(defn handler [{wrap-authenticated :wrap-auth {:keys [backend] :as manager} :drafter/manager}]
+(defn handler [{{:keys [backend] :as manager} :drafter/manager}]
   (let [inner-handler (partial handler* manager)]
-    (-> backend
-        (feat-middleware/existing-draftset-handler inner-handler)
-        (wrap-authenticated))))
+    (->> inner-handler
+        (feat-middleware/existing-draftset-handler backend)
+        (middleware/wrap-authorize :editor))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset.claim/handler [_]
-  (s/keys :req [:drafter/manager] :req-un [::wrap-auth]))
+  (s/keys :req [:drafter/manager]))
 
 (defmethod ig/init-key :drafter.feature.draftset.claim/handler [_ opts]
   (handler opts))

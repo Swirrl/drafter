@@ -1,9 +1,1 @@
-#merge
-[#include "test-system.edn"
- {:drafter.handler/app
-  {:repo #ig/ref :drafter.stasher/repo
-   :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
-   :draftset-api-routes #ig/ref [:drafter/routes :draftset/api]
-   :jobs-status-routes #ig/ref :drafter.routes/jobs-status
-   :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
-   :wrap-auth #ig/ref :drafter.middleware/wrap-auth}}]
+#merge [#include "test-system.edn" {:drafter/global-auth? true}]

@@ -9,6 +9,7 @@
    [drafter.feature.common :as feat-common]
    [drafter.feature.middleware :as feat-middleware]
    [drafter.feature.modified-times :as modified-times]
+   [drafter.job-responses :as job-response]
    [drafter.rdf.draftset-management.job-util :as jobs]
    [drafter.requests :as req]
    [drafter.responses :as response]
@@ -65,7 +66,7 @@
 
 (defn async-job [{:keys [drafter/manager]}]
   (fn [draftset-id graph user-id silent metadata]
-    (let [response #(response/submit-async-job!
+    (let [response #(job-response/submit-async-job!
                       (jobs/make-job user-id :background-write
                         (jobs/job-metadata
                           (:backend manager) draftset-id 'delete-draftset-graph metadata)

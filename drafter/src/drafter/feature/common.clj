@@ -4,7 +4,7 @@
    [drafter.async.responses :as r]
    [drafter.backend.draftset.operations :as dsops]
    [drafter.rdf.draftset-management.job-util :as jobs]
-   [drafter.responses :as response]
+   [drafter.job-responses :as response]
    [ring.util.response :as ring]))
 
 (defn draftset-sync-write-response [result backend draftset-id]
