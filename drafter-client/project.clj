@@ -1,7 +1,7 @@
 (defproject drafter-client "1.0.1-SNAPSHOT"
   :description "Client for the Drafter HTTP API"
   :url "http://github.com/swirrl/drafter-client"
-  :source-paths ["src" "generated/src"]
+  :source-paths ["src"]
   :dependencies [[buddy/buddy-sign "3.4.1"]
                  [cheshire "5.10.1"]
                  [clj-http "3.12.3"]

@@ -1,7 +1,6 @@
 (ns drafter.main
   (:gen-class)
   (:require [aero.core :as aero]
-            [clojure.edn :as edn]
             [clojure.java.io :as io]
             [drafter.timeouts :as timeouts]
             [clojure.tools.logging :as log]
@@ -63,8 +62,9 @@
     (-> system-config
         aero/read-config)))
 
-(defn- inject-datadog [system-config]
+(defn- inject-datadog
   "Add datadog to every other component"
+  [system-config]
   (merge-with
    mm/meta-merge
    (zipmap (keys (dissoc system-config :drafter.main/datadog))
