@@ -445,12 +445,19 @@
   {:post [(keyword? %)]}
   (get formats (ck/query-type cache-key)))
 
+(defn log-stasher-status [hit-or-miss {:keys [query-str] :as cache-key}]
+  (log/infof "Stasher %s key: %s for %s query:\n%s"
+             hit-or-miss
+             (fc/cache-key->hash-key cache-key)
+             (name (ck/query-type cache-key))
+             query-str))
+
 (defrecord StasherCache [cache-backend thread-pool formats]
   Stash
   (get-result [this cache-key base-uri-str]
     (let [fmt (data-format formats cache-key)]
       (when-let [^Closeable in-stream (fc/source-stream cache-backend cache-key fmt)]
-        (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
+        (log-stasher-status "hit" cache-key)
         (case (ck/query-type cache-key)
           :graph (read-graph-cache-stream thread-pool base-uri-str in-stream fmt)
           :tuple (read-tuple-cache-stream thread-pool in-stream fmt)
@@ -463,7 +470,7 @@
   (wrap-result [this cache-key query-result]
     (let [fmt (data-format formats cache-key)
           out-stream (fc/destination-stream cache-backend cache-key fmt)]
-      (log/debugf "Preparing to insert entry for %s query" (ck/query-type cache-key))
+      (log-stasher-status "miss" cache-key)
       (case (:query-type cache-key)
         :graph (timing/graph-result
                 "drafter.stasher.graph_sync.cache_miss"
@@ -475,7 +482,7 @@
   (async-read [this cache-key handler base-uri-str]
     (let [fmt (data-format formats cache-key)]
       (when-let [in-stream (fc/source-stream cache-backend cache-key fmt)]
-        (log/debugf "Found entry in cache for %s query" (ck/query-type cache-key))
+        (log-stasher-status "hit" cache-key)
         (with-open [^Closeable input-stream in-stream]
           (case (:query-type cache-key)
             :graph (async-read-graph-cache-stream input-stream fmt handler base-uri-str)
@@ -484,6 +491,7 @@
   (wrap-async-handler [this cache-key handler]
     (let [fmt (data-format formats cache-key)
           out-stream (fc/destination-stream cache-backend cache-key fmt)]
+      (log-stasher-status "miss" cache-key)
       (case (:query-type cache-key)
         :graph (timing/rdf-handler
                 "drafter.stasher.graph_async.cache_miss"
@@ -627,6 +635,7 @@
                                                       dataset
                                                       conn)
                 result (get-result cache cache-key base-uri-str)]
+
             (if (some? result)
               result
               (dd/measure!

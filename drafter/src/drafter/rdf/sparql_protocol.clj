@@ -255,7 +255,7 @@
         timeout-response))))
 
 (defn sparql-execution-handler [{{:keys [prepared-query format response-content-type]} :sparql :as request}]
-  (log/info (str "Running query\n" prepared-query "\nwith graph restrictions"))
+  (log/debugf "Running graph restricted query:\n%s" prepared-query)
   (execute-prepared-query prepared-query format response-content-type))
 
 (defn sparql-timeout-handler

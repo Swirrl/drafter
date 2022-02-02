@@ -64,7 +64,7 @@
                               wrap-encode-errors
                               middleware/wrap-total-requests-counter
                               middleware/wrap-request-timer
-                              log-request
+                              #(log-request % {:query "<scrubbed>"})
                               ;;wrap-file-info       ;; Content-Type, Content-Length, and Last Modified headers for files in body
                               ]
                  ;; add access rules here
