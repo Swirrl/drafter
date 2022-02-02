@@ -1,12 +1,12 @@
 (ns drafter.feature.draftset.create
   (:require
    [clojure.spec.alpha :as s]
-   [drafter.async.responses :as response]
    [drafter.backend.draftset.operations :as dsops]
    [drafter.feature.common :as feat-common]
    [drafter.middleware :as middleware]
    [drafter.rdf.draftset-management.job-util :as jobutil]
    [drafter.requests :as req]
+   [drafter.responses :as response]
    [drafter.util :as util]
    [integrant.core :as ig]
    [ring.util.response :as ring]))

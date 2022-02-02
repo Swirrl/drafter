@@ -2,7 +2,6 @@
   (:require
    [clojure.spec.alpha :as s]
    [drafter.async.jobs :as ajobs]
-   [drafter.async.responses :as async-response]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.backend.draftset.graphs :as graphs]
    [drafter.backend.draftset.operations :as ops]
@@ -12,7 +11,7 @@
    [drafter.rdf.draftset-management.job-util :as jobs]
    [drafter.requests :as req]
    [drafter.responses :as response]
-   [drafter.job-responses :as job-response]
+   [drafter.write-scheduler :as writes]
    [integrant.core :as ig]))
 
 (defn create-or-empty-draft-graph-for [repo graph-manager draftset-ref live-graph]
@@ -45,7 +44,7 @@
   "Enqueues a job to copy graph into draftest on behalf of the given user"
   [manager draftset user-id graph metadata]
   (let [job (copy-live-graph-into-draftset-job manager user-id draftset graph metadata)]
-    (job-response/enqueue-async-job! job)))
+    (writes/enqueue-async-job! job)))
 
 (defn put-draftset-graph-handler
   [{:keys [wrap-as-draftset-owner] {:keys [backend] :as manager} :drafter/manager}]
@@ -58,7 +57,7 @@
       (fn [{:keys [params] :as request}]
         (let [{:keys [draftset-id graph metadata]} params
               job (copy-live-graph manager draftset-id (req/user-id request) graph metadata)]
-          (async-response/submitted-job-response job)))))))
+          (response/submitted-job-response job)))))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.append-by-graph/handler [_]
   (s/keys :req [:drafter/manager] :req-un [::wrap-as-draftset-owner]))

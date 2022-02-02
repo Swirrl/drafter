@@ -10,7 +10,7 @@
   stack of any route - hence you may need to be careful about being
   overly-specific in your interpretation of the error."
   (:require [clojure.tools.logging :as log]
-            [drafter.async.responses :as r]
+            [drafter.responses :as r]
             [clojure.spec.alpha :as s]
             [drafter.async.spec :as async]
             [drafter.util :as util]))
@@ -79,3 +79,21 @@
 (defmethod encode-error :reading-aborted [ex]
   (r/error-response 422
                     :rdf-parse-error (.getMessage ex)))
+
+(defmethod encode-error :writes-temporarily-disabled [ex]
+  (r/error-response 503 ex))
+
+(defmethod encode-error :forbidden [ex]
+  (r/error-response 403 ex))
+
+(defmethod encode-error :payload-too-large [ex]
+  (r/error-response 413 ex))
+
+(defmethod encode-error :bad-request [ex]
+  (r/error-response 400 ex))
+
+(defmethod encode-error :unprocessable-request [ex]
+  (r/error-response 413 ex))
+
+(defmethod encode-error :method-not-allowed [ex]
+  (r/method-not-allowed-response (:method (ex-data ex))))

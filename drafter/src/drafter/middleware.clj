@@ -18,7 +18,7 @@
            (org.apache.tika.mime MediaType)
            (java.util.zip GZIPInputStream)))
 
-;; Attempts to authenticates a request if it has an authorization header.
+;; Attempts to authenticate a request if it has an authorization header.
 ;; NOTE allows requests without an authorization header through unchanged, so
 ;; wrap-authorize is required to actually restrict access to a route.
 (defmethod ig/init-key :drafter.middleware/wrap-authenticate

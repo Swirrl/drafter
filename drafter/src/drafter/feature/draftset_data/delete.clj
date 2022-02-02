@@ -9,14 +9,14 @@
             [drafter.middleware :refer [require-rdf-content-type temp-file-body inflate-gzipped]]
             [drafter.rdf.draftset-management.job-util :as jobs]
             [drafter.rdf.sesame :refer [is-quads-format? read-statements]]
-            [drafter.job-responses :as response]
             [drafter.util :as util]
             [grafter-2.rdf.protocols :as pr]
             [grafter-2.rdf4j.io :as gio]
             [grafter-2.rdf4j.repository :as repo]
             [integrant.core :as ig]
             [drafter.requests :as req]
-            [drafter.async.responses :as async-response])
+            [drafter.responses :as response]
+            [drafter.write-scheduler :as writes])
   (:import org.eclipse.rdf4j.model.Resource))
 
 (defn- empty-draft-only-graph? [repo live-graph-uri draft-graph-uri]
@@ -117,7 +117,7 @@
   "Enqueues a job to delete the data within source from draftset on behalf of the given user"
   [manager user-id draftset source metadata]
   (let [job (delete-data-from-draftset-job manager user-id draftset source metadata)]
-    (response/enqueue-async-job! job)))
+    (writes/enqueue-async-job! job)))
 
 (defn delete-draftset-data-handler
   [{:keys [:drafter/manager wrap-as-draftset-owner]}]
@@ -126,7 +126,7 @@
               {:keys [draftset-id metadata]} params
               source (ds-data-common/get-request-statement-source request)
               delete-job (delete-data manager user-id draftset-id source metadata)]
-          (async-response/submitted-job-response delete-job)))
+          (response/submitted-job-response delete-job)))
       inflate-gzipped
       temp-file-body
       deset-middleware/parse-graph-for-triples

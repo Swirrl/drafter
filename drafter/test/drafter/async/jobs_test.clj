@@ -5,7 +5,7 @@
             [clojure.spec.alpha :as s]
             [drafter.async.spec :as spec]
             [drafter.async.jobs :as jobs]
-            [drafter.async.responses :as r]
+            [drafter.responses :as r]
             [clj-time.coerce :refer [from-date]]
             [drafter.user-test :refer [test-editor]]
             [cheshire.core :as json]

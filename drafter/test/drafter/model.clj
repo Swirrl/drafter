@@ -22,7 +22,6 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-publisher test-editor]]
             [drafter.rdf.sesame :as ses]
-            [drafter.job-responses :as responses]
             [drafter.rdf.draftset-management.jobs :as dsjobs]
             [martian.encoders :as enc]
             [drafter.write-scheduler :as writes]
@@ -68,7 +67,7 @@
         job (dsjobs/delete-draftset-job backend
                                         user
                                         params)]
-    (responses/enqueue-async-job! job)))
+    (write-scheduler/enqueue-async-job! job)))
 
 (defn- list-draftsets-op [{:keys [backend] :as drafter} user {:keys [include union-with-live?] :as opts}]
   (ds-list/get-draftsets backend user (or include :all) (or union-with-live? false)))
@@ -83,7 +82,7 @@
           job (dsjobs/publish-draftset-job drafter
                                            user
                                            params)]
-      (responses/enqueue-async-job! job))
+      (write-scheduler/enqueue-async-job! job))
     (throw (ex-info "You require the publisher role to perform this action" {}))))
 
 (defn- draftset-query-endpoint-op [{:keys [backend]} _user draftset-ref {:keys [union-with-live?] :as opts}]

@@ -7,11 +7,11 @@
             [drafter.rdf.draftset-management.job-util :as jobutil]
             [drafter.requests :as req]
             [drafter.responses
-             :refer [conflict-detected-response forbidden-response]]
+             :refer [conflict-detected-response forbidden-response]
+             :as response]
             [drafter.user :as user]
             [integrant.core :as ig]
-            [ring.util.response :as ring]
-            [drafter.async.responses :as response]))
+            [ring.util.response :as ring]))
 
 (defn- respond [result]
   (if (jobutil/failed-job-result? result)

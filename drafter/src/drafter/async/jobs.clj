@@ -1,16 +1,17 @@
 (ns drafter.async.jobs
-  (:require [clj-time.coerce :refer [from-long]]
-            [clj-time.format :refer [formatters unparse]]
-            [clojure.spec.alpha :as s]
-            [cognician.dogstatsd :as datadog]
-            [compojure.core :refer [context GET routes]]
-            [drafter.async.responses :as r]
-            [drafter.async.spec :as spec]
-            [drafter.draftset :as ds]
-            [drafter.logging :refer [with-logging-context]]
-            [drafter.middleware :as middleware]
-            [drafter.util :as util]
-            [integrant.core :as ig])
+  (:require
+   [clj-time.coerce :refer [from-long]]
+   [clj-time.format :refer [formatters unparse]]
+   [clojure.spec.alpha :as s]
+   [cognician.dogstatsd :as datadog]
+   [compojure.core :refer [context GET routes]]
+   [drafter.async.spec :as spec]
+   [drafter.draftset :as ds]
+   [drafter.logging :refer [with-logging-context]]
+   [drafter.middleware :as middleware]
+   [drafter.responses :as r]
+   [drafter.util :as util]
+   [integrant.core :as ig])
   (:import clojure.lang.ExceptionInfo
            java.util.UUID
            org.apache.log4j.MDC
