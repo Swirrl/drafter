@@ -90,7 +90,7 @@
 (defn remove-graph-from-draftset-handler
   "Remove a supplied graph from the draftset."
   [{:keys [wrap-as-draftset-owner] :as resources}]
-  (wrap-as-draftset-owner
+  (wrap-as-draftset-owner :editor
    (parse-query-param-flag-handler
     :silent
     (feat-middleware/parse-graph-param-handler true (request-handler resources)))))

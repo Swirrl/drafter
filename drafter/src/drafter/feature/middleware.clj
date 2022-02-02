@@ -54,8 +54,8 @@
 
 (defn wrap-as-draftset-owner
   [{backend :drafter/backend}]
-  (fn [handler]
-    (middleware/wrap-authorize :editor
+  (fn [required-role handler]
+    (middleware/wrap-authorize required-role
      (existing-draftset-handler
       backend
       (restrict-to-draftset-owner backend handler)))))

@@ -121,17 +121,17 @@
 
 (defn delete-draftset-data-handler
   [{:keys [:drafter/manager wrap-as-draftset-owner]}]
-  (-> (fn [{:keys [params] :as request}]
-        (let [user-id (req/user-id request)
-              {:keys [draftset-id metadata]} params
-              source (ds-data-common/get-request-statement-source request)
-              delete-job (delete-data manager user-id draftset-id source metadata)]
-          (response/submitted-job-response delete-job)))
-      inflate-gzipped
-      temp-file-body
-      deset-middleware/parse-graph-for-triples
-      require-rdf-content-type
-      wrap-as-draftset-owner))
+  (->> (fn [{:keys [params] :as request}]
+         (let [user-id (req/user-id request)
+               {:keys [draftset-id metadata]} params
+               source (ds-data-common/get-request-statement-source request)
+               delete-job (delete-data manager user-id draftset-id source metadata)]
+           (response/submitted-job-response delete-job)))
+       inflate-gzipped
+       temp-file-body
+       deset-middleware/parse-graph-for-triples
+       require-rdf-content-type
+       (wrap-as-draftset-owner :editor)))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete/delete-data-handler [_]
   (s/keys :req [:drafter/manager]

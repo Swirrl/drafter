@@ -8,8 +8,7 @@
 
 (defn handler
   [{wrap-as-draftset-owner :wrap-as-draftset-owner backend :drafter/backend}]
-  (log/info "del draftset handler wrapper: " wrap-as-draftset-owner)
-  (wrap-as-draftset-owner
+  (wrap-as-draftset-owner :editor
    (fn [{:keys [params] :as request}]
      (log/info "drafter.feature.draftset.delete/handler " request)
      (writes/submit-async-job!

@@ -119,7 +119,7 @@
   "Ring handler to append data into a draftset."
   [{:keys [:drafter/manager
            ::time/clock wrap-as-draftset-owner]}]
-  (wrap-as-draftset-owner
+  (wrap-as-draftset-owner :editor
     (require-rdf-content-type
       (dset-middleware/parse-graph-for-triples
         (temp-file-body

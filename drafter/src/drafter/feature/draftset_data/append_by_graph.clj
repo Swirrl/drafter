@@ -52,7 +52,7 @@
             (middleware/parse-graph-param-handler
              true
              (required-live-graph-param-handler backend handler)))]
-    (wrap-as-draftset-owner
+    (wrap-as-draftset-owner :editor
      (required-live-graph-param
       (fn [{:keys [params] :as request}]
         (let [{:keys [draftset-id graph metadata]} params
