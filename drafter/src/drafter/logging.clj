@@ -1,7 +1,5 @@
 (ns drafter.logging
-  (:require [clojure.tools.logging :as log]
-            [integrant.core :as ig]
-            [clojure.java.io :as io])
+  (:require [clojure.tools.logging :as log])
   (:import org.apache.logging.log4j.ThreadContext
            java.util.UUID))
 
