@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="WARN">
+<Configuration status="WARN" monitorInterval="10">
     <Properties>
         <Property name="log-path">${env:DRAFTER_LOGS_DIR:-logs}</Property>
     </Properties>
 
     <Appenders>
         <RollingFile name="sparql" fileName="${log-path}/sparql-test.log" filePattern="${log-path}/sparql-test-%d{yyyy-MM-dd}-%i.log">
-            <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %7X{method} %30X{route} %12X{user} %12X{jobId} %12X{reqId} :: %m%n" />
+            <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %5X{user} %12X{jobId} %12X{reqId} :: %m%n" />
             <Policies>
                 <SizeBasedTriggeringPolicy size="10 MB" />
             </Policies>
         </RollingFile>
 
         <RollingFile name="drafter" fileName="${log-path}/drafter-test.log" filePattern="${log-path}/drafter-test-%d{yyyy-MM-dd}-%i.log">
-            <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %7X{method} %30X{route} %12X{user} %12X{jobId} %12X{reqId} :: %m%n" />
+            <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %5X{user} %12X{jobId} %12X{reqId} :: %m%n" />
             <Policies>
                 <SizeBasedTriggeringPolicy size="10 MB" />
             </Policies>
@@ -28,6 +28,10 @@
         </Logger>
 
         <Logger name="drafter" level="debug">
+            <AppenderRef ref="drafter" />
+        </Logger>
+
+        <Logger name="drafter.write-scheduler" level="info">
             <AppenderRef ref="drafter" />
         </Logger>
 
