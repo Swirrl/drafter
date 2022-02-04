@@ -88,8 +88,8 @@ jobs:
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
 
               echo Deploying main artifact release
-              clojure -M:omni publish -f drafter/target/drafter-pmd3-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
-              clojure -M:omni publish -f drafter/target/drafter-pmd4-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+              clojure -M:omni publish -f drafter/target/drafter-pmd3-circle-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+              clojure -M:omni publish -f drafter/target/drafter-pmd4-circle-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
 
             else
               echo Not deploying as this is not main branch
