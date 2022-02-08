@@ -28,7 +28,7 @@
         stardog-update (env :sparql-update-endpoint)]
     (assert stardog-query "Set SPARQL_QUERY_ENDPOINT to run these tests.")
     (assert stardog-update "Set SPARQL_UPDATE_ENDPOINT to run these tests.")
-    (gr-repo/sparql-repo "http://localhost:5820/drafter-client-test/query" "http://localhost:5820/drafter-client-test/update")))
+    (gr-repo/sparql-repo stardog-query stardog-update)))
 
 (defn db-fixture [f]
   (let [stardog-repo (get-stardog-repo)]

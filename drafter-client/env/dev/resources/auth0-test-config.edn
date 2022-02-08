@@ -5,8 +5,8 @@
  ;;          {:username "system@swirrl.com" :password "password" :role :system}]
  ;;  :realm "Drafter Memory Repo"}
 
- :drafter.common.config/sparql-query-endpoint "http://localhost:5820/drafter-client-test/query"
- :drafter.common.config/sparql-update-endpoint "http://localhost:5820/drafter-client-test/update"
+ :drafter.common.config/sparql-query-endpoint #env SPARQL_QUERY_ENDPOINT
+ :drafter.common.config/sparql-update-endpoint #env SPARQL_UPDATE_ENDPOINT
 
  :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
 

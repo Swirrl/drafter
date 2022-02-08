@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Watch config file for changes every 30 seconds -->
+<Configuration status="info" monitorInterval="30">
+
+    <Appenders>
+        <Console name="console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %12X{user} %12X{jobId} %12X{reqId} :: %m%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="info" additivity="false">
+          <appender-ref ref="console" level="info"/> <!-- only log warnings and worse to REPL -->
+        </Root>
+    </Loggers>
+</Configuration>
