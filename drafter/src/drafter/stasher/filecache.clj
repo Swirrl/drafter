@@ -13,7 +13,7 @@
 
 (def default-cache-dir "stasher-cache")
 
-(defn- cache-key->hash-key
+(defn cache-key->hash-key
   "Cache keys at the interface to the cache are maps, but we need to
   repeatably hash these to an MD5 sum for the filename/location on
   disk.  This function takes a cache-key (map) and converts it into an
@@ -69,12 +69,12 @@
   supply on disk."
   [dir ext cache-key temp-file]
   (let [cache-key-fname (cache-key->cache-path dir ext cache-key)]
-    (log/debugf "Created cache entry %s for %s query %s"
-                cache-key-fname
-                (ck/query-type cache-key)
-                (cache-key->query-id cache-key))
     (io/make-parents cache-key-fname)
-    (fs/rename temp-file cache-key-fname)))
+    (fs/rename temp-file cache-key-fname)
+    (log/debugf "Created cache entry %s for %s query %s"
+               cache-key-fname
+               (ck/query-type cache-key)
+               (cache-key->query-id cache-key))))
 
 (defn lookup [dir ext item]
   (let [cache-fpath (cache-key->cache-path dir ext item)]

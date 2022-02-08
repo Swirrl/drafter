@@ -81,9 +81,9 @@
         org.mindrot/jbcrypt {:mvn/version "0.4"}
 
         org.clojure/tools.logging {:mvn/version "1.2.2"}
-        org.apache.logging.log4j/log4j-api {:mvn/version "2.17.0"} ; Import log4j2 as the logging backend
-        org.apache.logging.log4j/log4j-core {:mvn/version "2.17.0"} ; Import log4j2 as the logging backend
-        org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.17.0"} ; Redirect all SLF4J logs over the log4j2 backend
+        org.apache.logging.log4j/log4j-api {:mvn/version "2.17.1"} ; Import log4j2 as the logging backend
+        org.apache.logging.log4j/log4j-core {:mvn/version "2.17.1"} ; Import log4j2 as the logging backend
+        org.apache.logging.log4j/log4j-slf4j-impl {:mvn/version "2.17.1"} ; Redirect all SLF4J logs over the log4j2 backend
 
         org.slf4j/log4j-over-slf4j {:mvn/version "1.7.32"} ; redirect log4j 1.x logs
         org.slf4j/jcl-over-slf4j {:mvn/version "1.7.32"} ; redirect commons logging
