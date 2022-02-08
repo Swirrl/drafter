@@ -1,0 +1,48 @@
+language: java
+sudo: required
+dist: bionic
+lein: 2.9.1
+jdk:
+  - openjdk8
+services:
+  - docker
+env:
+  global:
+    - SPARQL_QUERY_ENDPOINT='http://localhost:5820/drafter-client-test/query'
+    - SPARQL_UPDATE_ENDPOINT='http://localhost:5820/drafter-client-test/update'
+    - DRAFTER_ENDPOINT='http://localhost:3001'
+    - DRAFTER_JWS_SIGNING_KEY=foo
+    - AUTH0_DOMAIN=https://dev-kkt-m758.eu.auth0.com
+    - AUTH0_AUD=https://pmd
+    - AUTH0_CLIENT_ID=7klE25HUY333vTEx7rM1dmsnO6vHkaSG
+    - AUTH0_CLIENT_SECRET=QYoWNwf11dzWNh6XYd3jH8-j5j8r36UKuoFgrPakE_aw_Gy_EwWSppvqSULRICY4
+    - TRAVIS_BRANCH_ESC="${TRAVIS_BRANCH//\//_}"
+cache:
+  directories:
+    - $HOME/.m2
+    - .cpcache # tools.deps classpath cache
+    - drafter/.cpcache # tools.deps classpath cache
+before_install:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - "sudo ./travis/install_base.sh"
+  - "./travis/install_services.sh"
+install:
+  - cd drafter && clojure -A:dev:test -Spath && cd ..
+  - cd drafter-client && clojure -A:dev:test -Spath && cd ..
+before_script:
+  - "./travis/before_script.sh"
+script:
+  - ./travis/test-all
+after_success:
+  - ./travis/after_success.sh
+deploy:
+  - provider: script
+    script: "clojure -A:omni publish -f drafter/target/drafter-pmd3-${TRAVIS_BRANCH_ESC}-${TRAVIS_BUILD_NUMBER}.zip"
+    skip_cleanup: true
+    on:
+      all_branches: true
+  - provider: script
+    script: "clojure -A:omni publish -f drafter/target/drafter-pmd4-${TRAVIS_BRANCH_ESC}-${TRAVIS_BUILD_NUMBER}.zip"
+    skip_cleanup: true
+    on:
+      all_branches: true
