@@ -68,7 +68,7 @@
                                        middleware/wrap-total-requests-counter
                                        middleware/wrap-request-timer
                                        #(log-request % {:query "<scrubbed>"})]
-                               global-auth? (cons #(middleware/wrap-authorize :reader %)))
+                               global-auth? (cons #(middleware/wrap-authorize :access %)))
                  ;; add access rules here
                  :access-rules []
                  ;; serialize/deserialize the following data formats

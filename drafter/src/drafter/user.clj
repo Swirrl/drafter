@@ -18,7 +18,7 @@
   (throw (ex-info "Config error.  Please use a concrete implementation of the user repo instead." {})))
 
 (def role->permission-level
-  {:reader 0 :editor 1 :publisher 2 :manager 3 :system 4})
+  {:access 0 :editor 1 :publisher 2 :manager 3 :system 4})
 
 (def ^{:doc
        "Ordered list of roles from least permissions to greatest permissions."}

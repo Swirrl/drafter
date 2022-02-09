@@ -10,7 +10,7 @@
            org.bson.types.ObjectId))
 
 (def ^:private role-mappings
-  {00 :reader
+  {00 :access
    10 :editor
    20 :publisher
    30 :manager
