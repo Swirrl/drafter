@@ -82,8 +82,10 @@
 
 (defn get-public-endpoint
   "Gets the public endpoint"
-  [client]
-  (endpoint/from-json (i/get-public-endpoint client)))
+  ([client]
+   (endpoint/from-json (:body (i/get-public-endpoint client))))
+  ([client access-token]
+   (endpoint/from-json (i/request client i/get-public-endpoint access-token))))
 
 (defn draftsets
   "List available Draftsets. The optional opts map allows additional options to be provided
