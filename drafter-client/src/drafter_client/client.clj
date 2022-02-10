@@ -6,6 +6,7 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [swirrl.auth0.client :as auth]
+            [drafter-client.auth.auth0.m2m :as m2m]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.client.interceptors :as interceptor]
             [drafter-client.client.impl :as i]
@@ -477,6 +478,13 @@
                    (:auth-provider client)
                    (:auth0 client)))
 
+;; Normally we'd use the m2m provider to handle auth, but when drafter is
+;; running with global auth we need a one off token to get the schema before
+;; the m2m provider has been initialised
+(defn- bearer-token [auth0]
+  (->> {:auth0 auth0} m2m/get-client-id-token
+       :access_token (format "Bearer %s")))
+
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
@@ -489,7 +497,10 @@
                 batch-size drafter-uri)
     (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
-          (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
+          (martian-http/bootstrap-swagger {:interceptors i/default-interceptors}
+                                          (when auth0
+                                            {:headers {"Authorization"
+                                                       (bearer-token auth0)}}))
           (->DrafterClient opts auth-provider auth0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
