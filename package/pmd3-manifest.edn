@@ -41,5 +41,5 @@
 
               :omni/package-name "drafter-pmd3"
               :omni/dependencies {"stardog" "5.2.0-2.1" ; pmd3 needs stardog 5. 2.1 includes the log4shell patch.
-                                  "mongodb" "3.2"
+                                  "mongodb" "3.2-1.1"
                                   "server-ssl" "1.2021"}}]
