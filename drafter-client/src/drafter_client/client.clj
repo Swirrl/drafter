@@ -480,12 +480,9 @@
                    (:auth-provider client)
                    (:auth0 client)))
 
-;; Normally we'd use the m2m provider to handle auth, but when drafter is
-;; running with global auth we need a one off token to get the schema before
-;; the m2m provider has been initialised
-(defn- bearer-token [auth0]
-  (->> {:auth0 auth0} m2m/get-client-id-token
-       :access_token (format "Bearer %s")))
+;; When drafter is running with global auth we sometimes need a one off token
+(defn access-token [auth0]
+  (->> {:auth0 auth0} m2m/get-client-id-token :access_token))
 
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
@@ -499,10 +496,11 @@
                 batch-size drafter-uri)
     (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
-          (martian-http/bootstrap-swagger {:interceptors i/default-interceptors}
-                                          (when auth0
-                                            {:headers {"Authorization"
-                                                       (bearer-token auth0)}}))
+          (martian-http/bootstrap-swagger
+           {:interceptors i/default-interceptors}
+           (when auth0
+             {:headers {"Authorization"
+                        (format "Bearer %s" (access-token auth0))}}))
           (->DrafterClient opts auth-provider auth0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
