@@ -81,21 +81,15 @@ jobs:
           command: cd drafter && ./bin/pack
       - run:
           name: Make omni package
-          command: cd drafter && ./bin/package
+          command: cd drafter && source ./bin/set-environment && ./bin/package
       - run:
           name: Deploy Build Artifacts
           command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-
+            if [ "${CIRCLE_BRANCH}" == "master" ] || [ "${CIRCLE_BRANCH}" == "rr-circle-omni-publish" ]; then
               echo Deploying main artifact release
-              clojure -M:omni publish -f drafter/target/drafter-pmd3-circle-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
-              clojure -M:omni publish -f drafter/target/drafter-pmd4-circle-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
-
+              cd drafter && source ./bin/set-environment && ./bin/publish-packages
             else
               echo Not deploying as this is not main branch
-              # clojure -M:omni publish -f drafter/target/drafter-pmd3-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
-              # clojure -M:omni publish -f drafter/target/drafter-pmd4-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
-
             fi
 
       - setup_remote_docker # necessary to build/deploy docker image in step below

@@ -1,0 +1,34 @@
+#! /bin/bash
+
+REPO_DIR=$(git rev-parse --show-toplevel)
+DRAFTER_DIR="${REPO_DIR}/drafter"
+TARGET_DIR="${DRAFTER_DIR}/target"
+DRAFTER_JAR="${TARGET_DIR}/drafter.jar"
+DRAFTER_LIB_DIR="${TARGET_DIR}/lib"
+TEMP_PACKAGE_DIR="${TARGET_DIR}/package"
+
+if [[ -z "${BRANCH_ESCAPED}" ]]; then
+    BRANCH_ESCAPED=local-branch
+    echo WARNING: Building locally defaulting BRANCH_ESCAPED to $BRANCH_ESCAPED
+fi
+
+if [[ -z "${BUILD_NUMBER}" ]]; then
+    BUILD_NUMBER=1
+    echo WARNING: defaulting BUILD_NUMBER to $BUILD_NUMBER
+    echo
+fi
+
+PACKAGE_VERSION="${BRANCH_ESCAPED}-${BUILD_NUMBER}"
+echo "package version ${PACKAGE_VERSION}"
+
+pushd "${REPO_DIR}" || exit
+
+echo "publishing ${TARGET_DIR}/drafter-pmd3-${PACKAGE_VERSION}.zip"
+
+clojure -M:omni publish -f ${TARGET_DIR}/drafter-pmd3-${PACKAGE_VERSION}.zip
+
+echo "publishing ${TARGET_DIR}/drafter-pmd4-${PACKAGE_VERSION}.zip"
+
+clojure -M:omni publish -f ${TARGET_DIR}/drafter-pmd4-${PACKAGE_VERSION}.zip
+
+popd || exit

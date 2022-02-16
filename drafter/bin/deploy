@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 
-drafter="$( cd "$(dirname "$0")/.." ; pwd -P )"
+### is this used??
+echo "bin/deploy"
 
-cd $drafter
+# drafter="$( cd "$(dirname "$0")/.." ; pwd -P )"
 
-DRAFTER_VERSION=$(cat "$drafter/VERSION")
-REPOSITORY=swirrl-private-jars-snapshots
+# cd $drafter
 
-if [ -n "$TRAVIS_TAG" ]; then
-  DRAFTER_VERSION=$TRAVIS_TAG
-  REPOSITORY=swirrl-private-jars-releases
-fi
+# DRAFTER_VERSION=$(cat "$drafter/VERSION")
+# REPOSITORY=swirrl-private-jars-snapshots
 
-echo Deploying drafter version $DRAFTER_VERSION to repository $REPOSITORY
+# if [ -n "$TRAVIS_TAG" ]; then
+#   DRAFTER_VERSION=$TRAVIS_TAG
+#   REPOSITORY=swirrl-private-jars-releases
+# fi
 
-clojure -M:krunk krunk.edn \
-      :repository-id "\"$REPOSITORY\"" \
-      :group-id drafter \
-      :artifact-id drafter \
-      :version "\"$DRAFTER_VERSION\"" \
-      :jar-file \"./target/drafter.jar\"
+# echo Deploying drafter version $DRAFTER_VERSION to repository $REPOSITORY
+
+# clojure -M:krunk krunk.edn \
+#       :repository-id "\"$REPOSITORY\"" \
+#       :group-id drafter \
+#       :artifact-id drafter \
+#       :version "\"$DRAFTER_VERSION\"" \
+#       :jar-file \"./target/drafter.jar\"

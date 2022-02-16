@@ -2,7 +2,7 @@
  :omni/package-format "1"
  ;;:omni/package-name "drafter"
  ;;:omni/dependencies #include "../dependencies.edn"
- :omni/package-version #join [#env TRAVIS_BRANCH "-" #env TRAVIS_BUILD_NUMBER]
+ :omni/package-version #env PACKAGE_VERSION
 
  :omni/defs {:zip-name "drafter.zip"}
 
