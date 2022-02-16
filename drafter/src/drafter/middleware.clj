@@ -31,13 +31,17 @@
 
 (defn wrap-authorize [required-role handler]
   (fn [request]
-    (if-let [user (:identity request)]
-      (if (user/has-role? (:identity request) required-role)
-        (handler request)
-        (response/forbidden-response (str "You require the "
-                                          (name required-role)
-                                          " role to perform this action")))
-      (response/unauthorized-response "Not authenticated"))))
+    ;; "a CORS-preflight request never includes credentials"
+    ;; https://fetch.spec.whatwg.org/#cors-protocol-and-credentials
+    (if (= :options (:request-method request))
+      (handler request)
+      (if-let [user (:identity request)]
+        (if (user/has-role? (:identity request) required-role)
+          (handler request)
+          (response/forbidden-response (str "You require the "
+                                            (name required-role)
+                                            " role to perform this action")))
+        (response/unauthorized-response "Not authenticated")))))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]
