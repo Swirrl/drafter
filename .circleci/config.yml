@@ -85,8 +85,8 @@ jobs:
       - run:
           name: Deploy Build Artifacts
           command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ] || [ "${CIRCLE_BRANCH}" == "rr-circle-omni-publish" ]; then
-              echo Deploying main artifact release
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              echo "Deploying main artifact release"
               cd drafter && source ./bin/set-environment && ./bin/publish-packages
             else
               echo Not deploying as this is not main branch
@@ -96,8 +96,13 @@ jobs:
       - run:
           name: Build (and potentially Deploy) swirrl/drafter-pmd4 docker
           command: |
-            cd drafter
-            clojure -T:build pmd4-docker-build
+            echo "commented out - need to fix auth"
+            # if [ "${CIRCLE_BRANCH}" == "master" ]; then
+            #   cd drafter
+            #   clojure -T:build pmd4-docker-build
+            # else
+            #   echo "Not deploying docker as this is not main branch"
+            # fi
 
 commands:
   setup-services:
