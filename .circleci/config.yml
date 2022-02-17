@@ -231,4 +231,4 @@ workflows:
       - build-artifacts:
           context:
             - swirrl-jar-and-omni-user
-            - swirrl-dockerhub-consumer
+            - swirrl-dockerhub-publisher
