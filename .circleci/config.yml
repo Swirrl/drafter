@@ -96,13 +96,13 @@ jobs:
       - run:
           name: Build (and potentially Deploy) swirrl/drafter-pmd4 docker
           command: |
-            echo "commented out - need to fix auth"
-            # if [ "${CIRCLE_BRANCH}" == "master" ]; then
-            #   cd drafter
-            #   clojure -T:build pmd4-docker-build
-            # else
-            #   echo "Not deploying docker as this is not main branch"
-            # fi
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              cd drafter
+              clojure -T:build pmd4-docker-build :image-type :registry
+            else
+              cd drafter
+              clojure -T:build pmd4-docker-build :image-type :docker
+            fi
 
 commands:
   setup-services:
@@ -154,7 +154,7 @@ commands:
           name: Resolve drafter deps
           command: |
             cd drafter
-            clojure -P -A:dev:test:krunk:pack
+            clojure -P -A:dev:test:pack
 
       - run:
           name: Resolve drafter-client deps

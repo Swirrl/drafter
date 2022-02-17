@@ -33,14 +33,15 @@
   (let [drafter-basis (b/create-basis {:project "deps.edn" :aliases [:pmd4/docker]})]
     (-> opts
         (assoc :basis drafter-basis
-               :image-name "swirrl/drafter-pmd4"
-               :image-type (if (main-build?)
-                             :registry ; push to registry if in CI
-                             :docker   ; otherwise push to dockerd locally
-                             )
+               :image-name "swirrl/drafter-pmd4" ; TODO include the destination registry details?
+               :image-type (or (opts :image-type) :docker)              
                :include {"/app/config" ["./resources/drafter-auth0.edn"]}
                :base-image "gcr.io/distroless/java:11"
-               :volumes #{"/app/config" "/app/stasher-cache"})
+               :volumes #{"/app/config" "/app/stasher-cache"}
+               ;; TODO: maybe add registry creds, and tags.
+               ; :to-registry {}  ; creds for pushing
+               ; :tags #{"latest" "2.5_circle-245"} ; tags
+               )
         (pack/docker))))
 
 (comment (pmd4-docker-build nil))

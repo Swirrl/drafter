@@ -141,10 +141,6 @@
 
                          :main-opts ["-m" "drafter.main" "/app/config/drafter-auth0.edn"]}
 
-           :krunk {:extra-deps {swirrl/krunk {:git/url "git@github.com:Swirrl/krunk.git"
-                                              :sha "3cdfae90133eef26dc32090d5d555871c49a529b"}}
-                   :main-opts ["-m" "krunk.deploy"]}
-
            :pack {:extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
                                                 :sha "53544484a2594b90432075f1efb73268de1f7e1f"}}
                   :main-opts ["-m" "mach.pack.alpha.skinny"]}
