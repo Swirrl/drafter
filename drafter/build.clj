@@ -37,8 +37,9 @@
                :image-type (or (opts :image-type) :docker)              
                :include {"/app/config" ["./resources/drafter-auth0.edn"]}
                :base-image "gcr.io/distroless/java:11"
-               :volumes #{"/app/config" "/app/stasher-cache"}
-               :to-registry {:username (System/getenv "DOCKERHUB_USERNAME") :password (System/getenv "DOCKERHUB_PASSWORD")}  ; creds for pushing
+               :volumes #{"/app/config" "/app/stasher-cache"}               
+               :to-registry-username (System/getenv "DOCKERHUB_USERNAME")
+               :to-registry-password (System/getenv "DOCKERHUB_PASSWORD")
                ; :tags #{"latest" "2.5_circle-245"} ; tags
                )
         (pack/docker))))
