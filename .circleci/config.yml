@@ -201,28 +201,41 @@ commands:
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
+# See also: https://circleci.com/docs/2.0/workflows/#executing-workflows-for-a-git-tag for how tags work
 workflows:
   build-workflow:
     jobs:
       - test-drafter-auth0:
+          filters:
+            tags:
+              only: /^v\d*\.\d/
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
             - stardog-jfrog-repository
       - test-drafter-basic-auth:
+          filters:
+            tags:
+              only: /^v\d*\.\d/
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
             - stardog-jfrog-repository
       - test-drafter-non-api:
+          filters:
+            tags:
+              only: /^v\d*\.\d/
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
             - stardog-jfrog-repository
       - test-drafterclient:
+          filters:
+            tags:
+              only: /^v\d*\.\d/
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
@@ -231,7 +244,7 @@ workflows:
       - build-artifacts:
           filters:
             tags:
-              only: /^v.*/
+              only: /^v\d*\.\d/
           context:
             - swirrl-jar-and-omni-user
             - swirrl-dockerhub-publisher
