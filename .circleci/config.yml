@@ -85,7 +85,7 @@ jobs:
       - run:
           name: Deploy Build Artifacts
           command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+            if [ "${CIRCLE_BRANCH}" == "master" ] || [ -n "${CIRCLE_TAG}" ]; then
               echo "Deploying main artifact release"
               cd drafter && source ./bin/set-environment && ./bin/publish-packages
             else
@@ -96,7 +96,7 @@ jobs:
       - run:
           name: Build (and potentially Deploy) swirrl/drafter-pmd4 docker
           command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+            if [ "${CIRCLE_BRANCH}" == "master" ] || [ -n "${CIRCLE_TAG}" ]; then
               cd drafter
               clojure -T:build pmd4-docker-build :image-type :registry
             else
