@@ -208,7 +208,7 @@ workflows:
       - test-drafter-auth0:
           filters:
             tags:
-              only: /^v\d*\.\d*\z/
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
@@ -217,7 +217,7 @@ workflows:
       - test-drafter-basic-auth:
           filters:
             tags:
-              only: /^v\d*\.\d*\z/
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
@@ -226,7 +226,7 @@ workflows:
       - test-drafter-non-api:
           filters:
             tags:
-              only: /^v\d*\.\d*\z/
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
@@ -235,7 +235,7 @@ workflows:
       - test-drafterclient:
           filters:
             tags:
-              only: /^v\d*\.\d*\z/
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
@@ -244,7 +244,7 @@ workflows:
       - build-artifacts:
           filters:
             tags:
-              only: /^v\d*\.\d*\z/
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
             - swirrl-dockerhub-publisher
