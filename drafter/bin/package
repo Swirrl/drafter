@@ -10,9 +10,9 @@ DRAFTER_JAR="${TARGET_DIR}/drafter.jar"
 DRAFTER_LIB_DIR="${TARGET_DIR}/lib"
 TEMP_PACKAGE_DIR="${TARGET_DIR}/package"
 
-if [[ -z "${BRANCH_ESCAPED}" ]]; then
-    BRANCH_ESCAPED=local-branch
-    echo WARNING: Building locally defaulting BRANCH_ESCAPED to $BRANCH_ESCAPED
+if [[ -z "${BRANCH_OR_TAG}" ]]; then
+    BRANCH_OR_TAG=local-branch
+    echo WARNING: Building locally defaulting BRANCH_OR_TAG to $BRANCH_OR_TAG
 fi
 
 if [[ -z "${BUILD_NUMBER}" ]]; then
@@ -25,11 +25,7 @@ if [ ! -f "${DRAFTER_JAR}" ] || [ ! -d "${DRAFTER_LIB_DIR}" ]; then
   echo "Cannot create package - drafter pack does not exist. Run bin/pack script to create it" 1>&2
 fi
 
-if [[ -z "${CIRCLE_TAG}" ]]; then
-  PACKAGE_VERSION="${BRANCH_ESCAPED}-${BUILD_NUMBER}"
-else 
-  PACKAGE_VERSION="${CIRCLE_TAG}-${BUILD_NUMBER}"
-fi
+PACKAGE_VERSION="${BRANCH_OR_TAG}-${BUILD_NUMBER}"
 
 echo "package version ${PACKAGE_VERSION}"
 
