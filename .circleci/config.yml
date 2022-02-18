@@ -229,6 +229,9 @@ workflows:
             - swirrl-dockerhub-consumer
             - stardog-jfrog-repository
       - build-artifacts:
+          filters:
+            tags:
+              only: /^v.*/
           context:
             - swirrl-jar-and-omni-user
             - swirrl-dockerhub-publisher
