@@ -18,7 +18,13 @@ if [[ -z "${BUILD_NUMBER}" ]]; then
     echo
 fi
 
-PACKAGE_VERSION="${BRANCH_ESCAPED}-${BUILD_NUMBER}"
+if [[ -z "${CIRCLE_TAG}" ]]; then
+  PACKAGE_VERSION="${BRANCH_ESCAPED}-${BUILD_NUMBER}"
+else 
+  PACKAGE_VERSION="${CIRCLE_TAG}-${BUILD_NUMBER}"
+fi
+
+
 echo "package version ${PACKAGE_VERSION}"
 
 pushd "${REPO_DIR}" || exit
