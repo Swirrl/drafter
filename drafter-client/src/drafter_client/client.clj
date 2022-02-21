@@ -487,7 +487,9 @@
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
-  [drafter-uri & {:keys [batch-size version auth-provider auth0 job-timeout] :as opts}]
+  [drafter-uri &
+   {:keys [batch-size version auth-provider auth0 job-timeout auth-bootstrap?]
+    :as opts}]
   (let [version (or version "v1")
         swagger-json "swagger/swagger.json"
         job-timeout (or job-timeout ##Inf)
@@ -498,7 +500,7 @@
       (-> (format "%s/%s" drafter-uri swagger-json)
           (martian-http/bootstrap-swagger
            {:interceptors i/default-interceptors}
-           (when auth0
+           (when (and auth-bootstrap? auth0)
              {:headers {"Authorization"
                         (format "Bearer %s" (access-token auth0))}}))
           (->DrafterClient opts auth-provider auth0)))))
