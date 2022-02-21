@@ -30,6 +30,25 @@ documentation you will need to inspect the Yaml file from which the above is gen
 
 This can be found in [/drafter/doc/drafter.yml](/drafter/doc/drafter.yml).
 
+## Continuous Integration
+
+Drafter uses Circle CI. 
+
+Every commit of every branch is built.
+
+Additionally, commits to the master branch creates and publishes omni packages with names like `<branch-name>-circle_<build-no>_<commit>` e.g. `master-circle_643_fd4570`
+
+Tags that look like `v<number>.<number>` e.g. `v2.6` will also create and publish an omni package.
+
+## Making a release
+
+To make a release, tag and push a tag that looks like `v<number>.<number>` to the repo (either via CLI or via Github UI).
+
+Make a release through the Github UI and choose the tag. Add some notes about what's new (and link to issues).
+
+Existing releases can be found here: [Github releases](https://github.com/Swirrl/drafter/releases).
+
+
 ## Migrations
 
 Migrations live in [./migrations](./migrations), and for now are run manually
@@ -41,3 +60,4 @@ $ stardog query <database-name> <path-to-migration>
 
 If a version bump requires a migration to be run, it should be noted in the
 release notes.
+
