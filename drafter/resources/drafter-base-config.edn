@@ -173,7 +173,7 @@
                                   }
 
  ;; Set to true to require all requests to be authorized
- :drafter/global-auth? false
+ :drafter/global-auth? #boolean #or [#env DRAFTER_GLOBAL_AUTH false]
 
  :drafter.handler/app
  {:repo #ig/ref :drafter.stasher/repo
