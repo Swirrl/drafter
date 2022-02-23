@@ -47,10 +47,10 @@
   (let [{:keys [rdf-format graph]} params
         source (ses/->FormatStatementSource body rdf-format)]
     (cond
-      (and (not (str/blank? graph))
-           (ses/is-quads-format? rdf-format))
+      (and graph (ses/is-quads-format? rdf-format))
       ;; only adds triple :c context with graph if :c val is nil
-      (ses/->RespectfulGraphStatementSource source (URI. graph))
+      (ses/->RespectfulGraphStatementSource source
+                                            (if (uri? graph) graph (URI. graph)))
 
       (ses/is-quads-format? rdf-format)
       source
