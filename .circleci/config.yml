@@ -164,7 +164,7 @@ commands:
     steps:
       - restore_cache:
           keys:
-            - v2-omni-cache-{{ checksum "dependencies.edn" }}
+            - v3-omni-cache-{{ checksum "dependencies.edn" }}
             # note no fallback here as omni can't deal with partial caches.
 
   restore-all-caches:
@@ -186,7 +186,7 @@ commands:
       - save_cache:
           paths:
             - ~/repo/.omni_cache
-          key: v2-omni-cache-{{ checksum "dependencies.edn" }}
+          key: v3-omni-cache-{{ checksum "dependencies.edn" }}
 
 
 
