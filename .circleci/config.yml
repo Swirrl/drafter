@@ -171,7 +171,7 @@ commands:
     description: "restore caches"
     steps:
       - restore-clj-cache
-      - restore-omni-cache
+      #- restore-omni-cache
 
   save-caches:
     description: "save caches"
