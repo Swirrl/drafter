@@ -15,7 +15,9 @@
    [grafter-2.rdf.protocols :as pr :refer [context]]
    [grafter-2.rdf4j.io :as rio :refer [rdf-writer]])
   (:import
-   java.io.StringWriter))
+    java.io.StringWriter
+    (org.eclipse.rdf4j.rio RDFFormat)
+    (java.net URI)))
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
@@ -44,8 +46,17 @@
   [{:keys [body params] :as request}]
   (let [{:keys [rdf-format graph]} params
         source (ses/->FormatStatementSource body rdf-format)]
-    (if (ses/is-quads-format? rdf-format)
+    (cond
+      (and (= rdf-format RDFFormat/JSONLD)
+           (not (str/blank? graph))
+           (ses/is-quads-format? rdf-format))
+      ;; only adds triple :c context with graph if :c val is nil
+      (ses/->RespectfulGraphTripleStatementSource source (URI. graph))
+
+      (ses/is-quads-format? rdf-format)
       source
+
+      :else
       (ses/->GraphTripleStatementSource source graph))))
 
 (defn lock-writes-and-copy-graph
