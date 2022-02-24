@@ -99,7 +99,8 @@
 
 (defn get-public-endpoint
   [client]
-  (martian/response-for client :get-public-endpoint))
+  (-> (martian/response-for client :get-public-endpoint)
+      (:body)))
 
 (defn create-public-endpoint
   [client opts]

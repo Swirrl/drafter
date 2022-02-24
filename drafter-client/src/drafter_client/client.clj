@@ -6,7 +6,6 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [swirrl.auth0.client :as auth]
-            [drafter-client.auth.auth0.m2m :as m2m]
             [drafter-client.client.draftset :as draftset]
             [drafter-client.client.interceptors :as interceptor]
             [drafter-client.client.impl :as i]
@@ -82,10 +81,8 @@
 
 (defn get-public-endpoint
   "Gets the public endpoint"
-  ([client]
-   (endpoint/from-json (:body (i/get-public-endpoint client))))
-  ([client access-token]
-   (endpoint/from-json (i/request client i/get-public-endpoint access-token))))
+  [client]
+  (endpoint/from-json (i/get-public-endpoint client)))
 
 (defn draftsets
   "List available Draftsets. The optional opts map allows additional options to be provided
@@ -480,16 +477,10 @@
                    (:auth-provider client)
                    (:auth0 client)))
 
-;; When drafter is running with global auth we sometimes need a one off token
-(defn access-token [auth0]
-  (->> {:auth0 auth0} m2m/get-client-id-token :access_token))
-
 (defn client
   "Create a Drafter client for `drafter-uri` where the (web-)client will pass an
   access-token to each request."
-  [drafter-uri &
-   {:keys [batch-size version auth-provider auth0 job-timeout auth-bootstrap?]
-    :as opts}]
+  [drafter-uri & {:keys [batch-size version auth-provider auth0 job-timeout] :as opts}]
   (let [version (or version "v1")
         swagger-json "swagger/swagger.json"
         job-timeout (or job-timeout ##Inf)
@@ -498,11 +489,7 @@
                 batch-size drafter-uri)
     (when (seq drafter-uri)
       (-> (format "%s/%s" drafter-uri swagger-json)
-          (martian-http/bootstrap-swagger
-           {:interceptors i/default-interceptors}
-           (when (and auth-bootstrap? auth0)
-             {:headers {"Authorization"
-                        (format "Bearer %s" (access-token auth0))}}))
+          (martian-http/bootstrap-swagger {:interceptors i/default-interceptors})
           (->DrafterClient opts auth-provider auth0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
