@@ -4,12 +4,10 @@
    [clojure.spec.alpha :as s]
    [drafter.async.responses :as async-response]
    [drafter.backend.draftset.draft-management :as mgmt]
-   [drafter.backend.draftset.graphs :as graphs]
    [drafter.draftset :as ds]
    [drafter.feature.draftset-data.common :as ds-data-common]
    [drafter.feature.draftset-data.middleware :as dset-middleware]
    [drafter.middleware :refer [require-rdf-content-type temp-file-body inflate-gzipped]]
-   [drafter.rdf.drafter-ontology :refer [modified-times-graph-uri]]
    [drafter.rdf.draftset-management.job-util :as jobs]
    [drafter.requests :as req]
    [drafter.responses :as response]
@@ -123,7 +121,7 @@
            ::time/clock wrap-as-draftset-owner]}]
   (wrap-as-draftset-owner
     (require-rdf-content-type
-      (dset-middleware/require-graph-for-triples-rdf-format
+      (dset-middleware/parse-graph-for-triples
         (temp-file-body
           (inflate-gzipped
             (fn [{:keys [params] :as request}]
