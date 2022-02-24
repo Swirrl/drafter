@@ -1,6 +1,5 @@
 (ns drafter.feature.draftset-data.common
   (:require
-   [clojure.string :as str]
    [drafter.async.jobs :as ajobs]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.backend.draftset.graphs :as graphs]
@@ -15,9 +14,7 @@
    [grafter-2.rdf.protocols :as pr :refer [context]]
    [grafter-2.rdf4j.io :as rio :refer [rdf-writer]])
   (:import
-    java.io.StringWriter
-    (org.eclipse.rdf4j.rio RDFFormat)
-    (java.net URI)))
+    java.io.StringWriter))
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
@@ -49,8 +46,7 @@
     (cond
       (and graph (ses/is-quads-format? rdf-format))
       ;; only adds triple :c context with graph if :c val is nil
-      (ses/->RespectfulGraphStatementSource source
-                                            (if (uri? graph) graph (URI. graph)))
+      (ses/->RespectfulGraphStatementSource source graph)
 
       (ses/is-quads-format? rdf-format)
       source
