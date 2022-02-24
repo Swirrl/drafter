@@ -1,4 +1,4 @@
-{:paths ["src" "resources/base"]
+{:paths ["src" "resources"]
 
  :deps {
         buddy/buddy-sign {:mvn/version "3.4.1"}
