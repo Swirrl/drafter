@@ -29,11 +29,18 @@
         (((apply comp middleware) handler) request)
         (handler request)))))
 
-(defn wrap-authorize [required-role handler]
-  (fn [request]
+(defn- whitelisted? [{:keys [request-method uri]}]
+  (case request-method
     ;; "a CORS-preflight request never includes credentials"
     ;; https://fetch.spec.whatwg.org/#cors-protocol-and-credentials
-    (if (= :options (:request-method request))
+    :options true
+    ;; Allow access to swagger docs
+    :get (#{"/" "/swagger/swagger.json"} uri)
+    false))
+
+(defn wrap-authorize [required-role handler]
+  (fn [request]
+    (if (whitelisted? request)
       (handler request)
       (if-let [user (:identity request)]
         (if (user/has-role? (:identity request) required-role)
