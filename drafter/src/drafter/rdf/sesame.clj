@@ -13,7 +13,8 @@
            [org.eclipse.rdf4j.common.iteration Iteration]
            [org.eclipse.rdf4j.repository RepositoryConnection]
            [org.eclipse.rdf4j.model Resource IRI Value]
-           [org.eclipse.rdf4j.query.impl MapBindingSet]))
+           [org.eclipse.rdf4j.query.impl MapBindingSet]
+           (java.net URI)))
 
 (defn is-quads-format? [^RDFFormat rdf-format]
   (.supportsContexts rdf-format))
