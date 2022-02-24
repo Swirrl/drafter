@@ -13,7 +13,8 @@
            [org.eclipse.rdf4j.common.iteration Iteration]
            [org.eclipse.rdf4j.repository RepositoryConnection]
            [org.eclipse.rdf4j.model Resource IRI Value]
-           [org.eclipse.rdf4j.query.impl MapBindingSet]))
+           [org.eclipse.rdf4j.query.impl MapBindingSet]
+           (java.net URI)))
 
 (defn is-quads-format? [^RDFFormat rdf-format]
   (.supportsContexts rdf-format))
@@ -78,6 +79,16 @@
   pr/ITripleReadable
   (to-statements [_this options]
     (map #(util/make-quad graph %) (pr/to-statements triple-source options))))
+
+;; Only adds quad context with supplied graph URI when not present
+(defrecord RespectfulGraphStatementSource [statement-source graph]
+  pr/ITripleReadable
+  (to-statements [_this options]
+    (map (fn [statement]
+           (pr/map->Quad (cond-> statement
+                                 (nil? (:c statement))
+                                 (assoc :c graph))))
+         (pr/to-statements statement-source options))))
 
 (defrecord CollectionStatementSource [statements]
   pr/ITripleReadable

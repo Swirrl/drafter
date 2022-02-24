@@ -129,7 +129,7 @@
           (async-response/submitted-job-response delete-job)))
       inflate-gzipped
       temp-file-body
-      deset-middleware/require-graph-for-triples-rdf-format
+      deset-middleware/parse-graph-for-triples
       require-rdf-content-type
       wrap-as-draftset-owner))
 

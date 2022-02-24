@@ -66,6 +66,83 @@
     (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
       (is (= (set (help/eval-statements (statements data-file))) (set ds-quads))))))
 
+(def jane-doe-statements
+  [{:s "http://person.org/janedoe"
+    :p "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+    :o "http://schema.org/Person"}
+   {:s "http://person.org/janedoe"
+    :p "http://schema.org/jobTitle"
+    :o "Professor"}
+   {:s "http://person.org/janedoe"
+    :p "http://schema.org/name"
+    :o "Jane Doe"}
+   {:s "http://person.org/janedoe"
+    :p "http://schema.org/telephone"
+    :o "(425) 123-4567"}
+   {:s "http://person.org/janedoe"
+    :p "http://schema.org/url"
+    :o "http://www.janedoe.com"}])
+
+(t/deftest append-json-ld-quad-data-to-draftset
+  (tc/with-system
+    keys-for-test
+    [system system-config]
+    (testing "when calling the append API with JSON-LD quads"
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-editor)
+            append-request (help/append-to-draftset-request test-editor
+                                                            draftset-location
+                                                            (io/file "test/resources/json-ld/person-quads.jsonld")
+                                                            {:content-type "application/ld+json"})
+            append-response (handler append-request)
+            expected-quads (map #(assoc % :c "http://scotts-world-o-graphs.net/graph") jane-doe-statements)]
+        (tc/await-success (get-in append-response [:body :finished-job]))
+        (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
+          (is (= (set expected-quads)
+                 (set ds-quads))
+              "context from JSON-LD data is included in quad statements"))))))
+
+(t/deftest append-json-ld-quad-data-with-graph-param-to-draftset
+  (tc/with-system
+    keys-for-test
+    [system system-config]
+    (testing "when calling append API graph param is supplied along with JSON-LD quads"
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-editor)
+            append-request (-> (help/append-to-draftset-request test-editor
+                                                                draftset-location
+                                                                (io/file "test/resources/json-ld/person-quads.jsonld")
+                                                                {:content-type "application/ld+json"})
+                               (assoc-in [:params :graph] "http://foo.com/my-graph"))
+            append-response (handler append-request)
+            expected-quads (map #(assoc % :c "http://scotts-world-o-graphs.net/graph") jane-doe-statements)]
+        (tc/await-success (get-in append-response [:body :finished-job]))
+        (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
+          (is (= (set expected-quads)
+                 (set ds-quads))
+              "context from JSON-LD data is included in quad statements, graph param does not overwrite them"))))))
+
+(t/deftest append-json-ld-triple-data-with-graph-param-to-draftset
+  (tc/with-system
+    keys-for-test
+    [system system-config]
+    (testing "when calling append API graph param is supplied along with JSON-LD triples"
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-editor)
+            append-request (-> (help/append-to-draftset-request test-editor
+                                                                draftset-location
+                                                                (io/file "test/resources/json-ld/person-triples.jsonld")
+                                                                {:content-type "application/ld+json"})
+                               (assoc-in [:params :graph] "http://foo.com/my-graph"))
+            append-response (handler append-request)
+            expected-quads (map #(assoc % :c "http://foo.com/my-graph") jane-doe-statements)]
+        (tc/await-success (get-in append-response [:body :finished-job]))
+        (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
+
+          (is (= (set expected-quads)
+                 (set ds-quads))
+              "context from graph param is included in quad statements"))))))
+
 (tc/deftest-system-with-keys append-quad-data-with-metadata
   keys-for-test
   [system system-config]
