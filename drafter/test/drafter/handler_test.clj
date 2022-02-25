@@ -1,45 +1,76 @@
 (ns ^:rest-api drafter.handler-test
   (:require
-   [drafter.user-test :refer [test-norole test-access test-editor test-publisher]]
    [clojure.test :refer [deftest are]]
+   [drafter.feature.endpoint.public :as public]
    [drafter.routes.sparql-test :refer [live-query]]
-   [drafter.test-common :as tc])
+   [drafter.test-common :as tc]
+   [drafter.user-test :refer [test-norole test-access test-editor test-publisher]])
   (:import java.util.UUID))
 
 (deftest global-auth-test
-  (let [root {:scheme :http :request-method :get :uri "/"}
-        list (assoc root :uri "/v1/draftsets")]
-    (tc/with-system [{handler :drafter.handler/app :as system}
+  (let [get {:scheme :http :request-method :get}
+        whitelisted (assoc get :uri "/swagger/swagger.json")
+        get-public (assoc
+                    get
+                    :uri "/v1/sparql/live"
+                    :headers {"accept" "text/plain"}
+                    :query-string
+                    "query=select%20%2A%20where%20%7B%3Fs%20%3Fp%20%3Fo%7D")
+        options-public (assoc get-public
+                              :request-method :options
+                              :headers {"origin" "http://swirrl.com"
+                                        "access-control-request-method" "post"
+                                        "access-control-request-headers" "accept"})
+        list-draftsets (assoc get :uri "/v1/draftsets")]
+    (tc/with-system [{handler :drafter.handler/app}
                      "test-system.edn"]
-      (are [status req] (= status (:status (handler req)))
-        ;; On a default system without global auth, routes are publicly
-        ;; accessable by default
-        200 root
-        200 (tc/with-identity test-norole root)
-        200 (tc/with-identity test-access root)
-        200 (tc/with-identity test-editor root)
-        200 (tc/with-identity test-publisher root)
-
-        ;; The list draftset route requires editor role
-        401 list
-        403 (tc/with-identity test-norole list)
-        403 (tc/with-identity test-access list)
-        200 (tc/with-identity test-editor list)
-        ;; Publisher implies editor
-        200 (tc/with-identity test-publisher list)))
-    (tc/with-system [{handler :drafter.handler/app :as system}
+      (are [req identity status]
+        (= status (:status (handler (if identity
+                                      (tc/with-identity identity req)
+                                      req))))
+        whitelisted    nil            200
+        whitelisted    test-norole    200
+        whitelisted    test-access    200
+        whitelisted    test-editor    200
+        whitelisted    test-publisher 200
+        get-public     nil            200
+        get-public     test-norole    200
+        get-public     test-access    200
+        get-public     test-editor    200
+        get-public     test-publisher 200
+        options-public nil            200
+        options-public test-norole    200
+        options-public test-access    200
+        options-public test-editor    200
+        options-public test-publisher 200
+        list-draftsets nil            401 ;; Unauthorized, requires editor
+        list-draftsets test-norole    403 ;; Forbidden, requires editor
+        list-draftsets test-access    403 ;; Forbidden, requires editor
+        list-draftsets test-editor    200
+        list-draftsets test-publisher 200))
+    (tc/with-system [{handler :drafter.handler/app}
                      "global-auth-test-system.edn"]
-      (are [status req] (= status (:status (handler req)))
-        ;; On a system with :drafter/global-auth? true, access role or stronger
-        ;; are required for all routes
-        401 root
-        403 (tc/with-identity test-norole root)
-        200 (tc/with-identity test-access root)
-        200 (tc/with-identity test-editor root)
-        200 (tc/with-identity test-publisher root)
-        ;; But list still requires editor role
-        401 list
-        403 (tc/with-identity test-norole list)
-        403 (tc/with-identity test-access list)
-        200 (tc/with-identity test-editor list)
-        200 (tc/with-identity test-publisher list)))))
+      (are [req identity status]
+        (= status (:status (handler (if identity
+                                      (tc/with-identity identity req)
+                                      req))))
+        whitelisted    nil            200
+        whitelisted    test-norole    200
+        whitelisted    test-access    200
+        whitelisted    test-editor    200
+        whitelisted    test-publisher 200
+        get-public     nil            401 ;; Unauthorized, requires access
+        get-public     test-norole    403 ;; Forbidden, requires access
+        get-public     test-access    200
+        get-public     test-editor    200
+        get-public     test-publisher 200
+        options-public nil            200
+        options-public test-norole    200
+        options-public test-access    200
+        options-public test-editor    200
+        options-public test-publisher 200
+        list-draftsets nil            401 ;; Unauthorized, requires editor
+        list-draftsets test-norole    403 ;; Forbidden, requires editor
+        list-draftsets test-access    403 ;; Forbidden, requires editor
+        list-draftsets test-editor    200
+        list-draftsets test-publisher 200))))
