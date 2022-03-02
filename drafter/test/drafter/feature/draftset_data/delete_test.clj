@@ -22,12 +22,6 @@
 
 (def system-config "drafter/feature/empty-db-system.edn")
 
-(def dummy "dummy@user.com")
-
-(defn- get-source [nt-file graph]
-  (let [source (ses/->FormatStatementSource nt-file RDFFormat/NTRIPLES)]
-    (ses/->GraphTripleStatementSource source graph)))
-
 (t/deftest delete-public-endpoint-quads-test
   (tc/with-system
     [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
