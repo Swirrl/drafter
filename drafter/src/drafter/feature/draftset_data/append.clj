@@ -118,7 +118,8 @@
 (defn data-handler
   "Ring handler to append data into a draftset."
   [{:keys [:drafter/manager
-           ::time/clock wrap-as-draftset-owner]}]
+           :rdf/base-uri
+           ::time/clock wrap-as-draftset-owner] :as _opts}]
   (wrap-as-draftset-owner
     (require-rdf-content-type
       (dset-middleware/parse-graph-for-triples
@@ -127,7 +128,7 @@
             (fn [{:keys [params] :as request}]
               (let [user-id (req/user-id request)
                     {:keys [draftset-id metadata]} params
-                    source (ds-data-common/get-request-statement-source request)
+                    source (ds-data-common/get-request-statement-source request base-uri)
                     append-job (append-data manager user-id draftset-id source metadata)]
                 (async-response/submitted-job-response append-job)))))))))
 
