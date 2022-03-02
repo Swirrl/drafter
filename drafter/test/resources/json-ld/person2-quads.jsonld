@@ -1,0 +1,28 @@
+[
+  {
+    "@id": "http://scotts-world-o-graphs.net/graph",
+    "@graph": [
+      {
+        "@id": "http://person.org/johndoe",
+        "@type": [
+          "/Person"
+        ],
+        "http://schema.org/jobTitle": [
+          {
+            "@value": "Student"
+          }
+        ],
+        "http://schema.org/name": [
+          {
+            "@value": "John Doe"
+          }
+        ],
+        "http://schema.org/url": [
+          {
+            "@id": "http://www.johndoe.com"
+          }
+        ]
+      }
+    ]
+  }
+]
