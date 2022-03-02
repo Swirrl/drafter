@@ -8,6 +8,8 @@
  :drafter.common.config/sparql-query-endpoint #env SPARQL_QUERY_ENDPOINT
  :drafter.common.config/sparql-update-endpoint #env SPARQL_UPDATE_ENDPOINT
 
+ :drafter.common.config/base-uri ""
+
  :drafter.stasher.filecache/file-backend {:dir #or [#env STASHER_CACHE_DIR "stasher-cache"]}
 
  :drafter.stasher/cache {:cache-backend #ig/ref :drafter.stasher.filecache/file-backend
@@ -88,6 +90,7 @@
                                               :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/manager #ig/ref :drafter/manager
+                                                            :rdf/base-uri #ig/ref :drafter.common.config/base-uri
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.delete-by-graph/sync-job-handler
@@ -106,6 +109,7 @@
                                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append/data-handler {:drafter/manager #ig/ref :drafter/manager
+                                                     :rdf/base-uri #ig/ref :drafter.common.config/base-uri
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/manager #ig/ref :drafter/manager

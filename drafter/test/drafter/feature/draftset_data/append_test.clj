@@ -22,12 +22,6 @@
 
 (def system-config "test-system.edn")
 
-(def dummy "dummy@user.com")
-
-(defn- get-source [nt-file graph]
-  (let [source (ses/->FormatStatementSource nt-file RDFFormat/NTRIPLES)]
-    (ses/->GraphTripleStatementSource source graph)))
-
 (def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
 
 (tc/deftest-system-with-keys append-quad-data-with-valid-content-type-to-draftset
