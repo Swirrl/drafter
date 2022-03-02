@@ -64,31 +64,34 @@
 (defn read-statements
   "Creates a lazy stream of statements from an input stream containing
   RDF data serialised in the given format."
-  ([input rdf-format] (read-statements input rdf-format jobs/batched-write-size))
-  ([input rdf-format batch-size]
+  ([input rdf-format base-uri] (read-statements input rdf-format base-uri jobs/batched-write-size))
+  ([input rdf-format base-uri batch-size]
    (statements input
                :format rdf-format
-               :buffer-size batch-size)))
+               :buffer-size batch-size
+               :base-uri base-uri)))
 
-(defrecord FormatStatementSource [inner-source format]
+(defrecord FormatStatementSource [inner-source format base-uri]
   pr/ITripleReadable
   (to-statements [_this _options]
-    (read-statements inner-source format)))
+    (read-statements inner-source format base-uri)))
 
-(defrecord GraphTripleStatementSource [triple-source graph]
+(defrecord GraphTripleStatementSource [triple-source graph base-uri]
   pr/ITripleReadable
   (to-statements [_this options]
-    (map #(util/make-quad graph %) (pr/to-statements triple-source options))))
+    (map #(util/make-quad graph %)
+         (pr/to-statements triple-source (assoc options :base-uri base-uri)))))
 
 ;; Only adds quad context with supplied graph URI when not present
-(defrecord RespectfulGraphStatementSource [statement-source graph]
+(defrecord RespectfulGraphStatementSource [statement-source graph base-uri]
   pr/ITripleReadable
   (to-statements [_this options]
     (map (fn [statement]
            (pr/map->Quad (cond-> statement
                                  (nil? (:c statement))
                                  (assoc :c graph))))
-         (pr/to-statements statement-source options))))
+         (pr/to-statements statement-source
+                           (assoc options :base-uri base-uri)))))
 
 (defrecord CollectionStatementSource [statements]
   pr/ITripleReadable
