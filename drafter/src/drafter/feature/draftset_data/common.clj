@@ -40,19 +40,25 @@
 
 (defn get-request-statement-source
   "Returns an ITripleReadable statement source from an incoming jobs request"
-  [{:keys [body params] :as request}]
+  [{:keys [body params] :as request} base-uri]
   (let [{:keys [rdf-format graph]} params
-        source (ses/->FormatStatementSource body rdf-format)]
+        source (ses/map->FormatStatementSource {:inner-source body
+                                                :format rdf-format
+                                                :base-uri base-uri})]
     (cond
       (and graph (ses/is-quads-format? rdf-format))
       ;; only adds triple :c context with graph if :c val is nil
-      (ses/->RespectfulGraphStatementSource source graph)
+      (ses/map->RespectfulGraphStatementSource {:statement-source source
+                                                :graph graph
+                                                :base-uri base-uri})
 
       (ses/is-quads-format? rdf-format)
       source
 
       :else
-      (ses/->GraphTripleStatementSource source graph))))
+      (ses/map->GraphTripleStatementSource {:triple-source source
+                                            :graph graph
+                                            :base-uri base-uri}))))
 
 (defn lock-writes-and-copy-graph
   "Calls mgmt/copy-graph to copy a live graph into the draftset, but

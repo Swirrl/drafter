@@ -120,11 +120,11 @@
     (response/enqueue-async-job! job)))
 
 (defn delete-draftset-data-handler
-  [{:keys [:drafter/manager wrap-as-draftset-owner]}]
+  [{:keys [:drafter/manager :rdf/base-uri wrap-as-draftset-owner]}]
   (-> (fn [{:keys [params] :as request}]
         (let [user-id (req/user-id request)
               {:keys [draftset-id metadata]} params
-              source (ds-data-common/get-request-statement-source request)
+              source (ds-data-common/get-request-statement-source request base-uri)
               delete-job (delete-data manager user-id draftset-id source metadata)]
           (async-response/submitted-job-response delete-job)))
       inflate-gzipped
