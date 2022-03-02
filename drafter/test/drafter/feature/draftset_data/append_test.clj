@@ -21,8 +21,12 @@
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system-config "test-system.edn")
+(def system-config-with-base-uri "test-system-base-uri.edn")
 
-(def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
+(def keys-for-test [[:drafter/routes :draftset/api]
+                    :drafter/write-scheduler
+                    :drafter.fixture-data/loader
+                    :drafter.common.config/base-uri])
 
 (tc/deftest-system-with-keys append-quad-data-with-valid-content-type-to-draftset
   keys-for-test
@@ -136,6 +140,38 @@
           (is (= (set expected-quads)
                  (set ds-quads))
               "context from graph param is included in quad statements"))))))
+
+(t/deftest append-json-ld-quad-data-to-draftset-with-base-uri
+  (tc/with-system
+    keys-for-test
+    [system system-config-with-base-uri]
+    (testing "when calling the append API with JSON-LD quads and base-uri is configured"
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-editor)
+            append-request (help/append-to-draftset-request test-editor
+                                                            draftset-location
+                                                            ;; this file contains some relative URIs
+                                                            (io/file "test/resources/json-ld/person2-quads.jsonld")
+                                                            {:content-type "application/ld+json"})
+            append-response (handler append-request)
+            expected-quads (map #(assoc % :c "http://scotts-world-o-graphs.net/graph")
+                                '({:s "http://person.org/johndoe"
+                                   :p "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+                                   :o "http://all-your-base-are-belong.us/Person"}
+                                  {:s "http://person.org/johndoe"
+                                   :p "http://schema.org/jobTitle"
+                                   :o "Student"}
+                                  {:s "http://person.org/johndoe"
+                                   :p "http://schema.org/name"
+                                   :o "John Doe"}
+                                  {:s "http://person.org/johndoe"
+                                   :p "http://schema.org/url"
+                                   :o "http://www.johndoe.com"}))]
+        (tc/await-success (get-in append-response [:body :finished-job]))
+        (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
+          (is (= (set expected-quads)
+                 (set ds-quads))
+              "relative URI /Person should have base-uri as prefix in saved quad statements"))))))
 
 (tc/deftest-system-with-keys append-quad-data-with-metadata
   keys-for-test
