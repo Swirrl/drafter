@@ -76,7 +76,10 @@
                     (:drafter.common.config/sparql-update-endpoint system)))
 
 (defn- append-triples [drafter user draftset-ref graph triples]
-  (let [source (ses/->GraphTripleStatementSource (ses/->CollectionStatementSource triples) graph)]
+  (let [source (ses/map->GraphTripleStatementSource {:triple-source (ses/->CollectionStatementSource triples)
+                                                     :graph graph
+                                                     ;:base-uri base-uri
+                                                     })]
     (model/append-data drafter user draftset-ref source)))
 
 (defn- publish-quads [drafter quads]

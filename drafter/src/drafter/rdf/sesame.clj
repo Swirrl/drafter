@@ -64,16 +64,17 @@
 (defn read-statements
   "Creates a lazy stream of statements from an input stream containing
   RDF data serialised in the given format."
-  ([input rdf-format] (read-statements input rdf-format jobs/batched-write-size))
-  ([input rdf-format batch-size]
+  ([input rdf-format base-uri] (read-statements input rdf-format base-uri jobs/batched-write-size))
+  ([input rdf-format base-uri batch-size]
    (statements input
                :format rdf-format
-               :buffer-size batch-size)))
+               :buffer-size batch-size
+               :base-uri base-uri)))
 
-(defrecord FormatStatementSource [inner-source format]
+(defrecord FormatStatementSource [inner-source format base-uri]
   pr/ITripleReadable
   (to-statements [_this _options]
-    (read-statements inner-source format)))
+    (read-statements inner-source format base-uri)))
 
 ;; NOTE: The purpose of this is to stomp `graph` over all statements
 ;; in the sequence if `graph` is set.
