@@ -1,0 +1,9 @@
+@prefix foaf:  <http://xmlns.com/foaf/0.1/> .
+
+<http://people.org/dbanner>    a                 </Person> ;
+                               foaf:firstName    "David" ;
+                               foaf:homepage     <http://www.davidbanner.com> ;
+                               foaf:name         "David Banner" ;
+                               </nick>           "hulk" ;
+                               foaf:surname      "Banner" ;
+                               foaf:title        "Dr" .
