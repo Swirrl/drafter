@@ -173,6 +173,54 @@
                  (set ds-quads))
               "relative URI /Person should have base-uri as prefix in saved quad statements"))))))
 
+(t/deftest append-quad-trig-data-to-draftset-with-base-uri
+  (tc/with-system
+    keys-for-test
+    [system system-config-with-base-uri]
+    (testing "when calling the append API with turtle triples and base-uri is configured"
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-editor)
+            ;; this file contains some relative URIs
+            turtle-file (io/file "test/resources/drafter/feature/draftset/append_base_uri_test.ttl")
+            append-request (-> (help/append-to-draftset-request test-editor
+                                                                draftset-location
+                                                                turtle-file
+                                                                {:content-type "text/turtle"})
+                               (assoc-in [:params :graph] "http://foo.com/my-graph"))
+            append-response (handler append-request)]
+        (tc/await-success (get-in append-response [:body :finished-job]))
+        (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
+          (is (= (set '({:s "http://people.org/dbanner",
+                         :p "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+                         :o "http://all-your-base-are-belong.us/Person",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/name",
+                         :o "David Banner",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/firstName",
+                         :o "David",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/homepage",
+                         :o "http://www.davidbanner.com",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/surname",
+                         :o "Banner",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/title",
+                         :o "Dr",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://all-your-base-are-belong.us/nick",
+                         :o "hulk",
+                         :c "http://foo.com/my-graph"}))
+                 (set ds-quads))
+              "relative URI /Person should have base-uri as prefix in saved quad statements"))))))
+
 (tc/deftest-system-with-keys append-quad-data-with-metadata
   keys-for-test
   [system system-config]
