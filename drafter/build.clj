@@ -4,44 +4,28 @@
             [juxt.pack.api :as pack])
   (:refer-clojure :exclude [test]))
 
-(defn- get-branch-name []
-  (or (System/getenv "CIRCLE_BRANCH")
-      (b/git-process {:git-args ["branch" "--show-current"]})))
-
-(defn- cleanup-branch-name [branch-str]
-  (str/replace branch-str #"\\" "_"))
-
-(defn main-build? []
-  (and (System/getenv "CIRCLE_BRANCH")
-       (= "master" (get-branch-name))))
-
-(def version-prefix "1.1")
-
-(defn version []
-  (let [current-branch (cleanup-branch-name
-                        (get-branch-name))]
-    (str version-prefix "."
-         (if (main-build?)
-           (b/git-count-revs nil)
-           (str (b/git-count-revs nil) "-BRANCH-BUILD-" current-branch)))))
-
-(comment
-  (version)
-  )
+;; A tag name must be valid ASCII and may contain lowercase and uppercase
+;; letters, digits, underscores, periods and dashes
+;; https://docs.docker.com/engine/reference/commandline/tag/#extended-description
+(defn tag [s]
+  (str/replace s #"[^a-zA-Z0-9_.-]" "_"))
 
 (defn pmd4-docker-build [opts]
   (let [drafter-basis (b/create-basis {:project "deps.edn" :aliases [:pmd4/docker]})]
     (-> opts
         (assoc :basis drafter-basis
                :image-name "swirrl/drafter-pmd4" ; TODO include the destination registry details?
-               :image-type (or (opts :image-type) :docker)              
+               :image-type (or (opts :image-type) :docker)
                :include {"/app/config" ["./resources/drafter-auth0.edn"]}
                :base-image "gcr.io/distroless/java:11"
-               :volumes #{"/app/config" "/app/stasher-cache"}               
+               :volumes #{"/app/config" "/app/stasher-cache"}
                :to-registry-username (System/getenv "DOCKERHUB_USERNAME")
                :to-registry-password (System/getenv "DOCKERHUB_PASSWORD")
-               ; :tags #{"latest" "2.5_circle-245"} ; tags
-               )
+               :tags (into #{}
+                           (map #(tag (b/git-process {:git-args %})))
+                           ["describe --tags"
+                            "rev-parse HEAD"
+                            "branch --show-current"]))
         (pack/docker))))
 
 (comment (pmd4-docker-build nil))
