@@ -48,14 +48,14 @@
                                                 :format rdf-format
                                                 :base-uri active-base-uri})]
     (cond
-      (and graph (ses/is-quads-format? rdf-format))
+      (and (ses/is-quads-format? rdf-format)
+           (or graph active-base-uri))
       ;; only adds triple :c context with graph if :c val is nil
       (ses/map->RespectfulGraphStatementSource {:statement-source source
                                                 :graph graph
                                                 :base-uri active-base-uri})
 
       (ses/is-quads-format? rdf-format)
-      ;; TODO: need to add base-uri here?
       source
 
       :else
