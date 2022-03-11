@@ -243,3 +243,4 @@ workflows:
           context:
             - swirrl-jar-and-omni-user
             - swirrl-dockerhub-publisher
+            - gcp-artifact-registry
