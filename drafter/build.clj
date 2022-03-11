@@ -17,6 +17,11 @@
     :include {"/app/config" ["./resources/drafter-auth0.edn"]}
     :base-image "gcr.io/distroless/java:11"
     :volumes #{"/app/config" "/app/stasher-cache"}
+    ;; NOTE Not as documented!
+    ;; The docstring states that these should be
+    ;;     :to-registry {:username ... :password ...}
+    ;; but alas, that is a lie.
+    ;; https://github.com/juxt/pack.alpha/issues/101
     :to-registry-username "_json_key"
     :to-registry-password (System/getenv "GCLOUD_SERVICE_KEY")
     :tags (into #{}
