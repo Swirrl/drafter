@@ -15,8 +15,7 @@
             [grafter-2.rdf.protocols :as pr]
             [drafter.rdf.sesame :as ses]
             [grafter-2.rdf4j.io :as gio])
-  (:import java.net.URI
-           org.eclipse.rdf4j.rio.RDFFormat))
+  (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
