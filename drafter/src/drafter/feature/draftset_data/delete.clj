@@ -123,8 +123,10 @@
   [{:keys [:drafter/manager :rdf/base-uri wrap-as-draftset-owner]}]
   (-> (fn [{:keys [params] :as request}]
         (let [user-id (req/user-id request)
-              {:keys [draftset-id metadata]} params
-              source (ds-data-common/get-request-statement-source request base-uri)
+              {:keys [draftset-id metadata base]} params
+              ;; base-uri may be set in config, but overridden by api params
+              active-base-uri (or base base-uri)
+              source (ds-data-common/get-request-statement-source request active-base-uri)
               delete-job (delete-data manager user-id draftset-id source metadata)]
           (async-response/submitted-job-response delete-job)))
       inflate-gzipped
