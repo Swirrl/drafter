@@ -9,23 +9,25 @@
 (defn tag [s]
   (str/replace s #"[^a-zA-Z0-9_.-]" "_"))
 
+(def repo "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl")
+
 (defn pmd4-docker-build [opts]
-  (pack/docker
-   {:basis (b/create-basis {:project "deps.edn" :aliases [:pmd4/docker]})
-    :image-name "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl/drafter-pmd4"
-    :image-type (get opts :image-type :docker)
-    :include {"/app/config" ["./resources/drafter-auth0.edn"]}
-    :base-image "gcr.io/distroless/java:11"
-    :volumes #{"/app/config" "/app/stasher-cache"}
-    ;; NOTE Not as documented!
-    ;; The docstring states that these should be
-    ;;     :to-registry {:username ... :password ...}
-    ;; but alas, that is a lie.
-    ;; https://github.com/juxt/pack.alpha/issues/101
-    :to-registry-username "_json_key"
-    :to-registry-password (System/getenv "GCLOUD_SERVICE_KEY")
-    :tags (into #{}
-                (map #(tag (b/git-process {:git-args %})))
-                ["describe --tags"
-                 "rev-parse HEAD"
-                 "branch --show-current"])}))
+  (let [tags (map #(tag (b/git-process {:git-args %}))
+                  ["rev-parse HEAD"
+                   "describe --tags"
+                   "branch --show-current"])]
+    (pack/docker
+     {:basis (b/create-basis {:project "deps.edn" :aliases [:pmd4/docker]})
+      :image-name (str repo "/drafter-pmd4:" (first tags))
+      :image-type (get opts :image-type :docker)
+      :include {"/app/config" ["./resources/drafter-auth0.edn"]}
+      :base-image "gcr.io/distroless/java:11"
+      :volumes #{"/app/config" "/app/stasher-cache"}
+      ;; NOTE Not as documented!
+      ;; The docstring states that these should be
+      ;;     :to-registry {:username ... :password ...}
+      ;; but alas, that is a lie.
+      ;; https://github.com/juxt/pack.alpha/issues/101
+      :to-registry-username "_json_key"
+      :to-registry-password (System/getenv "GCLOUD_SERVICE_KEY")
+      :tags (set (rest tags))})))
