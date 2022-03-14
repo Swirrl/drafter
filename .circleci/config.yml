@@ -13,10 +13,13 @@ executors:
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
+      - image: swirrl/stardog:6.2.3
+        auth:
+          username: $DOCKERHUB_USERNAME # can specify string literal values
+          password: $DOCKERHUB_PASSWORD # or project environment variable reference
 
     resource_class: large
     working_directory: ~/repo
-    # resource_class: xlarge
 
     environment:
       # Customize the JVM maximum heap limit
@@ -40,14 +43,31 @@ executors:
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  test-drafter:
+  test-drafter-auth0:
     executor: tests-executor
     steps:
       - run-tests:
           project-dir: drafter
           database-name: drafter-test-db
+          kaocha-flags: "--focus :auth0"
 
-  test-drafter-client:
+  test-drafter-basic-auth:
+    executor: tests-executor
+    steps:
+      - run-tests:
+          project-dir: drafter
+          database-name: drafter-test-db
+          kaocha-flags: "--focus :basic-auth"
+
+  test-drafter-non-api:
+    executor: tests-executor
+    steps:
+      - run-tests:
+          project-dir: drafter
+          database-name: drafter-test-db
+          kaocha-flags: "--focus :non-api"
+
+  test-drafterclient:
     executor: tests-executor
     steps:
       - run-tests:
@@ -63,11 +83,23 @@ jobs:
           command: cd drafter && ./bin/pack
       - run:
           name: Make omni package
-          command: cd drafter && ./bin/package
+          command: cd drafter && source ./bin/set-environment && ./bin/package
       - run:
-          name: Deploy
-          command: echo clojure -M:omni publish -f drafter/target/drafter-pmd3-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+          name: Deploy Build Artifacts
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ] || [ -n "${CIRCLE_TAG}" ]; then
+              echo "Deploying main artifact release"
+              cd drafter && source ./bin/set-environment && ./bin/publish-packages
+            else
+              echo Not deploying as this is not main branch
+            fi
 
+      - setup_remote_docker # necessary to build/deploy docker image in step below
+      - run:
+          name: Build (and potentially Deploy) swirrl/drafter-pmd4 docker
+          command: |
+            cd drafter
+            clojure -T:build pmd4-docker-build :image-type :registry
 
 commands:
   setup-services:
@@ -91,6 +123,9 @@ commands:
         type: string
       database-name:
         type: string
+      kaocha-flags:
+        type: string
+        default: ""
     steps:
       - setup-services
 
@@ -129,7 +164,7 @@ commands:
             AUTH0_CLIENT_SECRET: "QYoWNwf11dzWNh6XYd3jH8-j5j8r36UKuoFgrPakE_aw_Gy_EwWSppvqSULRICY4"
           command: |
             cd <<parameters.project-dir>>
-            ./bin/kaocha --reporter documentation --fail-fast
+            ./bin/kaocha --reporter documentation --fail-fast <<parameters.kaocha-flags>>
 
       - save-caches
 
@@ -160,6 +195,11 @@ commands:
             - v1-tdeps-dependencies-{{ checksum "deps.edn" }}
             # note no fallback due to parallel running
 
+  restore-all-caches:
+    description: "restore caches"
+    steps:
+      - restore-clj-cache
+
   save-caches:
     description: "save caches"
     steps:
@@ -179,25 +219,52 @@ commands:
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
+# See also: https://circleci.com/docs/2.0/workflows/#executing-workflows-for-a-git-tag for how tags work
 workflows:
   build-workflow:
     jobs:
-      - test-drafter:
+      - test-drafter-auth0:
+          filters:
+            tags:
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
-      - test-drafter-client:
+            - stardog-jfrog-repository
+      - test-drafter-basic-auth:
+          filters:
+            tags:
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
+            - stardog-jfrog-repository
+      - test-drafter-non-api:
+          filters:
+            tags:
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
+          context:
+            - swirrl-jar-and-omni-user
+            - drafter-auth0-dev-creds # creds for our auth0 dev setup
+            - swirrl-dockerhub-consumer
+            - stardog-jfrog-repository
       - test-drafterclient:
+          filters:
+            tags:
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
+            - stardog-jfrog-repository
       - build-artifacts:
+          filters:
+            tags:
+              only: /^v\d*\.\d*\z/ # tags that look like v0.0
           context:
             - swirrl-jar-and-omni-user
-            - swirrl-dockerhub-consumer
+            - swirrl-dockerhub-publisher
+            - gcp-artifact-registry
+
