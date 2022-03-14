@@ -96,13 +96,8 @@ jobs:
       - run:
           name: Build (and potentially Deploy) swirrl/drafter-pmd4 docker
           command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ] || [ -n "${CIRCLE_TAG}" ]; then
-              cd drafter
-              clojure -T:build pmd4-docker-build :image-type :registry
-            else
-              cd drafter
-              clojure -T:build pmd4-docker-build :image-type :docker
-            fi
+            cd drafter
+            clojure -T:build pmd4-docker-build :image-type :registry
 
 commands:
   setup-services:
@@ -248,3 +243,4 @@ workflows:
           context:
             - swirrl-jar-and-omni-user
             - swirrl-dockerhub-publisher
+            - gcp-artifact-registry
