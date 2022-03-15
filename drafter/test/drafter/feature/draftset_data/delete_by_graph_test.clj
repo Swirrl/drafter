@@ -12,7 +12,10 @@
 
 (def system "drafter/feature/empty-db-system.edn")
 
-(def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler])
+(def keys-for-test [:drafter.fixture-data/loader
+                    [:drafter/routes :draftset/api]
+                    :drafter/write-scheduler
+                    :drafter.common.config/base-uri])
 
 (t/deftest delete-live-graph-not-in-draftset
   (tc/with-system
@@ -96,29 +99,33 @@
           delete-response (handler delete-request)]
       (tc/assert-is-forbidden-response delete-response))))
 
-(tc/deftest-system-with-keys delete-live-graph-async-test
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api]} system]
-  (let [quads (statements "test/resources/test-draftset.trig")
-        graph-quads (group-by context quads)
-        live-graphs (keys graph-quads)
-        graph-to-delete (first live-graphs)
-        draftset-location (help/create-draftset-through-api handler test-editor)]
-    (help/publish-quads-through-api handler quads)
-    (let [request (-> (help/delete-draftset-graph-request test-editor
-                                                          draftset-location
-                                                          graph-to-delete)
-                      (assoc-in [:headers "perform-async"] "true"))
-          {:keys [status body] :as _job-response} (handler request)
-          ds-response (->> {:request-method :get :uri draftset-location}
-                           (tc/with-identity test-editor)
-                           (handler))]
+(deftest delete-live-graph-async-test
+  (tc/with-system
+    keys-for-test
+    [{handler [:drafter/routes :draftset/api]} system]
+    (let [quads (statements "test/resources/test-draftset.trig")
+          graph-quads (group-by context quads)
+          live-graphs (keys graph-quads)
+          graph-to-delete (first live-graphs)
+          draftset-location (help/create-draftset-through-api handler test-editor)]
+      (help/publish-quads-through-api handler quads)
+      (let [request (-> (help/delete-draftset-graph-request test-editor
+                                                            draftset-location
+                                                            graph-to-delete)
+                        (assoc-in [:headers "perform-async"] "true"))
+            {:keys [status body] :as job-response} (handler request)]
 
-      ;; did we get a job back?
-      (is (= 202 status))
-      (is (contains? body :finished-job))
-      (is (= :ok (:type body)))
+        ;; did we get a job back?
+        (is (= 202 status))
+        (is (contains? body :finished-job))
+        (is (= :ok (:type body)))
 
-      ;; did the job delete the graph?
-      (is (= 200 (:status ds-response)))
-      (is (= :deleted (get-in ds-response [:body :changes graph-to-delete :status]))))))
+        (tc/await-success (get-in job-response [:body :finished-job]))
+
+        (let [ds-response (->> {:request-method :get :uri draftset-location}
+                               (tc/with-identity test-editor)
+                               (handler))]
+
+          ;; did the job delete the graph?
+          (is (= 200 (:status ds-response)))
+          (is (= :deleted (get-in ds-response [:body :changes graph-to-delete :status]))))))))
