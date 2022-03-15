@@ -75,20 +75,15 @@
   (to-statements [_this _options]
     (read-statements inner-source format)))
 
+;; NOTE: The purpose of this is to stomp `graph` over all statements
+;; in the sequence if `graph` is set.
 (defrecord GraphTripleStatementSource [triple-source graph]
   pr/ITripleReadable
   (to-statements [_this options]
-    (map #(util/make-quad graph %) (pr/to-statements triple-source options))))
-
-;; Only adds quad context with supplied graph URI when not present
-(defrecord RespectfulGraphStatementSource [statement-source graph]
-  pr/ITripleReadable
-  (to-statements [_this options]
-    (map (fn [statement]
-           (pr/map->Quad (cond-> statement
-                                 (nil? (:c statement))
-                                 (assoc :c graph))))
-         (pr/to-statements statement-source options))))
+    (let [statements (pr/to-statements triple-source options)]
+      (if graph
+        (map #(util/make-quad graph %) statements)
+        statements))))
 
 (defrecord CollectionStatementSource [statements]
   pr/ITripleReadable
