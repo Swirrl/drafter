@@ -47,21 +47,11 @@
         source (ses/map->FormatStatementSource {:inner-source body
                                                 :format rdf-format
                                                 :base-uri active-base-uri})]
-    (cond
-      (and (ses/is-quads-format? rdf-format)
-           (or graph active-base-uri))
-      ;; only adds triple :c context with graph if :c val is nil
-      (ses/map->RespectfulGraphStatementSource {:statement-source source
-                                                :graph graph
-                                                :base-uri active-base-uri})
-
-      (ses/is-quads-format? rdf-format)
+    (if (and (ses/is-quads-format? rdf-format)
+             (not graph))
       source
-
-      :else
       (ses/map->GraphTripleStatementSource {:triple-source source
-                                            :graph graph
-                                            :base-uri active-base-uri}))))
+                                            :graph graph}))))
 
 (defn lock-writes-and-copy-graph
   "Calls mgmt/copy-graph to copy a live graph into the draftset, but

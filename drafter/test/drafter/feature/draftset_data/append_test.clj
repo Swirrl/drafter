@@ -112,12 +112,12 @@
                                                                 {:content-type "application/ld+json"})
                                (assoc-in [:params :graph] "http://foo.com/my-graph"))
             append-response (handler append-request)
-            expected-quads (map #(assoc % :c "http://scotts-world-o-graphs.net/graph") jane-doe-statements)]
+            expected-quads (map #(assoc % :c "http://foo.com/my-graph") jane-doe-statements)]
         (tc/await-success (get-in append-response [:body :finished-job]))
         (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
           (is (= (set expected-quads)
                  (set ds-quads))
-              "context from JSON-LD data is included in quad statements, graph param does not overwrite them"))))))
+              "graph context from JSON-LD data is included in quad statements, graph param overwrites it"))))))
 
 (t/deftest append-json-ld-triple-data-with-graph-param-to-draftset
   (tc/with-system

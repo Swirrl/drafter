@@ -76,22 +76,13 @@
   (to-statements [_this _options]
     (read-statements inner-source format base-uri)))
 
-(defrecord GraphTripleStatementSource [triple-source graph base-uri]
+(defrecord GraphTripleStatementSource [triple-source graph]
   pr/ITripleReadable
   (to-statements [_this options]
-    (map #(util/make-quad graph %)
-         (pr/to-statements triple-source (assoc options :base-uri base-uri)))))
-
-;; Only adds quad context with supplied graph URI when not present
-(defrecord RespectfulGraphStatementSource [statement-source graph base-uri]
-  pr/ITripleReadable
-  (to-statements [_this options]
-    (map (fn [statement]
-           (pr/map->Quad (cond-> statement
-                                 (nil? (:c statement))
-                                 (assoc :c graph))))
-         (pr/to-statements statement-source
-                           (assoc options :base-uri base-uri)))))
+    (let [statements (pr/to-statements triple-source options)]
+      (if graph
+        (map #(util/make-quad graph %) statements)
+        statements))))
 
 (defrecord CollectionStatementSource [statements]
   pr/ITripleReadable
