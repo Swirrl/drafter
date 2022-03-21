@@ -161,7 +161,8 @@
     (into {} kvs)))
 
 (defn make-quad
-  "Creates a quad from a graph and triple"
+  "Creates a quad from a graph and triple. Will overwrite
+  any existing :c context vals if present in `triple`"
   [graph triple]
   (pr/map->Quad (assoc triple :c graph)))
 

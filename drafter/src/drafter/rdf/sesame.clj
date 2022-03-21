@@ -13,7 +13,8 @@
            [org.eclipse.rdf4j.common.iteration Iteration]
            [org.eclipse.rdf4j.repository RepositoryConnection]
            [org.eclipse.rdf4j.model Resource IRI Value]
-           [org.eclipse.rdf4j.query.impl MapBindingSet]))
+           [org.eclipse.rdf4j.query.impl MapBindingSet]
+           (java.net URI)))
 
 (defn is-quads-format? [^RDFFormat rdf-format]
   (.supportsContexts rdf-format))
@@ -74,10 +75,15 @@
   (to-statements [_this _options]
     (read-statements inner-source format)))
 
+;; NOTE: The purpose of this is to stomp `graph` over all statements
+;; in the sequence if `graph` is set.
 (defrecord GraphTripleStatementSource [triple-source graph]
   pr/ITripleReadable
   (to-statements [_this options]
-    (map #(util/make-quad graph %) (pr/to-statements triple-source options))))
+    (let [statements (pr/to-statements triple-source options)]
+      (if graph
+        (map #(util/make-quad graph %) statements)
+        statements))))
 
 (defrecord CollectionStatementSource [statements]
   pr/ITripleReadable

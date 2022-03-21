@@ -1,6 +1,5 @@
 (ns drafter.feature.draftset-data.common
   (:require
-   [clojure.string :as str]
    [drafter.async.jobs :as ajobs]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.backend.draftset.graphs :as graphs]
@@ -15,7 +14,7 @@
    [grafter-2.rdf.protocols :as pr :refer [context]]
    [grafter-2.rdf4j.io :as rio :refer [rdf-writer]])
   (:import
-   java.io.StringWriter))
+    java.io.StringWriter))
 
 (defn quad-batch->graph-triples
   "Extracts the graph-uri from a sequence of quads and converts all
@@ -41,12 +40,16 @@
 
 (defn get-request-statement-source
   "Returns an ITripleReadable statement source from an incoming jobs request"
-  [{:keys [body params] :as request}]
+  [{:keys [body params] :as _request}]
   (let [{:keys [rdf-format graph]} params
-        source (ses/->FormatStatementSource body rdf-format)]
-    (if (ses/is-quads-format? rdf-format)
+        source (ses/map->FormatStatementSource {:inner-source body
+                                                :format rdf-format})]
+    (if (and (ses/is-quads-format? rdf-format)
+             (not graph))
       source
-      (ses/->GraphTripleStatementSource source graph))))
+      ;; else stomp `graph` over all statements
+      (ses/map->GraphTripleStatementSource {:triple-source source
+                                            :graph graph}))))
 
 (defn lock-writes-and-copy-graph
   "Calls mgmt/copy-graph to copy a live graph into the draftset, but
