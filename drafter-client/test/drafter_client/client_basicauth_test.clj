@@ -16,8 +16,7 @@
 
 (defn start-basicauth-drafter-server []
   (drafter/-main basicauth-config
-                 (h/res-file "stasher-off.edn")
-                 (h/res-file "init-public-endpoint.edn")))
+                 (h/res-file "stasher-off.edn")))
 
 (defn drafter-server-fixture [f]
   (try
