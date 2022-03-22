@@ -204,10 +204,4 @@
  :drafter.main/datadog {:statsd-address #or [#env DATADOG_STATSD_ADDRESS nil]
                         :tags {:service :drafter}}
 
- :drafter.feature.endpoint.public/init
- {:repo #ig/ref :drafter.stasher/repo
-  :wait #ig/ref [:drafter.util/wait-for-connection :service/stardog]}
-
- [:drafter.util/wait-for-connection :service/stardog]
- {:uri #ig/ref :drafter.common.config/sparql-query-endpoint
-  :timeout-seconds 60}}
+ :drafter.feature.endpoint.public/init {:repo #ig/ref :drafter.stasher/repo}}
