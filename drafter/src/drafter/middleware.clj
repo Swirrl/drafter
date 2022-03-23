@@ -24,10 +24,11 @@
 (defmethod ig/init-key :drafter.middleware/wrap-authenticate
   [_ {:keys [middleware] :as opts}]
   (fn [handler]
-    (fn [request]
-      (if-let [_ (http/-get-header request "authorization")]
-        (((apply comp middleware) handler) request)
-        (handler request)))))
+    (let [wrapped ((apply comp middleware) handler)]
+      (fn [request]
+        (if-let [_ (http/-get-header request "authorization")]
+          (wrapped request)
+          (handler request))))))
 
 (defn- whitelisted? [{:keys [request-method uri]}]
   (case request-method
