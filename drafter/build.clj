@@ -7,7 +7,7 @@
 ;; letters, digits, underscores, periods and dashes
 ;; https://docs.docker.com/engine/reference/commandline/tag/#extended-description
 (defn tag [s]
-  (str/replace s #"[^a-zA-Z0-9_.-]" "_"))
+  (when s (str/replace s #"[^a-zA-Z0-9_.-]" "_")))
 
 (def repo "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl")
 
