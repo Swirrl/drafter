@@ -2,7 +2,6 @@
   (:require
    [clojure.spec.alpha :as s]
    [drafter.async.jobs :as ajobs]
-   [drafter.async.responses :as async-responses]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.backend.draftset.graphs :as graphs]
    [drafter.backend.draftset.operations :as dsops]
@@ -14,6 +13,7 @@
    [drafter.responses :as response]
    [drafter.routes.draftsets-api :refer [parse-query-param-flag-handler]]
    [drafter.time :as time]
+   [drafter.write-scheduler :as writes]
    [integrant.core :as ig]
    [ring.util.response :as ring]))
 
@@ -59,13 +59,13 @@
           ::graph-not-found (response/unprocessable-entity-response
                              "Graph not found")
           ::delete-job-failed (let [job-result (:result (ex-data exi))]
-                                (async-responses/api-response 500 job-result))
+                                (response/api-response 500 job-result))
           ;;unknown failure
           (throw exi))))))
 
 (defn async-job [{:keys [drafter/manager]}]
   (fn [draftset-id graph user-id silent metadata]
-    (let [response #(response/submit-async-job!
+    (let [response #(writes/submit-async-job!
                       (jobs/make-job user-id :background-write
                         (jobs/job-metadata
                           (:backend manager) draftset-id 'delete-draftset-graph metadata)
@@ -90,7 +90,7 @@
 (defn remove-graph-from-draftset-handler
   "Remove a supplied graph from the draftset."
   [{:keys [wrap-as-draftset-owner] :as resources}]
-  (wrap-as-draftset-owner
+  (wrap-as-draftset-owner :editor
    (parse-query-param-flag-handler
     :silent
     (feat-middleware/parse-graph-param-handler true (request-handler resources)))))

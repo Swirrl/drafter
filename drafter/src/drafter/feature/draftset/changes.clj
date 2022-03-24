@@ -7,7 +7,7 @@
             [drafter.rdf.draftset-management.job-util :as jobutil]
             [integrant.core :as ig]
             [ring.util.response :as ring]
-            [drafter.async.responses :as response]
+            [drafter.responses :as response]
             [drafter.requests :as req]
             [drafter.rdf.drafter-ontology :refer [modified-times-graph-uri]]
             [drafter.feature.modified-times :as modified-times]
@@ -28,7 +28,7 @@
 
 (defn delete-draftset-changes-handler
   [{:keys [wrap-as-draftset-owner] {:keys [backend] :as manager} :drafter/manager}]
-  (wrap-as-draftset-owner
+  (wrap-as-draftset-owner :editor
    (middleware/parse-graph-param-handler
     true
     (fn [{{:keys [draftset-id graph]} :params :as request}]

@@ -119,7 +119,8 @@ info:
 
     | rank | role            | Description                                                                          |
     |------|-----------------|--------------------------------------------------------------------------------------|
-    |    1 | editor          | Can acess the admin panel and create and edit draftsets.                             |
+    |    0 | access          | Can access the system at all (only comes in to play when `:drafter/global-auth?`)    |
+    |    1 | editor          | Can access the admin panel and create and edit draftsets.                            |
     |    2 | publisher       | Can do everything an editor can, but also publish to the live site.                  |
     |    3 | manager         | Can do everything a publisher can, but also manage user accounts (not via this API)  |
 

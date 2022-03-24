@@ -33,7 +33,7 @@
 
 (defn handler
   [{:keys [:drafter/manager :drafter.user/repo wrap-as-draftset-owner]}]
-  (wrap-as-draftset-owner
+  (wrap-as-draftset-owner :editor
     (fn [{{:keys [user role draftset-id]} :params owner :identity}]
       (cond
         (and (some? user) (some? role))

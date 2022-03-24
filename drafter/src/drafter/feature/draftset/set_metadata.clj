@@ -7,7 +7,7 @@
 
 (defn handler
   [{:keys [wrap-as-draftset-owner] {:keys [backend] :as manager} :drafter/manager}]
-  (wrap-as-draftset-owner
+  (wrap-as-draftset-owner :editor
    (fn [{{:keys [draftset-id] :as params} :params :as request}]
      (feat-common/run-sync
       manager

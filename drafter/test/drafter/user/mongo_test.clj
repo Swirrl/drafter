@@ -31,9 +31,10 @@
       (is (= test-user found-user)))))
 
 (deftest get-all-users-test
-  (let [role-f (fn [i] (get user/roles (mod i (count user/roles))))
-        email-f #(str "user" % "@example.com")
-        expected-users (map #(user/create-user (email-f %) (role-f %) (str %)) (range 1 10))]
+  (let [email-f #(str "user" % "@example.com")
+        expected-users (map #(user/create-user (email-f %1) %2 (str %1))
+                            (range 1 10)
+                            (cycle user/roles))]
 
     (doseq [u expected-users]
       (um/insert-user *user-repo* u))

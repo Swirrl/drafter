@@ -7,14 +7,6 @@
             [drafter.user :as user]
             [clojure.set :as set]))
 
-(defn authorized? [{:keys [roles] :as token}]
-  (boolean (seq (set/intersection roles (set user/roles)))))
-
-(defn unauthorized [msg]
-  {:status 401
-   :headers {"Content-Type" "text/plain"}
-   :body msg})
-
 (defn email [{:keys [payload] :as access-token}]
   (or (get payload (keyword "https://pmd/user/email"))
       (get payload :sub)))
@@ -38,7 +30,7 @@
                 (assoc :identity {:email email' :role role})
                 (handler))
             (response/forbidden-response "Not authorized.")))
-        (unauthorized "Not authenticated.")))))
+        (response/unauthorized-response "Not authenticated.")))))
 
 (defmethod ig/init-key :drafter.middleware.auth0-auth/token-authentication
   [_ {:keys [auth0] :as opts}]
@@ -46,24 +38,7 @@
     (fn [{:keys [:swirrl.auth0/authenticated] :as request}]
       (case authenticated
         ::jwt/token-verified (handler request)
-        ::jwt/token-expired (unauthorized "Token expired.")
-        ::jwt/claim-invalid (unauthorized "Not authenticated.")
-        ::jwt/token-invalid (unauthorized "Not authenticated.")
-        (unauthorized "Not authenticated.")))))
-
-(defmethod ig/init-key :drafter.middleware.auth0-auth/authorization [_ _]
-  (fn [handler]
-    (fn [{:keys [:swirrl.auth0/access-token] :as request}]
-      (if (authorized? access-token)
-        (handler request)
-        (response/forbidden-response "Not authorized.")))))
-
-(s/def ::wrap-auth fn?)
-(s/def ::wrap-token fn?)
-
-(defmethod ig/pre-init-spec :drafter.middleware.auth0-auth/wrap-auth [_]
-  (s/keys :req-un [::wrap-token ::wrap-auth]))
-
-(defmethod ig/init-key :drafter.middleware.auth0-auth/wrap-auth
-  [_ {:keys [wrap-token wrap-auth] :as config}]
-  (comp wrap-token wrap-auth))
+        ::jwt/token-expired (response/unauthorized-response "Token expired.")
+        ::jwt/claim-invalid (response/unauthorized-response "Not authenticated.")
+        ::jwt/token-invalid (response/unauthorized-response "Not authenticated.")
+        (response/unauthorized-response "Not authenticated.")))))

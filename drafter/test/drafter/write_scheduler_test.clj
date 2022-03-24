@@ -1,8 +1,6 @@
 (ns drafter.write-scheduler-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
-            [drafter
-             [responses :as resp]
-             [write-scheduler :refer [compare-jobs]]]
+            [drafter.write-scheduler :refer [compare-jobs] :as writes]
             [drafter.test-helpers.lock-manager :as lm]
             [schema.test :refer [validate-schemas]]
             [drafter.async.jobs :refer [->Job create-job job-succeeded!]]
@@ -45,8 +43,8 @@
   (let []
     (testing "run-sync-job!"
       (testing "when global-writes-lock is unlocked"
-        (let [response (resp/run-sync-job! global-writes-lock
-                                           (const-job :blocking-write :done))]
+        (let [response (writes/run-sync-job!
+                        global-writes-lock (const-job :blocking-write :done))]
           (is (= 200 (:status response))
               "Job returns 200")
           (is (= :done (get-in response [:body :details :details]))
@@ -58,8 +56,8 @@
            (lm/take-lock! lock-mgr)
 
            (is (thrown? clojure.lang.ExceptionInfo
-                        (resp/run-sync-job! global-writes-lock
-                                            (const-job :blocking-write :done)))
+                        (writes/run-sync-job!
+                         global-writes-lock (const-job :blocking-write :done)))
                "Waits a short while for lock, and raises an error when it can't acquire it.")
 
            (finally
@@ -72,7 +70,7 @@
   (testing "submit-async-job!"
     (testing "when submitting :background-write's"
       (testing "when global-writes-lock is unlocked"
-        (let [response (resp/submit-async-job! (const-job :background-write :done))]
+        (let [response (writes/submit-async-job! (const-job :background-write :done))]
           (is (= 202 (:status response))
               "Job returns 202 (Accepted)")
           (is (string? (get-in response [:body :finished-job]))
@@ -83,7 +81,7 @@
           (try
             (lm/take-lock! lock-mgr)
 
-            (let [response (resp/submit-async-job! (const-job :background-write :done))]
+            (let [response (writes/submit-async-job! (const-job :background-write :done))]
               ;; :background-write Jobs should still be queued even if
               ;; the writes lock is engaged.  Internal copy operations
               ;; will honor the lock instead.
@@ -99,7 +97,7 @@
   [{:keys [:drafter/global-writes-lock]} system]
   (testing "when submitting :publish-write's"
     (testing "when global-writes-lock is unlocked"
-      (let [response (resp/submit-async-job! (const-job :publish-write :done))]
+      (let [response (writes/submit-async-job! (const-job :publish-write :done))]
         (is (= 202 (:status response))
             "Job returns 202 (Accepted)")
         (is (string? (get-in response [:body :finished-job]))
@@ -110,7 +108,7 @@
         (try
           (lm/take-lock! lock-mgr)
 
-          (let [response (resp/submit-async-job! (const-job :publish-write :done))]
+          (let [response (writes/submit-async-job! (const-job :publish-write :done))]
             ;; :publish-write Jobs should still be queued even if
             ;; the writes lock is engaged.  Internal copy operations
             ;; will honor the lock instead.

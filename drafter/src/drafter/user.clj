@@ -17,11 +17,13 @@
 (defmethod ig/init-key :drafter.user/repo [k opts]
   (throw (ex-info "Config error.  Please use a concrete implementation of the user repo instead." {})))
 
-(def ^{:doc "Ordered list of roles from least permissions to greatest
-permissions."
-       } roles [:editor :publisher :manager :system])
+(def role->permission-level
+  {:access 0 :editor 1 :publisher 2 :manager 3 :system 4})
 
-(def role->permission-level (zipmap roles (iterate inc 1))) ;; e.g. {:editor 1, :publisher 2, :manager 3}
+(def ^{:doc
+       "Ordered list of roles from least permissions to greatest permissions."}
+  roles
+  (sort-by role->permission-level (keys role->permission-level)))
 
 (def username :email)
 (def role :role)
@@ -48,7 +50,7 @@ permissions."
   (.getSchemeSpecificPart user-uri))
 
 (defn is-known-role? [r]
-  (util/seq-contains? roles r))
+  (contains? role->permission-level r))
 
 (defn- get-valid-email [email]
   (if-let [valid (util/validate-email-address email)]
@@ -95,7 +97,8 @@ permissions."
   "Takes a user and a role keyword and tests whether the user is
   authorised to operate in that role."
   [{:keys [role] :as user} requested]
-  (<= (role->permission-level requested) (role->permission-level role)))
+  (and (is-known-role? role)
+       (<= (role->permission-level requested) (role->permission-level role))))
 
 (defn- user-token-invalid [token invalid-key info]
   (let [msg (str "User token invalid: " info " (" invalid-key " = '" (invalid-key token) "')")]

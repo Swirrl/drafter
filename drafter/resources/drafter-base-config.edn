@@ -60,28 +60,28 @@
  [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
                                                               :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
 
- :drafter.routes/jobs-status {:wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.routes/jobs-status {}
 
  :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.live/endpoint
                                                  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
- :drafter.feature.draftset.list/get-draftsets-handler {:drafter/backend #ig/ref :drafter/backend
-                                                       :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.draftset.list/get-draftsets-handler
+ {:drafter/backend #ig/ref :drafter/backend}
 
- :drafter.feature.draftset.show/handler {:drafter/backend #ig/ref :drafter/backend
-                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.draftset.show/handler
+ {:drafter/backend #ig/ref :drafter/backend}
 
- :drafter.feature.draftset.create/handler {:drafter/manager #ig/ref :drafter/manager
-                                           :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.draftset.create/handler
+ {:drafter/manager #ig/ref :drafter/manager}
 
- :drafter.feature.middleware/wrap-as-draftset-owner {:drafter/backend #ig/ref :drafter/backend
-                                                     :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.middleware/wrap-as-draftset-owner
+ {:drafter/backend #ig/ref :drafter/backend}
 
  :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset.options/handler {:drafter/backend #ig/ref :drafter/backend
-                                            :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.draftset.options/handler
+ {:drafter/backend #ig/ref :drafter/backend}
 
  :drafter.feature.draftset-data.show/handler {:drafter/backend #ig/ref :drafter/backend
                                               :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
@@ -129,16 +129,16 @@
                                            :drafter.user/repo #ig/ref :drafter.user/repo
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset.claim/handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
-                                          :drafter/manager #ig/ref :drafter/manager}
+ :drafter.feature.draftset.claim/handler
+ {:drafter/manager #ig/ref :drafter/manager}
 
  #_:drafter.routes.draftsets-api/get-users-handler
- :drafter.feature.users.list/get-users-handler {:wrap-auth #ig/ref :drafter.middleware/wrap-auth
-                                                :drafter.user/repo #ig/ref :drafter.user/repo}
+ :drafter.feature.users.list/get-users-handler
+ {:drafter.user/repo #ig/ref :drafter.user/repo}
 
  :drafter.feature.endpoint.show/handler {:repo #ig/ref :drafter/backend}
- :drafter.feature.endpoint.list/handler {:drafter/backend #ig/ref :drafter/backend
-                                         :wrap-auth #ig/ref :drafter.middleware/wrap-auth}
+ :drafter.feature.endpoint.list/handler
+ {:drafter/backend #ig/ref :drafter/backend}
 
  [:drafter/routes :draftset/api] {:context "/v1"
                                   :routes [[:get "/users" #ig/ref :drafter.feature.users.list/get-users-handler]
@@ -172,11 +172,17 @@
                                            ]
                                   }
 
- :drafter.handler/app {:repo #ig/ref :drafter.stasher/repo
-                       :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
-                       :draftset-api-routes #ig/ref [:drafter/routes :draftset/api]
-                       :jobs-status-routes #ig/ref :drafter.routes/jobs-status
-                       :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock}
+ ;; Set to true to require all requests to be authorized
+ :drafter/global-auth? #boolean #or [#env DRAFTER_GLOBAL_AUTH false]
+
+ :drafter.handler/app
+ {:repo #ig/ref :drafter.stasher/repo
+  :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
+  :draftset-api-routes #ig/ref [:drafter/routes :draftset/api]
+  :jobs-status-routes #ig/ref :drafter.routes/jobs-status
+  :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate
+  :global-auth? #ig/ref :drafter/global-auth?}
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Web Server

@@ -39,40 +39,40 @@
   (is (= 401 status)))
 
 (tc/deftest-system-with-keys authenticate-user-test
-  [:drafter.middleware/wrap-auth]
-  [{:keys [:drafter.middleware/wrap-auth]} system]
+  [:drafter.middleware/wrap-authenticate]
+  [{:keys [:drafter.middleware/wrap-authenticate]} system]
   (let [username "test@example.com"
         user {:email username :role :publisher}
         token (tc/user-access-token username "drafter:publisher")
         request (create-authorised-request token)
-        handler (wrap-auth identity)
+        handler (wrap-authenticate identity)
         {:keys [identity] :as response} (handler request)]
     (is (auth/authenticated? response))
     (is (= (user/authenticated! user) identity))))
 
 (tc/deftest-system-with-keys invalid-token-should-not-authenticate-test
-  [:drafter.middleware/wrap-auth]
-  [{:keys [:drafter.middleware/wrap-auth]} system]
+  [:drafter.middleware/wrap-authenticate]
+  [{:keys [:drafter.middleware/wrap-authenticate]} system]
   (let [username "test@example.com"
         user {:email username :role :pmd.role/drafter:editor}
         token "blahblahblah"
         request (create-authorised-request token)
-        handler (wrap-auth identity)
+        handler (wrap-authenticate identity)
         response (handler request)]
     (is (= false (auth/authenticated? response)))))
 
 (tc/deftest-system-with-keys request-without-credentials-should-not-authenticate
-  [:drafter.middleware/wrap-auth]
-  [{:keys [:drafter.middleware/wrap-auth]} system]
-  (let [handler (wrap-auth identity)
+  [:drafter.middleware/wrap-authenticate]
+  [{:keys [:drafter.middleware/wrap-authenticate]} system]
+  (let [handler (wrap-authenticate identity)
         response (handler {:uri "/test" :request-method :get})]
     (is (= false (auth/authenticated? response)))))
 
 (tc/deftest-system-with-keys handler-should-return-not-authenticated-response-if-inner-handler-returns-unauthorised
-  [:drafter.middleware/wrap-auth]
-  [{:keys [:drafter.middleware/wrap-auth]} system]
+  [:drafter.middleware/wrap-authenticate]
+  [{:keys [:drafter.middleware/wrap-authenticate]} system]
   (let [inner-handler (fn [req] {:status 401 :body "Auth required"})
-        handler (wrap-auth inner-handler)
+        handler (wrap-authenticate inner-handler)
         response (handler {:uri "/test" :request-method :get})]
     (assert-is-unauthorised-response response)))
 

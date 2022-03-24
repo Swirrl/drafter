@@ -1,0 +1,1 @@
+#merge [#include "test-system.edn" {:drafter/global-auth? true}]

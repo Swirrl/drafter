@@ -70,7 +70,7 @@
         jws-backend (get-configured-token-auth-backend config)]
     (remove nil? [basic-backend jws-backend])))
 
-(defn- wrap-authenticated [auth-backends inner-handler realm]
+(defn- wrap-authenticate [auth-backends inner-handler realm]
   (let [auth-handler (apply wrap-authentication (require-authenticated inner-handler) auth-backends)
         unauthorised-fn (fn [req err]
                           (response/unauthorised-basic-response (or realm "Drafter")))]
@@ -79,10 +79,11 @@
 (defn make-authenticated-wrapper [{:keys [realm] :as user-repo} config]
   (let [auth-backends (get-configured-auth-backends user-repo config)]
     (fn [inner-handler]
-      (wrap-authenticated auth-backends inner-handler realm))))
+      (wrap-authenticate auth-backends inner-handler realm))))
 
-(defmethod ig/pre-init-spec :drafter.middleware.auth/wrap-auth [_]
+(defmethod ig/pre-init-spec :drafter.middleware.auth/wrap-authenticate [_]
   (s/keys :req [::user/repo]))
 
-(defmethod ig/init-key :drafter.middleware.auth/wrap-auth [_ {:keys [::user/repo] :as config}]
+(defmethod ig/init-key :drafter.middleware.auth/wrap-authenticate
+  [_ {:keys [::user/repo] :as config}]
   (make-authenticated-wrapper repo config))

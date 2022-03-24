@@ -2,7 +2,6 @@
   "Appending quads & triples into a draftset."
   (:require
    [clojure.spec.alpha :as s]
-   [drafter.async.responses :as async-response]
    [drafter.backend.draftset.draft-management :as mgmt]
    [drafter.draftset :as ds]
    [drafter.feature.draftset-data.common :as ds-data-common]
@@ -12,6 +11,7 @@
    [drafter.requests :as req]
    [drafter.responses :as response]
    [drafter.time :as time]
+   [drafter.write-scheduler :as writes]
    [grafter-2.rdf.protocols :as pr]
    [grafter-2.rdf4j.io :as gio]
    [grafter-2.rdf4j.repository :as repo]
@@ -113,13 +113,13 @@
   "Enqueues a job to append quads from a data source into draftset on behalf of the given user"
   [manager user-id draftset source metadata]
   (let [job (append-data-to-draftset-job manager user-id draftset source metadata)]
-    (response/enqueue-async-job! job)))
+    (writes/enqueue-async-job! job)))
 
 (defn data-handler
   "Ring handler to append data into a draftset."
   [{:keys [:drafter/manager
            ::time/clock wrap-as-draftset-owner]}]
-  (wrap-as-draftset-owner
+  (wrap-as-draftset-owner :editor
     (require-rdf-content-type
       (dset-middleware/parse-graph-for-triples
         (temp-file-body
@@ -129,7 +129,7 @@
                     {:keys [draftset-id metadata]} params
                     source (ds-data-common/get-request-statement-source request)
                     append-job (append-data manager user-id draftset-id source metadata)]
-                (async-response/submitted-job-response append-job)))))))))
+                (response/submitted-job-response append-job)))))))))
 
 (defmethod ig/pre-init-spec ::data-handler [_]
   (s/keys :req [:drafter/manager]

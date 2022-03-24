@@ -99,8 +99,7 @@
           delete-response (handler delete-request)]
       (tc/assert-is-forbidden-response delete-response))))
 
-(deftest delete-live-graph-async-test
-  (tc/with-system
+(tc/deftest-system-with-keys delete-live-graph-async-test
     keys-for-test
     [{handler [:drafter/routes :draftset/api]} system]
     (let [quads (statements "test/resources/test-draftset.trig")
@@ -128,4 +127,4 @@
 
           ;; did the job delete the graph?
           (is (= 200 (:status ds-response)))
-          (is (= :deleted (get-in ds-response [:body :changes graph-to-delete :status]))))))))
+          (is (= :deleted (get-in ds-response [:body :changes graph-to-delete :status])))))))
