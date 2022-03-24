@@ -12,10 +12,11 @@
 (def repo "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl")
 
 (defn pmd4-docker-build [opts]
-  (let [tags (map #(tag (b/git-process {:git-args %}))
-                  ["rev-parse HEAD"
+  (let [tags (->> ["rev-parse HEAD"
                    "describe --tags"
-                   "branch --show-current"])]
+                   "branch --show-current"]
+                  (map #(tag (b/git-process {:git-args %})))
+                  (remove nil?))]
     (pack/docker
      {:basis (b/create-basis {:project "deps.edn" :aliases [:pmd4/docker]})
       ;; If we don't include a tag in the :image-name, then pack implicitly
