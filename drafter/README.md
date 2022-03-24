@@ -40,7 +40,7 @@ Additionally, commits to the master branch creates and publishes omni packages w
 
 Tags that look like `v<number>.<number>` e.g. `v2.6` will also create and publish an omni package that looks like: `2.6-circle_999_abcdef` (not a real versioned release).
 
-## Making a release
+## Making a release
 
 To make a release, tag and push a tag that looks like `v<number>.<number>` to the repo (either via CLI or via Github UI).
 
