@@ -8,6 +8,8 @@
  :drafter.common.config/sparql-query-endpoint #env SPARQL_QUERY_ENDPOINT
  :drafter.common.config/sparql-update-endpoint #env SPARQL_UPDATE_ENDPOINT
 
+ :drafter.common.config/base-uri #or [#env DRAFTER_BASE_URI ""]
+
  :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
 
  :drafter.user/auth0-repository {:auth0 #ig/ref :swirrl.auth0/client}

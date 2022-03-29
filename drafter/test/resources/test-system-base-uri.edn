@@ -1,9 +1,0 @@
-#merge [#include "repo.edn"
-        #include "backend.edn"
-        #include "swirrl-auth0.edn"
-        #profile {:auth0 #include "auth0-repo.edn"
-                  :basic-auth #include "user-repo.edn"}
-        #include "log-system.edn"
-        #include "web.edn"
-        {:drafter.common.config/base-uri "http://all-your-base-are-belong.us/"
-         :drafter.fixture-data/loader {:repo #ig/ref :drafter.stasher/repo :fixtures []}}]

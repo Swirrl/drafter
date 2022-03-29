@@ -28,6 +28,7 @@ executors:
       SPARQL_QUERY_ENDPOINT: "http://localhost:5820/muttnik-test/query"
       SPARQL_UPDATE_ENDPOINT: "http://localhost:5820/muttnik-test/update"
       STARDOG_HOME: .omni_cache/install/stardog/install/stardog-home/
+      DRAFTER_BASE_URI: "http://drafter-test-base.org/"
 
 
   build-executor:

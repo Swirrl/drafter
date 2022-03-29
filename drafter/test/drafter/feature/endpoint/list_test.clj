@@ -25,9 +25,15 @@
               req)]
     req))
 
+(def keys-for-test
+  [:drafter.stasher/repo
+   [:drafter/routes :draftset/api]
+   :drafter.fixture-data/loader 
+   :drafter/write-scheduler])
+
 (deftest no-login-test
   (tc/with-system
-    [:drafter.stasher/repo [:drafter/routes :draftset/api] :drafter.fixture-data/loader :drafter/write-scheduler]
+    keys-for-test
     [system "drafter/feature/empty-db-system.edn"]
     (let [repo (:drafter.stasher/repo system)
           handler (get system [:drafter/routes :draftset/api])
@@ -48,7 +54,7 @@
 
 (deftest no-public-endpoint-test
   (tc/with-system
-    [:drafter.stasher/repo [:drafter/routes :draftset/api] :drafter.fixture-data/loader :drafter/write-scheduler]
+    keys-for-test
     [system "drafter/feature/empty-db-system.edn"]
     (let [handler (get system [:drafter/routes :draftset/api])]
       (let [req (get-endpoints-request)
@@ -64,7 +70,7 @@
 
 (deftest with-login-test
   (tc/with-system
-    [:drafter.stasher/repo [:drafter/routes :draftset/api] :drafter.fixture-data/loader :drafter/write-scheduler]
+    keys-for-test
     [system "drafter/feature/empty-db-system.edn"]
     (let [handler (get system [:drafter/routes :draftset/api])
           expected-public {:id "public"

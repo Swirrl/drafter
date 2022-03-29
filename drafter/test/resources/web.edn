@@ -1,5 +1,5 @@
 {
- :drafter.common.config/base-uri ""
+ :drafter.common.config/base-uri "http://drafter-test-base.org/"
 
  :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
 

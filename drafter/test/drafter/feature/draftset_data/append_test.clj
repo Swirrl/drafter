@@ -20,7 +20,6 @@
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system-config "test-system.edn")
-(def system-config-with-base-uri "test-system-base-uri.edn")
 
 (def keys-for-test [[:drafter/routes :draftset/api]
                     :drafter/write-scheduler
@@ -143,7 +142,7 @@
 (t/deftest append-json-ld-quad-data-to-draftset-with-base-uri-from-config
   (tc/with-system
     keys-for-test
-    [system system-config-with-base-uri]
+    [system system-config]
     (testing "when calling the append API with JSON-LD quads and base-uri is configured"
       (let [handler (get system [:drafter/routes :draftset/api])
             draftset-location (help/create-draftset-through-api handler test-editor)
@@ -175,7 +174,7 @@
 (t/deftest append-json-ld-quad-data-to-draftset-with-base-uri-supplied-in-request-params
   (tc/with-system
     keys-for-test
-    [system system-config-with-base-uri]
+    [system system-config]
     (testing "when calling the append API with JSON-LD quads and base-uri is supplied in request params"
       (testing "base URI in request params overrides base URI in configuration"
         (let [handler (get system [:drafter/routes :draftset/api])
@@ -209,7 +208,7 @@
 (t/deftest append-quad-trig-data-to-draftset-with-base-uri
   (tc/with-system
     keys-for-test
-    [system system-config-with-base-uri]
+    [system system-config]
     (testing "when calling the append API with turtle triples and base-uri is configured"
       (let [handler (get system [:drafter/routes :draftset/api])
             draftset-location (help/create-draftset-through-api handler test-editor)
