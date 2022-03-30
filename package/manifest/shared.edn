@@ -30,7 +30,6 @@
                           :path "dev-stop.sh"
                           :mode "755"
                           :env #{:dev :ci}}
-                         "log4j2.xml"
                          "init-public-endpoint.edn"]
                :systemd [{:type :selmer/template
                           :path "drafter.service"
