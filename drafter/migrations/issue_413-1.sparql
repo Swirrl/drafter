@@ -44,7 +44,7 @@ INSERT {
         ?ds dcterms:modified ?now .
     }
 } WHERE {
-    { SELECT DISTINCT ?ds WHERE {
+    { SELECT DISTINCT ?ds ?dsmodified WHERE {
         GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
         ?ds a drafter:DraftSet .
         OPTIONAL { ?ds dcterms:modified ?dsmodified }
