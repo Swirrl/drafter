@@ -28,7 +28,6 @@
       :image-type (get opts :image-type :docker)
       :include {"/app/config" ["./resources/drafter-auth0.edn"]}
       :base-image "gcr.io/distroless/java:11"
-      :volumes #{"/app/config" "/app/stasher-cache"}
       ;; NOTE Not as documented!
       ;; The docstring states that these should be
       ;;     :to-registry {:username ... :password ...}
