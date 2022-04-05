@@ -5,13 +5,23 @@
             [grafter-2.rdf4j.repository :as repo]
             [grafter-2.rdf4j.sparql :as sp]))
 
+(defn- retry [retries sleep f]
+  (let [res (try {:ok (f)} (catch Exception ex {:ex ex}))]
+    (if (contains? res :ok)
+      (:ok res)
+      (if (pos? retries)
+        (do
+          (Thread/sleep sleep)
+          (recur (dec retries) sleep f))
+        (throw (:ex res))))))
+
 (defn ensure-public-endpoint
   "Ensures the public endpoint exists within the endpoints graph, creating it if
    necessary."
   [repo]
   (with-open [conn (repo/->connection repo)]
     (let [u (slurp (io/resource "drafter/feature/endpoint/ensure_public_endpoint.sparql"))]
-      (gproto/update! conn u))))
+      (retry 60 1000 #(gproto/update! conn u)))))
 
 (defn get-public-endpoint
   "Returns a map representation of the public endpoint"

@@ -42,8 +42,7 @@
 
 (defn start-auth0-drafter-server []
   (drafter/-main (h/res-file "auth0-test-config.edn")
-                 (h/res-file "stasher-off.edn")
-                 (h/res-file "init-public-endpoint.edn")))
+                 (h/res-file "stasher-off.edn")))
 
 (defn drafter-server-fixture [f]
   (try

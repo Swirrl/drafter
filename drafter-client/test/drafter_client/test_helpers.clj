@@ -52,13 +52,11 @@
 
 (defn start-auth0-drafter-server []
   (main/-main (res-file "auth0-test-config.edn")
-              (res-file "stasher-off.edn")
-              (res-file "init-public-endpoint.edn")))
+              (res-file "stasher-off.edn")))
 
 (defn start-basicauth-drafter-server []
   (main/-main (res-file "basicauth-test-config.edn")
-              (res-file "stasher-off.edn")
-              (res-file "init-public-endpoint.edn")))
+              (res-file "stasher-off.edn")))
 
 (defn stop-drafter-server []
   (main/stop-system!))

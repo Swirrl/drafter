@@ -29,8 +29,7 @@
                          {:type :copy
                           :path "dev-stop.sh"
                           :mode "755"
-                          :env #{:dev :ci}}
-                         "init-public-endpoint.edn"]
+                          :env #{:dev :ci}}]
                :systemd [{:type :selmer/template
                           :path "drafter.service"
                           :keys [:omni/install-dir]}]
