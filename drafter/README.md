@@ -61,3 +61,15 @@ $ stardog query <database-name> <path-to-migration>
 If a version bump requires a migration to be run, it should be noted in the
 release notes.
 
+## Docker
+
+CI will build and push a docker image to
+
+```
+europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl/drafter-pmd4
+```
+
+tagged with git tag, branch name, and commit sha.
+
+Consumers may want to mount volumes at `/app/config` to provide custom
+configuration, and at `/app/stasher-cache` to persist the cache.
