@@ -143,8 +143,6 @@
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
- :drafter/global-auth? false
-
  :drafter.swagger/swagger-routes {:auth-methods #ig/refset :drafter.auth/auth-method
                                   :global-auth? #ig/ref :drafter/global-auth?}
 
@@ -155,7 +153,6 @@
   :jobs-status-routes #ig/ref :drafter.routes/jobs-status
   :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate
-  :global-auth? #ig/ref :drafter/global-auth?
   :swagger-routes #ig/ref :drafter.swagger/swagger-routes}
 
  :drafter.server/http {:handler #ig/ref :drafter.handler/app
