@@ -75,7 +75,7 @@
 (defn get-draftsets-handler
   ":get /draftsets"
   [{:keys [drafter/backend wrap-authenticate]}]
-  (middleware/wrap-authorize wrap-authenticate :editor
+  (middleware/wrap-authorize wrap-authenticate :draft:view
     (middleware/include-endpoints-param
       (parse-union-with-live-handler
         (fn [{user :identity {:keys [include union-with-live]} :params :as request}]

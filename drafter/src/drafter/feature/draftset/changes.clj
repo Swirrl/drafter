@@ -28,7 +28,7 @@
 
 (defn delete-draftset-changes-handler
   [{:keys [wrap-as-draftset-owner] {:keys [backend] :as manager} :drafter/manager}]
-  (wrap-as-draftset-owner :editor
+  (wrap-as-draftset-owner :draft:edit
    (middleware/parse-graph-param-handler
     true
     (fn [{{:keys [draftset-id graph]} :params :as request}]

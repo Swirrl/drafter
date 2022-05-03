@@ -82,18 +82,18 @@
         (wrapped request)
         (handler request)))))
 
-(defn wrap-authorize [wrap-authenticate required-role handler]
+(defn wrap-authorize [wrap-authenticate permission handler]
   (wrap-authenticate
    (fn [request]
      (if (whitelisted? request)
        (handler request)
        (let [user (:identity request)]
-         (if (user/has-role? (:identity request) required-role)
+         (if (user/has-permission? (:identity request) permission)
            (handler request)
            (response/forbidden-response
             (str "You require the "
-                 (name required-role)
-                 " role to perform this action"))))))))
+                 (name permission)
+                 " permission to perform this action"))))))))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]

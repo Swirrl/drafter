@@ -119,6 +119,11 @@
   (and (is-known-role? role)
        (<= (role->permission-level requested) (role->permission-level role))))
 
+(defn has-permission?
+  "Check if a user has a given permission."
+  [user permission]
+  (contains? (:permissions user) permission))
+
 (defn- user-token-invalid [token invalid-key info]
   (let [msg (str "User token invalid: " info " (" invalid-key " = '" (invalid-key token) "')")]
     (throw (ex-info msg {:token token}))))

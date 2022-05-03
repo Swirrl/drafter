@@ -23,7 +23,7 @@
 
 (defn handler
   [{:keys [drafter/backend wrap-authenticate]}]
-  (middleware/wrap-authorize wrap-authenticate :editor
+  (middleware/wrap-authorize wrap-authenticate :draft:view
    (feat-middleware/existing-draftset-handler
     backend
     (parse-union-with-live-handler

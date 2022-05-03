@@ -11,7 +11,7 @@
   [{wrap-as-draftset-owner :wrap-as-draftset-owner
     backend :drafter/backend
     draftset-query-timeout-fn :timeout-fn}]
-  (wrap-as-draftset-owner :editor
+  (wrap-as-draftset-owner :draft:view
    (parse-union-with-live-handler
     (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
       (let [executor (ep/build-draftset-endpoint backend draftset-id union-with-live)

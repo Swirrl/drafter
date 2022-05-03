@@ -40,7 +40,7 @@
   (let [inner-handler (partial handler* manager)]
     (->> inner-handler
         (feat-middleware/existing-draftset-handler backend)
-        (middleware/wrap-authorize wrap-authenticate :editor))))
+        (middleware/wrap-authorize wrap-authenticate :draft:claim))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset.claim/handler [_]
   (s/keys :req [:drafter/manager]))
