@@ -41,12 +41,10 @@
 (defn get-request-statement-source
   "Returns an ITripleReadable statement source from an incoming jobs request"
   [{:keys [body params] :as _request} base-uri]
-  (let [{:keys [rdf-format graph base]} params
-        ;; base-uri may be set in config, but overridden by api params
-        active-base-uri (or base base-uri)
+  (let [{:keys [rdf-format graph]} params
         source (ses/map->FormatStatementSource {:inner-source body
                                                 :format rdf-format
-                                                :base-uri active-base-uri})]
+                                                :base-uri base-uri})]
     (if (and (ses/is-quads-format? rdf-format)
              (not graph))
       source

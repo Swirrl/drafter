@@ -435,7 +435,6 @@ paths:
         - $ref: '#/parameters/graph'
         - $ref: '#/parameters/metadata'
         - $ref: '#/parameters/encoding'
-        - $ref: '#/parameters/base'
         #- $ref: '#/parameters/messagenonote'
       consumes:
         - application/n-quads
@@ -480,7 +479,6 @@ paths:
         - $ref: '#/parameters/graph'
         - $ref: '#/parameters/metadata'
         - $ref: '#/parameters/encoding'
-        - $ref: '#/parameters/base'
         #- $ref: '#/parameters/messagenonote'
       consumes:
         - application/n-quads
@@ -1068,15 +1066,6 @@ parameters:
       performed on.  This is only required if the supplied RDF data is
       in triples format.  If quads are provided then all the quads are
       assumed to be in this graph.
-    in: query
-    required: false
-    type: string
-    format: uri
-  base:
-    name: base
-    description: |
-      The base URI that should be used as a base for relative URIs
-      specified in the operation.
     in: query
     required: false
     type: string

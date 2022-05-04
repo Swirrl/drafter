@@ -171,40 +171,6 @@
                  (set expected-quads))
               "relative URI /Person should have base-uri as prefix in saved quad statements"))))))
 
-(t/deftest append-json-ld-quad-data-to-draftset-with-base-uri-supplied-in-request-params
-  (tc/with-system
-    keys-for-test
-    [system system-config]
-    (testing "when calling the append API with JSON-LD quads and base-uri is supplied in request params"
-      (testing "base URI in request params overrides base URI in configuration"
-        (let [handler (get system [:drafter/routes :draftset/api])
-              draftset-location (help/create-draftset-through-api handler test-editor)
-              append-request (-> (help/append-to-draftset-request test-editor
-                                                                  draftset-location
-                                                                  ;; this file contains some relative URIs
-                                                                  (io/file "test/resources/json-ld/person2-quads.jsonld")
-                                                                  {:content-type "application/ld+json"})
-                                 (assoc-in [:params :base] "http://foop.org/"))
-              append-response (handler append-request)
-              expected-quads (map #(assoc % :c "http://scotts-world-o-graphs.net/graph")
-                                  [{:s "http://person.org/johndoe"
-                                    :p "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-                                    :o "http://foop.org/Person"}
-                                   {:s "http://person.org/johndoe"
-                                    :p "http://schema.org/jobTitle"
-                                    :o "Student"}
-                                   {:s "http://person.org/johndoe"
-                                    :p "http://schema.org/name"
-                                    :o "John Doe"}
-                                   {:s "http://person.org/johndoe"
-                                    :p "http://schema.org/url"
-                                    :o "http://www.johndoe.com"}])]
-          (tc/await-success (get-in append-response [:body :finished-job]))
-          (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
-            (is (= (set ds-quads)
-                   (set expected-quads))
-                "relative URI /Person should have base-uri as prefix in saved quad statements")))))))
-
 (t/deftest append-quad-trig-data-to-draftset-with-base-uri
   (tc/with-system
     keys-for-test
