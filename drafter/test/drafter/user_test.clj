@@ -9,7 +9,6 @@
 (use-fixtures :each tc/with-spec-instrumentation)
 
 (def test-password "password")
-(def test-norole (create-user "norole@swirrl.com" :norole (get-digest test-password)))
 (def test-access (create-user "access@swirrl.com" :access (get-digest test-password)))
 (def test-editor (create-user "editor@swirrl.com" :editor (get-digest test-password)))
 (def test-publisher (create-user "publisher@swirrl.com" :publisher (get-digest test-password)))
@@ -58,16 +57,32 @@
     (is (thrown? ExceptionInfo (validate-token! {:email "foo@bar.com" :role "invalid"}))))
 
   (testing "Valid token"
-    (is (= {:email "foo@bar.com" :role :editor} (validate-token! {:email "foo@bar.com" :role "editor"})))))
+    (is (= {:email "foo@bar.com"
+            :role :editor
+            :permissions (role->permissions :editor)}
+           (validate-token! {:email "foo@bar.com" :role "editor"})))))
 
 (deftest authenticated!-test
   (are [user expected] (= expected (authenticated! user))
-    (create-user "test@example.com" :publisher "digest") (create-authenticated-user "test@example.com" :publisher)
-    (create-authenticated-user "test@example.com" :editor) (create-authenticated-user "test@example.com" :editor)
-    (->
-     (create-authenticated-user "test@example.com" :editor)
-     (assoc :x "x")
-     (assoc :y "y")) (create-authenticated-user "test@example.com" :editor)))
+    (create-user "test@example.com" :publisher "digest")
+    (create-authenticated-user "test@example.com"
+                               :publisher
+                               (role->permissions :publisher))
+
+    (create-authenticated-user "test@example.com"
+                               :editor
+                               (role->permissions :editor))
+    (create-authenticated-user "test@example.com"
+                               :editor
+                               (role->permissions :editor))
+
+    (assoc (create-authenticated-user "test@example.com"
+                                      :editor
+                                      (role->permissions :editor))
+           :x "x" :y "y")
+    (create-authenticated-user "test@example.com"
+                               :editor
+                               (role->permissions :editor))))
 
 (deftest is-owner?-test
   (are [user draftset expected] (= expected (is-owner? user draftset))

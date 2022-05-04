@@ -43,8 +43,9 @@
     [:drafter.middleware/wrap-authenticate]
     [{:keys [:drafter.middleware/wrap-authenticate]} system]
     (let [username "test@example.com"
-          user {:email username :role :publisher}
-          token (tc/user-access-token username "drafter:publisher")
+          permissions #{:cat:pet :missiles:launch}
+          user {:email username :role :publisher :permissions permissions}
+          token (tc/user-access-token username "drafter:publisher" permissions)
           request (create-authorised-request token)
           handler (wrap-authenticate identity)
           {:keys [identity] :as response} (handler request)]

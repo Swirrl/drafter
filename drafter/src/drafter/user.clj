@@ -12,7 +12,7 @@
   (get-all-users [this]
     "Returns all users in this repository"))
 
-(defrecord User [email role password-digest])
+(defrecord User [email role permissions password-digest])
 
 (defmethod ig/init-key :drafter.user/repo [k opts]
   (throw (ex-info "Config error.  Please use a concrete implementation of the user repo instead." {})))
@@ -76,12 +76,25 @@
     valid
     (throw (IllegalArgumentException. (str "Not a valid email address: " email)))))
 
+(defn role->permissions
+  "This function is only intended to be used for compatibility with mongo user
+   storage, or for convenience in tests."
+  [role]
+  (case role
+    :access #{}
+    :editor #{:draft:claim :draft:create :draft:delete :draft:edit :draft:offer
+              :draft:share :draft:view :job:view :user:view}
+    :publisher (conj (role->permissions :editor) :draft:publish)
+    :manager (recur :publisher)
+    :system (recur :manager)))
+
 (defn create-user
-  "Creates a user with a username, role and password digest which can
-  be used to authenticate the user."
+  "Creates a user with a username, role and password digest which can be used
+   to authenticate the user. Grants the user permissions corresponding to the
+   given role."
   [email role password-digest]
   (let [email (get-valid-email email)]
-     (->User email role password-digest)))
+     (->User email role (role->permissions role) password-digest)))
 
 (defn create-authenticated-user
   "Create a user without any authentication information which is
@@ -89,15 +102,15 @@
   authenticated for a request, their authentication parameters should
   no longer be needed, so users are normalised into a model without
   these parameters."
-  [email role]
+  [email role permissions]
   (let [email (get-valid-email email)]
-    {:email email :role role}))
+    {:email email :role role :permissions permissions}))
 
 (defn authenticated!
   "Asserts that the given user has been authenticated and returns a
   representation of the user without authentication information."
-  [{:keys [email role] :as user}]
-  (create-authenticated-user email role))
+  [{:keys [email role permissions] :as user}]
+  (create-authenticated-user email role permissions))
 
 (defn try-authenticate
   "Tries to authenticate a user with the given candidate
@@ -135,7 +148,7 @@
   (if-let [email (util/validate-email-address (:email token))]
     (let [role (keyword (:role token))]
       (if (is-known-role? role)
-        (create-authenticated-user email role)
+        (create-authenticated-user email role (role->permissions role))
         (user-token-invalid token :role "Unknown role")))
     (user-token-invalid token :email "Invalid address")))
 

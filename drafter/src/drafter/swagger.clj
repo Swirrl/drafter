@@ -40,120 +40,120 @@
           (recur resolved))))))
 
 (defn get-api-route-specs [global-auth?]
-  (let [read-role (when global-auth? :access)]
+  (let [access-permission (when global-auth? :public:view)]
     [{:id 'get-endpoints
       :path "/endpoints"
       :method :get
-      :role read-role}
+      :permission access-permission}
      {:id 'get-public-endpoint
       :path "/endpoint/public"
       :method :get
-      :role read-role}
+      :permission access-permission}
 
      {:id 'create-draftset
       :path "/draftsets"
       :method :post
-      :role :editor}
+      :permission :draft:create}
      {:id 'get-draftsets
       :path "/draftsets"
       :method :get
-      :role :access}
+      :permission :draft:view}
      {:id 'get-draftset
       :path "/draftset/{id}"
       :method :get
-      :role :access}
+      :permission :draft:view}
      {:id 'put-draftset
       :path "/draftset/{id}"
       :method :put
-      :role :editor}
+      :permission :draft:edit}
      {:id     'delete-draftset
       :path   "/draftset/{id}"
       :method :delete
-      :role :editor}
+      :permission :draft:delete}
 
      {:id 'put-draftset-graph
       :path "/draftset/{id}/graph"
       :method :put
-      :role :editor}
+      :permission :draft:edit}
      {:id 'delete-draftset-graph
       :path "/draftset/{id}/graph"
       :method :delete
-      :role :editor}
+      :permission :draft:edit}
 
      {:id 'delete-draftset-changes
       :path "/draftset/{id}/changes"
       :method :delete
-      :role :editor}
+      :permission :draft:edit}
 
      {:id 'put-draftset-data
       :path "/draftset/{id}/data"
       :method :put
-      :role :editor}
+      :permission :draft:edit}
      {:id 'delete-draftset-data
       :path "/draftset/{id}/data"
       :method :delete
-      :role :editor}
+      :permission :draft:edit}
      {:id 'get-draftset-data
       :path "/draftset/{id}/data"
       :method :get
-      :role :editor}
+      :permission :draft:view}
 
      {:id 'submit-draftset-to
       :path "/draftset/{id}/submit-to"
       :method :post
-      :role :editor}
+      :permission :draft:submit}
      {:id 'claim-draftset
       :path "/draftset/{id}/claim"
       :method :put
-      :role :editor}
+      :permission :draft:claim}
      {:id 'publish-draftset
       :path "/draftset/{id}/publish"
       :method :post
-      :role :publisher}
+      :permission :draft:publish}
 
      {:id 'get-query-draftset
       :path "/draftset/{id}/query"
       :method :get
-      :role :editor}
+      :permission :draft:view}
      {:id 'post-query-draftset
       :path "/draftset/{id}/query"
       :method :post
-      :role :editor}
+      :permission :draft:view}
      {:id 'post-update-draftset
       :path "/draftset/{id}/update"
       :method :post
-      :role :editor}
+      :permission :draft:edit}
      {:id 'get-query-live
       :path "/sparql/live"
       :method :get
-      :role read-role}
+      :permission access-permission}
      {:id 'post-query-live
       :path "/sparql/live"
       :method :post
-      :role read-role}
+      :permission access-permission}
 
      {:id 'get-users
       :path "/users"
       :method :get
-      :role :access}
+      :permission :user:view}
 
      {:id 'get-job
       :path "/status/jobs/{jobid}"
       :method :get
-      :role :editor}
+      :permission :job:view}
      {:id 'get-jobs
       :path "/status/jobs"
       :method :get
-      :role :editor}
+      :permission :job:view}
      {:id 'status-job-finished
       :path "/status/finished-jobs/{jobid}"
       :method :get
-      :role read-role}
+      :permission access-permission}
 
      {:id 'status-writes-locked
       :path "/status/writes-locked"
       :method :get
-      :role read-role}]))
+      :permission access-permission}]))
 
 (defn- route-spec-path
   "Returns the path of an operation within the swagger spec JSON"
@@ -166,7 +166,7 @@
                       {swagger-key
                        (auth/get-swagger-security-definition auth-method)}}]
     (letfn [(authenticated? [route-spec]
-              (some? (:role route-spec)))
+              (some? (:permission route-spec)))
             (add-route [spec route-spec]
               (if (authenticated? route-spec)
                 (let [operation-requirements (auth/get-operation-swagger-security-requirement auth-method route-spec)]
@@ -276,7 +276,7 @@
 (defn swagger-json-handler
   "Returns a ring handler which serves the swagger JSON at the given path. auth-methods should be a collection of all the
   configured authentication methods in the system. These are required to configure the available securityDefinitions.
-  The global-auth? parameter indicates whether global authentication is enabled. This affects the roles required to
+  The global-auth? parameter indicates whether global authentication is enabled. This affects the permissions required to
   access certain API routes."
   [path auth-methods global-auth?]
   (let [swagger-json (load-spec-and-resolve-refs auth-methods global-auth?)]

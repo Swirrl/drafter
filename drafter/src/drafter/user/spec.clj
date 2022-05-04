@@ -9,6 +9,7 @@
   (:import [drafter.user User]))
 
 (s/def ::user/role (s/with-gen user/is-known-role? (fn [] (gen/elements user/roles))))
+(s/def ::user/permissions (s/coll-of keyword? :kind set?))
 (s/def ::user/email :drafter/EmailAddress)
 (s/def ::user/password-digest string?)
 (s/def ::user/username :drafter/EmailAddress)
@@ -17,8 +18,10 @@
 (s/def :token/role string?)
 
 (s/def ::user/DbUser #(instance? User %))
-(s/def ::user/User (s/keys :req-un [::user/role ::user/email]))
-(s/def ::user/UserSummary (s/keys :req-un [::user/username ::user/role]))
+(s/def ::user/User
+  (s/keys :req-un [::user/role ::user/email ::user/permissions]))
+(s/def ::user/UserSummary
+  (s/keys :req-un [::user/username ::user/role ::user/permissions]))
 (s/def ::user/UserToken (s/keys :req-un [:token/email :token/role]))
 
 (s/def ::user/repo #(satisfies? user/UserRepository %))
@@ -36,11 +39,13 @@
   :ret :drafter/URI)
 
 (s/fdef user/create-user
-  :args (s/cat :email string? :role ::user/role :password-digest ::user/password-digest)
+  :args (s/cat :email string?
+               :role ::user/role
+               :password-digest ::user/password-digest)
   :ret ::user/DbUser)
 
 (s/fdef user/create-authenticated-user
-  :args (s/cat :email string? :role ::user/role)
+  :args (s/cat :email string? :role ::user/role :permissions ::user/permissions)
   :ret ::user/User)
 
 (s/fdef user/authenticated!
