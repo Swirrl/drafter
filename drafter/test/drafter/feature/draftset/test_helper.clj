@@ -31,10 +31,10 @@
   (and (>= status 400)
        (< status 500)))
 
-(defn create-submit-to-role-request [user draftset-location role]
+(defn create-submit-to-permission-request [user draftset-location permission]
   (tc/with-identity user {:uri (str draftset-location "/submit-to")
                           :request-method :post
-                          :params {:role (name role)}}))
+                          :params {:permission (name permission)}}))
 
 (defn create-draftset-through-api
   ([handler] (create-draftset-through-api handler test-editor))
@@ -59,8 +59,11 @@
         response (handler request)]
     (tc/assert-is-ok-response response)))
 
-(defn submit-draftset-to-role-through-api [handler user draftset-location role]
-  (let [response (handler (create-submit-to-role-request user draftset-location role))]
+(defn submit-draftset-to-permission-through-api
+  [handler user draftset-location permission]
+  (let [response (handler (create-submit-to-permission-request user
+                                                               draftset-location
+                                                               permission))]
     (tc/assert-is-ok-response response)))
 
 (defn delete-draftset-graph-request [user draftset-location graph-to-delete]

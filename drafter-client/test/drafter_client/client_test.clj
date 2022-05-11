@@ -220,7 +220,7 @@
         token (auth-util/publisher-token)
         ds-1 (sut/new-draftset client token "first" "description")
         ds-2 (sut/new-draftset client token "second" "description")]
-    (sut/submit-to-role client token (draftset/id ds-2) :publisher)
+    (sut/submit-to-permission client token (draftset/id ds-2) :draft:claim)
     (t/testing "default"
       (let [draftsets (sut/draftsets client token)]
         (t/is (= #{(draftset/id ds-1) (draftset/id ds-2)}

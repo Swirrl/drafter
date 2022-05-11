@@ -45,7 +45,7 @@
 
 (def drafter:modifiedAt dcterms:modified)
 
-(def drafter:claimRole (url/append-path-segments drafter "claimRole"))
+(def drafter:claimPermission (url/append-path-segments drafter "claimPermission"))
 
 (def drafter:claimUser (url/append-path-segments drafter "claimUser"))
 

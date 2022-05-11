@@ -16,7 +16,6 @@
 
  :drafter.middleware/wrap-authenticate
  {:middleware [#ig/ref :swirrl.auth0.middleware/bearer-token
-               #ig/ref :swirrl.auth0.middleware/normalize-roles
                #ig/ref :drafter.middleware.auth0-auth/identify
                #ig/ref :drafter.middleware.auth0-auth/token-authentication]}
 

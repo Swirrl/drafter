@@ -76,15 +76,15 @@
   ([creator display-name description]
    (assoc (create-draftset creator display-name) :description description)))
 
-(defn- submit [draftset submitter role-or-user-key role-or-user-value]
+(defn- submit [draftset submitter permission-or-user-key permission-or-user-value]
   (-> draftset
-      (dissoc :current-owner :claim-role :claim-user)
-      (assoc role-or-user-key role-or-user-value)
+      (dissoc :current-owner :claim-permission :claim-user)
+      (assoc permission-or-user-key permission-or-user-value)
       (assoc :submitted-by submitter)))
 
 ;; Not used outside of tests
-(defn submit-to-role [draftset submitter role]
-  (submit draftset submitter :claim-role role))
+(defn submit-to-permission [draftset submitter permission]
+  (submit draftset submitter :claim-permission permission))
 
 ;; Not used outside of tests
 (defn submit-to-user [draftset submitter username]
@@ -92,5 +92,5 @@
 
 (defn claim [draftset claimant]
   (-> draftset
-      (dissoc :submission)
-      (assoc :current-owner claimant)))
+      (dissoc :claim-permission :claim-user)
+      (assoc :current-owner (:email claimant))))

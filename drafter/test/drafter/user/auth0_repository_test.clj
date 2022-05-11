@@ -1,7 +1,7 @@
 (ns drafter.user.auth0-repository-test
   (:require [clojure.test :refer :all]
             [drafter.test-common :as tc]
-            [drafter.user :as user :refer [create-user get-digest roles username]]
+            [drafter.user :as user :refer [create-user get-digest username]]
             [drafter.user-test :refer [test-editor]]
             [drafter.user.auth0-repository :as repo]))
 

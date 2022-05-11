@@ -76,14 +76,14 @@
   (dsops/find-permitted-draftset-operations backend draftset-ref user))
 
 (defn- publish-draftset-op [drafter user draftset-ref {:keys [metadata] :as opts}]
-  (if (user/has-role? user :publisher)
+  (if (user/has-permission? user :draft:publish)
     (let [params (cond-> {:draftset-id draftset-ref}
                          (some? metadata) (assoc :metadata (format-metadata metadata)))
           job (dsjobs/publish-draftset-job drafter
                                            user
                                            params)]
       (write-scheduler/enqueue-async-job! job))
-    (throw (ex-info "You require the publisher role to perform this action" {}))))
+    (throw (ex-info "You require the publish permission to perform this action" {}))))
 
 (defn- draftset-query-endpoint-op [{:keys [backend]} _user draftset-ref {:keys [union-with-live?] :as opts}]
   (backend/endpoint-repo backend draftset-ref {:union-with-live? union-with-live?}))
@@ -95,12 +95,21 @@
 (defn- show-draftset-op [{:keys [backend] :as drafter} user draftset-ref {:keys [union-with-live?] :as opts}]
   (ds-show/get-draftset backend user draftset-ref (or union-with-live? false)))
 
-(defn- submit-draftset-op [{:keys [backend]} user draftset-ref {target-user :user target-role :role :as opts}]
+(defn- submit-draftset-op
+  [{:keys [backend]} user draftset-ref {target-user :user
+                                        target-permission :permission}]
   (cond
-    (and (some? target-user) (some? target-role)) (throw (ex-info "Specify only one of target user or role" {}))
-    (some? target-user) (dsops/submit-draftset-to-user! backend draftset-ref user target-user)
-    (some? target-role) (dsops/submit-draftset-to-role! backend draftset-ref user target-role)
-    :else (throw (ex-info "Target user or role required" {})))
+    (and (some? target-user) (some? target-permission))
+    (throw (ex-info "Specify only one of target user or permission" {}))
+
+    (some? target-user)
+    (dsops/submit-draftset-to-user! backend draftset-ref user target-user)
+
+    (some? target-permission)
+    (dsops/submit-draftset-to-permission! backend draftset-ref user target-permission)
+
+    :else
+    (throw (ex-info "Target user or permission required" {})))
   (dsops/get-draftset-info backend draftset-ref))
 
 (defn- append-draftset-data-op [drafter user draftset-ref source {:keys [metadata] :as opts}]
@@ -279,10 +288,10 @@
   [drafter user draftset-ref target-user]
   (submit-draftset drafter user draftset-ref {:user target-user}))
 
-(defn submit-draftset-to-role
-  "Submits a draftset owned by user to a role"
-  [drafter user draftset-ref target-role]
-  (submit-draftset drafter user draftset-ref {:role target-role}))
+(defn submit-draftset-to-permission
+  "Submits a draftset owned by user to a permission"
+  [drafter user draftset-ref target-permission]
+  (submit-draftset drafter user draftset-ref {:permission target-permission}))
 
 (defn append-data
   "Appends data from an RDF source to a draftset"
@@ -334,7 +343,10 @@
               _ds-list (list-draftsets drafter test-publisher {})]
 
           ;;lifecycle
-          (submit-draftset-to-role drafter test-publisher ds-id :editor)
+          (submit-draftset-to-permission drafter
+                                         test-publisher
+                                         ds-id
+                                         :draft:claim)
           (claim-draftset drafter test-editor ds-id)
           (submit-draftset-to-user drafter test-editor ds-id test-publisher)
           (claim-draftset drafter test-publisher ds-id)

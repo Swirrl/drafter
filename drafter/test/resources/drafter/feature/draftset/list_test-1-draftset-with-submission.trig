@@ -21,6 +21,6 @@ draftset:4e7f444f-3e34-420e-9126-f9691aeb986b a drafter:DraftSet ;
 	drafter:submittedBy <mailto:editor@swirrl.com> .
 
 <http://publishmydata.com/def/drafter/submission/ab08a82b-f6ea-4baf-9b98-e5dbb80b6bc9> a drafter:Submission ;
-	drafter:claimRole "editor" .
+	drafter:claimPermission "draft:claim" .
 
 }

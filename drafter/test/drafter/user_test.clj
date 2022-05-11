@@ -19,19 +19,19 @@
   (testing "Invalid email address"
     (is (thrown? IllegalArgumentException (create-user "invalidemail" :publisher (get-digest "password"))))))
 
-(deftest has-role?-test
-  (are [user role has?] (= has? (has-role? user role))
-       test-editor :editor true
-       test-editor :publisher false
-       test-editor :manager false
+(deftest has-permission?-test
+  (are [user permission has?] (= has? (has-permission? user permission))
+       test-editor :draft:edit true
+       test-editor :draft:publish false
+       test-editor :draft:publish false
 
-       test-publisher :editor true
-       test-publisher :publisher true
-       test-publisher :manager false
+       test-publisher :draft:edit true
+       test-publisher :draft:publish true
+       test-publisher :draft:publish true
 
-       test-manager :editor true
-       test-manager :publisher true
-       test-manager :manager true))
+       test-manager :draft:edit true
+       test-manager :draft:publish true
+       test-manager :draft:publish true))
 
 (t/deftest roles-including-test
   (t/are [role expected] (= expected (roles-including role))
@@ -58,7 +58,6 @@
 
   (testing "Valid token"
     (is (= {:email "foo@bar.com"
-            :role :editor
             :permissions (role->permissions :editor)}
            (validate-token! {:email "foo@bar.com" :role "editor"})))))
 
@@ -66,22 +65,15 @@
   (are [user expected] (= expected (authenticated! user))
     (create-user "test@example.com" :publisher "digest")
     (create-authenticated-user "test@example.com"
-                               :publisher
                                (role->permissions :publisher))
 
-    (create-authenticated-user "test@example.com"
-                               :editor
-                               (role->permissions :editor))
-    (create-authenticated-user "test@example.com"
-                               :editor
-                               (role->permissions :editor))
+    (create-authenticated-user "test@example.com" (role->permissions :editor))
+    (create-authenticated-user "test@example.com" (role->permissions :editor))
 
     (assoc (create-authenticated-user "test@example.com"
-                                      :editor
                                       (role->permissions :editor))
            :x "x" :y "y")
     (create-authenticated-user "test@example.com"
-                               :editor
                                (role->permissions :editor))))
 
 (deftest is-owner?-test
@@ -89,9 +81,9 @@
        test-editor (ds/create-draftset (username test-editor)) true
        test-editor (ds/create-draftset (username test-publisher)) false))
 
-(defn- submitted-to-role [creator role]
+(defn- submitted-to-permission [creator permission]
   (-> (ds/create-draftset (username creator))
-      (ds/submit-to-role (username creator) role)))
+      (ds/submit-to-permission (username creator) permission)))
 
 (defn- submitted-to-user [creator target]
   (-> (ds/create-draftset (username creator))
@@ -99,8 +91,8 @@
 
 (deftest is-submitted-by?-test
   (are [user draftset expected] (= expected (is-submitted-by? user draftset))
-    test-editor (submitted-to-role test-editor :publisher) true
-    test-publisher (submitted-to-role test-editor :manager) false
+    test-editor (submitted-to-permission test-editor :draft:claim) true
+    test-publisher (submitted-to-permission test-editor :draft:claim) false
     test-editor (ds/create-draftset (username test-editor)) false))
 
 (deftest can-claim?-test
@@ -109,11 +101,11 @@
     test-editor (ds/create-draftset (username test-editor)) true
 
     ;;submitter can re-claim draftset if it has not yet been claimed
-    test-editor (submitted-to-role test-editor :publisher) true
+    test-editor (submitted-to-permission test-editor :draft:claim) true
     test-editor (submitted-to-user test-editor test-manager) true
 
-    ;;user can claim draftset submitted to their role
-    test-publisher (submitted-to-role test-editor :publisher) true
+    ;;user can claim draftset submitted to a permission they have
+    test-publisher (submitted-to-permission test-editor :draft:claim) true
 
     ;;user can claim draftset submitted to them
     test-manager (submitted-to-user test-editor test-manager) true
@@ -121,8 +113,8 @@
     ;;user cannot claim draftset owned by another user
     test-publisher (ds/create-draftset (username test-editor)) false
 
-    ;;user cannot claim draftset submitted to role they are not in
-    test-publisher (submitted-to-role test-editor :manager) false
+    ;;user cannot claim draftset submitted to a permission they don't have
+    test-publisher (submitted-to-permission test-editor :draft:claim:manager) false
 
     ;;user cannot claim draftset submitted to other user
     test-manager (submitted-to-user test-editor test-publisher) false))
@@ -130,22 +122,36 @@
 (deftest permitted-draftset-operations-test
   (are [user draftset expected-operations] (= expected-operations (permitted-draftset-operations draftset user))
     ;;non-publishing owner
-    test-editor (ds/create-draftset (username test-editor)) #{:delete :edit :submit :claim}
+    test-editor
+    (ds/create-draftset (username test-editor))
+    #{:share :claim :delete :edit :view :create :submit}
 
     ;;publishing owner
-    test-publisher (ds/create-draftset (username test-publisher)) #{:delete :edit :submit :claim :publish}
+    test-publisher
+    (ds/create-draftset (username test-publisher))
+    #{:share :claim :delete :edit :view :create :submit :publish}
 
     ;;submitter on unclaimed
-    test-editor (submitted-to-role test-editor :publisher) #{:claim}
+    test-editor (submitted-to-permission test-editor :draft:claim) #{:claim}
 
     ;;submitted on claimed
-    test-editor (ds/claim (submitted-to-role test-editor :publisher) test-publisher) #{}
+    test-editor
+    (ds/claim (submitted-to-permission test-editor :draft:claim) test-publisher)
+    #{}
 
     ;;non-owner
     test-publisher (ds/create-draftset (username test-editor)) #{}
 
-    ;;user in claim role
-    test-publisher (ds/submit-to-role (ds/create-draftset "tmp@example.com") "tmp@example.com" :publisher) #{:claim}
+    ;;user has claim permission
+    test-publisher
+    (ds/submit-to-permission (ds/create-draftset "tmp@example.com")
+                             "tmp@example.com"
+                             :draft:claim)
+    #{:claim}
 
-    ;;user not in claim role
-    test-editor (ds/submit-to-role (ds/create-draftset "tmp@example.com") "tmp@example.com" :manager) #{}))
+    ;;user doesn't have claim permission
+    test-editor
+    (ds/submit-to-permission (ds/create-draftset "tmp@example.com")
+                             "tmp@example.com"
+                             :draft:publish)
+    #{}))

@@ -52,7 +52,7 @@
   "Returns an implementation of the AuthenticationMethod protocol which uses auth0. Tokens should be
    specified on incoming requests within an 'Authorization: Bearer <token>' header. The validity of
    the token is checked with the given jwk parameter. The decoded token should contain the user's
-   email and at least one drafter role or it will be rejected."
+   email or it will be rejected."
   [auth0-client jwk]
   (reify auth/AuthenticationMethod
     (parse-request [_this request]
@@ -71,7 +71,7 @@
        :flow "application"
        :description "OAuth authentication via Auth0"
        :tokenUrl (str (:endpoint auth0-client) "/oauth/token")
-       :scopes (into {} (map (fn [role] [(role->scope role) (user/get-role-summary role)]) user/roles))})
+       :scopes (into {} (map (fn [permission] [(str "drafter:" permission) (user/get-role-summary role)]) user/roles))})
 
     (get-operation-swagger-security-requirement [_this {:keys [role] :as operation}]
       (let [satisfying-roles (user/roles-including role)]

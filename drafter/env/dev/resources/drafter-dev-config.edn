@@ -15,5 +15,4 @@
  ;; auth method
  ;; JWT signed by mock JWK
  :drafter.auth.mock-auth0/mock-auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
-                                                  :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
- }
+                                                  :jwk #ig/ref :drafter.auth.auth0/mock-jwk}}

@@ -85,10 +85,6 @@
   (let [delete-query (delete-draftset-statements-query draftset-ref)]
     (sparql/update! db delete-query)))
 
-(defn- role-scores-values-clause [scored-roles]
-  (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
-    (clojure.string/join " " score-pairs)))
-
 (defn- graph-mapping-draft-graphs [graph-mapping]
   (vals graph-mapping))
 
@@ -171,7 +167,7 @@
       "}"
       "OPTIONAL {"
       "  ?ds <" drafter:hasSubmission "> ?submission ."
-      "  ?submission <" drafter:claimRole "> ?role ."
+      "  ?submission <" drafter:claimPermission "> ?permission ."
       "}"
       "{"
       "  SELECT DISTINCT ?ds WHERE {"
@@ -203,17 +199,6 @@
 (defn- user-is-owner-clause [user]
   (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
 
-(defn- user-is-in-claim-role-clause [user]
-  (let [role (user/role user)
-        user-role-score (role user/role->permission-level)]
-    (str
-      "{"
-      "   VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
-      "  ?ds <" drafter:hasSubmission "> ?submission ."
-      "  ?submission <" drafter:claimRole "> ?role ."
-      "  FILTER (" user-role-score " >= ?rv)"
-      "}")))
-
 (defn- draftset-properties-result->properties
   [draftset-ref
    {:keys [created
@@ -221,7 +206,7 @@
            description
            creator
            owner
-           role
+           permission
            claimuser
            submitter
            modified
@@ -235,7 +220,7 @@
         optional-fields {:display-name title
                          :description description
                          :current-owner (some-> owner (user/uri->username))
-                         :claim-role (some-> role (keyword))
+                         :claim-permission (keyword permission)
                          :claim-user (some-> claimuser (user/uri->username))
                          :submitted-by (some-> submitter (user/uri->username))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
@@ -315,7 +300,8 @@
     (let [q (set-draftset-metadata-query (ds/->draftset-uri draftset-ref) update-pairs)]
       (sparql/update! backend q))))
 
-(defn- submit-draftset-to-role-query [draftset-ref submission-id owner role]
+(defn- submit-draftset-to-permission-query
+  [draftset-ref submission-id owner permission]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
         submit-uri (submission-id->uri submission-id)
         user-uri (user/user->uri owner)]
@@ -327,7 +313,7 @@
      "} INSERT {"
      (with-state-graph
        "<" submit-uri "> <" rdf:a "> <" drafter:Submission "> ."
-       "<" submit-uri "> <" drafter:claimRole "> \"" (name role) "\" ."
+       "<" submit-uri "> <" drafter:claimPermission "> \"" (name permission) "\" ."
        "<" draftset-uri "> <" drafter:hasSubmission "> <" submit-uri "> ."
        "<" draftset-uri "> <" drafter:submittedBy "> <" user-uri "> ."
        )
@@ -341,15 +327,16 @@
        )
      "}")))
 
-(defn submit-draftset-to-role!
-  "Submits a draftset to users of the specified role.
+(defn submit-draftset-to-permission!
+  "Submits a draftset to users with the specified permission.
 
-  Removes the current owner of a draftset and makes it available to be
-  claimed by another user in a particular role. If the given user is
-  not the current owner of the draftset, no changes are made."
-  [backend draftset-ref owner role]
-  (let [q (submit-draftset-to-role-query draftset-ref (util/create-uuid) owner role)]
-    (sparql/update! backend q)))
+   Removes the current owner of a draftset and makes it available to be claimed
+   by another user with a particular permission. If the given user is not the
+   current owner of the draftset, no changes are made."
+  [backend draftset-ref owner permission]
+  (sparql/update! backend
+                  (submit-draftset-to-permission-query
+                   draftset-ref (util/create-uuid) owner permission)))
 
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
@@ -384,10 +371,7 @@
 
 (defn- try-claim-draftset-query [draftset-ref claimant]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
-        user-uri (user/user->uri claimant)
-        role (user/role claimant)
-        user-score (user/role->permission-level role)
-        scores-values (role-scores-values-clause user/role->permission-level)]
+        user-uri (user/user->uri claimant)]
     (str
      "DELETE {"
      (with-state-graph
@@ -400,41 +384,20 @@
      (with-state-graph
        "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
        "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-       "?submission ?sp ?so ."
-       "{"
-       "  SELECT DISTINCT ?submission WHERE {"
-       "    {"
-       "       VALUES (?role ?rv) { " scores-values " }"
-       "       ?submission <" drafter:claimRole "> ?role ."
-       "       FILTER (" user-score " >= ?rv)"
-       "    } UNION {"
-       "      ?submission <" drafter:claimUser "> <" user-uri "> ."
-       "    } UNION {"
-       "      <" draftset-uri "> <" drafter:submittedBy "> <" user-uri "> ."
-       "      <" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-       "    }"
-       "  }"
-       "}")
+       "?submission ?sp ?so .")
      "}")))
 
 (defn- try-claim-draftset!
-  "Sets the claiming user to the owner of the given draftset if:
-     - the draftset is available (has no current owner)
-     - the claiming user is in the appropriate role"
+  "Sets the claiming user to the owner of the given draftset if the draftset is
+   available (has no current owner). We should have already checked the
+   claimant has permission to claim the draftset."
   [backend draftset-ref claimant]
   (let [q (try-claim-draftset-query draftset-ref claimant)]
     (sparql/update! backend q)))
 
-(defn- infer-claim-outcome [{:keys [current-owner claim-role claim-user] :as ds-info} claimant]
-  (cond
-    (nil? ds-info) :not-found
-    (= (user/username claimant) current-owner) :ok
-    (some? current-owner) :owned
-    (and (some? claim-role)
-         (not (user/has-role? claimant claim-role))) :role
-    (and (some? claim-user)
-         (not= claim-user (user/username claimant))) :user
-    :else :unknown))
+(defn- infer-claim-outcome
+  [{:keys [current-owner] :as ds-info} claimant]
+  (if (= (user/username claimant) current-owner) :ok :unknown))
 
 (defn claim-draftset!
   "Attempts to claim a draftset for a user. If the draftset is
@@ -443,17 +406,19 @@
   operation and the current info for the draftset.
   The possible outcomes are:
     - :ok The draftset was claimed by the user
-    - :owned Claim failed as the draftset is not available
-    - :role Claim failed because the user is not in the claim role
-    - :user Claim failed because the user is not the assigned user
     - :not-found Claim failed because the draftset does not exist
+    - :forbidden Claim failed because the user does not have permission
     - :unknown Claim failed for an unknown reason"
   [backend draftset-ref claimant]
-
-  (try-claim-draftset! backend draftset-ref claimant)
-  (let [ds-info (get-draftset-info backend draftset-ref)
-        outcome (infer-claim-outcome ds-info claimant)]
-    [outcome ds-info]))
+  (if-let [ds-info (get-draftset-info backend draftset-ref)]
+    (if (user/can-claim? claimant ds-info)
+      (do
+        (try-claim-draftset! backend draftset-ref claimant)
+        (let [ds-info (get-draftset-info backend draftset-ref)
+              outcome (infer-claim-outcome ds-info claimant)]
+          [outcome ds-info]))
+      [:forbidden nil])
+    [:not-found nil]))
 
 (defn find-permitted-draftset-operations [backend draftset-ref user]
   (if-let [ds-info (get-draftset-info backend draftset-ref)]

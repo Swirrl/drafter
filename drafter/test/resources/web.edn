@@ -7,9 +7,10 @@
  :drafter.auth.auth0/auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
                                         :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
 
- :drafter.middleware/wrap-authenticate {:auth-methods [#ig/ref :drafter.auth.basic/basic-auth-method
-                                                       #ig/ref :drafter.auth.jws/jws-auth-method
-                                                       #ig/ref :drafter.auth.auth0/auth0-auth-method]}
+ :drafter.middleware/wrap-authenticate
+ {:auth-methods [#ig/ref :drafter.auth.basic/basic-auth-method
+                 #ig/ref :drafter.auth.jws/jws-auth-method
+                 #ig/ref :drafter.auth.auth0/auth0-auth-method]}
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

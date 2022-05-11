@@ -10,20 +10,14 @@
             [drafter.feature.endpoint.public :as pub]
             [drafter.endpoint :as ep]))
 
-(defn- role-scores-values-clause [scored-roles]
-  (let [score-pairs (map (fn [[r v]] (format "(\"%s\" %d)" (name r) v)) scored-roles)]
-    (clojure.string/join " " score-pairs)))
-
-(defn- user-is-in-claim-role-clause [user]
-  (let [role (user/role user)
-        user-role-score (role user/role->permission-level)]
-    (str
-      "{"
-      "   VALUES (?role ?rv) { " (role-scores-values-clause user/role->permission-level) " }"
-      "  ?ds <" drafter:hasSubmission "> ?submission ."
-      "  ?submission <" drafter:claimRole "> ?role ."
-      "  FILTER (" user-role-score " >= ?rv)"
-      "}")))
+;; Fetches all drafts with any claim permission set, we still need to check
+;; that the user actually has the set permission.
+(def claim-permission-clause
+  (str
+   "{"
+   "  ?ds <" drafter:hasSubmission "> ?submission ."
+   "  ?submission <" drafter:claimPermission "> ?permission ."
+   "}"))
 
 (defn- user-is-claim-user-clause [user]
   (str
@@ -44,7 +38,7 @@
   (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
 
 (defn user-claimable-clauses [user]
-  [(user-is-in-claim-role-clause user)
+  [claim-permission-clause
    (user-is-claim-user-clause user)
    (user-is-submitter-clause user)])
 
@@ -53,10 +47,12 @@
         (user-is-owner-clause user)))
 
 (defn get-all-draftsets-info [repo user]
-  (dsops/get-all-draftsets-by repo (user-all-visible-clauses user)))
+  (filter #(user/can-view? user %)
+          (dsops/get-all-draftsets-by repo (user-all-visible-clauses user))))
 
 (defn get-draftsets-claimable-by [repo user]
-  (dsops/get-all-draftsets-by repo (user-claimable-clauses user)))
+  (filter #(user/can-claim? user %)
+          (dsops/get-all-draftsets-by repo (user-claimable-clauses user))))
 
 (defn get-draftsets-owned-by [repo user]
   (dsops/get-all-draftsets-by repo [(user-is-owner-clause user)]))

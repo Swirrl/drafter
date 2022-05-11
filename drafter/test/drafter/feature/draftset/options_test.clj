@@ -15,7 +15,7 @@
         options-request (tc/with-identity test-editor {:uri draftset-location :request-method :options})
         {:keys [body] :as options-response} (handler options-request)]
     (tc/assert-is-ok-response options-response)
-    (is (= #{:edit :delete :submit :claim} (set body)))))
+    (is (= #{:edit :delete :submit :claim :create :share :view} (set body)))))
 
 (tc/deftest-system-with-keys get-options-for-non-existent-draftset
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api]]
