@@ -42,40 +42,41 @@
     wrap-authenticate :wrap-authenticate
     swagger-routes :swagger-routes
     global-auth? :global-auth?}]
-  (wrap-handler (app-handler
-                 ;; add your application routes here
-                 (-> []
-                     (add-route swagger-routes)
-                     (add-route draftset-api-routes)
-                     (add-route live-sparql-route)
-                     (add-route (context "/v1/status" [] (status-routes global-writes-lock)))
-                     (add-route jobs-status-routes)
-                     (add-routes (denv/env-specific-routes backend))
-                     (add-route app-routes))
+  (wrap-handler
+   (app-handler
+    ;; add your application routes here
+    (-> []
+        (add-route swagger-routes)
+        (add-route draftset-api-routes)
+        (add-route live-sparql-route)
+        (add-route (context "/v1/status" [] (status-routes global-writes-lock)))
+        (add-route jobs-status-routes)
+        (add-routes (denv/env-specific-routes backend))
+        (add-route app-routes))
 
-                 :ring-defaults (-> (assoc-in api-defaults [:params :multipart] true)
-                                    ;; Enables wrap-forwarded-scheme middleware. Essential in prod
-                                    ;; env when scheme needs to be passed through from load balancer
-                                    (assoc :proxy true))
-                 ;; add custom middleware here
-                 :middleware
-                 (let [middleware [wrap-verbs
-                                   wrap-encode-errors
-                                   middleware/wrap-total-requests-counter
-                                   middleware/wrap-request-timer
-                                   #(log-request % {:query "<scrubbed>"})]]
-                   (if global-auth?
-                     (cons #(middleware/wrap-authorize
-                             wrap-authenticate :access %)
-                           middleware)
-                     middleware))
+    :ring-defaults (-> (assoc-in api-defaults [:params :multipart] true)
+                       ;; Enables wrap-forwarded-scheme middleware. Essential in prod
+                       ;; env when scheme needs to be passed through from load balancer
+                       (assoc :proxy true))
+    ;; add custom middleware here
+    :middleware
+    (let [middleware [wrap-verbs
+                      wrap-encode-errors
+                      middleware/wrap-total-requests-counter
+                      middleware/wrap-request-timer
+                      #(log-request % {:query "<scrubbed>"})]]
+      (if global-auth?
+        (cons #(middleware/wrap-authorize
+                wrap-authenticate :public:view %)
+              middleware)
+        middleware))
 
-                 ;; add access rules here
-                 :access-rules []
-                 ;; serialize/deserialize the following data formats
-                 ;; available formats:
-                 ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
-                 :formats [:json-kw :edn])))
+    ;; add access rules here
+    :access-rules []
+    ;; serialize/deserialize the following data formats
+    ;; available formats:
+    ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
+    :formats [:json-kw :edn])))
 
 (defmethod ig/init-key :drafter/global-auth? [_ v] v)
 

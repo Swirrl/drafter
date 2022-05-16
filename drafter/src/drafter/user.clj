@@ -17,24 +17,20 @@
 (defmethod ig/init-key :drafter.user/repo [k opts]
   (throw (ex-info "Config error.  Please use a concrete implementation of the user repo instead." {})))
 
-(def role->permissions
-  "This map is only intended to be used for compatibility with mongo user
+(defn role->permissions
+  "This function is only intended to be used for compatibility with mongo user
    storage, or for convenience in tests."
-  {:access #{}
-   :editor #{:draft:claim :draft:create :draft:delete :draft:edit
-             :draft:submit :draft:share :draft:view :job:view :user:view}
-   :publisher #{:draft:claim :draft:create :draft:delete :draft:edit
-                :draft:submit :draft:share :draft:view :job:view :user:view
-                :draft:publish}
-   :manager #{:draft:claim :draft:create :draft:delete :draft:edit
-              :draft:submit :draft:share :draft:view :job:view :user:view
-              :draft:publish
-              ;; :draft:claim:manager is used in tests to demonstrate scoped
-              ;; claim permissions.
-              :draft:claim:manager}
-   :system #{:draft:claim :draft:create :draft:delete :draft:edit
-             :draft:submit :draft:share :draft:view :job:view :user:view
-             :draft:publish}})
+  [role]
+  (case role
+    :norole #{}
+    :access #{:public:view}
+    :editor (conj (role->permissions :access)
+                  :draft:claim :draft:create :draft:delete :draft:edit
+                  :draft:submit :draft:share :draft:view :job:view :user:view)
+    :publisher (conj (role->permissions :editor) :draft:publish)
+    ;; :manager is used in tests to demonstrate scoped claim permissions.
+    :manager (conj (role->permissions :publisher) :draft:claim:manager)
+    :system (recur :manager)))
 
 (defn roles-including
   "Returns the set of roles which include the given role"
@@ -55,7 +51,7 @@
     :manager "Full access to drafts"
     :system "Full access to the entire system"} role))
 
-(def roles (keys role->permissions))
+(def roles #{:access :editor :publisher :manager :system})
 
 (def username :email)
 
@@ -81,7 +77,7 @@
   (.getSchemeSpecificPart user-uri))
 
 (defn is-known-role? [r]
-  (contains? role->permissions r))
+  (contains? roles r))
 
 (defn- get-valid-email [email]
   (if-let [valid (util/validate-email-address email)]

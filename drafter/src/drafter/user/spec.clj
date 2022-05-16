@@ -8,7 +8,7 @@
             [clojure.spec.test.alpha :as st])
   (:import [drafter.user User]))
 
-(s/def ::user/role (set (keys user/role->permissions)))
+(s/def ::user/role user/roles)
 (s/def ::user/permissions (s/coll-of keyword? :kind set?))
 (s/def ::user/email :drafter/EmailAddress)
 (s/def ::user/password-digest string?)
