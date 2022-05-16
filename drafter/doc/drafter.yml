@@ -104,6 +104,7 @@ info:
 
     Currently available permissions are:
 
+    - public:view
     - draft:claim
     - draft:create
     - draft:delete

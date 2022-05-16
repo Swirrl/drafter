@@ -85,6 +85,10 @@
                                 :env-var DRAFTER_LOGS_DIR
                                 :optional true}
 
+ :drafter/global-auth? {:doc "Set to true to enable global auth"
+                        :env-var DRAFTER_GLOBAL_AUTH
+                        :optional true}
+
  :datadog/statsd-address {:doc "Address of the statsd service"
                           :env-var DATADOG_STATSD_ADDRESS
                           :default "localhost:8125"

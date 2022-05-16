@@ -40,7 +40,8 @@
     jobs-status-routes :jobs-status-routes
     global-writes-lock :drafter/global-writes-lock
     wrap-authenticate :wrap-authenticate
-    swagger-routes :swagger-routes}]
+    swagger-routes :swagger-routes
+    global-auth? :global-auth?}]
   (wrap-handler (app-handler
                  ;; add your application routes here
                  (-> []
@@ -75,6 +76,8 @@
                  ;; available formats:
                  ;; :json :json-kw :yaml :yaml-kw :edn :yaml-in-html
                  :formats [:json-kw :edn])))
+
+(defmethod ig/init-key :drafter/global-auth? [_ v] v)
 
 (defmethod ig/init-key :drafter.handler/app [k opts]
   (build-handler opts))
