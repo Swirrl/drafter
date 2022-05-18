@@ -23,7 +23,6 @@ export SPARQL_QUERY_ENDPOINT=http://localhost:5820/drafter-client-test/query
 export SPARQL_UPDATE_ENDPOINT=http://localhost:5820/drafter-client-test/update
 export DRAFTER_ENDPOINT=http://localhost:3001
 export AUTH0_AUD=https://pmd
-export DRAFTER_BASE_URI=http://drafter-test-base.org/
 ```
 
 3. Run `drafter-client` tests from `drafter-client` directory
