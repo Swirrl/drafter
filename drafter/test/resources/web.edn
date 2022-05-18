@@ -1,4 +1,6 @@
 {
+ :drafter.common.config/base-uri "http://drafter-test-base.org/"
+
  :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
 
  :swirrl.auth0.middleware/bearer-token
@@ -67,6 +69,7 @@
                                               :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/manager #ig/ref :drafter/manager
+                                                            :rdf/base-uri #ig/ref :drafter.common.config/base-uri
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.delete-by-graph/sync-job-handler
@@ -85,6 +88,7 @@
                                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append/data-handler {:drafter/manager #ig/ref :drafter/manager
+                                                     :rdf/base-uri #ig/ref :drafter.common.config/base-uri
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/manager #ig/ref :drafter/manager

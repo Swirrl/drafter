@@ -2,6 +2,8 @@
 ;; system is launched via drafter.main.
 
 {
+ :drafter.common.config/base-uri "http://drafter-dev.org"
+
  :swirrl.auth0/client {:endpoint #env AUTH0_DOMAIN
                        :iss #env AUTH0_DOMAIN
                        :aud #env AUTH0_AUD

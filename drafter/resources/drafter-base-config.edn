@@ -1,12 +1,14 @@
 {
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Repo config
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
  :drafter.common.config/sparql-query-endpoint #env SPARQL_QUERY_ENDPOINT
  :drafter.common.config/sparql-update-endpoint #env SPARQL_UPDATE_ENDPOINT
+
+ :drafter.common.config/base-uri #or [#env DRAFTER_BASE_URI ""]
 
  :drafter.stasher.filecache/file-backend {:dir #or [#env STASHER_CACHE_DIR "stasher-cache"]}
 
@@ -35,7 +37,7 @@
                         :sparql-update-endpoint #ig/ref :drafter.common.config/sparql-update-endpoint}
 
 
-;;;; A repo specifically for the live query endpoint
+ ;;;; A repo specifically for the live query endpoint
  :drafter.backend.live/endpoint {:repo #ig/ref :drafter.stasher/repo}
 
  :drafter/backend {:repo #ig/ref :drafter.stasher/repo}
@@ -50,15 +52,15 @@
                    :drafter.time/clock #ig/ref :drafter.time/system-clock
                    :drafter.backend.draftset.graphs/manager #ig/ref :drafter.backend.draftset.graphs/manager}
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Web handlers
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
  [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE
                                                           :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
 
  [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
-                                                              :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
+                                                              :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
 
  :drafter.routes/jobs-status {:wrap-auth #ig/ref :drafter.middleware/wrap-auth}
 
@@ -88,6 +90,7 @@
                                               :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/manager #ig/ref :drafter/manager
+                                                            :rdf/base-uri #ig/ref :drafter.common.config/base-uri
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.delete-by-graph/sync-job-handler
@@ -106,6 +109,7 @@
                                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append/data-handler {:drafter/manager #ig/ref :drafter/manager
+                                                     :rdf/base-uri #ig/ref :drafter.common.config/base-uri
                                                      :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/manager #ig/ref :drafter/manager
@@ -178,9 +182,9 @@
                        :jobs-status-routes #ig/ref :drafter.routes/jobs-status
                        :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock}
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Web Server
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
  :drafter.server/http {:handler #ig/ref :drafter.handler/app
                        :open-browser? false
@@ -188,17 +192,17 @@
                        :port #long #or [#port #env DRAFTER_HTTP_PORT 3001]}
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Misc
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
  :drafter/write-scheduler {:port #long #or [#port #env DRAFTER_HTTP_PORT 3001]
                            :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock}
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; logging
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
  :drafter.main/datadog {:statsd-address #or [#env DATADOG_STATSD_ADDRESS nil]
                         :tags {:service :drafter}}

@@ -40,14 +40,14 @@
 
 (defn get-request-statement-source
   "Returns an ITripleReadable statement source from an incoming jobs request"
-  [{:keys [body params] :as _request}]
+  [{:keys [body params] :as _request} base-uri]
   (let [{:keys [rdf-format graph]} params
         source (ses/map->FormatStatementSource {:inner-source body
-                                                :format rdf-format})]
+                                                :format rdf-format
+                                                :base-uri base-uri})]
     (if (and (ses/is-quads-format? rdf-format)
              (not graph))
       source
-      ;; else stomp `graph` over all statements
       (ses/map->GraphTripleStatementSource {:triple-source source
                                             :graph graph}))))
 

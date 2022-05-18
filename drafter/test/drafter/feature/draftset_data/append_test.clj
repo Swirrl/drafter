@@ -15,20 +15,16 @@
             [grafter-2.rdf.protocols :as pr]
             [drafter.rdf.sesame :as ses]
             [grafter-2.rdf4j.io :as gio])
-  (:import java.net.URI
-           org.eclipse.rdf4j.rio.RDFFormat))
+  (:import java.net.URI))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system-config "test-system.edn")
 
-(def dummy "dummy@user.com")
-
-(defn- get-source [nt-file graph]
-  (let [source (ses/->FormatStatementSource nt-file RDFFormat/NTRIPLES)]
-    (ses/->GraphTripleStatementSource source graph)))
-
-(def keys-for-test [[:drafter/routes :draftset/api] :drafter/write-scheduler :drafter.fixture-data/loader])
+(def keys-for-test [[:drafter/routes :draftset/api]
+                    :drafter/write-scheduler
+                    :drafter.fixture-data/loader
+                    :drafter.common.config/base-uri])
 
 (tc/deftest-system-with-keys append-quad-data-with-valid-content-type-to-draftset
   keys-for-test
@@ -142,6 +138,86 @@
           (is (= (set expected-quads)
                  (set ds-quads))
               "context from graph param is included in quad statements"))))))
+
+(t/deftest append-json-ld-quad-data-to-draftset-with-base-uri-from-config
+  (tc/with-system
+    keys-for-test
+    [system system-config]
+    (testing "when calling the append API with JSON-LD quads and base-uri is configured"
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-editor)
+            append-request (help/append-to-draftset-request test-editor
+                                                            draftset-location
+                                                            ;; this file contains some relative URIs
+                                                            (io/file "test/resources/json-ld/person2-quads.jsonld")
+                                                            {:content-type "application/ld+json"})
+            append-response (handler append-request)
+            expected-quads (map #(assoc % :c "http://scotts-world-o-graphs.net/graph")
+                                [{:s "http://person.org/johndoe"
+                                  :p "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+                                  :o "http://all-your-base-are-belong.us/Person"}
+                                 {:s "http://person.org/johndoe"
+                                  :p "http://schema.org/jobTitle"
+                                  :o "Student"}
+                                 {:s "http://person.org/johndoe"
+                                  :p "http://schema.org/name"
+                                  :o "John Doe"}
+                                 {:s "http://person.org/johndoe"
+                                  :p "http://schema.org/url"
+                                  :o "http://www.johndoe.com"}])]
+        (tc/await-success (get-in append-response [:body :finished-job]))
+        (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
+          (is (= (set ds-quads)
+                 (set expected-quads))
+              "relative URI /Person should have base-uri as prefix in saved quad statements"))))))
+
+(t/deftest append-quad-trig-data-to-draftset-with-base-uri
+  (tc/with-system
+    keys-for-test
+    [system system-config]
+    (testing "when calling the append API with turtle triples and base-uri is configured"
+      (let [handler (get system [:drafter/routes :draftset/api])
+            draftset-location (help/create-draftset-through-api handler test-editor)
+            ;; this file contains some relative URIs
+            turtle-file (io/file "test/resources/drafter/feature/draftset/append_base_uri_test.ttl")
+            append-request (-> (help/append-to-draftset-request test-editor
+                                                                draftset-location
+                                                                turtle-file
+                                                                {:content-type "text/turtle"})
+                               (assoc-in [:params :graph] "http://foo.com/my-graph"))
+            append-response (handler append-request)]
+        (tc/await-success (get-in append-response [:body :finished-job]))
+        (let [ds-quads (help/get-user-draftset-quads-through-api handler draftset-location test-editor)]
+          (is (= (set '({:s "http://people.org/dbanner",
+                         :p "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+                         :o "http://all-your-base-are-belong.us/Person",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/name",
+                         :o "David Banner",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/firstName",
+                         :o "David",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/homepage",
+                         :o "http://www.davidbanner.com",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/surname",
+                         :o "Banner",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://xmlns.com/foaf/0.1/title",
+                         :o "Dr",
+                         :c "http://foo.com/my-graph"}
+                        {:s "http://people.org/dbanner",
+                         :p "http://all-your-base-are-belong.us/nick",
+                         :o "hulk",
+                         :c "http://foo.com/my-graph"}))
+                 (set ds-quads))
+              "relative URI /Person should have base-uri as prefix in saved quad statements"))))))
 
 (tc/deftest-system-with-keys append-quad-data-with-metadata
   keys-for-test

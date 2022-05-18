@@ -14,7 +14,7 @@
             ))
 
 (def dev-config
-  {:mock  (io/resource "drafter-dev-config.edn")
+  {:mock  (io/resource "drafter-dev-mocked-auth0-config.edn")
    :auth0 (io/resource "drafter-dev-auth0.edn")
    :basic (io/resource "drafter-basic-dev-config.edn")})
 

@@ -18,7 +18,7 @@
                          {:type :zip
                           :path #ref [:omni/defs :zip-name]
                           :dest-path #ref [:omni/defs :zip-name]
-                          :extract-dir "."}                         
+                          :extract-dir "."}
                          {:type :env
                           :dest-path "drafter-env.list"
                           :mode "660"
@@ -86,6 +86,9 @@
              :drafter/logs-dir {:doc "Location of the drafter logs directory"
                                 :env-var DRAFTER_LOGS_DIR
                                 :optional true}
+
+ :drafter/base-uri {:doc "The base URI that should be used as a base for relative URIs"
+                    :env-var DRAFTER_BASE_URI}
 
  :datadog/statsd-address {:doc "Address of the statsd service"
                           :env-var DATADOG_STATSD_ADDRESS

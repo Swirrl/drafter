@@ -6,7 +6,7 @@ These files will then be merged ontop of the internal base configuration in orde
 
 This allows drafter configuration to be split up into profiles.
 
-Most notably drafters base configuration is only a partial configuration.  Crucially it is missing how authentication and users should be managed.  
+Most notably drafters base configuration is only a partial configuration.  Crucially it is missing how authentication and users should be managed.
 
 We typically provide this REQUIRED extra configuration on the command line as an extra file of integrant keys.
 
@@ -46,19 +46,20 @@ See [drafter-logging](https://github.com/Swirrl/drafter/blob/master/drafter/doc/
 
 The base EDN file allows the following environment variables to be overriden
 
-| Env Var                                 | Required | Default    | Description                                          |
-|-----------------------------------------+----------+------------+------------------------------------------------------|
-| SPARQL_QUERY_ENDPOINT                   | Yes      | N/A        | Backend SPARQL Query Endpoint (Stardog)              |
-| SPARQL_UPDATE_ENDPOINT                  | Yes      | N/A        | Backend SPARQL Update Endpoint (Stardog)             |
-| DRAFTER_HTTP_PORT                       | No       | 3001       | The HTTP port drafter listens on                     |
-| DRAFTER_BATCHED_WRITE_SIZE              | No       | 10000      | Max size of write batches in triples                 |
-| DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE     | No       | 30 seconds | Live endpoint max query timeout                      |
-| DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET | No       | 30 seconds | Draftset endpoint max query timeout                  |
+| Env Var                                 | Required | Default    | Description                                                        |
+|-----------------------------------------+----------+------------+--------------------------------------------------------------------|
+| SPARQL_QUERY_ENDPOINT                   | Yes      | N/A        | Backend SPARQL Query Endpoint (Stardog)                            |
+| SPARQL_UPDATE_ENDPOINT                  | Yes      | N/A        | Backend SPARQL Update Endpoint (Stardog)                           |
+| DRAFTER_BASE_URI                        | No       | ""         | Base URI which relative URIs in input data should be expanded with |
+| DRAFTER_HTTP_PORT                       | No       | 3001       | The HTTP port drafter listens on                                   |
+| DRAFTER_BATCHED_WRITE_SIZE              | No       | 10000      | Max size of write batches in triples                               |
+| DRAFTER_TIMEOUT_QUERY_ENDPOINT_LIVE     | No       | 30 seconds | Live endpoint max query timeout                                    |
+| DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET | No       | 30 seconds | Draftset endpoint max query timeout                                |
 
-=DRAFTER_BATCHED_WRITE_SIZE=
-
-Due to the limitations of the sesame SPARQL repository, large append or delete jobs must split the incoming data into batches
-to be applied sequentially to the stardog database. The size of these batches can be configured - note that out-of-memory
+Due to the limitations of the sesame SPARQL repository, large append
+or delete jobs must split the incoming data into batches to be applied
+sequentially to the stardog database. The size of these batches can be
+configured with ==DRAFTER_BATCHED_WRITE_SIZE== - note that out-of-memory
 errors can occur if the value is set too high.
 
 ** AUTH0 Profile

@@ -8,7 +8,6 @@
    [drafter.feature.endpoint.public :refer :all]
    [drafter.fixture-data :as fd]
    [drafter.rdf.drafter-ontology :refer :all]
-   [drafter.stasher.cache-key :as cache-key]
    [drafter.test-common :as tc]
    [drafter.util :as util]
    [grafter.vocabularies.dcterms :refer :all]
