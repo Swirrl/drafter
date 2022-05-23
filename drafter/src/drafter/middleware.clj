@@ -19,16 +19,21 @@
            (java.util.zip GZIPInputStream)))
 
 ;; Attempts to authenticate a request if it has an authorization header.
-;; NOTE allows requests without an authorization header through unchanged, so
+;; NOTE allows requests without an authorization header or with an
+;; authorization header we don't understand through unchanged, so
 ;; wrap-authorize is required to actually restrict access to a route.
 (defmethod ig/init-key :drafter.middleware/wrap-authenticate
   [_ {:keys [middleware] :as opts}]
   (fn [handler]
     (let [wrapped ((apply comp middleware) handler)]
       (fn [request]
-        (if-let [_ (http/-get-header request "authorization")]
-          (wrapped request)
-          (handler request))))))
+        (let [res (wrapped request)]
+          (if (= 401 (:status res))
+            ;; It's possible the request didn't need to be authenticated
+            ;; anyway. If it did, then it will still be rejected by
+            ;; wrap-authorize so it's safe to try again without authentication.
+            (handler request)
+            res))))))
 
 (defn- whitelisted? [{:keys [request-method uri]}]
   (case request-method
