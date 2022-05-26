@@ -150,6 +150,11 @@
   (i/request client i/submit-draftset-to access-token id
              :permission (name permission)))
 
+;; The role parameter is deprecated
+(defn submit-to-role [client access-token id role]
+  (i/request client i/submit-draftset-to access-token id
+             :role (name role)))
+
 (defn claim [client access-token id]
   (i/request client i/claim-draftset access-token id))
 

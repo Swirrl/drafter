@@ -359,9 +359,9 @@
   (martian/response-for client :status-writes-locked {}))
 
 (defn submit-draftset-to
-  "Submit a Draftset to a user or role"
+  "Submit a Draftset to a user or permission"
   #:drafter-client.client.impl{:generated true}
-  [client id & {:keys [role user] :as opts}]
+  [client id & {:keys [user permission] :as opts}]
   (martian/response-for
    client
    :submit-draftset-to
