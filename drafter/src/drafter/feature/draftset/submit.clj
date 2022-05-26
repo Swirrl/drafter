@@ -31,23 +31,30 @@
                                           (keyword permission))
    #(feat-common/draftset-sync-write-response % backend draftset-id)))
 
+;; Maps a role to a permission that that role has, but less privileged roles
+;; don't have.
+(def role->canonical-permission
+  {"editor" "draft:edit" "publisher" "draft:publish"})
+
 (defn handler
   [{:keys [:drafter/manager :drafter.user/repo wrap-as-draftset-owner]}]
   (wrap-as-draftset-owner :draft:submit
-    (fn [{{:keys [user permission draftset-id]} :params owner :identity}]
-      (cond
-        (and (some? user) (some? permission))
-        (unprocessable-entity-response
-          "Only one of user and permission parameters permitted")
+    (fn [{{:keys [user permission role draftset-id]} :params owner :identity}]
+      ;; The role parameter is deprecated
+      (let [permission (or permission (role->canonical-permission role))]
+        (cond
+          (and (some? user) (some? permission))
+          (unprocessable-entity-response
+           "Only one of user and permission parameters permitted")
 
-        (some? user)
-        (handle-user manager repo user draftset-id owner)
+          (some? user)
+          (handle-user manager repo user draftset-id owner)
 
-        (some? permission)
-        (handle-permission manager permission draftset-id owner)
+          (some? permission)
+          (handle-permission manager permission draftset-id owner)
 
-        :else
-        (unprocessable-entity-response "user or permission parameter required")))))
+          :else
+          (unprocessable-entity-response "user or permission parameter required"))))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset.submit/handler [_]
   (s/keys :req [:drafter/manager ::user/repo]

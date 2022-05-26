@@ -36,6 +36,12 @@
                           :request-method :post
                           :params {:permission (name permission)}}))
 
+;; The role parameter is deprecated
+(defn create-submit-to-role-request [user draftset-location role]
+  (tc/with-identity user {:uri (str draftset-location "/submit-to")
+                          :request-method :post
+                          :params {:role (name role)}}))
+
 (defn create-draftset-through-api
   ([handler] (create-draftset-through-api handler test-editor))
   ([handler user] (create-draftset-through-api handler user nil))
@@ -64,6 +70,14 @@
   (let [response (handler (create-submit-to-permission-request user
                                                                draftset-location
                                                                permission))]
+    (tc/assert-is-ok-response response)))
+
+;; The role parameter is deprecated
+(defn submit-draftset-to-role-through-api
+  [handler user draftset-location role]
+  (let [response (handler (create-submit-to-role-request user
+                                                         draftset-location
+                                                         role))]
     (tc/assert-is-ok-response response)))
 
 (defn delete-draftset-graph-request [user draftset-location graph-to-delete]

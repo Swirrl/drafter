@@ -50,6 +50,21 @@
           (claim-draftset-through-api handler draftset-location test-publisher)]
       (is (= (user/username test-publisher) current-owner)))))
 
+;; The role parameter is deprecated
+(tc/deftest-system-with-keys claim-draftset-submitted-to-role
+  keys-for-test
+  [system "test-system.edn"]
+  (let [handler (get system [:drafter/routes :draftset/api])
+        {{draftset-location "Location"} :headers}
+        (handler (ct/create-draftset-request test-editor))]
+    (help/submit-draftset-to-role-through-api handler
+                                              test-editor
+                                              draftset-location
+                                              :editor)
+    (let [{:keys [current-owner] :as ds-info}
+          (claim-draftset-through-api handler draftset-location test-publisher)]
+      (is (= (user/username test-publisher) current-owner)))))
+
 (tc/deftest-system-with-keys claim-draftset-submitted-to-user
   keys-for-test
   [system "test-system.edn"]
