@@ -73,3 +73,49 @@ tagged with git tag, branch name, and commit sha.
 
 Consumers may want to mount volumes at `/app/config` to provide custom
 configuration, and at `/app/stasher-cache` to persist the cache.
+
+## RBAC
+
+When deploying drafter with auth0 auth, users are expected to have been
+configured with some subset of the following permissions, (depending on what
+they should be allowed to do), and for those permissions to be passed in the
+`permissions` claim of the auth token.
+
+```
+drafter:draft:claim
+drafter:draft:create
+drafter:draft:delete
+drafter:draft:edit
+drafter:draft:publish
+drafter:draft:share
+drafter:draft:submit
+drafter:draft:view
+drafter:job:view
+drafter:public:view
+drafter:user:view
+```
+
+How exactly this is done isn't important, and these permissions can be split
+between roles in a way that makes sense for the specific deployment, but for
+example you might:
+
+1. create a new API called PMD-RBAC, with audience `https://publishmydata.com`
+2. in RBAC Settings, "Enable RBAC" and "Add Permissions in the Access Token"
+3. add all of the above permissions under "Permissions"
+4. authorize the drafter and muttnik "Machine to Machine Applications"
+5. under "User Management" > "Roles" create roles (see below)
+6. assign roles to the relevant users
+
+### Example role mapping:
+
+- PMD-RBAC:User has drafter:public:view
+- PMD-RBAC:Reviewer has drafter:draft:view drafter:job:view drafter:public:view
+  drafter:user:view
+- PMD-RBAC:Editor has drafter:draft:claim drafter:draft:create
+  drafter:draft:delete drafter:draft:edit drafter:draft:share
+  drafter:draft:submit drafter:draft:view drafter:job:view drafter:public:view
+  drafter:user:view
+- PMD-RBAC:Publisher has drafter:draft:claim drafter:draft:create
+  drafter:draft:delete drafter:draft:edit drafter:draft:publish
+  drafter:draft:share drafter:draft:submit drafter:draft:view drafter:job:view
+  drafter:public:view drafter:user:view
