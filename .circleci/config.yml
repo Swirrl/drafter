@@ -92,9 +92,9 @@ jobs:
               clojure -M:omni publish -f drafter/target/drafter-pmd4-circle-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
 
             else
-              echo Not deploying as this is not main branch
-              # clojure -M:omni publish -f drafter/target/drafter-pmd3-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
-              # clojure -M:omni publish -f drafter/target/drafter-pmd4-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+              echo Deploying branch release
+              clojure -M:omni publish -f drafter/target/drafter-pmd3-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
+              clojure -M:omni publish -f drafter/target/drafter-pmd4-branch-build-${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}.zip
 
             fi
 
