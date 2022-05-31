@@ -12,9 +12,10 @@
    [ring.util.response :as ring]))
 
 (defn create-draftsets-handler
-  [{{:keys [backend global-writes-lock clock] :as manager} :drafter/manager}]
+  [{{:keys [backend global-writes-lock clock] :as manager} :drafter/manager
+    wrap-authenticate :wrap-authenticate}]
   (let [version "/v1"]
-    (middleware/wrap-authorize :editor
+    (middleware/wrap-authorize wrap-authenticate :editor
      (fn [{{:keys [display-name description]} :params user :identity :as request}]
        (feat-common/run-sync
         {:backend backend :global-writes-lock global-writes-lock}

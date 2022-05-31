@@ -61,14 +61,19 @@
                                     ;; env when scheme needs to be passed through from load balancer
                                     (assoc :proxy true))
                  ;; add custom middleware here
-                 :middleware (cond->> [wrap-authenticate
-                                       #(wrap-resource % "swagger-ui")
-                                       wrap-verbs
-                                       wrap-encode-errors
-                                       middleware/wrap-total-requests-counter
-                                       middleware/wrap-request-timer
-                                       #(log-request % {:query "<scrubbed>"})]
-                               global-auth? (cons #(middleware/wrap-authorize :access %)))
+                 :middleware
+                 (let [middleware [#(wrap-resource % "swagger-ui")
+                                   wrap-verbs
+                                   wrap-encode-errors
+                                   middleware/wrap-total-requests-counter
+                                   middleware/wrap-request-timer
+                                   #(log-request % {:query "<scrubbed>"})]]
+                   (if global-auth?
+                     (cons #(middleware/wrap-authorize
+                             wrap-authenticate :access %)
+                           middleware)
+                     middleware))
+
                  ;; add access rules here
                  :access-rules []
                  ;; serialize/deserialize the following data formats

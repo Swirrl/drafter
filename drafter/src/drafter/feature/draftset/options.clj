@@ -7,8 +7,8 @@
             [clojure.spec.alpha :as s]))
 
 (defn handler
-  [{backend :drafter/backend}]
-  (middleware/wrap-authorize :editor
+  [{:keys [drafter/backend wrap-authenticate]}]
+  (middleware/wrap-authorize wrap-authenticate :editor
    (feat-middleware/existing-draftset-handler
     backend
     (fn [{{:keys [draftset-id]} :params user :identity}]
