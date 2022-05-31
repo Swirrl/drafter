@@ -1,2 +1,2 @@
 stardog: trap '../.omni_cache/install/stardog/install/stardog/bin/stardog-admin server stop' EXIT > /dev/null; env STARDOG_HOME=$(pwd)/../.omni_cache/install/stardog/install/stardog-home $(pwd)/../.omni_cache/install/stardog/install/stardog/bin/stardog-admin server start --disable-security --foreground
-mongodb: docker run -p 27017:27017 --rm --name mongodb-dev -v $(pwd)/../.omni_cache/install/mongodb/install/data:/data/db -v $(pwd)/../.omni_cache/install/mongodb/install/dump:/dump mongo:3.2
+mongodb: docker run -p 27017:27017 --rm --name mongodb-dev -v $(pwd)/../.omni_cache/install/mongodb/install/data:/data/db -v $(pwd)/../.omni_cache/install/mongodb/install/dump:/dump mongo:4.4
