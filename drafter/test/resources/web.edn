@@ -121,7 +121,8 @@
 
  :drafter.feature.endpoint.show/handler {:repo #ig/ref :drafter/backend}
  :drafter.feature.endpoint.list/handler
- {:drafter/backend #ig/ref :drafter/backend}
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  [:drafter/routes :draftset/api] {:context "/v1"
                                   :routes [[:get "/users" #ig/ref :drafter.feature.users.list/get-users-handler]

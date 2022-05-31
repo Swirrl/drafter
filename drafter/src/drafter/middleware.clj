@@ -37,6 +37,17 @@
           (handler request)
           (wrapped request))))))
 
+(defn wrap-optionally-authenticate
+  "Attempt to authenticate the request only if it has an authorization header.
+   For routes which don't require authentication, but can personalise results
+   if a user is logged in."
+  [wrap-authenticate handler]
+  (let [wrapped (wrap-authenticate handler)]
+    (fn [request]
+      (if (http/-get-header request "authorization")
+        (wrapped request)
+        (handler request)))))
+
 (defn wrap-authorize [wrap-authenticate required-role handler]
   (wrap-authenticate
    (fn [request]
