@@ -1,4 +1,4 @@
-version: "3.9"
+version: "3.10"
 services:
   stardog:
     image: swirrl/stardog:6.2.3-multi-dbs
@@ -7,6 +7,6 @@ services:
     environment:
       CREATE_DATABASE: drafter-dev-db,drafter-test-db
   mongo:
-    image: mongo:3.2
+    image: mongo:4.4
     ports:
       - "27017:27017"
