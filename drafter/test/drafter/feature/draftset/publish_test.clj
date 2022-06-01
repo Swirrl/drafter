@@ -9,8 +9,8 @@
    [drafter.test-common :as tc]
    [drafter.user-test :refer [test-editor test-manager test-publisher]]
    [drafter.util :as util]
-   [grafter-2.rdf.protocols :refer [context]]
-   [grafter-2.rdf4j.io :refer [statements]]
+   [grafter-2.rdf.protocols :refer [context] :as pr]
+   [grafter-2.rdf4j.io :refer [statements] :as gio]
    [martian.encoders :as enc])
   (:import [java.time OffsetDateTime]
            [java.time.temporal ChronoUnit]))
@@ -18,6 +18,13 @@
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
 (def system-config "drafter/feature/empty-db-system.edn")
+
+(defn- publish-quads
+  "Adds the given quads to a new draftset and publishes them via the API"
+  [handler quads]
+  (let [draftset-location (help/create-draftset-through-api handler test-publisher)]
+    (help/append-quads-to-draftset-through-api handler test-publisher draftset-location quads)
+    (help/publish-draftset-through-api handler draftset-location test-publisher)))
 
 (tc/deftest-system-with-keys publish-draftset-with-graphs-not-in-live
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
@@ -30,6 +37,45 @@
 
     (let [live-quads (help/get-live-user-quads-through-api handler)]
       (is (= (set (help/eval-statements quads)) (set live-quads))))))
+
+;; test graphs containing statements referencing their own graph can be published
+(t/deftest publish-self-referential-graph-subject-test
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          quads (set (gio/statements (io/resource "drafter/feature/draftset/publish_test-statements-reference-own-graph.trig")))]
+      (publish-quads handler quads)
+
+      (let [live-quads (help/get-live-user-quads-through-api handler)]
+        (t/is (= (set (help/eval-statements quads)) (set live-quads)))))))
+
+;; test graphs containing statements referencing arbitrary other graphs can be published
+(t/deftest publish-statements-reference-other-graphs-test
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          quads (set (gio/statements (io/resource "drafter/feature/draftset/publish_test-statements-reference-other-graphs.trig")))]
+      (publish-quads handler quads)
+
+      (let [live-quads (help/get-live-user-quads-through-api handler)]
+        (t/is (= (set (help/eval-statements quads)) (set live-quads)))))))
+
+;; test graphs containing statements referencing arbitrary other graphs can be published incrementally through separate
+;; drafts
+(t/deftest publish-statements-referencing-other-graphs-incremental-test
+  (tc/with-system
+    [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
+    [system system-config]
+    (let [handler (get system [:drafter/routes :draftset/api])
+          quads (set (gio/statements (io/resource "drafter/feature/draftset/publish_test-statements-reference-other-graphs.trig")))
+          [draft1 draft2] (split-at (/ (count quads) 2) (shuffle quads))]
+      (publish-quads handler draft1)
+      (publish-quads handler draft2)
+
+      (let [live-quads (help/get-live-user-quads-through-api handler)]
+        (t/is (= (set (help/eval-statements quads)) (set live-quads)))))))
 
 (tc/deftest-system-with-keys publish-with-metadata-on-job
   [:drafter.fixture-data/loader [:drafter/routes :draftset/api] :drafter/write-scheduler]
