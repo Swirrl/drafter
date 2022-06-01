@@ -35,29 +35,35 @@
  [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout #timeout #env DRAFTER_TIMEOUT_QUERY_ENDPOINT_DRAFTSET
                                                               :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY }
 
- :drafter.routes/jobs-status {}
+ :drafter.routes/jobs-status
+ {:wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  :drafter.routes.sparql/live-sparql-query-route {:repo #ig/ref :drafter.backend.live/endpoint
                                                  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/live-timeout]}
 
  :drafter.feature.draftset.show/handler
- {:drafter/backend #ig/ref :drafter/backend}
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  :drafter.feature.draftset.list/get-draftsets-handler
- {:drafter/backend #ig/ref :drafter/backend}
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
 
  :drafter.feature.draftset.create/handler
- {:drafter/manager #ig/ref :drafter/manager}
+ {:drafter/manager #ig/ref :drafter/manager
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  :drafter.feature.middleware/wrap-as-draftset-owner
- {:drafter/backend #ig/ref :drafter/backend}
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.options/handler
- {:drafter/backend #ig/ref :drafter/backend}
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  :drafter.feature.draftset-data.show/handler {:drafter/backend #ig/ref :drafter/backend
                                               :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
@@ -106,14 +112,17 @@
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
  :drafter.feature.draftset.claim/handler
- {:drafter/manager #ig/ref :drafter/manager}
+ {:drafter/manager #ig/ref :drafter/manager
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  :drafter.feature.users.list/get-users-handler
- {:drafter.user/repo #ig/ref :drafter.user/repo}
+ {:drafter.user/repo #ig/ref :drafter.user/repo
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  :drafter.feature.endpoint.show/handler {:repo #ig/ref :drafter/backend}
  :drafter.feature.endpoint.list/handler
- {:drafter/backend #ig/ref :drafter/backend}
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
  [:drafter/routes :draftset/api] {:context "/v1"
                                   :routes [[:get "/users" #ig/ref :drafter.feature.users.list/get-users-handler]

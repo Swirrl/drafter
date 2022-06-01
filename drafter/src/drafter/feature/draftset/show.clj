@@ -22,8 +22,8 @@
     ::not-found))
 
 (defn handler
-  [{backend :drafter/backend}]
-  (middleware/wrap-authorize :editor
+  [{:keys [drafter/backend wrap-authenticate]}]
+  (middleware/wrap-authorize wrap-authenticate :editor
    (feat-middleware/existing-draftset-handler
     backend
     (parse-union-with-live-handler

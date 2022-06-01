@@ -35,11 +35,12 @@
       (forbidden-response "User not in role for draftset claim"))
     (ring/not-found "Draftset not found")))
 
-(defn handler [{{:keys [backend] :as manager} :drafter/manager}]
+(defn handler [{{:keys [backend] :as manager} :drafter/manager
+                wrap-authenticate :wrap-authenticate}]
   (let [inner-handler (partial handler* manager)]
     (->> inner-handler
         (feat-middleware/existing-draftset-handler backend)
-        (middleware/wrap-authorize :editor))))
+        (middleware/wrap-authorize wrap-authenticate :editor))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset.claim/handler [_]
   (s/keys :req [:drafter/manager]))

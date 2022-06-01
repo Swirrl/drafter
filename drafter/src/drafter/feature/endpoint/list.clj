@@ -3,7 +3,7 @@
             [drafter.endpoint :as ep]
             [drafter.feature.endpoint.public :as pub]
             [drafter.feature.draftset.list :as dsl]
-            [drafter.middleware :refer [include-endpoints-param]]
+            [drafter.middleware :as middleware]
             [drafter.routes.draftsets-api :refer [parse-union-with-live-handler]]
             [clojure.spec.alpha :as s]
             [ring.util.response :as ring]))
@@ -29,11 +29,13 @@
 
 (defn list-handler
   ":get /endpoints"
-  [backend]
-  (include-endpoints-param
-   (parse-union-with-live-handler
-    (fn [{user :identity {:keys [include union-with-live]} :params :as request}]
-      (ring/response (get-endpoints backend user include union-with-live))))))
+  [backend wrap-authenticate]
+  (middleware/wrap-optionally-authenticate wrap-authenticate
+    (middleware/include-endpoints-param
+      (parse-union-with-live-handler
+       (fn [{user :identity {:keys [include union-with-live]} :params :as request}]
+         (ring/response (get-endpoints backend user include union-with-live)))))))
 
-(defmethod ig/init-key ::handler [_ {:keys [drafter/backend] :as opts}]
-  (list-handler backend))
+(defmethod ig/init-key ::handler
+  [_ {:keys [drafter/backend wrap-authenticate] :as opts}]
+  (list-handler backend wrap-authenticate))

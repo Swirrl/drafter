@@ -8,8 +8,8 @@
 (defn get-users-handler
   "Ring handler that returns a list of user objects representing users
   within the system."
-  [{user-repo ::user/repo}]
-  (middleware/wrap-authorize :editor
+  [{user-repo ::user/repo wrap-authenticate :wrap-authenticate}]
+  (middleware/wrap-authorize wrap-authenticate :editor
    (fn [r]
      (let [users (user/get-all-users user-repo)
            summaries (map user/get-summary users)]

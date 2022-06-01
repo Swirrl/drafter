@@ -53,9 +53,9 @@
       (response/forbidden-response "Operation only permitted by draftset owner"))))
 
 (defn wrap-as-draftset-owner
-  [{backend :drafter/backend}]
+  [{:keys [:drafter/backend wrap-authenticate]}]
   (fn [required-role handler]
-    (middleware/wrap-authorize required-role
+    (middleware/wrap-authorize wrap-authenticate required-role
      (existing-draftset-handler
       backend
       (restrict-to-draftset-owner backend handler)))))

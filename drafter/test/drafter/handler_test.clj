@@ -1,6 +1,6 @@
 (ns ^:rest-api drafter.handler-test
   (:require
-   [clojure.test :refer [deftest are]]
+   [clojure.test :refer [deftest is are]]
    [drafter.feature.endpoint.public :as public]
    [drafter.routes.sparql-test :refer [live-query]]
    [drafter.test-common :as tc]
@@ -74,3 +74,15 @@
         list-draftsets test-access    403 ;; Forbidden, requires editor
         list-draftsets test-editor    200
         list-draftsets test-publisher 200))))
+
+;; When muttnik is behind basic auth and drafter is running on the same host,
+;; the browser will forward the header to drafter. We should ignore it.
+(deftest malformed-auth-headers
+  (tc/with-system [{handler :drafter.handler/app} "test-system.edn"]
+    (-> {:scheme :http
+         :request-method :get
+         :uri "/v1/sparql/live"
+         :headers {"accept" "text/plain" "authorization" "Basic foo"}
+         :query-string
+         "query=select%20%2A%20where%20%7B%3Fs%20%3Fp%20%3Fo%7D"}
+        handler :status (= 200) is)))

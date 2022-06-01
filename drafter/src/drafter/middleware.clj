@@ -18,18 +18,6 @@
            (org.apache.tika.mime MediaType)
            (java.util.zip GZIPInputStream)))
 
-;; Attempts to authenticate a request if it has an authorization header.
-;; NOTE allows requests without an authorization header through unchanged, so
-;; wrap-authorize is required to actually restrict access to a route.
-(defmethod ig/init-key :drafter.middleware/wrap-authenticate
-  [_ {:keys [middleware] :as opts}]
-  (fn [handler]
-    (let [wrapped ((apply comp middleware) handler)]
-      (fn [request]
-        (if-let [_ (http/-get-header request "authorization")]
-          (wrapped request)
-          (handler request))))))
-
 (defn- whitelisted? [{:keys [request-method uri]}]
   (case request-method
     ;; "a CORS-preflight request never includes credentials"
@@ -39,17 +27,39 @@
     :get (#{"/" "/swagger/swagger.json"} uri)
     false))
 
-(defn wrap-authorize [required-role handler]
-  (fn [request]
-    (if (whitelisted? request)
-      (handler request)
-      (if-let [user (:identity request)]
-        (if (user/has-role? (:identity request) required-role)
+(defmethod ig/init-key :drafter.middleware/wrap-authenticate
+  [_ {:keys [middleware] :as opts}]
+  (fn [handler]
+    (let [wrapped ((apply comp middleware) handler)]
+      (fn [request]
+        (if (or (:identity request) ; already authenticated
+                (whitelisted? request))
           (handler request)
-          (response/forbidden-response (str "You require the "
-                                            (name required-role)
-                                            " role to perform this action")))
-        (response/unauthorized-response "Not authenticated")))))
+          (wrapped request))))))
+
+(defn wrap-optionally-authenticate
+  "Attempt to authenticate the request only if it has an authorization header.
+   For routes which don't require authentication, but can personalise results
+   if a user is logged in."
+  [wrap-authenticate handler]
+  (let [wrapped (wrap-authenticate handler)]
+    (fn [request]
+      (if (http/-get-header request "authorization")
+        (wrapped request)
+        (handler request)))))
+
+(defn wrap-authorize [wrap-authenticate required-role handler]
+  (wrap-authenticate
+   (fn [request]
+     (if (whitelisted? request)
+       (handler request)
+       (let [user (:identity request)]
+         (if (user/has-role? (:identity request) required-role)
+           (handler request)
+           (response/forbidden-response
+            (str "You require the "
+                 (name required-role)
+                 " role to perform this action"))))))))
 
 (defn require-params [required-keys inner-handler]
   (fn [{:keys [params] :as request}]
