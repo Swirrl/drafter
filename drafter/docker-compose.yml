@@ -1,7 +1,8 @@
 version: "3.10"
 services:
   stardog:
-    image: swirrl/stardog:6.2.3-multi-dbs
+    image: "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl/\
+            stardog:6.2.3--2022-06-06"
     ports:
       - "5820:5820"
     environment:

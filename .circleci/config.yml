@@ -13,12 +13,13 @@ executors:
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
-      - image: swirrl/stardog:6.2.3
+      - image: "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl/\
+                stardog:6.2.3--2022-06-06"
         environment:
           CREATE_DATABASE: drafter-test-db
         auth:
-          username: $DOCKERHUB_USERNAME # can specify string literal values
-          password: $DOCKERHUB_PASSWORD # or project environment variable reference
+          username: _json_key
+          password: ${GCLOUD_SERVICE_KEY}
 
     resource_class: medium
 
@@ -209,6 +210,7 @@ workflows:
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
             - stardog-jfrog-repository
+            - gcp-artifact-registry
       - test-drafter-basic-auth:
           filters:
             tags:
@@ -218,6 +220,7 @@ workflows:
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
             - stardog-jfrog-repository
+            - gcp-artifact-registry
       - test-drafter-non-api:
           filters:
             tags:
@@ -227,6 +230,7 @@ workflows:
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
             - stardog-jfrog-repository
+            - gcp-artifact-registry
       - test-drafterclient:
           filters:
             tags:
@@ -236,6 +240,7 @@ workflows:
             - drafter-auth0-dev-creds # creds for our auth0 dev setup
             - swirrl-dockerhub-consumer
             - stardog-jfrog-repository
+            - gcp-artifact-registry
       - build-artifacts:
           filters:
             tags:
