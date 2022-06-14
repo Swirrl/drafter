@@ -497,6 +497,7 @@ paths:
       parameters:
         - $ref: '#/parameters/id'
         - $ref: '#/parameters/permission'
+        - $ref: '#/parameters/role'
         - $ref: '#/parameters/submit-user'
 #        - $ref: '#/parameters/message'
 #        - $ref: '#/parameters/note'
@@ -848,6 +849,13 @@ parameters:
   permission:
     name: permission
     description: A permission
+    in: query
+    required: false
+    type: string
+  role:
+    name: role
+    deprecated: true
+    description: Deprecated, use permission instead
     in: query
     required: false
     type: string
