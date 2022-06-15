@@ -99,7 +99,7 @@ How exactly this is done isn't important, and these permissions can be split
 between roles in a way that makes sense for the specific deployment, but for
 example you might:
 
-1. create a new API called PMD-RBAC, with audience `https://publishmydata.com`
+1. create a new API called PMD, with audience `https://pmd`
 2. in RBAC Settings, "Enable RBAC" and "Add Permissions in the Access Token"
 3. add all of the above permissions under "Permissions"
 4. authorize the drafter and muttnik "Machine to Machine Applications"
