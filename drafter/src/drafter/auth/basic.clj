@@ -5,7 +5,8 @@
             [clojure.tools.logging :as log]
             [buddy.auth.protocols :as authproto]
             [drafter.responses :as response]
-            [integrant.core :as ig]))
+            [integrant.core :as ig]
+            [clojure.java.io :as io]))
 
 (defn- authenticate-user
   "Authenticate the credentials supplied in a request against the user repository.
@@ -37,7 +38,21 @@
        (authenticate [_this _request state]
          (if-let [identity (authenticate-user user-repo state)]
            identity
-           (auth/authentication-failed (response/unauthorised-basic-response realm))))))))
+           (auth/authentication-failed (response/unauthorised-basic-response realm))))
+
+       (get-swagger-key [_this] :basic-auth)
+
+       (get-swagger-description [_this]
+         {:heading "Basic authentication"
+          :description (slurp (io/resource "drafter/auth/basic_swagger_description.md"))})
+
+       (get-swagger-security-definition [_this]
+         {:type "basic"
+          :description "HTTP Basic Authentication"})
+
+       (get-operation-swagger-security-requirement [_this _operation] [])
+
+       (get-swagger-ui-config [_this] {})))))
 
 (derive ::basic-auth-method ::auth/auth-method)
 

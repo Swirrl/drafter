@@ -5,7 +5,13 @@
              [walk :as walk]]
             [clojure.java.io :as io]
             [clout.core :as clout]
-            [scjsv.core :as jsonsch]))
+            [compojure.core :refer [GET] :as compojure]
+            [ring.swagger.swagger-ui :as swagger-ui]
+            [scjsv.core :as jsonsch]
+            [drafter.user :as user]
+            [drafter.auth :as auth]
+            [meta-merge.core :as mm]
+            [integrant.core :as ig]))
 
 (defn- load-spec-file []
   (-> "public/swagger/drafter.yml"
@@ -33,11 +39,169 @@
           resolved
           (recur resolved))))))
 
+(defn get-api-route-specs [global-auth?]
+  (let [read-role (when global-auth? :access)]
+    [{:id 'get-endpoints
+      :path "/endpoints"
+      :method :get
+      :role read-role}
+     {:id 'get-public-endpoint
+      :path "/endpoint/public"
+      :method :get
+      :role read-role}
+
+     {:id 'create-draftset
+      :path "/draftsets"
+      :method :post
+      :role :editor}
+     {:id 'get-draftsets
+      :path "/draftsets"
+      :method :get
+      :role :access}
+     {:id 'get-draftset
+      :path "/draftset/{id}"
+      :method :get
+      :role :access}
+     {:id 'put-draftset
+      :path "/draftset/{id}"
+      :method :put
+      :role :editor}
+     {:id     'delete-draftset
+      :path   "/draftset/{id}"
+      :method :delete
+      :role :editor}
+
+     {:id 'put-draftset-graph
+      :path "/draftset/{id}/graph"
+      :method :put
+      :role :editor}
+     {:id 'delete-draftset-graph
+      :path "/draftset/{id}/graph"
+      :method :delete
+      :role :editor}
+
+     {:id 'delete-draftset-changes
+      :path "/draftset/{id}/changes"
+      :method :delete
+      :role :editor}
+
+     {:id 'put-draftset-data
+      :path "/draftset/{id}/data"
+      :method :put
+      :role :editor}
+     {:id 'delete-draftset-data
+      :path "/draftset/{id}/data"
+      :method :delete
+      :role :editor}
+     {:id 'get-draftset-data
+      :path "/draftset/{id}/data"
+      :method :get
+      :role :editor}
+
+     {:id 'submit-draftset-to
+      :path "/draftset/{id}/submit-to"
+      :method :post
+      :role :editor}
+     {:id 'claim-draftset
+      :path "/draftset/{id}/claim"
+      :method :put
+      :role :editor}
+     {:id 'publish-draftset
+      :path "/draftset/{id}/publish"
+      :method :post
+      :role :publisher}
+
+     {:id 'get-query-draftset
+      :path "/draftset/{id}/query"
+      :method :get
+      :role :editor}
+     {:id 'post-query-draftset
+      :path "/draftset/{id}/query"
+      :method :post
+      :role :editor}
+     {:id 'post-update-draftset
+      :path "/draftset/{id}/update"
+      :method :post
+      :role :editor}
+     {:id 'get-query-live
+      :path "/sparql/live"
+      :method :get
+      :role read-role}
+     {:id 'post-query-live
+      :path "/sparql/live"
+      :method :post
+      :role read-role}
+
+     {:id 'get-users
+      :path "/users"
+      :method :get
+      :role :access}
+
+     {:id 'get-job
+      :path "/status/jobs/{jobid}"
+      :method :get
+      :role :editor}
+     {:id 'get-jobs
+      :path "/status/jobs"
+      :method :get
+      :role :editor}
+     {:id 'status-job-finished
+      :path "/status/finished-jobs/{jobid}"
+      :method :get
+      :role read-role}
+
+     {:id 'status-writes-locked
+      :path "/status/writes-locked"
+      :method :get
+      :role read-role}]))
+
+(defn- route-spec-path
+  "Returns the path of an operation within the swagger spec JSON"
+  [{:keys [path method]}]
+  [:paths (keyword path) method])
+
+(defn- get-auth-method-security-defs [auth-method route-specs]
+  (let [swagger-key (auth/get-swagger-key auth-method)
+        security-def {:securityDefinitions
+                      {swagger-key
+                       (auth/get-swagger-security-definition auth-method)}}]
+    (letfn [(authenticated? [route-spec]
+              (some? (:role route-spec)))
+            (add-route [spec route-spec]
+              (if (authenticated? route-spec)
+                (let [operation-requirements (auth/get-operation-swagger-security-requirement auth-method route-spec)]
+                  (assoc-in spec (route-spec-path route-spec) {:security [{swagger-key operation-requirements}]}))
+                spec))]
+      (reduce add-route security-def route-specs))))
+
+(defn- auth-method-description [auth-method]
+  (let [{:keys [heading description]} (auth/get-swagger-description auth-method)]
+    (str "### " heading "\n" description)))
+
+(defn- append-authentication-method-descriptions
+  "Appends authentication method documentation to the end of the swagger description"
+  [spec auth-methods]
+  (update-in spec [:info :description] (fn [desc]
+                                         (let [sb (StringBuilder. desc)]
+                                           (if (seq auth-methods)
+                                             (doseq [auth-method auth-methods]
+                                               (.append sb (auth-method-description auth-method))
+                                               (.append sb "\n"))
+                                             (.append sb "\n__No authentication methods available__"))
+                                           (str sb)))))
+
+(defn- load-spec [auth-methods global-auth?]
+  (let [spec (load-spec-file)
+        spec (append-authentication-method-descriptions spec auth-methods)
+        route-specs (get-api-route-specs global-auth?)
+        security-defs (map (fn [auth-method] (get-auth-method-security-defs auth-method route-specs)) auth-methods)]
+    (reduce (fn [spec security-def] (mm/meta-merge spec security-def)) spec security-defs)))
+
 (defn load-spec-and-resolve-refs
   "Load our swagger schemas and inline all the JSON Pointers as a post
   processing step."
-  []
-  (resolve-refs (load-spec-file)))
+  [auth-methods global-auth?]
+  (resolve-refs (load-spec auth-methods global-auth?)))
 
 (defn validate-swagger-schema!
   "Function to compare a value to its schema and raise an appropriate
@@ -108,3 +272,35 @@
   [spec handler]
   (fn [request]
     (validate-response-against-swagger-spec spec request (handler request))))
+
+(defn swagger-json-handler
+  "Returns a ring handler which serves the swagger JSON at the given path. auth-methods should be a collection of all the
+  configured authentication methods in the system. These are required to configure the available securityDefinitions.
+  The global-auth? parameter indicates whether global authentication is enabled. This affects the roles required to
+  access certain API routes."
+  [path auth-methods global-auth?]
+  (let [swagger-json (load-spec-and-resolve-refs auth-methods global-auth?)]
+    (GET path []
+      {:status 200
+       :headers {"Content-Type" "application/json"}
+       :body swagger-json})))
+
+(defn swagger-ui-handler
+  "Returns a handler which serves the swagger UI. json-path should be the path to the swagger JSON configuration.
+   auth-methods should be the collection of configured authentication methods - these may need to configure certain aspects of the UI."
+  [json-path auth-methods]
+  (let [auth-method-opts (apply merge (map auth/get-swagger-ui-config auth-methods))
+        opts (merge {:path "/"
+                     :swagger-docs json-path}
+                    auth-method-opts)]
+    (swagger-ui/swagger-ui opts)))
+
+(defn swagger-routes
+  ([auth-methods global-auth?] (swagger-routes auth-methods global-auth?))
+  ([auth-methods global-auth? {:keys [json-path] :or {json-path "/swagger/swagger.json"}}]
+   (compojure/routes
+     (swagger-json-handler json-path auth-methods global-auth?)
+     (swagger-ui-handler json-path auth-methods))))
+
+(defmethod ig/init-key ::swagger-routes [_ {:keys [auth-methods global-auth?] :as opts}]
+  (swagger-routes auth-methods global-auth? opts))

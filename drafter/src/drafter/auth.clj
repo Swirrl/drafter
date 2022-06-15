@@ -16,7 +16,27 @@
     "Takes the incoming request and the data returned by the parse-request method
      to resolve the authentication data to a valid drafter user. Should return the
      user record if successful, or throw an ExceptionInfo if the authentication
-     failed."))
+     failed.")
+
+  (get-swagger-description [this]
+    "Returns a high-level description of this authentication method along with any
+     information required to use it within the Swagger UI. Should return a map containing
+     the following keys:
+       :heading - Brief heading for this authentication method
+       :description - Markdown description of this method along with details for use in the UI")
+
+  (get-swagger-key [this]
+    "Returns a key to identify this authentication method within the swagger spec")
+
+  (get-swagger-security-definition [this]
+    "Returns the swagger security definition for this authentication method")
+
+  (get-operation-swagger-security-requirement [this operation]
+    "Returns a swagger security requirements object for the given operation")
+
+  (get-swagger-ui-config [this]
+    "Returns a map containing any extra configuration this authorisation method
+     requires to configure the swagger UI."))
 
 (defn authentication-failed
   "Throws an exception indicating the request could not be authenticated.

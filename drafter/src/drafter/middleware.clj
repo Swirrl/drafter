@@ -27,7 +27,7 @@
     ;; https://fetch.spec.whatwg.org/#cors-protocol-and-credentials
     :options true
     ;; Allow access to swagger docs
-    :get (#{"/" "/swagger/swagger.json"} uri)
+    :get (#{"/" "/index.html" "/config.json" "/swagger/swagger.json"} uri)
     false))
 
 (defn authenticate-request

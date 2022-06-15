@@ -4,7 +4,8 @@
             [buddy.auth.protocols :as authproto]
             [integrant.core :as ig]
             [drafter.user :as user]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [clojure.java.io :as io])
   (:import clojure.lang.ExceptionInfo))
 
 (defn- get-jws-auth-backend [token-auth-key]
@@ -38,7 +39,23 @@
             (catch ExceptionInfo ex
               (log/error ex "Token authentication failed due to an invalid user token")
               (auth/authentication-failed)))
-          (auth/authentication-failed))))))
+          (auth/authentication-failed)))
+
+      (get-swagger-key [_this] :jws-auth)
+
+      (get-swagger-description [_this]
+        {:heading "JWS Authentication"
+         :description (slurp (io/resource "drafter/auth/jws_swagger_description.md"))})
+
+      (get-swagger-security-definition [_this]
+        {:type "apiKey"
+         :name "Authorization"
+         :in "header"
+         :description "Token authentication with a signed JWS token"})
+
+      (get-operation-swagger-security-requirement [_this _operation] [])
+
+      (get-swagger-ui-config [_this] {}))))
 
 (derive ::jws-auth-method ::auth/auth-method)
 

@@ -3,9 +3,9 @@
             [compojure.route :as route]
             [drafter.env :as denv]
             [drafter.middleware :as middleware]
-            [drafter.routes.pages :refer [pages-routes]]
             [drafter.routes.status :refer [status-routes]]
             [drafter.swagger :as swagger]
+
             [drafter.timeouts :as timeouts]
             [drafter.util :refer [set-var-root!]]
             [drafter.write-scheduler :refer [start-writer! stop-writer!]]
@@ -19,10 +19,6 @@
             [drafter.logging :refer [log-request]]))
 
 (defroutes app-routes
-  (GET "/swagger/swagger.json" []
-       {:status 200
-        :headers {"Content-Type" "application/json"}
-        :body (swagger/load-spec-and-resolve-refs)})
   (route/resources "/")
   (route/not-found "Not Found"))
 
@@ -44,11 +40,12 @@
     jobs-status-routes :jobs-status-routes
     global-writes-lock :drafter/global-writes-lock
     wrap-authenticate :wrap-authenticate
-    global-auth? :global-auth?}]
+    global-auth? :global-auth?
+    swagger-routes :swagger-routes}]
   (wrap-handler (app-handler
                  ;; add your application routes here
                  (-> []
-                     (add-route (pages-routes))
+                     (add-route swagger-routes)
                      (add-route draftset-api-routes)
                      (add-route live-sparql-route)
                      (add-route (context "/v1/status" [] (status-routes global-writes-lock)))
@@ -62,8 +59,7 @@
                                     (assoc :proxy true))
                  ;; add custom middleware here
                  :middleware
-                 (let [middleware [#(wrap-resource % "swagger-ui")
-                                   wrap-verbs
+                 (let [middleware [wrap-verbs
                                    wrap-encode-errors
                                    middleware/wrap-total-requests-counter
                                    middleware/wrap-request-timer

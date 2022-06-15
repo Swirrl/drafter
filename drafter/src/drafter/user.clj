@@ -20,6 +20,25 @@
 (def role->permission-level
   {:access 0 :editor 1 :publisher 2 :manager 3 :system 4})
 
+(defn roles-including
+  "Returns the set of roles which include the given role"
+  [role]
+  (let [required-level (role->permission-level role)]
+    (->> role->permission-level
+         (keep (fn [[candidate level]]
+                 (if (>= level required-level)
+                   candidate)))
+         (set))))
+
+(defn get-role-summary
+  "Returns a brief summary of the given role"
+  [role]
+  ({:access "Read-only access"
+    :editor "Create and edit access to drafts"
+    :publisher "Create, edit and publish access to drafts"
+    :manager "Full access to drafts"
+    :system "Full access to the entire system"} role))
+
 (def ^{:doc
        "Ordered list of roles from least permissions to greatest permissions."}
   roles

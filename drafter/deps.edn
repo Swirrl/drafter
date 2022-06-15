@@ -60,6 +60,7 @@
         me.raynes/fs {:mvn/version "1.4.6"} ;; filesystem utils
 
         metosin/ring-swagger-ui {:mvn/version "3.20.1"}
+        metosin/ring-swagger {:mvn/version "0.26.2"}
 
         ;; Use JENA for our query rewriting
         org.apache.jena/jena-arq {:mvn/version "3.17.0"

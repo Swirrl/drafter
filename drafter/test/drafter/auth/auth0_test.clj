@@ -7,6 +7,19 @@
             [drafter.user :as user])
   (:import clojure.lang.ExceptionInfo))
 
+(t/deftest read-role-test
+  (t/testing "Valid role"
+    (t/is (= :publisher (sut/read-role "drafter:publisher"))))
+
+  (t/testing "Non-drafter role"
+    (t/is (nil? (sut/read-role "muttnik:editor"))))
+
+  (t/testing "Invalid drafter role"
+    (t/is (nil? (sut/read-role "drafter:invalid"))))
+
+  (t/testing "No prefix"
+    (t/is (nil? (sut/read-role "manager")))))
+
 (defn- get-auth-method [system]
   (let [jwk (:drafter.auth.auth0/mock-jwk system)
         auth0-client (:swirrl.auth0/client system)]

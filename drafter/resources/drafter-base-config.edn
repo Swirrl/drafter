@@ -186,6 +186,9 @@
  ;; Set to true to require all requests to be authorized
  :drafter/global-auth? #boolean #or [#env DRAFTER_GLOBAL_AUTH false]
 
+ :drafter.swagger/swagger-routes {:auth-methods #ig/refset :drafter.auth/auth-method
+                                  :global-auth? #ig/ref :drafter/global-auth?}
+
  :drafter.handler/app
  {:repo #ig/ref :drafter.stasher/repo
   :live-sparql-query-route #ig/ref :drafter.routes.sparql/live-sparql-query-route
@@ -193,7 +196,9 @@
   :jobs-status-routes #ig/ref :drafter.routes/jobs-status
   :drafter/global-writes-lock #ig/ref :drafter/global-writes-lock
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate
-  :global-auth? #ig/ref :drafter/global-auth?}
+  :global-auth? #ig/ref :drafter/global-auth?
+  :swagger-routes #ig/ref :drafter.swagger/swagger-routes
+  }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Web Server
