@@ -11,8 +11,6 @@
     [drafter-client.test-util.auth :as auth-util]
     [drafter-client.test-util.jwt :as jwt]
     [drafter.main :as drafter]
-    [drafter.middleware.auth0-auth]
-    [drafter.middleware.auth]
     [drafter.util :as util]
     [environ.core :refer [env]]
     [grafter-2.rdf.protocols :as pr]

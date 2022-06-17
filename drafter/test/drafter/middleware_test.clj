@@ -1,16 +1,19 @@
 (ns drafter.middleware-test
   (:require [clojure.java.io :as io]
-            [clojure.test :refer :all]
-            [drafter.middleware :refer :all]
+            [clojure.test :refer :all :as t]
+            [drafter.middleware :refer :all :as sut]
+            [drafter.auth :as auth]
             [drafter.test-common :as tc]
             [grafter-2.rdf4j.formats :as formats]
-            [ring.util.response :refer [response]])
+            [ring.util.response :refer [response]]
+            [drafter.responses :as response]
+            [drafter.user :as user])
   (:import [java.io File]
            org.eclipse.rdf4j.rio.RDFFormat
-           [java.util.zip GZIPOutputStream]))
+           [java.util.zip GZIPOutputStream]
+           [clojure.lang ExceptionInfo]))
 
 (use-fixtures :each tc/with-spec-instrumentation)
-
 
 (defn- notifying-handler [a]
   (fn [r]
@@ -52,8 +55,6 @@
       (let [request {:params {param-name "invalid-value"}}
             response (handler request)]
         (tc/assert-is-unprocessable-response response)))))
-
-
 
 (defn- ok-handler [request]
   (response "OK"))
@@ -172,3 +173,109 @@
                    :headers {"accept" "text/plain"}}
           response (handler request)]
       (tc/assert-is-not-acceptable-response response))))
+
+(def ^{:doc "Authentication method that never matches a request"} never-matches-auth-method
+  (reify auth/AuthenticationMethod
+    (parse-request [_this _request] nil)
+    (authenticate [_this _request _state]
+      ;; NOTE: should never be called
+      (throw (ex-info "Authentication failed" {})))))
+
+(defn- fails-with-auth-method
+  "Returns an authentication method that always matches a request
+   and fails authentication with the given exception"
+  [ex]
+  (reify auth/AuthenticationMethod
+    (parse-request [_this _request] {:dummy :state})
+    (authenticate [_this _request _state]
+      (throw ex))))
+
+(def always-fails-auth-method
+  (fails-with-auth-method (ex-info "Authentication failed" {})))
+
+(defn- succeeds-with-auth-method
+  "Returns an authentication method that always matches a request and
+   successfully authenticates with the given user"
+  [user]
+  (reify auth/AuthenticationMethod
+    (parse-request [_this _request] {:dummy :state})
+    (authenticate [_this _request _state]
+      user)))
+
+(t/deftest authenticate-request-test
+  (t/testing "No matching auth method"
+    (let [auth-methods [never-matches-auth-method]
+          request {:uri "/test" :request-method :get}]
+      (t/is (nil? (sut/authenticate-request auth-methods request)))))
+
+  (t/testing "Authentication succeeds"
+    (let [user (user/create-authenticated-user "test@example.com" :editor)
+          auth-methods [(succeeds-with-auth-method user)]
+          request {:uri "/test" :request-method :get}]
+      (t/is (= user (sut/authenticate-request auth-methods request)))))
+
+  (t/testing "Authenticates with first matching handler"
+    (let [user1 (user/create-authenticated-user "test1@example.com" :editor)
+          user2 (user/create-authenticated-user "test2@example.com" :publisher)
+          auth-methods [(succeeds-with-auth-method user1)
+                        (succeeds-with-auth-method user2)]
+          request {:uri "/test" :request-method :get}]
+      (t/is (= user1 (authenticate-request auth-methods request)))))
+
+  (t/testing "Authentication fails"
+    (let [auth-methods [always-fails-auth-method]
+          request {:uri "/test" :request-method :get}]
+      (t/is (thrown? ExceptionInfo (authenticate-request auth-methods request))))))
+
+(t/deftest wrap-authenticate-test
+  (t/testing "Allows OPTIONS requests"
+    (let [auth-methods [always-fails-auth-method]
+          handler (sut/wrap-authenticate identity auth-methods)
+          request {:uri "/test" :request-method :options}
+          response (handler request)]
+      (t/is (= request response))))
+
+  (t/testing "Allows swagger UI routes"
+    (let [auth-methods [always-fails-auth-method]
+          handler (sut/wrap-authenticate identity auth-methods)
+          request {:uri "/swagger/swagger.json" :request-method :get}
+          response (handler request)]
+      (t/is (= request response))))
+
+  (t/testing "Allows requests with existing identity"
+    (let [auth-methods [always-fails-auth-method]
+          handler (sut/wrap-authenticate identity auth-methods)
+          user (user/create-authenticated-user "test@example.com" :publisher)
+          request {:uri "/test" :request-method :get :identity user}
+          response (handler request)]
+      (t/is (= request response))))
+
+  (t/testing "Authenticates user"
+    (let [user (user/create-authenticated-user "test@example.com" :editor)
+          auth-methods [(succeeds-with-auth-method user)]
+          handler (sut/wrap-authenticate identity auth-methods)
+          request {:uri "/test" :request-method :get}
+          response (handler request)]
+      (t/is (= user (:identity response)))))
+
+  (t/testing "Not authenticated if no auth methods match"
+    (let [auth-methods [never-matches-auth-method]
+          handler (sut/wrap-authenticate identity auth-methods)
+          request {:uri "/test" :request-method :get}
+          response (handler request)]
+      (tc/assert-is-unauthorised-response response)))
+
+  (t/testing "Not authenticated if authentication fails"
+    (let [auth-methods [always-fails-auth-method]
+          handler (sut/wrap-authenticate identity auth-methods)
+          request {:uri "/test" :request-method :get}
+          response (handler request)]
+      (tc/assert-is-unauthorised-response response)))
+
+  (t/testing "Custom response from authentication error"
+    (let [auth-ex (ex-info "Authentication failed" {:response (response/forbidden-response "Forbidden")})
+          auth-methods [(fails-with-auth-method auth-ex)]
+          handler (sut/wrap-authenticate identity auth-methods)
+          request {:uri "/test" :request-method :get}
+          response (handler request)]
+      (tc/assert-is-forbidden-response response))))

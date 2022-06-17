@@ -4,6 +4,7 @@
             [clojure.string :as string]
             [clojure.tools.logging :as log]
             [cognician.dogstatsd :as datadog]
+            [drafter.logging :refer [with-logging-context]]
             [drafter.rdf.content-negotiation :as conneg]
             [drafter.requests :as drafter-request]
             [drafter.responses :as response]
@@ -13,10 +14,12 @@
             [grafter-2.rdf4j.formats :refer [mimetype->rdf-format]]
             [ring.util.request :as request]
             [integrant.core :as ig]
-            [buddy.auth.http :as http])
+            [buddy.auth.http :as http]
+            [drafter.auth :as auth])
   (:import java.io.File
-           (org.apache.tika.mime MediaType)
-           (java.util.zip GZIPInputStream)))
+           [org.apache.tika.mime MediaType]
+           [java.util.zip GZIPInputStream]
+           [clojure.lang ExceptionInfo]))
 
 (defn- whitelisted? [{:keys [request-method uri]}]
   (case request-method
@@ -27,15 +30,46 @@
     :get (#{"/" "/swagger/swagger.json"} uri)
     false))
 
+(defn authenticate-request
+  "Authenticates an incoming request against a list of authentication methods.
+   Each method is attempted in turn to see if it matches the request. The user is
+   authenticated with the first matching authentication method. If this method
+   throws an exception due to an authentication failure, the entire authentication
+   attempt also fails. Returns the representation of the user if authentication is
+   successful, or returns nil if no authentication method matches the request."
+  [auth-methods request]
+  (loop [[auth-method & methods] auth-methods]
+    (when auth-method
+      (if-let [state (auth/parse-request auth-method request)]
+        (auth/authenticate auth-method request state)
+        (recur methods)))))
+
+(defn wrap-authenticate
+  "Wraps a handler with one that first attempts to authenticate incoming requests
+   using a collection of authentication methods (unless the request is whitelisted).
+   Associates the user on the request under the :identity key if authentication succeeds,
+   otherwise returns a Unauthorized response."
+  [handler auth-methods]
+  (fn [request]
+    (if (or (:identity request) ; already authenticated
+            (whitelisted? request))
+      (handler request)
+      (try
+        (if-let [{:keys [email] :as identity} (authenticate-request auth-methods request)]
+          (with-logging-context {:user email} ;; wrap a logging context over the request so we can trace the user
+                                (datadog/increment! "drafter.requests.authorised" 1)
+                                (log/info "got user" email)
+                                (handler (assoc request :identity identity)))
+          (do
+            (datadog/increment! "drafter.requests.unauthorised" 1)
+            (response/unauthorized-response "Not authenticated.")))
+        (catch ExceptionInfo ex
+          (datadog/increment! "drafter.requests.unauthorised" 1)
+          (auth/authentication-failed-response ex))))))
+
 (defmethod ig/init-key :drafter.middleware/wrap-authenticate
-  [_ {:keys [middleware] :as opts}]
-  (fn [handler]
-    (let [wrapped ((apply comp middleware) handler)]
-      (fn [request]
-        (if (or (:identity request) ; already authenticated
-                (whitelisted? request))
-          (handler request)
-          (wrapped request))))))
+  [_ {:keys [auth-methods] :as opts}]
+  #(wrap-authenticate %1 auth-methods))
 
 (defn wrap-optionally-authenticate
   "Attempt to authenticate the request only if it has an authorization header.
@@ -164,7 +198,6 @@
     (let [temp-file (File/createTempFile "drafter-body" nil)]
       (io/copy body temp-file)
       (inner-handler (assoc request :body temp-file)))))
-
 
 (defn negotiate-sparql-results-content-type-with
   "Returns a handler which performs content negotiation for a SPARQL query with the given negotiation function.

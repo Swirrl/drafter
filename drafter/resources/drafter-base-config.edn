@@ -149,6 +149,8 @@
  {:drafter/backend #ig/ref :drafter/backend
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
+ :drafter.middleware/wrap-authenticate {:auth-methods #ig/refset :drafter.auth/auth-method}
+
  [:drafter/routes :draftset/api] {:context "/v1"
                                   :routes [[:get "/users" #ig/ref :drafter.feature.users.list/get-users-handler]
 

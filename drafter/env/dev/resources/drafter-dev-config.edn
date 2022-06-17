@@ -4,27 +4,16 @@
                                           {:username "system@swirrl.com" :password "password" :role :system}]
                                   :realm "Drafter Memory Repo"}
 
- :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
+ :drafter.auth.auth0/mock-jwk {}
 
  ;; this config is using the memory-repo for user lookup, so will not use auth0 API
  :swirrl.auth0/client {:iss #env AUTH0_DOMAIN
                        :aud #env AUTH0_AUD
                        :endpoint #env AUTH0_DOMAIN
-                       :client-id #env AUTH0_CLIENT_ID
-                       :client-secret #env AUTH0_CLIENT_SECRET}
+                       :swagger-json #resource "swirrl/auth0/swagger.json"}
 
- :swirrl.auth0.middleware/bearer-token
- {:auth0 #ig/ref :swirrl.auth0/client :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
-
- :drafter.middleware.auth0-auth/identify {}
-
- :drafter.middleware.auth0-auth/token-authentication {}
-
- :drafter.auth/read-role {}
- :swirrl.auth0.middleware/normalize-roles {:role-reader #ig/ref :drafter.auth/read-role}
-
- :drafter.middleware/wrap-authenticate
- {:middleware [#ig/ref :swirrl.auth0.middleware/bearer-token
-               #ig/ref :swirrl.auth0.middleware/normalize-roles
-               #ig/ref :drafter.middleware.auth0-auth/identify
-               #ig/ref :drafter.middleware.auth0-auth/token-authentication]}}
+ ;; auth method
+ ;; JWT signed by mock JWK
+ :drafter.auth.auth0/auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
+                                        :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+ }

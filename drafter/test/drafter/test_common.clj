@@ -124,7 +124,7 @@
       (proxy [Jwk] ["" "" "RSA" "" '() "" '() "" {}]
         (getPublicKey [] (.getPublic keypair))))))
 
-(defmethod ig/init-key :drafter.auth.auth0/mock-jwk [_ {:keys [endpoint] :as opts}]
+(defmethod ig/init-key :drafter.auth.auth0/mock-jwk [_ _opts]
   (mock-jwk))
 
 (defn user-access-token [user-id scope]

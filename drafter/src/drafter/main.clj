@@ -18,6 +18,9 @@
 (defmethod aero/reader 'ig/ref [_ _ value]
   (ig/ref value))
 
+(defmethod aero/reader 'ig/refset [_ _ value]
+  (ig/refset value))
+
 (defmethod aero/reader 'resource [_ _ value]
   (io/resource value))
 

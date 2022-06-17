@@ -1,31 +1,15 @@
 {
  :drafter.auth.auth0/mock-jwk {:endpoint #env AUTH0_DOMAIN}
 
- :swirrl.auth0.middleware/bearer-token
- {:auth0 #ig/ref :swirrl.auth0/client :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+ ;; authentication methods
+ :drafter.auth.basic/basic-auth-method {:drafter.user/repo #ig/ref :drafter.user/repo}
+ :drafter.auth.jws/jws-auth-method {:jws-signing-key "foo"}
+ :drafter.auth.auth0/auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
+                                        :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
 
- :drafter.middleware.auth0-auth/identify {}
-
- :drafter.middleware.auth0-auth/token-authentication {}
-
- :drafter.middleware.auth/wrap-authenticate
- {:drafter.user/repo #ig/ref :drafter.user/repo :jws-signing-key "foo"}
-
- :drafter.auth/read-role {}
- :swirrl.auth0.middleware/normalize-roles {:role-reader #ig/ref :drafter.auth/read-role}
-
- :drafter.middleware/wrap-authenticate
- #profile {:auth0 {:middleware [#ig/ref :swirrl.auth0.middleware/bearer-token
-                                #ig/ref :swirrl.auth0.middleware/normalize-roles
-                                #ig/ref :drafter.middleware.auth0-auth/identify
-                                #ig/ref :drafter.middleware.auth0-auth/token-authentication]}
-           :basic-auth {:middleware [#ig/ref :drafter.middleware.auth/wrap-authenticate]}}
-
- ;; [:drafter.timeouts/timeout-query :drafter/live-timeout] {:endpoint-timeout 30
- ;;                                                          :jws-signing-key "foo"}
-
- ;; [:drafter.timeouts/timeout-query :drafter/draftset-timeout] {:endpoint-timeout 30
- ;;                                                              :jws-signing-key "foo"}
+ :drafter.middleware/wrap-authenticate {:auth-methods [#ig/ref :drafter.auth.basic/basic-auth-method
+                                                       #ig/ref :drafter.auth.jws/jws-auth-method
+                                                       #ig/ref :drafter.auth.auth0/auth0-auth-method]}
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
