@@ -169,6 +169,10 @@
       "  ?ds <" drafter:hasSubmission "> ?submission ."
       "  ?submission <" drafter:claimPermission "> ?permission ."
       "}"
+      ;; TODO it makes sense for there to be multiple viewpermission and
+      ;; viewuser. How do we handle this?
+      "OPTIONAL { ?ds <" drafter:viewPermission "> ?viewpermission . }"
+      "OPTIONAL { ?ds <" drafter:viewUser "> ?viewuser . }"
       "{"
       "  SELECT DISTINCT ?ds WHERE {"
       "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
@@ -210,7 +214,9 @@
            claimuser
            submitter
            modified
-           version] :as ds}]
+           version
+           viewpermission
+           viewuser] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :type "Draftset"
                          :created-at created
@@ -224,6 +230,8 @@
                          :claim-role (keyword (user/canonical-permission->role
                                                permission))
                          :claim-user (some-> claimuser (user/uri->username))
+                         :view-permission (keyword viewpermission)
+                         :view-user (some-> viewuser user/uri->username)
                          :submitted-by (some-> submitter (user/uri->username))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
@@ -340,6 +348,26 @@
                   (submit-draftset-to-permission-query
                    draftset-ref (util/create-uuid) owner permission)))
 
+(defn- share-draftset-with-permission-query
+  [draftset-ref owner permission]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (str
+     "INSERT {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:viewPermission "> \"" (name permission) "\" .")
+     "} WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> .")
+     "}")))
+
+(defn share-draftset-with-permission!
+  "Shares a draftset with users with the specified permission. If the given
+   user is not the current owner of the draftset, no changes are made."
+  [backend draftset-ref owner permission]
+  (sparql/update! backend (share-draftset-with-permission-query
+                           draftset-ref owner permission)))
+
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
         target-uri (user/user->uri target)
@@ -369,6 +397,22 @@
 
 (defn submit-draftset-to-user! [backend draftset-ref submitter target]
   (let [q (submit-to-user-query draftset-ref (util/create-uuid) submitter target)]
+    (sparql/update! backend q)))
+
+(defn- share-with-user-query [draftset-ref owner target]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (str
+     "INSERT {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:viewUser "> <" (user/user->uri target) "> .")
+     "} WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> .")
+     "}")))
+
+(defn share-draftset-with-user! [backend draftset-ref submitter target]
+  (let [q (share-with-user-query draftset-ref submitter target)]
     (sparql/update! backend q)))
 
 (defn- try-claim-draftset-query [draftset-ref claimant]

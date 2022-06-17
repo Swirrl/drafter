@@ -49,6 +49,10 @@
 
 (def drafter:claimUser (url/append-path-segments drafter "claimUser"))
 
+(def drafter:viewPermission (url/append-path-segments drafter "viewPermission"))
+
+(def drafter:viewUser (url/append-path-segments drafter "viewUser"))
+
 (def drafter:submittedBy (url/append-path-segments drafter "submittedBy"))
 
 (def drafter:draft (url/append-path-segments drafter))
