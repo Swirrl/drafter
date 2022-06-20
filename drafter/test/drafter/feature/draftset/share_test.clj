@@ -38,7 +38,7 @@
     (tc/assert-spec ::ds/Draftset body)
     ;; Current owner doesn't change when sharing
     (is (= (user/username test-editor) (:current-owner body)))
-    (is (= (user/username test-publisher) (:view-user body)))))
+    (is (= #{(user/username test-publisher)} (:view-users body)))))
 
 (tc/deftest-system-with-keys share-draftset-with-user-as-non-owner
   keys-for-test
@@ -97,4 +97,25 @@
     (tc/assert-spec ::ds/Draftset body)
     ;; Current owner doesn't change when sharing
     (is (= (user/username test-editor) (:current-owner body)))
-    (is (= :draft:claim (:view-permission body)))))
+    (is (= #{:draft:claim} (:view-permissions body)))))
+
+(tc/deftest-system-with-keys share-draftset-with-multiple-users-and-permissions
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
+  (let [draftset (help/create-draftset-through-api handler test-manager)]
+    (tc/assert-is-ok-response
+     (handler (help/create-share-with-permission-request
+               test-manager draftset :draft:claim)))
+    (tc/assert-is-ok-response
+     (handler (help/create-share-with-permission-request
+               test-manager draftset :draft:claim:special)))
+    (tc/assert-is-ok-response
+     (handler (help/share-draftset-with-user-request
+               draftset test-publisher test-manager)))
+    (let [res (handler (help/share-draftset-with-user-request
+                        draftset test-editor test-manager))]
+      (tc/assert-is-ok-response res)
+      (is (= #{:draft:claim :draft:claim:special}
+             (:view-permissions (:body res)))
+      (is (= #{"publisher@swirrl.com" "editor@swirrl.com"}
+             (:view-users (:body res))))))))

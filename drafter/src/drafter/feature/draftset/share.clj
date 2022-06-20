@@ -6,6 +6,8 @@
    [drafter.user :as user]
    [integrant.core :as ig]))
 
+;; TODO unshare
+
 (defn handle-user
   [{:keys [backend] :as manager} repo user draftset-id owner]
   (if-let [target-user (user/find-user-by-username repo user)]

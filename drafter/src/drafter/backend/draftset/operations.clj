@@ -16,7 +16,8 @@
   (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
            [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler BindingSet GraphQueryResult]
            org.eclipse.rdf4j.queryrender.RenderUtils
-           org.eclipse.rdf4j.rio.RDFHandler))
+           org.eclipse.rdf4j.rio.RDFHandler
+           java.net.URI))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -169,10 +170,18 @@
       "  ?ds <" drafter:hasSubmission "> ?submission ."
       "  ?submission <" drafter:claimPermission "> ?permission ."
       "}"
-      ;; TODO it makes sense for there to be multiple viewpermission and
-      ;; viewuser. How do we handle this?
-      "OPTIONAL { ?ds <" drafter:viewPermission "> ?viewpermission . }"
-      "OPTIONAL { ?ds <" drafter:viewUser "> ?viewuser . }"
+      ;; Makes the assumption that usernames and permissions don't contain
+      ;; spaces, so we can use space as a separator. Usernames are URIs, which
+      ;; cannot contain spaces. Permissions are OAuth 2.0 scopes, which also
+      ;; cannot contain spaces.
+      "OPTIONAL {"
+      "  SELECT ?ds (GROUP_CONCAT(?p; SEPARATOR=\" \") AS ?viewpermissions)"
+      "  WHERE { ?ds <" drafter:viewPermission "> ?p } GROUP BY ?ds"
+      "}"
+      "OPTIONAL {"
+      "  SELECT ?ds (GROUP_CONCAT(?u; SEPARATOR=\" \") AS ?viewusers)"
+      "  WHERE { ?ds <" drafter:viewUser "> ?u } GROUP BY ?ds"
+      "}"
       "{"
       "  SELECT DISTINCT ?ds WHERE {"
       "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
@@ -215,8 +224,8 @@
            submitter
            modified
            version
-           viewpermission
-           viewuser] :as ds}]
+           viewpermissions
+           viewusers] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :type "Draftset"
                          :created-at created
@@ -230,9 +239,15 @@
                          :claim-role (keyword (user/canonical-permission->role
                                                permission))
                          :claim-user (some-> claimuser (user/uri->username))
-                         :view-permission (keyword viewpermission)
-                         :view-user (some-> viewuser user/uri->username)
-                         :submitted-by (some-> submitter (user/uri->username))}]
+                         :submitted-by (some-> submitter (user/uri->username))
+                         :view-permissions
+                         (when viewpermissions
+                           (set (map keyword
+                                     (string/split viewpermissions #" "))))
+                         :view-users
+                         (when viewusers
+                           (set (map #(user/uri->username (URI. %))
+                                     (string/split viewusers #" "))))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
 (defn- combine-draftset-properties-and-graph-states [ds-properties graph-states]
