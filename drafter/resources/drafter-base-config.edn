@@ -82,6 +82,10 @@
  {:drafter/backend #ig/ref :drafter/backend
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
+ :drafter.feature.middleware/wrap-as-draftset-viewer
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
+
  :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
@@ -89,9 +93,10 @@
  {:drafter/backend #ig/ref :drafter/backend
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
- :drafter.feature.draftset-data.show/handler {:drafter/backend #ig/ref :drafter/backend
-                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                              :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.feature.draftset-data.show/handler
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-as-draftset-viewer #ig/ref :drafter.feature.middleware/wrap-as-draftset-viewer
+  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/manager #ig/ref :drafter/manager
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
@@ -117,9 +122,10 @@
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/manager #ig/ref :drafter/manager
                                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset.query/handler {:drafter/backend #ig/ref :drafter/backend
-                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                          :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.feature.draftset.query/handler
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-as-draftset-viewer #ig/ref :drafter.feature.middleware/wrap-as-draftset-viewer
+  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset.update/handler {:drafter/manager #ig/ref :drafter/manager
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner

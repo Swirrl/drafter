@@ -8,8 +8,8 @@
             [integrant.core :as ig]))
 
 (defn handler
-  [{backend :drafter/backend :keys [wrap-as-draftset-owner timeout-fn]}]
-  (wrap-as-draftset-owner :drafter:draft:view
+  [{backend :drafter/backend :keys [wrap-as-draftset-viewer timeout-fn]}]
+  (wrap-as-draftset-viewer :drafter:draft:view
    (parse-union-with-live-handler
     (fn [{{:keys [draftset-id union-with-live]} :params :as request}]
       (let [executor (backend/endpoint-repo backend draftset-id {:union-with-live? union-with-live})
@@ -18,7 +18,7 @@
 
 (defmethod ig/pre-init-spec ::handler [_]
   (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner ::sp/timeout-fn]))
+          :req-un [::wrap-as-draftset-viewer ::sp/timeout-fn]))
 
 (def cors-allowed-headers
   #{"Accept"

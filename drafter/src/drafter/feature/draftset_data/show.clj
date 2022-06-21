@@ -8,10 +8,10 @@
             [integrant.core :as ig]))
 
 (defn handler
-  [{wrap-as-draftset-owner :wrap-as-draftset-owner
+  [{wrap-as-draftset-viewer :wrap-as-draftset-viewer
     backend :drafter/backend
     draftset-query-timeout-fn :timeout-fn}]
-  (wrap-as-draftset-owner :drafter:draft:view
+  (wrap-as-draftset-viewer :drafter:draft:view
    (parse-union-with-live-handler
     (fn [{{:keys [draftset-id graph union-with-live] :as params} :params :as request}]
       (let [executor (ep/build-draftset-endpoint backend draftset-id union-with-live)
@@ -30,7 +30,7 @@
 
 (defmethod ig/pre-init-spec ::handler [_]
   (s/keys :req [:drafter/backend]
-          :req-un [::wrap-as-draftset-owner ::sp/timeout-fn]))
+          :req-un [::wrap-as-draftset-viewer ::sp/timeout-fn]))
 
 (defmethod ig/init-key ::handler [_ opts]
   (handler opts))

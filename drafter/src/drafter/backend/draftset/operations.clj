@@ -286,6 +286,9 @@
 (defn get-draftset-info [repo draftset-ref]
   (first (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])))
 
+(defn is-draftset-viewer? [backend draftset-ref user]
+  (user/can-view? user (get-draftset-info backend draftset-ref)))
+
 (defn- delete-draftset-query [draftset-ref draft-graph-uris]
   (let [delete-drafts-query (map mgmt/delete-draft-graph-and-remove-from-state-query draft-graph-uris)
         delete-draftset-query (delete-draftset-statements-query draftset-ref)]

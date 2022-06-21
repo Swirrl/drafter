@@ -3,6 +3,7 @@
    [clojure.test :as t :refer [is]]
    [drafter.draftset :as ds]
    [drafter.draftset.spec :as dss]
+   [drafter.feature.draftset.query-test :as query]
    [drafter.feature.draftset.test-helper :as help]
    [drafter.test-common :as tc]
    [drafter.user :as user]
@@ -15,7 +16,7 @@
   [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
     (tc/assert-is-not-found-response
      (handler (help/create-share-with-permission-request
-               test-editor "/v1/draftset/missing" :draft:claim))))
+               test-editor "/v1/draftset/missing" :draft:view))))
 
 (tc/deftest-system-with-keys share-draftset-with-permission-by-non-owner
   keys-for-test
@@ -24,7 +25,7 @@
      (handler (help/create-share-with-permission-request
                test-publisher
                (help/create-draftset-through-api handler test-editor)
-               :draft:claim))))
+               :draft:view))))
 
 (tc/deftest-system-with-keys share-draftset-with-user
   keys-for-test
@@ -81,7 +82,7 @@
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         request (help/share-draftset-with-user-request
                  draftset-location test-publisher test-editor)
-        request (assoc-in request [:params :permission] "draft:claim")]
+        request (assoc-in request [:params :permission] "draft:view")]
     (tc/assert-is-unprocessable-response (handler request))))
 
 (tc/deftest-system-with-keys share-draftset-with-permission
@@ -92,12 +93,12 @@
          (help/create-share-with-permission-request
           test-editor
           (help/create-draftset-through-api handler test-editor)
-          :draft:claim))]
+          :draft:view))]
     (tc/assert-is-ok-response share-response)
     (tc/assert-spec ::ds/Draftset body)
     ;; Current owner doesn't change when sharing
     (is (= (user/username test-editor) (:current-owner body)))
-    (is (= #{:draft:claim} (:view-permissions body)))))
+    (is (= #{:draft:view} (:view-permissions body)))))
 
 (tc/deftest-system-with-keys share-draftset-with-multiple-users-and-permissions
   keys-for-test
@@ -105,17 +106,52 @@
   (let [draftset (help/create-draftset-through-api handler test-manager)]
     (tc/assert-is-ok-response
      (handler (help/create-share-with-permission-request
-               test-manager draftset :draft:claim)))
+               test-manager draftset :draft:view)))
     (tc/assert-is-ok-response
      (handler (help/create-share-with-permission-request
-               test-manager draftset :draft:claim:special)))
+               test-manager draftset :draft:view:special)))
     (tc/assert-is-ok-response
      (handler (help/share-draftset-with-user-request
                draftset test-publisher test-manager)))
     (let [res (handler (help/share-draftset-with-user-request
                         draftset test-editor test-manager))]
       (tc/assert-is-ok-response res)
-      (is (= #{:draft:claim :draft:claim:special}
+      (is (= #{:draft:view :draft:view:special}
              (:view-permissions (:body res)))
       (is (= #{"publisher@swirrl.com" "editor@swirrl.com"}
              (:view-users (:body res))))))))
+
+(tc/deftest-system-with-keys can-query-draftset-shared-with-user
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
+  (let [draftset (help/create-draftset-through-api handler test-manager)]
+    (tc/assert-is-ok-response
+     (handler (help/share-draftset-with-user-request draftset
+                                                     test-editor
+                                                     test-manager)))
+    (tc/assert-is-ok-response
+     (handler (help/get-draftset-quads-request draftset test-editor :nq "true")))
+    (tc/assert-is-ok-response
+     (handler
+      (query/create-query-request test-editor
+                                  draftset
+                                  "select * where { ?s ?p ?o }"
+                                  "application/sparql-results+json"
+                                  :union-with-live? "true")))))
+
+(tc/deftest-system-with-keys can-query-draftset-shared-with-permission
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
+  (let [draftset (help/create-draftset-through-api handler test-manager)]
+    (tc/assert-is-ok-response
+     (handler (help/create-share-with-permission-request
+               test-manager draftset :draft:view)))
+    (tc/assert-is-ok-response
+     (handler (help/get-draftset-quads-request draftset test-editor :nq "true")))
+    (tc/assert-is-ok-response
+     (handler
+      (query/create-query-request test-editor
+                                  draftset
+                                  "select * where { ?s ?p ?o }"
+                                  "application/sparql-results+json"
+                                  :union-with-live? "true")))))

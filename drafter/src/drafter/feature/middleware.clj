@@ -52,6 +52,15 @@
       (inner-handler request)
       (response/forbidden-response "Operation only permitted by draftset owner"))))
 
+(defn restrict-to-draftset-viewer
+  "Middleware to enforce authentication and check the user making the request
+   has permission to view the draftset"
+  [backend inner-handler]
+  (fn [{user :identity {:keys [draftset-id]} :params :as request}]
+    (if (dsops/is-draftset-viewer? backend draftset-id user)
+      (inner-handler request)
+      (response/forbidden-response "Operation only permitted by draftset viewers"))))
+
 (defn wrap-as-draftset-owner
   [{:keys [:drafter/backend wrap-authenticate]}]
   (fn [permission handler]
@@ -60,8 +69,19 @@
       backend
       (restrict-to-draftset-owner backend handler)))))
 
+(defn wrap-as-draftset-viewer
+  [{:keys [:drafter/backend wrap-authenticate]}]
+  (fn [permission handler]
+    (middleware/wrap-authorize wrap-authenticate permission
+     (existing-draftset-handler
+      backend
+      (restrict-to-draftset-viewer backend handler)))))
+
 (defmethod ig/pre-init-spec ::wrap-as-draftset-owner [_]
   (s/keys :req [:drafter/backend]))
 
 (defmethod ig/init-key ::wrap-as-draftset-owner [_ opts]
   (wrap-as-draftset-owner opts))
+
+(defmethod ig/init-key ::wrap-as-draftset-viewer [_ opts]
+  (wrap-as-draftset-viewer opts))
