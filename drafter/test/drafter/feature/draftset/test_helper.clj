@@ -74,6 +74,10 @@
   (share-draftset-with-username-request
    draftset-location (user/username target-user) user))
 
+(defn unshare-draftset-request [draftset-location user]
+  (tc/with-identity user {:uri (str draftset-location "/share")
+                          :request-method :delete}))
+
 (defn submit-draftset-to-user-through-api [handler draftset-location target-user user]
   (let [request (submit-draftset-to-user-request draftset-location target-user user)
         response (handler request)]

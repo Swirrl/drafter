@@ -6,8 +6,6 @@
    [drafter.user :as user]
    [integrant.core :as ig]))
 
-;; TODO unshare
-
 (defn handle-user
   [{:keys [backend] :as manager} repo user draftset-id owner]
   (if-let [target-user (user/find-user-by-username repo user)]
@@ -33,7 +31,7 @@
                                            (keyword permission))
    #(feat-common/draftset-sync-write-response % backend draftset-id)))
 
-(defmethod ig/init-key :drafter.feature.draftset.share/handler
+(defmethod ig/init-key :drafter.feature.draftset.share/post
   [_ {:keys [drafter/manager drafter.user/repo wrap-as-draftset-owner]}]
   (wrap-as-draftset-owner :draft:share
     (fn [{{:keys [user permission draftset-id]} :params owner :identity}]
@@ -50,3 +48,16 @@
 
         :else
         (unprocessable-entity-response "user or permission parameter required")))))
+
+(defmethod ig/init-key :drafter.feature.draftset.share/delete
+  [_ {:keys [drafter/manager drafter.user/repo wrap-as-draftset-owner]}]
+  (wrap-as-draftset-owner :draft:share
+    (fn [{{:keys [draftset-id]} :params owner :identity}]
+      (feat-common/run-sync
+       manager
+       (:email owner)
+       'unshare-draftset
+       draftset-id
+       #(dsops/unshare-draftset! (:backend manager) draftset-id owner)
+       #(feat-common/draftset-sync-write-response
+         % (:backend manager) draftset-id)))))

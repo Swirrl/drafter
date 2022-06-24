@@ -121,7 +121,7 @@
       (is (= #{"publisher@swirrl.com" "editor@swirrl.com"}
              (:view-users (:body res))))))))
 
-(tc/deftest-system-with-keys can-query-draftset-shared-with-user
+(tc/deftest-system-with-keys query-draftset-shared-with-user
   keys-for-test
   [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
   (let [draftset (help/create-draftset-through-api handler test-manager)]
@@ -139,7 +139,7 @@
                                   "application/sparql-results+json"
                                   :union-with-live? "true")))))
 
-(tc/deftest-system-with-keys can-query-draftset-shared-with-permission
+(tc/deftest-system-with-keys query-draftset-shared-with-permission
   keys-for-test
   [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
   (let [draftset (help/create-draftset-through-api handler test-manager)]
@@ -155,3 +155,24 @@
                                   "select * where { ?s ?p ?o }"
                                   "application/sparql-results+json"
                                   :union-with-live? "true")))))
+
+(tc/deftest-system-with-keys unshare-draftset
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
+  (let [draftset (help/create-draftset-through-api handler test-manager)]
+    (tc/assert-is-ok-response
+     (handler (help/create-share-with-permission-request
+               test-manager draftset :draft:view)))
+    (tc/assert-is-ok-response
+     (handler (help/create-share-with-permission-request
+               test-manager draftset :draft:view:special)))
+    (tc/assert-is-ok-response
+     (handler (help/share-draftset-with-user-request
+               draftset test-publisher test-manager)))
+    (tc/assert-is-ok-response
+     (handler (help/share-draftset-with-user-request
+               draftset test-editor test-manager)))
+    (let [res (handler (help/unshare-draftset-request draftset test-manager))]
+      (tc/assert-is-ok-response res)
+      (is (nil? (:view-permissions (:body res)))
+      (is (nil? (:view-users (:body res))))))))

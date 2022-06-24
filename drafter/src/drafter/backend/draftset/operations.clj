@@ -386,6 +386,25 @@
   (sparql/update! backend (share-draftset-with-permission-query
                            draftset-ref owner permission)))
 
+(defn unshare-draftset!
+  "Removes all shares from a draftset, so only the owner can view it. If the
+   given user is not the current owner of the draftset, no changes are made."
+  [backend draftset-ref owner]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (sparql/update! backend
+      (str
+       "DELETE {"
+       (with-state-graph
+         "<" draftset-uri "> <" drafter:viewPermission "> ?vp ;"
+         "                   <" drafter:viewUser "> ?vu .")
+       "} WHERE {"
+       (with-state-graph
+         "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> ;"
+         "                   <" rdf:a "> <" drafter:DraftSet "> ."
+         " OPTIONAL { <" draftset-uri "> <" drafter:viewPermission "> ?vp . }"
+         " OPTIONAL { <" draftset-uri "> <" drafter:viewUser "> ?vu . }")
+       "}"))))
+
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
         target-uri (user/user->uri target)
