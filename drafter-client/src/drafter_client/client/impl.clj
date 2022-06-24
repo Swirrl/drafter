@@ -375,6 +375,14 @@
    :share-draftset-with
    (merge {:id id} opts)))
 
+(defn unshare-draftset
+  "Share a Draftset with a user or permission"
+  [client id]
+  (martian/response-for
+   client
+   :unshare-draftset
+   {:id id}))
+
 (defn- assert-client [client]
   (when-not client
     (throw (ex-info "Trying to make request to drafter with `nil` client."

@@ -162,6 +162,9 @@
   (i/request client i/share-draftset-with access-token id
              :permission (name permission)))
 
+(defn unshare [client access-token id]
+  (i/request client i/unshare-draftset access-token id))
+
 (defn claim [client access-token id]
   (i/request client i/claim-draftset access-token id))
 

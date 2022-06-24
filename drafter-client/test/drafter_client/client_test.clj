@@ -228,9 +228,10 @@
       (let [draftsets (sut/draftsets client publisher-token)]
         (t/is (= #{(draftset/id ds-1) (draftset/id ds-2) (draftset/id ds-3)}
                  (set (map draftset/id draftsets))))))
+    (sut/unshare client editor-token (draftset/id ds-3))
     (t/testing "all"
       (let [draftsets (sut/draftsets client publisher-token {:include :all})]
-        (t/is (= #{(draftset/id ds-1) (draftset/id ds-2) (draftset/id ds-3)}
+        (t/is (= #{(draftset/id ds-1) (draftset/id ds-2)}
                  (set (map draftset/id draftsets))))))
     (t/testing "owned"
       (let [owned (sut/draftsets client publisher-token {:include :owned})]
