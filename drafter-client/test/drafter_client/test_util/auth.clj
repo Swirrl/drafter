@@ -20,3 +20,10 @@
          "publisher@swirrl.com"
          "drafter:publisher"
          (role->permissions :publisher)))
+
+(defn editor-token []
+  (token (env :auth0-domain)
+         (env :auth0-aud)
+         "editor@swirrl.com"
+         "drafter:editor"
+         (role->permissions :editor)))

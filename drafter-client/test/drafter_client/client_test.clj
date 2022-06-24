@@ -217,24 +217,27 @@
 
 (t/deftest draftsets-include-test
   (let [client (drafter-client)
-        token (auth-util/publisher-token)
-        ds-1 (sut/new-draftset client token "first" "description")
-        ds-2 (sut/new-draftset client token "second" "description")]
-    (sut/submit-to-permission client token (draftset/id ds-2) :drafter:draft:claim)
+        publisher-token (auth-util/publisher-token)
+        editor-token (auth-util/editor-token)
+        ds-1 (sut/new-draftset client publisher-token "first" "description")
+        ds-2 (sut/new-draftset client publisher-token "second" "description")
+        ds-3 (sut/new-draftset client editor-token "third" "description")]
+    (sut/submit-to-permission client publisher-token (draftset/id ds-2) :drafter:draft:claim)
+    (sut/share-with-permission client editor-token (draftset/id ds-3) :drafter:draft:view)
     (t/testing "default"
-      (let [draftsets (sut/draftsets client token)]
-        (t/is (= #{(draftset/id ds-1) (draftset/id ds-2)}
+      (let [draftsets (sut/draftsets client publisher-token)]
+        (t/is (= #{(draftset/id ds-1) (draftset/id ds-2) (draftset/id ds-3)}
                  (set (map draftset/id draftsets))))))
     (t/testing "all"
-      (let [draftsets (sut/draftsets client token {:include :all})]
-        (t/is (= #{(draftset/id ds-1) (draftset/id ds-2)}
+      (let [draftsets (sut/draftsets client publisher-token {:include :all})]
+        (t/is (= #{(draftset/id ds-1) (draftset/id ds-2) (draftset/id ds-3)}
                  (set (map draftset/id draftsets))))))
     (t/testing "owned"
-      (let [owned (sut/draftsets client token {:include :owned})]
+      (let [owned (sut/draftsets client publisher-token {:include :owned})]
         (is (= #{(draftset/id ds-1)}
                (set (map draftset/id owned))))))
     (t/testing "claimable"
-      (let [claimable (sut/draftsets client token {:include :claimable})]
+      (let [claimable (sut/draftsets client publisher-token {:include :claimable})]
         (is (= #{(draftset/id ds-2)}
                (set (map draftset/id claimable))))))))
 

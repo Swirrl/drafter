@@ -367,6 +367,14 @@
    :submit-draftset-to
    (merge {:id id} opts)))
 
+(defn share-draftset-with
+  "Share a Draftset with a user or permission"
+  [client id & {:keys [user permission] :as opts}]
+  (martian/response-for
+   client
+   :share-draftset-with
+   (merge {:id id} opts)))
+
 (defn- assert-client [client]
   (when-not client
     (throw (ex-info "Trying to make request to drafter with `nil` client."
