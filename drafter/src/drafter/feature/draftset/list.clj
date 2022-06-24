@@ -34,6 +34,15 @@
     "}")
   )
 
+;; Fetches all drafts with any view permission set, we still need to check that
+;; the user actually has the set permission.
+(def view-permission-clause
+  (str "{ ?ds <" drafter:viewPermission "> ?permission }"))
+
+(defn- user-is-view-user-clause [user]
+  (str
+    "{ ?ds <" drafter:viewUser "> <" (user/user->uri user) "> }"))
+
 (defn- user-is-owner-clause [user]
   (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
 
@@ -44,7 +53,9 @@
 
 (defn user-all-visible-clauses [user]
   (conj (user-claimable-clauses user)
-        (user-is-owner-clause user)))
+        (user-is-owner-clause user)
+        view-permission-clause
+        (user-is-view-user-clause user)))
 
 (defn get-all-draftsets-info [repo user]
   (filter #(user/can-view? user %)

@@ -56,17 +56,20 @@
   [{:keys [drafter.feature.draftset.list/get-draftsets-handler] :as system} "drafter/feature/draftset/list_test-2.edn"]
 
   (t/testing "All draftsets"
-    (assert-visibility #{"owned" "publishing"}
-                       (get-draftsets-handler (get-draftsets-request test-publisher :include :all))
-                       (str"Expected publisher to see owned and publishing draftsets"))
+    (assert-visibility
+     #{"owned" "publishing" "shared-with-manager"}
+     (get-draftsets-handler (get-draftsets-request test-publisher :include :all))
+     (str"Expected publisher to see owned and publishing draftsets"))
 
-    (assert-visibility #{"editing" "publishing" "admining"}
-                       (get-draftsets-handler (get-draftsets-request test-editor :include :all))
-                       (str "Expected editor to see editing, publishing & admining draftsets"))
+    (assert-visibility
+     #{"editing" "publishing" "admining"}
+     (get-draftsets-handler (get-draftsets-request test-editor :include :all))
+     (str "Expected editor to see editing, publishing & admining draftsets"))
 
-    (assert-visibility #{"publishing" "admining"}
-                       (get-draftsets-handler (get-draftsets-request test-manager :include :all))
-                       (str "Expected manager to see publishing and admining draftsets"))))
+    (assert-visibility
+     #{"publishing" "admining" "shared-with-manager"}
+     (get-draftsets-handler (get-draftsets-request test-manager :include :all))
+     (str "Expected manager to see publishing and admining draftsets"))))
 
 (t/deftest get-draftsets-union-with-live-test
   (tc/with-system
