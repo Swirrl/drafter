@@ -539,6 +539,24 @@ paths:
             $ref: '#/definitions/Draftset'
         '422':
           description: The share request could not be processed.
+    delete:
+      operationId: unshare-draftset
+      summary: Unshare a Draftset
+      description: |
+        Unshares this draftset so that only its owner can view it.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+      tags:
+        - Draftsets
+      responses:
+        '200':
+          description: The Draftset was successfully unshared.
+          schema:
+            $ref: '#/definitions/Draftset'
+        '422':
+          description: The unshare request could not be processed.
   /draftset/{id}/claim:
     put:
       operationId: claim-draftset
