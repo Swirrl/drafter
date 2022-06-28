@@ -15,7 +15,7 @@ for the request in different ways. Multiple authentication modes can be configur
 
 *** Basic authentication
 
-As defined by [RFC 7617](https://datatracker.ietf.org/doc/html/rfc7617) users provide their credentials as the base64-encoding of `username:password` within the `Authorization` header. These credentials
+As defined by [[https://datatracker.ietf.org/doc/html/rfc7617][RFC 7617]] users provide their credentials as the base64-encoding of `username:password` within the `Authorization` header. These credentials
 are validated against a configured user store (usually one backed by mongodb) and resolved to the corresponding user if valid.
 
 *** JWS token authentication
