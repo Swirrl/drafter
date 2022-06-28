@@ -42,26 +42,23 @@ which the base configuration references to build the authentication middleware.
 
 The basic authentication mode must be configured with the user store:
 
-__basic-auth.edn__
-```language clojure
+#+begin_src clojure
 :drafter.auth.basic/basic-auth-method {:drafter.user/repo #ig/ref :drafter.user/memory-repository}
-```
+#+end_src
 
 **** JWS authentication
 
 The JWS authentication mode requires the shared signing key secret. If accessing drafter with PMD3, this should match the `DRAFTER_JWS_SIGNING_KEY` environment variable used to configure PMD:
 
-__jws-auth.edn__
-```language clojure
+#+begin_src
 :drafter.auth.jws/jws-auth-method {:jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
-```
+#+end_src
 
 **** Auth0
 
 The Auth0 authentication method requires the details of a Drafter client application within an Auth0 tenant.
 
-__auth0.edn__
-```language clojure
+#+begin_src
 :swirrl.auth0/client {:endpoint #env AUTH0_DOMAIN
                       :iss #env AUTH0_DOMAIN
                       :aud #env AUTH0_AUD
@@ -74,7 +71,7 @@ __auth0.edn__
 
  :drafter.auth.auth0/auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
                                         :jwk #ig/ref :swirrl.auth0/jwk}
-```
+#+end_src
 
 ***** Swagger UI
 
@@ -97,8 +94,7 @@ The `Client ID` and `Client Secret` can then be provided in the UI to authentica
 This authentication method should only be used in development, and uses a shared RSA keypair to sign and validate user JWT tokens. The shared keypair is exposed via the `:drafter.auth.auth0/mock-jwk` component which is a parameter of the
 authentication method. Generated tokens must also specify the same `audience` (`:aud`) and `issuer` (`:iss`) values used to configure the auth0 client.
 
-__mock-auth0.edn__
-```language clojure
+#+begin_src clojure
 :drafter.auth.auth0/mock-jwk {}
 
  :swirrl.auth0/client {:iss #env AUTH0_DOMAIN
@@ -108,7 +104,7 @@ __mock-auth0.edn__
 
  :drafter.auth.mock-auth0/mock-auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
                                                   :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
-```
+#+end_src
 
 *** Supplying configuration
 
