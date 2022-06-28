@@ -15,7 +15,7 @@ for the request in different ways. Multiple authentication modes can be configur
 
 *** Basic authentication
 
-As defined by [[https://datatracker.ietf.org/doc/html/rfc7617][RFC 7617]] users provide their credentials as the base64-encoding of `username:password` within the `Authorization` header. These credentials
+As defined by [[https://datatracker.ietf.org/doc/html/rfc7617][RFC 7617]] users provide their credentials as the base64-encoding of 'username:password' within the Authorization header. These credentials
 are validated against a configured user store (usually one backed by mongodb) and resolved to the corresponding user if valid.
 
 *** JWS token authentication
@@ -35,7 +35,7 @@ signed.
 
 *** Configuring authentication
 
-The base drafter definition is insufficient to construct a valid integrant system, and at least one authentication mode should be configured in an EDN file supplied to drafter on startup. Each authentication mode component derives `:drafter.auth/authentication-mode`
+The base drafter definition is insufficient to construct a valid integrant system, and at least one authentication mode should be configured in an EDN file supplied to drafter on startup. Each authentication mode component derives :drafter.auth/authentication-mode
 which the base configuration references to build the authentication middleware.
 
 **** Basic authentication
@@ -48,7 +48,7 @@ The basic authentication mode must be configured with the user store:
 
 **** JWS authentication
 
-The JWS authentication mode requires the shared signing key secret. If accessing drafter with PMD3, this should match the `DRAFTER_JWS_SIGNING_KEY` environment variable used to configure PMD:
+The JWS authentication mode requires the shared signing key secret. If accessing drafter with PMD3, this should match the DRAFTER_JWS_SIGNING_KEY environment variable used to configure PMD:
 
 #+begin_src
 :drafter.auth.jws/jws-auth-method {:jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
@@ -78,21 +78,21 @@ The Auth0 authentication method requires the details of a Drafter client applica
 The Auth0 authentication method is presented in the Swagger UI as an OAuth application authentication flow. Authenticating with this method requires the configuration of a 'Machine to machine' application
 within Auth0, along with some extra configuration to set the username on the token. To configure a new API user:
 
-1. Open the Auth0 management dashboard for the Auth0 tenant corresponding to the configured Auth0 client e.g. `https://manage.auth0.com/dashboard/eu/<tenant-id>/`
+1. Open the Auth0 management dashboard for the Auth0 tenant corresponding to the configured Auth0 client e.g. https://manage.auth0.com/dashboard/eu/<tenant-id>/
 2. Create a new 'Machine to machine' application (Applications -> Create Application -> Machine to machine applications)
 3. Select an API - this is probably be a PMD application defined within the tenant
 4. Select the required permissions to associate with the application
-5. Add an `email` metadata field for application corresponding to the Drafter username for authorisation tokens (Settings tab -> Advanced Settings -> Application Metadata tab)
-6. Ensure there is a 'Hook' to set the corresponding `Drafter` metadata on new tokens (Auth Pipeline -> Hooks). This will usually already exist in most tenants, see e.g. `add-user-info-to-access-token` in the dev `dev-kkt-m758` tenant.
-7. The Swagger UI submits new token requests to Auth0 via Javascript. Since this is a cross-origin request, Auth0 must be configured to allow the origin hosting the Swagger UI. Add the origin to the `Allowed Origins (CORS)`
-   field within the `Application URIs` section of the application settings e.g. `http://localhost:3001` for use in development.
+5. Add an *email* metadata field for application corresponding to the Drafter username for authorisation tokens (Settings tab -> Advanced Settings -> Application Metadata tab)
+6. Ensure there is a 'Hook' to set the corresponding Drafter metadata on new tokens (Auth Pipeline -> Hooks). This will usually already exist in most tenants, see e.g. add-user-info-to-access-token in the dev dev-kkt-m758 tenant.
+7. The Swagger UI submits new token requests to Auth0 via Javascript. Since this is a cross-origin request, Auth0 must be configured to allow the origin hosting the Swagger UI. Add the origin to the 'Allowed Origins (CORS)'
+   field within the 'Application URIs' section of the application settings e.g. http://localhost:3001 for use in development.
 
-The `Client ID` and `Client Secret` can then be provided in the UI to authenticate to Drafter.
+The 'Client ID' and 'Client Secret' can then be provided in the UI to authenticate to Drafter.
 
 **** Mock Auth0
 
 This authentication method should only be used in development, and uses a shared RSA keypair to sign and validate user JWT tokens. The shared keypair is exposed via the `:drafter.auth.auth0/mock-jwk` component which is a parameter of the
-authentication method. Generated tokens must also specify the same `audience` (`:aud`) and `issuer` (`:iss`) values used to configure the auth0 client.
+authentication method. Generated tokens must also specify the same 'audience' (:aud) and 'issuer' (:iss) values used to configure the auth0 client.
 
 #+begin_src clojure
 :drafter.auth.auth0/mock-jwk {}
