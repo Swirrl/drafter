@@ -8,29 +8,37 @@ This allows drafter configuration to be split up into profiles.
 
 Most notably drafters base configuration is only a partial configuration.  Crucially it is missing how authentication and users should be managed.
 
-## Authentication Modes
+** Authentication Modes
 
 Most API routes (all routes when global authentication is enabled) require a user to be present on the incoming request. Drafter supports multiple modes of authentication which attempt to resolve a user
 for the request in different ways. Multiple authentication modes can be configured simultaneously. There are currently 4 supported modes:
 
-* Basic authentication - As defined by [RFC 7617](https://datatracker.ietf.org/doc/html/rfc7617) users provide their credentials as the base64-encoding of `username:password` within the `Authorization` header. These credentials
-                         are validated against a configured user store (usually one backed by mongodb) and resolved to the corresponding user if valid.
+*** Basic authentication
 
-* JWS token authentication - Users are represented as JWT tokens within a JSON Web Signature (JWS) structure. The authentication mode is configured with a shared symmetric signing key used to both sign and validate user documents.
-                             This mode is primarily used in PMD3 deployments to share authenticated user information between PMD and Drafter.
+As defined by [RFC 7617](https://datatracker.ietf.org/doc/html/rfc7617) users provide their credentials as the base64-encoding of `username:password` within the `Authorization` header. These credentials
+are validated against a configured user store (usually one backed by mongodb) and resolved to the corresponding user if valid.
 
-* Auth0 - Users are configured within an Auth0 tenant and provided on each request as a signed JWT bearer token. This authentication mode must be configured with details of a Drafter Auth0 client application to validate incoming tokens.
-          This is the only supported authentication mode in PMD4 production environments.
+*** JWS token authentication
 
-* Mock Auth0 - Like the Auth0 method, users are represented on requests as signed JWT bearer tokens. The 'mock' method used in development configures a known RSA keypair which allows arbitrary user tokens to be constructed and
-               signed.
+Users are represented as JWT tokens within a JSON Web Signature (JWS) structure. The authentication mode is configured with a shared symmetric signing key used to both sign and validate user documents.
+This mode is primarily used in PMD3 deployments to share authenticated user information between PMD and Drafter.
 
-### Configuring authentication
+*** Auth0
+
+Users are configured within an Auth0 tenant and provided on each request as a signed JWT bearer token. This authentication mode must be configured with details of a Drafter Auth0 client application to validate incoming tokens.
+This is the only supported authentication mode in PMD4 production environments.
+
+*** Mock Auth0
+
+Like the Auth0 method, users are represented on requests as signed JWT bearer tokens. The 'mock' method used in development configures a known RSA keypair which allows arbitrary user tokens to be constructed and
+signed.
+
+*** Configuring authentication
 
 The base drafter definition is insufficient to construct a valid integrant system, and at least one authentication mode should be configured in an EDN file supplied to drafter on startup. Each authentication mode component derives `:drafter.auth/authentication-mode`
 which the base configuration references to build the authentication middleware.
 
-#### Basic authentication
+**** Basic authentication
 
 The basic authentication mode must be configured with the user store:
 
@@ -39,7 +47,7 @@ __basic-auth.edn__
 :drafter.auth.basic/basic-auth-method {:drafter.user/repo #ig/ref :drafter.user/memory-repository}
 ```
 
-#### JWS authentication
+**** JWS authentication
 
 The JWS authentication mode requires the shared signing key secret. If accessing drafter with PMD3, this should match the `DRAFTER_JWS_SIGNING_KEY` environment variable used to configure PMD:
 
@@ -48,7 +56,7 @@ __jws-auth.edn__
 :drafter.auth.jws/jws-auth-method {:jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
 ```
 
-#### Auth0
+**** Auth0
 
 The Auth0 authentication method requires the details of a Drafter client application within an Auth0 tenant.
 
@@ -68,7 +76,7 @@ __auth0.edn__
                                         :jwk #ig/ref :swirrl.auth0/jwk}
 ```
 
-##### Swagger UI
+***** Swagger UI
 
 The Auth0 authentication method is presented in the Swagger UI as an OAuth application authentication flow. Authenticating with this method requires the configuration of a 'Machine to machine' application
 within Auth0, along with some extra configuration to set the username on the token. To configure a new API user:
@@ -84,7 +92,7 @@ within Auth0, along with some extra configuration to set the username on the tok
 
 The `Client ID` and `Client Secret` can then be provided in the UI to authenticate to Drafter.
 
-#### Mock Auth0
+**** Mock Auth0
 
 This authentication method should only be used in development, and uses a shared RSA keypair to sign and validate user JWT tokens. The shared keypair is exposed via the `:drafter.auth.auth0/mock-jwk` component which is a parameter of the
 authentication method. Generated tokens must also specify the same `audience` (`:aud`) and `issuer` (`:iss`) values used to configure the auth0 client.
@@ -102,7 +110,7 @@ __mock-auth0.edn__
                                                   :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
 ```
 
-### Supplying configuration
+*** Supplying configuration
 
 An EDN configuration file containing the definition for one or more of the above authentication methods should be supplied as a command-line parameter when starting Drafter.
 
