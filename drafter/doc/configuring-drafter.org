@@ -80,7 +80,7 @@ within Auth0, along with some extra configuration to set the username on the tok
 
 1. Open the Auth0 management dashboard for the Auth0 tenant corresponding to the configured Auth0 client e.g. https://manage.auth0.com/dashboard/eu/<tenant-id>/
 2. Create a new 'Machine to machine' application (Applications -> Create Application -> Machine to machine applications)
-3. Select an API - this is probably be a PMD application defined within the tenant
+3. Select an API - this will probably be a PMD application defined within the tenant
 4. Select the required permissions to associate with the application
 5. Add an *email* metadata field for application corresponding to the Drafter username for authorisation tokens (Settings tab -> Advanced Settings -> Application Metadata tab)
 6. Ensure there is a 'Hook' to set the corresponding Drafter metadata on new tokens (Auth Pipeline -> Hooks). This will usually already exist in most tenants, see e.g. add-user-info-to-access-token in the dev dev-kkt-m758 tenant.
@@ -91,7 +91,7 @@ The 'Client ID' and 'Client Secret' can then be provided in the UI to authentica
 
 **** Mock Auth0
 
-This authentication method should only be used in development, and uses a shared RSA keypair to sign and validate user JWT tokens. The shared keypair is exposed via the `:drafter.auth.auth0/mock-jwk` component which is a parameter of the
+This authentication method should only be used in development, and uses a shared RSA keypair to sign and validate user JWT tokens. The shared keypair is exposed via the :drafter.auth.auth0/mock-jwk component which is a parameter of the
 authentication method. Generated tokens must also specify the same 'audience' (:aud) and 'issuer' (:iss) values used to configure the auth0 client.
 
 #+begin_src clojure
