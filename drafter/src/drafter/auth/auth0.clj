@@ -85,7 +85,7 @@
       (let [satisfying-roles (user/roles-including role)]
         (mapv role->scope satisfying-roles)))
 
-    (get-swagger-ui-config [_this] {})))
+    (get-swagger-ui-config [_this] {:auth0Audience (:aud auth0-client)})))
 
 (derive ::auth0-auth-method ::auth/auth-method)
 
