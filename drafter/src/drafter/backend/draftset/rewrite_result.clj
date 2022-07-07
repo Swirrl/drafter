@@ -184,6 +184,8 @@
         (.getMaxExecutionTime inner-query))
       (setMaxExecutionTime [this max]
         (.setMaxExecutionTime inner-query max)))
+    '(Object
+       (toString [_this] (.toString inner-query)))
     specs))
 
 (def-rewriting-query-record RewritingBooleanQuery

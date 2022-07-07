@@ -52,7 +52,8 @@
             [drafter.backend.draftset.graphs :as graphs]
             [drafter.time :as time]
             [drafter.rdf.jena :as jena]
-            [drafter.feature.modified-times :as modified-times])
+            [drafter.feature.modified-times :as modified-times]
+            [clojure.tools.logging :as log])
   (:import java.net.URI
            [org.apache.jena.sparql.modify.request
             QuadDataAcc Target
@@ -402,6 +403,7 @@
                             :max-update-size max-update-size}
 
             update-request' (build-update update-plan update-context)]
+        (log/debugf "About to run rewritten draft UPDATE query: %n%s" update-request')
         (sparql/update! backend update-request')))))
 
 ;; Handler
@@ -479,6 +481,7 @@
             params (parse-update-params request)
             update-query (get-update-query params)
             update-request (parse-update-query manager update-query max-update-size)]
+        (log/infof "Received draft UPDATE query: %n%s" update-query)
         (assoc params :update-request update-request :draftset-id draftset-id))
       (throw (ex-info "Method not supported"
                       {:error :method-not-allowed :method request-method})))))
