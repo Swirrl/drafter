@@ -35,15 +35,27 @@
             <AppenderRef ref="drafter" />
         </Logger>
 
-        <Logger name="drafter.rdf.sparql-protocol" level="debug">
+        <Logger name="drafter.rdf.sparql-protocol" level="debug" additivity="false">
             <AppenderRef ref="sparql" />
         </Logger>
 
-        <Logger name="drafter.routes.sparql" level="debug">
+        <Logger name="drafter.rdf.sparql" level="info" additivity="false">
             <AppenderRef ref="sparql" />
         </Logger>
 
-        <Logger name="drafter.routes.sparql-update" level="debug">
+        <Logger name="drafter.feature.draftset.update" level="info" additivity="false">
+            <AppenderRef ref="sparql" />
+        </Logger>
+
+        <Logger name="drafter.routes.sparql" level="debug" additivity="false">
+            <AppenderRef ref="sparql" />
+        </Logger>
+
+        <Logger name="drafter.backend.draftset.rewrite-query" level="info" additivity="false">
+            <AppenderRef ref="sparql" />
+        </Logger>
+
+        <Logger name="drafter.stasher" level="info" additivity="false">
             <AppenderRef ref="sparql" />
         </Logger>
 
