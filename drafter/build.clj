@@ -35,3 +35,6 @@
       ;; https://github.com/juxt/pack.alpha/issues/101
       :to-registry-username "_json_key"
       :to-registry-password (System/getenv "GCLOUD_SERVICE_KEY")})))
+
+(defn clean [_]
+  (b/delete {:path "target"}))

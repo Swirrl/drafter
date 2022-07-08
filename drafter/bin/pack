@@ -9,22 +9,11 @@ TARGET_DIR="${DRAFTER_DIR}/target"
 LIB_DIR="${TARGET_DIR}/lib"
 DRAFTER_JAR="${TARGET_DIR}/drafter.jar"
 
-# clean existing
-if [ -d "${TARGET_DIR}" ]; then
-  if [ -d "${LIB_DIR}" ]; then
-    rm -r "${LIB_DIR}"
-  fi
-
-
-  if [ -f "${DRAFTER_JAR}" ]; then
-    rm "${DRAFTER_JAR}"
-  fi
-else
-  mkdir "${TARGET_DIR}"
-fi
-
 # pack
 pushd "${DRAFTER_DIR}" || exit
 trap "popd" EXIT
+
+# clean existing
+clj -T:build clean
 
 clojure -M:prod:pack -e env/prod/clj --lib-dir "${LIB_DIR}" --project-path "${DRAFTER_JAR}"
