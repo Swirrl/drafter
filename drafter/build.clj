@@ -8,6 +8,7 @@
 (def version (format "2.0.%s" (b/git-count-revs nil)))
 (def class-dir "target/classes")
 (def jar-file (format "target/drafter-%s.jar" version))
+(def uberjar-file (format "target/drafter-%s-standalone.jar" version))
 
 ;; A tag name must be valid ASCII and may contain lowercase and uppercase
 ;; letters, digits, underscores, periods and dashes
@@ -55,10 +56,14 @@
                   :path-coerce :jar
                   :libs "target/lib"})))
 
-(defn jar [_]
+(defn- copy-files [basis aliases]
+  (b/copy-dir {:src-dirs ["src" "resources" "env/prod/clj"]
+               :target-dir class-dir}))
+
+(defn jar [opts]
+  (clean opts)
   (let [basis (jar-basis)]
-    (b/copy-dir {:src-dirs ["src" "resources" "env/prod/clj"]
-                 :target-dir class-dir})
+    (copy-files basis #{:prod})
 
     (b/write-pom {:class-dir class-dir
                   :lib lib
@@ -78,3 +83,16 @@
                 :version version
                 :jar-file jar-file
                 :class-dir class-dir})))
+
+(defn uber [opts]
+  (clean opts)
+
+  (let [basis (jar-basis)]
+    (copy-files basis #{:prod})
+    (b/compile-clj {:basis basis
+                    :src-dirs ["src"]
+                    :class-dir class-dir})
+    (b/uber {:basis basis
+             :class-dir class-dir
+             :uber-file uberjar-file
+             :main 'drafter.main})))

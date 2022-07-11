@@ -56,7 +56,8 @@
                            :exclusions [compojure/compojure
                                         org.clojure/java.classpath
                                         org.clojure/tools.reader
-                                        org.clojure/java.classpath]}
+                                        org.clojure/java.classpath
+                                        javax.servlet/servlet-api]}
         me.raynes/fs {:mvn/version "1.4.6"} ;; filesystem utils
 
         metosin/ring-swagger-ui {:mvn/version "3.20.1"}
