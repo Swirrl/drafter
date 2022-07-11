@@ -126,6 +126,34 @@
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}
 
+           ;; Alias for starting drafter in a pmd4 config with:
+           ;; clojure -M:pmd4
+           :pmd4 {:extra-paths ["env/prod/clj" "env/docker/resources"]
+                  :jvm-opts ["-Xmx4g"
+                             "-Dcom.sun.management.jmxremote.ssl=false"
+                             "-Dcom.sun.management.jmxremote.authenticate=false"
+                             "-Dcom.sun.management.jmxremote.port=3007"
+                             "-Dhttp.maxConnections=60"
+                             "-Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
+                             "-Dlog4j2.formatMsgNoLookups=true"
+                             "-Dlog4j.configurationFile=log4j2.xml"]
+
+                  :main-opts ["-m" "drafter.main" "./resources/drafter-auth0.edn"]}
+
+           ;; Alias for starting drafter in a pmd3 config with:
+           ;; clojure -M:pmd3
+           :pmd3 {:extra-paths ["env/prod/clj" "env/docker/resources"]
+                  :jvm-opts ["-Xmx4g"
+                             "-Dcom.sun.management.jmxremote.ssl=false"
+                             "-Dcom.sun.management.jmxremote.authenticate=false"
+                             "-Dcom.sun.management.jmxremote.port=3007"
+                             "-Dhttp.maxConnections=60"
+                             "-Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
+                             "-Dlog4j2.formatMsgNoLookups=true"
+                             "-Dlog4j.configurationFile=log4j2.xml"]
+
+                  :main-opts ["-m" "drafter.main" "./env/dev/resources/drafter-basic-dev-config.edn"]}
+
 
            ;; config for pmd4 flavoured docker
            :pmd4/docker {:extra-paths ["env/prod/clj" "env/docker/resources"]

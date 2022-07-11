@@ -1,3 +1,20 @@
+* Starting Drafter
+
+If you want to run drafter in a PMD3 (Basic Auth / JWS Auth) or PMD4
+(Auth0) development configuration but not develop it you can quickly
+launch it and configure it in the following manner accordingly:
+
+#+BEGIN_EXAMPLE
+$ clojure -M:pmd3
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+$ clojure -M:pmd4
+#+END_EXAMPLE
+
+These aliases will then require to further refine the configuration
+through [[*Env vars][environment variables]].
+
 * Configuring Drafter
 
 Drafter uses integrant for its configuration.  It contains a partial base [[/drafter/resources/drafter-base-config.edn][configuration]] inside its jar, and expects additional configuration to provided as EDN files via its command line.
@@ -144,6 +161,10 @@ See [drafter-logging](https://github.com/Swirrl/drafter/blob/master/drafter/doc/
 
 * Env vars
 
+NOTE: A =.envrc.example= config file of environment variables suitable
+for modification for development usage via [[https://direnv.net/][direnv]] are available in
+[[file:~/repos/drafter/.envrc.example][.envrc.example]].
+
 The base EDN file allows the following environment variables to be overriden
 
 | Env Var                                 | Required | Default    | Description                                          |
@@ -161,13 +182,16 @@ Due to the limitations of the sesame SPARQL repository, large append or delete j
 to be applied sequentially to the stardog database. The size of these batches can be configured - note that out-of-memory
 errors can occur if the value is set too high.
 
-** AUTH0 Profile
+** PMD4 (AUTH0 Profile)
 
 If running in a PMD4 configuration you may want to set some of the
 auth0 configuration through environment variables.  Consult the EDN
 file for the specific =#env= readers to use.
 
-** Mongo Profile
+** PMD3 (Mongo Profile)
+
+NOTE: the =deps.edn= =:pmd3= alias does not require mongodb, as it launches
+with an in memory user database.
 
 If running drafter in PMD3 legacy mode you may configure the mongo
 users profile with the following env vars:
