@@ -1,8 +1,7 @@
 (ns build
   (:require [clojure.tools.build.api :as b]
             [clojure.string :as str]
-            [juxt.pack.api :as pack]
-            [clojure.java.io :as io]))
+            [juxt.pack.api :as pack]))
 
 (def lib 'com.swirrl/drafter)
 (def version (format "2.0.%s" (b/git-count-revs nil)))
@@ -49,7 +48,9 @@
 (defn- jar-basis []
   (b/create-basis {:project "deps.edn" :aliases [:prod]}))
 
-(defn skinny [_]
+(defn skinny
+  "Builds a pack 'skinny' jar and a lib directory containing all dependencies"
+  [_]
   (let [basis (jar-basis)]
     (pack/skinny {:basis basis
                   :path "target/drafter.jar"
@@ -57,10 +58,15 @@
                   :libs "target/lib"})))
 
 (defn- copy-files [basis aliases]
-  (b/copy-dir {:src-dirs ["src" "resources" "env/prod/clj"]
-               :target-dir class-dir}))
+  (let [alias-extra-paths (mapcat (fn [alias]
+                                    (get-in basis [:aliases alias :extra-paths]))
+                                  aliases)]
+    (b/copy-dir {:src-dirs (concat ["src" "resources"] alias-extra-paths)
+                 :target-dir class-dir})))
 
-(defn jar [opts]
+(defn jar
+  "Builds a jar in the target directory"
+  [opts]
   (clean opts)
   (let [basis (jar-basis)]
     (copy-files basis #{:prod})
@@ -75,7 +81,9 @@
     (b/jar {:class-dir class-dir
             :jar-file jar-file})))
 
-(defn install [opts]
+(defn install
+  "Builds a jar and publishes it to the local maven repository"
+  [opts]
   (jar opts)
   (let [basis (jar-basis)]
     (b/install {:basis basis
@@ -84,7 +92,9 @@
                 :jar-file jar-file
                 :class-dir class-dir})))
 
-(defn uber [opts]
+(defn uber
+  "Builds an uberjar in the target directory"
+  [opts]
   (clean opts)
 
   (let [basis (jar-basis)]
