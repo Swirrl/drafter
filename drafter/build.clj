@@ -1,7 +1,13 @@
 (ns build
   (:require [clojure.tools.build.api :as b]
             [clojure.string :as str]
-            [juxt.pack.api :as pack]))
+            [juxt.pack.api :as pack]
+            [clojure.java.io :as io]))
+
+(def lib 'com.swirrl/drafter)
+(def version (format "2.0.%s" (b/git-count-revs nil)))
+(def class-dir "target/classes")
+(def jar-file (format "target/drafter-%s.jar" version))
 
 ;; A tag name must be valid ASCII and may contain lowercase and uppercase
 ;; letters, digits, underscores, periods and dashes
@@ -39,9 +45,36 @@
 (defn clean [_]
   (b/delete {:path "target"}))
 
+(defn- jar-basis []
+  (b/create-basis {:project "deps.edn" :aliases [:prod]}))
+
 (defn skinny [_]
-  (let [basis (b/create-basis {:project "deps.edn" :aliases [:prod]})]
+  (let [basis (jar-basis)]
     (pack/skinny {:basis basis
                   :path "target/drafter.jar"
                   :path-coerce :jar
                   :libs "target/lib"})))
+
+(defn jar [_]
+  (let [basis (jar-basis)]
+    (b/copy-dir {:src-dirs ["src" "resources" "env/prod/clj"]
+                 :target-dir class-dir})
+
+    (b/write-pom {:class-dir class-dir
+                  :lib lib
+                  :version version
+                  :basis basis
+                  :src-dirs ["src"]
+                  :resource-dirs ["resources" "prod/clj/drafter"]})
+
+    (b/jar {:class-dir class-dir
+            :jar-file jar-file})))
+
+(defn install [opts]
+  (jar opts)
+  (let [basis (jar-basis)]
+    (b/install {:basis basis
+                :lib lib
+                :version version
+                :jar-file jar-file
+                :class-dir class-dir})))
