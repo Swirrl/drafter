@@ -38,3 +38,10 @@
 
 (defn clean [_]
   (b/delete {:path "target"}))
+
+(defn skinny [_]
+  (let [basis (b/create-basis {:project "deps.edn" :aliases [:prod]})]
+    (pack/skinny {:basis basis
+                  :path "target/drafter.jar"
+                  :path-coerce :jar
+                  :libs "target/lib"})))

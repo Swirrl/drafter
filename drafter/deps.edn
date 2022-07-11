@@ -125,6 +125,7 @@
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}
 
+           :prod {:extra-paths ["env/prod/clj"]}
 
            ;; config for pmd4 flavoured docker
            :pmd4/docker {:extra-paths ["env/prod/clj" "env/docker/resources"]
