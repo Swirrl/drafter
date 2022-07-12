@@ -31,8 +31,10 @@
 
 package com.swirrl;
 
+import org.eclipse.rdf4j.query.QueryLanguage;
+import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
-import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.*;
 import clojure.java.api.Clojure;
 import clojure.lang.IFn;
 
@@ -49,8 +51,11 @@ public class MyBenchmark {
         return (IFn)Clojure.var("clojure.core", "keyword").invoke(value);
     }
 
-    private static Object getManager() {
-        SPARQLRepository repo = new SPARQLRepository("http://localhost:5820/drafter-test-db/query", "http://localhost:5820/drafter-test-db/update");
+    private static SPARQLRepository getRepository() {
+        return new SPARQLRepository("http://localhost:5820/drafter-test-db/query", "http://localhost:5820/drafter-test-db/update");
+    }
+
+    private static Object createManager(SPARQLRepository repo) {
         require("drafter.manager");
         IFn createFn = Clojure.var("drafter.manager", "create-manager");
         return createFn.invoke(repo);
@@ -85,12 +90,38 @@ public class MyBenchmark {
         return createFn.invoke(repo, user);
     }
 
+    @State(Scope.Thread)
+    public static class DraftState {
+        private SPARQLRepository repo;
+        private Object manager;
+        private Object draftset;
+
+        @Setup(Level.Iteration)
+        public void setup() {
+            System.out.println("Setting up...");
+            this.repo = getRepository();
+            this.manager = createManager(this.repo);
+            this.draftset = createDraftset(manager);
+        }
+
+        @TearDown(Level.Iteration)
+        public void tearDown() {
+            System.out.println("Tearing down...");
+            try(RepositoryConnection conn = this.repo.getConnection()) {
+                conn.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
+            }
+        }
+
+        public Object getManager() { return this.manager; }
+        public Object getDraftset() { return this.draftset; }
+    }
+
     @Benchmark
-    public void appendTest() {
-        Object manager = getManager();
+    public void appendTest(DraftState state) {
+        Object manager = state.getManager();
         Object sm = getAppendStateMachine();
 
-        Object draftset = createDraftset(manager);
+        Object draftset = state.getDraftset();
 
         Object liveToDraftMapping = Clojure.var("clojure.core", "hash-map").invoke();
         Object source = new File("../drafter/test/resources/drafter/backend/draftset/operations_test/all_data_queries.trig");
@@ -99,5 +130,4 @@ public class MyBenchmark {
         IFn execFn = Clojure.var("drafter.feature.draftset-data.common", "exec-state-machine-sync");
         execFn.invoke(sm, liveToDraftMapping, source, context);
     }
-
 }
