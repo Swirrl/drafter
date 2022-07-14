@@ -39,6 +39,8 @@ import clojure.java.api.Clojure;
 import clojure.lang.IFn;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 public class MyBenchmark {
 
@@ -98,7 +100,6 @@ public class MyBenchmark {
 
         @Setup(Level.Iteration)
         public void setup() {
-            System.out.println("Setting up...");
             this.repo = getRepository();
             this.manager = createManager(this.repo);
             this.draftset = createDraftset(manager);
@@ -106,7 +107,6 @@ public class MyBenchmark {
 
         @TearDown(Level.Iteration)
         public void tearDown() {
-            System.out.println("Tearing down...");
             try(RepositoryConnection conn = this.repo.getConnection()) {
                 conn.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
             }
@@ -116,18 +116,56 @@ public class MyBenchmark {
         public Object getDraftset() { return this.draftset; }
     }
 
-    @Benchmark
-    public void appendTest(DraftState state) {
+    private static Object getInputSource(String fileName) {
+        require("drafter.rdf.sesame");
+        URI graph;
+        try {
+            graph = new URI("http://gss-data.org.uk/data/gss_data/census-2011-catalog-entry");
+        } catch (URISyntaxException ex) {
+            throw new RuntimeException("Invalid URI", ex);
+        }
+
+        File source = new File(System.getProperty("data.dir"), fileName);
+        return Clojure.var("drafter.rdf.sesame", "->GraphTripleStatementSource").invoke(source, graph);
+    }
+
+    private static void appendOnlyTest(DraftState state, String fileName) throws Exception {
         Object manager = state.getManager();
         Object sm = getAppendStateMachine();
 
         Object draftset = state.getDraftset();
 
         Object liveToDraftMapping = Clojure.var("clojure.core", "hash-map").invoke();
-        Object source = new File("../drafter/test/resources/drafter/backend/draftset/operations_test/all_data_queries.trig");
+
+        Object source = getInputSource(fileName);
+
         Object context = appendJobContext(manager, draftset);
 
         IFn execFn = Clojure.var("drafter.feature.draftset-data.common", "exec-state-machine-sync");
         execFn.invoke(sm, liveToDraftMapping, source, context);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_5k(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_5k.nt");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_50k(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_50k.nt");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_500k(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_500k.nt");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_5m(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_5m.nt");
     }
 }
