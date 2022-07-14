@@ -42,7 +42,7 @@ import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-public class MyBenchmark {
+public class AppendBenchmark {
 
     private static void require(String nsName) {
         IFn require = Clojure.var("clojure.core", "require");
