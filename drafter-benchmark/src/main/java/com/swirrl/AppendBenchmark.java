@@ -31,118 +31,31 @@
 
 package com.swirrl;
 
-import org.eclipse.rdf4j.query.QueryLanguage;
-import org.eclipse.rdf4j.repository.RepositoryConnection;
-import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
 import org.openjdk.jmh.annotations.*;
-import clojure.java.api.Clojure;
-import clojure.lang.IFn;
-
-import java.io.File;
-import java.net.URI;
-import java.net.URISyntaxException;
 
 public class AppendBenchmark {
-
-    private static void require(String nsName) {
-        IFn require = Clojure.var("clojure.core", "require");
-        require.invoke(Clojure.read(nsName));
-    }
-
-    private static IFn keyword(String value) {
-        return (IFn)Clojure.var("clojure.core", "keyword").invoke(value);
-    }
-
-    private static SPARQLRepository getRepository() {
-        return new SPARQLRepository("http://localhost:5820/drafter-test-db/query", "http://localhost:5820/drafter-test-db/update");
-    }
-
-    private static Object createManager(SPARQLRepository repo) {
-        require("drafter.manager");
-        IFn createFn = Clojure.var("drafter.manager", "create-manager");
-        return createFn.invoke(repo);
-    }
-
-    private static Object getAppendStateMachine() {
-        require("drafter.feature.draftset-data.append");
-        IFn smFn = Clojure.var("drafter.feature.draftset-data.append", "append-state-machine");
-        return smFn.invoke();
-    }
-
-    private static Object appendJobContext(Object manager, Object draftsetRef) {
-        require("drafter.feature.draftset-data.common");
-        IFn contextFn = Clojure.var("drafter.feature.draftset-data.common", "job-context");
-        return contextFn.invoke(manager, draftsetRef);
-    }
-
-    private static Object createUser(String email, String roleName) {
-        require("drafter.user");
-        IFn createFn = Clojure.var("drafter.user", "create-authenticated-user");
-        return createFn.invoke(email, keyword(roleName));
-    }
-
-    private static Object createDraftset(Object manager) {
-        // TODO: add accessor function
-        Object repo = keyword("backend").invoke(manager);
-        Object user = createUser("publisher@swirrl.com", "publisher");
-
-        require("drafter.backend.draftset.operations");
-        IFn createFn = Clojure.var("drafter.backend.draftset.operations", "create-draftset!");
-
-        return createFn.invoke(repo, user);
-    }
-
     @State(Scope.Thread)
     public static class DraftState {
-        private SPARQLRepository repo;
-        private Object manager;
-        private Object draftset;
+        private Drafter drafter;
+        private Draftset draftset;
 
         @Setup(Level.Iteration)
         public void setup() {
-            this.repo = getRepository();
-            this.manager = createManager(this.repo);
-            this.draftset = createDraftset(manager);
+            this.drafter = Drafter.create();
+            this.draftset = this.drafter.createDraft(User.publisher());
         }
 
         @TearDown(Level.Iteration)
         public void tearDown() {
-            try(RepositoryConnection conn = this.repo.getConnection()) {
-                conn.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
-            }
+            this.drafter.dropDb();
         }
 
-        public Object getManager() { return this.manager; }
-        public Object getDraftset() { return this.draftset; }
-    }
-
-    private static Object getInputSource(String fileName) {
-        require("drafter.rdf.sesame");
-        URI graph;
-        try {
-            graph = new URI("http://gss-data.org.uk/data/gss_data/census-2011-catalog-entry");
-        } catch (URISyntaxException ex) {
-            throw new RuntimeException("Invalid URI", ex);
-        }
-
-        File source = new File(System.getProperty("data.dir"), fileName);
-        return Clojure.var("drafter.rdf.sesame", "->GraphTripleStatementSource").invoke(source, graph);
+        public Drafter getDrafter() { return this.drafter; }
+        public Draftset getDraftset() { return this.draftset; }
     }
 
     private static void appendOnlyTest(DraftState state, String fileName) throws Exception {
-        Object manager = state.getManager();
-        Object sm = getAppendStateMachine();
-
-        Object draftset = state.getDraftset();
-
-        Object liveToDraftMapping = Clojure.var("clojure.core", "hash-map").invoke();
-
-        Object source = getInputSource(fileName);
-
-        Object context = appendJobContext(manager, draftset);
-
-        IFn execFn = Clojure.var("drafter.feature.draftset-data.common", "exec-state-machine-sync");
-        execFn.invoke(sm, liveToDraftMapping, source, context);
+        state.getDrafter().append(state.getDraftset(), fileName);
     }
 
     @Benchmark
