@@ -27,7 +27,7 @@ public class AppendBenchmark {
 
     private static void appendOnlyTest(DraftState state, String fileName) throws Exception {
         File dataFile = Util.resolveDataFile(fileName);
-        state.getDrafter().append(state.getDraftset(), dataFile);
+        state.getDrafter().append(state.getDraftset(), Util.CENSUS_URI, dataFile);
     }
 
     @Benchmark

@@ -7,6 +7,7 @@ import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
 
 import java.io.File;
+import java.net.URI;
 
 public class Drafter {
     private final SPARQLRepository repo;
@@ -36,9 +37,9 @@ public class Drafter {
         return smFn.invoke();
     }
 
-    public void append(Draftset draftset, File dataFile) {
+    public void append(Draftset draftset, URI graph, File dataFile) {
         Object sm = getAppendStateMachine();
-        execStateMachine(sm, draftset, dataFile);
+        execStateMachine(sm, draftset, graph, dataFile);
     }
 
     private static Object getDeleteStateMachine() {
@@ -46,9 +47,9 @@ public class Drafter {
         return Clojure.var("drafter.feature.draftset-data.delete", "delete-state-machine").invoke();
     }
 
-    private void execStateMachine(Object stateMachine, Draftset draftset, File dataFile) {
+    private void execStateMachine(Object stateMachine, Draftset draftset, URI graph, File dataFile) {
         Object liveToDraftMapping = draftset.getGraphMapping(this.repo);
-        Object source = Util.getInputSource(dataFile);
+        Object source = Util.getInputSource(graph, dataFile);
         Object context = this.jobContext(draftset);
 
         Util.require("drafter.feature.draftset-data.common");
@@ -56,9 +57,9 @@ public class Drafter {
         execFn.invoke(stateMachine, liveToDraftMapping, source, context);
     }
 
-    public void delete(Draftset draftset, File toDelete) {
+    public void delete(Draftset draftset, URI graph, File toDelete) {
         Object sm = getDeleteStateMachine();
-        execStateMachine(sm, draftset, toDelete);
+        execStateMachine(sm, draftset, graph, toDelete);
     }
 
     public void dropDb() {

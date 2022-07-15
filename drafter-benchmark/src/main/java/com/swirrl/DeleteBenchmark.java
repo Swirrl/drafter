@@ -3,6 +3,7 @@ package com.swirrl;
 import org.openjdk.jmh.annotations.*;
 
 import java.io.File;
+import java.net.URI;
 
 public class DeleteBenchmark {
 
@@ -46,7 +47,7 @@ public class DeleteBenchmark {
         public void setup() {
             this.drafter = Drafter.create();
             this.draftset = this.drafter.createDraft(User.publisher());
-            this.drafter.append(this.draftset, this.dataFile);
+            this.drafter.append(this.draftset, this.getGraph(), this.dataFile);
         }
 
         @TearDown(Level.Iteration)
@@ -57,10 +58,11 @@ public class DeleteBenchmark {
         public Drafter getDrafter() { return this.drafter; }
         public Draftset getDraftset() { return this.draftset; }
         public File getDeletionFile() { return this.deletionFile; }
+        public URI getGraph() { return Util.CENSUS_URI; }
     }
 
     private static void deleteTest(DeleteState state) {
-        state.getDrafter().delete(state.getDraftset(), state.getDeletionFile());
+        state.getDrafter().delete(state.getDraftset(), state.getGraph(), state.getDeletionFile());
     }
 
     @Benchmark

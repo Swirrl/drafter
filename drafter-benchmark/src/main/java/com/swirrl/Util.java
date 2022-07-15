@@ -14,6 +14,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class Util {
+    public static URI CENSUS_URI = uri("http://gss-data.org.uk/data/gss_data/census-2011-catalog-entry");
+
     public static void require(String nsName) {
         IFn require = Clojure.var("clojure.core", "require");
         require.invoke(Clojure.read(nsName));
@@ -39,19 +41,16 @@ public class Util {
         return new File(dir, fileName);
     }
 
-    public static Object getInputSource(String fileName) {
-        return getInputSource(resolveDataFile(fileName));
-    }
-
-    public static Object getInputSource(File file) {
-        require("drafter.rdf.sesame");
-        URI graph;
+    public static URI uri(String uriStr) {
         try {
-            graph = new URI("http://gss-data.org.uk/data/gss_data/census-2011-catalog-entry");
+            return new URI(uriStr);
         } catch (URISyntaxException ex) {
             throw new RuntimeException("Invalid URI", ex);
         }
+    }
 
+    public static Object getInputSource(URI graph, File file) {
+        require("drafter.rdf.sesame");
         return Clojure.var("drafter.rdf.sesame", "->GraphTripleStatementSource").invoke(file, graph);
     }
 
