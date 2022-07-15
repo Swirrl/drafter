@@ -18,13 +18,10 @@ public class Drafter {
     }
 
     public Draftset createDraft(User user) {
-        // TODO: add accessor function
-        Object repo = Util.keyword("backend").invoke(manager);
-
         Util.require("drafter.backend.draftset.operations");
         IFn createFn = Clojure.var("drafter.backend.draftset.operations", "create-draftset!");
 
-        return new Draftset(createFn.invoke(repo, user.obj()));
+        return new Draftset(createFn.invoke(this.repo, user.obj()));
     }
 
     private Object jobContext(Draftset draftset) {
@@ -39,27 +36,9 @@ public class Drafter {
         return smFn.invoke();
     }
 
-    private void innerAppend(Draftset draftset, Object source) {
-        Object sm = getAppendStateMachine();
-
-        // TODO: query db!
-        // TODO: make argument?
-        Object liveToDraftMapping = Clojure.var("clojure.core", "hash-map").invoke();
-
-        Object context = this.jobContext(draftset);
-
-        IFn execFn = Clojure.var("drafter.feature.draftset-data.common", "exec-state-machine-sync");
-        execFn.invoke(sm, liveToDraftMapping, source, context);
-    }
-
     public void append(Draftset draftset, File dataFile) {
-        Object source = Util.getInputSource(dataFile);
-        this.innerAppend(draftset, source);
-    }
-
-    public void append(Draftset draftset, String fileName) {
-        Object source = Util.getInputSource(fileName);
-        this.innerAppend(draftset, source);
+        Object sm = getAppendStateMachine();
+        execStateMachine(sm, draftset, dataFile);
     }
 
     private static Object getDeleteStateMachine() {
@@ -67,15 +46,19 @@ public class Drafter {
         return Clojure.var("drafter.feature.draftset-data.delete", "delete-state-machine").invoke();
     }
 
-    public void delete(Draftset draftset, File toDelete) {
-        Object sm = getDeleteStateMachine();
-
+    private void execStateMachine(Object stateMachine, Draftset draftset, File dataFile) {
         Object liveToDraftMapping = draftset.getGraphMapping(this.repo);
-        Object source = Util.getInputSource(toDelete);
+        Object source = Util.getInputSource(dataFile);
         Object context = this.jobContext(draftset);
 
+        Util.require("drafter.feature.draftset-data.common");
         IFn execFn = Clojure.var("drafter.feature.draftset-data.common", "exec-state-machine-sync");
-        execFn.invoke(sm, liveToDraftMapping, source, context);
+        execFn.invoke(stateMachine, liveToDraftMapping, source, context);
+    }
+
+    public void delete(Draftset draftset, File toDelete) {
+        Object sm = getDeleteStateMachine();
+        execStateMachine(sm, draftset, toDelete);
     }
 
     public void dropDb() {

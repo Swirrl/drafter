@@ -3,8 +3,6 @@ package com.swirrl;
 import org.openjdk.jmh.annotations.*;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 public class DeleteBenchmark {
 
@@ -34,7 +32,6 @@ public class DeleteBenchmark {
 
     @State(Scope.Thread)
     public static class DeleteState {
-        //private final int inputSize;
         private Drafter drafter;
         private Draftset draftset;
         private final File dataFile;
@@ -46,27 +43,14 @@ public class DeleteBenchmark {
         }
 
         @Setup(Level.Iteration)
-        public void setup() throws Exception {
+        public void setup() {
             this.drafter = Drafter.create();
             this.draftset = this.drafter.createDraft(User.publisher());
             this.drafter.append(this.draftset, this.dataFile);
         }
 
-        private static Path writeDeletionFile(File sourceFile, int inputSize) throws Exception {
-            Path tempFile = Files.createTempFile("drafter_bench", ".nt");
-            try {
-                int toDelete = inputSize / 2;
-                Util.extractStatements(sourceFile, tempFile, toDelete);
-                return tempFile;
-            } catch (Exception ex) {
-                tempFile.toFile().delete();
-                throw ex;
-            }
-        }
-
         @TearDown(Level.Iteration)
         public void tearDown() {
-            //this.tempFile.toFile().delete();
             this.drafter.dropDb();
         }
 
@@ -81,25 +65,25 @@ public class DeleteBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_5k(DeleteState_5k state) throws Exception {
+    public void deleteTest_5k(DeleteState_5k state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_50k(DeleteState_50k state) throws Exception {
+    public void deleteTest_50k(DeleteState_50k state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_500k(DeleteState_500k state) throws Exception {
+    public void deleteTest_500k(DeleteState_500k state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_5m(DeleteState_5m state) throws Exception {
+    public void deleteTest_5m(DeleteState_5m state) {
         deleteTest(state);
     }
 }
