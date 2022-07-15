@@ -25,7 +25,7 @@
 
   Returns the response if valid, otherwise raises an error."
   [handler request]
-  (let [swagger-spec (swagger/load-spec-and-resolve-refs)]
+  (let [swagger-spec (swagger/load-spec-and-resolve-refs [] false)]
     (swagger/validate-response-against-swagger-spec swagger-spec request (handler request))))
 
 (defn create-draftset-request

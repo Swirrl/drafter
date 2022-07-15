@@ -1,5 +1,5 @@
 (ns drafter.user-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer :all :as t]
             [drafter.draftset :as ds]
             [drafter.test-common :as tc]
             [drafter.user :refer :all])
@@ -33,6 +33,14 @@
        test-manager :editor true
        test-manager :publisher true
        test-manager :manager true))
+
+(t/deftest roles-including-test
+  (t/are [role expected] (= expected (roles-including role))
+    :access #{:access :editor :publisher :manager :system}
+    :editor #{:editor :publisher :manager :system}
+    :publisher #{:publisher :manager :system}
+    :manager #{:manager :system}
+    :system #{:system}))
 
 (deftest password-valid?-test
   (let [password (str (UUID/randomUUID))

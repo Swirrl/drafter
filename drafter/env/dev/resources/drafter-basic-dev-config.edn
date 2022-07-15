@@ -6,13 +6,7 @@
                                           {:username "system@swirrl.com" :password "password" :role :system}]
                                   :realm "Drafter Memory Repo"}
 
- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ;; Web Middleware
- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
- :drafter.middleware.auth/wrap-authenticate
- {:drafter.user/repo #ig/ref :drafter.user/repo
-  :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
-
- :drafter.middleware/wrap-authenticate
- {:middleware [#ig/ref :drafter.middleware.auth/wrap-authenticate]}}
+ ;; authentication methods
+ :drafter.auth.basic/basic-auth-method {:drafter.user/repo #ig/ref :drafter.user/memory-repository}
+ :drafter.auth.jws/jws-auth-method {:jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
+ }

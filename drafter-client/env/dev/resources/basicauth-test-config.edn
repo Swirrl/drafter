@@ -18,17 +18,9 @@
 
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ;; User Database config
+ ;; Authentication methods
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
- :drafter.middleware.auth/wrap-authenticate
- {:drafter.user/repo #ig/ref :drafter.user/memory-repository
-  :jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
-
- :drafter.middleware/wrap-authenticate
- {:middleware [#ig/ref :drafter.middleware.auth/wrap-authenticate]}
-
-
+ :drafter.auth.basic/basic-auth-method {:drafter.user/repo #ig/ref :drafter.user/memory-repository}
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; Drafter client config below.  Configured for this drafter server.

@@ -10,7 +10,7 @@
             [drafter.spec :refer [load-spec-namespaces!]]
             [clojure.java.io :as io]
             [meta-merge.core :as mm]
-            [drafter.test-common] ;; for :mock profile
+            [drafter.test-common :as tc] ;; for :mock profile
             ))
 
 (def dev-config

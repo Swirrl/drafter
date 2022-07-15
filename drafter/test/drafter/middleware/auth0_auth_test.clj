@@ -1,7 +1,7 @@
 (ns ^:auth0 drafter.middleware.auth0-auth-test
   (:require [buddy.auth :as auth]
             [clojure.java.io :as io]
-            [clojure.test :refer :all]
+            [clojure.test :refer :all :as t]
             [drafter.middleware :refer :all]
             [drafter.test-common :as tc]
             [drafter.user :as user]
@@ -38,17 +38,18 @@
 (defn- assert-is-unauthorised-response [{:keys [status headers] :as response}]
   (is (= 401 status)))
 
-(tc/deftest-system-with-keys authenticate-user-test
-  [:drafter.middleware/wrap-authenticate]
-  [{:keys [:drafter.middleware/wrap-authenticate]} system]
-  (let [username "test@example.com"
-        user {:email username :role :publisher}
-        token (tc/user-access-token username "drafter:publisher")
-        request (create-authorised-request token)
-        handler (wrap-authenticate identity)
-        {:keys [identity] :as response} (handler request)]
-    (is (auth/authenticated? response))
-    (is (= (user/authenticated! user) identity))))
+(t/deftest authenticate-user-test
+  (tc/with-system
+    [:drafter.middleware/wrap-authenticate]
+    [{:keys [:drafter.middleware/wrap-authenticate]} system]
+    (let [username "test@example.com"
+          user {:email username :role :publisher}
+          token (tc/user-access-token username "drafter:publisher")
+          request (create-authorised-request token)
+          handler (wrap-authenticate identity)
+          {:keys [identity] :as response} (handler request)]
+      (t/is (auth/authenticated? response))
+      (t/is (= (user/authenticated! user) identity)))))
 
 (tc/deftest-system-with-keys invalid-token-should-not-authenticate-test
   [:drafter.middleware/wrap-authenticate]
@@ -75,22 +76,3 @@
         handler (wrap-authenticate inner-handler)
         response (handler {:uri "/test" :request-method :get})]
     (assert-is-unauthorised-response response)))
-
-;; (deftest require-authenticated-should-call-inner-handler-if-authenticated
-;;   (let [handler (require-authenticated identity)]
-;;     (is (thrown? ExceptionInfo (handler {:uri "/foo" :request-method :get})))))
-;; TODO: what about this? need the logging/stats from require-authenticated, but
-;; not the other stuff
-
-(defn- notifying-handler [a]
-  (fn [r]
-    (reset! a true)
-    (response "")))
-
-;; (deftest required-authenticated-should-throw-if-unauthenticated
-;;   (let [user (user/create-user "test@example.com" :publisher "sdlkf")
-;;         request {:uri "/foo" :request-method :post :identity user}
-;;         invoked-inner (atom false)
-;;         handler (require-authenticated (notifying-handler invoked-inner))]
-;;     (handler request)
-;;     (is (= true @invoked-inner))))

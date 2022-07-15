@@ -14,18 +14,7 @@
 
  :swirrl.auth0/jwk {:endpoint #env AUTH0_DOMAIN}
 
- :swirrl.auth0.middleware/bearer-token
- {:auth0 #ig/ref :swirrl.auth0/client :jwk #ig/ref :swirrl.auth0/jwk}
-
- :drafter.middleware.auth0-auth/identify {}
-
- :drafter.middleware.auth0-auth/token-authentication {}
-
- :drafter.auth/read-role {}
- :swirrl.auth0.middleware/normalize-roles {:role-reader #ig/ref :drafter.auth/read-role}
-
- :drafter.middleware/wrap-authenticate
- {:middleware [#ig/ref :swirrl.auth0.middleware/bearer-token
-               #ig/ref :swirrl.auth0.middleware/normalize-roles
-               #ig/ref :drafter.middleware.auth0-auth/identify
-               #ig/ref :drafter.middleware.auth0-auth/token-authentication]}}
+ ;; auth0 authentication method
+ :drafter.auth.auth0/auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
+                                        :jwk #ig/ref :swirrl.auth0/jwk}
+ }

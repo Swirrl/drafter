@@ -2,8 +2,6 @@
   (:require [clojure.spec.test.alpha :as st]
             [clojure.test :as t :refer :all]
             [drafter.main :as main]
-            [drafter.middleware.auth0-auth]
-            [drafter.middleware.auth]
             [drafter-client.client :as client]
             [drafter-client.test-util.db :as db-util]
             [environ.core :refer [env]]

@@ -1,14 +1,131 @@
+* Starting Drafter
+
+If you want to run drafter in a PMD3 (Basic Auth / JWS Auth) or PMD4
+(Auth0) development configuration but not develop it you can quickly
+launch it and configure it in the following manner accordingly:
+
+#+BEGIN_EXAMPLE
+$ clojure -M:pmd3
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+$ clojure -M:pmd4
+#+END_EXAMPLE
+
+These aliases will then require to further refine the configuration
+through [[*Env vars][environment variables]].
+
 * Configuring Drafter
 
 Drafter uses integrant for its configuration.  It contains a partial base [[/drafter/resources/drafter-base-config.edn][configuration]] inside its jar, and expects additional configuration to provided as EDN files via its command line.
 
-These files will then be merged ontop of the internal base configuration in order (left to right).
+These files will then be merged on top of the internal base configuration in order (left to right).
 
 This allows drafter configuration to be split up into profiles.
 
-Most notably drafters base configuration is only a partial configuration.  Crucially it is missing how authentication and users should be managed.  
+Most notably drafters base configuration is only a partial configuration.  Crucially it is missing how authentication and users should be managed.
 
-We typically provide this REQUIRED extra configuration on the command line as an extra file of integrant keys.
+** Authentication Modes
+
+Most API routes (all routes when global authentication is enabled) require a user to be present on the incoming request. Drafter supports multiple modes of authentication which attempt to resolve a user
+for the request in different ways. Multiple authentication modes can be configured simultaneously. There are currently 4 supported modes:
+
+*** Basic authentication
+
+As defined by [[https://datatracker.ietf.org/doc/html/rfc7617][RFC 7617]] users provide their credentials as the base64-encoding of 'username:password' within the Authorization header. These credentials
+are validated against a configured user store (usually one backed by mongodb) and resolved to the corresponding user if valid.
+
+*** JWS token authentication
+
+Users are represented as JWT tokens within a JSON Web Signature (JWS) structure. The authentication mode is configured with a shared symmetric signing key used to both sign and validate user documents.
+This mode is primarily used in PMD3 deployments to share authenticated user information between PMD and Drafter.
+
+*** Auth0
+
+Users are configured within an Auth0 tenant and provided on each request as a signed JWT bearer token. This authentication mode must be configured with details of a Drafter Auth0 client application to validate incoming tokens.
+This is the only supported authentication mode in PMD4 production environments.
+
+*** Mock Auth0
+
+Like the Auth0 method, users are represented on requests as signed JWT bearer tokens. The 'mock' method used in development configures a known RSA keypair which allows arbitrary user tokens to be constructed and
+signed.
+
+*** Configuring authentication
+
+The base drafter definition is insufficient to construct a valid integrant system, and at least one authentication mode should be configured in an EDN file supplied to drafter on startup. Each authentication mode component derives :drafter.auth/authentication-mode
+which the base configuration references to build the authentication middleware.
+
+**** Basic authentication
+
+The basic authentication mode must be configured with the user store:
+
+#+begin_src clojure
+:drafter.auth.basic/basic-auth-method {:drafter.user/repo #ig/ref :drafter.user/memory-repository}
+#+end_src
+
+**** JWS authentication
+
+The JWS authentication mode requires the shared signing key secret. If accessing drafter with PMD3, this should match the DRAFTER_JWS_SIGNING_KEY environment variable used to configure PMD:
+
+#+begin_src
+:drafter.auth.jws/jws-auth-method {:jws-signing-key #env DRAFTER_JWS_SIGNING_KEY}
+#+end_src
+
+**** Auth0
+
+The Auth0 authentication method requires the details of a Drafter client application within an Auth0 tenant.
+
+#+begin_src
+:swirrl.auth0/client {:endpoint #env AUTH0_DOMAIN
+                      :iss #env AUTH0_DOMAIN
+                      :aud #env AUTH0_AUD
+                      :api #join [#env AUTH0_DOMAIN "/api/v2/"]
+                      :swagger-json #resource "swirrl/auth0/swagger.json"
+                      :client-id #env AUTH0_CLIENT_ID
+                      :client-secret #env AUTH0_CLIENT_SECRET}
+
+ :swirrl.auth0/jwk {:endpoint #env AUTH0_DOMAIN}
+
+ :drafter.auth.auth0/auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
+                                        :jwk #ig/ref :swirrl.auth0/jwk}
+#+end_src
+
+***** Swagger UI
+
+The Auth0 authentication method is presented in the Swagger UI as an OAuth application authentication flow. Authenticating with this method requires the configuration of a 'Machine to machine' application
+within Auth0, along with some extra configuration to set the username on the token. To configure a new API user:
+
+1. Open the Auth0 management dashboard for the Auth0 tenant corresponding to the configured Auth0 client e.g. https://manage.auth0.com/dashboard/eu/<tenant-id>/
+2. Create a new 'Machine to machine' application (Applications -> Create Application -> Machine to machine applications)
+3. Select an API - this will probably be a PMD application defined within the tenant
+4. Select the required permissions to associate with the application
+5. Add an *email* metadata field for application corresponding to the Drafter username for authorisation tokens (Settings tab -> Advanced Settings -> Application Metadata tab)
+6. Ensure there is a 'Hook' to set the corresponding Drafter metadata on new tokens (Auth Pipeline -> Hooks). This will usually already exist in most tenants, see e.g. add-user-info-to-access-token in the dev dev-kkt-m758 tenant.
+7. The Swagger UI submits new token requests to Auth0 via Javascript. Since this is a cross-origin request, Auth0 must be configured to allow the origin hosting the Swagger UI. Add the origin to the 'Allowed Origins (CORS)'
+   field within the 'Application URIs' section of the application settings e.g. http://localhost:3001 for use in development.
+
+The 'Client ID' and 'Client Secret' can then be provided in the UI to authenticate to Drafter.
+
+**** Mock Auth0
+
+This authentication method should only be used in development, and uses a shared RSA keypair to sign and validate user JWT tokens. The shared keypair is exposed via the :drafter.auth.auth0/mock-jwk component which is a parameter of the
+authentication method. Generated tokens must also specify the same 'audience' (:aud) and 'issuer' (:iss) values used to configure the auth0 client.
+
+#+begin_src clojure
+:drafter.auth.auth0/mock-jwk {}
+
+ :swirrl.auth0/client {:iss #env AUTH0_DOMAIN
+                       :aud #env AUTH0_AUD
+                       :endpoint #env AUTH0_DOMAIN
+                       :swagger-json #resource "swirrl/auth0/swagger.json"}
+
+ :drafter.auth.mock-auth0/mock-auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
+                                                  :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
+#+end_src
+
+*** Supplying configuration
+
+An EDN configuration file containing the definition for one or more of the above authentication methods should be supplied as a command-line parameter when starting Drafter.
 
 These partial configurations / profiles typically support:
 
@@ -44,6 +161,10 @@ See [drafter-logging](https://github.com/Swirrl/drafter/blob/master/drafter/doc/
 
 * Env vars
 
+NOTE: A =.envrc.example= config file of environment variables suitable
+for modification for development usage via [[https://direnv.net/][direnv]] are available in
+[[file:~/repos/drafter/.envrc.example][.envrc.example]].
+
 The base EDN file allows the following environment variables to be overriden
 
 | Env Var                                 | Required | Default    | Description                                          |
@@ -61,13 +182,16 @@ Due to the limitations of the sesame SPARQL repository, large append or delete j
 to be applied sequentially to the stardog database. The size of these batches can be configured - note that out-of-memory
 errors can occur if the value is set too high.
 
-** AUTH0 Profile
+** PMD4 (AUTH0 Profile)
 
 If running in a PMD4 configuration you may want to set some of the
 auth0 configuration through environment variables.  Consult the EDN
 file for the specific =#env= readers to use.
 
-** Mongo Profile
+** PMD3 (Mongo Profile)
+
+NOTE: the =deps.edn= =:pmd3= alias does not require mongodb, as it launches
+with an in memory user database.
 
 If running drafter in PMD3 legacy mode you may configure the mongo
 users profile with the following env vars:
