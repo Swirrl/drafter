@@ -62,6 +62,16 @@ public class Drafter {
         execStateMachine(sm, draftset, graph, toDelete);
     }
 
+    private Object getGraphManager() {
+        Util.require("drafter.backend.draftset.graphs");
+        return Clojure.var("drafter.backend.draftset.graphs", "create-manager").invoke(this.repo);
+    }
+
+    public void deleteGraph(Draftset draftset, URI graphToDelete) {
+        Util.require("drafter.backend.draftset.graphs");
+        Clojure.var("drafter.backend.draftset.graphs", "delete-user-graph").invoke(this.getGraphManager(), draftset.obj(), graphToDelete);
+    }
+
     public void publish(Draftset draftset) {
         Util.require("drafter.backend.draftset.operations.publish");
         Clojure.var("drafter.backend.draftset.operations.publish", "publish-draftset!").invoke(this.manager, draftset.obj());
