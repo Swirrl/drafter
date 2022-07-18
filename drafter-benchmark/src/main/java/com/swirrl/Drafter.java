@@ -77,6 +77,15 @@ public class Drafter {
         Clojure.var("drafter.backend.draftset.operations.publish", "publish-draftset!").invoke(this.manager, draftset.obj());
     }
 
+    private static Long MAX_UPDATE_SIZE = (long)5000;
+
+    public void submitUpdate(Draftset draftset, String query) {
+        Util.require("drafter.feature.draftset.update");
+        Object parsedQuery = Clojure.var("drafter.feature.draftset.update", "parse-update-query").invoke(this.manager, query, MAX_UPDATE_SIZE);
+
+        Clojure.var("drafter.feature.draftset.update", "update!").invoke(this.manager, MAX_UPDATE_SIZE, draftset.obj(), parsedQuery);
+    }
+
     public void dropDb() {
         try(RepositoryConnection conn = this.repo.getConnection()) {
             conn.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
