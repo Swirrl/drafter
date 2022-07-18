@@ -10,13 +10,13 @@ public class AppendBenchmark {
         private Drafter drafter;
         private Draftset draftset;
 
-        @Setup(Level.Iteration)
+        @Setup(Level.Invocation)
         public void setup() {
             this.drafter = Drafter.create();
             this.draftset = this.drafter.createDraft(User.publisher());
         }
 
-        @TearDown(Level.Iteration)
+        @TearDown(Level.Invocation)
         public void tearDown() {
             this.drafter.dropDb();
         }

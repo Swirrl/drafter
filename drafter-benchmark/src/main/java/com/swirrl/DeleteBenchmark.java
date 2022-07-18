@@ -43,14 +43,14 @@ public class DeleteBenchmark {
             this.deletionFile = Util.resolveDataFile(deletionFileName);
         }
 
-        @Setup(Level.Iteration)
+        @Setup(Level.Invocation)
         public void setup() {
             this.drafter = Drafter.create();
             this.draftset = this.drafter.createDraft(User.publisher());
             this.drafter.append(this.draftset, this.getGraph(), this.dataFile);
         }
 
-        @TearDown(Level.Iteration)
+        @TearDown(Level.Invocation)
         public void tearDown() {
             this.drafter.dropDb();
         }

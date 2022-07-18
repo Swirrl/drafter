@@ -62,6 +62,11 @@ public class Drafter {
         execStateMachine(sm, draftset, graph, toDelete);
     }
 
+    public void publish(Draftset draftset) {
+        Util.require("drafter.backend.draftset.operations.publish");
+        Clojure.var("drafter.backend.draftset.operations.publish", "publish-draftset!").invoke(this.manager, draftset.obj());
+    }
+
     public void dropDb() {
         try(RepositoryConnection conn = this.repo.getConnection()) {
             conn.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
