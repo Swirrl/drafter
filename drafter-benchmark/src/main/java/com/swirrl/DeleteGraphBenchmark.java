@@ -17,13 +17,13 @@ public class DeleteGraphBenchmark {
             this.drafter = Drafter.create();
         }
 
-        @Setup
+        @Setup(Level.Invocation)
         public void setup() {
             this.draftset = this.drafter.createDraft(User.publisher());
             this.drafter.append(this.draftset, Util.CENSUS_URI, this.dataFile);
         }
 
-        @TearDown
+        @TearDown(Level.Invocation)
         public void tearDown() {
             this.drafter.dropDb();
         }
