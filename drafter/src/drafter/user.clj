@@ -32,24 +32,18 @@
     :manager (conj (role->permissions :publisher) :draft:claim:manager)
     :system (recur :manager)))
 
-(defn roles-including
-  "Returns the set of roles which include the given role"
-  [role]
-  (let [required-level (role->permission-level role)]
-    (->> role->permission-level
-         (keep (fn [[candidate level]]
-                 (if (>= level required-level)
-                   candidate)))
-         (set))))
-
-(defn get-role-summary
-  "Returns a brief summary of the given role"
-  [role]
-  ({:access "Read-only access"
-    :editor "Create and edit access to drafts"
-    :publisher "Create, edit and publish access to drafts"
-    :manager "Full access to drafts"
-    :system "Full access to the entire system"} role))
+(def permission-summary
+  {:draft:claim "Claim submitted drafts"
+   :draft:create "Create drafts"
+   :draft:delete "Delete drafts"
+   :draft:edit "Edit drafts"
+   :draft:publish "Publish drafts"
+   :draft:share "Share drafts to be viewed"
+   :draft:submit "Submit drafts to be claimed"
+   :draft:view "View shared drafts"
+   :job:view "View the status of jobs"
+   :public:view "View the public endpoint (if global auth is on)"
+   :user:view "View users"})
 
 (def roles #{:access :editor :publisher :manager :system})
 

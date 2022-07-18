@@ -209,14 +209,14 @@
       (t/is (nil? (sut/authenticate-request auth-methods request)))))
 
   (t/testing "Authentication succeeds"
-    (let [user (user/create-authenticated-user "test@example.com" :editor)
+    (let [user (user/create-authenticated-user "test@example.com" #{:draft:view})
           auth-methods [(succeeds-with-auth-method user)]
           request {:uri "/test" :request-method :get}]
       (t/is (= user (sut/authenticate-request auth-methods request)))))
 
   (t/testing "Authenticates with first matching handler"
-    (let [user1 (user/create-authenticated-user "test1@example.com" :editor)
-          user2 (user/create-authenticated-user "test2@example.com" :publisher)
+    (let [user1 (user/create-authenticated-user "test1@example.com" #{:draft:view})
+          user2 (user/create-authenticated-user "test2@example.com" #{:draft:view})
           auth-methods [(succeeds-with-auth-method user1)
                         (succeeds-with-auth-method user2)]
           request {:uri "/test" :request-method :get}]
@@ -245,13 +245,13 @@
   (t/testing "Allows requests with existing identity"
     (let [auth-methods [always-fails-auth-method]
           handler (sut/wrap-authenticate identity auth-methods)
-          user (user/create-authenticated-user "test@example.com" :publisher)
+          user (user/create-authenticated-user "test@example.com" #{:draft:view})
           request {:uri "/test" :request-method :get :identity user}
           response (handler request)]
       (t/is (= request response))))
 
   (t/testing "Authenticates user"
-    (let [user (user/create-authenticated-user "test@example.com" :editor)
+    (let [user (user/create-authenticated-user "test@example.com" #{:draft:view})
           auth-methods [(succeeds-with-auth-method user)]
           handler (sut/wrap-authenticate identity auth-methods)
           request {:uri "/test" :request-method :get}

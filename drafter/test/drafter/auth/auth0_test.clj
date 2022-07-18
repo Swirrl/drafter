@@ -7,19 +7,6 @@
             [drafter.user :as user])
   (:import clojure.lang.ExceptionInfo))
 
-(t/deftest read-role-test
-  (t/testing "Valid role"
-    (t/is (= :publisher (sut/read-role "drafter:publisher"))))
-
-  (t/testing "Non-drafter role"
-    (t/is (nil? (sut/read-role "muttnik:editor"))))
-
-  (t/testing "Invalid drafter role"
-    (t/is (nil? (sut/read-role "drafter:invalid"))))
-
-  (t/testing "No prefix"
-    (t/is (nil? (sut/read-role "manager")))))
-
 (defn- get-auth-method [system]
   (let [jwk (:drafter.auth.auth0/mock-jwk system)
         auth0-client (:swirrl.auth0/client system)]
@@ -50,10 +37,11 @@
     [system "test-system.edn"]
     (let [auth-method (get-auth-method system)
           username "test@example.com"
-          token (tc/user-access-token username "drafter:editor")
+          permissions #{:cat:pet :missiles:launch}
+          token (tc/user-access-token username "drafter:editor" permissions)
           request (add-auth-header {:uri "/test" :request-method :get} token)
           user (auth-common/expect-authentication auth-method request)
-          expected-user (user/create-authenticated-user username :editor)]
+          expected-user (user/create-authenticated-user username permissions)]
       (t/is (= expected-user user)))))
 
 (t/deftest should-reject-invalid-token

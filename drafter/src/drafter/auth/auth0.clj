@@ -12,11 +12,6 @@
   (or (get payload (keyword "https://pmd/user/email"))
       (get payload :sub)))
 
-(defn- role->scope
-  "Converts a drafter role into the corresponding auth0 scope"
-  [role]
-  (str "drafter:" (name role)))
-
 (defn parse-request-token
   "Parses a bearer token from an incoming request if one exists."
   [auth0-client jwk request]
@@ -48,6 +43,9 @@
     ::jwt/token-invalid (auth/authentication-failed)
     (auth/authentication-failed)))
 
+(defn- update-keys [m f]
+  (into {} (map (fn [[k v]] [(f k) v]) m)))
+
 (defn auth0-auth-method
   "Returns an implementation of the AuthenticationMethod protocol which uses auth0. Tokens should be
    specified on incoming requests within an 'Authorization: Bearer <token>' header. The validity of
@@ -71,11 +69,10 @@
        :flow "application"
        :description "OAuth authentication via Auth0"
        :tokenUrl (str (:endpoint auth0-client) "/oauth/token")
-       :scopes (into {} (map (fn [permission] [(str "drafter:" permission) (user/get-role-summary role)]) user/roles))})
+       :scopes (update-keys user/permission-summary #(str "drafter" %))})
 
-    (get-operation-swagger-security-requirement [_this {:keys [role] :as operation}]
-      (let [satisfying-roles (user/roles-including role)]
-        (mapv role->scope satisfying-roles)))
+    (get-operation-swagger-security-requirement [_this {:keys [permission] :as operation}]
+      [(str "drafter:" permission)])
 
     (get-swagger-ui-config [_this] {:auth0Audience (:aud auth0-client)})))
 

@@ -34,14 +34,6 @@
        test-manager :draft:publish true
        test-manager :draft:publish true))
 
-(t/deftest roles-including-test
-  (t/are [role expected] (= expected (roles-including role))
-    :access #{:access :editor :publisher :manager :system}
-    :editor #{:editor :publisher :manager :system}
-    :publisher #{:publisher :manager :system}
-    :manager #{:manager :system}
-    :system #{:system}))
-
 (deftest password-valid?-test
   (let [password (str (UUID/randomUUID))
         password-digest (get-digest password)
