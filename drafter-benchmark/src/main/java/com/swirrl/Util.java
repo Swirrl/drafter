@@ -1,17 +1,11 @@
 package com.swirrl;
 
+import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import clojure.java.api.Clojure;
 import clojure.lang.IFn;
 import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
-
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 public class Util {
     public static URI CENSUS_URI = uri("http://gss-data.org.uk/data/gss_data/census-2011-catalog-entry");
@@ -52,20 +46,5 @@ public class Util {
     public static Object getInputSource(URI graph, File file) {
         require("drafter.rdf.sesame");
         return Clojure.var("drafter.rdf.sesame", "->GraphTripleStatementSource").invoke(file, graph);
-    }
-
-    public static void extractStatements(File source, Path dest, int count) throws IOException {
-        int read = 0;
-        try (BufferedReader r = Files.newBufferedReader(source.toPath())) {
-            try (BufferedWriter w = Files.newBufferedWriter(dest)) {
-                while (read < count) {
-                    String line = r.readLine();
-                    if (line == null) { return; }
-                    w.write(line);
-                    w.newLine();
-                    read++;
-                }
-            }
-        }
     }
 }
