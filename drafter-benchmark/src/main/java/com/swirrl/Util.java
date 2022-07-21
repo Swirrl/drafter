@@ -44,7 +44,8 @@ public class Util {
     }
 
     public static Object getInputSource(File file) {
-        return file;
+        require("drafter.rdf.sesame");
+        return Clojure.var("drafter.rdf.sesame", "->FormatStatementSource").invoke(file, Util.keyword("nq"));
     }
 
     public static Object getInputSource(URI graph, File file) {

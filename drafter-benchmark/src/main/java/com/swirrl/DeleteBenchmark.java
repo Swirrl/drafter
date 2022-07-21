@@ -7,27 +7,99 @@ import java.net.URI;
 
 public class DeleteBenchmark {
 
-    public static class DeleteState_5k extends DeleteState {
-        public DeleteState_5k() {
-            super("data_5k.nt", "data_5k_delete.nt");
+    public static class DeleteState_1k_1g extends DeleteState {
+        public DeleteState_1k_1g() {
+            super("data_1k_1g.nq");
         }
     }
 
-    public static class DeleteState_50k extends DeleteState {
-        public DeleteState_50k() {
-            super("data_50k.nt", "data_50k_delete.nt");
+    public static class DeleteState_1k_10g extends DeleteState {
+        public DeleteState_1k_10g() {
+            super("data_1k_10g.nq");
         }
     }
 
-    public static class DeleteState_500k extends DeleteState {
-        public DeleteState_500k() {
-            super("data_500k.nt", "data_500k_delete.nt");
+    public static class DeleteState_1k_100g extends DeleteState {
+        public DeleteState_1k_100g() {
+            super("data_1k_100g.nq");
         }
     }
 
-    public static class DeleteState_5m extends DeleteState {
-        public DeleteState_5m() {
-            super("data_5m.nt", "data_5m_delete.nt");
+    public static class DeleteState_1k_1000g extends DeleteState {
+        public DeleteState_1k_1000g() {
+            super("data_1k_1000g.nq");
+        }
+    }
+
+    public static class DeleteState_10k_1g extends DeleteState {
+        public DeleteState_10k_1g() {
+            super("data_10k_1g.nq");
+        }
+    }
+
+    public static class DeleteState_10k_10g extends DeleteState {
+        public DeleteState_10k_10g() {
+            super("data_10k_10g.nq");
+        }
+    }
+
+    public static class DeleteState_10k_100g extends DeleteState {
+        public DeleteState_10k_100g() {
+            super("data_10k_100g.nq");
+        }
+    }
+
+    public static class DeleteState_10k_1000g extends DeleteState {
+        public DeleteState_10k_1000g() {
+            super("data_10k_1000g.nq");
+        }
+    }
+
+    public static class DeleteState_100k_1g extends DeleteState {
+        public DeleteState_100k_1g() {
+            super("data_100k_1g.nq");
+        }
+    }
+
+    public static class DeleteState_100k_10g extends DeleteState {
+        public DeleteState_100k_10g() {
+            super("data_100k_10g.nq");
+        }
+    }
+
+    public static class DeleteState_100k_100g extends DeleteState {
+        public DeleteState_100k_100g() {
+            super("data_100k_100g.nq");
+        }
+    }
+
+    public static class DeleteState_100k_1000g extends DeleteState {
+        public DeleteState_100k_1000g() {
+            super("data_100k_1000g.nq");
+        }
+    }
+
+    public static class DeleteState_1000k_1g extends DeleteState {
+        public DeleteState_1000k_1g() {
+            super("data_1000k_1g.nq");
+        }
+    }
+
+    public static class DeleteState_1000k_10g extends DeleteState {
+        public DeleteState_1000k_10g() {
+            super("data_1000k_10g.nq");
+        }
+    }
+
+    public static class DeleteState_1000k_100g extends DeleteState {
+        public DeleteState_1000k_100g() {
+            super("data_1000k_100g.nq");
+        }
+    }
+
+    public static class DeleteState_1000k_1000g extends DeleteState {
+        public DeleteState_1000k_1000g() {
+            super("data_1000k_1000g.nq");
         }
     }
 
@@ -38,8 +110,10 @@ public class DeleteBenchmark {
         private final File dataFile;
         private final File deletionFile;
 
-        protected DeleteState(String dataFileName, String deletionFileName) {
+        protected DeleteState(String dataFileName) {
             this.dataFile = Util.resolveDataFile(dataFileName);
+
+            String deletionFileName = dataFileName + ".delete";
             this.deletionFile = Util.resolveDataFile(deletionFileName);
         }
 
@@ -67,25 +141,97 @@ public class DeleteBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_5k(DeleteState_5k state) {
+    public void deleteTest_1k_1g(DeleteState_1k_1g state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_50k(DeleteState_50k state) {
+    public void deleteTest_1k_10g(DeleteState_1k_10g state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_500k(DeleteState_500k state) {
+    public void deleteTest_1k_100g(DeleteState_1k_100g state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_5m(DeleteState_5m state) {
+    public void deleteTest_1k_1000g(DeleteState_1k_1000g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_10k_1g(DeleteState_10k_1g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_10k_10g(DeleteState_10k_10g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_10k_100g(DeleteState_10k_100g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_10k_1000g(DeleteState_10k_1000g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_100k_1g(DeleteState_100k_1g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_100k_10g(DeleteState_100k_10g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_100k_100g(DeleteState_100k_100g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_100k_1000g(DeleteState_100k_1000g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_1000k_1g(DeleteState_1000k_1g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_1000k_10g(DeleteState_1000k_10g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_1000k_100g(DeleteState_1000k_100g state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_1000k_1000g(DeleteState_1000k_1000g state) {
         deleteTest(state);
     }
 }
