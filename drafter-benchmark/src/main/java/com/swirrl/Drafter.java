@@ -49,7 +49,7 @@ public class Drafter {
 
     private void execStateMachine(Object stateMachine, Draftset draftset, URI graph, File dataFile) {
         Object liveToDraftMapping = draftset.getGraphMapping(this.repo);
-        Object source = Util.getInputSource(graph, dataFile);
+        Object source = Util.getInputSource(dataFile);
         Object context = this.jobContext(draftset);
 
         Util.require("drafter.feature.draftset-data.common");

@@ -30,27 +30,107 @@ public class AppendBenchmark {
         state.getDrafter().append(state.getDraftset(), Util.CENSUS_URI, dataFile);
     }
 
+    // 1k statements
+
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void appendTest_5k(DraftState state) throws Exception {
-        appendOnlyTest(state, "data_5k.nt");
+    public void appendTest_1k_1g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_1k_1g.nq");
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void appendTest_50k(DraftState state) throws Exception {
-        appendOnlyTest(state, "data_50k.nt");
+    public void appendTest_1k_10g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_1k_10g.nq");
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void appendTest_500k(DraftState state) throws Exception {
-        appendOnlyTest(state, "data_500k.nt");
+    public void appendTest_1k_100g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_1k_100g.nq");
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void appendTest_5m(DraftState state) throws Exception {
-        appendOnlyTest(state, "data_5m.nt");
+    public void appendTest_1k_1000g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_1k_1000g.nq");
+    }
+
+    // 10k statements
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_10k_1g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_10k_1g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_10k_10g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_10k_10g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_10k_100g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_10k_100g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_10k_1000g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_10k_1000g.nq");
+    }
+
+    // 100k statements
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_100k_1g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_100k_1g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_100k_10g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_100k_10g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_100k_100g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_100k_100g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_100k_1000g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_100k_1000g.nq");
+    }
+
+    // 1m statements
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_1000k_1g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_1000k_1g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_1000k_10g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_1000k_10g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_1000k_100g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_1000k_100g.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_1000k_1000g(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_1000k_1000g.nq");
     }
 }

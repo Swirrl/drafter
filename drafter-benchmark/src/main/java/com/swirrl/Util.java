@@ -43,6 +43,10 @@ public class Util {
         }
     }
 
+    public static Object getInputSource(File file) {
+        return file;
+    }
+
     public static Object getInputSource(URI graph, File file) {
         require("drafter.rdf.sesame");
         return Clojure.var("drafter.rdf.sesame", "->GraphTripleStatementSource").invoke(file, graph);
