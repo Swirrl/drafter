@@ -3,6 +3,9 @@ package com.swirrl;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import clojure.java.api.Clojure;
 import clojure.lang.IFn;
 import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
@@ -51,5 +54,18 @@ public class Util {
     public static Object getInputSource(URI graph, File file) {
         require("drafter.rdf.sesame");
         return Clojure.var("drafter.rdf.sesame", "->GraphTripleStatementSource").invoke(file, graph);
+    }
+
+    private static Pattern DATA_FILE_PATTERN = Pattern.compile("^data_\\d+k_(\\d+)g.nq$");
+
+    public static int getNumGraphs(File dataFile) {
+        Matcher m = DATA_FILE_PATTERN.matcher(dataFile.getName());
+        boolean matches = m.find();
+
+        if (! matches) {
+            throw new RuntimeException(String.format("File name %1$s does not match expected data file pattern", dataFile.getName()));
+        }
+
+        return Integer.parseInt(m.group(1));
     }
 }
