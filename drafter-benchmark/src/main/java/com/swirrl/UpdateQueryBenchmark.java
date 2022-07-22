@@ -1,15 +1,19 @@
 package com.swirrl;
 
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.query.GraphQueryResult;
 import org.eclipse.rdf4j.query.QueryResults;
 import org.eclipse.rdf4j.rio.RDFFormat;
+import org.eclipse.rdf4j.sparqlbuilder.graphpattern.GraphPattern;
+import org.eclipse.rdf4j.sparqlbuilder.graphpattern.GraphPatterns;
+import org.eclipse.rdf4j.sparqlbuilder.rdf.Rdf;
 import org.openjdk.jmh.annotations.*;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
-import java.net.URI;
+import java.util.Random;
 
 public class UpdateQueryBenchmark {
     @State(Scope.Thread)
@@ -31,29 +35,30 @@ public class UpdateQueryBenchmark {
             this.updateQuery = this.generateUpdateQuery();
         }
 
-        private static String deleteStatementQuery(URI graphUri, Statement triple) {
-            // TODO: create from query class?
-            return String.format("DELETE DATA { GRAPH <%1$s> { <%2$s> <%3$s> <%4$s> } }",
-                    graphUri,
-                    triple.getSubject(),
-                    triple.getPredicate(),
-                    triple.getObject());
+        // generates an UPDATE statement which deletes a random statement from the input data
+        private static String deleteStatementQuery(Statement quad) {
+            GraphPattern gp = GraphPatterns.tp(quad.getSubject(), quad.getPredicate(), quad.getObject())
+                    .from(Rdf.iri((IRI)quad.getContext()));
+            return String.format("DELETE DATA { %1$s }", gp.getQueryString());
         }
 
-        private static Statement getTriple(File dataFile) throws Exception {
+        private static int getStatementIndex(File dataFile) {
+            int numStatements = Util.getNumStatements(dataFile);
+            return new Random().nextInt(numStatements);
+        }
+
+        private static Statement getStatement(File dataFile) throws Exception {
             try (InputStream is = new FileInputStream(dataFile)) {
-                try (GraphQueryResult res = QueryResults.parseGraphBackground(is, "", RDFFormat.NTRIPLES)) {
-                    if (! res.hasNext()) {
-                        throw new RuntimeException("Failed to read triple from source file");
-                    }
-                    return res.next();
+                try (GraphQueryResult res = QueryResults.parseGraphBackground(is, "", RDFFormat.NQUADS)) {
+                    int idx = getStatementIndex(dataFile);
+                    return res.stream().skip(idx).findFirst().get();
                 }
             }
         }
 
         private String generateUpdateQuery() throws Exception {
-            Statement triple = getTriple(this.dataFile);
-            return deleteStatementQuery(Util.CENSUS_URI, triple);
+            Statement quad = getStatement(this.dataFile);
+            return deleteStatementQuery(quad);
         }
 
         @TearDown(Level.Invocation)
@@ -66,28 +71,70 @@ public class UpdateQueryBenchmark {
         public String getUpdateQuery() { return this.updateQuery; }
     }
 
-    public static class UpdateQueryState_5k extends UpdateQueryState {
-        public UpdateQueryState_5k() {
-            super("data_5k.nt");
+    public static class UpdateQueryState_1k_1g extends UpdateQueryState {
+        public UpdateQueryState_1k_1g() {
+            super("data_1k_1g.nq");
         }
     }
 
-    public static class UpdateQueryState_50k extends UpdateQueryState {
-        public UpdateQueryState_50k() {
-            super("data_50k.nt");
-        }
+    public static class UpdateQueryState_1k_10g extends UpdateQueryState {
+        public UpdateQueryState_1k_10g() { super("data_1k_10g.nq"); }
     }
 
-    public static class UpdateQueryState_500k extends UpdateQueryState {
-        public UpdateQueryState_500k() {
-            super("data_500k.nt");
-        }
+    public static class UpdateQueryState_1k_100g extends UpdateQueryState {
+        public UpdateQueryState_1k_100g() { super("data_1k_100g.nq"); }
     }
 
-    public static class UpdateQueryState_5m extends UpdateQueryState {
-        public UpdateQueryState_5m() {
-            super("data_5m.nt");
-        }
+    public static class UpdateQueryState_1k_1000g extends UpdateQueryState {
+        public UpdateQueryState_1k_1000g() { super("data_1k_1000g.nq"); }
+    }
+
+    public static class UpdateQueryState_10k_1g extends UpdateQueryState {
+        public UpdateQueryState_10k_1g() { super("data_10k_1g.nq"); }
+    }
+
+    public static class UpdateQueryState_10k_10g extends UpdateQueryState {
+        public UpdateQueryState_10k_10g() { super("data_10k_10g.nq"); }
+    }
+
+    public static class UpdateQueryState_10k_100g extends UpdateQueryState {
+        public UpdateQueryState_10k_100g() { super("data_10k_100g.nq"); }
+    }
+
+    public static class UpdateQueryState_10k_1000g extends UpdateQueryState {
+        public UpdateQueryState_10k_1000g() { super("data_10k_1000g.nq"); }
+    }
+
+    public static class UpdateQueryState_100k_1g extends UpdateQueryState {
+        public UpdateQueryState_100k_1g() { super("data_100k_1g.nq"); }
+    }
+
+    public static class UpdateQueryState_100k_10g extends UpdateQueryState {
+        public UpdateQueryState_100k_10g() { super("data_100k_10g.nq"); }
+    }
+
+    public static class UpdateQueryState_100k_100g extends UpdateQueryState {
+        public UpdateQueryState_100k_100g() { super("data_100k_100g.nq"); }
+    }
+
+    public static class UpdateQueryState_100k_1000g extends UpdateQueryState {
+        public UpdateQueryState_100k_1000g() { super("data_100k_1000g.nq"); }
+    }
+
+    public static class UpdateQueryState_1000k_1g extends UpdateQueryState {
+        public UpdateQueryState_1000k_1g() { super("data_1000k_1g.nq"); }
+    }
+
+    public static class UpdateQueryState_1000k_10g extends UpdateQueryState {
+        public UpdateQueryState_1000k_10g() { super("data_1000k_10g.nq"); }
+    }
+
+    public static class UpdateQueryState_1000k_100g extends UpdateQueryState {
+        public UpdateQueryState_1000k_100g() { super("data_1000k_100g.nq"); }
+    }
+
+    public static class UpdateQueryState_1000k_1000g extends UpdateQueryState {
+        public UpdateQueryState_1000k_1000g() { super("data_1000k_1000g.nq"); }
     }
 
     private static void updateQueryTest(UpdateQueryState state) {
@@ -96,25 +143,73 @@ public class UpdateQueryBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_5k(UpdateQueryState_5k state) {
+    public void updateQueryTest_1k_1g(UpdateQueryState_1k_1g state) {
         updateQueryTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_50k(UpdateQueryState_50k state) {
+    public void updateQueryTest_1k_10g(UpdateQueryState_1k_10g state) {
         updateQueryTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_500k(UpdateQueryState_500k state) {
+    public void updateQueryTest_1k_100g(UpdateQueryState_1k_100g state) {
         updateQueryTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_5m(UpdateQueryState_5m state) {
+    public void updateQueryTest_1k_1000g(UpdateQueryState_1k_1000g state) {
         updateQueryTest(state);
     }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_10k_1g(UpdateQueryState_10k_1g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_10k_10g(UpdateQueryState_10k_10g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_10k_100g(UpdateQueryState_10k_100g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_10k_1000g(UpdateQueryState_10k_1000g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_100k_1g(UpdateQueryState_100k_1g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_100k_10g(UpdateQueryState_100k_10g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_100k_100g(UpdateQueryState_100k_100g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_100k_1000g(UpdateQueryState_100k_1000g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_1000k_1g(UpdateQueryState_1000k_1g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_1000k_10g(UpdateQueryState_1000k_10g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_1000k_100g(UpdateQueryState_1000k_100g state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_1000k_1000g(UpdateQueryState_1000k_1000g state) { updateQueryTest(state); }
 }

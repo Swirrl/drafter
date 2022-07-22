@@ -3,6 +3,7 @@ package com.swirrl;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,9 +57,9 @@ public class Util {
         return Clojure.var("drafter.rdf.sesame", "->GraphTripleStatementSource").invoke(file, graph);
     }
 
-    private static Pattern DATA_FILE_PATTERN = Pattern.compile("^data_\\d+k_(\\d+)g.nq$");
+    private static Pattern DATA_FILE_PATTERN = Pattern.compile("^data_(\\d+)k_(\\d+)g.nq$");
 
-    public static int getNumGraphs(File dataFile) {
+    private static MatchResult matchDataFile(File dataFile) {
         Matcher m = DATA_FILE_PATTERN.matcher(dataFile.getName());
         boolean matches = m.find();
 
@@ -66,6 +67,17 @@ public class Util {
             throw new RuntimeException(String.format("File name %1$s does not match expected data file pattern", dataFile.getName()));
         }
 
-        return Integer.parseInt(m.group(1));
+        return m.toMatchResult();
+    }
+
+    public static int getNumGraphs(File dataFile) {
+        MatchResult r = matchDataFile(dataFile);
+        return Integer.parseInt(r.group(2));
+    }
+
+    public static int getNumStatements(File dataFile) {
+        MatchResult m = matchDataFile(dataFile);
+        int kStatements = Integer.parseInt(m.group(1));
+        return kStatements * 1000;
     }
 }
