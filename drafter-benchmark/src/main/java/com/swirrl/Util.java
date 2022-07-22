@@ -12,7 +12,6 @@ import clojure.lang.IFn;
 import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
 
 public class Util {
-    public static URI CENSUS_URI = uri("http://gss-data.org.uk/data/gss_data/census-2011-catalog-entry");
 
     public static void require(String nsName) {
         IFn require = Clojure.var("clojure.core", "require");
@@ -50,11 +49,6 @@ public class Util {
     public static Object getInputSource(File file) {
         require("drafter.rdf.sesame");
         return Clojure.var("drafter.rdf.sesame", "->FormatStatementSource").invoke(file, Util.keyword("nq"));
-    }
-
-    public static Object getInputSource(URI graph, File file) {
-        require("drafter.rdf.sesame");
-        return Clojure.var("drafter.rdf.sesame", "->GraphTripleStatementSource").invoke(file, graph);
     }
 
     private static Pattern DATA_FILE_PATTERN = Pattern.compile("^data_(\\d+)k_(\\d+)g.nq$");

@@ -37,9 +37,9 @@ public class Drafter {
         return smFn.invoke();
     }
 
-    public void append(Draftset draftset, URI graph, File dataFile) {
+    public void append(Draftset draftset, File dataFile) {
         Object sm = getAppendStateMachine();
-        execStateMachine(sm, draftset, graph, dataFile);
+        execStateMachine(sm, draftset, dataFile);
     }
 
     private static Object getDeleteStateMachine() {
@@ -47,7 +47,7 @@ public class Drafter {
         return Clojure.var("drafter.feature.draftset-data.delete", "delete-state-machine").invoke();
     }
 
-    private void execStateMachine(Object stateMachine, Draftset draftset, URI graph, File dataFile) {
+    private void execStateMachine(Object stateMachine, Draftset draftset, File dataFile) {
         Object liveToDraftMapping = draftset.getGraphMapping(this.repo);
         Object source = Util.getInputSource(dataFile);
         Object context = this.jobContext(draftset);
@@ -57,9 +57,9 @@ public class Drafter {
         execFn.invoke(stateMachine, liveToDraftMapping, source, context);
     }
 
-    public void delete(Draftset draftset, URI graph, File toDelete) {
+    public void delete(Draftset draftset, File toDelete) {
         Object sm = getDeleteStateMachine();
-        execStateMachine(sm, draftset, graph, toDelete);
+        execStateMachine(sm, draftset, toDelete);
     }
 
     private Object getGraphManager() {

@@ -31,7 +31,7 @@ public class UpdateQueryBenchmark {
         @Setup(Level.Invocation)
         public void setup() throws Exception {
             this.draftset = this.drafter.createDraft(User.publisher());
-            this.drafter.append(this.draftset, Util.CENSUS_URI, this.dataFile);
+            this.drafter.append(this.draftset, this.dataFile);
             this.updateQuery = this.generateUpdateQuery();
         }
 

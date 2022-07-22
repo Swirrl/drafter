@@ -22,7 +22,7 @@ public class DeleteGraphBenchmark {
         @Setup(Level.Invocation)
         public void setup() {
             this.draftset = this.drafter.createDraft(User.publisher());
-            this.drafter.append(this.draftset, Util.CENSUS_URI, this.dataFile);
+            this.drafter.append(this.draftset, this.dataFile);
 
             int numGraphs = Util.getNumGraphs(this.dataFile);
             this.graphToDelete = getGraphToDelete(numGraphs);
