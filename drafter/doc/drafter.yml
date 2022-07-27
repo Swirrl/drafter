@@ -50,7 +50,7 @@ info:
       - `/data` which can be used to `POST` (append), `DELETE` or
         `GET` quads from the draftset.
 
-      - `/submit-to` to relinquish ownership of the drafset and either assign
+      - `/submit-to` to relinquish ownership of the draftset and either assign
         ownership to another user, or make it available to users with a given
         permission. The user which takes ownership of the draftset may
         depending on their permissions then choose to make further ammendments,
