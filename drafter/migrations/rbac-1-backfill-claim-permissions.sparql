@@ -1,0 +1,21 @@
+# Migration to backfill claim permissions
+#
+# Run me with
+#
+#     stardog query <database-name> rbac-1-backfill-claim-permissions.sparql
+#
+# Assumes that drafter:claimRole is always one of "editor" or "publisher",
+# check that this is the case with rbac-0-check-claim-roles.sparql first.
+
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+INSERT {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?submission drafter:claimPermission ?permission .
+  }
+} WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?submission drafter:claimRole ?role .
+    BIND(IF(?role = "editor", "draft:edit", "draft:publish") as ?permission)
+  }
+}
