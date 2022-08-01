@@ -24,14 +24,11 @@
   (are [user permission has?] (= has? (has-permission? user permission))
        test-editor :draft:edit true
        test-editor :draft:publish false
-       test-editor :draft:publish false
 
        test-publisher :draft:edit true
        test-publisher :draft:publish true
-       test-publisher :draft:publish true
 
        test-manager :draft:edit true
-       test-manager :draft:publish true
        test-manager :draft:publish true))
 
 (deftest password-valid?-test
