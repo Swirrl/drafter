@@ -40,7 +40,7 @@
           (recur resolved))))))
 
 (defn get-api-route-specs [global-auth?]
-  (let [access-permission (when global-auth? :public:view)]
+  (let [access-permission (when global-auth? :drafter:public:view)]
     [{:id 'get-endpoints
       :path "/endpoints"
       :method :get
@@ -53,76 +53,76 @@
      {:id 'create-draftset
       :path "/draftsets"
       :method :post
-      :permission :draft:create}
+      :permission :drafter:draft:create}
      {:id 'get-draftsets
       :path "/draftsets"
       :method :get
-      :permission :draft:view}
+      :permission :drafter:draft:view}
      {:id 'get-draftset
       :path "/draftset/{id}"
       :method :get
-      :permission :draft:view}
+      :permission :drafter:draft:view}
      {:id 'put-draftset
       :path "/draftset/{id}"
       :method :put
-      :permission :draft:edit}
+      :permission :drafter:draft:edit}
      {:id     'delete-draftset
       :path   "/draftset/{id}"
       :method :delete
-      :permission :draft:delete}
+      :permission :drafter:draft:delete}
 
      {:id 'put-draftset-graph
       :path "/draftset/{id}/graph"
       :method :put
-      :permission :draft:edit}
+      :permission :drafter:draft:edit}
      {:id 'delete-draftset-graph
       :path "/draftset/{id}/graph"
       :method :delete
-      :permission :draft:edit}
+      :permission :drafter:draft:edit}
 
      {:id 'delete-draftset-changes
       :path "/draftset/{id}/changes"
       :method :delete
-      :permission :draft:edit}
+      :permission :drafter:draft:edit}
 
      {:id 'put-draftset-data
       :path "/draftset/{id}/data"
       :method :put
-      :permission :draft:edit}
+      :permission :drafter:draft:edit}
      {:id 'delete-draftset-data
       :path "/draftset/{id}/data"
       :method :delete
-      :permission :draft:edit}
+      :permission :drafter:draft:edit}
      {:id 'get-draftset-data
       :path "/draftset/{id}/data"
       :method :get
-      :permission :draft:view}
+      :permission :drafter:draft:view}
 
      {:id 'submit-draftset-to
       :path "/draftset/{id}/submit-to"
       :method :post
-      :permission :draft:submit}
+      :permission :drafter:draft:submit}
      {:id 'claim-draftset
       :path "/draftset/{id}/claim"
       :method :put
-      :permission :draft:claim}
+      :permission :drafter:draft:claim}
      {:id 'publish-draftset
       :path "/draftset/{id}/publish"
       :method :post
-      :permission :draft:publish}
+      :permission :drafter:draft:publish}
 
      {:id 'get-query-draftset
       :path "/draftset/{id}/query"
       :method :get
-      :permission :draft:view}
+      :permission :drafter:draft:view}
      {:id 'post-query-draftset
       :path "/draftset/{id}/query"
       :method :post
-      :permission :draft:view}
+      :permission :drafter:draft:view}
      {:id 'post-update-draftset
       :path "/draftset/{id}/update"
       :method :post
-      :permission :draft:edit}
+      :permission :drafter:draft:edit}
      {:id 'get-query-live
       :path "/sparql/live"
       :method :get
@@ -135,16 +135,16 @@
      {:id 'get-users
       :path "/users"
       :method :get
-      :permission :user:view}
+      :permission :drafter:user:view}
 
      {:id 'get-job
       :path "/status/jobs/{jobid}"
       :method :get
-      :permission :job:view}
+      :permission :drafter:job:view}
      {:id 'get-jobs
       :path "/status/jobs"
       :method :get
-      :permission :job:view}
+      :permission :drafter:job:view}
      {:id 'status-job-finished
       :path "/status/finished-jobs/{jobid}"
       :method :get

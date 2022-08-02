@@ -32,8 +32,8 @@
       (if-let [email (email access-token)]
         {:email email
          :permissions (->> access-token :payload :permissions
-                           (keep #(re-matches #"drafter:(.*)" %))
-                           (map (comp keyword second)) set)}
+                           (keep #(re-matches #"drafter:.*" %))
+                           (map keyword) set)}
         (auth/authentication-failed)))
 
     ::jwt/token-expired
@@ -69,7 +69,7 @@
        :flow "application"
        :description "OAuth authentication via Auth0"
        :tokenUrl (str (:endpoint auth0-client) "/oauth/token")
-       :scopes (update-keys user/permission-summary #(str "drafter" %))})
+       :scopes (update-keys user/permission-summary name)})
 
     (get-operation-swagger-security-requirement [_this {:keys [permission] :as operation}]
       [(str "drafter:" permission)])

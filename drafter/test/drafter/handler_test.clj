@@ -32,8 +32,8 @@
         get-public     test-access    200
         get-public     test-editor    200
         get-public     test-publisher 200
-        list-draftsets nil            401 ;; Unauthorized, requires :draft:view
-        list-draftsets test-access    403 ;; Forbidden, requires :draft:view
+        list-draftsets nil            401 ;; Unauthorized, requires :drafter:draft:view
+        list-draftsets test-access    403 ;; Forbidden, requires :drafter:draft:view
         list-draftsets test-editor    200
         list-draftsets test-publisher 200))
     (tc/with-system [{handler :drafter.handler/app}
@@ -47,8 +47,8 @@
         whitelisted    test-access    200
         whitelisted    test-editor    200
         whitelisted    test-publisher 200
-        get-public     nil            401 ;; Unauthorized, requires :public:view
-        get-public     test-norole    403 ;; Forbidden, requires :public:view
+        get-public     nil            401 ;; Unauthorized, requires :drafter:public:view
+        get-public     test-norole    403 ;; Forbidden, requires :drafter:public:view
         get-public     test-access    200
         get-public     test-editor    200
         get-public     test-publisher 200
@@ -57,9 +57,9 @@
         options-public test-access    200
         options-public test-editor    200
         options-public test-publisher 200
-        list-draftsets nil            401 ;; Unauthorized, requires :draft:view
-        list-draftsets test-norole    403 ;; Forbidden, requires :draft:view
-        list-draftsets test-access    403 ;; Forbidden, requires :draft:view
+        list-draftsets nil            401 ;; Unauthorized, requires :drafter:draft:view
+        list-draftsets test-norole    403 ;; Forbidden, requires :drafter:draft:view
+        list-draftsets test-access    403 ;; Forbidden, requires :drafter:draft:view
         list-draftsets test-editor    200
         list-draftsets test-publisher 200))))
 

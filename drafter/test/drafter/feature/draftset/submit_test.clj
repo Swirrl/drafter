@@ -17,7 +17,7 @@
   (let [submit-response (handler (help/create-submit-to-permission-request
                                   test-editor
                                   "/v1/draftset/missing"
-                                  :draft:claim))]
+                                  :drafter:draft:claim))]
     (tc/assert-is-not-found-response submit-response)))
 
 (tc/deftest-system-with-keys submit-draftset-to-permission-by-non-owner
@@ -27,7 +27,7 @@
         submit-response (handler (help/create-submit-to-permission-request
                                   test-publisher
                                   draftset-location
-                                  :draft:claim))]
+                                  :drafter:draft:claim))]
     (tc/assert-is-forbidden-response submit-response)))
 
 (tc/deftest-system-with-keys submit-draftset-to-user
@@ -83,7 +83,7 @@
   [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         request (help/submit-draftset-to-user-request draftset-location test-publisher test-editor)
-        request (assoc-in request [:params :permission] "draft:claim")
+        request (assoc-in request [:params :permission] "drafter:draft:claim")
         response (handler request)]
     (tc/assert-is-unprocessable-response response)))
 
@@ -93,7 +93,7 @@
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         submit-request (help/create-submit-to-permission-request test-editor
                                                                  draftset-location
-                                                                 :draft:claim)
+                                                                 :drafter:draft:claim)
         {ds-info :body :as submit-response} (handler submit-request)]
     (tc/assert-is-ok-response submit-response)
     (tc/assert-spec ::ds/Draftset ds-info)

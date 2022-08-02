@@ -37,7 +37,7 @@
     [system "test-system.edn"]
     (let [auth-method (get-auth-method system)
           username "test@example.com"
-          permissions #{:cat:pet :missiles:launch}
+          permissions #{:drafter:cat:pet :drafter:missiles:launch}
           token (tc/user-access-token username "drafter:editor" permissions)
           request (add-auth-header {:uri "/test" :request-method :get} token)
           user (auth-common/expect-authentication auth-method request)

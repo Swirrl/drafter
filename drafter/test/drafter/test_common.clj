@@ -116,9 +116,7 @@
       (.withAudience (into-array String [aud]))
       (.withExpiresAt (to-date (clj-time/plus (clj-time/now) (clj-time/minutes 10))))
       (.withClaim "scope" role)
-      (.withArrayClaim "permissions"
-                       (into-array String
-                                   (map #(str "drafter" %) permissions)))
+      (.withArrayClaim "permissions" (into-array String (map name permissions)))
       (.sign alg)))
 
 (defn mock-jwk []

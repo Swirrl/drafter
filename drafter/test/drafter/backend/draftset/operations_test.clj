@@ -94,7 +94,7 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:claim)
+                                          :drafter:draft:claim)
       (let [owner (sut/get-draftset-owner *test-backend* draftset-id)]
         (is (nil? owner))))))
 
@@ -108,7 +108,7 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:claim)
+                                          :drafter:draft:claim)
       (is (= false (sut/is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "Has different owner"
@@ -155,9 +155,9 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:claim)
+                                          :drafter:draft:claim)
 
-      (is (draftset-has-claim-permission? draftset-id :draft:claim))
+      (is (draftset-has-claim-permission? draftset-id :drafter:draft:claim))
       (is (= false (has-any-object? draftset-uri drafter:hasOwner)))))
 
   (testing "Submitted by other user"
@@ -166,7 +166,7 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-publisher
-                                          :draft:claim)
+                                          :drafter:draft:claim)
 
       (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor))
       (is (= false (has-any-object? draftset-uri drafter:hasSubmission))))))
@@ -217,11 +217,11 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:claim)
+                                          :drafter:draft:claim)
       (sut/submit-draftset-to-user! *test-backend* draftset-id test-editor test-manager)
 
       (is (= nil (sut/get-draftset-owner *test-backend* draftset-id)))
-      (is (draftset-has-claim-permission? draftset-id :draft:claim))
+      (is (draftset-has-claim-permission? draftset-id :drafter:draft:claim))
       (is (= false (draftset-has-claim-user? draftset-id test-manager))))))
 
 (defn- draftset-has-submission? [draftset-ref]
@@ -240,7 +240,7 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:claim)
+                                          :drafter:draft:claim)
 
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-publisher)
             ds-info (sut/get-draftset-info *test-backend* draftset-id)]
@@ -271,7 +271,7 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:claim)
+                                          :drafter:draft:claim)
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor))
@@ -290,7 +290,7 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:publish)
+                                          :drafter:draft:publish)
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor))
@@ -301,7 +301,7 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:publish)
+                                          :drafter:draft:publish)
       (sut/claim-draftset! *test-backend* draftset-id test-publisher)
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :forbidden result)))))
@@ -317,7 +317,7 @@
       (sut/submit-draftset-to-permission! *test-backend*
                                           draftset-id
                                           test-editor
-                                          :draft:claim:manager)
+                                          :drafter:draft:claim:manager)
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-publisher)]
         (is (= :forbidden result))
         (is (nil? (sut/get-draftset-owner *test-backend* draftset-id))))))

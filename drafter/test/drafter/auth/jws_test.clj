@@ -35,7 +35,7 @@
         request (add-user {:uri "/test" :request-method :get} user signing-key)
         identity (auth-common/expect-authentication auth-method request)]
     (t/is (= (:email user) (:email identity)))
-    (t/is (contains? (:permissions identity) :draft:publish))))
+    (t/is (contains? (:permissions identity) :drafter:draft:publish))))
 
 (t/deftest should-reject-token-with-invalid-issuer
   (let [doc {:user "test@example.com"

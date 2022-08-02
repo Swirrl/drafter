@@ -45,7 +45,7 @@
     (help/submit-draftset-to-permission-through-api handler
                                                     test-editor
                                                     draftset-location
-                                                    :draft:claim)
+                                                    :drafter:draft:claim)
     (let [{:keys [current-owner] :as ds-info}
           (claim-draftset-through-api handler draftset-location test-publisher)]
       (is (= (user/username test-publisher) current-owner)))))
@@ -108,7 +108,7 @@
     (help/submit-draftset-to-permission-through-api handler
                                                     test-editor
                                                     draftset-location
-                                                    :draft:claim)
+                                                    :drafter:draft:claim)
     (claim-draftset-through-api handler draftset-location test-editor)))
 
 (tc/deftest-system-with-keys claim-owned-by-other-user-draftset-submitted-by-self
@@ -120,7 +120,7 @@
     (help/submit-draftset-to-permission-through-api handler
                                                     test-editor
                                                     draftset-location
-                                                    :draft:claim)
+                                                    :drafter:draft:claim)
     (claim-draftset-through-api handler draftset-location test-publisher)
     (let [response (handler (create-claim-request draftset-location test-editor))]
       (tc/assert-is-forbidden-response response))))
@@ -147,7 +147,7 @@
     (help/submit-draftset-to-permission-through-api handler
                                                     test-editor
                                                     draftset-location
-                                                    :draft:publish)
+                                                    :drafter:draft:publish)
     (let [claim-response (handler (create-claim-request draftset-location other-editor))]
       (tc/assert-is-forbidden-response claim-response))))
 

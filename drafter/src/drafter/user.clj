@@ -23,27 +23,29 @@
   [role]
   (case role
     :norole #{}
-    :access #{:public:view}
+    :access #{:drafter:public:view}
     :editor (conj (role->permissions :access)
-                  :draft:claim :draft:create :draft:delete :draft:edit
-                  :draft:submit :draft:share :draft:view :job:view :user:view)
-    :publisher (conj (role->permissions :editor) :draft:publish)
+                  :drafter:draft:claim :drafter:draft:create
+                  :drafter:draft:delete :drafter:draft:edit
+                  :drafter:draft:submit :drafter:draft:share
+                  :drafter:draft:view :drafter:job:view :drafter:user:view)
+    :publisher (conj (role->permissions :editor) :drafter:draft:publish)
     ;; :manager is used in tests to demonstrate scoped claim permissions.
-    :manager (conj (role->permissions :publisher) :draft:claim:manager)
+    :manager (conj (role->permissions :publisher) :drafter:draft:claim:manager)
     :system (recur :manager)))
 
 (def permission-summary
-  {:draft:claim "Claim submitted drafts"
-   :draft:create "Create drafts"
-   :draft:delete "Delete drafts"
-   :draft:edit "Edit drafts"
-   :draft:publish "Publish drafts"
-   :draft:share "Share drafts to be viewed"
-   :draft:submit "Submit drafts to be claimed"
-   :draft:view "View shared drafts"
-   :job:view "View the status of jobs"
-   :public:view "View the public endpoint (if global auth is on)"
-   :user:view "View users"})
+  {:drafter:draft:claim "Claim submitted drafts"
+   :drafter:draft:create "Create drafts"
+   :drafter:draft:delete "Delete drafts"
+   :drafter:draft:edit "Edit drafts"
+   :drafter:draft:publish "Publish drafts"
+   :drafter:draft:share "Share drafts to be viewed"
+   :drafter:draft:submit "Submit drafts to be claimed"
+   :drafter:draft:view "View shared drafts"
+   :drafter:job:view "View the status of jobs"
+   :drafter:public:view "View the public endpoint (if global auth is on)"
+   :drafter:user:view "View users"})
 
 (def roles #{:access :editor :publisher :manager :system})
 
@@ -159,7 +161,7 @@
 (defn permitted-draftset-operations [draftset user]
   (cond
    (is-owner? user draftset)
-   (set (keep #(when-let [[_ op] (re-matches #"draft:(.*)" (name %))]
+   (set (keep #(when-let [[_ op] (re-matches #"drafter:draft:(.*)" (name %))]
                  (keyword op))
               (:permissions user)))
 

@@ -34,11 +34,11 @@
 ;; Maps a role to a permission that that role has, but less privileged roles
 ;; don't have.
 (def role->canonical-permission
-  {"editor" "draft:edit" "publisher" "draft:publish"})
+  {"editor" "drafter:draft:edit" "publisher" "drafter:draft:publish"})
 
 (defn handler
   [{:keys [:drafter/manager :drafter.user/repo wrap-as-draftset-owner]}]
-  (wrap-as-draftset-owner :draft:submit
+  (wrap-as-draftset-owner :drafter:draft:submit
     (fn [{{:keys [user permission role draftset-id]} :params owner :identity}]
       ;; The role parameter is deprecated
       (let [permission (or permission (role->canonical-permission role))]

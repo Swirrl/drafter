@@ -37,5 +37,5 @@ draftset:7f94456f-8a92-4d40-8691-2c32f89e9741 a drafter:DraftSet ;
 	drafter:submittedBy <mailto:editor@swirrl.com> .
 
 <http://publishmydata.com/def/drafter/submission/1414fd7a-62dc-4aa4-8b3c-d0059883bbee> a drafter:Submission ;
-	drafter:claimPermission "draft:claim" .
+	drafter:claimPermission "drafter:draft:claim" .
 }

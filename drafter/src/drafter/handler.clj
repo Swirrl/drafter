@@ -67,7 +67,7 @@
                       #(log-request % {:query "<scrubbed>"})]]
       (if global-auth?
         (cons #(middleware/wrap-authorize
-                wrap-authenticate :public:view %)
+                wrap-authenticate :drafter:public:view %)
               middleware)
         middleware))
 

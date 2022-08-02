@@ -104,17 +104,17 @@ info:
 
     Currently available permissions are:
 
-    - public:view
-    - draft:claim
-    - draft:create
-    - draft:delete
-    - draft:edit
-    - draft:publish
-    - draft:share
-    - draft:submit
-    - draft:view
-    - job:view
-    - user:view
+    - drafter:public:view
+    - drafter:draft:claim
+    - drafter:draft:create
+    - drafter:draft:delete
+    - drafter:draft:edit
+    - drafter:draft:publish
+    - drafter:draft:share
+    - drafter:draft:submit
+    - drafter:draft:view
+    - drafter:job:view
+    - drafter:user:view
 
     ## Authentication & Security
 

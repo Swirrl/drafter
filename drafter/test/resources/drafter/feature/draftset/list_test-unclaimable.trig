@@ -38,5 +38,5 @@
 		drafter:hasOwner <mailto:editor@swirrl.com> .
 	
 	<http://publishmydata.com/def/drafter/submission/a74aaec9-a1e5-4418-9528-c07a1d275e72> a drafter:Submission ;
-		drafter:claimPermission "draft:publish" .
+		drafter:claimPermission "drafter:draft:publish" .
 }

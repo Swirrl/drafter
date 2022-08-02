@@ -9,7 +9,7 @@
   "Ring handler that returns a list of user objects representing users
   within the system."
   [{user-repo ::user/repo wrap-authenticate :wrap-authenticate}]
-  (middleware/wrap-authorize wrap-authenticate :user:view
+  (middleware/wrap-authorize wrap-authenticate :drafter:user:view
    (fn [r]
      (let [users (user/get-all-users user-repo)
            summaries (map user/get-summary users)]

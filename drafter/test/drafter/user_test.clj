@@ -22,14 +22,14 @@
 
 (deftest has-permission?-test
   (are [user permission has?] (= has? (has-permission? user permission))
-       test-editor :draft:edit true
-       test-editor :draft:publish false
+       test-editor :drafter:draft:edit true
+       test-editor :drafter:draft:publish false
 
-       test-publisher :draft:edit true
-       test-publisher :draft:publish true
+       test-publisher :drafter:draft:edit true
+       test-publisher :drafter:draft:publish true
 
-       test-manager :draft:edit true
-       test-manager :draft:publish true))
+       test-manager :drafter:draft:edit true
+       test-manager :drafter:draft:publish true))
 
 (deftest password-valid?-test
   (let [password (str (UUID/randomUUID))
@@ -81,8 +81,8 @@
 
 (deftest is-submitted-by?-test
   (are [user draftset expected] (= expected (is-submitted-by? user draftset))
-    test-editor (submitted-to-permission test-editor :draft:claim) true
-    test-publisher (submitted-to-permission test-editor :draft:claim) false
+    test-editor (submitted-to-permission test-editor :drafter:draft:claim) true
+    test-publisher (submitted-to-permission test-editor :drafter:draft:claim) false
     test-editor (ds/create-draftset (username test-editor)) false))
 
 (deftest can-claim?-test
@@ -91,11 +91,11 @@
     test-editor (ds/create-draftset (username test-editor)) true
 
     ;;submitter can re-claim draftset if it has not yet been claimed
-    test-editor (submitted-to-permission test-editor :draft:claim) true
+    test-editor (submitted-to-permission test-editor :drafter:draft:claim) true
     test-editor (submitted-to-user test-editor test-manager) true
 
     ;;user can claim draftset submitted to a permission they have
-    test-publisher (submitted-to-permission test-editor :draft:claim) true
+    test-publisher (submitted-to-permission test-editor :drafter:draft:claim) true
 
     ;;user can claim draftset submitted to them
     test-manager (submitted-to-user test-editor test-manager) true
@@ -104,7 +104,7 @@
     test-publisher (ds/create-draftset (username test-editor)) false
 
     ;;user cannot claim draftset submitted to a permission they don't have
-    test-publisher (submitted-to-permission test-editor :draft:claim:manager) false
+    test-publisher (submitted-to-permission test-editor :drafter:draft:claim:manager) false
 
     ;;user cannot claim draftset submitted to other user
     test-manager (submitted-to-user test-editor test-publisher) false))
@@ -122,11 +122,11 @@
     #{:share :claim :delete :edit :view :create :submit :publish}
 
     ;;submitter on unclaimed
-    test-editor (submitted-to-permission test-editor :draft:claim) #{:claim}
+    test-editor (submitted-to-permission test-editor :drafter:draft:claim) #{:claim}
 
     ;;submitted on claimed
     test-editor
-    (ds/claim (submitted-to-permission test-editor :draft:claim) test-publisher)
+    (ds/claim (submitted-to-permission test-editor :drafter:draft:claim) test-publisher)
     #{}
 
     ;;non-owner
@@ -136,12 +136,12 @@
     test-publisher
     (ds/submit-to-permission (ds/create-draftset "tmp@example.com")
                              "tmp@example.com"
-                             :draft:claim)
+                             :drafter:draft:claim)
     #{:claim}
 
     ;;user doesn't have claim permission
     test-editor
     (ds/submit-to-permission (ds/create-draftset "tmp@example.com")
                              "tmp@example.com"
-                             :draft:publish)
+                             :drafter:draft:publish)
     #{}))

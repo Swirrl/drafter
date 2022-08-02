@@ -162,7 +162,7 @@
     (help/submit-draftset-to-permission-through-api handler
                                                     test-editor
                                                     draftset-location
-                                                    :draft:claim)
+                                                    :drafter:draft:claim)
     (let [ds-info (help/get-user-draftset-info-view-through-api handler draftset-location test-publisher)])))
 
 (tc/deftest-system-with-keys get-draftset-for-other-user-test

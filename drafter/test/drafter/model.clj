@@ -76,7 +76,7 @@
   (dsops/find-permitted-draftset-operations backend draftset-ref user))
 
 (defn- publish-draftset-op [drafter user draftset-ref {:keys [metadata] :as opts}]
-  (if (user/has-permission? user :draft:publish)
+  (if (user/has-permission? user :drafter:draft:publish)
     (let [params (cond-> {:draftset-id draftset-ref}
                          (some? metadata) (assoc :metadata (format-metadata metadata)))
           job (dsjobs/publish-draftset-job drafter
@@ -346,7 +346,7 @@
           (submit-draftset-to-permission drafter
                                          test-publisher
                                          ds-id
-                                         :draft:claim)
+                                         :drafter:draft:claim)
           (claim-draftset drafter test-editor ds-id)
           (submit-draftset-to-user drafter test-editor ds-id test-publisher)
           (claim-draftset drafter test-publisher ds-id)
