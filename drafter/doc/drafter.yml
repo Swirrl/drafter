@@ -50,15 +50,14 @@ info:
       - `/data` which can be used to `POST` (append), `DELETE` or
         `GET` quads from the draftset.
 
-      - `/submit-to` to relinquish ownership of the drafset and either
-        assign ownership to another user, or make it available to
-        users in a given role. The user which takes ownership of the
-        draftset may depending on their role then choose to make
-        further ammendments, `/publish` or submit the draftset to a
-        new owner.
+      - `/submit-to` to relinquish ownership of the draftset and either assign
+        ownership to another user, or make it available to users with a given
+        permission. The user which takes ownership of the draftset may
+        depending on their permissions then choose to make further ammendments,
+        `/publish` or submit the draftset to a new owner.
 
-      - `/publish` which can be used by clients with the `publisher`
-        role to publish a reviewed draftset to the live site.
+      - `/publish` which can be used by clients with the `draft:publish`
+        permission to publish a reviewed draftset to the live site.
 
       - `/claim` which a user must call on Draftset's submitted to
         them before they can perform any actions upon them.  Claiming
@@ -97,28 +96,25 @@ info:
 
     ## Roles
 
-    Users in Drafter and PMD are assigned to a role which authorises
-    them to perform various actions associated with the role and all
-    of the roles ranked beneath it.  The roles are currently:
+    Users in Drafter and PMD are assigned roles, which in turn grant sets of
+    permissions. A user with multiple roles is granted the union of the
+    permissions associated with each role.
 
-    | rank | role            | Description                                                                          |
-    |------|-----------------|--------------------------------------------------------------------------------------|
-    |    0 | access          | Can access the system at all (only comes in to play when `:drafter/global-auth?`)    |
-    |    1 | editor          | Can access the admin panel and create and edit draftsets.                            |
-    |    2 | publisher       | Can do everything an editor can, but also publish to the live site.                  |
-    |    3 | manager         | Can do everything a publisher can, but also manage user accounts (not via this API)  |
+    ## Permissions
 
+    Currently available permissions are:
 
-    Roles are also what users use to exchange Draftsets.  Users submit
-    a Draftset to a role, which puts it in that roles pool of
-    claimable Draftsets.  Draftsets are then only claimable out of the
-    role's pool by users with a role of an equal or higher rank.  In
-    addition to this the user who submitted the draftset to the role
-    can also withdraw it from submission by claiming it back -
-    regarldess of their role's rank.
-
-    Draftsets *must* be claimed before they can be reviewed, published
-    or edited.
+    - drafter:public:view
+    - drafter:draft:claim
+    - drafter:draft:create
+    - drafter:draft:delete
+    - drafter:draft:edit
+    - drafter:draft:publish
+    - drafter:draft:share
+    - drafter:draft:submit
+    - drafter:draft:view
+    - drafter:job:view
+    - drafter:user:view
 
     ## Authentication & Security
 
@@ -493,16 +489,14 @@ paths:
   /draftset/{id}/submit-to:
     post:
       operationId: submit-draftset-to
-      summary: Submit a Draftset to a user or role
+      summary: Submit a Draftset to a user or permission holder
       description: |
-        Submits this draftset for review and potential publication.
+        Submits this draftset to be claimed by another user.
         Draftsets are submitted directly to a user, or into a pool for
-        users of a given role.
-
-        Users with a role greater than or equal to the role the
-        draftset was submitted to can then lay claim to it.
+        users with a given permission.
       parameters:
         - $ref: '#/parameters/id'
+        - $ref: '#/parameters/permission'
         - $ref: '#/parameters/role'
         - $ref: '#/parameters/submit-user'
 #        - $ref: '#/parameters/message'
@@ -525,11 +519,6 @@ paths:
         performing this operation.  This is necessary to prevent
         other's from making changes to the data contained within the
         Draftset.
-
-        Each role in the system has a pool of 0 or more claimable
-        draftsets associated with it.  Claimable draftsets are
-        draftsets in a pool where the rank of the pools role is less
-        than or equal to the user's role's rank.
       parameters:
         - $ref: '#/parameters/id'
         #- $ref: '#/parameters/messagenonote'
@@ -857,16 +846,19 @@ parameters:
     in: query
     required: false
     type: string
-  role:
-    name: role
-    description: The role to submit the draftset to
+  permission:
+    name: permission
+    description: A permission
     in: query
     required: false
     type: string
-    enum:
-      - editor
-      - publisher
-      - manager
+  role:
+    name: role
+    deprecated: true
+    description: Deprecated, use permission instead
+    in: query
+    required: false
+    type: string
   submit-user:
     name: user
     description: The username of the user to submit the draftset to.
@@ -1096,17 +1088,13 @@ definitions:
 
   User:
     type: object
-    required: [username, role]
+    required: [username]
     properties:
       username:
         type: string
         description: Username of the user
-      role:
-        type: string
-        description: role of the user
     example:
       username: user@example.com
-      role: publisher
 
   Endpoint:
     type: object
@@ -1160,13 +1148,9 @@ definitions:
           submitted-by:
             type: string
             description: The owner who submitted this Draftset for review
-          claim-role:
+          claim-permission:
             type: string
-            enum:
-              - editor
-              - publisher
-              - manager
-            description: The required role for users who can claim this Draftset
+            description: Only users with this permission can claim this Draftset
           claim-user:
             type: string
             description: The user who can claim this Draftset

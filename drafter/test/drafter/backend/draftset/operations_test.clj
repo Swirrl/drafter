@@ -91,7 +91,10 @@
 
   (testing "With no owner"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor)]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:claim)
       (let [owner (sut/get-draftset-owner *test-backend* draftset-id)]
         (is (nil? owner))))))
 
@@ -102,7 +105,10 @@
 
   (testing "Has no owner"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor)]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:claim)
       (is (= false (sut/is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "Has different owner"
@@ -133,28 +139,34 @@
     (doseq [dg draft-graphs]
       (is (= false (mgmth/draft-exists? *test-backend* dg))))))
 
-(defn- draftset-has-claim-role? [draftset-id role]
+(defn- draftset-has-claim-permission? [draftset-id permission]
   (let [q (str
            "ASK WHERE {"
            (with-state-graph
              "<" (->draftset-uri draftset-id) "> <" drafter:hasSubmission "> ?submission ."
-             "?submission <" drafter:claimRole "> \"" (name role) "\" .")
+             "?submission <" drafter:claimPermission "> \"" (name permission) "\" .")
            "}")]
     (sparql/eager-query *test-backend* q)))
 
-(deftest submit-draftset-to-role-test!
+(deftest submit-draftset-to-permission-test!
   (testing "Existing owner"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:claim)
 
-      (is (draftset-has-claim-role? draftset-id :publisher))
+      (is (draftset-has-claim-permission? draftset-id :drafter:draft:claim))
       (is (= false (has-any-object? draftset-uri drafter:hasOwner)))))
 
   (testing "Submitted by other user"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-publisher :manager)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-publisher
+                                          :drafter:draft:claim)
 
       (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor))
       (is (= false (has-any-object? draftset-uri drafter:hasSubmission))))))
@@ -202,11 +214,14 @@
 
   (testing "When submitted"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor)]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:claim)
       (sut/submit-draftset-to-user! *test-backend* draftset-id test-editor test-manager)
 
       (is (= nil (sut/get-draftset-owner *test-backend* draftset-id)))
-      (is (draftset-has-claim-role? draftset-id :publisher))
+      (is (draftset-has-claim-permission? draftset-id :drafter:draft:claim))
       (is (= false (draftset-has-claim-user? draftset-id test-manager))))))
 
 (defn- draftset-has-submission? [draftset-ref]
@@ -219,10 +234,13 @@
     (sparql/eager-query *test-backend* q)))
 
 (deftest claim-draftset-test!
-  (testing "No owner when user in role"
+  (testing "No owner when user has claim permission"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor "Test draftset")
           draftset-uri (->draftset-uri draftset-id)]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:claim)
 
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-publisher)
             ds-info (sut/get-draftset-info *test-backend* draftset-id)]
@@ -244,13 +262,16 @@
       (sut/submit-draftset-to-user! *test-backend* draftset-id test-editor test-publisher)
 
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-manager)]
-        (is (= :user result))
+        (is (= :forbidden result))
         (is (nil? (sut/get-draftset-owner *test-backend* draftset-id)))
         (is (draftset-has-submission? draftset-id)))))
 
-  (testing "Reclaimed by submitter after submit to role"
+  (testing "Reclaimed by submitter after submit to permission"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor "Test draftset")]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:claim)
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor))
@@ -264,9 +285,12 @@
         (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor))
         (is (= false (draftset-has-submission? draftset-id))))))
 
-  (testing "No owner when user is submitter not in role"
+  (testing "No owner when user doesn't have permission but is submitter"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor "Test draftset")]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:publish)
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-editor)]
         (is (= :ok result))
         (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor))
@@ -274,10 +298,13 @@
 
   (testing "Owned by other user after submitted by user"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor "Test draftset")]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :publisher)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:publish)
       (sut/claim-draftset! *test-backend* draftset-id test-publisher)
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-editor)]
-        (is (= :owned result)))))
+        (is (= :forbidden result)))))
 
   (testing "Claimed by current owner"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor)
@@ -285,17 +312,20 @@
       (is (= :ok result))
       (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor))))
 
-  (testing "User not in claim role"
+  (testing "User doesn't have claim permission"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor)]
-      (sut/submit-draftset-to-role! *test-backend* draftset-id test-editor :manager)
+      (sut/submit-draftset-to-permission! *test-backend*
+                                          draftset-id
+                                          test-editor
+                                          :drafter:draft:claim:manager)
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-publisher)]
-        (is (= :role result))
+        (is (= :forbidden result))
         (is (nil? (sut/get-draftset-owner *test-backend* draftset-id))))))
 
   (testing "Draftset owned by other user"
     (let [draftset-id (sut/create-draftset! *test-backend* test-editor)]
       (let [[result _] (sut/claim-draftset! *test-backend* draftset-id test-publisher)]
-        (is (= :owned result))
+        (is (= :forbidden result))
         (is (sut/is-draftset-owner? *test-backend* draftset-id test-editor)))))
 
   (testing "Draftset does not exist"

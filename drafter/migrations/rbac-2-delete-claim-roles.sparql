@@ -1,0 +1,14 @@
+# Migration to delete claim roles after migrating to claim permissions
+#
+# Run me with
+#
+#     stardog query <database-name> rbac-2-delete-claim-roles.sparql
+
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+DELETE WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?submission drafter:claimRole ?role .
+  }
+}
+

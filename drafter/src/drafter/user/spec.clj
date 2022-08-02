@@ -8,7 +8,8 @@
             [clojure.spec.test.alpha :as st])
   (:import [drafter.user User]))
 
-(s/def ::user/role (s/with-gen user/is-known-role? (fn [] (gen/elements user/roles))))
+(s/def ::user/role user/roles)
+(s/def ::user/permissions (s/coll-of keyword? :kind set?))
 (s/def ::user/email :drafter/EmailAddress)
 (s/def ::user/password-digest string?)
 (s/def ::user/username :drafter/EmailAddress)
@@ -17,8 +18,10 @@
 (s/def :token/role string?)
 
 (s/def ::user/DbUser #(instance? User %))
-(s/def ::user/User (s/keys :req-un [::user/role ::user/email]))
-(s/def ::user/UserSummary (s/keys :req-un [::user/username ::user/role]))
+(s/def ::user/User
+  (s/keys :req-un [::user/email ::user/permissions]))
+(s/def ::user/UserSummary
+  (s/keys :req-un [::user/username]))
 (s/def ::user/UserToken (s/keys :req-un [:token/email :token/role]))
 
 (s/def ::user/repo #(satisfies? user/UserRepository %))
@@ -36,11 +39,13 @@
   :ret :drafter/URI)
 
 (s/fdef user/create-user
-  :args (s/cat :email string? :role ::user/role :password-digest ::user/password-digest)
+  :args (s/cat :email string?
+               :role ::user/role
+               :password-digest ::user/password-digest)
   :ret ::user/DbUser)
 
 (s/fdef user/create-authenticated-user
-  :args (s/cat :email string? :role ::user/role)
+  :args (s/cat :email string? :permissions ::user/permissions)
   :ret ::user/User)
 
 (s/fdef user/authenticated!
@@ -50,10 +55,6 @@
 (s/fdef user/get-summary
   :args (s/cat :user ::user/User)
   :ret ::user/UserSummary)
-
-(s/fdef user/has-role?
-  :args (s/cat :user ::user/User :requested ::user/role)
-  :ret boolean?)
 
 (s/fdef user/validate-token!
   :args (s/cat :token ::user/UserToken)
@@ -71,10 +72,6 @@
   :args (s/cat :user ::user/User :draftset ::ds/Draftset)
   :ret boolean?)
 
-(s/fdef user/can-view?
-  :args (s/cat :user ::user/User :draftset ::ds/Draftset)
-  :ret boolean?)
-
 (s/fdef user/permitted-draftset-operations
   :args (s/cat :draftset ::ds/Draftset :user ::user/User)
   :ret (s/coll-of ::ds/Operation :kind set?))
@@ -87,12 +84,10 @@
    `user/create-authenticated-user
    `user/authenticated!
    `user/get-summary
-   `user/has-role?
    `user/validate-token!
    `user/has-owner?
    `user/is-owner?
    `user/can-claim?
-   `user/can-view?
    `user/permitted-draftset-operations])
 
 (defn instrument []

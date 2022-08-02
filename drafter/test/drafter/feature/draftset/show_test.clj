@@ -19,13 +19,6 @@
 
 (def system-config "drafter/feature/empty-db-system.edn")
 
-(defn- create-submit-to-role-request [user draftset-location role]
-  (tc/with-identity user {:uri (str draftset-location "/submit-to") :request-method :post :params {:role (name role)}}))
-
-(defn- submit-draftset-to-role-through-api [handler user draftset-location role]
-  (let [response (handler (create-submit-to-role-request user draftset-location role))]
-    (tc/assert-is-ok-response response)))
-
 (tc/deftest-system-with-keys get-all-draftsets-changes-test
   keys-for-test
   [system system-config]
@@ -166,7 +159,10 @@
   [system system-config]
   (let [handler (get system [:drafter/routes :draftset/api])
         draftset-location (help/create-draftset-through-api handler test-editor)]
-    (submit-draftset-to-role-through-api handler test-editor draftset-location :publisher)
+    (help/submit-draftset-to-permission-through-api handler
+                                                    test-editor
+                                                    draftset-location
+                                                    :drafter:draft:claim)
     (let [ds-info (help/get-user-draftset-info-view-through-api handler draftset-location test-publisher)])))
 
 (tc/deftest-system-with-keys get-draftset-for-other-user-test

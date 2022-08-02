@@ -8,7 +8,7 @@
 
 (defn handler
   [{:keys [drafter/backend wrap-authenticate]}]
-  (middleware/wrap-authorize wrap-authenticate :editor
+  (middleware/wrap-authorize wrap-authenticate :drafter:draft:view
    (feat-middleware/existing-draftset-handler
     backend
     (fn [{{:keys [draftset-id]} :params user :identity}]

@@ -492,7 +492,7 @@
 
 (defn handler
   [{:keys [wrap-as-draftset-owner] :as opts}]
-  (wrap-as-draftset-owner :editor (fn [request] (handler* opts request))))
+  (wrap-as-draftset-owner :drafter:draft:edit (fn [request] (handler* opts request))))
 
 (def cors-allowed-headers
   #{"Accept"

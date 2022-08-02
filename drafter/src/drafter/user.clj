@@ -12,40 +12,44 @@
   (get-all-users [this]
     "Returns all users in this repository"))
 
-(defrecord User [email role password-digest])
+(defrecord User [email permissions password-digest])
 
 (defmethod ig/init-key :drafter.user/repo [k opts]
   (throw (ex-info "Config error.  Please use a concrete implementation of the user repo instead." {})))
 
-(def role->permission-level
-  {:access 0 :editor 1 :publisher 2 :manager 3 :system 4})
-
-(defn roles-including
-  "Returns the set of roles which include the given role"
+(defn role->permissions
+  "This function is only intended to be used for compatibility with mongo user
+   storage, or for convenience in tests."
   [role]
-  (let [required-level (role->permission-level role)]
-    (->> role->permission-level
-         (keep (fn [[candidate level]]
-                 (if (>= level required-level)
-                   candidate)))
-         (set))))
+  (case role
+    :norole #{}
+    :access #{:drafter:public:view}
+    :editor (conj (role->permissions :access)
+                  :drafter:draft:claim :drafter:draft:create
+                  :drafter:draft:delete :drafter:draft:edit
+                  :drafter:draft:submit :drafter:draft:share
+                  :drafter:draft:view :drafter:job:view :drafter:user:view)
+    :publisher (conj (role->permissions :editor) :drafter:draft:publish)
+    ;; :manager is used in tests to demonstrate scoped claim permissions.
+    :manager (conj (role->permissions :publisher) :drafter:draft:claim:manager)
+    :system (recur :manager)))
 
-(defn get-role-summary
-  "Returns a brief summary of the given role"
-  [role]
-  ({:access "Read-only access"
-    :editor "Create and edit access to drafts"
-    :publisher "Create, edit and publish access to drafts"
-    :manager "Full access to drafts"
-    :system "Full access to the entire system"} role))
+(def permission-summary
+  {:drafter:draft:claim "Claim submitted drafts"
+   :drafter:draft:create "Create drafts"
+   :drafter:draft:delete "Delete drafts"
+   :drafter:draft:edit "Edit drafts"
+   :drafter:draft:publish "Publish drafts"
+   :drafter:draft:share "Share drafts to be viewed"
+   :drafter:draft:submit "Submit drafts to be claimed"
+   :drafter:draft:view "View shared drafts"
+   :drafter:job:view "View the status of jobs"
+   :drafter:public:view "View the public endpoint (if global auth is on)"
+   :drafter:user:view "View users"})
 
-(def ^{:doc
-       "Ordered list of roles from least permissions to greatest permissions."}
-  roles
-  (sort-by role->permission-level (keys role->permission-level)))
+(def roles #{:access :editor :publisher :manager :system})
 
 (def username :email)
-(def role :role)
 
 (defn get-digest
   "Generate the hashed password from the given plaintext password."
@@ -69,7 +73,7 @@
   (.getSchemeSpecificPart user-uri))
 
 (defn is-known-role? [r]
-  (contains? role->permission-level r))
+  (contains? roles r))
 
 (defn- get-valid-email [email]
   (if-let [valid (util/validate-email-address email)]
@@ -77,11 +81,12 @@
     (throw (IllegalArgumentException. (str "Not a valid email address: " email)))))
 
 (defn create-user
-  "Creates a user with a username, role and password digest which can
-  be used to authenticate the user."
+  "Creates a user with a username, role and password digest which can be used
+   to authenticate the user. Grants the user permissions corresponding to the
+   given role."
   [email role password-digest]
   (let [email (get-valid-email email)]
-     (->User email role password-digest)))
+     (->User email (role->permissions role) password-digest)))
 
 (defn create-authenticated-user
   "Create a user without any authentication information which is
@@ -89,15 +94,14 @@
   authenticated for a request, their authentication parameters should
   no longer be needed, so users are normalised into a model without
   these parameters."
-  [email role]
-  (let [email (get-valid-email email)]
-    {:email email :role role}))
+  [email permissions]
+  {:email (get-valid-email email) :permissions permissions})
 
 (defn authenticated!
   "Asserts that the given user has been authenticated and returns a
   representation of the user without authentication information."
-  [{:keys [email role] :as user}]
-  (create-authenticated-user email role))
+  [{:keys [email permissions] :as user}]
+  (create-authenticated-user email permissions))
 
 (defn try-authenticate
   "Tries to authenticate a user with the given candidate
@@ -109,15 +113,13 @@
 
 (defn get-summary
   "Returns a map containing summary information about a user."
-  [{:keys [email role] :as user}]
-  {:username email :role role})
+  [{:keys [email] :as user}]
+  {:username email})
 
-(defn has-role?
-  "Takes a user and a role keyword and tests whether the user is
-  authorised to operate in that role."
-  [{:keys [role] :as user} requested]
-  (and (is-known-role? role)
-       (<= (role->permission-level requested) (role->permission-level role))))
+(defn has-permission?
+  "Check if a user has a given permission."
+  [user permission]
+  (contains? (:permissions user) permission))
 
 (defn- user-token-invalid [token invalid-key info]
   (let [msg (str "User token invalid: " info " (" invalid-key " = '" (invalid-key token) "')")]
@@ -130,7 +132,7 @@
   (if-let [email (util/validate-email-address (:email token))]
     (let [role (keyword (:role token))]
       (if (is-known-role? role)
-        (create-authenticated-user email role)
+        (create-authenticated-user email (role->permissions role))
         (user-token-invalid token :role "Unknown role")))
     (user-token-invalid token :email "Invalid address")))
 
@@ -143,25 +145,25 @@
 (defn is-submitted-by? [user {:keys [submitted-by] :as draftset}]
   (= (username user) submitted-by))
 
-(defn can-claim? [user {:keys [claim-role claim-user] :as draftset}]
+(defn can-claim? [user {:keys [claim-permission claim-user] :as draftset}]
   (or (is-owner? user draftset)
       (and (not (has-owner? draftset))
            (is-submitted-by? user draftset))
-      (and (some? claim-role)
-           (has-role? user claim-role))
+      (and (some? claim-permission)
+           (has-permission? user claim-permission))
       (= claim-user (username user))))
 
-(defn can-view? [user draftset]
-  (or (can-claim? user draftset)
-      (is-owner? user draftset)))
+;; Currently the conditions for viewing a draft (in a list of all drafts, etc)
+;; happen to be the same as the conditions for claiming a draft. This needn't
+;; be the case in the future.
+(def can-view? can-claim?)
 
 (defn permitted-draftset-operations [draftset user]
   (cond
    (is-owner? user draftset)
-   (let [ops #{:delete :edit :submit :claim}]
-     (if (has-role? user :publisher)
-       (conj ops :publish)
-       ops))
+   (set (keep #(when-let [[_ op] (re-matches #"drafter:draft:(.*)" (name %))]
+                 (keyword op))
+              (:permissions user)))
 
    (can-claim? user draftset)
    #{:claim}

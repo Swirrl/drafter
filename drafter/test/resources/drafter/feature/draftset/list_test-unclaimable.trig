@@ -19,7 +19,7 @@
 		drafter:hasOwner <mailto:publisher@swirrl.com> ;
 		rdfs:label "owned" .
 
-        # This draftset should be claimable by publisher@swirrl.com (or anyone in publisher role)
+	# This draftset should be claimable by publisher@swirrl.com (or anyone with draft:publish)
 	draftset:claimable a drafter:DraftSet ;
 		dcterms:modified "2017-11-30T14:15:18.348Z"^^xsd:dateTime ;
 		drafter:version version:16bd5568-df31-4d15-931a-681e86c391e2 ;
@@ -38,5 +38,5 @@
 		drafter:hasOwner <mailto:editor@swirrl.com> .
 	
 	<http://publishmydata.com/def/drafter/submission/a74aaec9-a1e5-4418-9528-c07a1d275e72> a drafter:Submission ;
-		drafter:claimRole "publisher" .
+		drafter:claimPermission "drafter:draft:publish" .
 }

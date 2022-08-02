@@ -11,25 +11,24 @@
 
 (def keys-for-test [:drafter.fixture-data/loader [:drafter/routes :draftset/api]])
 
-(tc/deftest-system-with-keys submit-non-existent-draftset-to-role
+(tc/deftest-system-with-keys submit-non-existent-draftset-to-permission
   keys-for-test
   [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
-  (let [submit-response (handler (help/create-submit-to-role-request test-editor "/v1/draftset/missing" :publisher))]
+  (let [submit-response (handler (help/create-submit-to-permission-request
+                                  test-editor
+                                  "/v1/draftset/missing"
+                                  :drafter:draft:claim))]
     (tc/assert-is-not-found-response submit-response)))
 
-(tc/deftest-system-with-keys submit-draftset-to-role-by-non-owner
+(tc/deftest-system-with-keys submit-draftset-to-permission-by-non-owner
   keys-for-test
   [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
-        submit-response (handler (help/create-submit-to-role-request test-publisher draftset-location :manager))]
+        submit-response (handler (help/create-submit-to-permission-request
+                                  test-publisher
+                                  draftset-location
+                                  :drafter:draft:claim))]
     (tc/assert-is-forbidden-response submit-response)))
-
-(tc/deftest-system-with-keys submit-draftset-to-invalid-role
-  keys-for-test
-  [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
-  (let [draftset-location (help/create-draftset-through-api handler test-editor)
-        submit-response (handler (help/create-submit-to-role-request test-editor draftset-location :invalid))]
-    (tc/assert-is-unprocessable-response submit-response)))
 
 (tc/deftest-system-with-keys submit-draftset-to-user
   keys-for-test
@@ -79,20 +78,36 @@
         response (handler submit-request)]
     (tc/assert-is-unprocessable-response response)))
 
-(tc/deftest-system-with-keys submit-to-with-both-user-and-role-params
+(tc/deftest-system-with-keys submit-to-with-both-user-and-permission-params
   keys-for-test
   [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         request (help/submit-draftset-to-user-request draftset-location test-publisher test-editor)
-        request (assoc-in request [:params :role] "editor")
+        request (assoc-in request [:params :permission] "drafter:draft:claim")
         response (handler request)]
     (tc/assert-is-unprocessable-response response)))
 
+(tc/deftest-system-with-keys submit-draftset-to-permission
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        submit-request (help/create-submit-to-permission-request test-editor
+                                                                 draftset-location
+                                                                 :drafter:draft:claim)
+        {ds-info :body :as submit-response} (handler submit-request)]
+    (tc/assert-is-ok-response submit-response)
+    (tc/assert-spec ::ds/Draftset ds-info)
+
+    (is (= false (contains? ds-info :current-owner)))))
+
+;; The role parameter is deprecated
 (tc/deftest-system-with-keys submit-draftset-to-role
   keys-for-test
   [{handler [:drafter/routes :draftset/api]} "test-system.edn"]
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
-        submit-request (help/create-submit-to-role-request test-editor draftset-location :publisher)
+        submit-request (help/create-submit-to-role-request test-editor
+                                                           draftset-location
+                                                           :publisher)
         {ds-info :body :as submit-response} (handler submit-request)]
     (tc/assert-is-ok-response submit-response)
     (tc/assert-spec ::ds/Draftset ds-info)

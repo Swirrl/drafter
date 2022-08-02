@@ -22,5 +22,4 @@
 
  ;; auth0 authentication method
  :drafter.auth.auth0/auth0-auth-method {:auth0-client #ig/ref :swirrl.auth0/client
-                                        :jwk #ig/ref :drafter.auth.auth0/mock-jwk}
- }
+                                        :jwk #ig/ref :drafter.auth.auth0/mock-jwk}}

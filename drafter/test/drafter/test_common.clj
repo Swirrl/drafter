@@ -109,13 +109,14 @@
 
 (def alg (Algorithm/RSA256 pubkey privkey))
 
-(defn token [iss aud sub role]
+(defn token [iss aud sub role permissions]
   (-> (JWT/create)
       (.withIssuer (str iss \/))
       (.withSubject sub)
       (.withAudience (into-array String [aud]))
       (.withExpiresAt (to-date (clj-time/plus (clj-time/now) (clj-time/minutes 10))))
       (.withClaim "scope" role)
+      (.withArrayClaim "permissions" (into-array String (map name permissions)))
       (.sign alg)))
 
 (defn mock-jwk []
@@ -127,22 +128,23 @@
 (defmethod ig/init-key :drafter.auth.auth0/mock-jwk [_ _opts]
   (mock-jwk))
 
-(defn user-access-token [user-id scope]
-  (token (env :auth0-domain) (env :auth0-aud) user-id scope))
+(defn user-access-token [user-id scope permissions]
+  (token (env :auth0-domain) (env :auth0-aud) user-id scope permissions))
 
 (defn set-auth-header [request access-token]
   (assoc-in request [:headers "Authorization"] (str "Bearer " access-token)))
 
 (defn with-identity
   "Sets the given test user as the user on a request"
-  [{:keys [email role] :as user} request]
+  [{:keys [email role permissions] :as user} request]
   ;; TODO: this is a bit gross but, we need to switch implementation of this
   ;; mocky thing based on the type of auth provider we're currently testing.
   (case *auth-env*
     :auth0
     (-> request
         (assoc :identity user)
-        (set-auth-header (user-access-token email (str "drafter" role))))
+        (set-auth-header
+         (user-access-token email (str "drafter" role) permissions)))
     (let [unencoded-auth (str (user/username user) ":" "password")
           encoded-auth (util/str->base64 unencoded-auth)]
       (-> request

@@ -80,8 +80,8 @@
         db (mg/get-db conn db-name)]
     (->MongoUserRepository conn db collection-name)))
 
-(defn- user->mongo-user [user]
-  (let [[email role digest] ((juxt user/username user/role user/password-digest) user)
+(defn- user->mongo-user [user role]
+  (let [[email digest] ((juxt user/username user/password-digest) user)
         role-number (get (set/map-invert role-mappings) role)]
     {:_id (ObjectId.)
      :email email
@@ -96,8 +96,8 @@
 
 (defn insert-user
   "Inserts a user into a mongo db user repository."
-  [repo user]
-  (let [mongo-user (user->mongo-user user)]
+  [repo user role]
+  (let [mongo-user (user->mongo-user user role)]
     (insert-document repo mongo-user)))
 
 (derive :drafter.user/mongo :drafter.user/repo)

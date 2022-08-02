@@ -76,7 +76,7 @@
 (defmethod ig/init-key :drafter.routes/jobs-status [_ opts]
   (context
    "/v1/status" []
-   (middleware/wrap-authorize (:wrap-authenticate opts) :editor
+   (middleware/wrap-authorize (:wrap-authenticate opts) :drafter:job:view
     (routes
      (GET "/jobs/:id" [id]
           (or (when-let [job (some-> id r/try-parse-uuid get-job)]

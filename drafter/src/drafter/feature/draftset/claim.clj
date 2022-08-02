@@ -17,30 +17,28 @@
   (if (jobutil/failed-job-result? result)
     (response/api-response 500 result)
     (let [[claim-outcome ds-info] (:details result)]
-      (if (= :ok claim-outcome)
-        (ring/response ds-info)
-        (conflict-detected-response "Failed to claim draftset")))))
+      (case claim-outcome
+        :ok (ring/response ds-info)
+        :forbidden (forbidden-response "User does not have permission to claim draftset")
+        :not-found (ring/not-found "Draftset not found")
+        :unknown (conflict-detected-response "Failed to claim draftset")))))
 
 (defn- handler*
   [{:keys [backend] :as manager}
    {{:keys [draftset-id]} :params user :identity :as request}]
-  (if-let [ds-info (dsops/get-draftset-info backend draftset-id)]
-    (if (user/can-claim? user ds-info)
-      (feat-common/run-sync manager
-                            (req/user-id request)
-                            'claim-draftset
-                            draftset-id
-                            #(dsops/claim-draftset! backend draftset-id user)
-                            respond)
-      (forbidden-response "User not in role for draftset claim"))
-    (ring/not-found "Draftset not found")))
+  (feat-common/run-sync manager
+                        (req/user-id request)
+                        'claim-draftset
+                        draftset-id
+                        #(dsops/claim-draftset! backend draftset-id user)
+                        respond))
 
 (defn handler [{{:keys [backend] :as manager} :drafter/manager
                 wrap-authenticate :wrap-authenticate}]
   (let [inner-handler (partial handler* manager)]
     (->> inner-handler
         (feat-middleware/existing-draftset-handler backend)
-        (middleware/wrap-authorize wrap-authenticate :editor))))
+        (middleware/wrap-authorize wrap-authenticate :drafter:draft:claim))))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset.claim/handler [_]
   (s/keys :req [:drafter/manager]))

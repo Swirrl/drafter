@@ -131,7 +131,7 @@
        temp-file-body
        deset-middleware/parse-graph-for-triples
        require-rdf-content-type
-       (wrap-as-draftset-owner :editor)))
+       (wrap-as-draftset-owner :drafter:draft:edit)))
 
 (defmethod ig/pre-init-spec :drafter.feature.draftset-data.delete/delete-data-handler [_]
   (s/keys :req [:drafter/manager]

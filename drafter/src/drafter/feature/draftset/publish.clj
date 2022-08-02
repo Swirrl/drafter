@@ -9,7 +9,7 @@
 
 (defn handler
   [{manager :drafter/manager :keys [wrap-as-draftset-owner]}]
-  (wrap-as-draftset-owner :publisher
+  (wrap-as-draftset-owner :drafter:draft:publish
     (fn [{params :params :as request}]
       (writes/submit-async-job!
        (dsjobs/publish-draftset-job manager

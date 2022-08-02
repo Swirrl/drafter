@@ -16,7 +16,7 @@
 (s/def ::ds/submitted-by :drafter/EmailAddress)
 (s/def ::ds/current-owner :drafter/EmailAddress)
 (s/def ::ds/claim-user string?)
-(s/def ::ds/claim-role keyword?)
+(s/def ::ds/claim-permission keyword?)
 
 (s/def ::ds/HasDescription (s/keys :req-un [::ds/description]))
 (s/def ::ds/HasDisplayName (s/keys :req-un [::ds/display-name]))
@@ -24,9 +24,11 @@
                                     (s/keys :req-un [::ds/changes ::ds/created-by]
                                             :opt-un [::ds/display-name ::ds/description ::ds/submitted-by])))
 (s/def ::ds/OwnedDraftset (s/merge ::ds/DraftsetCommon (s/keys :req-un [::ds/current-owner])))
-(s/def ::ds/SubmittedToRole (s/keys :req-un [::ds/claim-role]))
+(s/def ::ds/SubmittedToPermission (s/keys :req-un [::ds/claim-permission]))
 (s/def ::ds/SubmittedToUser (s/keys :req-un [::ds/claim-user]))
-(s/def ::ds/SubmittedDraftset (s/and ::ds/DraftsetCommon (s/or :role ::ds/SubmittedToRole :user ::ds/SubmittedToUser)))
+(s/def ::ds/SubmittedDraftset
+  (s/and ::ds/DraftsetCommon (s/or :permission ::ds/SubmittedToPermission
+                                   :user ::ds/SubmittedToUser)))
 (s/def ::ds/Draftset (s/or :owned ::ds/OwnedDraftset :submitted ::ds/SubmittedDraftset))
 
 (def operations #{:delete :edit :submit :publish :claim})

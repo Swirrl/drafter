@@ -9,15 +9,14 @@
     [drafter-client.client.endpoint :as endpoint]
     [drafter-client.test-helpers :as h]
     [drafter-client.test-util.auth :as auth-util]
-    [drafter-client.test-util.jwt :as jwt]
     [drafter.main :as drafter]
+    [drafter.test-common :refer [mock-jwk]]
     [drafter.util :as util]
     [environ.core :refer [env]]
     [grafter-2.rdf.protocols :as pr]
     [grafter-2.rdf4j.io :as rio]
     [grafter-2.rdf4j.repository :as gr-repo]
-    [integrant.core :as ig]
-    [grafter-2.rdf4j.io :as gio])
+    [integrant.core :as ig])
   (:import clojure.lang.ExceptionInfo
            java.net.URI
            [java.util UUID]
@@ -32,11 +31,11 @@
 ;; Override the :drafter.auth.auth0/jwk init-key otherwise it'll be trying to
 ;; contact auth0
 (defmethod ig/init-key :drafter.auth.auth0/jwk [_ {:keys [endpoint] :as opts}]
-  (jwt/mock-jwk))
+  (mock-jwk))
 
 ;; But this is the one that everything should use anyway
 (defmethod ig/init-key :drafter.auth.auth0/mock-jwk [_ {:keys [endpoint] :as opts}]
-  (jwt/mock-jwk))
+  (mock-jwk))
 
 (defn start-auth0-drafter-server []
   (drafter/-main (h/res-file "auth0-test-config.edn")
@@ -221,7 +220,7 @@
         token (auth-util/publisher-token)
         ds-1 (sut/new-draftset client token "first" "description")
         ds-2 (sut/new-draftset client token "second" "description")]
-    (sut/submit-to-role client token (draftset/id ds-2) :publisher)
+    (sut/submit-to-permission client token (draftset/id ds-2) :drafter:draft:claim)
     (t/testing "default"
       (let [draftsets (sut/draftsets client token)]
         (t/is (= #{(draftset/id ds-1) (draftset/id ds-2)}
@@ -385,12 +384,12 @@
                 draftset (sut/new-draftset client token name description)
                 _ (sut/add-data-sync client token draftset f {:gzip gzip?})
                 quads* (h/get-user-quads client token draftset)
-                expected-quads (set (gio/statements f))]
+                expected-quads (set (rio/statements f))]
             (t/is (= expected-quads (set quads*)))))))
 
     (t/testing "Add quads from a gzipped file"
       (let [source (io/file "test/resources/test_data.trig")
-            expected-quads (set (gio/statements source))]
+            expected-quads (set (rio/statements source))]
         (t/testing "with format and gzip extension"
           (let [f (File/createTempFile "drafter-client" ".trig.gz")]
             (try

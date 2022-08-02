@@ -1,0 +1,14 @@
+# Query to check claim roles to ensure all cases are covered in
+# rbac-1-backfill-claim-permissions.sparql
+#
+# Run me with
+#
+#     stardog query <database-name> rbac-0-check-claim-roles.sparql
+
+PREFIX drafter: <http://publishmydata.com/def/drafter/>
+
+SELECT DISTINCT ?role WHERE {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?submission drafter:claimRole ?role .
+  }
+}

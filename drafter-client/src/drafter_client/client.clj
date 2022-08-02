@@ -1,5 +1,5 @@
 (ns drafter-client.client
-  (:refer-clojure :exclude [name type get])
+  (:refer-clojure :exclude [get])
   (:require [cheshire.core :as json]
             [clj-time.format :refer [formatters parse]]
             [clojure.spec.alpha :as s]
@@ -17,8 +17,6 @@
             [martian.clj-http :as martian-http]
             [martian.core :as martian])
   (:import clojure.lang.ExceptionInfo))
-
-(alias 'c 'clojure.core)
 
 (def live draftset/live)
 
@@ -75,8 +73,9 @@
    same as for draftsets."
   [client access-token & [include]]
   (let [get-endpoints (partial i/request client i/get-endpoints access-token)
-        include (if (keyword? include) (c/name include) include)
-        endpoints (if include (get-endpoints :include include) (get-endpoints))]
+        endpoints (if include
+                    (get-endpoints :include (name include))
+                    (get-endpoints))]
     (map endpoint/from-json endpoints)))
 
 (defn get-public-endpoint
@@ -147,9 +146,14 @@
 (defn submit-to-user [client access-token id user]
   (i/request client i/submit-draftset-to access-token id :user user))
 
+(defn submit-to-permission [client access-token id permission]
+  (i/request client i/submit-draftset-to access-token id
+             :permission (name permission)))
+
+;; The role parameter is deprecated
 (defn submit-to-role [client access-token id role]
-  (let [role (if (keyword? role) (c/name role) role)]
-    (i/request client i/submit-draftset-to access-token id :role role)))
+  (i/request client i/submit-draftset-to access-token id
+             :role (name role)))
 
 (defn claim [client access-token id]
   (i/request client i/claim-draftset access-token id))
