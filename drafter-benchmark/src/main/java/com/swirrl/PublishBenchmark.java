@@ -18,8 +18,8 @@ public class PublishBenchmark {
         public PublishState_1k_100g() { super("data_1k_100g.nq"); }
     }
 
-    public static class PublishState_1k_1000g extends PublishState {
-        public PublishState_1k_1000g() { super("data_1k_1000g.nq"); }
+    public static class PublishState_1k_200g extends PublishState {
+        public PublishState_1k_200g() { super("data_1k_200g.nq"); }
     }
 
     public static class PublishState_10k_1g extends PublishState {
@@ -34,8 +34,8 @@ public class PublishBenchmark {
         public PublishState_10k_100g() { super("data_10k_100g.nq"); }
     }
 
-    public static class PublishState_10k_1000g extends PublishState {
-        public PublishState_10k_1000g() { super("data_10k_1000g.nq"); }
+    public static class PublishState_10k_200g extends PublishState {
+        public PublishState_10k_200g() { super("data_10k_200g.nq"); }
     }
 
     public static class PublishState_100k_1g extends PublishState {
@@ -50,8 +50,8 @@ public class PublishBenchmark {
         public PublishState_100k_100g() { super("data_100k_100g.nq"); }
     }
 
-    public static class PublishState_100k_1000g extends PublishState {
-        public PublishState_100k_1000g() { super("data_100k_1000g.nq"); }
+    public static class PublishState_100k_200g extends PublishState {
+        public PublishState_100k_200g() { super("data_100k_200g.nq"); }
     }
 
     public static class PublishState_1000k_1g extends PublishState {
@@ -66,8 +66,8 @@ public class PublishBenchmark {
         public PublishState_1000k_100g() { super("data_1000k_100g.nq"); }
     }
 
-    public static class PublishState_1000k_1000g extends PublishState {
-        public PublishState_1000k_1000g() { super("data_1000k_1000g.nq"); }
+    public static class PublishState_1000k_200g extends PublishState {
+        public PublishState_1000k_200g() { super("data_1000k_200g.nq"); }
     }
 
     @State(Scope.Thread)
@@ -116,7 +116,7 @@ public class PublishBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1k_1000g(PublishState_1k_1000g state) { publishTest(state); }
+    public void publishTest_1k_200g(PublishState_1k_200g state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
@@ -132,7 +132,7 @@ public class PublishBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_10k_1000g(PublishState_10k_1000g state) { publishTest(state); }
+    public void publishTest_10k_200g(PublishState_10k_200g state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
@@ -148,7 +148,7 @@ public class PublishBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_100k_1000g(PublishState_100k_1000g state) { publishTest(state); }
+    public void publishTest_100k_200g(PublishState_100k_200g state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
@@ -164,5 +164,5 @@ public class PublishBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1000k_1000g(PublishState_1000k_1000g state) { publishTest(state); }
+    public void publishTest_1000k_200g(PublishState_1000k_200g state) { publishTest(state); }
 }

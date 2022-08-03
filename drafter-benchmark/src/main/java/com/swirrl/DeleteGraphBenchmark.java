@@ -60,8 +60,8 @@ public class DeleteGraphBenchmark {
         public DeleteGraphState_1k_100g() { super("data_1k_100g.nq"); }
     }
 
-    public static class DeleteGraphState_1k_1000g extends DeleteGraphState {
-        public DeleteGraphState_1k_1000g() { super("data_1k_1000g.nq"); }
+    public static class DeleteGraphState_1k_200g extends DeleteGraphState {
+        public DeleteGraphState_1k_200g() { super("data_1k_200g.nq"); }
     }
 
     public static class DeleteGraphState_10k_1g extends DeleteGraphState {
@@ -76,8 +76,8 @@ public class DeleteGraphBenchmark {
         public DeleteGraphState_10k_100g() { super("data_10k_100g.nq"); }
     }
 
-    public static class DeleteGraphState_10k_1000g extends DeleteGraphState {
-        public DeleteGraphState_10k_1000g() { super("data_10k_1000g.nq"); }
+    public static class DeleteGraphState_10k_200g extends DeleteGraphState {
+        public DeleteGraphState_10k_200g() { super("data_10k_200g.nq"); }
     }
 
     public static class DeleteGraphState_100k_1g extends DeleteGraphState {
@@ -92,8 +92,8 @@ public class DeleteGraphBenchmark {
         public DeleteGraphState_100k_100g() { super("data_100k_100g.nq"); }
     }
 
-    public static class DeleteGraphState_100k_1000g extends DeleteGraphState {
-        public DeleteGraphState_100k_1000g() { super("data_100k_1000g.nq"); }
+    public static class DeleteGraphState_100k_200g extends DeleteGraphState {
+        public DeleteGraphState_100k_200g() { super("data_100k_200g.nq"); }
     }
 
     public static class DeleteGraphState_1000k_1g extends DeleteGraphState {
@@ -108,8 +108,8 @@ public class DeleteGraphBenchmark {
         public DeleteGraphState_1000k_100g() { super("data_1000k_100g.nq"); }
     }
 
-    public static class DeleteGraphState_1000k_1000g extends DeleteGraphState {
-        public DeleteGraphState_1000k_1000g() { super("data_1000k_1000g.nq"); }
+    public static class DeleteGraphState_1000k_200g extends DeleteGraphState {
+        public DeleteGraphState_1000k_200g() { super("data_1000k_200g.nq"); }
     }
 
     private static void deleteGraphTest(DeleteGraphState state) {
@@ -132,7 +132,7 @@ public class DeleteGraphBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteGraphTest_1k_1000g(DeleteGraphState_1k_1000g state) { deleteGraphTest(state); }
+    public void deleteGraphTest_1k_200g(DeleteGraphState_1k_200g state) { deleteGraphTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
@@ -148,7 +148,7 @@ public class DeleteGraphBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteGraphTest_10k_1000g(DeleteGraphState_10k_1000g state) { deleteGraphTest(state); }
+    public void deleteGraphTest_10k_200g(DeleteGraphState_10k_200g state) { deleteGraphTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
@@ -164,7 +164,7 @@ public class DeleteGraphBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteGraphTest_100k_1000g(DeleteGraphState_100k_1000g state) { deleteGraphTest(state); }
+    public void deleteGraphTest_100k_200g(DeleteGraphState_100k_200g state) { deleteGraphTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
@@ -180,5 +180,5 @@ public class DeleteGraphBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteGraphTest_1000k_1000g(DeleteGraphState_1000k_1000g state) { deleteGraphTest(state); }
+    public void deleteGraphTest_1000k_200g(DeleteGraphState_1000k_200g state) { deleteGraphTest(state); }
 }
