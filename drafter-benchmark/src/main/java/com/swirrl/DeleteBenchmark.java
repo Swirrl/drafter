@@ -116,6 +116,16 @@ public class DeleteBenchmark {
             this.deletionFile = Util.resolveDataFile(deletionFileName);
         }
 
+        @Setup(Level.Iteration)
+        public void setupIteration() {
+            Util.createTestDb();
+        }
+
+        @TearDown(Level.Iteration)
+        public void tearDownIteration() {
+            Util.dropTestDb();
+        }
+
         @Setup(Level.Invocation)
         public void setup() {
             this.drafter = Drafter.create();

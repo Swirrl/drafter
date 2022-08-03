@@ -22,9 +22,13 @@ public class Util {
         return (IFn)Clojure.var("clojure.core", "keyword").invoke(value);
     }
 
-    public static SPARQLRepository getRepository() {
+    private static String getTestDbName() {
         String configDbName = System.getProperty("db.name");
-        String dbName = configDbName == null ? "drafter-test-db" : configDbName;
+        return configDbName == null ? "drafter-test-db" : configDbName;
+    }
+
+    public static SPARQLRepository getRepository() {
+        String dbName = getTestDbName();
         String query = String.format("http://localhost:5820/%1$s/query", dbName);
         String update = String.format("http://localhost:5820/%1$s/update", dbName);
         return new SPARQLRepository(query, update);
@@ -73,5 +77,52 @@ public class Util {
         MatchResult m = matchDataFile(dataFile);
         int kStatements = Integer.parseInt(m.group(1));
         return kStatements * 1000;
+    }
+
+    private static File getStardogDir() {
+        String dir = System.getProperty("stardog.dir");
+        if (dir == null) {
+            throw new RuntimeException("Stardog directory not configured - set stardog.dir property");
+        }
+        return new File(dir);
+    }
+
+    private static File getStardogBinDir() {
+        return new File(getStardogDir(), "stardog/bin");
+    }
+
+    private static File getStardogAdmin() {
+        return new File(getStardogBinDir(), "stardog-admin");
+    }
+
+    private static void bashCommand(String... args) throws Exception {
+        String[] procArgs = new String[args.length + 2];
+        procArgs[0] = "bash";
+        procArgs[1] = "-c";
+        for (int i = 0; i < args.length; ++i) {
+            procArgs[i + 2] = args[i];
+        }
+
+        Process p = Runtime.getRuntime().exec(procArgs);
+        int exitCode = p.waitFor();
+        if (exitCode != 0) {
+            throw new RuntimeException("Non-zero exit code when executing command");
+        }
+    }
+
+    public static void createTestDb() {
+        try {
+            bashCommand(getStardogAdmin().getAbsolutePath(), "db", "create", "-n", getTestDbName());
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to create test database", ex);
+        }
+    }
+
+    public static void dropTestDb() {
+        try {
+            bashCommand(getStardogAdmin().getAbsolutePath(), "db", "drop", "--", getTestDbName());
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to drop test database", ex);
+        }
     }
 }

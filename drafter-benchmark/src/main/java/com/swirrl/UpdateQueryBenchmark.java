@@ -28,6 +28,16 @@ public class UpdateQueryBenchmark {
             this.drafter = Drafter.create();
         }
 
+        @Setup(Level.Iteration)
+        public void setupIteration() {
+            Util.createTestDb();
+        }
+
+        @TearDown(Level.Iteration)
+        public void tearDownIteration() {
+            Util.dropTestDb();
+        }
+
         @Setup(Level.Invocation)
         public void setup() throws Exception {
             this.draftset = this.drafter.createDraft(User.publisher());
