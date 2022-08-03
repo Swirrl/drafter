@@ -33,7 +33,7 @@
 
 (defmethod ig/init-key :drafter.feature.draftset.share/post
   [_ {:keys [drafter/manager drafter.user/repo wrap-as-draftset-owner]}]
-  (wrap-as-draftset-owner :draft:share
+  (wrap-as-draftset-owner :drafter:draft:share
     (fn [{{:keys [user permission draftset-id]} :params owner :identity}]
       (cond
         (and (some? user) (some? permission))
@@ -51,7 +51,7 @@
 
 (defmethod ig/init-key :drafter.feature.draftset.share/delete
   [_ {:keys [drafter/manager drafter.user/repo wrap-as-draftset-owner]}]
-  (wrap-as-draftset-owner :draft:share
+  (wrap-as-draftset-owner :drafter:draft:share
     (fn [{{:keys [draftset-id]} :params owner :identity}]
       (feat-common/run-sync
        manager
