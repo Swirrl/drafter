@@ -3,7 +3,12 @@ package com.swirrl;
 import org.openjdk.jmh.annotations.*;
 
 import java.io.File;
+import java.util.concurrent.TimeUnit;
 
+@Warmup(iterations = 0)
+@Fork(value = 2, warmups = 0)
+@Measurement(iterations = 2)
+@Timeout(time = 2, timeUnit = TimeUnit.HOURS)
 public class PublishBenchmark {
 
     public static class PublishState_1k_1g extends PublishState {

@@ -1,6 +1,6 @@
 package com.swirrl;
 
-import java.io.File;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.regex.MatchResult;
@@ -9,6 +9,11 @@ import java.util.regex.Pattern;
 
 import clojure.java.api.Clojure;
 import clojure.lang.IFn;
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.query.BindingSet;
+import org.eclipse.rdf4j.query.TupleQuery;
+import org.eclipse.rdf4j.query.TupleQueryResult;
+import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
 
 public class Util {
@@ -95,15 +100,26 @@ public class Util {
         return new File(getStardogBinDir(), "stardog-admin");
     }
 
-    private static void bashCommand(String... args) throws Exception {
-        String[] procArgs = new String[args.length + 2];
-        procArgs[0] = "bash";
-        procArgs[1] = "-c";
-        for (int i = 0; i < args.length; ++i) {
-            procArgs[i + 2] = args[i];
-        }
+    private static void dumpStream(InputStream is, String name) {
+        System.out.println("Dumping " + name);
 
-        Process p = Runtime.getRuntime().exec(procArgs);
+        try(BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    private static void bashCommand(String... args) throws Exception {
+        String cmdStr = String.join(" ", args);
+
+        Process p = Runtime.getRuntime().exec(new String[] {"/bin/bash", "-c", cmdStr});
+        //dumpStream(p.getInputStream(), "stdin");
+        //dumpStream(p.getErrorStream(), "stderr");
+
         int exitCode = p.waitFor();
         if (exitCode != 0) {
             throw new RuntimeException("Non-zero exit code when executing command");
@@ -124,5 +140,148 @@ public class Util {
         } catch (Exception ex) {
             throw new RuntimeException("Failed to drop test database", ex);
         }
+    }
+
+    private static String getFileStem(String fileName) {
+        int idx = fileName.lastIndexOf('.');
+        return idx == -1 ? fileName : fileName.substring(0, idx);
+    }
+
+    private static File getBackupsDir() {
+        String dir = System.getProperty("backup.dir");
+        if (dir == null) {
+            throw new RuntimeException("Backup dir not configured - set backup.dir property");
+        }
+        return new File(dir);
+    }
+
+    private static File getDataFileBackupDir(String fileName) {
+        String stem = getFileStem(fileName);
+        return new File(getBackupsDir(), stem);
+    }
+
+    private static File getDataFileRestoreDir(File backupDir) {
+        // restore directory should be {backupDir}/{dbName}/{backupDate}
+        // There should only be one backup date directory
+        File dbDir = new File(backupDir, getTestDbName());
+
+        if (! dbDir.exists()) {
+            throw new RuntimeException(String.format("Test database backup directory %s does not exist", dbDir.getAbsolutePath()));
+        }
+
+        File[] restoreDirs = dbDir.listFiles();
+
+        if (restoreDirs == null) {
+            throw new RuntimeException(String.format("Expected %s to be a directory", dbDir.getAbsolutePath()));
+        }
+
+        if (restoreDirs.length != 1 && !restoreDirs[0].isDirectory()) {
+            throw new RuntimeException(String.format("Expected single directory within backup directory %s", dbDir.getAbsolutePath()));
+        }
+
+        return restoreDirs[0];
+    }
+
+    private static Draftset findDraftset() {
+        SPARQLRepository repo = getRepository();
+        try(RepositoryConnection conn = repo.getConnection()) {
+            String q = "PREFIX drafter: <http://publishmydata.com/def/drafter/> \n" +
+                    "   SELECT ?ds WHERE { \n" +
+                    "    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {\n" +
+                    "        ?ds a drafter:DraftSet .\n" +
+                    "    }\n" +
+                    "}";
+            TupleQuery pq = conn.prepareTupleQuery(q);
+            try(TupleQueryResult result = pq.evaluate()) {
+                if (! result.hasNext()) {
+                    throw new RuntimeException("Expected single draftset");
+                }
+                BindingSet bindings = result.next();
+
+                if (result.hasNext()) {
+                    throw new RuntimeException("Expected single draftset");
+                }
+
+                IRI draftsetIri = (IRI)bindings.getBinding("ds").getValue();
+                URI draftsetUri = uri(draftsetIri.toString());
+
+                // NOTE: java.net.URI implements DraftsetRef protocol
+                return new Draftset(draftsetUri);
+            }
+        }
+    }
+
+    public static Draftset loadIntoDraft(File dataFile) {
+        File dataBackupDir = getDataFileBackupDir(dataFile.getName());
+
+        if (dataBackupDir.exists()) {
+            // load existing backup and find draft
+            File restoreDir = getDataFileRestoreDir(dataBackupDir);
+            try {
+                bashCommand(getStardogAdmin().getAbsolutePath(), "db", "restore", restoreDir.getAbsolutePath());
+            } catch (Exception ex) {
+                throw new RuntimeException(String.format("Failed to restore database for file %s", dataFile.getName()));
+            }
+
+            return findDraftset();
+        } else {
+
+            createTestDb();
+
+            // load data file into new draft
+            Drafter drafter = Drafter.create();
+            Draftset draftset = drafter.createDraft(User.publisher());
+            drafter.append(draftset, dataFile);
+
+            // save backup to backups dir
+            boolean created = dataBackupDir.mkdirs();
+            if (! created) {
+                throw new RuntimeException(String.format("Failed to create data file backups directory: %s", dataBackupDir.getAbsolutePath()));
+            }
+
+            System.out.printf("Saving to %s...%n", dataBackupDir.getAbsolutePath());
+
+            try {
+                bashCommand(getStardogAdmin().getAbsolutePath(), "db", "backup", "--to", dataBackupDir.getAbsolutePath(), getTestDbName());
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to create backup", ex);
+            }
+
+            return draftset;
+        }
+    }
+
+    public static void main(String[] args) {
+        File dataFile = resolveDataFile("data_100k_1g.nq");
+        File dataBackupDir = getDataFileBackupDir(dataFile.getName());
+
+        createTestDb();
+
+        Drafter drafter = Drafter.create();
+        Draftset draftset = drafter.createDraft(User.publisher());
+        drafter.append(draftset, dataFile);
+
+        System.out.printf("Saving to %s...%n", dataBackupDir.getAbsolutePath());
+
+        try {
+            bashCommand(getStardogAdmin().getAbsolutePath(), "db", "backup", "--to", dataBackupDir.getAbsolutePath(), getTestDbName());
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to create backup", ex);
+        }
+
+        System.out.println("Dropping test db...");
+        dropTestDb();
+        System.out.println("Dropped!");
+
+//        System.out.println("Restoring from backup...");
+//
+//        File restoreDir = getDataFileRestoreDir(dataBackupDir);
+//        try {
+//            bashCommand(getStardogAdmin().getAbsolutePath(), "db", "restore", restoreDir.getAbsolutePath());
+//        } catch (Exception ex) {
+//            throw new RuntimeException(String.format("Failed to restore database for file %s", dataFile.getName()));
+//        }
+//
+//        System.out.println("Restored!");
     }
 }

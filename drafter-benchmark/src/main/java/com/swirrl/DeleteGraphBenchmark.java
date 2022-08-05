@@ -5,7 +5,12 @@ import org.openjdk.jmh.annotations.*;
 import java.io.File;
 import java.net.URI;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
+@Warmup(iterations = 0)
+@Fork(value = 2, warmups = 0)
+@Measurement(iterations = 2)
+@Timeout(time = 2, timeUnit = TimeUnit.HOURS)
 public class DeleteGraphBenchmark {
     @State(Scope.Thread)
     public static class DeleteGraphState {
