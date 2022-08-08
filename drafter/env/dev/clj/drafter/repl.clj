@@ -11,7 +11,7 @@
             [clojure.java.io :as io]
             [meta-merge.core :as mm]
             [drafter.test-common :as tc] ;; for :mock profile
-            ))
+            [integrant.repl :refer [clear go halt prep init reset reset-all set-prep!]]))
 
 (def dev-config
   {:mock  (io/resource "drafter-dev-config.edn")
@@ -28,15 +28,22 @@
 
 (load-spec-namespaces!)
 
-(defn start-system!
-  ([] (start-system! {:instrument? true}))
-  ([{:keys [instrument? auth-type] :or {auth-type :auth0} :as opts}]
+(defn prep-system-profile [profile]
+  #(apply mm/meta-merge (->> (profiles profile)
+                            (remove nil?)
+                            (map main/read-system))))
 
-   (main/start-system! (apply mm/meta-merge (->> (profiles auth-type)
-                                                 (remove nil?)
-                                                 (map main/read-system))))
-   (when instrument?
-     (st/instrument))))
+(set-prep! (prep-system-profile :auth0))
+
+(defn reset-and-instrument
+  "Resets the integrant system, but also instruments the spec
+  definitions."
+
+  []
+
+  (reset)
+
+  (st/instrument))
 
 (do (println)
     (println "   ___           _____         ")
@@ -49,10 +56,9 @@
     (println)
     (println "REPL Commands: ")
     (println)
-    (println "(start-system!)                     ;; for auth0 system")
-    (println "(start-system! {:auth-type :mock})  ;; for a mock auth0 system")
-    (println "(start-system! {:auth-type :basic}) ;; for a dev system with basic auth & sample users (works with swagger ui)")
-    (println "(stop-system!)")
+    (println "(reset)                                  ;; reset drafter dev system (default is :auth0 dev config)")
+    (println "(set-prep! (prep-system-profile :mock))  ;; for a mock auth0 system, then (reset)")
+    (println "(set-prep! (prep-system-profile :basic)) ;; for a mock auth0 system, then (reset)")
     (println)
     (println "(test/run-all)")
     (println)

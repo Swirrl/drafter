@@ -104,12 +104,6 @@
   (when system
     (ig/halt! system)))
 
-(defn restart-system!
-  "Note this doesn't do a refresh yet."
-  []
-  (stop-system!)
-  (start-system!))
-
 (defn add-shutdown-hook!
   "Register a shutdown hook with the JVM.  This is not guaranteed to
   be called in all circumstances, but should be called upon receipt of
