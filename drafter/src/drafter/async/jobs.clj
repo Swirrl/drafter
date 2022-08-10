@@ -147,9 +147,12 @@
   "Move a job in the pending list into the complete list, adding :complete
   and :finish-time metadata."
   [{job-id :id :as job}]
-  (let [job' (assoc job
-                    :status :complete
-                    :finish-time (System/currentTimeMillis))]
+  (let [job' (-> job
+                 (assoc :status :complete
+                        :finish-time (System/currentTimeMillis))
+                 (dissoc :function) ;; remove function closure as otherwise it will leak batches of quads
+                 (map->Job)
+                 )]
     (swap! jobs (fn [jobs]
                   (-> jobs
                       (update :pending dissoc job-id)
