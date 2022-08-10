@@ -292,7 +292,7 @@
 (def job-id-path #"/v1/status/finished-jobs/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})")
 
 (defn job-path->job-id [job-path]
-  (if-let [uid (second (re-matches job-id-path job-path))]
+  (when-let [uid (second (re-matches job-id-path job-path))]
     (UUID/fromString uid)))
 
 (defn await-completion
