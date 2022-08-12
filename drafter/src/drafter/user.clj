@@ -38,10 +38,21 @@
 
 (defn permissions->role
   "This is a shim to provide a role in the API when we only have permissions
-   internally. Deprecated and only to be used for backward compatability."
+   internally. Deprecated and only to be used for backward compatibility."
   [permissions]
   (first (filter (fn [role] (set/subset? (role->permissions role) permissions))
                  [:manager :publisher :editor :access :norole])))
+
+(def role->canonical-permission
+  "Maps a role to a permission that that role has, but less privileged roles
+   don't have. Deprecated, for backward compatibility only."
+  {"editor" "drafter:draft:edit"
+   "publisher" "drafter:draft:publish"
+   "manager" "drafter:draft:claim:manager"})
+
+(def canonical-permission->role
+  "Deprecated, for backward compatibility only."
+  (set/map-invert role->canonical-permission))
 
 (def permission-summary
   {:drafter:draft:claim "Claim submitted drafts"

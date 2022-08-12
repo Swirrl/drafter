@@ -93,11 +93,12 @@
   (let [draftset-location (help/create-draftset-through-api handler test-editor)
         submit-request (help/create-submit-to-permission-request test-editor
                                                                  draftset-location
-                                                                 :drafter:draft:claim)
+                                                                 :drafter:draft:edit)
         {ds-info :body :as submit-response} (handler submit-request)]
     (tc/assert-is-ok-response submit-response)
     (tc/assert-spec ::ds/Draftset ds-info)
-
+    ;; For backward compatibility
+    (is (= :editor (:claim-role ds-info)))
     (is (= false (contains? ds-info :current-owner)))))
 
 ;; The role parameter is deprecated
