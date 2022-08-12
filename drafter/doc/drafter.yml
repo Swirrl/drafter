@@ -56,8 +56,9 @@ info:
         depending on their permissions then choose to make further ammendments,
         `/publish` or submit the draftset to a new owner.
 
-      - `/publish` which can be used by clients with the `draft:publish`
-        permission to publish a reviewed draftset to the live site.
+      - `/publish` which can be used by clients with the
+        `drafter:draft:publish` permission to publish a reviewed draftset to
+        the live site.
 
       - `/claim` which a user must call on Draftset's submitted to
         them before they can perform any actions upon them.  Claiming
@@ -859,6 +860,10 @@ parameters:
     in: query
     required: false
     type: string
+    enum:
+      - editor
+      - publisher
+      - manager
   submit-user:
     name: user
     description: The username of the user to submit the draftset to.
@@ -1093,8 +1098,12 @@ definitions:
       username:
         type: string
         description: Username of the user
+      role:
+        type: string
+        description: role of the user (deprecated, but provided for backward compatibility)
     example:
       username: user@example.com
+      role: publisher
 
   Endpoint:
     type: object
@@ -1151,6 +1160,13 @@ definitions:
           claim-permission:
             type: string
             description: Only users with this permission can claim this Draftset
+          claim-role:
+            type: string
+            enum:
+              - editor
+              - publisher
+              - manager
+            description: The required role for users who can claim this Draftset (deprecated, but provided for backward compatibility)
           claim-user:
             type: string
             description: The user who can claim this Draftset
