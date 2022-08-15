@@ -1,6 +1,8 @@
 (ns drafter.user
-  (:require [drafter.util :as util]
-            [integrant.core :as ig])
+  (:require
+   [clojure.set :as set]
+   [drafter.util :as util]
+   [integrant.core :as ig])
   (:import java.net.URI
            org.mindrot.jbcrypt.BCrypt))
 
@@ -33,6 +35,24 @@
     ;; :manager is used in tests to demonstrate scoped claim permissions.
     :manager (conj (role->permissions :publisher) :drafter:draft:claim:manager)
     :system (recur :manager)))
+
+(defn ^{:deprecated "For backward compatibility only"} permissions->role
+  "This is a shim to provide a role in the API when we only have permissions
+   internally. Deprecated and only to be used for backward compatibility."
+  [permissions]
+  (first (filter (fn [role] (set/subset? (role->permissions role) permissions))
+                 [:manager :publisher :editor :access :norole])))
+
+(def ^{:deprecated "For backward compatibility only"} role->canonical-permission
+  "Maps a role to a permission that that role has, but less privileged roles
+   don't have. Deprecated, for backward compatibility only."
+  {"editor" "drafter:draft:edit"
+   "publisher" "drafter:draft:publish"
+   "manager" "drafter:draft:claim:manager"})
+
+(def ^{:deprecated "For backward compatibility only"} canonical-permission->role
+  "Deprecated, for backward compatibility only."
+  (set/map-invert role->canonical-permission))
 
 (def permission-summary
   {:drafter:draft:claim "Claim submitted drafts"
@@ -113,8 +133,9 @@
 
 (defn get-summary
   "Returns a map containing summary information about a user."
-  [{:keys [email] :as user}]
-  {:username email})
+  [user]
+  {:username (:email user)
+   :role (permissions->role (:permissions user))})
 
 (defn has-permission?
   "Check if a user has a given permission."

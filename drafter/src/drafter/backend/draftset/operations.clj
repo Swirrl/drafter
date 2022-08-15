@@ -221,6 +221,8 @@
                          :description description
                          :current-owner (some-> owner (user/uri->username))
                          :claim-permission (keyword permission)
+                         :claim-role (keyword (user/canonical-permission->role
+                                               permission))
                          :claim-user (some-> claimuser (user/uri->username))
                          :submitted-by (some-> submitter (user/uri->username))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
