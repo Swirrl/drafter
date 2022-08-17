@@ -128,7 +128,8 @@
                               org.clojure/test.check {:mvn/version "1.1.1"}
                               ring-mock/ring-mock {:mvn/version "0.1.5"}
                               ring/ring-devel {:mvn/version "1.9.4" :exclusions [org.clojure/java.classpath org.clojure/tools.reader]}
-                              integrant/repl {:mvn/version "0.3.2"}}}
+                              integrant/repl {:mvn/version "0.3.2"}}
+                 :jvm-opts ["-Dclojure.server.repl={:port,5555,:accept,drafter.write-scheduler/toggle-writing!}"]}
 
            :test {:extra-paths ["env/dev/clj" "test" "test/resources"]}
 
@@ -142,7 +143,8 @@
                              "-Dhttp.maxConnections=60"
                              "-Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
                              "-Dlog4j2.formatMsgNoLookups=true"
-                             "-Dlog4j.configurationFile=log4j2.xml"]
+                             "-Dlog4j.configurationFile=log4j2.xml"
+                             "-Dclojure.server.repl={:port,5555,:accept,drafter.write-scheduler/toggle-writing!}"]
 
                   :main-opts ["-m" "drafter.main" "./resources/drafter-auth0.edn"]}
 
@@ -156,7 +158,8 @@
                              "-Dhttp.maxConnections=60"
                              "-Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
                              "-Dlog4j2.formatMsgNoLookups=true"
-                             "-Dlog4j.configurationFile=log4j2.xml"]
+                             "-Dlog4j.configurationFile=log4j2.xml"
+                             "-Dclojure.server.repl={:port,5555,:accept,drafter.write-scheduler/toggle-writing!}"]
 
                   :main-opts ["-m" "drafter.main" "./env/dev/resources/drafter-basic-dev-config.edn"]}
 
@@ -171,7 +174,8 @@
                                     "-Dhttp.maxConnections=60"
                                     "-Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
                                     "-Dlog4j2.formatMsgNoLookups=true"
-                                    "-Dlog4j.configurationFile=log4j2.xml"]
+                                    "-Dlog4j.configurationFile=log4j2.xml"
+                                    "-Dclojure.server.repl={:port,5555,:accept,drafter.write-scheduler/toggle-writing!}"]
 
                          :main-opts ["-m" "drafter.main" "/app/config/drafter-auth0.edn"]}
 
