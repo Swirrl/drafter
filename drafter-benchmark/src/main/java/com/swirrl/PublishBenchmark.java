@@ -75,6 +75,18 @@ public class PublishBenchmark {
         public PublishState_1000k_200g_0pc() { super("data_1000k_200g_0pc.nq"); }
     }
 
+    public static class PublishState_100k_10g_1pc extends PublishState {
+        public PublishState_100k_10g_1pc() { super("data_100k_10g_1pc.nq"); }
+    }
+
+    public static class PublishState_100k_10g_5pc extends PublishState {
+        public PublishState_100k_10g_5pc() { super("data_100k_10g_5pc.nq"); }
+    }
+
+    public static class PublishState_100k_10g_10pc extends PublishState {
+        public PublishState_100k_10g_10pc() { super("data_100k_10g_10pc.nq"); }
+    }
+
     @State(Scope.Thread)
     public static class PublishState {
         private final File dataFile;
@@ -180,4 +192,18 @@ public class PublishBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     public void publishTest_1000k_200g_0pc(PublishState_1000k_200g_0pc state) { publishTest(state); }
+
+    // graph-referencing tests
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void publishTest_100k_10g_1pc(PublishState_100k_10g_1pc state) { publishTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void publishTest_100k_10g_5pc(PublishState_100k_10g_5pc state) { publishTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void publishTest_100k_10g_10pc(PublishState_100k_10g_10pc state) { publishTest(state); }
 }

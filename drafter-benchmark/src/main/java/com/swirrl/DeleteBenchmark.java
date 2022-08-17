@@ -107,6 +107,18 @@ public class DeleteBenchmark {
         }
     }
 
+    public static class DeleteState_100k_10g_1pc extends DeleteState {
+        public DeleteState_100k_10g_1pc() { super("data_100k_10g_1pc.nq"); }
+    }
+
+    public static class DeleteState_100k_10g_5pc extends DeleteState {
+        public DeleteState_100k_10g_5pc() { super("data_100k_10g_5pc.nq"); }
+    }
+
+    public static class DeleteState_100k_10g_10pc extends DeleteState {
+        public DeleteState_100k_10g_10pc() { super("data_100k_10g_10pc.nq"); }
+    }
+
     @State(Scope.Thread)
     public static class DeleteState {
         private Drafter drafter;
@@ -248,4 +260,23 @@ public class DeleteBenchmark {
 //    public void deleteTest_1000k_200g_0pc(DeleteState_1000k_200g_0pc state) {
 //        deleteTest(state);
 //    }
+
+    // graph-referencing tests
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_100k_10g_1pc(DeleteState_100k_10g_1pc state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_100k_10g_5pc(DeleteState_100k_10g_5pc state) {
+        deleteTest(state);
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteTest_100k_10g_10pc(DeleteState_100k_10g_10pc state) {
+        deleteTest(state);
+    }
 }

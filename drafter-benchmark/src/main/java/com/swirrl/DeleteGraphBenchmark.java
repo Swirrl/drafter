@@ -127,6 +127,18 @@ public class DeleteGraphBenchmark {
         public DeleteGraphState_1000k_200g_0pc() { super("data_1000k_200g_0pc.nq"); }
     }
 
+    public static class DeleteGraphState_100k_10g_1pc extends DeleteGraphState {
+        public DeleteGraphState_100k_10g_1pc() { super("data_100k_10g_1pc.nq"); }
+    }
+
+    public static class DeleteGraphState_100k_10g_5pc extends DeleteGraphState {
+        public DeleteGraphState_100k_10g_5pc() { super("data_100k_10g_5pc.nq"); }
+    }
+
+    public static class DeleteGraphState_100k_10g_10pc extends DeleteGraphState {
+        public DeleteGraphState_100k_10g_10pc() { super("data_100k_10g_10pc.nq"); }
+    }
+
     private static void deleteGraphTest(DeleteGraphState state) {
         state.getDrafter().deleteGraph(state.getDraftset(), state.graphToDelete());
     }
@@ -196,4 +208,18 @@ public class DeleteGraphBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     public void deleteGraphTest_1000k_200g_0pc(DeleteGraphState_1000k_200g_0pc state) { deleteGraphTest(state); }
+
+    // graph-referencing tests
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteGraphTest_100k_10g_1pc(DeleteGraphState_100k_10g_1pc state) { deleteGraphTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteGraphTest_100k_10g_5pc(DeleteGraphState_100k_10g_5pc state) { deleteGraphTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void deleteGraphTest_100k_10g_10pc(DeleteGraphState_100k_10g_10pc state) { deleteGraphTest(state); }
 }

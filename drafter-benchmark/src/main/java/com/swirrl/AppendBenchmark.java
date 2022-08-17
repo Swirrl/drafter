@@ -148,4 +148,26 @@ public class AppendBenchmark {
     public void appendTest_1000k_200g_0pc(DraftState state) throws Exception {
         appendOnlyTest(state, "data_1000k_200g_0pc.nq");
     }
+
+    // graph-referencing statements
+    // all use 100k statements over 10 graphs
+    // NOTE: 100k_10g_0pc defined above
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_100k_10g_1pc(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_100k_10g_1pc.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_100k_10g_5pc(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_100k_10g_5pc.nq");
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void appendTest_100k_10g_10pc(DraftState state) throws Exception {
+        appendOnlyTest(state, "data_100k_10g_10pc.nq");
+    }
 }

@@ -152,6 +152,18 @@ public class UpdateQueryBenchmark {
         public UpdateQueryState_1000k_200g_0pc() { super("data_1000k_200g_0pc.nq"); }
     }
 
+    public static class UpdateQueryState_100k_10g_1pc extends UpdateQueryState {
+        public UpdateQueryState_100k_10g_1pc() { super("data_100k_10g_1pc.nq"); }
+    }
+
+    public static class UpdateQueryState_100k_10g_5pc extends UpdateQueryState {
+        public UpdateQueryState_100k_10g_5pc() { super("data_100k_10g_5pc.nq"); }
+    }
+
+    public static class UpdateQueryState_100k_10g_10pc extends UpdateQueryState {
+        public UpdateQueryState_100k_10g_10pc() { super("data_100k_10g_10pc.nq"); }
+    }
+
     private static void updateQueryTest(UpdateQueryState state) {
         state.getDrafter().submitUpdate(state.getDraftset(), state.getUpdateQuery());
     }
@@ -227,4 +239,17 @@ public class UpdateQueryBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     public void updateQueryTest_1000k_200g_0pc(UpdateQueryState_1000k_200g_0pc state) { updateQueryTest(state); }
+
+    // graph-referencing tests
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_100k_10g_1pc(UpdateQueryState_100k_10g_1pc state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_100k_10g_5pc(UpdateQueryState_100k_10g_5pc state) { updateQueryTest(state); }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    public void updateQueryTest_100k_10g_10pc(UpdateQueryState_100k_10g_10pc state) { updateQueryTest(state); }
 }
