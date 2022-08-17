@@ -11,99 +11,99 @@ import java.util.concurrent.TimeUnit;
 @Timeout(time = 2, timeUnit = TimeUnit.HOURS)
 public class DeleteBenchmark {
 
-    public static class DeleteState_1k_1g extends DeleteState {
-        public DeleteState_1k_1g() {
-            super("data_1k_1g.nq");
+    public static class DeleteState_1k_1g_0pc extends DeleteState {
+        public DeleteState_1k_1g_0pc() {
+            super("data_1k_1g_0pc.nq");
         }
     }
 
-    public static class DeleteState_1k_10g extends DeleteState {
-        public DeleteState_1k_10g() {
-            super("data_1k_10g.nq");
+    public static class DeleteState_1k_10g_0pc extends DeleteState {
+        public DeleteState_1k_10g_0pc() {
+            super("data_1k_10g_0pc.nq");
         }
     }
 
-    public static class DeleteState_1k_100g extends DeleteState {
-        public DeleteState_1k_100g() {
-            super("data_1k_100g.nq");
+    public static class DeleteState_1k_100g_0pc extends DeleteState {
+        public DeleteState_1k_100g_0pc() {
+            super("data_1k_100g_0pc.nq");
         }
     }
 
-    public static class DeleteState_1k_200g extends DeleteState {
-        public DeleteState_1k_200g() {
-            super("data_1k_200g.nq");
+    public static class DeleteState_1k_200g_0pc extends DeleteState {
+        public DeleteState_1k_200g_0pc() {
+            super("data_1k_200g_0pc.nq");
         }
     }
 
-    public static class DeleteState_10k_1g extends DeleteState {
-        public DeleteState_10k_1g() {
-            super("data_10k_1g.nq");
+    public static class DeleteState_10k_1g_0pc extends DeleteState {
+        public DeleteState_10k_1g_0pc() {
+            super("data_10k_1g_0pc.nq");
         }
     }
 
-    public static class DeleteState_10k_10g extends DeleteState {
-        public DeleteState_10k_10g() {
-            super("data_10k_10g.nq");
+    public static class DeleteState_10k_10g_0pc extends DeleteState {
+        public DeleteState_10k_10g_0pc() {
+            super("data_10k_10g_0pc.nq");
         }
     }
 
-    public static class DeleteState_10k_100g extends DeleteState {
-        public DeleteState_10k_100g() {
-            super("data_10k_100g.nq");
+    public static class DeleteState_10k_100g_0pc extends DeleteState {
+        public DeleteState_10k_100g_0pc() {
+            super("data_10k_100g_0pc.nq");
         }
     }
 
-    public static class DeleteState_10k_200g extends DeleteState {
-        public DeleteState_10k_200g() {
-            super("data_10k_200g.nq");
+    public static class DeleteState_10k_200g_0pc extends DeleteState {
+        public DeleteState_10k_200g_0pc() {
+            super("data_10k_200g_0pc.nq");
         }
     }
 
-    public static class DeleteState_100k_1g extends DeleteState {
-        public DeleteState_100k_1g() {
-            super("data_100k_1g.nq");
+    public static class DeleteState_100k_1g_0pc extends DeleteState {
+        public DeleteState_100k_1g_0pc() {
+            super("data_100k_1g_0pc.nq");
         }
     }
 
-    public static class DeleteState_100k_10g extends DeleteState {
-        public DeleteState_100k_10g() {
-            super("data_100k_10g.nq");
+    public static class DeleteState_100k_10g_0pc extends DeleteState {
+        public DeleteState_100k_10g_0pc() {
+            super("data_100k_10g_0pc.nq");
         }
     }
 
-    public static class DeleteState_100k_100g extends DeleteState {
-        public DeleteState_100k_100g() {
-            super("data_100k_100g.nq");
+    public static class DeleteState_100k_100g_0pc extends DeleteState {
+        public DeleteState_100k_100g_0pc() {
+            super("data_100k_100g_0pc.nq");
         }
     }
 
-    public static class DeleteState_100k_200g extends DeleteState {
-        public DeleteState_100k_200g() {
-            super("data_100k_200g.nq");
+    public static class DeleteState_100k_200g_0pc extends DeleteState {
+        public DeleteState_100k_200g_0pc() {
+            super("data_100k_200g_0pc.nq");
         }
     }
 
-    public static class DeleteState_1000k_1g extends DeleteState {
-        public DeleteState_1000k_1g() {
-            super("data_1000k_1g.nq");
+    public static class DeleteState_1000k_1g_0pc extends DeleteState {
+        public DeleteState_1000k_1g_0pc() {
+            super("data_1000k_1g_0pc.nq");
         }
     }
 
-    public static class DeleteState_1000k_10g extends DeleteState {
-        public DeleteState_1000k_10g() {
-            super("data_1000k_10g.nq");
+    public static class DeleteState_1000k_10g_0pc extends DeleteState {
+        public DeleteState_1000k_10g_0pc() {
+            super("data_1000k_10g_0pc.nq");
         }
     }
 
-    public static class DeleteState_1000k_100g extends DeleteState {
-        public DeleteState_1000k_100g() {
-            super("data_1000k_100g.nq");
+    public static class DeleteState_1000k_100g_0pc extends DeleteState {
+        public DeleteState_1000k_100g_0pc() {
+            super("data_1000k_100g_0pc.nq");
         }
     }
 
-    public static class DeleteState_1000k_200g extends DeleteState {
-        public DeleteState_1000k_200g() {
-            super("data_1000k_200g.nq");
+    public static class DeleteState_1000k_200g_0pc extends DeleteState {
+        public DeleteState_1000k_200g_0pc() {
+            super("data_1000k_200g_0pc.nq");
         }
     }
 
@@ -155,97 +155,97 @@ public class DeleteBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_1k_1g(DeleteState_1k_1g state) {
+    public void deleteTest_1k_1g_0pc(DeleteState_1k_1g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_1k_10g(DeleteState_1k_10g state) {
+    public void deleteTest_1k_10g_0pc(DeleteState_1k_10g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_1k_100g(DeleteState_1k_100g state) {
+    public void deleteTest_1k_100g_0pc(DeleteState_1k_100g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_1k_200g(DeleteState_1k_200g state) {
+    public void deleteTest_1k_200g_0pc(DeleteState_1k_200g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_10k_1g(DeleteState_10k_1g state) {
+    public void deleteTest_10k_1g_0pc(DeleteState_10k_1g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_10k_10g(DeleteState_10k_10g state) {
+    public void deleteTest_10k_10g_0pc(DeleteState_10k_10g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_10k_100g(DeleteState_10k_100g state) {
+    public void deleteTest_10k_100g_0pc(DeleteState_10k_100g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_10k_200g(DeleteState_10k_200g state) {
+    public void deleteTest_10k_200g_0pc(DeleteState_10k_200g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_100k_1g(DeleteState_100k_1g state) {
+    public void deleteTest_100k_1g_0pc(DeleteState_100k_1g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_100k_10g(DeleteState_100k_10g state) {
+    public void deleteTest_100k_10g_0pc(DeleteState_100k_10g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_100k_100g(DeleteState_100k_100g state) {
+    public void deleteTest_100k_100g_0pc(DeleteState_100k_100g_0pc state) {
         deleteTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_100k_200g(DeleteState_100k_200g state) {
+    public void deleteTest_100k_200g_0pc(DeleteState_100k_200g_0pc state) {
         deleteTest(state);
     }
 
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_1000k_1g(DeleteState_1000k_1g state) {
-        deleteTest(state);
-    }
+//    @Benchmark
+//    @BenchmarkMode(Mode.AverageTime)
+//    public void deleteTest_1000k_1g_0pc(DeleteState_1000k_1g_0pc state) {
+//        deleteTest(state);
+//    }
+//
+//    @Benchmark
+//    @BenchmarkMode(Mode.AverageTime)
+//    public void deleteTest_1000k_10g_0pc(DeleteState_1000k_10g_0pc state) {
+//        deleteTest(state);
+//    }
+//
+//    @Benchmark
+//    @BenchmarkMode(Mode.AverageTime)
+//    public void deleteTest_1000k_100g_0pc(DeleteState_1000k_100g_0pc state) {
+//        deleteTest(state);
+//    }
 
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_1000k_10g(DeleteState_1000k_10g state) {
-        deleteTest(state);
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_1000k_100g(DeleteState_1000k_100g state) {
-        deleteTest(state);
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    public void deleteTest_1000k_200g(DeleteState_1000k_200g state) {
-        deleteTest(state);
-    }
+//    @Benchmark
+//    @BenchmarkMode(Mode.AverageTime)
+//    public void deleteTest_1000k_200g_0pc(DeleteState_1000k_200g_0pc state) {
+//        deleteTest(state);
+//    }
 }

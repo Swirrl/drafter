@@ -86,70 +86,70 @@ public class UpdateQueryBenchmark {
         public String getUpdateQuery() { return this.updateQuery; }
     }
 
-    public static class UpdateQueryState_1k_1g extends UpdateQueryState {
-        public UpdateQueryState_1k_1g() {
-            super("data_1k_1g.nq");
+    public static class UpdateQueryState_1k_1g_0pc extends UpdateQueryState {
+        public UpdateQueryState_1k_1g_0pc() {
+            super("data_1k_1g_0pc.nq");
         }
     }
 
-    public static class UpdateQueryState_1k_10g extends UpdateQueryState {
-        public UpdateQueryState_1k_10g() { super("data_1k_10g.nq"); }
+    public static class UpdateQueryState_1k_10g_0pc extends UpdateQueryState {
+        public UpdateQueryState_1k_10g_0pc() { super("data_1k_10g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_1k_100g extends UpdateQueryState {
-        public UpdateQueryState_1k_100g() { super("data_1k_100g.nq"); }
+    public static class UpdateQueryState_1k_100g_0pc extends UpdateQueryState {
+        public UpdateQueryState_1k_100g_0pc() { super("data_1k_100g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_1k_200g extends UpdateQueryState {
-        public UpdateQueryState_1k_200g() { super("data_1k_200g.nq"); }
+    public static class UpdateQueryState_1k_200g_0pc extends UpdateQueryState {
+        public UpdateQueryState_1k_200g_0pc() { super("data_1k_200g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_10k_1g extends UpdateQueryState {
-        public UpdateQueryState_10k_1g() { super("data_10k_1g.nq"); }
+    public static class UpdateQueryState_10k_1g_0pc extends UpdateQueryState {
+        public UpdateQueryState_10k_1g_0pc() { super("data_10k_1g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_10k_10g extends UpdateQueryState {
-        public UpdateQueryState_10k_10g() { super("data_10k_10g.nq"); }
+    public static class UpdateQueryState_10k_10g_0pc extends UpdateQueryState {
+        public UpdateQueryState_10k_10g_0pc() { super("data_10k_10g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_10k_100g extends UpdateQueryState {
-        public UpdateQueryState_10k_100g() { super("data_10k_100g.nq"); }
+    public static class UpdateQueryState_10k_100g_0pc extends UpdateQueryState {
+        public UpdateQueryState_10k_100g_0pc() { super("data_10k_100g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_10k_200g extends UpdateQueryState {
-        public UpdateQueryState_10k_200g() { super("data_10k_200g.nq"); }
+    public static class UpdateQueryState_10k_200g_0pc extends UpdateQueryState {
+        public UpdateQueryState_10k_200g_0pc() { super("data_10k_200g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_100k_1g extends UpdateQueryState {
-        public UpdateQueryState_100k_1g() { super("data_100k_1g.nq"); }
+    public static class UpdateQueryState_100k_1g_0pc extends UpdateQueryState {
+        public UpdateQueryState_100k_1g_0pc() { super("data_100k_1g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_100k_10g extends UpdateQueryState {
-        public UpdateQueryState_100k_10g() { super("data_100k_10g.nq"); }
+    public static class UpdateQueryState_100k_10g_0pc extends UpdateQueryState {
+        public UpdateQueryState_100k_10g_0pc() { super("data_100k_10g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_100k_100g extends UpdateQueryState {
-        public UpdateQueryState_100k_100g() { super("data_100k_100g.nq"); }
+    public static class UpdateQueryState_100k_100g_0pc extends UpdateQueryState {
+        public UpdateQueryState_100k_100g_0pc() { super("data_100k_100g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_100k_200g extends UpdateQueryState {
-        public UpdateQueryState_100k_200g() { super("data_100k_200g.nq"); }
+    public static class UpdateQueryState_100k_200g_0pc extends UpdateQueryState {
+        public UpdateQueryState_100k_200g_0pc() { super("data_100k_200g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_1000k_1g extends UpdateQueryState {
-        public UpdateQueryState_1000k_1g() { super("data_1000k_1g.nq"); }
+    public static class UpdateQueryState_1000k_1g_0pc extends UpdateQueryState {
+        public UpdateQueryState_1000k_1g_0pc() { super("data_1000k_1g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_1000k_10g extends UpdateQueryState {
-        public UpdateQueryState_1000k_10g() { super("data_1000k_10g.nq"); }
+    public static class UpdateQueryState_1000k_10g_0pc extends UpdateQueryState {
+        public UpdateQueryState_1000k_10g_0pc() { super("data_1000k_10g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_1000k_100g extends UpdateQueryState {
-        public UpdateQueryState_1000k_100g() { super("data_1000k_100g.nq"); }
+    public static class UpdateQueryState_1000k_100g_0pc extends UpdateQueryState {
+        public UpdateQueryState_1000k_100g_0pc() { super("data_1000k_100g_0pc.nq"); }
     }
 
-    public static class UpdateQueryState_1000k_200g extends UpdateQueryState {
-        public UpdateQueryState_1000k_200g() { super("data_1000k_200g.nq"); }
+    public static class UpdateQueryState_1000k_200g_0pc extends UpdateQueryState {
+        public UpdateQueryState_1000k_200g_0pc() { super("data_1000k_200g_0pc.nq"); }
     }
 
     private static void updateQueryTest(UpdateQueryState state) {
@@ -158,73 +158,73 @@ public class UpdateQueryBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_1k_1g(UpdateQueryState_1k_1g state) {
+    public void updateQueryTest_1k_1g_0pc(UpdateQueryState_1k_1g_0pc state) {
         updateQueryTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_1k_10g(UpdateQueryState_1k_10g state) {
+    public void updateQueryTest_1k_10g_0pc(UpdateQueryState_1k_10g_0pc state) {
         updateQueryTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_1k_100g(UpdateQueryState_1k_100g state) {
+    public void updateQueryTest_1k_100g_0pc(UpdateQueryState_1k_100g_0pc state) {
         updateQueryTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_1k_200g(UpdateQueryState_1k_200g state) {
+    public void updateQueryTest_1k_200g_0pc(UpdateQueryState_1k_200g_0pc state) {
         updateQueryTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_10k_1g(UpdateQueryState_10k_1g state) { updateQueryTest(state); }
+    public void updateQueryTest_10k_1g_0pc(UpdateQueryState_10k_1g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_10k_10g(UpdateQueryState_10k_10g state) { updateQueryTest(state); }
+    public void updateQueryTest_10k_10g_0pc(UpdateQueryState_10k_10g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_10k_100g(UpdateQueryState_10k_100g state) { updateQueryTest(state); }
+    public void updateQueryTest_10k_100g_0pc(UpdateQueryState_10k_100g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_10k_200g(UpdateQueryState_10k_200g state) { updateQueryTest(state); }
+    public void updateQueryTest_10k_200g_0pc(UpdateQueryState_10k_200g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_100k_1g(UpdateQueryState_100k_1g state) { updateQueryTest(state); }
+    public void updateQueryTest_100k_1g_0pc(UpdateQueryState_100k_1g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_100k_10g(UpdateQueryState_100k_10g state) { updateQueryTest(state); }
+    public void updateQueryTest_100k_10g_0pc(UpdateQueryState_100k_10g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_100k_100g(UpdateQueryState_100k_100g state) { updateQueryTest(state); }
+    public void updateQueryTest_100k_100g_0pc(UpdateQueryState_100k_100g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_100k_200g(UpdateQueryState_100k_200g state) { updateQueryTest(state); }
+    public void updateQueryTest_100k_200g_0pc(UpdateQueryState_100k_200g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_1000k_1g(UpdateQueryState_1000k_1g state) { updateQueryTest(state); }
+    public void updateQueryTest_1000k_1g_0pc(UpdateQueryState_1000k_1g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_1000k_10g(UpdateQueryState_1000k_10g state) { updateQueryTest(state); }
+    public void updateQueryTest_1000k_10g_0pc(UpdateQueryState_1000k_10g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_1000k_100g(UpdateQueryState_1000k_100g state) { updateQueryTest(state); }
+    public void updateQueryTest_1000k_100g_0pc(UpdateQueryState_1000k_100g_0pc state) { updateQueryTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void updateQueryTest_1000k_200g(UpdateQueryState_1000k_200g state) { updateQueryTest(state); }
+    public void updateQueryTest_1000k_200g_0pc(UpdateQueryState_1000k_200g_0pc state) { updateQueryTest(state); }
 }

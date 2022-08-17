@@ -11,68 +11,68 @@ import java.util.concurrent.TimeUnit;
 @Timeout(time = 2, timeUnit = TimeUnit.HOURS)
 public class PublishBenchmark {
 
-    public static class PublishState_1k_1g extends PublishState {
-        public PublishState_1k_1g() { super("data_1k_1g.nq"); }
+    public static class PublishState_1k_1g_0pc extends PublishState {
+        public PublishState_1k_1g_0pc() { super("data_1k_1g_0pc.nq"); }
     }
 
-    public static class PublishState_1k_10g extends PublishState {
-        public PublishState_1k_10g() { super("data_1k_10g.nq"); }
+    public static class PublishState_1k_10g_0pc extends PublishState {
+        public PublishState_1k_10g_0pc() { super("data_1k_10g_0pc.nq"); }
     }
 
-    public static class PublishState_1k_100g extends PublishState {
-        public PublishState_1k_100g() { super("data_1k_100g.nq"); }
+    public static class PublishState_1k_100g_0pc extends PublishState {
+        public PublishState_1k_100g_0pc() { super("data_1k_100g_0pc.nq"); }
     }
 
-    public static class PublishState_1k_200g extends PublishState {
-        public PublishState_1k_200g() { super("data_1k_200g.nq"); }
+    public static class PublishState_1k_200g_0pc extends PublishState {
+        public PublishState_1k_200g_0pc() { super("data_1k_200g_0pc.nq"); }
     }
 
-    public static class PublishState_10k_1g extends PublishState {
-        public PublishState_10k_1g() { super("data_10k_1g.nq"); }
+    public static class PublishState_10k_1g_0pc extends PublishState {
+        public PublishState_10k_1g_0pc() { super("data_10k_1g_0pc.nq"); }
     }
 
-    public static class PublishState_10k_10g extends PublishState {
-        public PublishState_10k_10g() { super("data_10k_10g.nq"); }
+    public static class PublishState_10k_10g_0pc extends PublishState {
+        public PublishState_10k_10g_0pc() { super("data_10k_10g_0pc.nq"); }
     }
 
-    public static class PublishState_10k_100g extends PublishState {
-        public PublishState_10k_100g() { super("data_10k_100g.nq"); }
+    public static class PublishState_10k_100g_0pc extends PublishState {
+        public PublishState_10k_100g_0pc() { super("data_10k_100g_0pc.nq"); }
     }
 
-    public static class PublishState_10k_200g extends PublishState {
-        public PublishState_10k_200g() { super("data_10k_200g.nq"); }
+    public static class PublishState_10k_200g_0pc extends PublishState {
+        public PublishState_10k_200g_0pc() { super("data_10k_200g_0pc.nq"); }
     }
 
-    public static class PublishState_100k_1g extends PublishState {
-        public PublishState_100k_1g() { super("data_100k_1g.nq"); }
+    public static class PublishState_100k_1g_0pc extends PublishState {
+        public PublishState_100k_1g_0pc() { super("data_100k_1g_0pc.nq"); }
     }
 
-    public static class PublishState_100k_10g extends PublishState {
-        public PublishState_100k_10g() { super("data_100k_10g.nq"); }
+    public static class PublishState_100k_10g_0pc extends PublishState {
+        public PublishState_100k_10g_0pc() { super("data_100k_10g_0pc.nq"); }
     }
 
-    public static class PublishState_100k_100g extends PublishState {
-        public PublishState_100k_100g() { super("data_100k_100g.nq"); }
+    public static class PublishState_100k_100g_0pc extends PublishState {
+        public PublishState_100k_100g_0pc() { super("data_100k_100g_0pc.nq"); }
     }
 
-    public static class PublishState_100k_200g extends PublishState {
-        public PublishState_100k_200g() { super("data_100k_200g.nq"); }
+    public static class PublishState_100k_200g_0pc extends PublishState {
+        public PublishState_100k_200g_0pc() { super("data_100k_200g_0pc.nq"); }
     }
 
-    public static class PublishState_1000k_1g extends PublishState {
-        public PublishState_1000k_1g() { super("data_1000k_1g.nq"); }
+    public static class PublishState_1000k_1g_0pc extends PublishState {
+        public PublishState_1000k_1g_0pc() { super("data_1000k_1g_0pc.nq"); }
     }
 
-    public static class PublishState_1000k_10g extends PublishState {
-        public PublishState_1000k_10g() { super("data_1000k_10g.nq"); }
+    public static class PublishState_1000k_10g_0pc extends PublishState {
+        public PublishState_1000k_10g_0pc() { super("data_1000k_10g_0pc.nq"); }
     }
 
-    public static class PublishState_1000k_100g extends PublishState {
-        public PublishState_1000k_100g() { super("data_1000k_100g.nq"); }
+    public static class PublishState_1000k_100g_0pc extends PublishState {
+        public PublishState_1000k_100g_0pc() { super("data_1000k_100g_0pc.nq"); }
     }
 
-    public static class PublishState_1000k_200g extends PublishState {
-        public PublishState_1000k_200g() { super("data_1000k_200g.nq"); }
+    public static class PublishState_1000k_200g_0pc extends PublishState {
+        public PublishState_1000k_200g_0pc() { super("data_1000k_200g_0pc.nq"); }
     }
 
     @State(Scope.Thread)
@@ -117,67 +117,67 @@ public class PublishBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1k_1g(PublishState_1k_1g state) {
+    public void publishTest_1k_1g_0pc(PublishState_1k_1g_0pc state) {
         publishTest(state);
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1k_10g(PublishState_1k_10g state) { publishTest(state); }
+    public void publishTest_1k_10g_0pc(PublishState_1k_10g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1k_100g(PublishState_1k_100g state) { publishTest(state); }
+    public void publishTest_1k_100g_0pc(PublishState_1k_100g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1k_200g(PublishState_1k_200g state) { publishTest(state); }
+    public void publishTest_1k_200g_0pc(PublishState_1k_200g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_10k_1g(PublishState_10k_1g state) { publishTest(state); }
+    public void publishTest_10k_1g_0pc(PublishState_10k_1g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_10k_10g(PublishState_10k_10g state) { publishTest(state); }
+    public void publishTest_10k_10g_0pc(PublishState_10k_10g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_10k_100g(PublishState_10k_100g state) { publishTest(state); }
+    public void publishTest_10k_100g_0pc(PublishState_10k_100g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_10k_200g(PublishState_10k_200g state) { publishTest(state); }
+    public void publishTest_10k_200g_0pc(PublishState_10k_200g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_100k_1g(PublishState_100k_1g state) { publishTest(state); }
+    public void publishTest_100k_1g_0pc(PublishState_100k_1g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_100k_10g(PublishState_100k_10g state) { publishTest(state); }
+    public void publishTest_100k_10g_0pc(PublishState_100k_10g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_100k_100g(PublishState_100k_100g state) { publishTest(state); }
+    public void publishTest_100k_100g_0pc(PublishState_100k_100g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_100k_200g(PublishState_100k_200g state) { publishTest(state); }
+    public void publishTest_100k_200g_0pc(PublishState_100k_200g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1000k_1g(PublishState_1000k_1g state) { publishTest(state); }
+    public void publishTest_1000k_1g_0pc(PublishState_1000k_1g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1000k_10g(PublishState_1000k_10g state) { publishTest(state); }
+    public void publishTest_1000k_10g_0pc(PublishState_1000k_10g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1000k_100g(PublishState_1000k_100g state) { publishTest(state); }
+    public void publishTest_1000k_100g_0pc(PublishState_1000k_100g_0pc state) { publishTest(state); }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void publishTest_1000k_200g(PublishState_1000k_200g state) { publishTest(state); }
+    public void publishTest_1000k_200g_0pc(PublishState_1000k_200g_0pc state) { publishTest(state); }
 }

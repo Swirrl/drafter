@@ -53,8 +53,38 @@
                :p (gen/frequency [[1 graph-ref-gen] [9 predicate-gen]])
                :o (gen/frequency [[1 graph-ref-gen] [9 object-gen]])})))
 
+(defn non-ref-quad-gen
+  "Generates a quad in the given graph which does not reference any
+  other graphs"
+  [graph-uri]
+  (quad-gen {:g (gen/return graph-uri)
+             :s subject-gen
+             :p predicate-gen
+             :o object-gen}))
+
+(defn- sub-map-gen
+  "Generates non-empty maps where the keys are chosen from
+  candidate-keys and the corresponding values are all v"
+  [candidate-keys v]
+  (gen/fmap (fn [ks]
+              (zipmap ks (repeat v)))
+            (gen/set (gen/elements candidate-keys) {:min-elements 1 :max-elements (count candidate-keys)})))
+
+(defn graph-ref-quad-gen
+  "Generates a quad in the graph graph-uri which references at least one
+  of the graphs in graphs in the subject, predicate or object
+  positions."
+  [graph-uri graphs]
+  (let [graph-ref-gen (gen/elements graphs)
+        default-gens {:g (gen/return graph-uri)
+                      :s subject-gen
+                      :p predicate-gen
+                      :o object-gen}]
+    (gen/bind (sub-map-gen [:s :p :o] graph-ref-gen)
+              (fn [m] (quad-gen (merge default-gens m))))))
+
 (defn buckets-gen [n buckets]
-  (letfn [(aux [n avg-bucket-size remaining-indices acc]
+  (letfn [(size-buckets [n avg-bucket-size remaining-indices acc]
             (cond
               ;; add all remaining items to the last bucket
               (= 1 (count remaining-indices))
@@ -70,11 +100,21 @@
               (let [bucket-upper (min n (* 2 avg-bucket-size))]
                 (gen/let [idx (gen/elements remaining-indices)
                           size (gen/choose 0 bucket-upper)]
-                  (aux (- n size) avg-bucket-size (disj remaining-indices idx) (update acc idx + size))))))]
-    (let [avg-bucket-size (quot n buckets)
-          remaining-indices (set (range buckets))
-          counts (vec (repeat buckets 1))]
-      (aux (- n buckets) avg-bucket-size remaining-indices counts))))
+                  (size-buckets (- n size) avg-bucket-size (disj remaining-indices idx) (update acc idx + size))))))
+          (choose-buckets [n acc]
+            (if (zero? n)
+              (gen/return acc)
+              (gen/let [bucket-idx (gen/choose 0 (count acc))]
+                (choose-buckets (dec n) (update acc bucket-idx inc)))))]
+    ;; if there are more buckets than distribute, distribute items by
+    ;; choosing a bucket to place them in. Otherwise choose a random
+    ;; size for each bucket based on the average bucket size.
+    (if (> buckets n)
+      (choose-buckets n (vec (repeat buckets 0)))
+      (let [avg-bucket-size (quot n buckets)
+            remaining-indices (set (range buckets))
+            counts (vec (repeat buckets 0))]
+        (size-buckets n avg-bucket-size remaining-indices counts)))))
 
 (defn sample-1 [g]
   (first (gen/sample g 1)))

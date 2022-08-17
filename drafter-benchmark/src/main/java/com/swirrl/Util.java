@@ -60,7 +60,7 @@ public class Util {
         return Clojure.var("drafter.rdf.sesame", "->FormatStatementSource").invoke(file, Util.keyword("nq"));
     }
 
-    private static Pattern DATA_FILE_PATTERN = Pattern.compile("^data_(\\d+)k_(\\d+)g.nq$");
+    private static Pattern DATA_FILE_PATTERN = Pattern.compile("^data_(\\d+)k_(\\d+)g_(\\d+)(pc)?.nq$");
 
     private static MatchResult matchDataFile(File dataFile) {
         Matcher m = DATA_FILE_PATTERN.matcher(dataFile.getName());
