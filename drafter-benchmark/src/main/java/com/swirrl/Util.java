@@ -250,38 +250,4 @@ public class Util {
             return draftset;
         }
     }
-
-    public static void main(String[] args) {
-        File dataFile = resolveDataFile("data_100k_1g.nq");
-        File dataBackupDir = getDataFileBackupDir(dataFile.getName());
-
-        createTestDb();
-
-        Drafter drafter = Drafter.create();
-        Draftset draftset = drafter.createDraft(User.publisher());
-        drafter.append(draftset, dataFile);
-
-        System.out.printf("Saving to %s...%n", dataBackupDir.getAbsolutePath());
-
-        try {
-            bashCommand(getStardogAdmin().getAbsolutePath(), "db", "backup", "--to", dataBackupDir.getAbsolutePath(), getTestDbName());
-        } catch (Exception ex) {
-            throw new RuntimeException("Failed to create backup", ex);
-        }
-
-        System.out.println("Dropping test db...");
-        dropTestDb();
-        System.out.println("Dropped!");
-
-//        System.out.println("Restoring from backup...");
-//
-//        File restoreDir = getDataFileRestoreDir(dataBackupDir);
-//        try {
-//            bashCommand(getStardogAdmin().getAbsolutePath(), "db", "restore", restoreDir.getAbsolutePath());
-//        } catch (Exception ex) {
-//            throw new RuntimeException(String.format("Failed to restore database for file %s", dataFile.getName()));
-//        }
-//
-//        System.out.println("Restored!");
-    }
 }
