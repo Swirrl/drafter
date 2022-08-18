@@ -463,6 +463,7 @@ paths:
         - $ref: '#/parameters/graph'
         - $ref: '#/parameters/union-with-live'
         - $ref: '#/parameters/timeout'
+        - $ref: '#/parameters/accept'
       summary: Access the quads inside this Draftset
       description: |
         Request the contents of this draftset in any supported RDF
@@ -569,6 +570,7 @@ paths:
         - $ref: '#/parameters/timeout'
         - $ref: '#/parameters/default-graph-uri'
         - $ref: '#/parameters/named-graph-uri'
+        - $ref: '#/parameters/accept'
 
       tags:
         - Querying
@@ -605,6 +607,7 @@ paths:
         - $ref: '#/parameters/timeout'
         - $ref: '#/parameters/post_default-graph-uri'
         - $ref: '#/parameters/post_named-graph-uri'
+        - $ref: '#/parameters/accept'
       tags:
         - Querying
       responses:
@@ -672,6 +675,7 @@ paths:
         - $ref: '#/parameters/timeout'
         - $ref: '#/parameters/default-graph-uri'
         - $ref: '#/parameters/named-graph-uri'
+        - $ref: '#/parameters/accept'
       tags:
         - SPARQL Endpoints
       responses:
@@ -704,6 +708,7 @@ paths:
         - $ref: '#/parameters/timeout'
         - $ref: '#/parameters/post_default-graph-uri'
         - $ref: '#/parameters/post_named-graph-uri'
+        - $ref: '#/parameters/accept'
       tags:
         - SPARQL Endpoints
       responses:
@@ -1078,6 +1083,12 @@ parameters:
     type: boolean
     allowEmptyValue: true
     default: false
+  accept:
+    name: accept
+    in: query
+    required: false
+    type: string
+    description: Alternative to accept header for clients with no option to set headers
 
 definitions:
   Graph:
