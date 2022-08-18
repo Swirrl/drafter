@@ -84,7 +84,18 @@
           response (handler {:uri "/test"
                              :sparql {:prepared-query pquery}
                              :headers {"accept" "text/trig"}})]
-      (tc/assert-is-not-acceptable-response response))))
+      (tc/assert-is-not-acceptable-response response)))
+
+  (testing "Content negotiation via query parameter"
+    (let [handler (sparql-negotiation-handler identity)
+          pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
+          request {:uri "/sparql"
+                   :sparql {:prepared-query pquery}
+                   :headers {"accept" "*/*"}
+                   :params {:accept "application/json"}}
+          {{:keys [format response-content-type]} :sparql} (handler request)]
+      (is (= "application/json" response-content-type))
+      (is (some? format)))))
 
 (deftest sparql-timeout-handler-test
   (testing "With valid timeout"

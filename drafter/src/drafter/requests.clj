@@ -1,9 +1,12 @@
 (ns drafter.requests)
 
 (defn accept
-  "Returns the Accept header for a request if one exists."
+  "Returns the accept header or query parameter for a request if either exists.
+   The query parameter has precedence over the header, since it is likely to be
+   used in cases where the user has no control over the header."
   [request]
-  (get-in request [:headers "accept"]))
+  (or (get-in request [:params :accept])
+      (get-in request [:headers "accept"])))
 
 (defn query
   "Returns the query string for a request map"

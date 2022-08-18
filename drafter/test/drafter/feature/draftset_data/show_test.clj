@@ -134,3 +134,17 @@
           data-request (tc/with-identity test-editor data-request)
           data-response (handler data-request)]
       (tc/assert-is-not-acceptable-response data-response))))
+
+(tc/deftest-system-with-keys get-draftset-quads-data-with-accept-in-query
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
+  (let [draftset (help/create-draftset-through-api handler test-editor)]
+    (help/append-data-to-draftset-through-api
+     handler test-editor draftset "test/resources/test-draftset.trig")
+    (let [accepted "*/*"
+          data-request (help/get-draftset-quads-accept-request
+                        draftset test-editor accepted "false")
+          data-request (assoc-in data-request [:params :accept] "text/csv")
+          data-response (handler data-request)]
+      (tc/assert-is-ok-response data-response)
+      (is (= "text/csv" (get-in data-response [:headers "Content-Type"]))))))
