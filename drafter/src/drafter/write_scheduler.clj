@@ -123,15 +123,15 @@
                large write operations.  Please try again later."
               {:error :writes-temporarily-disabled}))))
 
-(defonce ^:private write-scheduler-admin
+(defonce write-scheduler-admin
          (atom {:loop-blocker nil :writing-paused? (promise)}))
 
 (defn- pause-write-loop! []
-  (let [msg "Requesting Write-scheduler pause. Stand by..."]
+  (swap! write-scheduler-admin assoc :loop-blocker (promise))
+  (let [msg "Write-scheduler pause has been requested. Stand by..."]
     (log/warn msg)
     ;; println is for remote socket users
-    (println msg))
-  (swap! write-scheduler-admin assoc :loop-blocker (promise)))
+    (println msg)))
 
 (defn- continue-write-loop! []
   (swap! write-scheduler-admin
@@ -149,7 +149,7 @@
     (if (and loop-blocker
              (not (realized? loop-blocker)))
       (do (continue-write-loop!)
-          (println "ACTIVE: Drafter is now actively writing"))
+          (println "\nACTIVE: Drafter is now actively writing"))
       (do (pause-write-loop!)
           @writing-paused?
           (println (str "\nPAUSED: Drafter has paused writing at: " (Date.)))))))
@@ -165,7 +165,6 @@
       (deliver writing-paused? true)
       (log/warn "Write-scheduler is now paused")
       ;; TODO: call a datadog method to record pausing and continuation
-      ;; TODO use deref with timeout in tests
       @loop-blocker
       (log/warn "Write-scheduler is now active again"))))
 
