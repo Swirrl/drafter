@@ -164,9 +164,10 @@
                (not (realized? loop-blocker)))
       (deliver writing-paused? true)
       (log/warn "Write-scheduler is now paused")
-      ;; TODO: call a datadog method to record pausing and continuation
+      (datadog/increment! "drafter.write_scheduler.paused" 1)
       @loop-blocker
-      (log/warn "Write-scheduler is now active again"))))
+      (log/warn "Write-scheduler is now active again")
+      (datadog/increment! "drafter.write_scheduler.paused" 0))))
 
 (defn- write-loop
   "Start the write loop running.  Note this function does not return
