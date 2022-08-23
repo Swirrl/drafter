@@ -138,7 +138,8 @@
                              "-Dhttp.maxConnections=60"
                              "-Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
                              "-Dlog4j2.formatMsgNoLookups=true"
-                             "-Dlog4j.configurationFile=log4j2.xml"]
+                             "-Dlog4j.configurationFile=log4j2.xml"
+                             "-Dclojure.server.repl={:port,5555,:accept,drafter.write-scheduler/toggle-writing!}"]
 
                   :main-opts ["-m" "drafter.main" "./resources/drafter-auth0.edn"]}
 
@@ -152,7 +153,8 @@
                              "-Dhttp.maxConnections=60"
                              "-Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
                              "-Dlog4j2.formatMsgNoLookups=true"
-                             "-Dlog4j.configurationFile=log4j2.xml"]
+                             "-Dlog4j.configurationFile=log4j2.xml"
+                             "-Dclojure.server.repl={:port,5555,:accept,drafter.write-scheduler/toggle-writing!}"]
 
                   :main-opts ["-m" "drafter.main" "./env/dev/resources/drafter-basic-dev-config.edn"]}
 
@@ -166,7 +168,8 @@
                                     "-Dhttp.maxConnections=60"
                                     "-Dorg.eclipse.jetty.server.Request.maxFormContentSize=41943040"
                                     "-Dlog4j2.formatMsgNoLookups=true"
-                                    "-Dlog4j.configurationFile=log4j2.xml"]
+                                    "-Dlog4j.configurationFile=log4j2.xml"
+                                    "-Dclojure.server.repl={:port,5555,:accept,drafter.write-scheduler/toggle-writing!}"]
 
                          :main-opts ["-m" "drafter.main" "/app/config/drafter-auth0.edn"]}
 
