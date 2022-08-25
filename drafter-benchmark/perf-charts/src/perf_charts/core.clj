@@ -29,11 +29,14 @@
   graphs."
   [fq-benchmark-name]
   (let [benchmark-name (last (string/split fq-benchmark-name #"\."))]
-    (if-let [[_ short-name k-statements graphs] (re-find #"(\w+)Test_(\d+)k_(\d+)g" benchmark-name)]
-      {:benchmark benchmark-name
-       :short-name short-name
-       :statements (* 1000 (Long/parseLong k-statements))
-       :graphs (Long/parseLong graphs)}
+    (if-let [[_ short-name k-statements graphs ref-statements] (re-find #"^(\w+)Test_(\d+)k_(\d+)g_(\d+)pc?$" benchmark-name)]
+      (let [n-statements (* 1000 (Long/parseLong k-statements))
+            n-ref (Long/parseLong ref-statements)]
+        {:benchmark benchmark-name
+         :short-name short-name
+         :statements n-statements
+         :ref-statements n-ref
+         :graphs (Long/parseLong graphs)})
       (throw (ex-info (format "Failed to parse benchmark name %s" fq-benchmark-name) {})))))
 
 (defn read-benchmarks
@@ -50,13 +53,31 @@
 (defn- map-values [f m]
   (into {} (map (fn [[k v]] [k (f v)]) m)))
 
-(defn- group-benchmarks [group-key x-key {:keys [version benchmarks]}]
-  (let [groups (group-by (juxt :short-name group-key) benchmarks)]
-    (map-values (fn [results]
-                         {:version version
-                          :x (map x-key results)
-                          :y (map :score results)})
-                       groups)))
+(def dim-keys #{:statements :graphs :ref-statements})
+
+(defn- get-benchmark-slices
+  "Fixes the given dimension to use as the x-axis and returns a map
+  {graph-key result}. Each graph-key contains the x-axis dimension
+  along with the values of the other dimensions for each benchmark
+  result. Each result map contains a collection of (x, y) co-ordinates
+  for the points on the graph. Only experiments containing more than
+  one point on the corresponding graph are returned."
+  [x-key {:keys [version benchmarks] :as benchmark-set}]
+  (let [other-dims (conj (disj dim-keys x-key) :short-name)
+        groups (group-by (fn [benchmark]
+                           {:x-key x-key :dims (select-keys benchmark other-dims)})
+                         benchmarks)]
+    (into {} (keep (fn [[k results]]
+                     (when (> (count results) 1)
+                       [k {:version version
+                           :x (map x-key results)
+                           :y (map :score results)}]))
+                   groups))))
+
+(defn- benchmark-set-slices [benchmark-set]
+  (merge (get-benchmark-slices :statements benchmark-set)
+         (get-benchmark-slices :graphs benchmark-set)
+         (get-benchmark-slices :ref-statements benchmark-set)))
 
 (defn collect-values
   "Collects the keys across a collection of maps into a single map
@@ -71,57 +92,63 @@
        (apply merge-with concat)
        (map-values vec)))
 
-(defn series-group [group-key x-key benchmarks]
-  (let [gs (map (fn [b] (group-benchmarks group-key x-key b)) benchmarks)]
-    (collect-values gs)))
+(defn collect-graphs [benchmark-sets]
+  (let [set-slices (mapv benchmark-set-slices benchmark-sets)
+        combined-slices (collect-values set-slices)]
+    ;; remove entries that only contain result for one benchmark set
+    (into {} (keep (fn [[k results]]
+                     (when (> (count results) 1)
+                       [k results]))
+                   combined-slices))))
 
-(defn by-statements-series
-  "Given a collection of benchmarks, returns a map of the form
-  {[benchmark-name statements] [series]} where each series is take
-  from the corresponding results in each benchmark results file."
-  [benchmarks]
-  (series-group :statements :graphs benchmarks))
+(defn- sort-dimensions [{:keys [dims] :as chart-keys}]
+  (let [dim-order {:short-name 1 :statements 2 :graphs 3 :ref-statements 4}]
+    (sort-by (comp dim-order key) dims)))
 
-(defn by-graph-series
-  "Given a collection of benchmarks, returns a map of the form
-  {[benchmark-name graphs] [series]} where each series is taken from
-  the corresponding results in each benchmark results file."
-  [benchmarks]
-  (series-group :graphs :statements benchmarks))
+(defn- dim-value-formatter
+  "Returns a function which formats a dimension-value pair according to
+  the dimension type. dim->format-fn should be a map of {dim fmt}
+  where fmt is a function from the dimension value to a string."
+  [dim->format-fn]
+  (fn [[dim value]]
+    (if-let [fmt-fn (get dim->format-fn dim)]
+      (fmt-fn value))))
 
-(defn- generate-by-graph
-  "Groups all benchmark results by the number of graphs in the input
-  data across all benchmark result files. Renders a chart for
-  each (benchmark, num graphs) in the results and writes the chart as
-  a .png file to the output directory."
-  [output-dir benchmarks]
-  (let [by-graph (by-graph-series benchmarks)]
-    (doseq [[[short-name graphs] results] by-graph]
-      (let [plot (chart-results results {:title (format "%s benchmark for %d graphs" short-name graphs)
-                                         :y-label "Seconds"
-                                         :x-label "Number of statements"})
-            file-name (format "%s-%d-graphs.png" short-name graphs)]
-        (ic/save plot (io/file output-dir file-name))))))
+(defn- chart-title [{:keys [dims] :as chart-keys}]
+  (let [[[_ benchmark-name] & dim-values] (sort-dimensions chart-keys)
+        fmt (dim-value-formatter
+             {:statements (fn [statements] (format "%d statements" statements))
+              :graphs (fn [graphs] (format "%d graphs" graphs))
+              :ref-statements (fn [refs] (format "%d%% graph-referencing statements" refs))})
+        dim-descs (map fmt dim-values)]
+    (format "%s benchmark for %s" benchmark-name (string/join ", " dim-descs))))
 
-(defn- generate-by-statements
-  "Groups all benchmark results by the number of statements in the input
-  data across all benchmark result files. Renders a chart for
-  each (benchmark, num statements) in the results and writes the chart
-  as a .png file to the output directory."
-  [output-dir benchmarks]
-  (let [by-statements (by-statements-series benchmarks)]
-    (doseq [[[short-name statements] results] by-statements]
-      (let [plot (chart-results results
-                                {:title (format "%s benchmark for %d statements" short-name statements)
-                                 :y-label "Seconds"
-                                 :x-label "Number of graphs"})
-            file-name (format "%s-%dk.png" short-name (/ statements 1000))]
-        (ic/save plot (io/file output-dir file-name))))))
+(defn- get-x-label [x-key]
+  (get {:statements "Number of statements"
+        :graphs "Number of graphs"
+        :ref-statements "% of graph-referencing statements"}
+       x-key))
 
-(defn benchmark-file
-  "Reads benchmark results from a benchmark file. The filename is
-  expected to have the format jmh-result-{version}.csv where version
-  identifies the drafter version used within the benchmarks."
+(defn- chart-file-name [{:keys [dims] :as chart-key}]
+  (let [fmt (dim-value-formatter {:statements (fn [statements] (format "%dk" (/ statements 1000)))
+                                  :short-name identity
+                                  :graphs (fn [graphs] (format "%dg" graphs))
+                                  :ref-statements (fn [refs] (format "%dpc" refs))})
+        ordered-dim-values (sort-dimensions chart-key)]
+    (str (string/join "-" (map fmt ordered-dim-values)) ".png")))
+
+(defn- write-chart [output-dir {:keys [x-key dims] :as chart-key} results]
+  (let [plot (chart-results results
+                            {:title (chart-title chart-key)
+                             :y-label "Seconds"
+                             :x-label (get-x-label x-key)})
+        file-name (chart-file-name chart-key)]
+    (ic/save plot (io/file output-dir file-name))))
+
+(defn read-benchmark-file
+  "Reads a set of benchmark results from a benchmark file. The filename
+  is expected to have the format jmh-result-{version}.csv where
+  version identifies the drafter version used within the benchmarks."
   [file]
   (if-let [[_ version] (re-find #"^jmh-result-(\w+).csv$" (.getName file))]
     {:file file :version version :benchmarks (read-benchmarks file)}
@@ -137,6 +164,7 @@
   are plotted on each output graph to show the comparison between the
   drafter versions used to generate each benchmark result file."
   [output-dir benchmark-files]
-  (let [benchmarks (mapv benchmark-file benchmark-files)]
-    (generate-by-graph output-dir benchmarks)
-    (generate-by-statements output-dir benchmarks)))
+  (let [benchmark-sets (mapv read-benchmark-file benchmark-files)
+        graphs (collect-graphs benchmark-sets)]
+    (doseq [[chart-key results] graphs]
+      (write-chart output-dir chart-key results))))
