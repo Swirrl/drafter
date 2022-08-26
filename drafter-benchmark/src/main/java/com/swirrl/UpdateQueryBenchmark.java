@@ -16,6 +16,12 @@ import java.io.InputStream;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Benchmarks for executing update queries. Each benchmark takes an instance of its own state class responsible for
+ * setting up the test database. Each state class creates a new empty draftset and appends all data from the
+ * associated benchmark data file. It chooses a random statement to delete and constructs a SPARQL UPDATE query to
+ * delete it. Each benchmark then submits the update query and waits for it to complete.
+ */
 @Warmup(iterations = 0)
 @Fork(value = 2, warmups = 0)
 @Measurement(iterations = 2)

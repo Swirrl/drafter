@@ -5,6 +5,11 @@ import org.openjdk.jmh.annotations.*;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Benchmarks for the 'publish draftset' operation. Each benchmark takes an instance of its own state class which
+ * is responsible for setting up each benchmark iteration. The state creates a new draftset and appends all the data
+ * from the benchmark data file. Each benchmark publishes the draftset to live.
+ */
 @Warmup(iterations = 0)
 @Fork(value = 2, warmups = 0)
 @Measurement(iterations = 2)

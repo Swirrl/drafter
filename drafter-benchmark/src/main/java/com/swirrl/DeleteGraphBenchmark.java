@@ -7,6 +7,11 @@ import java.net.URI;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Benchmarks for the 'delete graph' operation. Each benchmark takes an instance of its own state class which is
+ * responsible for setting up the benchmark. This creates a new draftset and appends all data from the corresponding
+ * data file. It also randomly chooses on of the graphs to delete within the benchmark.
+ */
 @Warmup(iterations = 0)
 @Fork(value = 2, warmups = 0)
 @Measurement(iterations = 2)

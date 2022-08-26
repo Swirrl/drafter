@@ -5,6 +5,13 @@ import org.openjdk.jmh.annotations.*;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Benchmarks for the delete operation. Each benchmark takes an instance of its own state class which is responsible
+ * for setting up the draft state. The test database is created and deleted around each test iteration. For each
+ * benchmark invocation a new draftset is created and the contents of the test state data file is appended. The
+ * delete operation in the benchmark deletes the contents of the associated 'delete' file corresponding to the
+ * source data file. These should contain half of the data in the 'data' file appended in the benchmark setup.
+ */
 @Warmup(iterations = 0)
 @Fork(value = 2, warmups = 0)
 @Measurement(iterations = 2)
@@ -152,7 +159,6 @@ public class DeleteBenchmark {
 
         @TearDown(Level.Invocation)
         public void tearDown() {
-            //Util.dropTestDb();
             this.drafter.dropDb();
         }
 

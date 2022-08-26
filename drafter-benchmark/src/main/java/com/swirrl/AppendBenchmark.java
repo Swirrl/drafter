@@ -5,6 +5,11 @@ import org.openjdk.jmh.annotations.*;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Benchmark for the append operation. Each benchmark takes a state parameter which creates and deletes the test
+ * database around each iteration. The benchmark creates a new empty draft and appends data from a file directly
+ * using the append state machine.
+ */
 @Warmup(iterations = 0)
 @Fork(value = 2, warmups = 0)
 @Measurement(iterations = 2)
