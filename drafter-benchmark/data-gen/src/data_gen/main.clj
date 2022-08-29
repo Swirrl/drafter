@@ -79,7 +79,6 @@
           graph-nrefs (dist-ref-statements n-ref graph-sizes)]
       (doseq [[g n-triples ref-triples-count] (map vector graphs graph-sizes graph-nrefs)]
         (let [non-ref-triples-count (- n-triples ref-triples-count)
-              qg (core/graph-quad-gen g graphs)
               quads (concat (core/generate-n (core/graph-ref-quad-gen g graphs) ref-triples-count)
                             (core/generate-n (core/non-ref-quad-gen g) non-ref-triples-count))]
           (pr/add rdf-writer quads))))))
