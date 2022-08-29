@@ -93,13 +93,8 @@
        (map-values vec)))
 
 (defn collect-graphs [benchmark-sets]
-  (let [set-slices (mapv benchmark-set-slices benchmark-sets)
-        combined-slices (collect-values set-slices)]
-    ;; remove entries that only contain result for one benchmark set
-    (into {} (keep (fn [[k results]]
-                     (when (> (count results) 1)
-                       [k results]))
-                   combined-slices))))
+  (let [set-slices (mapv benchmark-set-slices benchmark-sets)]
+    (collect-values set-slices)))
 
 (defn- sort-dimensions [{:keys [dims] :as chart-keys}]
   (let [dim-order {:short-name 1 :statements 2 :graphs 3 :ref-statements 4}]
