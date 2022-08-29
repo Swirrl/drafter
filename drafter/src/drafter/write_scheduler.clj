@@ -149,9 +149,9 @@
     (deliver (:jobs-flushed? @write-scheduler-admin) true)))
 
 (defn- reject-jobs-begin-flush! []
-  (let [rejecting-msg (str "REJECTING: Writes and jobs are now being rejected at: " (Date.)
+  (let [rejecting-msg (str "\nREJECTING: Writes and jobs are now being rejected at: " (Date.)
                            ". Waiting for jobs to flush...")
-        flushed-msg "FLUSHED: write jobs have been flushed. It is now safe to take backups"]
+        flushed-msg "\nFLUSHED: write jobs have been flushed. It is now safe to take backups"]
     (swap! write-scheduler-admin assoc
            :reject-mode? true
            :jobs-flushed? (promise))
