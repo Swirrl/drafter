@@ -1,0 +1,4 @@
+{:deps {org.clojure/clojure {:mvn/version "1.9.0"}
+        incanter/incanter-core {:mvn/version "1.9.3"}
+        incanter/incanter-charts {:mvn/version "1.9.3"}
+        org.clojure/tools.cli {:mvn/version "1.0.206"}}}
