@@ -13,5 +13,5 @@ DRAFTER_JAR="${TARGET_DIR}/drafter.jar"
 pushd "${DRAFTER_DIR}" || exit
 trap "popd" EXIT
 
-clj -T:build clean
-clj -T:build skinny
+clojure -T:build clean
+clojure -T:build skinny
