@@ -54,7 +54,9 @@
     (if (or (:identity request) ; already authenticated
             (whitelisted? request))
       (handler request)
-      (try
+      ;; TODO: this try / catch shouldn't be here like this - all legitimate
+      ;; exceptions e.g. 503 are caught and return a 401 response
+      ;(try
         (if-let [{:keys [email] :as identity} (authenticate-request auth-methods request)]
           (with-logging-context
             {:user email} ;; wrap a logging context over the request so we can trace the user
@@ -63,9 +65,10 @@
           (do
             (datadog/increment! "drafter.requests.unauthorised" 1)
             (response/unauthorized-response "Not authenticated.")))
-        (catch ExceptionInfo ex
-          (datadog/increment! "drafter.requests.unauthorised" 1)
-          (auth/authentication-failed-response ex))))))
+        ;(catch ExceptionInfo ex
+        ;  (datadog/increment! "drafter.requests.unauthorised" 1)
+        ;  (auth/authentication-failed-response ex)))
+      )))
 
 (defmethod ig/init-key :drafter.middleware/wrap-authenticate
   [_ {:keys [auth-methods] :as opts}]
