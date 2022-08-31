@@ -10,7 +10,7 @@
     [drafter-client.test-helpers :as h]
     [drafter-client.test-util.auth :as auth-util]
     [drafter.main :as drafter]
-    [drafter.test-common :refer [mock-jwk]]
+    [drafter.test-common :refer [mock-jwk] :as tc]
     [drafter.util :as util]
     [environ.core :refer [env]]
     [grafter-2.rdf.protocols :as pr]
@@ -359,6 +359,27 @@
             _ (sut/add-sync client token draftset graph triples)
             triples* (sut/get client token draftset graph)]
         (t/is (= (set triples) (set triples*)))))))
+
+(deftest adding-with-add-data-when-writes-rejected
+  (let [client (drafter-client)
+        token (auth-util/system-token)
+        name "Draftset adding when jobs and writes are rejected"
+        description "Testing adding things, and reading them"
+        triples (test-triples)]
+
+    (testing "Adding triples to a draft set when writes are rejected"
+      (let [graph (URI. "http://test.graph.com/triple-graph")
+            draftset (sut/new-draftset client token name description)]
+        (try
+          (tc/timeout 500 #(drafter.write-scheduler/toggle-reject-and-flush!))
+          (is
+            (thrown-with-msg?
+              ExceptionInfo
+              #"clj-http: status 503"
+              (tc/assert-is-service-unavailable-response (sut/add-data-sync client token draftset triples {:graph graph})))
+            "should receive a 503 unavailable response")
+          (finally
+            (tc/timeout 200 #(drafter.write-scheduler/toggle-reject-and-flush!))))))))
 
 (deftest adding-with-add-data
   (let [client (drafter-client)
