@@ -3,6 +3,10 @@
  :deps {buddy/buddy-auth {:mvn/version "3.0.1"}
         buddy/buddy-core {:mvn/version "1.10.1"}
 
+        ;; NOTE: multiple transitive jackson-core dependencies exist
+        ;; specify desired version at the top-level
+        com.fasterxml.jackson.core/jackson-core {:mvn/version "2.12.4"}
+
         ;; override cheshire a transitive dep of buddy-core which
         ;; otherwise introduces CVE-2020-28491 via its
         ;; jackson-dataformat-cbor dep.
@@ -56,7 +60,8 @@
                            :exclusions [compojure/compojure
                                         org.clojure/java.classpath
                                         org.clojure/tools.reader
-                                        org.clojure/java.classpath]}
+                                        org.clojure/java.classpath
+                                        javax.servlet/servlet-api]}
         me.raynes/fs {:mvn/version "1.4.6"} ;; filesystem utils
 
         metosin/ring-swagger-ui {:mvn/version "3.20.1"}
@@ -155,6 +160,7 @@
 
                   :main-opts ["-m" "drafter.main" "./env/dev/resources/drafter-basic-dev-config.edn"]}
 
+           :skinny {:extra-paths ["env/prod/clj"]}
 
            ;; config for pmd4 flavoured docker
            :pmd4/docker {:extra-paths ["env/prod/clj" "env/docker/resources"]
