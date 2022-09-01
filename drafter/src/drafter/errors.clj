@@ -13,7 +13,8 @@
             [drafter.responses :as r]
             [clojure.spec.alpha :as s]
             [drafter.async.spec :as async]
-            [drafter.util :as util]))
+            [drafter.util :as util])
+  (:import (clojure.lang ExceptionInfo)))
 
 (defmulti encode-error
   "Convert an Exception into an appropriate API error response object.
@@ -21,10 +22,16 @@
   clojure.lang.ExceptionInfo the value of its :error key."
   (fn [err]
     (cond
-      (instance? clojure.lang.ExceptionInfo err) (if-let [error-type (-> err ex-data :error)]
-                                                   error-type
-                                                   (class err))
-      (instance? Exception err) (class err))))
+      (instance? ExceptionInfo err) (if-let [error-type (-> err ex-data :error)]
+                                      (do
+                                        (log/error err
+                                                   (str "An error of type `" (:error (ex-data err)) "` occurred."))
+                                        error-type)
+                                      (class err))
+      (instance? Exception err) (do
+                                  (log/error err
+                                             (str "A `" (class err) "` error occurred."))
+                                  (class err)))))
 
 (s/fdef encode-error
   :args (s/cat :err util/throwable?)
@@ -34,12 +41,12 @@
   ;; The generic catch any possible exception case
   (r/error-response 500 :unknown-error (.getMessage ex)))
 
-(defmethod encode-error clojure.lang.ExceptionInfo [ex]
+(defmethod encode-error ExceptionInfo [ex]
   ;; Handle ex-info errors that don't define one of our :error keys
   (r/error-response 500 :unknown-error (.getMessage ex)))
 
 (defmethod encode-error :default [ex]
-  (if (instance? clojure.lang.ExceptionInfo ex)
+  (if (instance? ExceptionInfo ex)
     (let [error-type (:error (ex-data ex))]
       (assert error-type "Because the defmulti dispatches clojure.lang.ExceptionInfo's as :keywords we should never have a nil error-type here" )
       (r/error-response 500 error-type (.getMessage ex)))
@@ -56,7 +63,6 @@
     (try
       (handler req)
       (catch Throwable ex
-        (log/error ex "There was an unknown error.  Returning 500")
         (encode-error ex)))))
 
 (defmethod encode-error org.eclipse.rdf4j.query.QueryEvaluationException [ex]
