@@ -1,8 +1,8 @@
 (ns drafter.backend.draftset.draft-management-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer :all :as t]
             [drafter.backend.draftset.draft-management :refer :all]
             [drafter.backend.draftset.operations :refer [create-draftset!]]
-            [drafter.draftset :refer [->DraftsetId]]
+            [drafter.draftset :refer [->DraftsetId] :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql]
             [drafter.test-common
@@ -14,6 +14,7 @@
               make-graph-live!
               wrap-system-setup]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
+            [drafter.feature.draftset.test-helper :as th]
             [drafter.user-test :refer [test-editor]]
             [grafter-2.rdf4j.templater :refer [triplify]]
             [grafter-2.rdf4j.repository :as repo]
@@ -25,7 +26,11 @@
             [drafter.test-common :as tc]
             [drafter.backend.draftset.graphs :as graphs]
             [drafter.backend.draftset.operations :as dsops]
-            [drafter.time :as time])
+            [drafter.time :as time]
+            [grafter-2.rdf.protocols :as pr]
+            [grafter-2.rdf4j.io :as gio]
+            [drafter.backend.draftset.operations :as ops]
+            [drafter.rdf.sesame :as ses])
   (:import java.net.URI))
 
 (use-fixtures :each validate-schemas tc/with-spec-instrumentation)
@@ -378,6 +383,217 @@
       (is (= source-graph
              dest-graph)
           "Should be a copy of the source graph"))))
+
+(defn- rewrite-in-draft
+  "Creates a draft graph for the given live graph, inserts the given triples into the new draft graph and then
+   rewrites the graph contents. Returns a map containing the draft graph UI and the re-written contents of
+   the draft graph."
+  [live-graph-uri live-triples]
+  (let [repo (repo/sparql-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
+        graph-manager (graphs/create-manager repo)
+        draftset (create-draftset! repo test-editor)
+        draft-graph (graphs/create-user-graph-draft graph-manager draftset live-graph-uri)]
+    (sparql/add repo draft-graph live-triples)
+    (with-open [conn (repo/->connection repo)]
+      (rewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset)
+                               :deleted :ignore}))
+    (let [q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)
+          draft-triples (with-open [conn (repo/->connection repo)]
+                          (set (repo/query conn q)))]
+      {:draft-graph-uri draft-graph
+       :draft-triples (set draft-triples)})))
+
+(t/deftest rewrite-draftset!-graph-matches-s-test
+  (let [live-graph (URI. "http://example.com/graph")
+        triples #{(pr/->Triple live-graph (URI. "http://p") "o")}
+        {:keys [draft-graph-uri draft-triples]} (rewrite-in-draft live-graph triples)]
+    (t/is (= #{(pr/->Triple draft-graph-uri (URI. "http://p") "o")} draft-triples))))
+
+(t/deftest rewrite-draftset!-graph-matches-p-test
+  (let [live-graph (URI. "http://example.com/graph")
+        triples #{(pr/->Triple (URI. "http://s") live-graph "o")}
+        {:keys [draft-graph-uri draft-triples]} (rewrite-in-draft live-graph triples)]
+    (t/is (= #{(pr/->Triple (URI. "http://s") draft-graph-uri "o")} draft-triples))))
+
+(t/deftest rewrite-draftset!-graph-matches-o-test
+  (let [live-graph (URI. "http://example.com/graph")
+        s (URI. "http://s")
+        p (URI. "http://p")
+        triples #{(pr/->Triple s p live-graph)}
+        {:keys [draft-graph-uri draft-triples]} (rewrite-in-draft live-graph triples)]
+    (t/is (= #{(pr/->Triple s p draft-graph-uri)} draft-triples))))
+
+(t/deftest rewrite-draftset!-graph-matches-sp-test
+  (let [live-graph (URI. "http://example.com/graph")
+        triples #{(pr/->Triple live-graph live-graph "o")}
+        {:keys [draft-graph-uri draft-triples]} (rewrite-in-draft live-graph triples)]
+    (t/is (= #{(pr/->Triple draft-graph-uri draft-graph-uri "o")} draft-triples))))
+
+(t/deftest rewrite-draftset!-graph-matches-so-test
+  (let [live-graph (URI. "http://example.com/graph")
+        triples #{(pr/->Triple live-graph (URI. "http://p") live-graph)}
+        {:keys [draft-graph-uri draft-triples]} (rewrite-in-draft live-graph triples)]
+    (t/is (= #{(pr/->Triple draft-graph-uri (URI. "http://p") draft-graph-uri)} draft-triples))))
+
+(t/deftest rewrite-draftset!-graph-matches-po-test
+  (let [live-graph (URI. "http://example.com/graph")
+        triples #{(pr/->Triple (URI. "http://s") live-graph live-graph)}
+        {:keys [draft-graph-uri draft-triples]} (rewrite-in-draft live-graph triples)]
+    (t/is (= #{(pr/->Triple (URI. "http://s") draft-graph-uri draft-graph-uri)} draft-triples))))
+
+(t/deftest rewrite-draftset!-graph-matches-spo-test
+  (let [live-graph (URI. "http://example.com/graph")
+        triples #{(pr/->Triple live-graph live-graph live-graph)}
+        {:keys [draft-graph-uri draft-triples]} (rewrite-in-draft live-graph triples)]
+    (t/is (= #{(pr/->Triple draft-graph-uri draft-graph-uri draft-graph-uri)} draft-triples))))
+
+(defn- raw-graph-triples [repo graphs]
+  (into {} (map (fn [graph]
+                  (let [q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
+                        bindings (with-open [conn (repo/->connection repo)]
+                                   (vec (repo/query conn q)))]
+                    [graph (set (map (fn [bs] (pr/map->Triple bs)) bindings))]))
+                graphs)))
+
+(t/deftest rewrite-draftset!-multiple-graph-references
+  (let [live-graphs (map #(URI. (str "http://live-" %)) (range 1 5))
+        [lg1 lg2 lg3 lg4] live-graphs
+        quads {lg1 #{(pr/->Triple (URI. "http://s1") (URI. "http://p1") "o1")}
+               lg2 #{(pr/->Triple lg1 (URI. "http://p2") "o2")
+                     (pr/->Triple (URI. "http://s3") lg2 "o3")
+                     (pr/->Triple (URI. "http://s4") (URI. "http://p4") lg3)}
+               lg3 #{(pr/->Triple lg1 lg2 "o5")
+                     (pr/->Triple (URI. "http://s6") lg2 lg3)
+                     (pr/->Triple lg1 (URI. "http://p7") lg3)}
+               lg4 #{(pr/->Triple lg4 lg4 lg4)
+                     (pr/->Triple lg4 lg1 lg3)
+                     (pr/->Triple lg1 lg2 lg3)
+                     (pr/->Triple lg3 lg1 lg2)}}
+        repo (repo/sparql-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
+        graph-manager (graphs/create-manager repo)
+        draftset (create-draftset! repo test-editor)
+        live->draft (into {} (map (fn [[lg triples]]
+                                    (let [dg (graphs/create-user-graph-draft graph-manager draftset lg)]
+                                      (sparql/add repo dg triples)
+                                      [lg dg]))
+                                  quads))]
+    ;; re-write draftset
+    (with-open [conn (repo/->connection repo)]
+      (rewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset)
+                               :deleted :ignore}))
+
+    (let [draftset-quads (raw-graph-triples repo (vals live->draft))
+          rewrite-value (fn [v] (get live->draft v v))
+          rewrite-triple (fn [t] (reduce (fn [t loc] (update t loc rewrite-value)) t [:s :p :o]))
+          expected (into {} (map (fn [[lg ts]] [(get live->draft lg) (into #{} (map rewrite-triple ts))]) quads))]
+
+      (t/is (= expected draftset-quads)))))
+
+(defn- rewrite-draft-triples [draft-graph-uri draft-triples]
+  (letfn [(rewrite-value [v] (if (= ::dg v) draft-graph-uri v))
+          (rewrite-triple [t]
+            (-> t
+                (update :s rewrite-value)
+                (update :p rewrite-value)
+                (update :o rewrite-value)))]
+    (into #{} (map rewrite-triple draft-triples))))
+
+(defn- unrewrite-in-draft [live-graph-uri draft-triples]
+  (let [repo (repo/sparql-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
+        graph-manager (graphs/create-manager repo)
+        draftset (create-draftset! repo test-editor)
+        draft-graph (graphs/create-user-graph-draft graph-manager draftset live-graph-uri)
+        draft-triples (rewrite-draft-triples draft-graph draft-triples)]
+
+    (with-open [conn (repo/->connection repo)]
+      (sparql/add conn draft-graph draft-triples)
+      (unrewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset)
+                                 :live-graph-uris [live-graph-uri]}))
+
+    (let [q (format "CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <%s> { ?s ?p ?o } }" draft-graph)]
+      (with-open [conn (repo/->connection repo)]
+        (set (repo/query conn q))))))
+
+(t/deftest unrewrite-draftset-graph-matches-s-test
+  (let [live-graph-uri (URI. "http://example.com")
+        triples #{(pr/->Triple ::dg (URI. "http://p") "o")}
+        unrewritten-triples (unrewrite-in-draft live-graph-uri triples)]
+    (t/is (= #{(pr/->Triple live-graph-uri (URI. "http://p") "o")} unrewritten-triples))))
+
+(t/deftest unrewrite-draftset-graph-matches-p-test
+  (let [live-graph-uri (URI. "http://example.com")
+        triples #{(pr/->Triple (URI. "http://s") ::dg "o")}
+        unrewritten-triples (unrewrite-in-draft live-graph-uri triples)]
+    (t/is (= #{(pr/->Triple (URI. "http://s") live-graph-uri "o")} unrewritten-triples))))
+
+(t/deftest unrewrite-draftset-graph-matches-o-test
+  (let [live-graph-uri (URI. "http://example.com")
+        triples #{(pr/->Triple (URI. "http://s") (URI. "http://p") ::dg)}
+        unrewritten-triples (unrewrite-in-draft live-graph-uri triples)]
+    (t/is (= #{(pr/->Triple (URI. "http://s") (URI. "http://p") live-graph-uri)} unrewritten-triples))))
+
+(t/deftest unrewrite-draftset-graph-matches-sp-test
+  (let [live-graph-uri (URI. "http://example.com")
+        triples #{(pr/->Triple ::dg ::dg "o")}
+        unrewritten-triples (unrewrite-in-draft live-graph-uri triples)]
+    (t/is (= #{(pr/->Triple live-graph-uri live-graph-uri "o")} unrewritten-triples))))
+
+(t/deftest unrewrite-draftset-graph-matches-so-test
+  (let [live-graph-uri (URI. "http://example.com")
+        triples #{(pr/->Triple ::dg (URI. "http://p") ::dg)}
+        unrewritten-triples (unrewrite-in-draft live-graph-uri triples)]
+    (t/is (= #{(pr/->Triple live-graph-uri (URI. "http://p") live-graph-uri)} unrewritten-triples))))
+
+(t/deftest unrewrite-draftset-graph-matches-po-test
+  (let [live-graph-uri (URI. "http://example.com")
+        triples #{(pr/->Triple (URI. "http://s") ::dg ::dg)}
+        unrewritten-triples (unrewrite-in-draft live-graph-uri triples)]
+    (t/is (= #{(pr/->Triple (URI. "http://s") live-graph-uri live-graph-uri)} unrewritten-triples))))
+
+(t/deftest unrewrite-draftset!-graph-matches-spo-test
+  (let [live-graph-uri (URI. "http://example.com")
+        triples #{(pr/->Triple ::dg ::dg ::dg)}
+        unrewritten-triples (unrewrite-in-draft live-graph-uri triples)]
+
+    (t/is (= #{(pr/->Triple live-graph-uri live-graph-uri live-graph-uri)} unrewritten-triples))))
+
+(defn- rewrite-triples [graph-mapping graph->triples]
+  (letfn [(rewrite-value [v] (get graph-mapping v v))
+          (rewrite-triple [triple]
+            (reduce (fn [t loc] (update t loc rewrite-value)) triple [:s :p :o]))]
+    (util/map-values (fn [triples] (into #{} (map rewrite-triple triples))) graph->triples)))
+
+(t/deftest unrewrite-draftset!-multiple-graph-references
+  (let [repo (repo/sparql-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
+        graph-manager (graphs/create-manager repo)
+        live-graphs (map #(URI. (str "http://live-" %)) (range 1 5))
+        [lg1 lg2 lg3 lg4] live-graphs
+        draftset (create-draftset! repo test-editor)
+        draft-graphs (mapv (fn [lg] (graphs/create-user-graph-draft graph-manager draftset lg)) live-graphs)
+        [dg1 dg2 dg3 dg4] draft-graphs
+        draft-quads {dg1 #{(pr/->Triple (URI. "http://s1") (URI. "http://p1") "o1")}
+                     dg2 #{(pr/->Triple dg1 (URI. "http://p2") "o2")
+                           (pr/->Triple (URI. "http://s3") dg2 "o3")
+                           (pr/->Triple (URI. "http://s4") (URI. "http://p4") dg3)}
+                     dg3 #{(pr/->Triple dg1 dg2 "o5")
+                           (pr/->Triple (URI. "http://s6") dg2 dg3)
+                           (pr/->Triple dg1 (URI. "http://p7") dg3)}
+                     dg4 #{(pr/->Triple dg4 dg4 dg4)
+                           (pr/->Triple dg4 dg1 dg3)
+                           (pr/->Triple dg1 dg2 dg3)
+                           (pr/->Triple dg3 dg1 dg2)}}]
+    (with-open [conn (repo/->connection repo)]
+      ;; add draft triples
+      (doseq [[dg triples] draft-quads]
+        (sparql/add conn dg triples))
+
+      ;;unrewrite draft
+      (unrewrite-draftset! conn {:draftset-uri (ds/->draftset-uri draftset)
+                                 :live-graph-uris live-graphs}))
+
+    (let [expected (rewrite-triples (zipmap draft-graphs live-graphs) draft-quads)
+          actual (raw-graph-triples repo draft-graphs)]
+      (t/is (= expected actual)))))
 
 (use-fixtures :each (wrap-system-setup "test-system.edn" [:drafter.stasher/repo :drafter/write-scheduler]))
 ;(use-fixtures :each wrap-clean-test-db)

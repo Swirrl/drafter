@@ -1,0 +1,16 @@
+@prefix : <http://example.com/test/publish/statement-references-own-graph#> .
+
+# graph containing statements which reference their own graph
+:g {
+  :s1 :p1 :o1 .
+
+  :g :p2 :o2 .
+  :s3 :g :o3 .
+  :s4 :p4 :g .
+
+  :g :g :o5 .
+  :g :p6 :g .
+  :s7 :g :g .
+
+  :g :g :g .
+}

@@ -313,39 +313,112 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
-(defn- rewrite-q
-  [{:keys [?from ?to draftset-uri deleted live-graph-uris draft-graph-uris]}]
+(defn- uri-values [binding-name uris]
+  (format "VALUES ?%s { %s }"
+          binding-name
+          (string/join " " (map (fn [g] (str "<" g ">")) uris))))
+
+(defn- get-rewrite-state-graph-pattern
+  "Returns a group graph pattern within the drafter state graph which finds the draftset graphs
+   to rewrite within, along with the corresponding live and draft graphs to rewrite. The graph pattern
+   binds the following query variables:
+
+     ?ds - Draftset URI
+     ?g - (Draft) graph to search within the draftset identified by ?ds
+     ?dg - A draft graph in the draftset identified by ?ds
+     ?lg - A live graph with draft ?dg in the draftset identified by ?ds."
+  [{:keys [deleted live-graph-uris draft-graph-uris draftset-uri]}]
   (let [filter (case deleted
                  :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
                  :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
                  nil)
-        ds-values (when draftset-uri (str "VALUES ?ds { <" draftset-uri "> }"))
-        live-values (some->> (seq live-graph-uris)
-                             (map #(str "<" % ">"))
-                             (string/join " ")
-                             (format "VALUES ?lg { %s }"))
-        draft-values (some->> (seq draft-graph-uris)
-                              (map #(str "<" % ">"))
-                              (string/join " ")
-                              (format "VALUES ?dg { %s }"))
+        ds-values (when draftset-uri (uri-values "ds" [draftset-uri]))
+        live-values (some->> (seq live-graph-uris) (uri-values "lg"))
+        draft-values (some->> (seq draft-graph-uris) (uri-values "dg"))
         suffix (->> [filter ds-values live-values draft-values]
                     (remove nil?)
                     (string/join "\n    ")
                     (str "\n    "))]
     (format "
-DELETE { GRAPH ?g { %1$s ?p1 ?o1 . ?s2 %1$s ?o2 . ?s3 ?p3 %1$s . } }
-INSERT { GRAPH ?g { %2$s ?p1 ?o1 . ?s2 %2$s ?o2 . ?s3 ?p3 %2$s . } }
-WHERE {
-  GRAPH ?g { { %1$s ?p1 ?o1 } UNION
-             { ?s2 %1$s ?o2 } UNION
-             { ?s3 ?p3 %1$s } }
   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-    ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-    ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-    ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .%3$s
-  }
-} ;" ?from ?to suffix)))
+      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
+      ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
+      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
+      %s
+  }" suffix)))
+
+(defn- rewrite-subjects-q
+  "Rewrites all values in subject position to/from their value in draft/live"
+  [{:keys [?from ?to] :as opts}]
+  (let [state-filter (get-rewrite-state-graph-pattern opts)]
+    (format "
+DELETE {
+  GRAPH ?g { %1$s ?p ?o }
+}
+INSERT {
+  GRAPH ?g { %2$s ?p ?o }
+}
+WHERE {
+  GRAPH ?g { %1$s ?p ?o }
+  %3$s
+}" ?from ?to state-filter)))
+
+(defn- rewrite-predicates-q
+  "Rewrites all values in predicate position to/from their value in draft/live"
+  [{:keys [?from ?to] :as opts}]
+  (let [state-filter (get-rewrite-state-graph-pattern opts)]
+    (format "
+DELETE {
+  GRAPH ?g { ?s %1$s ?o }
+}
+INSERT {
+  GRAPH ?g { ?s %2$s ?o }
+}
+WHERE {
+  GRAPH ?g { ?s %1$s ?o }
+  %3$s
+}" ?from ?to state-filter)))
+
+(defn- rewrite-objects-q
+  "Rewrites all values in object position to/from their value in draft/live"
+  [{:keys [?from ?to] :as opts}]
+  (let [state-filter (get-rewrite-state-graph-pattern opts)]
+    (format "
+DELETE {
+  GRAPH ?g { ?s ?p %1$s }
+}
+INSERT {
+  GRAPH ?g { ?s ?p %2$s }
+}
+WHERE {
+  GRAPH ?g { ?s ?p %1$s }
+  %3$s
+}" ?from ?to state-filter)))
+
+(defn rewrite-q
+  "Generates a query to rewrite graph values within a draftset from draft to live or vice versa.
+   The query generates bindings for ?lg and ?dg representing the live and draft graphs within a
+   draftset. The :?from and :?to parameters can be specified to control the direction of rewriting:
+   {:?from ?lg :?to ?dg} will convert live graph URIs to their corresponding draft graphs, and
+   {:?from ?dg :to ?lg} will convert draft graphs to their live counterparts.
+
+   In addition the following other options are supported:
+     :deleted - Graphs deleted within a draftset retain an entry in the state graph but their draft data graphs
+                are empty. Setting this parameter to :ignore will filter all empty draft graphs and any references
+                to them will not be rewritten. If set to :rewrite then ONLY references to empty (i.e. deleted)
+                draft graphs will be rewritten.
+
+     :draftset-uri - Set this to restrict the draftset to be rewritten.
+
+     :live-graph-uris - A collection of live graph URIs to rewrite references to.
+
+     :draft-graph-uris - A collection of draft graph URIs to rewrite references to."
+  [opts]
+  (let [qs [(rewrite-subjects-q opts)
+            (rewrite-predicates-q opts)
+            (rewrite-objects-q opts)]]
+    (util/make-compound-sparql-query qs)))
 
 (defn rewrite-draftset-q [opts]
   (rewrite-q (assoc opts :?from '?lg :?to '?dg :deleted :ignore)))
@@ -358,8 +431,8 @@ WHERE {
        (sparql/update! conn)))
 
 (defn unrewrite-draftset! [conn opts]
-  (->> (unrewrite-draftset-q opts)
-       (sparql/update! conn)))
+  (let [q (unrewrite-draftset-q opts)]
+    (sparql/update! conn q)))
 
 (defn migrate-graphs-to-live! [repo graphs clock]
   "Migrates a collection of draft graphs to live through a single
@@ -371,7 +444,7 @@ WHERE {
           graph-migrate-queries (mapcat #(:queries (migrate-live-queries repo % transaction-started-at))
                                         graphs)
           fixup-q (unrewrite-draftset-q {:draft-graph-uris graphs})
-          update-str (str fixup-q (util/make-compound-sparql-query graph-migrate-queries))]
+          update-str (util/make-compound-sparql-query (cons fixup-q graph-migrate-queries))]
       (update! repo update-str)))
   (log/info "Make-live for graph(s) " graphs " done"))
 
