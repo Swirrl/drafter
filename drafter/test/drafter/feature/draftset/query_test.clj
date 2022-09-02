@@ -66,10 +66,29 @@
       (is (set/subset? expected-triples response-triples)))))
 
 (def slow-query
-  "CONSTRUCT WHERE {
-     ?s0 ?p0 ?o0 . ?s1 ?p1 ?o1 . ?s2 ?p2 ?o2 . ?s3 ?p3 ?o3 .
-     ?s4 ?p4 ?o4 . ?s5 ?p5 ?o5 . ?s6 ?p6 ?o6 . ?s7 ?p7 ?o7 .
-   }")
+  "CONSTRUCT { <http://query> <http://has-count> ?c } WHERE {
+    SELECT (COUNT(?s) as ?c) WHERE {
+       {
+           ?s ?p ?o .
+       }
+       OPTIONAL {
+           ?s2 ?p2 ?o2 .
+       }
+       OPTIONAL {
+           ?s3 ?p3 ?o3 .
+       } OPTIONAL {
+           ?s4 ?p4 ?o4 .
+       } OPTIONAL {
+           ?s5 ?p5 ?o5 .
+       } OPTIONAL {
+           ?s6 ?p6 ?o6 .
+       } OPTIONAL {
+           ?s7 ?p7 ?o7 .
+       } OPTIONAL {
+           ?s8 ?p8 ?o8 .
+       }
+    }
+}")
 
 (tc/deftest-system-with-keys query-timeout
   [:drafter.fixture-data/loader
