@@ -174,10 +174,10 @@
            (has-permission? user claim-permission))
       (= claim-user (username user))))
 
-;; Currently the conditions for viewing a draft (in a list of all drafts, etc)
-;; happen to be the same as the conditions for claiming a draft. This needn't
-;; be the case in the future.
-(def can-view? can-claim?)
+(defn can-view? [user draftset]
+  (or (can-claim? user draftset)
+      (contains? (:view-users draftset) (username user))
+      (some #(has-permission? user %) (:view-permissions draftset))))
 
 (defn permitted-draftset-operations [draftset user]
   (cond

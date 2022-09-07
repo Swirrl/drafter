@@ -20,6 +20,15 @@ draftset:35d0ddb6-e8eb-4672-aab4-a3f53d14c6fe a drafter:DraftSet ;
 	drafter:hasOwner <mailto:publisher@swirrl.com> ;
 	rdfs:label "owned" .
 
+draftset:8cca48a4-b626-46b5-b581-4326ecf144d5 a drafter:DraftSet ;
+	dcterms:modified "2018-01-16T12:31:23.516Z"^^xsd:dateTime ;
+	drafter:version version:af5b52d4-1c9a-4415-9aa8-08a448eae564 ;
+	dcterms:created "2018-01-16T12:31:23.516Z"^^xsd:dateTime ;
+	dcterms:creator <mailto:publisher@swirrl.com> ;
+	drafter:hasOwner <mailto:publisher@swirrl.com> ;
+	drafter:viewUser <mailto:manager@swirrl.com> ;
+	rdfs:label "shared-with-manager" .
+
 draftset:32159abf-d2ca-4f8b-8cc0-9609704c2553 a drafter:DraftSet ;
 	dcterms:modified "2018-01-16T12:31:30.865Z"^^xsd:dateTime ;
 	drafter:version version:d5f3935d-56b6-4d91-8f4f-9ea59d7fa0b0 ;

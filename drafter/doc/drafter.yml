@@ -56,6 +56,10 @@ info:
         depending on their permissions then choose to make further ammendments,
         `/publish` or submit the draftset to a new owner.
 
+      - `/share` to allow other users read only access to this draft without
+        relinquishing ownership of it -- either by specifying specific users,
+        or permissions that users must have.
+
       - `/publish` which can be used by clients with the
         `drafter:draft:publish` permission to publish a reviewed draftset to
         the live site.
@@ -512,6 +516,47 @@ paths:
             $ref: '#/definitions/Draftset'
         '422':
           description: The submit request could not be processed.
+  /draftset/{id}/share:
+    post:
+      operationId: share-draftset-with
+      summary: Share a Draftset with a user or permission holder
+      description: |
+        Shares this draftset for read only access by another user. Draftsets
+        are shared directly with a user, or with a pool of users with a given
+        permission.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+        - $ref: '#/parameters/permission'
+        - $ref: '#/parameters/share-user'
+      tags:
+        - Draftsets
+      responses:
+        '200':
+          description: The Draftset was successfully shared.
+          schema:
+            $ref: '#/definitions/Draftset'
+        '422':
+          description: The share request could not be processed.
+    delete:
+      operationId: unshare-draftset
+      summary: Unshare a Draftset
+      description: |
+        Unshares this draftset so that only its owner can view it.
+      security:
+        - jws-auth: []
+      parameters:
+        - $ref: '#/parameters/id'
+      tags:
+        - Draftsets
+      responses:
+        '200':
+          description: The Draftset was successfully unshared.
+          schema:
+            $ref: '#/definitions/Draftset'
+        '422':
+          description: The unshare request could not be processed.
   /draftset/{id}/claim:
     put:
       operationId: claim-draftset
@@ -872,6 +917,12 @@ parameters:
   submit-user:
     name: user
     description: The username of the user to submit the draftset to.
+    in: query
+    required: false
+    type: string
+  share-user:
+    name: user
+    description: The username of the user to share the draftset with.
     in: query
     required: false
     type: string

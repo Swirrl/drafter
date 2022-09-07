@@ -43,6 +43,10 @@
  {:drafter/backend #ig/ref :drafter/backend
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
+ :drafter.feature.middleware/wrap-as-draftset-viewer
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
+
  :drafter.feature.draftset.delete/handler {:drafter/backend #ig/ref :drafter/backend
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
@@ -50,9 +54,10 @@
  {:drafter/backend #ig/ref :drafter/backend
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
- :drafter.feature.draftset-data.show/handler {:drafter/backend #ig/ref :drafter/backend
-                                              :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                              :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.feature.draftset-data.show/handler
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-as-draftset-viewer #ig/ref :drafter.feature.middleware/wrap-as-draftset-viewer
+  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset-data.delete/delete-data-handler {:drafter/manager #ig/ref :drafter/manager
                                                             :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
@@ -78,9 +83,10 @@
  :drafter.feature.draftset-data.append-by-graph/handler {:drafter/manager #ig/ref :drafter/manager
                                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
- :drafter.feature.draftset.query/handler {:drafter/backend #ig/ref :drafter/backend
-                                          :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
-                                          :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
+ :drafter.feature.draftset.query/handler
+ {:drafter/backend #ig/ref :drafter/backend
+  :wrap-as-draftset-viewer #ig/ref :drafter.feature.middleware/wrap-as-draftset-viewer
+  :timeout-fn #ig/ref [:drafter.timeouts/timeout-query :drafter/draftset-timeout]}
 
  :drafter.feature.draftset.update/handler {:drafter/manager #ig/ref :drafter/manager
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner
@@ -96,6 +102,16 @@
                                            :drafter.user/repo #ig/ref :drafter.user/repo
                                            :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
 
+ :drafter.feature.draftset.share/post
+ {:drafter/manager #ig/ref :drafter/manager
+  :drafter.user/repo #ig/ref :drafter.user/repo
+  :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+
+ :drafter.feature.draftset.share/delete
+ {:drafter/manager #ig/ref :drafter/manager
+  :drafter.user/repo #ig/ref :drafter.user/repo
+  :wrap-as-draftset-owner #ig/ref :drafter.feature.middleware/wrap-as-draftset-owner}
+
  :drafter.feature.draftset.claim/handler
  {:drafter/manager #ig/ref :drafter/manager
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
@@ -109,37 +125,38 @@
  {:drafter/backend #ig/ref :drafter/backend
   :wrap-authenticate #ig/ref :drafter.middleware/wrap-authenticate}
 
- [:drafter/routes :draftset/api] {:context "/v1"
-                                  :routes [[:get "/users" #ig/ref :drafter.feature.users.list/get-users-handler]
+ [:drafter/routes :draftset/api]
+ {:context "/v1"
+  :routes
+  [[:get "/users" #ig/ref :drafter.feature.users.list/get-users-handler]
 
-                                           [:get "/draftsets" #ig/ref :drafter.feature.draftset.list/get-draftsets-handler]
-                                           [:post "/draftsets" #ig/ref :drafter.feature.draftset.create/handler]
+   [:get "/draftsets" #ig/ref :drafter.feature.draftset.list/get-draftsets-handler]
+   [:post "/draftsets" #ig/ref :drafter.feature.draftset.create/handler]
 
-                                           [:get "/draftset/:id" #ig/ref :drafter.feature.draftset.show/handler]
-                                           [:delete "/draftset/:id" #ig/ref :drafter.feature.draftset.delete/handler]
-                                           [:options "/draftset/:id" #ig/ref :drafter.feature.draftset.options/handler]
+   [:get "/draftset/:id" #ig/ref :drafter.feature.draftset.show/handler]
+   [:delete "/draftset/:id" #ig/ref :drafter.feature.draftset.delete/handler]
+   [:options "/draftset/:id" #ig/ref :drafter.feature.draftset.options/handler]
 
-                                           [:get "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.show/handler]
-                                           [:delete "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.delete/delete-data-handler]
+   [:get "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.show/handler]
+   [:delete "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.delete/delete-data-handler]
 
-                                           [:delete "/draftset/:id/graph" #ig/ref :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler]
-                                           [:delete "/draftset/:id/changes" #ig/ref :drafter.feature.draftset.changes/delete-changes-handler]
+   [:delete "/draftset/:id/graph" #ig/ref :drafter.feature.draftset-data.delete-by-graph/remove-graph-handler]
+   [:delete "/draftset/:id/changes" #ig/ref :drafter.feature.draftset.changes/delete-changes-handler]
 
+   [:put "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.append/data-handler]
+   [:put "/draftset/:id/graph" #ig/ref :drafter.feature.draftset-data.append-by-graph/handler]
+   [nil "/draftset/:id/query" #ig/ref :drafter.feature.draftset.query/handler]
+   [:post "/draftset/:id/update" #ig/ref :drafter.feature.draftset.update/handler]
 
-                                           [:put "/draftset/:id/data" #ig/ref :drafter.feature.draftset-data.append/data-handler]
-                                           [:put "/draftset/:id/graph" #ig/ref :drafter.feature.draftset-data.append-by-graph/handler]
-                                           [nil "/draftset/:id/query" #ig/ref :drafter.feature.draftset.query/handler]
-                                           [:post "/draftset/:id/update" #ig/ref :drafter.feature.draftset.update/handler]
+   [:post "/draftset/:id/publish" #ig/ref :drafter.feature.draftset.publish/handler]
+   [:put "/draftset/:id" #ig/ref :drafter.feature.draftset.set-metadata/handler]
+   [:post "/draftset/:id/submit-to" #ig/ref :drafter.feature.draftset.submit/handler]
+   [:put "/draftset/:id/claim" #ig/ref :drafter.feature.draftset.claim/handler]
+   [:post "/draftset/:id/share" #ig/ref :drafter.feature.draftset.share/post]
+   [:delete "/draftset/:id/share" #ig/ref :drafter.feature.draftset.share/delete]
 
-                                           [:post "/draftset/:id/publish" #ig/ref :drafter.feature.draftset.publish/handler]
-                                           [:put "/draftset/:id" #ig/ref :drafter.feature.draftset.set-metadata/handler]
-                                           [:post "/draftset/:id/submit-to" #ig/ref :drafter.feature.draftset.submit/handler]
-                                           [:put "/draftset/:id/claim" #ig/ref :drafter.feature.draftset.claim/handler]
-
-                                           [:get "/endpoint/public" #ig/ref :drafter.feature.endpoint.show/handler]
-                                           [:get "/endpoints" #ig/ref :drafter.feature.endpoint.list/handler]
-                                           ]
-                                  }
+   [:get "/endpoint/public" #ig/ref :drafter.feature.endpoint.show/handler]
+   [:get "/endpoints" #ig/ref :drafter.feature.endpoint.list/handler]]}
 
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

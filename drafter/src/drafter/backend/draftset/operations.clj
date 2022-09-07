@@ -16,7 +16,8 @@
   (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
            [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler BindingSet GraphQueryResult]
            org.eclipse.rdf4j.queryrender.RenderUtils
-           org.eclipse.rdf4j.rio.RDFHandler))
+           org.eclipse.rdf4j.rio.RDFHandler
+           java.net.URI))
 
 (defn- create-draftset-statements [user-uri title description draftset-uri created-date]
   (let [ss [draftset-uri
@@ -169,6 +170,18 @@
       "  ?ds <" drafter:hasSubmission "> ?submission ."
       "  ?submission <" drafter:claimPermission "> ?permission ."
       "}"
+      ;; Makes the assumption that usernames and permissions don't contain
+      ;; spaces, so we can use space as a separator. Usernames are URIs, which
+      ;; cannot contain spaces. Permissions are OAuth 2.0 scopes, which also
+      ;; cannot contain spaces.
+      "OPTIONAL {"
+      "  SELECT ?ds (GROUP_CONCAT(?p; SEPARATOR=\" \") AS ?viewpermissions)"
+      "  WHERE { ?ds <" drafter:viewPermission "> ?p } GROUP BY ?ds"
+      "}"
+      "OPTIONAL {"
+      "  SELECT ?ds (GROUP_CONCAT(?u; SEPARATOR=\" \") AS ?viewusers)"
+      "  WHERE { ?ds <" drafter:viewUser "> ?u } GROUP BY ?ds"
+      "}"
       "{"
       "  SELECT DISTINCT ?ds WHERE {"
       "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
@@ -210,7 +223,9 @@
            claimuser
            submitter
            modified
-           version] :as ds}]
+           version
+           viewpermissions
+           viewusers] :as ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :type "Draftset"
                          :created-at created
@@ -224,7 +239,15 @@
                          :claim-role (keyword (user/canonical-permission->role
                                                permission))
                          :claim-user (some-> claimuser (user/uri->username))
-                         :submitted-by (some-> submitter (user/uri->username))}]
+                         :submitted-by (some-> submitter (user/uri->username))
+                         :view-permissions
+                         (when viewpermissions
+                           (set (map keyword
+                                     (string/split viewpermissions #" "))))
+                         :view-users
+                         (when viewusers
+                           (set (map #(user/uri->username (URI. %))
+                                     (string/split viewusers #" "))))}]
     (merge required-fields (remove (comp nil? second) optional-fields))))
 
 (defn- combine-draftset-properties-and-graph-states [ds-properties graph-states]
@@ -262,6 +285,9 @@
 
 (defn get-draftset-info [repo draftset-ref]
   (first (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])))
+
+(defn is-draftset-viewer? [backend draftset-ref user]
+  (user/can-view? user (get-draftset-info backend draftset-ref)))
 
 (defn- delete-draftset-query [draftset-ref draft-graph-uris]
   (let [delete-drafts-query (map mgmt/delete-draft-graph-and-remove-from-state-query draft-graph-uris)
@@ -340,6 +366,45 @@
                   (submit-draftset-to-permission-query
                    draftset-ref (util/create-uuid) owner permission)))
 
+(defn- share-draftset-with-permission-query
+  [draftset-ref owner permission]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (str
+     "INSERT {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:viewPermission "> \"" (name permission) "\" .")
+     "} WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> .")
+     "}")))
+
+(defn share-draftset-with-permission!
+  "Shares a draftset with users with the specified permission. If the given
+   user is not the current owner of the draftset, no changes are made."
+  [backend draftset-ref owner permission]
+  (sparql/update! backend (share-draftset-with-permission-query
+                           draftset-ref owner permission)))
+
+(defn unshare-draftset!
+  "Removes all shares from a draftset, so only the owner can view it. If the
+   given user is not the current owner of the draftset, no changes are made."
+  [backend draftset-ref owner]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (sparql/update! backend
+      (str
+       "DELETE {"
+       (with-state-graph
+         "<" draftset-uri "> <" drafter:viewPermission "> ?vp ;"
+         "                   <" drafter:viewUser "> ?vu .")
+       "} WHERE {"
+       (with-state-graph
+         "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> ;"
+         "                   <" rdf:a "> <" drafter:DraftSet "> ."
+         " OPTIONAL { <" draftset-uri "> <" drafter:viewPermission "> ?vp . }"
+         " OPTIONAL { <" draftset-uri "> <" drafter:viewUser "> ?vu . }")
+       "}"))))
+
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
         target-uri (user/user->uri target)
@@ -369,6 +434,22 @@
 
 (defn submit-draftset-to-user! [backend draftset-ref submitter target]
   (let [q (submit-to-user-query draftset-ref (util/create-uuid) submitter target)]
+    (sparql/update! backend q)))
+
+(defn- share-with-user-query [draftset-ref owner target]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (str
+     "INSERT {"
+     (with-state-graph
+       "<" draftset-uri "> <" drafter:viewUser "> <" (user/user->uri target) "> .")
+     "} WHERE {"
+     (with-state-graph
+       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
+       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> .")
+     "}")))
+
+(defn share-draftset-with-user! [backend draftset-ref submitter target]
+  (let [q (share-with-user-query draftset-ref submitter target)]
     (sparql/update! backend q)))
 
 (defn- try-claim-draftset-query [draftset-ref claimant]

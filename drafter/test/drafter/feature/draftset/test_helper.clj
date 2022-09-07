@@ -42,6 +42,11 @@
                           :request-method :post
                           :params {:role (name role)}}))
 
+(defn create-share-with-permission-request [user draftset-location permission]
+  (tc/with-identity user {:uri (str draftset-location "/share")
+                          :request-method :post
+                          :params {:permission (name permission)}}))
+
 (defn create-draftset-through-api
   ([handler] (create-draftset-through-api handler test-editor))
   ([handler user] (create-draftset-through-api handler user nil))
@@ -59,6 +64,19 @@
 
 (defn submit-draftset-to-user-request [draftset-location target-user user]
   (submit-draftset-to-username-request draftset-location (user/username target-user) user))
+
+(defn share-draftset-with-username-request [draftset-location target-username user]
+  (tc/with-identity user {:uri (str draftset-location "/share")
+                          :request-method :post
+                          :params {:user target-username}}))
+
+(defn share-draftset-with-user-request [draftset-location target-user user]
+  (share-draftset-with-username-request
+   draftset-location (user/username target-user) user))
+
+(defn unshare-draftset-request [draftset-location user]
+  (tc/with-identity user {:uri (str draftset-location "/share")
+                          :request-method :delete}))
 
 (defn submit-draftset-to-user-through-api [handler draftset-location target-user user]
   (let [request (submit-draftset-to-user-request draftset-location target-user user)

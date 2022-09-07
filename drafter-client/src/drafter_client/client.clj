@@ -155,6 +155,16 @@
   (i/request client i/submit-draftset-to access-token id
              :role (name role)))
 
+(defn share-with-user [client access-token id user]
+  (i/request client i/share-draftset-with access-token id :user user))
+
+(defn share-with-permission [client access-token id permission]
+  (i/request client i/share-draftset-with access-token id
+             :permission (name permission)))
+
+(defn unshare [client access-token id]
+  (i/request client i/unshare-draftset access-token id))
+
 (defn claim [client access-token id]
   (i/request client i/claim-draftset access-token id))
 
