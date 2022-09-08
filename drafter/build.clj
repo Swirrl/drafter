@@ -61,7 +61,8 @@
     (pack/skinny {:basis basis
                   :path "target/drafter.jar"
                   :path-coerce :jar
-                  :libs "target/lib"})))
+                  :libs "target/lib"
+                  :lib-coerce :jar})))
 
 (defn- copy-files [basis aliases]
   (let [alias-extra-paths (mapcat (fn [alias]
