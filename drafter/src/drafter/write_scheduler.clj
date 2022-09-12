@@ -155,7 +155,7 @@
               (log/warn ex "A task raised an error.  Delivering error to promise")
               ;; TODO improve error returned
               (jobs/job-failed! job ex)))))
-      (log/debug "Writer waiting for tasks")
+      (log/trace "Writer waiting for tasks")
       (recur))))
 
 (defn start-writer! [global-writes-lock]
