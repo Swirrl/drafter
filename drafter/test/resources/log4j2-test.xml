@@ -31,7 +31,7 @@
             <AppenderRef ref="drafter" />
         </Logger>
 
-        <Logger name="drafter.write-scheduler" level="info">
+        <Logger name="drafter.write-scheduler" level="info" additivity="false">
             <AppenderRef ref="drafter" />
         </Logger>
 
