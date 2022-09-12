@@ -99,7 +99,7 @@
 (defrecord FileBackend [dir buffer-size]
   StashBackend
   (destination-stream [this cache-key fmt]
-    (log/debugf "Creating destination stream for %s query %s"
+    (log/tracef "Creating destination stream for %s query %s"
                 (ck/query-type cache-key)
                 (cache-key->query-id cache-key))
     (let [temp-file (create-temp-file! dir fmt)]

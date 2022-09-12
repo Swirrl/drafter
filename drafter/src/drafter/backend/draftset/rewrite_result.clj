@@ -76,7 +76,6 @@
     (handleLinks [this link-urls]
       (.handleLinks handler link-urls))
     (handleSolution [this binding-set]
-      (log/debug "select result wrapper " this  "handler: " handler)
       ;; NOTE: mutating the binding set whilst writing (iterating)
       ;; results causes bedlam with the iteration, especially with SPARQL
       ;; DISTINCT queries.
