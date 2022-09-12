@@ -137,7 +137,7 @@
         (datadog/gauge! "drafter.jobs_queue_size" (.size writes-queue))
         (with-logging-context (assoc
                                (meta job)
-                               :jobId (str "job-" (.substring (str job-id) 0 8)))
+                               :jobId (str (.substring (str job-id) 0 8)))
           (try
             ;; Note that task functions are responsible for the delivery
             ;; of the promise and the setting of DONE and also preserve
@@ -191,9 +191,8 @@
    (run-sync-job! global-writes-lock job default-job-result-handler))
   ([global-writes-lock job resp-fn]
    (log/info "Submitting sync job: " job)
-   (try
-     (let [job-result (exec-sync-job! global-writes-lock job)]
-       (resp-fn job-result)))))
+   (let [job-result (exec-sync-job! global-writes-lock job)]
+     (resp-fn job-result))))
 
 (defn enqueue-async-job!
   "Submits an async job for execution. Returns the submitted job."
