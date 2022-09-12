@@ -448,30 +448,45 @@
 (defn log-stasher-status
   "Specialised stasher logging procedure.
 
-  We log stasher query hashes and cache hits and misses, with their
-  stasher hashes to assist in debugging activities.
+  We maintain two log files the \"drafter.log\" where the main
+  narrative of requests are logged, and the \"sparql.log\" where we
+  log sparql queries and sparql update statements.
 
-  In the case of cache hits we should have logged the query already,
-  so searching for the hash in the logs should be enough to discover
-  the original query, and as most queries are cache hits this saves a
-  huge amount of noise in the logs.
+  The \"drafter.log\" doesn't contain the sparql queries themselves,
+  just the hashes of the queries and whether they were hits or misses.
+
+  The \"sparql.log\" contains the queries along with duplicated
+  information (from the \"drafter.log\") on their cache keys etc,
+  however in our default configuration we log only SPARQL misses only,
+  with SPARQL query hits being logged at debug level.
+
+  In the default config and in the case of cache hits we should have
+  logged the query already, so searching for the hash in the logs
+  should be enough to discover the original query, and as most queries
+  are cache hits this saves a huge amount of noise in the logs.
 
   However, the rotation policy on the SPARQL query log may mean that
   the original cache miss has been rotated out of the logs. In these
   cases production users can temporarily reconfigure the log4j2.xml
   file so that drafter.rdf.sparql is set to log at a 'debug' level and
-  wait for the configuration to be reloaded. This should result in
-  cache hits also logging the query for debugging.
-  "
+  wait for the configuration to be reloaded. This should allow
+  repeating the query to capture the query in the logs again."
   [hit-or-miss {:keys [query-str] :as cache-key}]
   (case hit-or-miss
-    "miss" (log/log "drafter.rdf.sparql" ; log from drafter.rdf.sparql ns (so queries are logged together)
-                    :info
-                    nil
-                    (format "Stasher miss key: %s for %s query:\n%s"
-                            (fc/cache-key->hash-key cache-key)
-                            (name (ck/query-type cache-key))
-                            query-str))
+    "miss" (do
+             (log/log "drafter.stasher" ; log to standard drafter log (with elided query)
+                      :info
+                      nil
+                      (format "Stasher miss key: %s for %s query (elided)"
+                              (fc/cache-key->hash-key cache-key)
+                              (name (ck/query-type cache-key))))
+             (log/log "drafter.rdf.sparql" ; log from drafter.rdf.sparql ns (so queries are logged together)
+                      :info
+                      nil
+                      (format "Stasher miss key: %s for %s query:\n%s"
+                              (fc/cache-key->hash-key cache-key)
+                              (name (ck/query-type cache-key))
+                              query-str)))
     "hit" (let [hash-key (fc/cache-key->hash-key cache-key)
                 query-type (name (ck/query-type cache-key))]
             ;; NOTE we log hits at info level without the query string
