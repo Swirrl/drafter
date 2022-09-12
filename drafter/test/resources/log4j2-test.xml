@@ -27,37 +27,41 @@
             <AppenderRef ref="drafter" />
         </Logger>
 
-        <Logger name="drafter" level="debug">
+        <Logger name="drafter" level="info">
             <AppenderRef ref="drafter" />
         </Logger>
 
-        <Logger name="drafter.write-scheduler" level="info" additivity="false">
-            <AppenderRef ref="drafter" />
+        <!--
+            NOTE: To toggle query logging of SPARQL hits change the
+            level="info" attribute to level="debug"
+        -->
+
+        <Logger name="drafter.rdf.sparql"
+                level="info"
+                additivity="false">
+          <AppenderRef ref="sparql" /> <!-- Send these to the sparql query log -->
         </Logger>
 
-        <Logger name="drafter.rdf.sparql-protocol" level="debug" additivity="false">
-            <AppenderRef ref="sparql" />
-        </Logger>
+        <!-- <Logger name="drafter.write-scheduler" level="info" additivity="false"> -->
+        <!--     <AppenderRef ref="drafter" /> -->
+        <!-- </Logger> -->
 
-        <Logger name="drafter.rdf.sparql" level="info" additivity="false">
-            <AppenderRef ref="sparql" />
-        </Logger>
+        <!-- <Logger name="drafter.rdf.sparql-protocol" level="debug" additivity="false"> -->
+        <!--   <AppenderRef ref="drafter" /> -->
+        <!-- </Logger> -->
 
-        <Logger name="drafter.feature.draftset.update" level="info" additivity="false">
-            <AppenderRef ref="sparql" />
-        </Logger>
 
-        <Logger name="drafter.routes.sparql" level="debug" additivity="false">
-            <AppenderRef ref="sparql" />
-        </Logger>
+        <!-- <Logger name="drafter.feature.draftset.update" level="info" additivity="false"> -->
+        <!--   <AppenderRef ref="drafter" /> -->
+        <!-- </Logger> -->
 
-        <Logger name="drafter.backend.draftset.rewrite-query" level="info" additivity="false">
-            <AppenderRef ref="sparql" />
-        </Logger>
+        <!-- <Logger name="drafter.backend.draftset.rewrite-query" level="debug" additivity="false"> -->
+        <!--   <AppenderRef ref="drafter" /> -->
+        <!-- </Logger> -->
 
-        <Logger name="drafter.stasher" level="info" additivity="false">
-            <AppenderRef ref="sparql" />
-        </Logger>
+        <!-- <Logger name="drafter.stasher" level="info" additivity="false"> -->
+        <!--   <AppenderRef ref="sparql" /> -->
+        <!-- </Logger> -->
 
         <Root>
             <!--don't log anything by default-->
