@@ -56,10 +56,10 @@
       (handler request)
       (try
         (if-let [{:keys [email] :as identity} (authenticate-request auth-methods request)]
-          (with-logging-context {:user email} ;; wrap a logging context over the request so we can trace the user
-                                (datadog/increment! "drafter.requests.authorised" 1)
-                                (log/info "got user" email)
-                                (handler (assoc request :identity identity)))
+          (with-logging-context
+            {:user email} ;; wrap a logging context over the request so we can trace the user
+            (datadog/increment! "drafter.requests.authorised" 1)
+            (handler (assoc request :identity identity)))
           (do
             (datadog/increment! "drafter.requests.unauthorised" 1)
             (response/unauthorized-response "Not authenticated.")))
