@@ -40,7 +40,7 @@
   live->draft graph mapping and then returns the re-written query
   serialised as a string."
   [live->draft query-str]
-  (log/info "Rewriting query " query-str)
+  (log/debug "Rewriting query " query-str)
 
   (let [live->draft (zipmap (map str (keys live->draft))
                             (map str (vals live->draft)))

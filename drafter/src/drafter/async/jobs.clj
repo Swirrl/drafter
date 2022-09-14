@@ -97,7 +97,7 @@
   [f]
   (let [request-id (MDC/get "reqId")] ;; copy reqId off calling thread
     (fn [{job-id :id :as job}]
-      (with-logging-context {:jobId (str "job-" (.substring (str job-id) 0 8))
+      (with-logging-context {:jobId (str (.substring (str job-id) 0 8))
                                  :reqId request-id}
         (f job)))))
 

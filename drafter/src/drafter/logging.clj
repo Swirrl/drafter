@@ -47,7 +47,7 @@
                    acc))]
      (fn [req]
        (let [start-time (System/currentTimeMillis)]
-         (with-logging-context {:reqId (str "req-" (-> (UUID/randomUUID) str (.substring 0 8)))
+         (with-logging-context {:reqId (str (-> (UUID/randomUUID) str (.substring 0 8)))
                                 :start-time start-time}
            (let [logable-params (reduce scrub
                                         (:params req {})

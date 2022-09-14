@@ -7,25 +7,81 @@
     </Properties>
 
     <Appenders>
-        <RollingFile name="file-log" fileName="${log-path}/drafter.log"
+        <RollingFile name="drafter" fileName="${log-path}/drafter.log"
                      filePattern="${log-path}/drafter.%i.log.gz">
             <PatternLayout>
-                <pattern>%d{ISO8601} %-5p %20.20c{1} %12X{user} %12X{jobId} %12X{reqId} :: %m%n</pattern>
+                <pattern>%d{ISO8601} %-5p %20.20c{1} %5X{user} %X{jobId, reqId} :: %m%n</pattern>
             </PatternLayout>
+            <!-- NOTE: gzip reduces size by ~90% so max log files size is ~1Gb -->
             <Policies>
-                <SizeBasedTriggeringPolicy size="50 MB" />
+                <SizeBasedTriggeringPolicy size="500 MB" />
             </Policies>
-            <DefaultRolloverStrategy max="20"/>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
+
+        <RollingFile name="sparql" fileName="${log-path}/sparql.log"
+                     filePattern="${log-path}/sparql.%i.log.gz">
+            <PatternLayout>
+                <pattern>%d{ISO8601} %-5p %20.20c{1} %5X{user} %X{jobId, reqId} :: %m%n</pattern>
+            </PatternLayout>
+            <!--NOTE: gzip reduces size by ~90% so max log files size is ~2Gb -->
+            <Policies>
+                <SizeBasedTriggeringPolicy size="500 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
         </RollingFile>
 
         <Console name="console" target="SYSTEM_OUT">
             <PatternLayout pattern="%d{ISO8601} %-5p %20.20c{1} %12X{user} %12X{jobId} %12X{reqId} :: %m%n"/>
         </Console>
+        <Null name="null" />
+
     </Appenders>
     <Loggers>
-        <Root level="info" additivity="false">
-            <appender-ref ref="console" level="warn"/> <!-- only log warnings and worse to REPL -->
-            <appender-ref ref="file-log" level="info"/>
+        <Logger name="org.openrdf" level="debug">
+            <AppenderRef ref="drafter" />
+        </Logger>
+
+        <Logger name="drafter" level="info">
+            <AppenderRef ref="drafter" />
+        </Logger>
+
+        <!--
+            NOTE: To toggle query logging of SPARQL hits change the
+            level="info" attribute to level="debug"
+        -->
+
+        <Logger name="drafter.rdf.sparql"
+                level="info"
+                additivity="false">
+          <AppenderRef ref="sparql" /> <!-- Send these to the sparql query log -->
+        </Logger>
+
+        <!-- <Logger name="drafter.write-scheduler" level="info" additivity="false"> -->
+        <!--     <AppenderRef ref="drafter" /> -->
+        <!-- </Logger> -->
+
+        <!-- <Logger name="drafter.rdf.sparql-protocol" level="debug" additivity="false"> -->
+        <!--   <AppenderRef ref="drafter" /> -->
+        <!-- </Logger> -->
+
+
+        <!-- <Logger name="drafter.feature.draftset.update" level="info" additivity="false"> -->
+        <!--   <AppenderRef ref="drafter" /> -->
+        <!-- </Logger> -->
+
+        <!-- <Logger name="drafter.backend.draftset.rewrite-query" level="debug" additivity="false"> -->
+        <!--   <AppenderRef ref="drafter" /> -->
+        <!-- </Logger> -->
+
+        <!-- <Logger name="drafter.stasher" level="info" additivity="false"> -->
+        <!--   <AppenderRef ref="sparql" /> -->
+        <!-- </Logger> -->
+
+        <Root>
+            <!--don't log anything by default-->
+            <AppenderRef ref="null" />
         </Root>
     </Loggers>
+
 </Configuration>

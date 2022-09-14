@@ -209,7 +209,7 @@
                   (with-logging-context logctx
                     (let [start-time (System/currentTimeMillis)]
                       (try
-                        (log/info "evaluating")
+                        (log/debug "evaluating")
                         (.evaluate pquery result-handler)
                         (catch Exception ex
                           (cond
