@@ -152,10 +152,6 @@
   [s]
   (error-response 422 :invalid-parameters s))
 
-(defn unauthorised-basic-response [realm]
-  (let [params (str "Basic realm=\"" realm "\"")]
-    {:status 401 :body "" :headers {"WWW-Authenticate" params}}))
-
 (defmacro when-params
   "Simple macro that takes a set of paramaters and tests that they're
   all truthy.  If any are falsey it returns an appropriate ring

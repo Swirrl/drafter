@@ -1,14 +1,9 @@
 (ns drafter.handler
-  (:require [compojure.core :refer [context defroutes GET]]
+  (:require [compojure.core :refer [context defroutes]]
             [compojure.route :as route]
             [drafter.env :as denv]
             [drafter.middleware :as middleware]
             [drafter.routes.status :refer [status-routes]]
-            [drafter.swagger :as swagger]
-
-            [drafter.timeouts :as timeouts]
-            [drafter.util :refer [set-var-root!]]
-            [drafter.write-scheduler :refer [start-writer! stop-writer!]]
             [integrant.core :as ig]
             [noir.util.middleware :refer [app-handler]]
             [ring.middleware.defaults :refer [api-defaults]]

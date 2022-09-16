@@ -179,7 +179,7 @@
     (parse-request [_this _request] nil)
     (authenticate [_this _request _state]
       ;; NOTE: should never be called
-      (throw (ex-info "Authentication failed" {})))))
+      (auth/authentication-failed))))
 
 (defn- fails-with-auth-method
   "Returns an authentication method that always matches a request
@@ -191,7 +191,7 @@
       (throw ex))))
 
 (def always-fails-auth-method
-  (fails-with-auth-method (ex-info "Authentication failed" {})))
+  (fails-with-auth-method (auth/authentication-failed-error)))
 
 (defn- succeeds-with-auth-method
   "Returns an authentication method that always matches a request and
@@ -206,13 +206,13 @@
   (t/testing "No matching auth method"
     (let [auth-methods [never-matches-auth-method]
           request {:uri "/test" :request-method :get}]
-      (t/is (nil? (sut/authenticate-request auth-methods request)))))
+      (t/is (= [:unhandled nil] (sut/authenticate-request auth-methods request)))))
 
   (t/testing "Authentication succeeds"
     (let [user (user/create-authenticated-user "test@example.com" #{:drafter:draft:view})
           auth-methods [(succeeds-with-auth-method user)]
           request {:uri "/test" :request-method :get}]
-      (t/is (= user (sut/authenticate-request auth-methods request)))))
+      (t/is (= [:authenticated user] (sut/authenticate-request auth-methods request)))))
 
   (t/testing "Authenticates with first matching handler"
     (let [user1 (user/create-authenticated-user "test1@example.com" #{:drafter:draft:view})
@@ -220,12 +220,14 @@
           auth-methods [(succeeds-with-auth-method user1)
                         (succeeds-with-auth-method user2)]
           request {:uri "/test" :request-method :get}]
-      (t/is (= user1 (authenticate-request auth-methods request)))))
+      (t/is (= [:authenticated user1] (authenticate-request auth-methods request)))))
 
   (t/testing "Authentication fails"
     (let [auth-methods [always-fails-auth-method]
-          request {:uri "/test" :request-method :get}]
-      (t/is (thrown? ExceptionInfo (authenticate-request auth-methods request))))))
+          request {:uri "/test" :request-method :get}
+          [result data] (authenticate-request auth-methods request)]
+      (t/is (= :authentication-failed result))
+      (t/is (map? data)))))
 
 (t/deftest wrap-authenticate-test
   (t/testing "Allows OPTIONS requests"
@@ -273,9 +275,19 @@
       (tc/assert-is-unauthorised-response response)))
 
   (t/testing "Custom response from authentication error"
-    (let [auth-ex (ex-info "Authentication failed" {:response (response/forbidden-response "Forbidden")})
+    (let [auth-ex (auth/authentication-failed-error "Authentication failed" (response/forbidden-response "Forbidden"))
           auth-methods [(fails-with-auth-method auth-ex)]
           handler (sut/wrap-authenticate identity auth-methods)
           request {:uri "/test" :request-method :get}
           response (handler request)]
-      (tc/assert-is-forbidden-response response))))
+      (tc/assert-is-forbidden-response response)))
+
+  (t/testing "Propagates exceptions from inner handler"
+    (let [inner-ex (ex-info ":'(" {:reason "Inner handler error"})
+          inner-handler (fn [_req] (throw inner-ex))
+          user (user/create-authenticated-user "test@example.com" #{:drafter:view})
+          auth-methods [(succeeds-with-auth-method user)]
+          handler (sut/wrap-authenticate inner-handler auth-methods)
+          request {:uri "/test" :request-method :get}
+          ex (t/is (thrown? ExceptionInfo (handler request)))]
+      (t/is (= inner-ex ex)))))

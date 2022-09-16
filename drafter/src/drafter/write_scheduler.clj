@@ -3,7 +3,7 @@
   responsible for ensuring writes are linearised without synchronous operations
   blocking for too long.
 
-  Long running synchronous operations can be scheduled as :publish-writes
+  Long-running synchronous operations can be scheduled as :publish-writes
   meaning any other concurrent write attempts will fail fast, rather block.
 
   The public functions in this namespace are concerned with submitting jobs and
@@ -22,9 +22,13 @@
   (:import [java.util.concurrent PriorityBlockingQueue TimeUnit]
            java.util.concurrent.atomic.AtomicBoolean
            java.util.concurrent.locks.ReentrantLock
-           org.apache.log4j.MDC))
+           org.apache.log4j.MDC
+           [java.util Date]))
 
 (def priority-levels-map { :publish-write 2 :background-write 1})
+
+(defonce write-scheduler-admin
+         (atom {:jobs-flushed? nil :reject-mode? false}))
 
 (def compare-jobs (comparator
                    (fn [job1 job2]
@@ -79,12 +83,20 @@
          (log/info "Releasing lock for" ~operation-type)
          (.unlock (:lock ~global-writes-lock))))))
 
+(defn check-for-reject-mode []
+  (when (:reject-mode? @write-scheduler-admin)
+      (throw
+        (ex-info (str "Write operations are temporarily unavailable due to maintenance. "
+                      "Please try again later.")
+                 {:error :writes-temporarily-disabled}))))
+
 ;;queue-job :: Job -> ()
 (defn queue-job!
   "Adds a write job to the job queue. If the job cannot be queued then
   an ExceptionInfo is thrown with a data map containing a :type key
   mapped to a :job-enqueue-failed value."
   [{:keys [priority] :as job}]
+  (check-for-reject-mode)
   (let [req-id (MDC/get "reqId")
         req-method (MDC/get "method")
         req-route (MDC/get "route")
@@ -106,9 +118,10 @@
   [{:keys [lock time unit] :as opts}
    {job-function :function :keys [priority] :as job}]
   {:pre [(= :blocking-write priority)]}
+  (check-for-reject-mode)
 
   ;; Try the lock & wait up to 10 seconds for it to let us in.  If it
-  ;; doesn't raise an error.  This ensure's :blocking-write's
+  ;; doesn't raise an error.  This ensures :blocking-write operations
   ;; pass/fail within an acceptable time, and that only one writer is
   ;; writing to the database at a time.
   (if (.tryLock lock)
@@ -122,34 +135,76 @@
                large write operations.  Please try again later."
               {:error :writes-temporarily-disabled}))))
 
+(defn- accept-and-process-jobs! []
+  (swap! write-scheduler-admin assoc
+         :jobs-flushed? nil
+         :reject-mode? false))
+
+(defn jobs-flushing-check []
+  (when (and
+          (:reject-mode? @write-scheduler-admin)
+          (:jobs-flushed? @write-scheduler-admin)
+          (not (realized? (:jobs-flushed? @write-scheduler-admin)))
+          (<= (.size writes-queue) 0))
+    (deliver (:jobs-flushed? @write-scheduler-admin) true)))
+
+(defn- reject-jobs-begin-flush! []
+  (let [rejecting-msg (str "\nREJECTING: Writes and jobs are now being rejected at: " (Date.)
+                           ". Waiting for jobs to flush...")
+        flushed-msg "\nFLUSHED: write jobs have been flushed. It is now safe to take backups"]
+    (swap! write-scheduler-admin assoc
+           :reject-mode? true
+           :jobs-flushed? (promise))
+    ;; println message for socket toggle caller
+    (println rejecting-msg)
+    (log/warn rejecting-msg)
+    (datadog/increment! "drafter.writes.entered_reject_mode" 1)
+    ;; block until queued jobs are all processed and confirmed flushed
+    @(:jobs-flushed? @write-scheduler-admin)
+    (println flushed-msg)
+    (log/warn flushed-msg)
+    (datadog/increment! "drafter.writes.jobs_flushed" 1)))
+
+(defn toggle-reject-and-flush!
+  "This function is intended to be called from outside Drafter via a socket repl.
+  It toggles Drafter into reject mode, where drafter rejects any new write jobs
+  and waits for all currently running jobs to flush."
+  []
+  (if (:reject-mode? @write-scheduler-admin)
+    (accept-and-process-jobs!)
+    (reject-jobs-begin-flush!)))
+
 (defn- write-loop
   "Start the write loop running.  Note this function does not return
   and is supposed to be run asynchronously on a future or thread.
 
   Users should normally use start-writer! to set this running."
-  [global-writes-lock flag]
+  [global-writes-lock should-continue?]
   (log/debug "Writer started waiting for tasks")
   (loop []
-    (when (.get flag)
+    (when (.get should-continue?)
+      (jobs-flushing-check)
+
       (when-let [{task-f! :function
                   priority :priority
                   job-id :id :as job} (.poll writes-queue 200 TimeUnit/MILLISECONDS)]
         (datadog/gauge! "drafter.jobs_queue_size" (.size writes-queue))
-        (with-logging-context (assoc
-                               (meta job)
-                               :jobId (str (.substring (str job-id) 0 8)))
+        (with-logging-context
+          (assoc
+            (meta job)
+            :jobId (str (.substring (str job-id) 0 8)))
           (try
             ;; Note that task functions are responsible for the delivery
             ;; of the promise and the setting of DONE and also preserve
             ;; their job id.
 
             (log-time-taken "task"
-              (if (= :publish-write priority)
-                ;; If we're a publish operation we take the lock to
-                ;; ensure nobody else can write to the database.
-                (with-lock global-writes-lock :publish-write
-                  (task-f! job))
-                (task-f! job)))
+                            (if (= :publish-write priority)
+                              ;; If we're a publish operation we take the lock to
+                              ;; ensure nobody else can write to the database.
+                              (with-lock global-writes-lock :publish-write
+                                         (task-f! job))
+                              (task-f! job)))
 
             (catch Throwable ex
               (log/warn ex "A task raised an error.  Delivering error to promise")
@@ -190,6 +245,7 @@
   ([global-writes-lock job]
    (run-sync-job! global-writes-lock job default-job-result-handler))
   ([global-writes-lock job resp-fn]
+   (check-for-reject-mode)
    (log/info "Submitting sync job: " job)
    (let [job-result (exec-sync-job! global-writes-lock job)]
      (resp-fn job-result))))
@@ -197,6 +253,7 @@
 (defn enqueue-async-job!
   "Submits an async job for execution. Returns the submitted job."
   [job]
+  (check-for-reject-mode)
   (log/info "Submitting async job: " job)
   (queue-job! job)
   (jobs/submit-async-job! job)
@@ -207,6 +264,7 @@
   "Submits an async job and returns a ring response indicating the
   result of the submit operation."
   [job]
+  (check-for-reject-mode)
   (enqueue-async-job! job)
   (r/submitted-job-response job))
 

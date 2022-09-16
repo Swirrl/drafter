@@ -118,7 +118,3 @@
           (finally
             ;; clean up lock state for next tests
             (lm/release-lock! lock-mgr)))))))
-
-;; TODO add tests for batched-write copying etc...
-
-;;(use-fixtures :once wrap-db-setup)

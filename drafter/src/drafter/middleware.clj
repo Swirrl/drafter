@@ -35,14 +35,25 @@
    Each method is attempted in turn to see if it matches the request. The user is
    authenticated with the first matching authentication method. If this method
    throws an exception due to an authentication failure, the entire authentication
-   attempt also fails. Returns the representation of the user if authentication is
-   successful, or returns nil if no authentication method matches the request."
+   attempt also fails. Returns a pair of [outcome data] where outcome is one of the following
+     :authenticated - The user successfully authentication. data is the authenticated user record
+     :authentication-failed - Authentication failed. The data is the 'not authenticated response' to return
+     :unhandled - No authentication method could handle the request. data is nil
+
+   Note this function will throw and exception if the authentication method raises one for any
+   reason other than an authentication failure."
   [auth-methods request]
   (loop [[auth-method & methods] auth-methods]
-    (when auth-method
+    (if auth-method
       (if-let [state (auth/parse-request auth-method request)]
-        (auth/authenticate auth-method request state)
-        (recur methods)))))
+        (try
+          [:authenticated (auth/authenticate auth-method request state)]
+          (catch Exception ex
+            (if (auth/is-authentication-failed-error? ex)
+              [:authentication-failed (auth/authentication-failed-response ex)]
+              (throw ex))))
+        (recur methods))
+      [:unhandled nil])))
 
 (defn wrap-authenticate
   "Wraps a handler with one that first attempts to authenticate incoming requests
@@ -54,18 +65,21 @@
     (if (or (:identity request) ; already authenticated
             (whitelisted? request))
       (handler request)
-      (try
-        (if-let [{:keys [email] :as identity} (authenticate-request auth-methods request)]
-          (with-logging-context
-            {:user email} ;; wrap a logging context over the request so we can trace the user
-            (datadog/increment! "drafter.requests.authorised" 1)
-            (handler (assoc request :identity identity)))
-          (do
-            (datadog/increment! "drafter.requests.unauthorised" 1)
-            (response/unauthorized-response "Not authenticated.")))
-        (catch ExceptionInfo ex
-          (datadog/increment! "drafter.requests.unauthorised" 1)
-          (auth/authentication-failed-response ex))))))
+      (let [[result data] (authenticate-request auth-methods request)]
+        (case result
+          :authenticated (let [{:keys [email] :as identity} data]
+                           (with-logging-context
+                             {:user email} ;; wrap a logging context over the request so we can trace the user
+                             (datadog/increment! "drafter.requests.authorised" 1)
+                             (handler (assoc request :identity identity))))
+
+          :authentication-failed (let [unauthenticated-response data]
+                                   (datadog/increment! "drafter.requests.unauthorised" 1)
+                                   unauthenticated-response)
+
+          :unhandled (do
+                       (datadog/increment! "drafter.requests.unauthorised" 1)
+                       (response/unauthorized-response "Not authenticated")))))))
 
 (defmethod ig/init-key :drafter.middleware/wrap-authenticate
   [_ {:keys [auth-methods] :as opts}]

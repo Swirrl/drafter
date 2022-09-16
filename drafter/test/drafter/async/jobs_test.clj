@@ -6,7 +6,6 @@
             [drafter.async.spec :as spec]
             [drafter.async.jobs :as jobs]
             [drafter.responses :as r]
-            [clj-time.coerce :refer [from-date]]
             [drafter.user-test :refer [test-editor]]
             [cheshire.core :as json]
             [drafter.feature.common :as feat-common])

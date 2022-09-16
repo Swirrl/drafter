@@ -1,5 +1,6 @@
 (ns drafter.auth
-  (:require [drafter.responses :as response]))
+  (:require [drafter.responses :as response])
+  (:import [clojure.lang ExceptionInfo]))
 
 (defprotocol AuthenticationMethod
   "Represents a method of specifying user authentication within a request"
@@ -38,11 +39,18 @@
     "Returns a map containing any extra configuration this authorisation method
      requires to configure the swagger UI."))
 
+(defn authentication-failed-error
+  "Constructs an Exception representing authentication failure"
+  ([] (ex-info "Not authenticated" {:type ::authentication-failed}))
+  ([msg] (ex-info msg {:type ::authentication-failed}))
+  ([msg response]
+   (ex-info msg {:type ::authentication-failed :response response})))
+
 (defn authentication-failed
   "Throws an exception indicating the request could not be authenticated.
    The response to return can optionally be specified."
-  ([] (throw (ex-info "Not authenticated." {})))
-  ([response] (throw (ex-info "Not authenticated" {:response response}))))
+  ([] (throw (authentication-failed-error)))
+  ([response] (throw (authentication-failed-error "Not authenticated" response))))
 
 (defn authentication-failed-response
   "The response to return as the result of a request which failed due to the
@@ -50,4 +58,10 @@
   [ex]
   (or (:response (ex-data ex))
       (response/unauthorized-response "Not authenticated.")))
+
+(defn is-authentication-failed-error?
+  "Whether the given Exception represents an authentication failure"
+  [ex]
+  (and (instance? ExceptionInfo ex)
+       (= ::authentication-failed (:type (ex-data ex)))))
 

@@ -637,3 +637,10 @@
                        false :draft}
         state (:public (sparql/select-1 repo q))]
     (get state-mapping state)))
+
+(defn timeout [timeout-ms callback]
+  (let [fut (future (callback))
+        ret (deref fut timeout-ms ::timed-out)]
+    (when (= ret ::timed-out)
+      (future-cancel fut))
+    ret))
