@@ -123,9 +123,9 @@ example you might:
 ## Maintenance read-only mode
 
 In production, you can execute the `drafter-toggle-writing.sh` script which communicates
-with Drafter server over a TCP socket to toggle Drafter into a read-only whereby writes
-(write jobs, or direct calls to `append` etc.) are rejected.
+with Drafter server over a TCP socket to toggle Drafter into a read-only mode whereby
+writes (write jobs, or direct calls to `append` etc.) are rejected.
 
-The socket (and hence script) will wait until all jobs are flushed before returning and
-updating the user when all jobs are flushed, and it is safe to do maintenance. This
-same information is also written to the drafter log.
+The socket (and hence script) will wait (blocked) until all jobs are flushed, before
+returning and updating the user with a message when all jobs are flushed. It is then
+safe to do maintenance. This same information is also written to the drafter log.
