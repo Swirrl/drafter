@@ -22,14 +22,13 @@
     (mgmt/migrate-graphs-to-live! backend user-drafts clock)
     (modified-times/publish-modifications-graph backend live->draft (time/now clock))))
 
-(defn- update-public-endpoint-modified-at-query []
+(def update-public-endpoint-modified-at-query
   (slurp (io/resource "drafter/backend/draftset/operations/publish/update-public-endpoint-modified-at.sparql")))
 
 (defn update-public-endpoint-modified-at!
   "Updates the modified time of the public endpoint to the current time"
   [backend]
-  (let [q (update-public-endpoint-modified-at-query)]
-    (sparql/update! backend q)))
+  (sparql/update! backend update-public-endpoint-modified-at-query))
 
 (def update-public-endpoint-version-query
   (->

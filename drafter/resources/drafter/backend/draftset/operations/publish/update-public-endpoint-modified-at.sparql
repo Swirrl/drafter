@@ -1,6 +1,8 @@
 PREFIX drafter: <http://publishmydata.com/def/drafter/>
 PREFIX dcterms: <http://purl.org/dc/terms/>
 
+# NOTE: query takes no params
+
 DELETE {
   GRAPH <http://publishmydata.com/graphs/drafter/endpoints> {
     drafter:public dcterms:modified ?pem .
