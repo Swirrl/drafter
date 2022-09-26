@@ -31,10 +31,7 @@
   (sparql/update! backend update-public-endpoint-modified-at-query))
 
 (def update-public-endpoint-version-query
-  (->
-   "drafter/backend/draftset/operations/update-public-endpoint-version.sparql"
-   io/resource
-   slurp))
+  (slurp (io/resource "drafter/backend/draftset/operations/update-public-endpoint-version.sparql")))
 
 (defn update-public-endpoint-version!
   "Updates the modified time of the public endpoint to the current time"

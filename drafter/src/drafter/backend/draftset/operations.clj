@@ -1,5 +1,6 @@
 (ns drafter.backend.draftset.operations
   (:require [clojure.string :as string]
+            [com.yetanalytics.flint :as fl]
             [drafter.backend.draftset.draft-management :as mgmt
              :refer [to-quads with-state-graph]]
             [drafter.draftset :as ds]
@@ -606,7 +607,8 @@
     (spog-tuple-query->graph-query conn tuple-query)))
 
 (defn all-graph-triples-query [backend graph]
-  (let [conn (repo/->connection backend)
-        unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-        escaped-query (RenderUtils/escape unsafe-query)]
-    (prepare-query conn escaped-query)))
+  (let [g (URI. (str graph))
+        conn (repo/->connection backend)]
+    (prepare-query conn
+                   (fl/format-query {:construct '[[?s ?p ?o]]
+                                     :where [[:graph g '[[?s ?p ?o]]]]}))))

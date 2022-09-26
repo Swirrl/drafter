@@ -165,12 +165,14 @@
 
 (defn- remove-empty-draft-modifications-graph [draft-modifications-graph]
   (let [bindings {:dmg draft-modifications-graph}]
-    (get-update-query-with-bindings (io/resource "drafter/feature/modified_times/remove_empty_draft_modifications_graph.sparql") bindings)))
+    (get-update-query-with-bindings
+      (io/resource "drafter/feature/modified_times/remove_empty_draft_modifications_graph.sparql") bindings)))
 
 (defn- remove-empty-draft-only-graft-modifications [draftset-ref draft-modifications-graph]
   (let [bindings {:ds  (url/->java-uri draftset-ref)
                   :dmg draft-modifications-graph}]
-    (get-update-query-with-bindings (io/resource "drafter/feature/modified_times/delete_empty_draft_only_graph_modifications.sparql") bindings)))
+    (get-update-query-with-bindings
+      (io/resource "drafter/feature/modified_times/delete_empty_draft_only_graph_modifications.sparql") bindings)))
 
 (defn- get-modifications-graph-state [repo draftset-ref]
   (let [bindings (with-open [conn (repo/->connection repo)]
