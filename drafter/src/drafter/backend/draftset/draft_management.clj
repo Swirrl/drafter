@@ -1,18 +1,20 @@
 (ns drafter.backend.draftset.draft-management
   (:require
-   [clojure.set :as set]
-   [clojure.string :as string]
-   [clojure.tools.logging :as log]
-   [drafter.rdf.drafter-ontology :refer :all]
-   [drafter.rdf.sparql :as sparql :refer [update!]]
-   [drafter.time :as time]
-   [drafter.util :as util]
-   [grafter-2.rdf4j.io :as rio]
-   [grafter-2.rdf4j.repository :as repo]
-   [grafter-2.rdf4j.templater :refer [add-properties graph]]
-   [grafter.url :as url]
-   [grafter.vocabularies.dcterms :refer [dcterms:issued]]
-   [grafter.vocabularies.rdf :refer :all])
+    [clojure.set :as set]
+    [clojure.string :as string]
+    [clojure.tools.logging :as log]
+    [com.yetanalytics.flint :as fl]
+    [grafter.vocabularies.rdf :refer [rdf rdf:a]]
+    [drafter.rdf.drafter-ontology :refer :all]
+    [drafter.rdf.sparql :as sparql :refer [update!]]
+    [drafter.time :as time]
+    [drafter.util :as util]
+    [grafter-2.rdf4j.io :as rio]
+    [grafter-2.rdf4j.repository :as repo]
+    [grafter-2.rdf4j.templater :refer [graph]]
+    [grafter.url :as url]
+    [grafter.vocabularies.dcterms :refer [dcterms:issued]]
+    [grafter.vocabularies.rdf :refer :all])
   (:import java.net.URI
            [java.util UUID]))
 
@@ -21,6 +23,9 @@
 (def staging-base (URI. "http://publishmydata.com/graphs/drafter/draft"))
 
 (def to-quads (partial graph drafter-state-graph))
+
+(defn sparql-uri [uri]
+  (str "<" uri ">"))
 
 (defn make-draft-graph-uri []
   (url/->java-uri (url/append-path-segments staging-base (str (UUID/randomUUID)))))
@@ -38,33 +43,30 @@
 
 (defn is-graph-managed? [db graph-uri]
   (sparql/eager-query db
-         (str "ASK WHERE {"
-              (with-state-graph
-                "<" graph-uri "> a <" drafter:ManagedGraph "> ."
-                "}"))))
+                      (fl/format-query {:ask []
+                                        :where [[:graph drafter-state-graph
+                                                 [[graph-uri rdf:a drafter:ManagedGraph]]]]})))
 
 (defn is-graph-live? [db graph-uri]
   (sparql/eager-query db
-         (str "ASK WHERE {"
-              (with-state-graph
-                "   <" graph-uri "> a <" drafter:ManagedGraph "> ."
-                "   <" graph-uri "> <" drafter:isPublic "> true ."
-                "}"))))
+                      (fl/format-query {:ask []
+                                        :where [[:graph drafter-state-graph
+                                                 [[graph-uri rdf:a drafter:ManagedGraph]
+                                                  [graph-uri drafter:isPublic true]]]]})))
 
 (defn- has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
   [db live-graph-uri]
-  (let [qry (str "ASK WHERE {"
-                 "  SELECT (COUNT(?draft) AS ?numberOfRefs)   WHERE {"
-                 "    {"
-                 "      <" live-graph-uri "> a <" drafter:ManagedGraph "> ;"
-                 "                           <" drafter:hasDraft "> ?draft ."
-                 "    }"
-                 "  }"
-                 "  HAVING (?numberOfRefs > 1)"
-                 "}")]
-    (sparql/eager-query db qry)))
+  (sparql/eager-query db
+                      (fl/format-query {:prefixes {:rdf (rdf "")
+                                                   :drafter drafter}
+                                        :ask []
+                                        :where {:select '[[(count ?draft) ?numberOfRefs]]
+                                                :where [{live-graph-uri {:rdf/type #{:drafter/ManagedGraph}
+                                                                         :drafter/hasDraft #{'?draft}}}]
+                                                :having '[(> ?numberOfRefs 1)]}}
+                                       :pretty? true)))
 
 (defn xsd-datetime
   "Coerce a date into the xsd-datetime string"
@@ -230,7 +232,7 @@
   "Copies source graph to destination graph.  Accepts an optional map
   of options.
 
-  Currently the only supported option is the boolean value :silent
+  Currently, the only supported option is the boolean value :silent
   which will ensure the copy always succeeds, whether or not their is
   a source graph etc."
   ([repo from to] (copy-graph repo from to {}))

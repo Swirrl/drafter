@@ -12,11 +12,9 @@
             [grafter-2.rdf4j.repository :as repo :refer [prepare-query]]
             [grafter.url :as url]
             [grafter.vocabularies.rdf :refer :all]
-            [clojure.java.io :as io]
             [drafter.time :as time])
   (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
            [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler BindingSet GraphQueryResult]
-           org.eclipse.rdf4j.queryrender.RenderUtils
            org.eclipse.rdf4j.rio.RDFHandler
            java.net.URI))
 
