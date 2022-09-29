@@ -28,10 +28,10 @@
     (sparql/update! conn q)))
 
 (defn- update-draftset-timestamp-query [draftset-ref modified-at]
-  (mgmt/set-timestamp (url/->java-uri draftset-ref) dcterms:modified modified-at))
+  (mgmt/set-timestamp-sparql (url/->java-uri draftset-ref) dcterms:modified modified-at))
 
 (defn- update-draftset-version-query [draftset-ref]
-  (mgmt/set-version (url/->java-uri draftset-ref) (util/version)))
+  (mgmt/set-version-sparql (url/->java-uri draftset-ref) (util/version)))
 
 (defn- update-draftset-timestamp! [conn draftset-ref modified-at]
   (sparql/update! conn (update-draftset-timestamp-query draftset-ref modified-at)))

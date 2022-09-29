@@ -73,66 +73,45 @@
   [offset-datetime]
   (str (rio/->backend-type offset-datetime)))
 
-(defn set-timestamp
+(defn set-timestamp-sparql
   "Returns an update string to update the given subject/resource with
   the supplied a timestamp."
   [subject time-predicate datetime]
-  (let [instant (xsd-datetime datetime)]
-    (str
-     "WITH <http://publishmydata.com/graphs/drafter/drafts>"
-     "DELETE {"
-     "   <" subject "> <" time-predicate "> ?lastvalue ."
-     "}"
-     "INSERT { "
-     "   <" subject "> <" time-predicate "> " instant " ."
-     "}"
-     "WHERE {"
-     "   <" subject "> ?p ?o . "
-     "  OPTIONAL {"
-     "     <" subject "> <" time-predicate "> ?lastvalue ."
-     "  }"
-     "}")))
+  (let [inst (.toInstant datetime)]
+    (fl/format-update {:prefixes {:xsd "<http://www.w3.org/2001/XMLSchema#>"}
+                       :with drafter-state-graph
+                       :delete [[subject time-predicate '?lastvalue]]
+                       :insert [[subject time-predicate inst]]
+                       :where [[subject '?p '?o]
+                               [:optional
+                                [[subject time-predicate '?lastvalue]]]]}
+                      :force-iris? true
+                      :pretty? true)))
 
-(defn set-version
+(defn set-version-sparql
   "Returns an update string to update the given subject/resource with
    the supplied version."
   [subject version]
-  (str
-   "WITH <http://publishmydata.com/graphs/drafter/drafts>"
-   "DELETE {"
-   "   <" subject "> <" drafter:version "> ?lastvalue ."
-   "}"
-   "INSERT { "
-   "   <" subject "> <" drafter:version "> <" version "> ."
-   "}"
-   "WHERE {"
-   "   <" subject "> ?p ?o . "
-   "  OPTIONAL {"
-   "     <" subject "> <" drafter:version "> ?lastvalue ."
-   "  }"
-   "}"))
-
-(defn- escape-sparql-value [val]
-  (if (string? val)
-    (str "\"" val "\"")
-    (str val)))
+  (fl/format-update {:with drafter-state-graph
+                     :delete [[subject drafter:version '?lastvalue]]
+                     :insert [[subject drafter:version version]]
+                     :where [[subject '?p '?o]
+                             [:optional
+                              [[subject drafter:version '?lastvalue]]]]}
+                    :pretty? true))
 
 (defn- upsert-single-object-sparql [subject predicate object]
-  (str
-   "WITH <http://publishmydata.com/graphs/drafter/drafts> "
-   "DELETE {"
-   "   <" subject "> <" predicate "> ?o ."
-   "} INSERT {"
-   "   <" subject "> <" predicate  "> " (escape-sparql-value object) " . "
-   "} WHERE {"
-   "   OPTIONAL { <" subject "> <" predicate  "> ?o }"
-   "}"))
+  (fl/format-update {:with drafter-state-graph
+                     :delete [[subject predicate '?o]]
+                     :insert [[subject predicate object]]
+                     :where [[:optional
+                              [[subject predicate '?o]]]]}
+                    :pretty? true))
 
 (defn upsert-single-object!
   "Inserts or updates the single object for a given predicate and subject in the state graph"
   [db subject predicate object]
-  (let [sparql (upsert-single-object-sparql subject predicate object)]
-    (update! db sparql)))
+  (update! db (upsert-single-object-sparql subject predicate object)))
 
 (defn set-isPublic-query [live-graph-uri is-public]
   (upsert-single-object-sparql live-graph-uri drafter:isPublic is-public))

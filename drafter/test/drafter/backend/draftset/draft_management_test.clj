@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all :as t]
             [drafter.backend.draftset.draft-management :refer :all]
             [drafter.backend.draftset.operations :refer [create-draftset!]]
-            [drafter.draftset :refer [->DraftsetId] :as ds]
+            [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql]
             [drafter.test-common
@@ -14,11 +14,9 @@
               make-graph-live!
               wrap-system-setup]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
-            [drafter.feature.draftset.test-helper :as th]
             [drafter.user-test :refer [test-editor]]
             [grafter-2.rdf4j.templater :refer [triplify]]
             [grafter-2.rdf4j.repository :as repo]
-            [grafter.url :as url]
             [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
@@ -27,10 +25,7 @@
             [drafter.backend.draftset.graphs :as graphs]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.time :as time]
-            [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.io :as gio]
-            [drafter.backend.draftset.operations :as ops]
-            [drafter.rdf.sesame :as ses])
+            [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI))
 
 (use-fixtures :each validate-schemas tc/with-spec-instrumentation)
@@ -297,7 +292,7 @@
 
 (deftest upsert-single-object-insert-test
   (let [db (repo/sail-repo)]
-    (upsert-single-object! db "http://foo/" "http://bar/" "baz")
+    (upsert-single-object! db (URI. "http://foo/") (URI. "http://bar/") "baz")
     (is (sparql/eager-query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
 (deftest upsert-single-object-update-test

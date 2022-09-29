@@ -67,10 +67,10 @@
           (is (empty? (second csv-result)))))
 
       (testing "Offline public graphs are not exposed"
-        (set-isPublic! repo "http://test.com/made-live-and-deleted-1" false)
+        (set-isPublic! repo (URI. "http://test.com/made-live-and-deleted-1") false)
         (let [csv-result (csv-> (endpoint
                                   (live-query
-                                    (select-all-in-graph "http://test.com/made-live-and-deleted-1"))))]
+                                    (select-all-in-graph (URI. "http://test.com/made-live-and-deleted-1")))))]
           (is (not= graph-1-result (second csv-result))))))))
 
 (tc/deftest-system-with-keys query-draftset-disallowed-with-service-query
