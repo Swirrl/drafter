@@ -236,7 +236,7 @@
           new-modifications (merge-modifications live-modification-times draft-modification-times published-at)
           queries [(publish-modified-times-query new-modifications)
                    (mgmt/set-isPublic-query modified-times-graph-uri true)
-                   (mgmt/delete-draft-state-query draft-modifications-graph)
+                   (mgmt/delete-draft-state-query-sparql draft-modifications-graph)
                    (mgmt/delete-graph-contents-query draft-modifications-graph)]
           compound-query (util/make-compound-sparql-query queries)]
       (with-open [conn (repo/->connection repo)]

@@ -131,23 +131,22 @@
   (update! db (delete-graph-contents-query graph-uri))
   (log/info (str "Deleted graph " graph-uri)))
 
-(defn delete-draft-state-query [draft-graph-uri]
+(defn delete-draft-state-query-sparql [draft-graph-uri]
   ;; if the graph-uri is a draft graph uri,
   ;; remove the mention of this draft uri, but leave the live graph as a managed graph.
-  (str
-   "WITH <" drafter-state-graph ">"
-   "DELETE {"
-   "   ?live <" drafter:hasDraft "> <" draft-graph-uri "> ."
-   "   <" draft-graph-uri "> ?p ?o ."
-   "} WHERE {"
-   "   ?live a <" drafter:ManagedGraph "> ;"
-   "         <" drafter:hasDraft "> <" draft-graph-uri "> ."
-   "   <" draft-graph-uri "> ?p ?o . "
-   "}"))
+  (fl/format-update {:prefixes {:rdf (rdf "")
+                                :drafter drafter}
+                     :with drafter-state-graph
+                     :delete [['?live drafter:hasDraft draft-graph-uri]
+                              [draft-graph-uri '?p '?o]]
+                     :where [{'?live {:rdf/type #{:drafter/ManagedGraph}
+                                      :drafter/hasDraft #{draft-graph-uri}}}
+                             [draft-graph-uri '?p '?o]]}
+                    :pretty? true))
 
 (defn delete-draft-graph-and-remove-from-state-query [draft-graph-uri]
   (let [drop-query (format "DROP SILENT GRAPH <%s>" draft-graph-uri)
-        delete-from-state-query (delete-draft-state-query draft-graph-uri)]
+        delete-from-state-query (delete-draft-state-query-sparql draft-graph-uri)]
     (util/make-compound-sparql-query [drop-query delete-from-state-query])))
 
 (defn- delete-dependent-private-managed-graph-query [draft-graph-uri]
@@ -285,7 +284,7 @@
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (let [move-query (move-graph draft-graph-uri live-graph-uri)
           update-timestamps-query (update-live-graph-timestamps-query draft-graph-uri transaction-at)
-          delete-state-query (delete-draft-state-query draft-graph-uri)
+          delete-state-query (delete-draft-state-query-sparql draft-graph-uri)
           live-public-query (set-isPublic-query live-graph-uri true)
           queries [update-timestamps-query move-query delete-state-query live-public-query]
           queries (if (should-delete-live-graph-from-state-after-draft-migrate? db draft-graph-uri live-graph-uri)
