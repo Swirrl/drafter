@@ -368,7 +368,7 @@
   (let [repo (repo/sail-repo)]
     (sparql/add repo (test-quads (URI. "http://test-graph/1")))
 
-    (copy-graph repo "http://test-graph/1" "http://test-graph/2")
+    (copy-graph repo (URI. "http://test-graph/1") (URI. "http://test-graph/2"))
 
     (let [source-graph (set (sparql/eager-query repo "SELECT * WHERE { GRAPH <http://test-graph/1> { ?s ?p ?o }}"))
           dest-graph   (set (sparql/eager-query repo "SELECT * WHERE { GRAPH <http://test-graph/2> { ?s ?p ?o }}"))]

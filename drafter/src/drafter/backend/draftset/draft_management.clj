@@ -179,11 +179,14 @@
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph. Returns nil if not
   found."
-  (let [q (str "SELECT ?live WHERE {"
-               (with-state-graph
-                 "?live a <" drafter:ManagedGraph "> ;"
-                 "      <" drafter:hasDraft "> <" draft-graph-uri "> . ")
-               "} LIMIT 1")]
+  (let [q (fl/format-query
+            {:prefixes {:rdf (rdf "") :drafter drafter}
+             :select ['?live]
+             :where [[:graph drafter-state-graph
+                      [{'?live {:rdf/type #{:drafter/ManagedGraph}
+                                :drafter/hasDraft #{draft-graph-uri}}}]]]
+             :limit 1}
+            :pretty? true)]
     (-> (sparql/eager-query db q)
         first
         (:live))))
@@ -197,15 +200,6 @@
                       [live-graph-uri '?p '?o]]]]}
     :pretty? true))
 
-(defn- copy-graph-query
-  [from to {:keys [silent] :as opts :or {silent false}}]
-  (let [silent (if silent
-                 "SILENT"
-                 "")]
-    (str
-     "\n"
-     "COPY " silent " <" from "> TO <" to ">")))
-
 (defn copy-graph
   "Copies source graph to destination graph.  Accepts an optional map
   of options.
@@ -214,34 +208,37 @@
   which will ensure the copy always succeeds, whether or not their is
   a source graph etc."
   ([repo from to] (copy-graph repo from to {}))
-  ([repo from to opts]
-   (update! repo (copy-graph-query from to opts))))
+  ([repo from to {:keys [silent] :as _opts :or {silent false}}]
+   (update! repo (fl/format-update
+                   {(if silent :copy-silent :copy) from
+                    :to to}))))
 
 (defn live-graphs
   "Get all live graph names.  Takes an optional boolean keyword
   argument of :online to allow querying for all online/offline live
   graphs."
   [db & {:keys [online] :or {online true}}]
-  (let [q (str "SELECT ?live WHERE {"
-               (with-state-graph
-                 "?live a <" drafter:ManagedGraph "> ;"
-                 "      <" drafter:isPublic "> " online " .")
-               "}")
-        results (sparql/eager-query db q)]
-    (into #{} (map :live results))))
-
-(defn graph-non-empty-query [graph-uri]
-  (str
-   "ASK WHERE {
-    SELECT * WHERE {
-      GRAPH <" graph-uri "> { ?s ?p ?o }
-    } LIMIT 1
-  }"))
+  (->> (fl/format-query
+         {:prefixes {:rdf (rdf "") :drafter drafter}
+          :select ['?live]
+          :where [[:graph drafter-state-graph
+                   [{'?live {:rdf/type #{:drafter/ManagedGraph}
+                             :drafter/isPublic #{online}}}]]]}
+         :pretty? true)
+       (sparql/eager-query db)
+       (map :live)
+       (into #{})))
 
 (defn graph-non-empty?
   "Returns true if the graph contains any statements."
   [repo graph-uri]
-  (sparql/eager-query repo (graph-non-empty-query graph-uri)))
+  (sparql/eager-query repo
+                      (fl/format-query
+                        {:ask []
+                         :where {:select :*
+                                 :where [[:graph graph-uri
+                                          '[[?s ?p ?o]]]]
+                                 :limit 1}})))
 
 (defn graph-empty?
   "Returns true if there are no statements in the associated graph."
