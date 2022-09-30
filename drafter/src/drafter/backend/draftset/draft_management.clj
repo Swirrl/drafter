@@ -256,18 +256,21 @@
    (graph-empty? repo draft-graph-uri)
    (not (has-more-than-one-draft? repo live-graph-uri))))
 
-(defn- update-live-graph-timestamps-query [draft-graph-uri now-ts]
-  (let [issued-at (xsd-datetime now-ts)]
-    (str
-      "# set a dcterms:issued timestamp if it doesn't have one already\n"
-      "WITH <" drafter-state-graph "> INSERT {"
-      "  ?live <" dcterms:issued "> " issued-at " ."
-      "} WHERE {"
-      "  VALUES ?draft { <" draft-graph-uri "> }"
-      "  ?live a <" drafter:ManagedGraph "> ;"
-      "        <" drafter:hasDraft "> ?draft ."
-      "  FILTER NOT EXISTS { ?live <" dcterms:issued "> ?existing . }"
-      "}")))
+(defn- update-live-graph-timestamps-query
+  "set a dcterms:issued timestamp if it doesn't have one already"
+  [draft-graph-uri now-ts]
+  (fl/format-update
+    {:prefixes {:rdf (rdf "")
+                :dcterms (URI. "http://purl.org/dc/terms/")
+                :drafter drafter}
+     :with drafter-state-graph
+     :insert [['?live :dcterms/issued now-ts]]
+
+     :where [[:values {'?draft [draft-graph-uri]}]
+             {'?live {:rdf/type #{:drafter/ManagedGraph}
+                      :drafter/hasDraft #{'?draft}}}
+             [:filter '(not-exists [[?live :dcterms/issued ?existing]])]]}
+    :pretty? true))
 
 (defn- move-graph
   "Move's how TBL intended.  Issues a SPARQL MOVE query.
