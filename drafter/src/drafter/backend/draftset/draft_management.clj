@@ -189,12 +189,13 @@
         (:live))))
 
 (defn- delete-live-graph-from-state-query [live-graph-uri]
-  (str
-   "DELETE WHERE {"
-   (with-state-graph
-     "<" live-graph-uri "> a <" drafter:ManagedGraph "> ;"
-     "                     ?p ?o")
-   "}"))
+  (fl/format-update
+    {:prefixes {:rdf (rdf "")
+                :drafter drafter}
+     :delete-where [[:graph drafter-state-graph
+                     [[live-graph-uri :rdf/type :drafter/ManagedGraph]
+                      [live-graph-uri '?p '?o]]]]}
+    :pretty? true))
 
 (defn- copy-graph-query
   [from to {:keys [silent] :as opts :or {silent false}}]
