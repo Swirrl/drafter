@@ -120,7 +120,7 @@
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
 
 (defn delete-graph-contents-query [graph-uri]
-  (str "DROP SILENT GRAPH <" graph-uri ">"))
+  (fl/format-update {:drop-silent [:graph graph-uri]}))
 
 (defn delete-graph-contents!
   "Transactionally delete the contents of the supplied graph and set
@@ -145,24 +145,23 @@
                     :pretty? true))
 
 (defn delete-draft-graph-and-remove-from-state-query [draft-graph-uri]
-  (let [drop-query (format "DROP SILENT GRAPH <%s>" draft-graph-uri)
-        delete-from-state-query (delete-draft-state-query-sparql draft-graph-uri)]
-    (util/make-compound-sparql-query [drop-query delete-from-state-query])))
+  (util/make-compound-sparql-query [(delete-graph-contents-query draft-graph-uri)
+                                    (delete-draft-state-query-sparql draft-graph-uri)]))
 
 (defn- delete-dependent-private-managed-graph-query [draft-graph-uri]
-  (str
-   "WITH <" drafter-state-graph ">"
-   "DELETE {"
-   "   ?lg ?lp ?lo ."
-   "} WHERE {"
-   "   ?lg a <" drafter:ManagedGraph "> ."
-   "   ?lg <" drafter:isPublic "> false ."
-   "   ?lg ?lp ?lo ."
-   "   MINUS {"
-   "      ?lg <" drafter:hasDraft "> ?odg ."
-   "      FILTER (?odg != <" draft-graph-uri ">)"
-   "   }"
-   "}"))
+  (fl/format-update {:prefixes {:rdf (rdf "")
+                                :drafter drafter}
+                     :with drafter-state-graph
+                     :delete '[[?lg ?lp ?lo]]
+                     :where [{'?lg {:rdf/type #{:drafter/ManagedGraph}
+                                    :drafter/isPublic #{false}}}
+                             ['?lg '?lp '?lo]
+
+                             [:minus
+                              [['?lg :drafter/hasDraft '?odg]
+                               [:bind [draft-graph-uri '?draftGraph]]
+                               [:filter '(not= ?draftGraph ?odg)]]]]}
+                    :pretty? true))
 
 (defn- delete-draft-graph-query [draft-graph-uri]
   (let [q (util/make-compound-sparql-query
