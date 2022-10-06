@@ -9,15 +9,12 @@
              [*test-backend*
               ask?
               import-data-to-draft!
-              select-all-in-graph
-              test-triples
               wrap-system-setup]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [grafter-2.rdf4j.io :refer [statements]]
-            [grafter-2.rdf4j.repository :as repo]
-            [grafter-2.rdf.protocols :refer [->Quad ->Triple context context]]
+            [grafter-2.rdf.protocols :refer [context context]]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.test-common :as tc]
             [grafter-2.rdf4j.io :as gio]

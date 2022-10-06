@@ -3,8 +3,8 @@
     [clojure.set :as set]
     [clojure.tools.logging :as log]
     [com.yetanalytics.flint :as fl]
-    [grafter.vocabularies.rdf :refer [rdf rdf:a]]
-    [drafter.rdf.drafter-ontology :refer :all]
+    [grafter.vocabularies.rdf :refer [rdf]]
+    [drafter.rdf.drafter-ontology :refer [drafter drafter:isPublic]]
     [drafter.rdf.sparql :as sparql :refer [update!]]
     [drafter.time :as time]
     [drafter.util :as util]
@@ -15,6 +15,10 @@
     [grafter.vocabularies.rdf :refer :all])
   (:import java.net.URI
            [java.util UUID]))
+
+(def base-prefixes {:rdf (rdf "")
+                    :dcterms (URI. "http://purl.org/dc/terms/")
+                    :drafter drafter})
 
 (def drafter-state-graph (URI. "http://publishmydata.com/graphs/drafter/drafts"))
 
@@ -30,24 +34,25 @@
 
 (defn is-graph-managed? [db graph-uri]
   (sparql/eager-query db
-                      (fl/format-query {:ask []
+                      (fl/format-query {:prefixes base-prefixes
+                                        :ask []
                                         :where [[:graph drafter-state-graph
-                                                 [[graph-uri rdf:a drafter:ManagedGraph]]]]})))
+                                                 [[graph-uri :rdf/type :drafter/ManagedGraph]]]]})))
 
 (defn is-graph-live? [db graph-uri]
   (sparql/eager-query db
-                      (fl/format-query {:ask []
+                      (fl/format-query {:prefixes base-prefixes
+                                        :ask []
                                         :where [[:graph drafter-state-graph
-                                                 [[graph-uri rdf:a drafter:ManagedGraph]
-                                                  [graph-uri drafter:isPublic true]]]]})))
+                                                 [[graph-uri :rdf/type :drafter/ManagedGraph]
+                                                  [graph-uri :drafter/isPublic true]]]]})))
 
 (defn- has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
   [db live-graph-uri]
   (sparql/eager-query db
-                      (fl/format-query {:prefixes {:rdf (rdf "")
-                                                   :drafter drafter}
+                      (fl/format-query {:prefixes base-prefixes
                                         :ask []
                                         :where {:select '[[(count ?draft) ?numberOfRefs]]
                                                 :where [{live-graph-uri {:rdf/type #{:drafter/ManagedGraph}
@@ -79,12 +84,13 @@
   "Returns an update string to update the given subject/resource with
    the supplied version."
   [subject version]
-  (fl/format-update {:with drafter-state-graph
-                     :delete [[subject drafter:version '?lastvalue]]
-                     :insert [[subject drafter:version version]]
+  (fl/format-update {:prefixes base-prefixes
+                     :with drafter-state-graph
+                     :delete [[subject :drafter/version '?lastvalue]]
+                     :insert [[subject :drafter/version version]]
                      :where [[subject '?p '?o]
                              [:optional
-                              [[subject drafter:version '?lastvalue]]]]}
+                              [[subject :drafter/version '?lastvalue]]]]}
                     :pretty? true))
 
 (defn- upsert-single-object-sparql [subject predicate object]
@@ -121,10 +127,9 @@
 (defn delete-draft-state-query-sparql [draft-graph-uri]
   ;; if the graph-uri is a draft graph uri,
   ;; remove the mention of this draft uri, but leave the live graph as a managed graph.
-  (fl/format-update {:prefixes {:rdf (rdf "")
-                                :drafter drafter}
+  (fl/format-update {:prefixes base-prefixes
                      :with drafter-state-graph
-                     :delete [['?live drafter:hasDraft draft-graph-uri]
+                     :delete [['?live :drafter/hasDraft draft-graph-uri]
                               [draft-graph-uri '?p '?o]]
                      :where [{'?live {:rdf/type #{:drafter/ManagedGraph}
                                       :drafter/hasDraft #{draft-graph-uri}}}
@@ -136,8 +141,7 @@
                                     (delete-draft-state-query-sparql draft-graph-uri)]))
 
 (defn- delete-dependent-private-managed-graph-query [draft-graph-uri]
-  (fl/format-update {:prefixes {:rdf (rdf "")
-                                :drafter drafter}
+  (fl/format-update {:prefixes base-prefixes
                      :with drafter-state-graph
                      :delete '[[?lg ?lp ?lo]]
                      :where [{'?lg {:rdf/type #{:drafter/ManagedGraph}
@@ -167,7 +171,7 @@
   "Given a draft graph URI, lookup and return its live graph. Returns nil if not
   found."
   (let [q (fl/format-query
-            {:prefixes {:rdf (rdf "") :drafter drafter}
+            {:prefixes base-prefixes
              :select ['?live]
              :where [[:graph drafter-state-graph
                       [{'?live {:rdf/type #{:drafter/ManagedGraph}
@@ -180,8 +184,7 @@
 
 (defn- delete-live-graph-from-state-query [live-graph-uri]
   (fl/format-update
-    {:prefixes {:rdf (rdf "")
-                :drafter drafter}
+    {:prefixes base-prefixes
      :delete-where [[:graph drafter-state-graph
                      [[live-graph-uri :rdf/type :drafter/ManagedGraph]
                       [live-graph-uri '?p '?o]]]]}
@@ -206,7 +209,7 @@
   graphs."
   [db & {:keys [online] :or {online true}}]
   (->> (fl/format-query
-         {:prefixes {:rdf (rdf "") :drafter drafter}
+         {:prefixes base-prefixes
           :select ['?live]
           :where [[:graph drafter-state-graph
                    [{'?live {:rdf/type #{:drafter/ManagedGraph}
@@ -247,9 +250,7 @@
   "set a dcterms:issued timestamp if it doesn't have one already"
   [draft-graph-uri now-ts]
   (fl/format-update
-    {:prefixes {:rdf (rdf "")
-                :dcterms (URI. "http://purl.org/dc/terms/")
-                :drafter drafter}
+    {:prefixes base-prefixes
      :with drafter-state-graph
      :insert [['?live :dcterms/issued now-ts]]
 
@@ -315,8 +316,7 @@
   [{:keys [?from ?to] :as opts}]
   (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
     (fl/format-update
-      {:prefixes {:rdf (rdf "")
-                  :drafter drafter}
+      {:prefixes base-prefixes
        :delete [[:graph '?g
                  [[?from '?p '?o]]]]
        :insert [[:graph '?g
@@ -332,8 +332,7 @@
   [{:keys [?from ?to] :as opts}]
   (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
     (fl/format-update
-      {:prefixes {:rdf (rdf "")
-                  :drafter drafter}
+      {:prefixes base-prefixes
        :delete [[:graph '?g
                  [['?s ?from '?o]]]]
        :insert [[:graph '?g
@@ -349,8 +348,7 @@
   [{:keys [?from ?to] :as opts}]
   (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
     (fl/format-update
-      {:prefixes {:rdf (rdf "")
-                  :drafter drafter}
+      {:prefixes base-prefixes
        :delete [[:graph '?g
                  [['?s '?p ?from]]]]
        :insert [[:graph '?g
