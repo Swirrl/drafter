@@ -28,17 +28,6 @@
 (defn make-draft-graph-uri []
   (url/->java-uri (url/append-path-segments staging-base (str (UUID/randomUUID)))))
 
-(defn with-state-graph
-  "Wraps the string in a SPARQL
-   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-     <<sparql-fragment>>
-   } clause."
-
-  [& sparql-string]
-  (apply str " GRAPH <" drafter-state-graph "> { "
-         (concat sparql-string
-                 " }")))
-
 (defn is-graph-managed? [db graph-uri]
   (sparql/eager-query db
                       (fl/format-query {:ask []

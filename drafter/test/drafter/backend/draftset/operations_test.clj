@@ -1,6 +1,5 @@
 (ns drafter.backend.draftset.operations-test
   (:require [clojure.test :as t :refer :all]
-            [drafter.backend.draftset.draft-management :refer [with-state-graph]]
             [drafter.backend.draftset.operations :as sut]
             [drafter.draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
             [drafter.rdf.drafter-ontology :refer :all]
@@ -142,7 +141,7 @@
 (defn- draftset-has-claim-permission? [draftset-id permission]
   (let [q (str
            "ASK WHERE {"
-           (with-state-graph
+           (mgmth/with-state-graph
              "<" (->draftset-uri draftset-id) "> <" drafter:hasSubmission "> ?submission ."
              "?submission <" drafter:claimPermission "> \"" (name permission) "\" .")
            "}")]
@@ -174,7 +173,7 @@
 (defn- draftset-has-claim-user? [draftset-id user]
   (let [q (str
            "ASK WHERE {"
-           (with-state-graph
+           (mgmth/with-state-graph
              "<" (->draftset-uri draftset-id) "> <" drafter:hasSubmission "> ?submission ."
              "?submission <" drafter:claimUser "> <" (user/user->uri user) "> .")
            "}")]
@@ -227,7 +226,7 @@
 (defn- draftset-has-submission? [draftset-ref]
   (let [draftset-uri (->draftset-uri draftset-ref)
         q (str "ASK WHERE {"
-               (with-state-graph
+               (mgmth/with-state-graph
                  "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
                  "<" draftset-uri "> <" drafter:hasSubmission "> ?submission")
                "}")]

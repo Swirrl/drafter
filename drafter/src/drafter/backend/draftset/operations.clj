@@ -1,8 +1,7 @@
 (ns drafter.backend.draftset.operations
   (:require [clojure.string :as string]
             [com.yetanalytics.flint :as fl]
-            [drafter.backend.draftset.draft-management :as mgmt
-             :refer [to-quads with-state-graph]]
+            [drafter.backend.draftset.draft-management :as mgmt :refer [to-quads]]
             [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql]
@@ -52,6 +51,17 @@
    "ASK WHERE {"
    "  GRAPH <" graph-uri "> { ?s ?p ?o }"
    "}"))
+
+(defn with-state-graph
+  "Wraps the string in a SPARQL
+   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+     <<sparql-fragment>>
+   } clause."
+
+  [& sparql-string]
+  (apply str " GRAPH <" mgmt/drafter-state-graph "> { "
+         (concat sparql-string
+                 " }")))
 
 (defn- draftset-exists-query [draftset-ref]
   (str "ASK WHERE {"

@@ -37,7 +37,7 @@
    "    ?s ?p ?o ."
    "  }"
    "} WHERE { "
-   (with-state-graph
+   (mgmt/with-state-graph
      "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
      "      <" drafter:hasDraft "> <" draft-graph-uri "> .")
    "  GRAPH ?live {"
@@ -314,7 +314,7 @@
         (is (= false (ask? "GRAPH <" draft-graph-uri "> { ?s ?p ?o }"))))
 
       (testing "should delete graph from state"
-        (is (= false (ask? (with-state-graph "<" draft-graph-uri "> ?p ?o")))))
+        (is (= false (ask? (mgmt/with-state-graph "<" draft-graph-uri "> ?p ?o")))))
 
       (testing "should delete managed graph"
         (is (= false (is-graph-managed? *test-backend* live-graph-uri))))))
@@ -560,7 +560,6 @@
   (let [repo (repo/sparql-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
         graph-manager (graphs/create-manager repo)
         live-graphs (map #(URI. (str "http://live-" %)) (range 1 5))
-        [lg1 lg2 lg3 lg4] live-graphs
         draftset (create-draftset! repo test-editor)
         draft-graphs (mapv (fn [lg] (graphs/create-user-graph-draft graph-manager draftset lg)) live-graphs)
         [dg1 dg2 dg3 dg4] draft-graphs
