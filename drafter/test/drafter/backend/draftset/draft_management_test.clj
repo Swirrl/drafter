@@ -17,7 +17,7 @@
             [drafter.user-test :refer [test-editor]]
             [grafter-2.rdf4j.templater :refer [triplify]]
             [grafter-2.rdf4j.repository :as repo]
-            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
+            [grafter.vocabularies.dcterms :refer [dcterms:issued]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
             [drafter.util :as util]
@@ -46,9 +46,7 @@
    "}"))
 
 (defn clone-data-from-live-to-draft!
-  "Copy all of the data found in the drafts live graph into the
-  specified draft."
-
+  "Copy all the data found in the drafts live graph into the specified draft."
   [repo draft-graph-uri]
   (sparql/update! repo (clone-data-from-live-to-draft-query draft-graph-uri)))
 

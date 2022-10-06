@@ -1,7 +1,6 @@
 (ns drafter.backend.draftset.draft-management
   (:require
     [clojure.set :as set]
-    [clojure.string :as string]
     [clojure.tools.logging :as log]
     [com.yetanalytics.flint :as fl]
     [grafter.vocabularies.rdf :refer [rdf rdf:a]]
@@ -13,7 +12,6 @@
     [grafter-2.rdf4j.repository :as repo]
     [grafter-2.rdf4j.templater :refer [graph]]
     [grafter.url :as url]
-    [grafter.vocabularies.dcterms :refer [dcterms:issued]]
     [grafter.vocabularies.rdf :refer :all])
   (:import java.net.URI
            [java.util UUID]))
@@ -293,12 +291,7 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
-(defn- uri-values [binding-name uris]
-  (format "VALUES ?%s { %s }"
-          binding-name
-          (string/join " " (map (fn [g] (str "<" g ">")) uris))))
-
-(defn- get-rewrite-state-graph-pattern
+(defn- get-flint-rewrite-state-graph-pattern
   "Returns a group graph pattern within the drafter state graph which finds the draftset graphs
    to rewrite within, along with the corresponding live and draft graphs to rewrite. The graph pattern
    binds the following query variables:
@@ -308,73 +301,76 @@
      ?dg - A draft graph in the draftset identified by ?ds
      ?lg - A live graph with draft ?dg in the draftset identified by ?ds."
   [{:keys [deleted live-graph-uris draft-graph-uris draftset-uri]}]
-  (let [filter (case deleted
-                 :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
-                 :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
-                 nil)
-        ds-values (when draftset-uri (uri-values "ds" [draftset-uri]))
-        live-values (some->> (seq live-graph-uris) (uri-values "lg"))
-        draft-values (some->> (seq draft-graph-uris) (uri-values "dg"))
-        suffix (->> [filter ds-values live-values draft-values]
-                    (remove nil?)
-                    (string/join "\n    ")
-                    (str "\n    "))]
-    (format "
-  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-      ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-      %s
-  }" suffix)))
+  (let [ds-values (when draftset-uri {'?ds [(url/->java-uri draftset-uri)]})
+        live-values (when (seq live-graph-uris) {'?lg live-graph-uris})
+        draft-values (when (seq draft-graph-uris) {'?dg draft-graph-uris})
+        filter-exp (case deleted
+                     :ignore '(exists [[:graph ?dg
+                                        [[?s_ ?p_ ?o_]]]])
+                     :rewrite '(not-exists [[:graph ?dg
+                                             [[?s_ ?p_ ?o_]]]])
+                     nil)]
+    (cond-> [[:graph drafter-state-graph
+              '[[?ds :rdf/type :drafter/DraftSet]
+                [?g :drafter/inDraftSet ?ds]
+                [?dg :drafter/inDraftSet ?ds]
+                [?lg :drafter/hasDraft ?dg]]]]
+
+            filter-exp (conj [:filter filter-exp])
+            ds-values (conj [:values ds-values])
+            live-values (conj [:values live-values])
+            draft-values (conj [:values draft-values]))))
 
 (defn- rewrite-subjects-q
   "Rewrites all values in subject position to/from their value in draft/live"
   [{:keys [?from ?to] :as opts}]
-  (let [state-filter (get-rewrite-state-graph-pattern opts)]
-    (format "
-DELETE {
-  GRAPH ?g { %1$s ?p ?o }
-}
-INSERT {
-  GRAPH ?g { %2$s ?p ?o }
-}
-WHERE {
-  GRAPH ?g { %1$s ?p ?o }
-  %3$s
-}" ?from ?to state-filter)))
+  (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
+    (fl/format-update
+      {:prefixes {:rdf (rdf "")
+                  :drafter drafter}
+       :delete [[:graph '?g
+                 [[?from '?p '?o]]]]
+       :insert [[:graph '?g
+                 [[?to '?p '?o]]]]
+       :where (->> [[:graph '?g
+                     [[?from '?p '?o]]]]
+                   (concat state-filter-pattern)
+                   (into []))}
+      :pretty? true)))
 
 (defn- rewrite-predicates-q
   "Rewrites all values in predicate position to/from their value in draft/live"
   [{:keys [?from ?to] :as opts}]
-  (let [state-filter (get-rewrite-state-graph-pattern opts)]
-    (format "
-DELETE {
-  GRAPH ?g { ?s %1$s ?o }
-}
-INSERT {
-  GRAPH ?g { ?s %2$s ?o }
-}
-WHERE {
-  GRAPH ?g { ?s %1$s ?o }
-  %3$s
-}" ?from ?to state-filter)))
+  (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
+    (fl/format-update
+      {:prefixes {:rdf (rdf "")
+                  :drafter drafter}
+       :delete [[:graph '?g
+                 [['?s ?from '?o]]]]
+       :insert [[:graph '?g
+                 [['?s ?to '?o]]]]
+       :where (->> [[:graph '?g
+                     [['?s ?from '?o]]]]
+                   (concat state-filter-pattern)
+                   (into []))}
+      :pretty? true)))
 
 (defn- rewrite-objects-q
   "Rewrites all values in object position to/from their value in draft/live"
   [{:keys [?from ?to] :as opts}]
-  (let [state-filter (get-rewrite-state-graph-pattern opts)]
-    (format "
-DELETE {
-  GRAPH ?g { ?s ?p %1$s }
-}
-INSERT {
-  GRAPH ?g { ?s ?p %2$s }
-}
-WHERE {
-  GRAPH ?g { ?s ?p %1$s }
-  %3$s
-}" ?from ?to state-filter)))
+  (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
+    (fl/format-update
+      {:prefixes {:rdf (rdf "")
+                  :drafter drafter}
+       :delete [[:graph '?g
+                 [['?s '?p ?from]]]]
+       :insert [[:graph '?g
+                 [['?s '?p ?to]]]]
+       :where (->> [[:graph '?g
+                     [['?s '?p ?from]]]]
+                   (concat state-filter-pattern)
+                   (into []))}
+      :pretty? true)))
 
 (defn rewrite-q
   "Generates a query to rewrite graph values within a draftset from draft to live or vice versa.
