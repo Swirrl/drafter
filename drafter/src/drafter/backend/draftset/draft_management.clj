@@ -26,9 +26,6 @@
 
 (def to-quads (partial graph drafter-state-graph))
 
-(defn sparql-uri [uri]
-  (str "<" uri ">"))
-
 (defn make-draft-graph-uri []
   (url/->java-uri (url/append-path-segments staging-base (str (UUID/randomUUID)))))
 
