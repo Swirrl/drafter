@@ -71,8 +71,7 @@
                        :with drafter-state-graph
                        :delete [[subject time-predicate '?lastvalue]]
                        :insert [[subject time-predicate inst]]
-                       :where [[subject '?p '?o]
-                               [:optional
+                       :where [[:optional
                                 [[subject time-predicate '?lastvalue]]]]}
                       :force-iris? true
                       :pretty? true)))
@@ -85,8 +84,7 @@
                      :with drafter-state-graph
                      :delete [[subject :drafter/version '?lastvalue]]
                      :insert [[subject :drafter/version version]]
-                     :where [[subject '?p '?o]
-                             [:optional
+                     :where [[:optional
                               [[subject :drafter/version '?lastvalue]]]]}
                     :pretty? true))
 
