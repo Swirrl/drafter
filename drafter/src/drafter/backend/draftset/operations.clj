@@ -46,12 +46,6 @@
        (rdf/add dbcon quads)
        (ds/->DraftsetId (str draftset-id))))))
 
-(defn- graph-exists-query [graph-uri]
-  (str
-   "ASK WHERE {"
-   "  GRAPH <" graph-uri "> { ?s ?p ?o }"
-   "}"))
-
 (defn with-state-graph
   "Wraps the string in a SPARQL
    GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
@@ -63,49 +57,40 @@
          (concat sparql-string
                  " }")))
 
-(defn- draftset-exists-query [draftset-ref]
-  (str "ASK WHERE {"
-       (with-state-graph
-         "<" (ds/->draftset-uri draftset-ref) "> a <" drafter:DraftSet "> .")
-       "}"))
-
 (defn draftset-exists? [db draftset-ref]
-  (let [q (draftset-exists-query draftset-ref)]
+  (let [q (fl/format-query
+            {:prefixes mgmt/base-prefixes
+             :ask []
+             :where [[:graph mgmt/drafter-state-graph
+                      [[(-> (ds/->draftset-uri draftset-ref) (url/->java-uri)) :rdf/type :drafter/DraftSet]]]]})]
     (sparql/eager-query db q)))
 
 (defn- delete-draftset-statements-query [draftset-ref]
-  (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" ds-uri  "> ?dp ?do ."
-       "?submission ?sp ?so .")
-     "} WHERE {"
-     (with-state-graph
-       "<" ds-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" ds-uri "> ?dp ?do ."
-       "OPTIONAL {"
-       "  <" ds-uri "> <" drafter:hasSubmission "> ?submission ."
-       "  ?submission ?sp ?so ."
-       "}"
-       )
-     "}")))
+  (let [ds-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+    (fl/format-update {:prefixes mgmt/base-prefixes
+                       :with mgmt/drafter-state-graph
+                       :delete [[ds-uri '?dp '?do]
+                                '[?submission ?sp ?so]]
+                       :where [[ds-uri :rdf/type :drafter/DraftSet]
+                               [ds-uri '?dp '?do]
+                               [:optional
+                                [[ds-uri :drafter/hasSubmission '?submission]
+                                 '[?submission ?sp ?so]]]]}
+                      :pretty? true)))
 
 (defn delete-draftset-statements! [db draftset-ref]
-  (let [delete-query (delete-draftset-statements-query draftset-ref)]
-    (sparql/update! db delete-query)))
-
-(defn- graph-mapping-draft-graphs [graph-mapping]
-  (vals graph-mapping))
+  (sparql/update! db (delete-draftset-statements-query draftset-ref)))
 
 (defn- get-draftset-owner-query [draftset-ref]
-  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "SELECT ?owner WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> ?owner .")
-     "} LIMIT 1")))
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+    (fl/format-query
+      {:prefixes mgmt/base-prefixes
+       :select ['?owner]
+       :where [[:graph mgmt/drafter-state-graph
+                [{draftset-uri {:rdf/type #{:drafter/DraftSet}
+                                :drafter/hasOwner #{'?owner}}}]]]
+       :limit 1}
+      :pretty? true)))
 
 (defn get-draftset-owner [backend draftset-ref]
   (let [q (get-draftset-owner-query draftset-ref)
@@ -136,8 +121,12 @@
 
 (defn- graph-mapping-result->graph-state [repo {:keys [lg dg public] :as res}]
   (assoc (graph-mapping-result->graph-mapping res)
-         :public public
-         :draft-graph-exists (sparql/eager-query repo (graph-exists-query dg))))
+    :public public
+    :draft-graph-exists (sparql/eager-query repo
+                                            (fl/format-query
+                                              {:ask []
+                                               :where [[:graph dg
+                                                        '[[?s ?p ?o]]]]}))))
 
 (defn- union-clauses [clauses]
   (string/join " UNION " clauses))
@@ -293,7 +282,8 @@
     (combine-all-properties-and-graph-states properties graph-states)))
 
 (defn get-draftset-info [repo draftset-ref]
-  (first (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])))
+  (->> (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])
+       (first)))
 
 (defn is-draftset-viewer? [backend draftset-ref user]
   (user/can-view? user (get-draftset-info backend draftset-ref)))
@@ -307,7 +297,7 @@
   "Deletes a draftset and all of its constituent graphs"
   [db draftset-ref]
   (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)
-        draft-graphs (graph-mapping-draft-graphs graph-mapping)
+        draft-graphs (vals graph-mapping)
         delete-query (delete-draftset-query draftset-ref draft-graphs)]
     (sparql/update! db delete-query)))
 
