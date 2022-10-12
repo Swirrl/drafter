@@ -1,20 +1,24 @@
 (ns drafter.backend.draftset.draft-management
   (:require
-   [clojure.set :as set]
-   [clojure.string :as string]
-   [clojure.tools.logging :as log]
-   [drafter.rdf.drafter-ontology :refer :all]
-   [drafter.rdf.sparql :as sparql :refer [update!]]
-   [drafter.time :as time]
-   [drafter.util :as util]
-   [grafter-2.rdf4j.io :as rio]
-   [grafter-2.rdf4j.repository :as repo]
-   [grafter-2.rdf4j.templater :refer [add-properties graph]]
-   [grafter.url :as url]
-   [grafter.vocabularies.dcterms :refer [dcterms:issued]]
-   [grafter.vocabularies.rdf :refer :all])
+    [clojure.set :as set]
+    [clojure.tools.logging :as log]
+    [com.yetanalytics.flint :as fl]
+    [grafter.vocabularies.rdf :refer [rdf]]
+    [drafter.rdf.drafter-ontology :refer [drafter drafter:isPublic]]
+    [drafter.rdf.sparql :as sparql :refer [update!]]
+    [drafter.time :as time]
+    [drafter.util :as util]
+    [grafter-2.rdf4j.io :as rio]
+    [grafter-2.rdf4j.repository :as repo]
+    [grafter-2.rdf4j.templater :refer [graph]]
+    [grafter.url :as url]
+    [grafter.vocabularies.rdf :refer :all])
   (:import java.net.URI
            [java.util UUID]))
+
+(def base-prefixes {:rdf (rdf "")
+                    :dcterms (URI. "http://purl.org/dc/terms/")
+                    :drafter drafter})
 
 (def drafter-state-graph (URI. "http://publishmydata.com/graphs/drafter/drafts"))
 
@@ -25,112 +29,79 @@
 (defn make-draft-graph-uri []
   (url/->java-uri (url/append-path-segments staging-base (str (UUID/randomUUID)))))
 
-(defn with-state-graph
-  "Wraps the string in a SPARQL
-   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-     <<sparql-fragment>>
-   } clause."
-
-  [& sparql-string]
-  (apply str " GRAPH <" drafter-state-graph "> { "
-         (concat sparql-string
-                 " }")))
-
 (defn is-graph-managed? [db graph-uri]
   (sparql/eager-query db
-         (str "ASK WHERE {"
-              (with-state-graph
-                "<" graph-uri "> a <" drafter:ManagedGraph "> ."
-                "}"))))
+                      (fl/format-query {:prefixes base-prefixes
+                                        :ask []
+                                        :where [[:graph drafter-state-graph
+                                                 [[graph-uri :rdf/type :drafter/ManagedGraph]]]]})))
 
 (defn is-graph-live? [db graph-uri]
   (sparql/eager-query db
-         (str "ASK WHERE {"
-              (with-state-graph
-                "   <" graph-uri "> a <" drafter:ManagedGraph "> ."
-                "   <" graph-uri "> <" drafter:isPublic "> true ."
-                "}"))))
+                      (fl/format-query {:prefixes base-prefixes
+                                        :ask []
+                                        :where [[:graph drafter-state-graph
+                                                 [[graph-uri :rdf/type :drafter/ManagedGraph]
+                                                  [graph-uri :drafter/isPublic true]]]]})))
 
 (defn- has-more-than-one-draft?
   "Given a live graph uri, check to see if it is referenced by more
   than one draft in the state graph."
   [db live-graph-uri]
-  (let [qry (str "ASK WHERE {"
-                 "  SELECT (COUNT(?draft) AS ?numberOfRefs)   WHERE {"
-                 "    {"
-                 "      <" live-graph-uri "> a <" drafter:ManagedGraph "> ;"
-                 "                           <" drafter:hasDraft "> ?draft ."
-                 "    }"
-                 "  }"
-                 "  HAVING (?numberOfRefs > 1)"
-                 "}")]
-    (sparql/eager-query db qry)))
+  (sparql/eager-query db
+                      (fl/format-query {:prefixes base-prefixes
+                                        :ask []
+                                        :where {:select '[[(count ?draft) ?numberOfRefs]]
+                                                :where [{live-graph-uri {:rdf/type #{:drafter/ManagedGraph}
+                                                                         :drafter/hasDraft #{'?draft}}}]
+                                                :having '[(> ?numberOfRefs 1)]}}
+                                       :pretty? true)))
 
 (defn xsd-datetime
   "Coerce a date into the xsd-datetime string"
   [offset-datetime]
   (str (rio/->backend-type offset-datetime)))
 
-(defn set-timestamp
+(defn set-timestamp-sparql
   "Returns an update string to update the given subject/resource with
   the supplied a timestamp."
   [subject time-predicate datetime]
-  (let [instant (xsd-datetime datetime)]
-    (str
-     "WITH <http://publishmydata.com/graphs/drafter/drafts>"
-     "DELETE {"
-     "   <" subject "> <" time-predicate "> ?lastvalue ."
-     "}"
-     "INSERT { "
-     "   <" subject "> <" time-predicate "> " instant " ."
-     "}"
-     "WHERE {"
-     "   <" subject "> ?p ?o . "
-     "  OPTIONAL {"
-     "     <" subject "> <" time-predicate "> ?lastvalue ."
-     "  }"
-     "}")))
+  (let [inst (.toInstant datetime)]
+    (fl/format-update {:prefixes {:xsd "<http://www.w3.org/2001/XMLSchema#>"}
+                       :with drafter-state-graph
+                       :delete [[subject time-predicate '?lastvalue]]
+                       :insert [[subject time-predicate inst]]
+                       :where [[subject '?p '?o]
+                               [:optional
+                                [[subject time-predicate '?lastvalue]]]]}
+                      :force-iris? true
+                      :pretty? true)))
 
-(defn set-version
+(defn set-version-sparql
   "Returns an update string to update the given subject/resource with
    the supplied version."
   [subject version]
-  (str
-   "WITH <http://publishmydata.com/graphs/drafter/drafts>"
-   "DELETE {"
-   "   <" subject "> <" drafter:version "> ?lastvalue ."
-   "}"
-   "INSERT { "
-   "   <" subject "> <" drafter:version "> <" version "> ."
-   "}"
-   "WHERE {"
-   "   <" subject "> ?p ?o . "
-   "  OPTIONAL {"
-   "     <" subject "> <" drafter:version "> ?lastvalue ."
-   "  }"
-   "}"))
-
-(defn- escape-sparql-value [val]
-  (if (string? val)
-    (str "\"" val "\"")
-    (str val)))
+  (fl/format-update {:prefixes base-prefixes
+                     :with drafter-state-graph
+                     :delete [[subject :drafter/version '?lastvalue]]
+                     :insert [[subject :drafter/version version]]
+                     :where [[subject '?p '?o]
+                             [:optional
+                              [[subject :drafter/version '?lastvalue]]]]}
+                    :pretty? true))
 
 (defn- upsert-single-object-sparql [subject predicate object]
-  (str
-   "WITH <http://publishmydata.com/graphs/drafter/drafts> "
-   "DELETE {"
-   "   <" subject "> <" predicate "> ?o ."
-   "} INSERT {"
-   "   <" subject "> <" predicate  "> " (escape-sparql-value object) " . "
-   "} WHERE {"
-   "   OPTIONAL { <" subject "> <" predicate  "> ?o }"
-   "}"))
+  (fl/format-update {:with drafter-state-graph
+                     :delete [[subject predicate '?o]]
+                     :insert [[subject predicate object]]
+                     :where [[:optional
+                              [[subject predicate '?o]]]]}
+                    :pretty? true))
 
 (defn upsert-single-object!
   "Inserts or updates the single object for a given predicate and subject in the state graph"
   [db subject predicate object]
-  (let [sparql (upsert-single-object-sparql subject predicate object)]
-    (update! db sparql)))
+  (update! db (upsert-single-object-sparql subject predicate object)))
 
 (defn set-isPublic-query [live-graph-uri is-public]
   (upsert-single-object-sparql live-graph-uri drafter:isPublic is-public))
@@ -139,7 +110,7 @@
   (upsert-single-object! db live-graph-uri drafter:isPublic boolean-value))
 
 (defn delete-graph-contents-query [graph-uri]
-  (str "DROP SILENT GRAPH <" graph-uri ">"))
+  (fl/format-update {:drop-silent [:graph graph-uri]}))
 
 (defn delete-graph-contents!
   "Transactionally delete the contents of the supplied graph and set
@@ -150,39 +121,35 @@
   (update! db (delete-graph-contents-query graph-uri))
   (log/info (str "Deleted graph " graph-uri)))
 
-(defn delete-draft-state-query [draft-graph-uri]
+(defn delete-draft-state-query-sparql [draft-graph-uri]
   ;; if the graph-uri is a draft graph uri,
   ;; remove the mention of this draft uri, but leave the live graph as a managed graph.
-  (str
-   "WITH <" drafter-state-graph ">"
-   "DELETE {"
-   "   ?live <" drafter:hasDraft "> <" draft-graph-uri "> ."
-   "   <" draft-graph-uri "> ?p ?o ."
-   "} WHERE {"
-   "   ?live a <" drafter:ManagedGraph "> ;"
-   "         <" drafter:hasDraft "> <" draft-graph-uri "> ."
-   "   <" draft-graph-uri "> ?p ?o . "
-   "}"))
+  (fl/format-update {:prefixes base-prefixes
+                     :with drafter-state-graph
+                     :delete [['?live :drafter/hasDraft draft-graph-uri]
+                              [draft-graph-uri '?p '?o]]
+                     :where [{'?live {:rdf/type #{:drafter/ManagedGraph}
+                                      :drafter/hasDraft #{draft-graph-uri}}}
+                             [draft-graph-uri '?p '?o]]}
+                    :pretty? true))
 
 (defn delete-draft-graph-and-remove-from-state-query [draft-graph-uri]
-  (let [drop-query (format "DROP SILENT GRAPH <%s>" draft-graph-uri)
-        delete-from-state-query (delete-draft-state-query draft-graph-uri)]
-    (util/make-compound-sparql-query [drop-query delete-from-state-query])))
+  (util/make-compound-sparql-query [(delete-graph-contents-query draft-graph-uri)
+                                    (delete-draft-state-query-sparql draft-graph-uri)]))
 
 (defn- delete-dependent-private-managed-graph-query [draft-graph-uri]
-  (str
-   "WITH <" drafter-state-graph ">"
-   "DELETE {"
-   "   ?lg ?lp ?lo ."
-   "} WHERE {"
-   "   ?lg a <" drafter:ManagedGraph "> ."
-   "   ?lg <" drafter:isPublic "> false ."
-   "   ?lg ?lp ?lo ."
-   "   MINUS {"
-   "      ?lg <" drafter:hasDraft "> ?odg ."
-   "      FILTER (?odg != <" draft-graph-uri ">)"
-   "   }"
-   "}"))
+  (fl/format-update {:prefixes base-prefixes
+                     :with drafter-state-graph
+                     :delete '[[?lg ?lp ?lo]]
+                     :where [{'?lg {:rdf/type #{:drafter/ManagedGraph}
+                                    :drafter/isPublic #{false}}}
+                             ['?lg '?lp '?lo]
+
+                             [:minus
+                              [['?lg :drafter/hasDraft '?odg]
+                               [:bind [draft-graph-uri '?draftGraph]]
+                               [:filter '(not= ?draftGraph ?odg)]]]]}
+                    :pretty? true))
 
 (defn- delete-draft-graph-query [draft-graph-uri]
   (let [q (util/make-compound-sparql-query
@@ -200,68 +167,65 @@
 (defn lookup-live-graph [db draft-graph-uri]
   "Given a draft graph URI, lookup and return its live graph. Returns nil if not
   found."
-  (let [q (str "SELECT ?live WHERE {"
-               (with-state-graph
-                 "?live a <" drafter:ManagedGraph "> ;"
-                 "      <" drafter:hasDraft "> <" draft-graph-uri "> . ")
-               "} LIMIT 1")]
+  (let [q (fl/format-query
+            {:prefixes base-prefixes
+             :select ['?live]
+             :where [[:graph drafter-state-graph
+                      [{'?live {:rdf/type #{:drafter/ManagedGraph}
+                                :drafter/hasDraft #{draft-graph-uri}}}]]]
+             :limit 1}
+            :pretty? true)]
     (-> (sparql/eager-query db q)
         first
         (:live))))
 
 (defn- delete-live-graph-from-state-query [live-graph-uri]
-  (str
-   "DELETE WHERE {"
-   (with-state-graph
-     "<" live-graph-uri "> a <" drafter:ManagedGraph "> ;"
-     "                     ?p ?o")
-   "}"))
-
-(defn- copy-graph-query
-  [from to {:keys [silent] :as opts :or {silent false}}]
-  (let [silent (if silent
-                 "SILENT"
-                 "")]
-    (str
-     "\n"
-     "COPY " silent " <" from "> TO <" to ">")))
+  (fl/format-update
+    {:prefixes base-prefixes
+     :delete-where [[:graph drafter-state-graph
+                     [[live-graph-uri :rdf/type :drafter/ManagedGraph]
+                      [live-graph-uri '?p '?o]]]]}
+    :pretty? true))
 
 (defn copy-graph
   "Copies source graph to destination graph.  Accepts an optional map
   of options.
 
-  Currently the only supported option is the boolean value :silent
+  Currently, the only supported option is the boolean value :silent
   which will ensure the copy always succeeds, whether or not their is
   a source graph etc."
   ([repo from to] (copy-graph repo from to {}))
-  ([repo from to opts]
-   (update! repo (copy-graph-query from to opts))))
+  ([repo from to {:keys [silent] :as _opts :or {silent false}}]
+   (update! repo (fl/format-update
+                   {(if silent :copy-silent :copy) from
+                    :to to}))))
 
 (defn live-graphs
   "Get all live graph names.  Takes an optional boolean keyword
   argument of :online to allow querying for all online/offline live
   graphs."
   [db & {:keys [online] :or {online true}}]
-  (let [q (str "SELECT ?live WHERE {"
-               (with-state-graph
-                 "?live a <" drafter:ManagedGraph "> ;"
-                 "      <" drafter:isPublic "> " online " .")
-               "}")
-        results (sparql/eager-query db q)]
-    (into #{} (map :live results))))
-
-(defn graph-non-empty-query [graph-uri]
-  (str
-   "ASK WHERE {
-    SELECT * WHERE {
-      GRAPH <" graph-uri "> { ?s ?p ?o }
-    } LIMIT 1
-  }"))
+  (->> (fl/format-query
+         {:prefixes base-prefixes
+          :select ['?live]
+          :where [[:graph drafter-state-graph
+                   [{'?live {:rdf/type #{:drafter/ManagedGraph}
+                             :drafter/isPublic #{online}}}]]]}
+         :pretty? true)
+       (sparql/eager-query db)
+       (map :live)
+       (into #{})))
 
 (defn graph-non-empty?
   "Returns true if the graph contains any statements."
   [repo graph-uri]
-  (sparql/eager-query repo (graph-non-empty-query graph-uri)))
+  (sparql/eager-query repo
+                      (fl/format-query
+                        {:ask []
+                         :where {:select :*
+                                 :where [[:graph graph-uri
+                                          '[[?s ?p ?o]]]]
+                                 :limit 1}})))
 
 (defn graph-empty?
   "Returns true if there are no statements in the associated graph."
@@ -279,18 +243,19 @@
    (graph-empty? repo draft-graph-uri)
    (not (has-more-than-one-draft? repo live-graph-uri))))
 
-(defn- update-live-graph-timestamps-query [draft-graph-uri now-ts]
-  (let [issued-at (xsd-datetime now-ts)]
-    (str
-      "# set a dcterms:issued timestamp if it doesn't have one already\n"
-      "WITH <" drafter-state-graph "> INSERT {"
-      "  ?live <" dcterms:issued "> " issued-at " ."
-      "} WHERE {"
-      "  VALUES ?draft { <" draft-graph-uri "> }"
-      "  ?live a <" drafter:ManagedGraph "> ;"
-      "        <" drafter:hasDraft "> ?draft ."
-      "  FILTER NOT EXISTS { ?live <" dcterms:issued "> ?existing . }"
-      "}")))
+(defn- update-live-graph-timestamps-query
+  "set a dcterms:issued timestamp if it doesn't have one already"
+  [draft-graph-uri now-ts]
+  (fl/format-update
+    {:prefixes base-prefixes
+     :with drafter-state-graph
+     :insert [['?live :dcterms/issued now-ts]]
+
+     :where [[:values {'?draft [draft-graph-uri]}]
+             {'?live {:rdf/type #{:drafter/ManagedGraph}
+                      :drafter/hasDraft #{'?draft}}}
+             [:filter '(not-exists [[?live :dcterms/issued ?existing]])]]}
+    :pretty? true))
 
 (defn- move-graph
   "Move's how TBL intended.  Issues a SPARQL MOVE query.
@@ -304,7 +269,7 @@
   (if-let [live-graph-uri (lookup-live-graph db draft-graph-uri)]
     (let [move-query (move-graph draft-graph-uri live-graph-uri)
           update-timestamps-query (update-live-graph-timestamps-query draft-graph-uri transaction-at)
-          delete-state-query (delete-draft-state-query draft-graph-uri)
+          delete-state-query (delete-draft-state-query-sparql draft-graph-uri)
           live-public-query (set-isPublic-query live-graph-uri true)
           queries [update-timestamps-query move-query delete-state-query live-public-query]
           queries (if (should-delete-live-graph-from-state-after-draft-migrate? db draft-graph-uri live-graph-uri)
@@ -313,12 +278,7 @@
       {:queries queries
        :live-graph-uri live-graph-uri})))
 
-(defn- uri-values [binding-name uris]
-  (format "VALUES ?%s { %s }"
-          binding-name
-          (string/join " " (map (fn [g] (str "<" g ">")) uris))))
-
-(defn- get-rewrite-state-graph-pattern
+(defn- get-flint-rewrite-state-graph-pattern
   "Returns a group graph pattern within the drafter state graph which finds the draftset graphs
    to rewrite within, along with the corresponding live and draft graphs to rewrite. The graph pattern
    binds the following query variables:
@@ -328,73 +288,73 @@
      ?dg - A draft graph in the draftset identified by ?ds
      ?lg - A live graph with draft ?dg in the draftset identified by ?ds."
   [{:keys [deleted live-graph-uris draft-graph-uris draftset-uri]}]
-  (let [filter (case deleted
-                 :ignore (str "FILTER EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
-                 :rewrite (str "FILTER NOT EXISTS { GRAPH ?dg { ?s_ ?p_ ?o_ } }")
-                 nil)
-        ds-values (when draftset-uri (uri-values "ds" [draftset-uri]))
-        live-values (some->> (seq live-graph-uris) (uri-values "lg"))
-        draft-values (some->> (seq draft-graph-uris) (uri-values "dg"))
-        suffix (->> [filter ds-values live-values draft-values]
-                    (remove nil?)
-                    (string/join "\n    ")
-                    (str "\n    "))]
-    (format "
-  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-      ?ds <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://publishmydata.com/def/drafter/DraftSet> .
-      ?g <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-      ?dg <http://publishmydata.com/def/drafter/inDraftSet> ?ds .
-      ?lg <http://publishmydata.com/def/drafter/hasDraft> ?dg .
-      %s
-  }" suffix)))
+  (let [ds-values (when draftset-uri {'?ds [(url/->java-uri draftset-uri)]})
+        live-values (when (seq live-graph-uris) {'?lg live-graph-uris})
+        draft-values (when (seq draft-graph-uris) {'?dg draft-graph-uris})
+        filter-exp (case deleted
+                     :ignore '(exists [[:graph ?dg
+                                        [[?s_ ?p_ ?o_]]]])
+                     :rewrite '(not-exists [[:graph ?dg
+                                             [[?s_ ?p_ ?o_]]]])
+                     nil)]
+    (cond-> [[:graph drafter-state-graph
+              '[[?ds :rdf/type :drafter/DraftSet]
+                [?g :drafter/inDraftSet ?ds]
+                [?dg :drafter/inDraftSet ?ds]
+                [?lg :drafter/hasDraft ?dg]]]]
+
+            filter-exp (conj [:filter filter-exp])
+            ds-values (conj [:values ds-values])
+            live-values (conj [:values live-values])
+            draft-values (conj [:values draft-values]))))
 
 (defn- rewrite-subjects-q
   "Rewrites all values in subject position to/from their value in draft/live"
   [{:keys [?from ?to] :as opts}]
-  (let [state-filter (get-rewrite-state-graph-pattern opts)]
-    (format "
-DELETE {
-  GRAPH ?g { %1$s ?p ?o }
-}
-INSERT {
-  GRAPH ?g { %2$s ?p ?o }
-}
-WHERE {
-  GRAPH ?g { %1$s ?p ?o }
-  %3$s
-}" ?from ?to state-filter)))
+  (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
+    (fl/format-update
+      {:prefixes base-prefixes
+       :delete [[:graph '?g
+                 [[?from '?p '?o]]]]
+       :insert [[:graph '?g
+                 [[?to '?p '?o]]]]
+       :where (->> [[:graph '?g
+                     [[?from '?p '?o]]]]
+                   (concat state-filter-pattern)
+                   (into []))}
+      :pretty? true)))
 
 (defn- rewrite-predicates-q
   "Rewrites all values in predicate position to/from their value in draft/live"
   [{:keys [?from ?to] :as opts}]
-  (let [state-filter (get-rewrite-state-graph-pattern opts)]
-    (format "
-DELETE {
-  GRAPH ?g { ?s %1$s ?o }
-}
-INSERT {
-  GRAPH ?g { ?s %2$s ?o }
-}
-WHERE {
-  GRAPH ?g { ?s %1$s ?o }
-  %3$s
-}" ?from ?to state-filter)))
+  (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
+    (fl/format-update
+      {:prefixes base-prefixes
+       :delete [[:graph '?g
+                 [['?s ?from '?o]]]]
+       :insert [[:graph '?g
+                 [['?s ?to '?o]]]]
+       :where (->> [[:graph '?g
+                     [['?s ?from '?o]]]]
+                   (concat state-filter-pattern)
+                   (into []))}
+      :pretty? true)))
 
 (defn- rewrite-objects-q
   "Rewrites all values in object position to/from their value in draft/live"
   [{:keys [?from ?to] :as opts}]
-  (let [state-filter (get-rewrite-state-graph-pattern opts)]
-    (format "
-DELETE {
-  GRAPH ?g { ?s ?p %1$s }
-}
-INSERT {
-  GRAPH ?g { ?s ?p %2$s }
-}
-WHERE {
-  GRAPH ?g { ?s ?p %1$s }
-  %3$s
-}" ?from ?to state-filter)))
+  (let [state-filter-pattern (get-flint-rewrite-state-graph-pattern opts)]
+    (fl/format-update
+      {:prefixes base-prefixes
+       :delete [[:graph '?g
+                 [['?s '?p ?from]]]]
+       :insert [[:graph '?g
+                 [['?s '?p ?to]]]]
+       :where (->> [[:graph '?g
+                     [['?s '?p ?from]]]]
+                   (concat state-filter-pattern)
+                   (into []))}
+      :pretty? true)))
 
 (defn rewrite-q
   "Generates a query to rewrite graph values within a draftset from draft to live or vice versa.

@@ -1,5 +1,7 @@
 PREFIX drafter: <http://publishmydata.com/def/drafter/>
 
+# NOTE: query takes no params
+
 WITH <http://publishmydata.com/graphs/drafter/endpoints>
 DELETE {
   drafter:public drafter:version ?old .

@@ -106,6 +106,10 @@
 
         wrap-verbs/wrap-verbs {:mvn/version "0.1.1"}
 
+        com.yetanalytics/flint {:mvn/version "0.2.0"
+                                :exclusions [org.clojure/clojure
+                                             org.clojure/clojurescript]}
+
         com.auth0/jwks-rsa {:mvn/version "0.20.0"}
         com.auth0/java-jwt {:mvn/version "3.18.2"}
         com.github.oliyh/martian {:mvn/version "0.1.20"}

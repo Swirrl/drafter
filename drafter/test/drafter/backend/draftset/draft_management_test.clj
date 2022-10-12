@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all :as t]
             [drafter.backend.draftset.draft-management :refer :all]
             [drafter.backend.draftset.operations :refer [create-draftset!]]
-            [drafter.draftset :refer [->DraftsetId] :as ds]
+            [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql]
             [drafter.test-common
@@ -14,12 +14,10 @@
               make-graph-live!
               wrap-system-setup]]
             [drafter.test-helpers.draft-management-helpers :as mgmt]
-            [drafter.feature.draftset.test-helper :as th]
             [drafter.user-test :refer [test-editor]]
             [grafter-2.rdf4j.templater :refer [triplify]]
             [grafter-2.rdf4j.repository :as repo]
-            [grafter.url :as url]
-            [grafter.vocabularies.dcterms :refer [dcterms:issued dcterms:modified]]
+            [grafter.vocabularies.dcterms :refer [dcterms:issued]]
             [grafter.vocabularies.rdf :refer :all]
             [schema.test :refer [validate-schemas]]
             [drafter.util :as util]
@@ -27,10 +25,7 @@
             [drafter.backend.draftset.graphs :as graphs]
             [drafter.backend.draftset.operations :as dsops]
             [drafter.time :as time]
-            [grafter-2.rdf.protocols :as pr]
-            [grafter-2.rdf4j.io :as gio]
-            [drafter.backend.draftset.operations :as ops]
-            [drafter.rdf.sesame :as ses])
+            [grafter-2.rdf.protocols :as pr])
   (:import java.net.URI))
 
 (use-fixtures :each validate-schemas tc/with-spec-instrumentation)
@@ -42,7 +37,7 @@
    "    ?s ?p ?o ."
    "  }"
    "} WHERE { "
-   (with-state-graph
+   (mgmt/with-state-graph
      "?live <" rdf:a "> <" drafter:ManagedGraph "> ;"
      "      <" drafter:hasDraft "> <" draft-graph-uri "> .")
    "  GRAPH ?live {"
@@ -51,9 +46,7 @@
    "}"))
 
 (defn clone-data-from-live-to-draft!
-  "Copy all of the data found in the drafts live graph into the
-  specified draft."
-
+  "Copy all the data found in the drafts live graph into the specified draft."
   [repo draft-graph-uri]
   (sparql/update! repo (clone-data-from-live-to-draft-query draft-graph-uri)))
 
@@ -297,7 +290,7 @@
 
 (deftest upsert-single-object-insert-test
   (let [db (repo/sail-repo)]
-    (upsert-single-object! db "http://foo/" "http://bar/" "baz")
+    (upsert-single-object! db (URI. "http://foo/") (URI. "http://bar/") "baz")
     (is (sparql/eager-query db "ASK { GRAPH <http://publishmydata.com/graphs/drafter/drafts> { <http://foo/> <http://bar/> \"baz\"} }"))))
 
 (deftest upsert-single-object-update-test
@@ -321,7 +314,7 @@
         (is (= false (ask? "GRAPH <" draft-graph-uri "> { ?s ?p ?o }"))))
 
       (testing "should delete graph from state"
-        (is (= false (ask? (with-state-graph "<" draft-graph-uri "> ?p ?o")))))
+        (is (= false (ask? (mgmt/with-state-graph "<" draft-graph-uri "> ?p ?o")))))
 
       (testing "should delete managed graph"
         (is (= false (is-graph-managed? *test-backend* live-graph-uri))))))
@@ -373,7 +366,7 @@
   (let [repo (repo/sail-repo)]
     (sparql/add repo (test-quads (URI. "http://test-graph/1")))
 
-    (copy-graph repo "http://test-graph/1" "http://test-graph/2")
+    (copy-graph repo (URI. "http://test-graph/1") (URI. "http://test-graph/2"))
 
     (let [source-graph (set (sparql/eager-query repo "SELECT * WHERE { GRAPH <http://test-graph/1> { ?s ?p ?o }}"))
           dest-graph   (set (sparql/eager-query repo "SELECT * WHERE { GRAPH <http://test-graph/2> { ?s ?p ?o }}"))]
@@ -567,7 +560,6 @@
   (let [repo (repo/sparql-repo "http://localhost:5820/drafter-test-db/query" "http://localhost:5820/drafter-test-db/update")
         graph-manager (graphs/create-manager repo)
         live-graphs (map #(URI. (str "http://live-" %)) (range 1 5))
-        [lg1 lg2 lg3 lg4] live-graphs
         draftset (create-draftset! repo test-editor)
         draft-graphs (mapv (fn [lg] (graphs/create-user-graph-draft graph-manager draftset lg)) live-graphs)
         [dg1 dg2 dg3 dg4] draft-graphs

@@ -1,7 +1,7 @@
 (ns drafter.backend.draftset.operations
   (:require [clojure.string :as string]
-            [drafter.backend.draftset.draft-management :as mgmt
-             :refer [to-quads with-state-graph]]
+            [com.yetanalytics.flint :as fl]
+            [drafter.backend.draftset.draft-management :as mgmt :refer [to-quads]]
             [drafter.draftset :as ds]
             [drafter.rdf.drafter-ontology :refer :all]
             [drafter.rdf.sparql :as sparql]
@@ -11,11 +11,9 @@
             [grafter-2.rdf4j.repository :as repo :refer [prepare-query]]
             [grafter.url :as url]
             [grafter.vocabularies.rdf :refer :all]
-            [clojure.java.io :as io]
             [drafter.time :as time])
   (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
            [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler BindingSet GraphQueryResult]
-           org.eclipse.rdf4j.queryrender.RenderUtils
            org.eclipse.rdf4j.rio.RDFHandler
            java.net.URI))
 
@@ -53,6 +51,17 @@
    "ASK WHERE {"
    "  GRAPH <" graph-uri "> { ?s ?p ?o }"
    "}"))
+
+(defn with-state-graph
+  "Wraps the string in a SPARQL
+   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+     <<sparql-fragment>>
+   } clause."
+
+  [& sparql-string]
+  (apply str " GRAPH <" mgmt/drafter-state-graph "> { "
+         (concat sparql-string
+                 " }")))
 
 (defn- draftset-exists-query [draftset-ref]
   (str "ASK WHERE {"
@@ -606,7 +615,8 @@
     (spog-tuple-query->graph-query conn tuple-query)))
 
 (defn all-graph-triples-query [backend graph]
-  (let [conn (repo/->connection backend)
-        unsafe-query (format "CONSTRUCT {?s ?p ?o} WHERE { GRAPH <%s> { ?s ?p ?o } }" graph)
-        escaped-query (RenderUtils/escape unsafe-query)]
-    (prepare-query conn escaped-query)))
+  (let [g (URI. (str graph))
+        conn (repo/->connection backend)]
+    (prepare-query conn
+                   (fl/format-query {:construct '[[?s ?p ?o]]
+                                     :where [[:graph g '[[?s ?p ?o]]]]}))))

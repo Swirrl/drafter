@@ -1,6 +1,5 @@
 (ns drafter.backend.draftset.operations-test
   (:require [clojure.test :as t :refer :all]
-            [drafter.backend.draftset.draft-management :refer [with-state-graph]]
             [drafter.backend.draftset.operations :as sut]
             [drafter.draftset :refer [->draftset-uri ->DraftsetId ->DraftsetURI]]
             [drafter.rdf.drafter-ontology :refer :all]
@@ -10,15 +9,12 @@
              [*test-backend*
               ask?
               import-data-to-draft!
-              select-all-in-graph
-              test-triples
               wrap-system-setup]]
             [drafter.test-helpers.draft-management-helpers :as mgmth]
             [drafter.user :as user]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [grafter-2.rdf4j.io :refer [statements]]
-            [grafter-2.rdf4j.repository :as repo]
-            [grafter-2.rdf.protocols :refer [->Quad ->Triple context context]]
+            [grafter-2.rdf.protocols :refer [context context]]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.test-common :as tc]
             [grafter-2.rdf4j.io :as gio]
@@ -142,7 +138,7 @@
 (defn- draftset-has-claim-permission? [draftset-id permission]
   (let [q (str
            "ASK WHERE {"
-           (with-state-graph
+           (mgmth/with-state-graph
              "<" (->draftset-uri draftset-id) "> <" drafter:hasSubmission "> ?submission ."
              "?submission <" drafter:claimPermission "> \"" (name permission) "\" .")
            "}")]
@@ -174,7 +170,7 @@
 (defn- draftset-has-claim-user? [draftset-id user]
   (let [q (str
            "ASK WHERE {"
-           (with-state-graph
+           (mgmth/with-state-graph
              "<" (->draftset-uri draftset-id) "> <" drafter:hasSubmission "> ?submission ."
              "?submission <" drafter:claimUser "> <" (user/user->uri user) "> .")
            "}")]
@@ -227,7 +223,7 @@
 (defn- draftset-has-submission? [draftset-ref]
   (let [draftset-uri (->draftset-uri draftset-ref)
         q (str "ASK WHERE {"
-               (with-state-graph
+               (mgmth/with-state-graph
                  "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
                  "<" draftset-uri "> <" drafter:hasSubmission "> ?submission")
                "}")]

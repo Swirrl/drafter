@@ -3,7 +3,6 @@
    [clojure.spec.alpha :as s]
    [drafter.rdf.draftset-management.jobs :as dsjobs]
    [drafter.requests :as req]
-   [drafter.responses :refer [forbidden-response]]
    [drafter.write-scheduler :as writes]
    [integrant.core :as ig]))
 

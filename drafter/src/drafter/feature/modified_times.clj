@@ -28,10 +28,10 @@
     (sparql/update! conn q)))
 
 (defn- update-draftset-timestamp-query [draftset-ref modified-at]
-  (mgmt/set-timestamp (url/->java-uri draftset-ref) dcterms:modified modified-at))
+  (mgmt/set-timestamp-sparql (url/->java-uri draftset-ref) dcterms:modified modified-at))
 
 (defn- update-draftset-version-query [draftset-ref]
-  (mgmt/set-version (url/->java-uri draftset-ref) (util/version)))
+  (mgmt/set-version-sparql (url/->java-uri draftset-ref) (util/version)))
 
 (defn- update-draftset-timestamp! [conn draftset-ref modified-at]
   (sparql/update! conn (update-draftset-timestamp-query draftset-ref modified-at)))
@@ -165,12 +165,14 @@
 
 (defn- remove-empty-draft-modifications-graph [draft-modifications-graph]
   (let [bindings {:dmg draft-modifications-graph}]
-    (get-update-query-with-bindings (io/resource "drafter/feature/modified_times/remove_empty_draft_modifications_graph.sparql") bindings)))
+    (get-update-query-with-bindings
+      (io/resource "drafter/feature/modified_times/remove_empty_draft_modifications_graph.sparql") bindings)))
 
 (defn- remove-empty-draft-only-graft-modifications [draftset-ref draft-modifications-graph]
   (let [bindings {:ds  (url/->java-uri draftset-ref)
                   :dmg draft-modifications-graph}]
-    (get-update-query-with-bindings (io/resource "drafter/feature/modified_times/delete_empty_draft_only_graph_modifications.sparql") bindings)))
+    (get-update-query-with-bindings
+      (io/resource "drafter/feature/modified_times/delete_empty_draft_only_graph_modifications.sparql") bindings)))
 
 (defn- get-modifications-graph-state [repo draftset-ref]
   (let [bindings (with-open [conn (repo/->connection repo)]
@@ -234,7 +236,7 @@
           new-modifications (merge-modifications live-modification-times draft-modification-times published-at)
           queries [(publish-modified-times-query new-modifications)
                    (mgmt/set-isPublic-query modified-times-graph-uri true)
-                   (mgmt/delete-draft-state-query draft-modifications-graph)
+                   (mgmt/delete-draft-state-query-sparql draft-modifications-graph)
                    (mgmt/delete-graph-contents-query draft-modifications-graph)]
           compound-query (util/make-compound-sparql-query queries)]
       (with-open [conn (repo/->connection repo)]

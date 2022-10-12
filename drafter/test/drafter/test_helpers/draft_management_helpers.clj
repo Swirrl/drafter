@@ -4,12 +4,23 @@
             [drafter.rdf.sparql :as sparql]
             [drafter.backend.draftset.operations :as dsops]))
 
+(defn with-state-graph
+  "Wraps the string in a SPARQL
+   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+     <<sparql-fragment>>
+   } clause."
+
+  [& sparql-string]
+  (apply str " GRAPH <" mgmt/drafter-state-graph "> { "
+         (concat sparql-string
+                 " }")))
+
 (defn draft-exists?
   "Checks state graph to see if a draft graph exists"
   [db graph-uri]
   (let [qry (str "ASK WHERE {"
                  "  SELECT ?s WHERE {"
-                 (mgmt/with-state-graph
+                 (with-state-graph
                    "      ?live a <" drafter:ManagedGraph "> ;"
                    "            <" drafter:hasDraft "> <" graph-uri "> ."
                    "      <" graph-uri "> a <" drafter:DraftGraph "> ."
@@ -28,7 +39,7 @@
   "Get all the draft graph URIs"
   [db]
   (let [query-str (str "SELECT ?draft WHERE {"
-                       (mgmt/with-state-graph
+                       (with-state-graph
                          "?live <" drafter:hasDraft "> ?draft .")
                        "}")
         results (sparql/eager-query db query-str)]
