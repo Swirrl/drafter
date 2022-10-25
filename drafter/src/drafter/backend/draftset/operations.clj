@@ -207,9 +207,6 @@
         mapping-pairs (map (juxt :live-graph-uri :draft-graph-uri) graph-states)]
     (into {} mapping-pairs)))
 
-(defn- user-is-owner-clause [user]
-  (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
-
 (defn- draftset-properties-result->properties
   [draftset-ref
    {:keys [created
@@ -223,7 +220,7 @@
            modified
            version
            viewpermissions
-           viewusers] :as ds}]
+           viewusers] :as _ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :type "Draftset"
                          :created-at created
@@ -451,34 +448,27 @@
   (let [q (share-with-user-query draftset-ref submitter target)]
     (sparql/update! backend q)))
 
-(defn- try-claim-draftset-query [draftset-ref claimant]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)
-        user-uri (user/user->uri claimant)]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-       "?submission ?sp ?so .")
-     "} INSERT {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> .")
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-       "?submission ?sp ?so .")
-     "}")))
-
 (defn- try-claim-draftset!
   "Sets the claiming user to the owner of the given draftset if the draftset is
    available (has no current owner). We should have already checked the
    claimant has permission to claim the draftset."
   [backend draftset-ref claimant]
-  (let [q (try-claim-draftset-query draftset-ref claimant)]
-    (sparql/update! backend q)))
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))
+        user-uri (user/user->uri claimant)]
+    (sparql/update! backend
+                    (fl/format-update
+                      {:prefixes mgmt/base-prefixes
+                       :with mgmt/drafter-state-graph
+                       :delete [[draftset-uri :drafter/hasSubmission '?submission]
+                                '[?submission ?sp ?so]]
+                       :insert [[draftset-uri :drafter/hasOwner user-uri]]
+                       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+                               [draftset-uri :drafter/hasSubmission '?submission]
+                               '[?submission ?sp ?so]]}
+                      :pretty? true))))
 
 (defn- infer-claim-outcome
-  [{:keys [current-owner] :as ds-info} claimant]
+  [{:keys [current-owner] :as _ds-info} claimant]
   (if (= (user/username claimant) current-owner) :ok :unknown))
 
 (defn claim-draftset!
@@ -507,25 +497,24 @@
     (user/permitted-draftset-operations ds-info user)
     #{}))
 
-(defn- find-draftset-draft-graph-query [draftset-ref live-graph]
-  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "SELECT ?dg WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "?dg <" rdf:a "> <" drafter:DraftGraph "> ."
-       "?dg <" drafter:inDraftSet "> <" draftset-uri "> ."
-       "<" live-graph "> <" rdf:a "> <" drafter:ManagedGraph "> ."
-       "<" live-graph "> <" drafter:hasDraft "> ?dg .")
-     "} LIMIT 1")))
-
 (defn find-draftset-draft-graph
   "Finds the draft graph for a live graph inside a draftset if one
   exists. Returns nil if the draftset does not exist, or does not
   contain a draft for the graph."
   [backend draftset-ref live-graph]
-  (let [q (find-draftset-draft-graph-query draftset-ref live-graph)
-        [result] (sparql/eager-query backend q)]
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))
+        [result] (sparql/eager-query backend
+                                     (fl/format-query
+                                       {:prefixes mgmt/base-prefixes
+                                        :select ['?dg]
+                                        :where [[:graph mgmt/drafter-state-graph
+                                                 [[draftset-uri :rdf/type :drafter/DraftSet]
+                                                  ['?dg :rdf/type :drafter/DraftGraph]
+                                                  ['?dg :drafter/inDraftSet draftset-uri]
+                                                  {live-graph {:rdf/type #{:drafter/ManagedGraph}
+                                                               :drafter/hasDraft #{'?dg}}}]]]
+                                        :limit 1}
+                                       :pretty? true))]
     (:dg result)))
 
 (defn- spog-bindings->statement [^BindingSet bindings]
@@ -601,7 +590,9 @@
   represented by the given backend."
   [backend]
   (let [conn (repo/->connection backend)
-        tuple-query (repo/prepare-query conn "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
+        tuple-query (repo/prepare-query conn
+                                        (fl/format-query {:select :*
+                                                          :where '[[:graph ?g [[?s ?p ?o]]]]}))]
     (spog-tuple-query->graph-query conn tuple-query)))
 
 (defn all-graph-triples-query [backend graph]
