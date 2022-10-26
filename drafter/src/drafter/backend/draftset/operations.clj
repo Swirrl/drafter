@@ -362,25 +362,19 @@
                   (submit-draftset-to-permission-query
                    draftset-ref (util/create-uuid) owner permission)))
 
-(defn- share-draftset-with-permission-query
-  [draftset-ref owner permission]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
-    (str
-     "INSERT {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:viewPermission "> \"" (name permission) "\" .")
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> .")
-     "}")))
-
 (defn share-draftset-with-permission!
   "Shares a draftset with users with the specified permission. If the given
    user is not the current owner of the draftset, no changes are made."
   [backend draftset-ref owner permission]
-  (sparql/update! backend (share-draftset-with-permission-query
-                           draftset-ref owner permission)))
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+    (sparql/update! backend
+                    (fl/format-update
+                      {:prefixes mgmt/base-prefixes
+                       :with mgmt/drafter-state-graph
+                       :insert [[draftset-uri :drafter/viewPermission (name permission)]]
+                       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+                               [draftset-uri :drafter/hasOwner (user/user->uri owner)]]}
+                      :pretty? true))))
 
 (defn unshare-draftset!
   "Removes all shares from a draftset, so only the owner can view it. If the
