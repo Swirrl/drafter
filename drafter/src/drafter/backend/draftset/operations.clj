@@ -326,30 +326,23 @@
 
 (defn- submit-draftset-to-permission-query
   [draftset-ref submission-id owner permission]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)
-        submit-uri (submission-id->uri submission-id)
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))
+        submit-uri (url/->java-uri (submission-id->uri submission-id))
         user-uri (user/user->uri owner)]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> ."
-       "<" draftset-uri "> <" drafter:submittedBy "> ?submitter .")
-     "} INSERT {"
-     (with-state-graph
-       "<" submit-uri "> <" rdf:a "> <" drafter:Submission "> ."
-       "<" submit-uri "> <" drafter:claimPermission "> \"" (name permission) "\" ."
-       "<" draftset-uri "> <" drafter:hasSubmission "> <" submit-uri "> ."
-       "<" draftset-uri "> <" drafter:submittedBy "> <" user-uri "> ."
-       )
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> ."
-       "OPTIONAL { "
-       "<" draftset-uri "> <" drafter:submittedBy "> ?submitter ."
-       "}"
-       )
-     "}")))
+    (fl/format-update
+      {:prefixes mgmt/base-prefixes
+       :with mgmt/drafter-state-graph
+       :delete [[draftset-uri :drafter/hasOwner user-uri]
+                [draftset-uri :drafter/submittedBy '?submitter]]
+       :insert [[submit-uri :rdf/type :drafter/Submission]
+                [submit-uri :drafter/claimPermission (name permission)]
+                [draftset-uri :drafter/hasSubmission submit-uri]
+                [draftset-uri :drafter/submittedBy user-uri]]
+       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+               [draftset-uri :drafter/hasOwner user-uri]
+               [:optional
+                [[draftset-uri :drafter/submittedBy '?submitter]]]]}
+      :pretty? true)))
 
 (defn submit-draftset-to-permission!
   "Submits a draftset to users with the specified permission.
