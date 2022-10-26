@@ -432,21 +432,16 @@
   (let [q (submit-to-user-query draftset-ref (util/create-uuid) submitter target)]
     (sparql/update! backend q)))
 
-(defn- share-with-user-query [draftset-ref owner target]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
-    (str
-     "INSERT {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:viewUser "> <" (user/user->uri target) "> .")
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> .")
-     "}")))
-
 (defn share-draftset-with-user! [backend draftset-ref submitter target]
-  (let [q (share-with-user-query draftset-ref submitter target)]
-    (sparql/update! backend q)))
+  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+    (sparql/update! backend
+                    (fl/format-update
+                      {:prefixes mgmt/base-prefixes
+                       :with mgmt/drafter-state-graph
+                       :insert [[draftset-uri :drafter/viewUser (user/user->uri target)]]
+                       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+                               [draftset-uri :drafter/hasOwner (user/user->uri submitter)]]}
+                      :pretty? true))))
 
 (defn- try-claim-draftset!
   "Sets the claiming user to the owner of the given draftset if the draftset is
