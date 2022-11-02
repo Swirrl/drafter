@@ -302,26 +302,24 @@
   {:display-name rdfs:label
    :description rdfs:comment})
 
-(defn- set-draftset-metadata-query [draftset-uri po-pairs]
-  (str
-   "DELETE {"
-   (with-state-graph
-     "<" draftset-uri "> ?p ?o .")
-   "} INSERT {"
-   (with-state-graph
-     (string/join " " (map (fn [[p o]] (str "<" draftset-uri "> <" p "> \"" o "\" .")) po-pairs)))
-   "} WHERE {"
-   (with-state-graph
-     "VALUES ?p { " (string/join " " (map #(str "<" (first %) ">") po-pairs)) " }"
-     "OPTIONAL { <" draftset-uri "> ?p ?o . }")
-   "}"))
-
 (defn set-draftset-metadata!
   "Takes a map containing new values for various metadata keys and
   updates them on the given draftset."
   [backend draftset-ref meta-map]
-  (when-let [update-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
-    (let [q (set-draftset-metadata-query (ds/->draftset-uri draftset-ref) update-pairs)]
+  (when-let [po-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
+    (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))
+          q (fl/format-update
+              {:prefixes mgmt/base-prefixes
+               :with mgmt/drafter-state-graph
+               :delete [[draftset-uri '?p '?o]]
+               :insert (into []
+                             (map (fn [[p o]]
+                                    [draftset-uri p o])
+                                  po-pairs))
+               :where [[:values {'?p (into [] (map first po-pairs))}]
+                       [:optional
+                        [[draftset-uri '?p '?o]]]]}
+              :pretty? true)]
       (sparql/update! backend q))))
 
 (defn- submit-draftset-to-permission-query
