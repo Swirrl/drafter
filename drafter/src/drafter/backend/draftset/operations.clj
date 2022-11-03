@@ -128,23 +128,6 @@
                                                :where [[:graph dg
                                                         '[[?s ?p ?o]]]]}))))
 
-(defn- get-draftsets-matching-graph-mappings-query [match-clauses]
-  (str
-    "SELECT * WHERE { "
-    (with-state-graph
-      "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
-      "?dg <" drafter:inDraftSet "> ?ds ."
-      "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-      "?lg <" drafter:hasDraft "> ?dg ."
-      "?lg <" drafter:isPublic "> ?public ."
-      "{"
-      "  SELECT DISTINCT ?ds WHERE {"
-      "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
-      (string/join " UNION " match-clauses)
-      "  }"
-      "}")
-    "}"))
-
 (defn- get-draftsets-matching-graph-mappings-query2 [match-clauses]
   (fl/format-query
     {:prefixes mgmt/base-prefixes
@@ -206,9 +189,11 @@
   (str
     "{ VALUES ?ds { <" (str (ds/->draftset-uri draftset-ref)) "> } }"))
 
+(defn- draftset-uri-clause2 [draftset-ref]
+  [[:values {'?ds [(url/->java-uri (ds/->draftset-uri draftset-ref))]}]])
+
 (defn get-draftset-graph-states [repo draftset-ref]
-  (let [q (get-draftsets-matching-graph-mappings-query2
-            [[:values {'?ds [(url/->java-uri (ds/->draftset-uri draftset-ref))]}]])]
+  (let [q (get-draftsets-matching-graph-mappings-query2 (draftset-uri-clause2 draftset-ref))]
     (->> q
          (sparql/eager-query repo)
          (map graph-mapping-result->graph-mapping))))
@@ -279,18 +264,21 @@
     (sparql/eager-query repo properties-query)))
 
 (defn- get-all-draftsets-mappings-by [repo clauses]
-  (let [mappings-query (get-draftsets-matching-graph-mappings-query clauses)]
+  (let [mappings-query (get-draftsets-matching-graph-mappings-query2 clauses)]
     (sparql/eager-query repo mappings-query)))
 
-(defn get-all-draftsets-by [repo clauses]
-  (let [properties (get-all-draftsets-properties-by repo clauses)
-        graph-mappings (get-all-draftsets-mappings-by repo clauses)
+; todo: v1, v2 versions of draftset-uri-clause are only temp intermediate scaffolding
+(defn get-all-draftsets-by [repo {:keys [v1 v2] :as _clauses}]
+  (let [properties (get-all-draftsets-properties-by repo v1)
+        graph-mappings (get-all-draftsets-mappings-by repo v2)
         graph-states (draftset-graph-mappings->graph-states repo graph-mappings)]
 
     (combine-all-properties-and-graph-states properties graph-states)))
 
 (defn get-draftset-info [repo draftset-ref]
-  (->> (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])
+  ; todo: v1, v2 versions of draftset-uri-clause are only temp intermediate scaffolding
+  (->> (get-all-draftsets-by repo {:v1 [(draftset-uri-clause draftset-ref)]
+                                   :v2 (draftset-uri-clause2 draftset-ref)})
        (first)))
 
 (defn is-draftset-viewer? [backend draftset-ref user]
@@ -400,29 +388,22 @@
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
         target-uri (user/user->uri target)
-        submit-uri (submission-id->uri submission-id)
-        draftset-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> <" submitter-uri "> ."
-       "<" draftset-uri "> <" drafter:submittedBy "> ?submitter .")
-     "} INSERT {"
-     (with-state-graph
-       "<" submit-uri "> <" rdf:a "> <" drafter:Submission "> ."
-       "<" submit-uri "> <" drafter:claimUser "> <" target-uri "> ."
-       "<" draftset-uri "> <" drafter:hasSubmission "> <" submit-uri "> ."
-       "<" draftset-uri "> <" drafter:submittedBy "> <" submitter-uri "> ."
-       )
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> <" submitter-uri "> ."
-       "OPTIONAL { "
-         "<" draftset-uri "> <" drafter:submittedBy "> ?submitter ."
-       "}"
-       )
-     "}")))
+        submit-uri (url/->java-uri (submission-id->uri submission-id))
+        draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+    (fl/format-update
+      {:prefixes mgmt/base-prefixes
+       :with mgmt/drafter-state-graph
+       :delete [[draftset-uri :drafter/hasOwner submitter-uri]
+                [draftset-uri :drafter/submittedBy '?submitter]]
+       :insert [[submit-uri :rdf/type :drafter/Submission]
+                [submit-uri :drafter/claimUser target-uri]
+                [draftset-uri :drafter/hasSubmission submit-uri]
+                [draftset-uri :drafter/submittedBy submitter-uri]]
+       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+               [draftset-uri :drafter/hasOwner submitter-uri]
+               [:optional
+                [[draftset-uri :drafter/submittedBy '?submitter]]]]}
+      :pretty? true)))
 
 (defn submit-draftset-to-user! [backend draftset-ref submitter target]
   (let [q (submit-to-user-query draftset-ref (util/create-uuid) submitter target)]
