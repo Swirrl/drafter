@@ -128,9 +128,6 @@
                                                :where [[:graph dg
                                                         '[[?s ?p ?o]]]]}))))
 
-(defn- union-clauses [clauses]
-  (string/join " UNION " clauses))
-
 (defn- get-draftsets-matching-graph-mappings-query [match-clauses]
   (str
     "SELECT * WHERE { "
@@ -143,10 +140,27 @@
       "{"
       "  SELECT DISTINCT ?ds WHERE {"
       "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
-      (union-clauses match-clauses)
+      (string/join " UNION " match-clauses)
       "  }"
       "}")
     "}"))
+
+(defn- get-draftsets-matching-graph-mappings-query2 [match-clauses]
+  (fl/format-query
+    {:prefixes mgmt/base-prefixes
+     :select :*
+     :where [[:graph mgmt/drafter-state-graph
+              ['[?ds :rdf/type :drafter/DraftSet]
+               '[?dg :drafter/inDraftSet ?ds]
+               '[?lg :rdf/type :drafter/ManagedGraph]
+               '[?lg :drafter/hasDraft ?dg]
+               '[?lg :drafter/isPublic ?public]
+
+               [:where {:select-distinct '[?ds]
+                        :where ['[?ds :rdf/type :drafter/DraftSet]
+                                [:union match-clauses]
+                                ]}]]]]}
+    :pretty? true))
 
 (defn- get-draftsets-matching-properties-query [match-clauses]
   (str
@@ -183,7 +197,7 @@
       "{"
       "  SELECT DISTINCT ?ds WHERE {"
       "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
-      "  " (union-clauses match-clauses)
+      "  " (string/join " UNION " match-clauses)
       "  }"
       "}")
     "}"))
@@ -192,12 +206,9 @@
   (str
     "{ VALUES ?ds { <" (str (ds/->draftset-uri draftset-ref)) "> } }"))
 
-(defn get-draftset-graph-mapping-query [draftset-ref]
-  (get-draftsets-matching-graph-mappings-query
-    [(draftset-uri-clause draftset-ref)]))
-
 (defn get-draftset-graph-states [repo draftset-ref]
-  (let [q (get-draftset-graph-mapping-query draftset-ref)]
+  (let [q (get-draftsets-matching-graph-mappings-query2
+            [[:values {'?ds [(url/->java-uri (ds/->draftset-uri draftset-ref))]}]])]
     (->> q
          (sparql/eager-query repo)
          (map graph-mapping-result->graph-mapping))))
