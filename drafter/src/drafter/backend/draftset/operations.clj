@@ -141,8 +141,9 @@
 
                [:where {:select-distinct '[?ds]
                         :where ['[?ds :rdf/type :drafter/DraftSet]
-                                [:union match-clauses]
-                                ]}]]]]}
+                                (if match-clauses
+                                  (vec (cons :union match-clauses))
+                                  [:union []])]}]]]]}
     :pretty? true))
 
 (defn- get-draftsets-matching-properties-query [match-clauses]
@@ -193,7 +194,7 @@
   [[:values {'?ds [(url/->java-uri (ds/->draftset-uri draftset-ref))]}]])
 
 (defn get-draftset-graph-states [repo draftset-ref]
-  (let [q (get-draftsets-matching-graph-mappings-query2 (draftset-uri-clause2 draftset-ref))]
+  (let [q (get-draftsets-matching-graph-mappings-query2 [(draftset-uri-clause2 draftset-ref)])]
     (->> q
          (sparql/eager-query repo)
          (map graph-mapping-result->graph-mapping))))
@@ -278,7 +279,7 @@
 (defn get-draftset-info [repo draftset-ref]
   ; todo: v1, v2 versions of draftset-uri-clause are only temp intermediate scaffolding
   (->> (get-all-draftsets-by repo {:v1 [(draftset-uri-clause draftset-ref)]
-                                   :v2 (draftset-uri-clause2 draftset-ref)})
+                                   :v2 [(draftset-uri-clause2 draftset-ref)]})
        (first)))
 
 (defn is-draftset-viewer? [backend draftset-ref user]
