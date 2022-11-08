@@ -17,6 +17,7 @@
            [java.util UUID]))
 
 (def base-prefixes {:rdf (rdf "")
+                    :rdfs (rdfs "")
                     :dcterms (URI. "http://purl.org/dc/terms/")
                     :drafter drafter})
 

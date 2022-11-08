@@ -128,7 +128,7 @@
                                                :where [[:graph dg
                                                         '[[?s ?p ?o]]]]}))))
 
-(defn- get-draftsets-matching-graph-mappings-query2 [match-clauses]
+(defn- get-draftsets-matching-graph-mappings-query [match-clauses]
   (fl/format-query
     {:prefixes mgmt/base-prefixes
      :select :*
@@ -147,54 +147,53 @@
     :pretty? true))
 
 (defn- get-draftsets-matching-properties-query [match-clauses]
-  (str
-    "SELECT * WHERE {"
-    (with-state-graph
-      "?ds <" drafter:createdAt "> ?created ."
-      "?ds <" drafter:modifiedAt "> ?modified ."
-      "?ds <" drafter:version "> ?version ."
-      "?ds <" drafter:createdBy "> ?creator ."
-      "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
-      "OPTIONAL { ?ds <" drafter:hasOwner "> ?owner . }"
-      "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
-      "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter. }"
-      "OPTIONAL {"
-      "  ?ds <" drafter:hasSubmission "> ?submission ."
-      "  ?submission <" drafter:claimUser "> ?claimuser ."
-      "}"
-      "OPTIONAL {"
-      "  ?ds <" drafter:hasSubmission "> ?submission ."
-      "  ?submission <" drafter:claimPermission "> ?permission ."
-      "}"
-      ;; Makes the assumption that usernames and permissions don't contain
-      ;; spaces, so we can use space as a separator. Usernames are URIs, which
-      ;; cannot contain spaces. Permissions are OAuth 2.0 scopes, which also
-      ;; cannot contain spaces.
-      "OPTIONAL {"
-      "  SELECT ?ds (GROUP_CONCAT(?p; SEPARATOR=\" \") AS ?viewpermissions)"
-      "  WHERE { ?ds <" drafter:viewPermission "> ?p } GROUP BY ?ds"
-      "}"
-      "OPTIONAL {"
-      "  SELECT ?ds (GROUP_CONCAT(?u; SEPARATOR=\" \") AS ?viewusers)"
-      "  WHERE { ?ds <" drafter:viewUser "> ?u } GROUP BY ?ds"
-      "}"
-      "{"
-      "  SELECT DISTINCT ?ds WHERE {"
-      "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
-      "  " (string/join " UNION " match-clauses)
-      "  }"
-      "}")
-    "}"))
+  (fl/format-query {:prefixes mgmt/base-prefixes
+                    :select :*
+                    :where [[:graph mgmt/drafter-state-graph
+                             ['[?ds :dcterms/created ?created]
+                              '[?ds :dcterms/modified ?modified]
+                              '[?ds :drafter/version ?version]
+                              '[?ds :dcterms/creator ?creator]
+                              '[:optional
+                                [[?ds :rdfs/comment ?description]]]
+                              '[:optional
+                                [[?ds :drafter/hasOwner ?owner]]]
+                              '[:optional
+                                [[?ds :rdfs/label ?title]]]
+                              '[:optional
+                                [[?ds :drafter/submittedBy ?submitter]]]
+                              '[:optional
+                                [[?ds :drafter/hasSubmission ?submission]
+                                 [?submission :drafter/claimUser ?claimuser]]]
+                              '[:optional
+                                [[?ds :drafter/hasSubmission ?submission]
+                                 [?submission :drafter/claimPermission ?permission]]]
+                              ;; Makes the assumption that usernames and permissions don't contain
+                              ;; spaces, so we can use space as a separator. Usernames are URIs, which
+                              ;; cannot contain spaces. Permissions are OAuth 2.0 scopes, which also
+                              ;; cannot contain spaces.
+                              '[:optional
+                                [[:where {:select [?ds [(group-concat ?p :separator " ") ?viewpermissions]]
+                                          :where [[?ds :drafter/viewPermission ?p]]
+                                          :group-by [?ds]}]]]
+                              '[:optional
+                                [[:where {:select [?ds [(group-concat ?u :separator " ") ?viewusers]]
+                                          :where [[?ds :drafter/viewUser ?u]]
+                                          :group-by [?ds]}]]]
+
+
+                              [:where {:select-distinct '[?ds]
+                                       :where ['[?ds :rdf/type :drafter/DraftSet]
+                                               (if match-clauses
+                                                 (vec (cons :union match-clauses))
+                                                 [:union []])]}]]]]}
+                   :pretty? true))
 
 (defn- draftset-uri-clause [draftset-ref]
-  (str
-    "{ VALUES ?ds { <" (str (ds/->draftset-uri draftset-ref)) "> } }"))
-
-(defn- draftset-uri-clause2 [draftset-ref]
   [[:values {'?ds [(url/->java-uri (ds/->draftset-uri draftset-ref))]}]])
 
 (defn get-draftset-graph-states [repo draftset-ref]
-  (let [q (get-draftsets-matching-graph-mappings-query2 [(draftset-uri-clause2 draftset-ref)])]
+  (let [q (get-draftsets-matching-graph-mappings-query [(draftset-uri-clause draftset-ref)])]
     (->> q
          (sparql/eager-query repo)
          (map graph-mapping-result->graph-mapping))))
@@ -249,7 +248,7 @@
 (defn- combine-all-properties-and-graph-states [draftset-properties graph-states]
   (let [ds-uri->graph-states (group-by :draftset-uri graph-states)]
     (map (fn [{ds-uri :ds :as result}]
-           (let [properties (draftset-properties-result->properties (ds/->DraftsetURI ds-uri) result)
+           (let [properties (draftset-properties-result->properties (url/->java-uri (ds/->DraftsetURI ds-uri)) result)
                  ds-graph-states (get ds-uri->graph-states ds-uri)]
              (combine-draftset-properties-and-graph-states properties ds-graph-states)))
          draftset-properties)))
@@ -265,21 +264,18 @@
     (sparql/eager-query repo properties-query)))
 
 (defn- get-all-draftsets-mappings-by [repo clauses]
-  (let [mappings-query (get-draftsets-matching-graph-mappings-query2 clauses)]
+  (let [mappings-query (get-draftsets-matching-graph-mappings-query clauses)]
     (sparql/eager-query repo mappings-query)))
 
-; todo: v1, v2 versions of draftset-uri-clause are only temp intermediate scaffolding
-(defn get-all-draftsets-by [repo {:keys [v1 v2] :as _clauses}]
-  (let [properties (get-all-draftsets-properties-by repo v1)
-        graph-mappings (get-all-draftsets-mappings-by repo v2)
+(defn get-all-draftsets-by [repo clauses]
+  (let [properties (get-all-draftsets-properties-by repo clauses)
+        graph-mappings (get-all-draftsets-mappings-by repo clauses)
         graph-states (draftset-graph-mappings->graph-states repo graph-mappings)]
 
     (combine-all-properties-and-graph-states properties graph-states)))
 
 (defn get-draftset-info [repo draftset-ref]
-  ; todo: v1, v2 versions of draftset-uri-clause are only temp intermediate scaffolding
-  (->> (get-all-draftsets-by repo {:v1 [(draftset-uri-clause draftset-ref)]
-                                   :v2 [(draftset-uri-clause2 draftset-ref)]})
+  (->> (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])
        (first)))
 
 (defn is-draftset-viewer? [backend draftset-ref user]

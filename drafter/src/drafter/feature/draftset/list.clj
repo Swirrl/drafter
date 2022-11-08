@@ -13,97 +13,51 @@
 ;; Fetches all drafts with any claim permission set, we still need to check
 ;; that the user actually has the set permission.
 (def claim-permission-clause
-  (str
-   "{"
-   "  ?ds <" drafter:hasSubmission "> ?submission ."
-   "  ?submission <" drafter:claimPermission "> ?permission ."
-   "}"))
-
-(def claim-permission-clause2
   '[[?ds :drafter/hasSubmission ?submission]
     [?submission :drafter/claimPermission ?permission]])
 
 (defn- user-is-claim-user-clause [user]
-  (str
-    "{"
-    "  ?ds <" drafter:hasSubmission "> ?submission ."
-    "  ?submission <" drafter:claimUser "> <" (user/user->uri user) "> ."
-    "}"))
-
-(defn- user-is-claim-user-clause2 [user]
   ['[?ds :drafter/hasSubmission ?submission]
    ['?submission :drafter/claimUser (user/user->uri user)]])
 
 (defn- user-is-submitter-clause [user]
-  (str
-    "{"
-    "  ?ds <" drafter:submittedBy "> <" (user/user->uri user) "> ."
-    "  FILTER NOT EXISTS { ?ds <" drafter:hasOwner "> ?owner }"
-    "}")
-  )
-
-(defn- user-is-submitter-clause2 [user]
   [['?ds :drafter/submittedBy (user/user->uri user)]
    [:filter '(not-exists [[?ds :drafter/hasOwner ?owner]])]])
 
 ;; Fetches all drafts with any view permission set, we still need to check that
 ;; the user actually has the set permission.
 (def view-permission-clause
-  (str "{ ?ds <" drafter:viewPermission "> ?permission }"))
-
-(def view-permission-clause2
   '[[?ds :drafter/viewPermission ?permission]])
 
 (defn- user-is-view-user-clause [user]
-  (str
-    "{ ?ds <" drafter:viewUser "> <" (user/user->uri user) "> }"))
-
-(defn- user-is-view-user-clause2 [user]
   [['?ds :drafter/viewUser (user/user->uri user)]])
 
 (defn- user-is-owner-clause [user]
-  (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
-
-(defn- user-is-owner-clause2 [user]
   [['?ds :drafter/hasOwner (user/user->uri user)]])
 
 (defn user-claimable-clauses [user]
-  [claim-permission-clause
-   (user-is-claim-user-clause user)
-   (user-is-submitter-clause user)])
-
-(defn user-claimable-clauses2 [user]
-    [claim-permission-clause2
-     (user-is-claim-user-clause2 user)
-     (user-is-submitter-clause2 user)])
-
-(defn user-all-visible-clauses [user]
-  (conj (user-claimable-clauses user)
-        (user-is-owner-clause user)
-        view-permission-clause
-        (user-is-view-user-clause user)))
+    [claim-permission-clause
+     (user-is-claim-user-clause user)
+     (user-is-submitter-clause user)])
 
 (defn user-all-visible-clauses2 [user]
   (vec
     (concat
-      (user-claimable-clauses2 user)
-      [(user-is-owner-clause2 user)
-       view-permission-clause2
-       (user-is-view-user-clause2 user)])))
+      (user-claimable-clauses user)
+      [(user-is-owner-clause user)
+       view-permission-clause
+       (user-is-view-user-clause user)])))
 
 (defn get-all-draftsets-info [repo user]
   (filter #(user/can-view? user %)
-          (dsops/get-all-draftsets-by repo {:v1 (user-all-visible-clauses user)
-                                            :v2 (user-all-visible-clauses2 user)})))
+          (dsops/get-all-draftsets-by repo (user-all-visible-clauses2 user))))
 
 (defn get-draftsets-claimable-by [repo user]
   (filter #(user/can-claim? user %)
-          (dsops/get-all-draftsets-by repo {:v1 (user-claimable-clauses user)
-                                            :v2 (user-claimable-clauses2 user)})))
+          (dsops/get-all-draftsets-by repo (user-claimable-clauses user))))
 
 (defn get-draftsets-owned-by [repo user]
-  (dsops/get-all-draftsets-by repo {:v1 [(user-is-owner-clause user)]
-                                    :v2 [(user-is-owner-clause2 user)]}))
+  (dsops/get-all-draftsets-by repo [(user-is-owner-clause user)]))
 
 (defn get-draftsets [backend user include union-with-live?]
   (let [draftsets (case include
