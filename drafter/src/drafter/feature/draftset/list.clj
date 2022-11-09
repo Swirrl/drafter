@@ -40,7 +40,7 @@
      (user-is-claim-user-clause user)
      (user-is-submitter-clause user)])
 
-(defn user-all-visible-clauses2 [user]
+(defn user-all-visible-clauses [user]
   (vec
     (concat
       (user-claimable-clauses user)
@@ -50,7 +50,7 @@
 
 (defn get-all-draftsets-info [repo user]
   (filter #(user/can-view? user %)
-          (dsops/get-all-draftsets-by repo (user-all-visible-clauses2 user))))
+          (dsops/get-all-draftsets-by repo (user-all-visible-clauses user))))
 
 (defn get-draftsets-claimable-by [repo user]
   (filter #(user/can-claim? user %)
