@@ -46,17 +46,6 @@
        (rdf/add dbcon quads)
        (ds/->DraftsetId (str draftset-id))))))
 
-(defn with-state-graph
-  "Wraps the string in a SPARQL
-   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-     <<sparql-fragment>>
-   } clause."
-
-  [& sparql-string]
-  (apply str " GRAPH <" mgmt/drafter-state-graph "> { "
-         (concat sparql-string
-                 " }")))
-
 (defn draftset-exists? [db draftset-ref]
   (let [q (fl/format-query
             {:prefixes mgmt/base-prefixes
