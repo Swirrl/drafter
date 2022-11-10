@@ -1,5 +1,6 @@
 (ns drafter.feature.modified-times
-  (:require [drafter.rdf.sparql :as sparql]
+  (:require [com.yetanalytics.flint :as fl]
+            [drafter.rdf.sparql :as sparql]
             [drafter.rdf.sesame :as ses]
             [grafter.url :as url]
             [drafter.backend.draftset.draft-management :as mgmt]
@@ -17,7 +18,8 @@
             [clojure.data :refer [diff]]
             [drafter.rdf.jena :as jena]
             [grafter-2.rdf.protocols :as pr])
-  (:import [org.eclipse.rdf4j.repository.sparql.query QueryStringUtil]))
+  (:import (java.net URI)
+           [org.eclipse.rdf4j.repository.sparql.query QueryStringUtil]))
 
 (defn- get-update-query-with-bindings [query-source bindings]
   (let [q (slurp query-source)]
@@ -169,10 +171,22 @@
       (io/resource "drafter/feature/modified_times/remove_empty_draft_modifications_graph.sparql") bindings)))
 
 (defn- remove-empty-draft-only-graft-modifications [draftset-ref draft-modifications-graph]
-  (let [bindings {:ds  (url/->java-uri draftset-ref)
-                  :dmg draft-modifications-graph}]
-    (get-update-query-with-bindings
-      (io/resource "drafter/feature/modified_times/delete_empty_draft_only_graph_modifications.sparql") bindings)))
+  (fl/format-update
+    {:prefixes mgmt/base-prefixes
+     :delete [[:graph draft-modifications-graph
+               '[[?dg :dcterms/modified ?modified]]]]
+     :where [[:where {:select '[?dg]
+                      :where [[:graph mgmt/drafter-state-graph
+                               ['[?lg :rdf/type :drafter/ManagedGraph]
+                                '[?lg :drafter/isPublic false]
+                                '[?lg :drafter/hasDraft ?dg]
+                                ['?dg :drafter/inDraftSet (url/->java-uri draftset-ref)]
+                                [:filter (not= '?lg (URI. "http://publishmydata.com/graphs/drafter/graph-modified-times"))]
+                                [:filter '(not-exists
+                                            [[:graph ?dg [[?s ?p ?o]]]])]]]]}]
+             [:graph draft-modifications-graph
+              '[[?dg :dcterms/modified ?modified]]]]}
+    :pretty? true))
 
 (defn- get-modifications-graph-state [repo draftset-ref]
   (let [bindings (with-open [conn (repo/->connection repo)]
