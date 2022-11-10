@@ -3,9 +3,12 @@
   to operate on them."
   (:require
    [drafter.rdf.drafter-ontology :as ont]
+   [com.yetanalytics.flint.axiom.protocol :as flint-p]
+   [com.yetanalytics.flint.axiom.impl.validation :as flint-val]
    [drafter.util :as util]
    [grafter.url :as url])
   (:import java.net.URI
+           (grafter.url GrafterURL)
            [java.util UUID]
            [java.time OffsetDateTime]))
 
@@ -25,7 +28,20 @@
   (->java-uri [this] uri)
 
   Object
-  (toString [this] (str uri)))
+  (toString [this] (str uri))
+
+  flint-p/IRI
+  (-valid-iri? [this] (flint-val/valid-iri-string?* (.toString (url/->java-uri uri))))
+  (-format-iri [this] (str "<" (url/->java-uri uri) ">"))
+  (-unwrap-iri [this] (.toString (url/->java-uri uri))))
+
+
+(extend-protocol flint-p/IRI
+  GrafterURL
+  (-valid-iri? [this] (flint-val/valid-iri-string?* (.toString (url/->java-uri this))))
+  (-format-iri [this] (str "<" (url/->java-uri this) ">"))
+  (-unwrap-iri [this] (.toString (url/->java-uri this))))
+
 
 (defrecord DraftsetId [id]
   DraftsetRef

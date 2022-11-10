@@ -287,7 +287,7 @@
      ?dg - A draft graph in the draftset identified by ?ds
      ?lg - A live graph with draft ?dg in the draftset identified by ?ds."
   [{:keys [deleted live-graph-uris draft-graph-uris draftset-uri]}]
-  (let [ds-values (when draftset-uri {'?ds [(url/->java-uri draftset-uri)]})
+  (let [ds-values (when draftset-uri {'?ds [draftset-uri]})
         live-values (when (seq live-graph-uris) {'?lg live-graph-uris})
         draft-values (when (seq draft-graph-uris) {'?dg draft-graph-uris})
         filter-exp (case deleted

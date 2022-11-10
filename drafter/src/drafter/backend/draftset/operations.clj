@@ -51,11 +51,11 @@
             {:prefixes mgmt/base-prefixes
              :ask []
              :where [[:graph mgmt/drafter-state-graph
-                      [[(-> (ds/->draftset-uri draftset-ref) (url/->java-uri)) :rdf/type :drafter/DraftSet]]]]})]
+                      [[(ds/->draftset-uri draftset-ref) :rdf/type :drafter/DraftSet]]]]})]
     (sparql/eager-query db q)))
 
 (defn- delete-draftset-statements-query [draftset-ref]
-  (let [ds-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+  (let [ds-uri (ds/->draftset-uri draftset-ref)]
     (fl/format-update {:prefixes mgmt/base-prefixes
                        :with mgmt/drafter-state-graph
                        :delete [[ds-uri '?dp '?do]
@@ -71,7 +71,7 @@
   (sparql/update! db (delete-draftset-statements-query draftset-ref)))
 
 (defn- get-draftset-owner-query [draftset-ref]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
     (fl/format-query
       {:prefixes mgmt/base-prefixes
        :select ['?owner]
@@ -179,7 +179,7 @@
                    :pretty? true))
 
 (defn- draftset-uri-clause [draftset-ref]
-  [[:values {'?ds [(url/->java-uri (ds/->draftset-uri draftset-ref))]}]])
+  [[:values {'?ds [(ds/->draftset-uri draftset-ref)]}]])
 
 (defn get-draftset-graph-states [repo draftset-ref]
   (let [q (get-draftsets-matching-graph-mappings-query [(draftset-uri-clause draftset-ref)])]
@@ -237,7 +237,7 @@
 (defn- combine-all-properties-and-graph-states [draftset-properties graph-states]
   (let [ds-uri->graph-states (group-by :draftset-uri graph-states)]
     (map (fn [{ds-uri :ds :as result}]
-           (let [properties (draftset-properties-result->properties (url/->java-uri (ds/->DraftsetURI ds-uri)) result)
+           (let [properties (draftset-properties-result->properties (ds/->DraftsetURI ds-uri) result)
                  ds-graph-states (get ds-uri->graph-states ds-uri)]
              (combine-draftset-properties-and-graph-states properties ds-graph-states)))
          draftset-properties)))
@@ -292,7 +292,7 @@
   updates them on the given draftset."
   [backend draftset-ref meta-map]
   (when-let [po-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
-    (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))
+    (let [draftset-uri (ds/->draftset-uri draftset-ref)
           q (fl/format-update
               {:prefixes mgmt/base-prefixes
                :with mgmt/drafter-state-graph
@@ -309,8 +309,8 @@
 
 (defn- submit-draftset-to-permission-query
   [draftset-ref submission-id owner permission]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))
-        submit-uri (url/->java-uri (submission-id->uri submission-id))
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)
+        submit-uri (submission-id->uri submission-id)
         user-uri (user/user->uri owner)]
     (fl/format-update
       {:prefixes mgmt/base-prefixes
@@ -342,7 +342,7 @@
   "Shares a draftset with users with the specified permission. If the given
    user is not the current owner of the draftset, no changes are made."
   [backend draftset-ref owner permission]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
     (sparql/update! backend
                     (fl/format-update
                       {:prefixes mgmt/base-prefixes
@@ -356,7 +356,7 @@
   "Removes all shares from a draftset, so only the owner can view it. If the
    given user is not the current owner of the draftset, no changes are made."
   [backend draftset-ref owner]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
     (sparql/update! backend
       (fl/format-update
         {:prefixes mgmt/base-prefixes
@@ -374,8 +374,8 @@
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
         target-uri (user/user->uri target)
-        submit-uri (url/->java-uri (submission-id->uri submission-id))
-        draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+        submit-uri (submission-id->uri submission-id)
+        draftset-uri (ds/->draftset-uri draftset-ref)]
     (fl/format-update
       {:prefixes mgmt/base-prefixes
        :with mgmt/drafter-state-graph
@@ -396,7 +396,7 @@
     (sparql/update! backend q)))
 
 (defn share-draftset-with-user! [backend draftset-ref submitter target]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
     (sparql/update! backend
                     (fl/format-update
                       {:prefixes mgmt/base-prefixes
@@ -411,7 +411,7 @@
    available (has no current owner). We should have already checked the
    claimant has permission to claim the draftset."
   [backend draftset-ref claimant]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)
         user-uri (user/user->uri claimant)]
     (sparql/update! backend
                     (fl/format-update
@@ -460,7 +460,7 @@
   exists. Returns nil if the draftset does not exist, or does not
   contain a draft for the graph."
   [backend draftset-ref live-graph]
-  (let [draftset-uri (url/->java-uri (ds/->draftset-uri draftset-ref))
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)
         [result] (sparql/eager-query backend
                                      (fl/format-query
                                        {:prefixes mgmt/base-prefixes
