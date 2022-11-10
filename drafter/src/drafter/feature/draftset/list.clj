@@ -13,49 +13,40 @@
 ;; Fetches all drafts with any claim permission set, we still need to check
 ;; that the user actually has the set permission.
 (def claim-permission-clause
-  (str
-   "{"
-   "  ?ds <" drafter:hasSubmission "> ?submission ."
-   "  ?submission <" drafter:claimPermission "> ?permission ."
-   "}"))
+  '[[?ds :drafter/hasSubmission ?submission]
+    [?submission :drafter/claimPermission ?permission]])
 
 (defn- user-is-claim-user-clause [user]
-  (str
-    "{"
-    "  ?ds <" drafter:hasSubmission "> ?submission ."
-    "  ?submission <" drafter:claimUser "> <" (user/user->uri user) "> ."
-    "}"))
+  ['[?ds :drafter/hasSubmission ?submission]
+   ['?submission :drafter/claimUser (user/user->uri user)]])
 
 (defn- user-is-submitter-clause [user]
-  (str
-    "{"
-    "  ?ds <" drafter:submittedBy "> <" (user/user->uri user) "> ."
-    "  FILTER NOT EXISTS { ?ds <" drafter:hasOwner "> ?owner }"
-    "}")
-  )
+  [['?ds :drafter/submittedBy (user/user->uri user)]
+   [:filter '(not-exists [[?ds :drafter/hasOwner ?owner]])]])
 
 ;; Fetches all drafts with any view permission set, we still need to check that
 ;; the user actually has the set permission.
 (def view-permission-clause
-  (str "{ ?ds <" drafter:viewPermission "> ?permission }"))
+  '[[?ds :drafter/viewPermission ?permission]])
 
 (defn- user-is-view-user-clause [user]
-  (str
-    "{ ?ds <" drafter:viewUser "> <" (user/user->uri user) "> }"))
+  [['?ds :drafter/viewUser (user/user->uri user)]])
 
 (defn- user-is-owner-clause [user]
-  (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
+  [['?ds :drafter/hasOwner (user/user->uri user)]])
 
 (defn user-claimable-clauses [user]
-  [claim-permission-clause
-   (user-is-claim-user-clause user)
-   (user-is-submitter-clause user)])
+    [claim-permission-clause
+     (user-is-claim-user-clause user)
+     (user-is-submitter-clause user)])
 
 (defn user-all-visible-clauses [user]
-  (conj (user-claimable-clauses user)
-        (user-is-owner-clause user)
-        view-permission-clause
-        (user-is-view-user-clause user)))
+  (vec
+    (concat
+      (user-claimable-clauses user)
+      [(user-is-owner-clause user)
+       view-permission-clause
+       (user-is-view-user-clause user)])))
 
 (defn get-all-draftsets-info [repo user]
   (filter #(user/can-view? user %)

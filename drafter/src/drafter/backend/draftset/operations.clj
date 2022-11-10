@@ -46,66 +46,40 @@
        (rdf/add dbcon quads)
        (ds/->DraftsetId (str draftset-id))))))
 
-(defn- graph-exists-query [graph-uri]
-  (str
-   "ASK WHERE {"
-   "  GRAPH <" graph-uri "> { ?s ?p ?o }"
-   "}"))
-
-(defn with-state-graph
-  "Wraps the string in a SPARQL
-   GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
-     <<sparql-fragment>>
-   } clause."
-
-  [& sparql-string]
-  (apply str " GRAPH <" mgmt/drafter-state-graph "> { "
-         (concat sparql-string
-                 " }")))
-
-(defn- draftset-exists-query [draftset-ref]
-  (str "ASK WHERE {"
-       (with-state-graph
-         "<" (ds/->draftset-uri draftset-ref) "> a <" drafter:DraftSet "> .")
-       "}"))
-
 (defn draftset-exists? [db draftset-ref]
-  (let [q (draftset-exists-query draftset-ref)]
+  (let [q (fl/format-query
+            {:prefixes mgmt/base-prefixes
+             :ask []
+             :where [[:graph mgmt/drafter-state-graph
+                      [[(ds/->draftset-uri draftset-ref) :rdf/type :drafter/DraftSet]]]]})]
     (sparql/eager-query db q)))
 
 (defn- delete-draftset-statements-query [draftset-ref]
-  (let [ds-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" ds-uri  "> ?dp ?do ."
-       "?submission ?sp ?so .")
-     "} WHERE {"
-     (with-state-graph
-       "<" ds-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" ds-uri "> ?dp ?do ."
-       "OPTIONAL {"
-       "  <" ds-uri "> <" drafter:hasSubmission "> ?submission ."
-       "  ?submission ?sp ?so ."
-       "}"
-       )
-     "}")))
+  (let [ds-uri (ds/->draftset-uri draftset-ref)]
+    (fl/format-update {:prefixes mgmt/base-prefixes
+                       :with mgmt/drafter-state-graph
+                       :delete [[ds-uri '?dp '?do]
+                                '[?submission ?sp ?so]]
+                       :where [[ds-uri :rdf/type :drafter/DraftSet]
+                               [ds-uri '?dp '?do]
+                               [:optional
+                                [[ds-uri :drafter/hasSubmission '?submission]
+                                 '[?submission ?sp ?so]]]]}
+                      :pretty? true)))
 
 (defn delete-draftset-statements! [db draftset-ref]
-  (let [delete-query (delete-draftset-statements-query draftset-ref)]
-    (sparql/update! db delete-query)))
-
-(defn- graph-mapping-draft-graphs [graph-mapping]
-  (vals graph-mapping))
+  (sparql/update! db (delete-draftset-statements-query draftset-ref)))
 
 (defn- get-draftset-owner-query [draftset-ref]
-  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "SELECT ?owner WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> ?owner .")
-     "} LIMIT 1")))
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (fl/format-query
+      {:prefixes mgmt/base-prefixes
+       :select ['?owner]
+       :where [[:graph mgmt/drafter-state-graph
+                [{draftset-uri {:rdf/type #{:drafter/DraftSet}
+                                :drafter/hasOwner #{'?owner}}}]]]
+       :limit 1}
+      :pretty? true)))
 
 (defn get-draftset-owner [backend draftset-ref]
   (let [q (get-draftset-owner-query draftset-ref)
@@ -136,79 +110,79 @@
 
 (defn- graph-mapping-result->graph-state [repo {:keys [lg dg public] :as res}]
   (assoc (graph-mapping-result->graph-mapping res)
-         :public public
-         :draft-graph-exists (sparql/eager-query repo (graph-exists-query dg))))
-
-(defn- union-clauses [clauses]
-  (string/join " UNION " clauses))
+    :public public
+    :draft-graph-exists (sparql/eager-query repo
+                                            (fl/format-query
+                                              {:ask []
+                                               :where [[:graph dg
+                                                        '[[?s ?p ?o]]]]}))))
 
 (defn- get-draftsets-matching-graph-mappings-query [match-clauses]
-  (str
-    "SELECT * WHERE { "
-    (with-state-graph
-      "?ds <"  rdf:a "> <" drafter:DraftSet "> ."
-      "?dg <" drafter:inDraftSet "> ?ds ."
-      "?lg <" rdf:a "> <" drafter:ManagedGraph "> ."
-      "?lg <" drafter:hasDraft "> ?dg ."
-      "?lg <" drafter:isPublic "> ?public ."
-      "{"
-      "  SELECT DISTINCT ?ds WHERE {"
-      "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
-      (union-clauses match-clauses)
-      "  }"
-      "}")
-    "}"))
+  (fl/format-query
+    {:prefixes mgmt/base-prefixes
+     :select :*
+     :where [[:graph mgmt/drafter-state-graph
+              ['[?ds :rdf/type :drafter/DraftSet]
+               '[?dg :drafter/inDraftSet ?ds]
+               '[?lg :rdf/type :drafter/ManagedGraph]
+               '[?lg :drafter/hasDraft ?dg]
+               '[?lg :drafter/isPublic ?public]
+
+               [:where {:select-distinct '[?ds]
+                        :where ['[?ds :rdf/type :drafter/DraftSet]
+                                (if match-clauses
+                                  (vec (cons :union match-clauses))
+                                  [:union []])]}]]]]}
+    :pretty? true))
 
 (defn- get-draftsets-matching-properties-query [match-clauses]
-  (str
-    "SELECT * WHERE {"
-    (with-state-graph
-      "?ds <" drafter:createdAt "> ?created ."
-      "?ds <" drafter:modifiedAt "> ?modified ."
-      "?ds <" drafter:version "> ?version ."
-      "?ds <" drafter:createdBy "> ?creator ."
-      "OPTIONAL { ?ds <" rdfs:comment "> ?description . }"
-      "OPTIONAL { ?ds <" drafter:hasOwner "> ?owner . }"
-      "OPTIONAL { ?ds <" rdfs:label "> ?title . }"
-      "OPTIONAL { ?ds <" drafter:submittedBy "> ?submitter. }"
-      "OPTIONAL {"
-      "  ?ds <" drafter:hasSubmission "> ?submission ."
-      "  ?submission <" drafter:claimUser "> ?claimuser ."
-      "}"
-      "OPTIONAL {"
-      "  ?ds <" drafter:hasSubmission "> ?submission ."
-      "  ?submission <" drafter:claimPermission "> ?permission ."
-      "}"
-      ;; Makes the assumption that usernames and permissions don't contain
-      ;; spaces, so we can use space as a separator. Usernames are URIs, which
-      ;; cannot contain spaces. Permissions are OAuth 2.0 scopes, which also
-      ;; cannot contain spaces.
-      "OPTIONAL {"
-      "  SELECT ?ds (GROUP_CONCAT(?p; SEPARATOR=\" \") AS ?viewpermissions)"
-      "  WHERE { ?ds <" drafter:viewPermission "> ?p } GROUP BY ?ds"
-      "}"
-      "OPTIONAL {"
-      "  SELECT ?ds (GROUP_CONCAT(?u; SEPARATOR=\" \") AS ?viewusers)"
-      "  WHERE { ?ds <" drafter:viewUser "> ?u } GROUP BY ?ds"
-      "}"
-      "{"
-      "  SELECT DISTINCT ?ds WHERE {"
-      "  ?ds <" rdf:a "> <" drafter:DraftSet "> ."
-      "  " (union-clauses match-clauses)
-      "  }"
-      "}")
-    "}"))
+  (fl/format-query {:prefixes mgmt/base-prefixes
+                    :select :*
+                    :where [[:graph mgmt/drafter-state-graph
+                             ['[?ds :dcterms/created ?created]
+                              '[?ds :dcterms/modified ?modified]
+                              '[?ds :drafter/version ?version]
+                              '[?ds :dcterms/creator ?creator]
+                              '[:optional
+                                [[?ds :rdfs/comment ?description]]]
+                              '[:optional
+                                [[?ds :drafter/hasOwner ?owner]]]
+                              '[:optional
+                                [[?ds :rdfs/label ?title]]]
+                              '[:optional
+                                [[?ds :drafter/submittedBy ?submitter]]]
+                              '[:optional
+                                [[?ds :drafter/hasSubmission ?submission]
+                                 [?submission :drafter/claimUser ?claimuser]]]
+                              '[:optional
+                                [[?ds :drafter/hasSubmission ?submission]
+                                 [?submission :drafter/claimPermission ?permission]]]
+                              ;; Makes the assumption that usernames and permissions don't contain
+                              ;; spaces, so we can use space as a separator. Usernames are URIs, which
+                              ;; cannot contain spaces. Permissions are OAuth 2.0 scopes, which also
+                              ;; cannot contain spaces.
+                              '[:optional
+                                [[:where {:select [?ds [(group-concat ?p :separator " ") ?viewpermissions]]
+                                          :where [[?ds :drafter/viewPermission ?p]]
+                                          :group-by [?ds]}]]]
+                              '[:optional
+                                [[:where {:select [?ds [(group-concat ?u :separator " ") ?viewusers]]
+                                          :where [[?ds :drafter/viewUser ?u]]
+                                          :group-by [?ds]}]]]
+
+
+                              [:where {:select-distinct '[?ds]
+                                       :where ['[?ds :rdf/type :drafter/DraftSet]
+                                               (if match-clauses
+                                                 (vec (cons :union match-clauses))
+                                                 [:union []])]}]]]]}
+                   :pretty? true))
 
 (defn- draftset-uri-clause [draftset-ref]
-  (str
-    "{ VALUES ?ds { <" (str (ds/->draftset-uri draftset-ref)) "> } }"))
-
-(defn get-draftset-graph-mapping-query [draftset-ref]
-  (get-draftsets-matching-graph-mappings-query
-    [(draftset-uri-clause draftset-ref)]))
+  [[:values {'?ds [(ds/->draftset-uri draftset-ref)]}]])
 
 (defn get-draftset-graph-states [repo draftset-ref]
-  (let [q (get-draftset-graph-mapping-query draftset-ref)]
+  (let [q (get-draftsets-matching-graph-mappings-query [(draftset-uri-clause draftset-ref)])]
     (->> q
          (sparql/eager-query repo)
          (map graph-mapping-result->graph-mapping))))
@@ -217,9 +191,6 @@
   (let [graph-states (get-draftset-graph-states repo draftset-ref)
         mapping-pairs (map (juxt :live-graph-uri :draft-graph-uri) graph-states)]
     (into {} mapping-pairs)))
-
-(defn- user-is-owner-clause [user]
-  (str "{ ?ds <" drafter:hasOwner "> <" (user/user->uri user) "> . }"))
 
 (defn- draftset-properties-result->properties
   [draftset-ref
@@ -234,7 +205,7 @@
            modified
            version
            viewpermissions
-           viewusers] :as ds}]
+           viewusers] :as _ds}]
   (let [required-fields {:id (str (ds/->draftset-id draftset-ref))
                          :type "Draftset"
                          :created-at created
@@ -293,7 +264,8 @@
     (combine-all-properties-and-graph-states properties graph-states)))
 
 (defn get-draftset-info [repo draftset-ref]
-  (first (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])))
+  (->> (get-all-draftsets-by repo [(draftset-uri-clause draftset-ref)])
+       (first)))
 
 (defn is-draftset-viewer? [backend draftset-ref user]
   (user/can-view? user (get-draftset-info backend draftset-ref)))
@@ -307,7 +279,7 @@
   "Deletes a draftset and all of its constituent graphs"
   [db draftset-ref]
   (let [graph-mapping (get-draftset-graph-mapping db draftset-ref)
-        draft-graphs (graph-mapping-draft-graphs graph-mapping)
+        draft-graphs (vals graph-mapping)
         delete-query (delete-draftset-query draftset-ref draft-graphs)]
     (sparql/update! db delete-query)))
 
@@ -315,26 +287,24 @@
   {:display-name rdfs:label
    :description rdfs:comment})
 
-(defn- set-draftset-metadata-query [draftset-uri po-pairs]
-  (str
-   "DELETE {"
-   (with-state-graph
-     "<" draftset-uri "> ?p ?o .")
-   "} INSERT {"
-   (with-state-graph
-     (string/join " " (map (fn [[p o]] (str "<" draftset-uri "> <" p "> \"" o "\" .")) po-pairs)))
-   "} WHERE {"
-   (with-state-graph
-     "VALUES ?p { " (string/join " " (map #(str "<" (first %) ">") po-pairs)) " }"
-     "OPTIONAL { <" draftset-uri "> ?p ?o . }")
-   "}"))
-
 (defn set-draftset-metadata!
   "Takes a map containing new values for various metadata keys and
   updates them on the given draftset."
   [backend draftset-ref meta-map]
-  (when-let [update-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
-    (let [q (set-draftset-metadata-query (ds/->draftset-uri draftset-ref) update-pairs)]
+  (when-let [po-pairs (vals (util/intersection-with draftset-param->predicate meta-map vector))]
+    (let [draftset-uri (ds/->draftset-uri draftset-ref)
+          q (fl/format-update
+              {:prefixes mgmt/base-prefixes
+               :with mgmt/drafter-state-graph
+               :delete [[draftset-uri '?p '?o]]
+               :insert (into []
+                             (map (fn [[p o]]
+                                    [draftset-uri p o])
+                                  po-pairs))
+               :where [[:values {'?p (into [] (map first po-pairs))}]
+                       [:optional
+                        [[draftset-uri '?p '?o]]]]}
+              :pretty? true)]
       (sparql/update! backend q))))
 
 (defn- submit-draftset-to-permission-query
@@ -342,27 +312,20 @@
   (let [draftset-uri (ds/->draftset-uri draftset-ref)
         submit-uri (submission-id->uri submission-id)
         user-uri (user/user->uri owner)]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> ."
-       "<" draftset-uri "> <" drafter:submittedBy "> ?submitter .")
-     "} INSERT {"
-     (with-state-graph
-       "<" submit-uri "> <" rdf:a "> <" drafter:Submission "> ."
-       "<" submit-uri "> <" drafter:claimPermission "> \"" (name permission) "\" ."
-       "<" draftset-uri "> <" drafter:hasSubmission "> <" submit-uri "> ."
-       "<" draftset-uri "> <" drafter:submittedBy "> <" user-uri "> ."
-       )
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> ."
-       "OPTIONAL { "
-       "<" draftset-uri "> <" drafter:submittedBy "> ?submitter ."
-       "}"
-       )
-     "}")))
+    (fl/format-update
+      {:prefixes mgmt/base-prefixes
+       :with mgmt/drafter-state-graph
+       :delete [[draftset-uri :drafter/hasOwner user-uri]
+                [draftset-uri :drafter/submittedBy '?submitter]]
+       :insert [[submit-uri :rdf/type :drafter/Submission]
+                [submit-uri :drafter/claimPermission (name permission)]
+                [draftset-uri :drafter/hasSubmission submit-uri]
+                [draftset-uri :drafter/submittedBy user-uri]]
+       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+               [draftset-uri :drafter/hasOwner user-uri]
+               [:optional
+                [[draftset-uri :drafter/submittedBy '?submitter]]]]}
+      :pretty? true)))
 
 (defn submit-draftset-to-permission!
   "Submits a draftset to users with the specified permission.
@@ -375,25 +338,19 @@
                   (submit-draftset-to-permission-query
                    draftset-ref (util/create-uuid) owner permission)))
 
-(defn- share-draftset-with-permission-query
-  [draftset-ref owner permission]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
-    (str
-     "INSERT {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:viewPermission "> \"" (name permission) "\" .")
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> .")
-     "}")))
-
 (defn share-draftset-with-permission!
   "Shares a draftset with users with the specified permission. If the given
    user is not the current owner of the draftset, no changes are made."
   [backend draftset-ref owner permission]
-  (sparql/update! backend (share-draftset-with-permission-query
-                           draftset-ref owner permission)))
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (sparql/update! backend
+                    (fl/format-update
+                      {:prefixes mgmt/base-prefixes
+                       :with mgmt/drafter-state-graph
+                       :insert [[draftset-uri :drafter/viewPermission (name permission)]]
+                       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+                               [draftset-uri :drafter/hasOwner (user/user->uri owner)]]}
+                      :pretty? true))))
 
 (defn unshare-draftset!
   "Removes all shares from a draftset, so only the owner can view it. If the
@@ -401,94 +358,75 @@
   [backend draftset-ref owner]
   (let [draftset-uri (ds/->draftset-uri draftset-ref)]
     (sparql/update! backend
-      (str
-       "DELETE {"
-       (with-state-graph
-         "<" draftset-uri "> <" drafter:viewPermission "> ?vp ;"
-         "                   <" drafter:viewUser "> ?vu .")
-       "} WHERE {"
-       (with-state-graph
-         "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> ;"
-         "                   <" rdf:a "> <" drafter:DraftSet "> ."
-         " OPTIONAL { <" draftset-uri "> <" drafter:viewPermission "> ?vp . }"
-         " OPTIONAL { <" draftset-uri "> <" drafter:viewUser "> ?vu . }")
-       "}"))))
+      (fl/format-update
+        {:prefixes mgmt/base-prefixes
+         :with mgmt/drafter-state-graph
+         :delete [{draftset-uri {:drafter/viewPermission #{'?vp}
+                                 :drafter/viewUser #{'?vu}}}]
+         :where [{draftset-uri {:drafter/hasOwner #{(user/user->uri owner)}
+                                :rdf/type #{:drafter/DraftSet}}}
+                 [:optional
+                  [[draftset-uri :drafter/viewPermission '?vp]]]
+                 [:optional
+                  [[draftset-uri :drafter/viewUser '?vu]]]]}
+        :pretty? true))))
 
 (defn- submit-to-user-query [draftset-ref submission-id submitter target]
   (let [submitter-uri (user/user->uri submitter)
         target-uri (user/user->uri target)
         submit-uri (submission-id->uri submission-id)
-        draftset-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> <" submitter-uri "> ."
-       "<" draftset-uri "> <" drafter:submittedBy "> ?submitter .")
-     "} INSERT {"
-     (with-state-graph
-       "<" submit-uri "> <" rdf:a "> <" drafter:Submission "> ."
-       "<" submit-uri "> <" drafter:claimUser "> <" target-uri "> ."
-       "<" draftset-uri "> <" drafter:hasSubmission "> <" submit-uri "> ."
-       "<" draftset-uri "> <" drafter:submittedBy "> <" submitter-uri "> ."
-       )
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> <" submitter-uri "> ."
-       "OPTIONAL { "
-         "<" draftset-uri "> <" drafter:submittedBy "> ?submitter ."
-       "}"
-       )
-     "}")))
+        draftset-uri (ds/->draftset-uri draftset-ref)]
+    (fl/format-update
+      {:prefixes mgmt/base-prefixes
+       :with mgmt/drafter-state-graph
+       :delete [[draftset-uri :drafter/hasOwner submitter-uri]
+                [draftset-uri :drafter/submittedBy '?submitter]]
+       :insert [[submit-uri :rdf/type :drafter/Submission]
+                [submit-uri :drafter/claimUser target-uri]
+                [draftset-uri :drafter/hasSubmission submit-uri]
+                [draftset-uri :drafter/submittedBy submitter-uri]]
+       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+               [draftset-uri :drafter/hasOwner submitter-uri]
+               [:optional
+                [[draftset-uri :drafter/submittedBy '?submitter]]]]}
+      :pretty? true)))
 
 (defn submit-draftset-to-user! [backend draftset-ref submitter target]
   (let [q (submit-to-user-query draftset-ref (util/create-uuid) submitter target)]
     (sparql/update! backend q)))
 
-(defn- share-with-user-query [draftset-ref owner target]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
-    (str
-     "INSERT {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:viewUser "> <" (user/user->uri target) "> .")
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasOwner "> <" (user/user->uri owner) "> .")
-     "}")))
-
 (defn share-draftset-with-user! [backend draftset-ref submitter target]
-  (let [q (share-with-user-query draftset-ref submitter target)]
-    (sparql/update! backend q)))
-
-(defn- try-claim-draftset-query [draftset-ref claimant]
-  (let [draftset-uri (ds/->draftset-uri draftset-ref)
-        user-uri (user/user->uri claimant)]
-    (str
-     "DELETE {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-       "?submission ?sp ?so .")
-     "} INSERT {"
-     (with-state-graph
-       "<" draftset-uri "> <" drafter:hasOwner "> <" user-uri "> .")
-     "} WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "<" draftset-uri "> <" drafter:hasSubmission "> ?submission ."
-       "?submission ?sp ?so .")
-     "}")))
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)]
+    (sparql/update! backend
+                    (fl/format-update
+                      {:prefixes mgmt/base-prefixes
+                       :with mgmt/drafter-state-graph
+                       :insert [[draftset-uri :drafter/viewUser (user/user->uri target)]]
+                       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+                               [draftset-uri :drafter/hasOwner (user/user->uri submitter)]]}
+                      :pretty? true))))
 
 (defn- try-claim-draftset!
   "Sets the claiming user to the owner of the given draftset if the draftset is
    available (has no current owner). We should have already checked the
    claimant has permission to claim the draftset."
   [backend draftset-ref claimant]
-  (let [q (try-claim-draftset-query draftset-ref claimant)]
-    (sparql/update! backend q)))
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)
+        user-uri (user/user->uri claimant)]
+    (sparql/update! backend
+                    (fl/format-update
+                      {:prefixes mgmt/base-prefixes
+                       :with mgmt/drafter-state-graph
+                       :delete [[draftset-uri :drafter/hasSubmission '?submission]
+                                '[?submission ?sp ?so]]
+                       :insert [[draftset-uri :drafter/hasOwner user-uri]]
+                       :where [[draftset-uri :rdf/type :drafter/DraftSet]
+                               [draftset-uri :drafter/hasSubmission '?submission]
+                               '[?submission ?sp ?so]]}
+                      :pretty? true))))
 
 (defn- infer-claim-outcome
-  [{:keys [current-owner] :as ds-info} claimant]
+  [{:keys [current-owner] :as _ds-info} claimant]
   (if (= (user/username claimant) current-owner) :ok :unknown))
 
 (defn claim-draftset!
@@ -517,25 +455,24 @@
     (user/permitted-draftset-operations ds-info user)
     #{}))
 
-(defn- find-draftset-draft-graph-query [draftset-ref live-graph]
-  (let [draftset-uri (str (ds/->draftset-uri draftset-ref))]
-    (str
-     "SELECT ?dg WHERE {"
-     (with-state-graph
-       "<" draftset-uri "> <" rdf:a "> <" drafter:DraftSet "> ."
-       "?dg <" rdf:a "> <" drafter:DraftGraph "> ."
-       "?dg <" drafter:inDraftSet "> <" draftset-uri "> ."
-       "<" live-graph "> <" rdf:a "> <" drafter:ManagedGraph "> ."
-       "<" live-graph "> <" drafter:hasDraft "> ?dg .")
-     "} LIMIT 1")))
-
 (defn find-draftset-draft-graph
   "Finds the draft graph for a live graph inside a draftset if one
   exists. Returns nil if the draftset does not exist, or does not
   contain a draft for the graph."
   [backend draftset-ref live-graph]
-  (let [q (find-draftset-draft-graph-query draftset-ref live-graph)
-        [result] (sparql/eager-query backend q)]
+  (let [draftset-uri (ds/->draftset-uri draftset-ref)
+        [result] (sparql/eager-query backend
+                                     (fl/format-query
+                                       {:prefixes mgmt/base-prefixes
+                                        :select ['?dg]
+                                        :where [[:graph mgmt/drafter-state-graph
+                                                 [[draftset-uri :rdf/type :drafter/DraftSet]
+                                                  ['?dg :rdf/type :drafter/DraftGraph]
+                                                  ['?dg :drafter/inDraftSet draftset-uri]
+                                                  {live-graph {:rdf/type #{:drafter/ManagedGraph}
+                                                               :drafter/hasDraft #{'?dg}}}]]]
+                                        :limit 1}
+                                       :pretty? true))]
     (:dg result)))
 
 (defn- spog-bindings->statement [^BindingSet bindings]
@@ -611,7 +548,9 @@
   represented by the given backend."
   [backend]
   (let [conn (repo/->connection backend)
-        tuple-query (repo/prepare-query conn "SELECT * WHERE { GRAPH ?g { ?s ?p ?o } }")]
+        tuple-query (repo/prepare-query conn
+                                        (fl/format-query {:select :*
+                                                          :where '[[:graph ?g [[?s ?p ?o]]]]}))]
     (spog-tuple-query->graph-query conn tuple-query)))
 
 (defn all-graph-triples-query [backend graph]

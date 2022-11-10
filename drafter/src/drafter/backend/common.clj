@@ -1,10 +1,8 @@
 (ns drafter.backend.common
   (:require [drafter.backend.draftset.arq :as arq]
-            [grafter-2.rdf4j.repository :as repo]
-            [clojure.set :as set])
+            [grafter-2.rdf4j.repository :as repo])
   (:import java.net.URI
-           org.eclipse.rdf4j.query.Dataset
-           org.apache.jena.sparql.core.DatasetDescription))
+           org.eclipse.rdf4j.query.Dataset))
 
 (defn- get-restrictions [graph-restrictions]
   (cond
@@ -25,12 +23,6 @@
     (let [stringified-restriction (map str graph-restrictions)]
       (repo/make-restricted-dataset :default-graph stringified-restriction
                                     :named-graphs stringified-restriction))))
-
-(defn apply-restriction [pquery restriction]
-  (let [dataset (restricted-dataset restriction)]
-    (.setDataset pquery dataset)
-    pquery))
-
 (defn validate-query
   "Validates a query by parsing it using ARQ. If the query is invalid
   a QueryParseException is thrown."

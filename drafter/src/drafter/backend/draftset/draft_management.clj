@@ -17,6 +17,7 @@
            [java.util UUID]))
 
 (def base-prefixes {:rdf (rdf "")
+                    :rdfs (rdfs "")
                     :dcterms (URI. "http://purl.org/dc/terms/")
                     :drafter drafter})
 
@@ -71,8 +72,7 @@
                        :with drafter-state-graph
                        :delete [[subject time-predicate '?lastvalue]]
                        :insert [[subject time-predicate inst]]
-                       :where [[subject '?p '?o]
-                               [:optional
+                       :where [[:optional
                                 [[subject time-predicate '?lastvalue]]]]}
                       :force-iris? true
                       :pretty? true)))
@@ -85,8 +85,7 @@
                      :with drafter-state-graph
                      :delete [[subject :drafter/version '?lastvalue]]
                      :insert [[subject :drafter/version version]]
-                     :where [[subject '?p '?o]
-                             [:optional
+                     :where [[:optional
                               [[subject :drafter/version '?lastvalue]]]]}
                     :pretty? true))
 
@@ -288,7 +287,7 @@
      ?dg - A draft graph in the draftset identified by ?ds
      ?lg - A live graph with draft ?dg in the draftset identified by ?ds."
   [{:keys [deleted live-graph-uris draft-graph-uris draftset-uri]}]
-  (let [ds-values (when draftset-uri {'?ds [(url/->java-uri draftset-uri)]})
+  (let [ds-values (when draftset-uri {'?ds [draftset-uri]})
         live-values (when (seq live-graph-uris) {'?lg live-graph-uris})
         draft-values (when (seq draft-graph-uris) {'?dg draft-graph-uris})
         filter-exp (case deleted
