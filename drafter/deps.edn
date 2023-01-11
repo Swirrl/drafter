@@ -42,13 +42,6 @@
 
         io.github.swirrl/grafter.repository {:mvn/version "3.0.0"}
 
-        ;; The beanutils dep below is a transitive dep of grafter ->
-        ;; rdf4j -> com.opencsv/opencsv. However 1.9.3 has
-        ;; CVE-2019-10086 against it, so bumping the dep here until we
-        ;; can upgrade rdf4j or other deps such that we no longer need
-        ;; to.
-        commons-beanutils/commons-beanutils {:mvn/version "1.9.4"}
-
         org.apache.tika/tika-core {:mvn/version "1.27"} ;; mime types
 
         org.apache.commons/commons-compress {:mvn/version "1.21"}
