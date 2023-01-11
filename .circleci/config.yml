@@ -5,7 +5,7 @@ version: 2.1
 executors:
   tests-executor:
     docker: # run the steps with Docker
-      - image: swirrl/cimg-clojure:1.10-browsers
+      - image: cimg/clojure:1.11.1-browsers
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
