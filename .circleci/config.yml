@@ -14,7 +14,7 @@ executors:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
       - image: "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl/\
-                stardog:6.2.3--2022-06-06"
+                stardog-6.2.3:72"
         environment:
           CREATE_DATABASE: drafter-test-db
         auth:
