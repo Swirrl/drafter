@@ -92,10 +92,6 @@
   inner cause exceptions."
   (take-while some? (iterate #(.getCause %) ex)))
 
-(defmacro set-var-root! [var form]
-  `(alter-var-root ~var (fn [& _#]
-                          ~form)))
-
 (defn make-compound-sparql-query
   "Combines a sequence of SPARQL queries into a single query."
   [queries]
