@@ -41,6 +41,7 @@
         ;;[com.taoensso/tower "2.0.2"]
 
         io.github.swirrl/grafter.repository {:mvn/version "3.0.0"}
+        org.eclipse.rdf4j/rdf4j-queryresultio-text {:mvn/version "4.2.2"}
 
         org.apache.tika/tika-core {:mvn/version "1.27"} ;; mime types
 
