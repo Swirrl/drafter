@@ -4,6 +4,7 @@
             [drafter.backend.common :as bcom]
             [drafter.rdf.sparql :as sparql]
             [drafter.rdf.sparql-protocol :refer :all]
+            [drafter.util :as util]
             [drafter.test-common :as tc]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
@@ -11,8 +12,7 @@
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI
            [java.io ByteArrayInputStream]
-           [java.util.concurrent CountDownLatch TimeUnit]
-           org.eclipse.rdf4j.model.impl.URIImpl))
+           [java.util.concurrent CountDownLatch TimeUnit]))
 
 (use-fixtures :each tc/with-spec-instrumentation)
 
@@ -42,8 +42,8 @@
             baz "http://baz"
             req (handler {:sparql {:query-string qs}})
             ds (.getActiveDataset (get-in req [:sparql :prepared-query]))]
-        (is (contains? (.getDefaultGraphs ds) (URIImpl. foo)))
-        (is (contains? (.getNamedGraphs ds) (URIImpl. baz)))))
+        (is (contains? (.getDefaultGraphs ds) (util/uri->rdf4j-uri foo)))
+        (is (contains? (.getNamedGraphs ds) (util/uri->rdf4j-uri baz)))))
 
     (testing "User restricted (FROM) query: protocol overrides query"
       (let [qs "SELECT * FROM <http://foo> WHERE { ?s ?p ?o }"
@@ -54,9 +54,9 @@
                                    :default-graph-uri [bar]
                                    :named-graph-uri [baz]}})
             ds (.getActiveDataset (get-in req [:sparql :prepared-query]))]
-        (is (contains? (.getDefaultGraphs ds) (URIImpl. bar)))
-        (is (not (contains? (.getDefaultGraphs ds) (URIImpl. foo))))
-        (is (contains? (.getNamedGraphs ds) (URIImpl. baz)))))
+        (is (contains? (.getDefaultGraphs ds) (util/uri->rdf4j-uri bar)))
+        (is (not (contains? (.getDefaultGraphs ds) (util/uri->rdf4j-uri foo))))
+        (is (contains? (.getNamedGraphs ds) (util/uri->rdf4j-uri baz)))))
 
     (testing "Malformed SPARQL query"
       (let [response (handler {:sparql {:query-string "NOT A SPARQL QUERY"}})]
