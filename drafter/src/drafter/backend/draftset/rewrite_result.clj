@@ -5,7 +5,7 @@
             [clojure.tools.logging :as log]
             [drafter.util :as util]
             [grafter-2.rdf.protocols :refer [map->Quad]])
-  (:import [org.eclipse.rdf4j.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult GraphQueryResult Dataset Query]
+  (:import [org.eclipse.rdf4j.query Dataset Query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult GraphQueryResult]
            [org.eclipse.rdf4j.query.impl BindingImpl MapBindingSet SimpleDataset]
            org.eclipse.rdf4j.rio.RDFHandler
            [org.eclipse.rdf4j.model Statement]))
