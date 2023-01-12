@@ -795,12 +795,11 @@
                             :base-uri (or (:base-uri opts)
                                           "http://publishmydata.com/id/")
                             :state-graph-last-modified (atom (get-state-graph-last-modified)))
-        repo (doto (proxy [SPARQLRepository] [query-endpoint update-endpoint]
-                     (getConnection []
-                       (let [^SPARQLRepository this this
-                             http-client (.createHTTPClient this)]
-                         (stasher-connection this http-client cache updated-opts))))
-               (.initialize))]
+        repo (proxy [SPARQLRepository] [query-endpoint update-endpoint]
+               (getConnection []
+                 (let [^SPARQLRepository this this
+                       http-client (.createHTTPClient this)]
+                   (stasher-connection this http-client cache updated-opts))))]
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     (log/infof "Stasher Caching enabled: %b" (get updated-opts :cache?))
     (repo/notifying-repo repo deltas)))
