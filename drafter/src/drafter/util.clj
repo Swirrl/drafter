@@ -7,13 +7,17 @@
    [drafter.rdf.drafter-ontology :refer [drafter:version]]
    [drafter.rdf.jena :as jena]
    [grafter-2.rdf.protocols :as pr]
-   [grafter.url :as url])
+   [grafter.url :as url]
+   [integrant.core :as ig])
   (:import
+   [java.io IOException]
+   [java.net URI]
    [java.util UUID]
    [javax.mail.internet AddressException InternetAddress]
    java.nio.charset.Charset
    java.security.MessageDigest
-   org.apache.commons.codec.binary.Hex))
+   org.apache.commons.codec.binary.Hex
+   [org.eclipse.rdf4j.model.impl SimpleValueFactory]))
 
 (defn create-uuid
   "Function that creates a UUID"
@@ -138,7 +142,12 @@
   ([seq partition-fn output-batch-size take-batch-size]
    (create-partition-batches (partition-all take-batch-size seq) partition-fn output-batch-size)))
 
+(def ^:private value-factory (SimpleValueFactory/getInstance))
 
+(defn uri->rdf4j-uri
+  "Converts a java.net.URI into a sesame URI"
+  [uri]
+  (.createIRI value-factory (str uri)))
 
 ;; Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
 (defn intersection-with

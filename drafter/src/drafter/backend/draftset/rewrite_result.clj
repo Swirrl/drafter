@@ -214,7 +214,7 @@
   be sesame URI instances. This function maps the mapping from java to sesame
   URIs."
   [uri-mapping]
-  (util/map-all util/uri->sesame-uri uri-mapping))
+  (util/map-all util/uri->rdf4j-uri uri-mapping))
 
 (defprotocol ToRewritingQuery
   (->rewriting-query [this live->draft draft->live]))

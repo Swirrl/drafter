@@ -31,7 +31,7 @@
   (with-open [conn (repo/->connection repo)]
     (let [rewritten-statements (map #(rer/rewrite-statement live->draft %) batch)
           sesame-statements (map gio/quad->backend-quad rewritten-statements)
-          graph-array (into-array Resource (map util/uri->sesame-uri (vals live->draft)))]
+          graph-array (into-array Resource (map util/uri->rdf4j-uri (vals live->draft)))]
       (.remove conn sesame-statements graph-array))))
 
 (defn- delete-quad-batch
