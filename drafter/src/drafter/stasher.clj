@@ -33,7 +33,8 @@
            (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry RDFParserFactory)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
            java.time.OffsetDateTime
-           (java.io InputStream Closeable)))
+           (java.io InputStream Closeable)
+           (java.lang.ref WeakReference)))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)
@@ -335,6 +336,16 @@
         (.handleBoolean bool-writer result))))
   result)
 
+(def DEPRECATED_ARGUMENT
+  "This argument is deprecated in the call sites where we pass it, it
+  looks like in a future RDF4j it will be removed. So we may need to
+  update the callsites that pass this parameter in the future.
+
+  See this PR for details:
+
+  https://github.com/eclipse/rdf4j/pull/4138"
+  (WeakReference. :DEPRECATED_REPLACE_IN_FUTURE_UPDATE))
+
 (defn- read-tuple-cache-stream
   "Return a BackgroundTupleResult and trigger a thread to iterate over
   the result stream.  BackgroundGraphResult will then marshal the
@@ -344,7 +355,7 @@
   will already be on results where the dataset restriction was set."
   [^ThreadPoolExecutor thread-pool stream fmt]
   (let [start-time (System/currentTimeMillis)
-        bg-tuple-result (BackgroundTupleResult. (get-parser :tuple fmt) stream)]
+        bg-tuple-result (BackgroundTupleResult. (get-parser :tuple fmt) stream DEPRECATED_ARGUMENT)]
 
     ;; execute parse thread on a thread pool.
     (.submit thread-pool ^Runnable (fn []
@@ -371,7 +382,8 @@
         bg-graph-result (BackgroundGraphResult. (get-parser :graph fmt-kw)
                                                 stream
                                                 charset
-                                                base-uri-str)]
+                                                base-uri-str
+                                                DEPRECATED_ARGUMENT)]
 
     ;; execute parse thread on a thread pool.
     (.submit thread-pool ^Runnable (fn []
@@ -576,13 +588,17 @@
                  (wrap-result cache cache-key
                               (.sendGraphQuery httpclient QueryLanguage/SPARQL
                                                query-str base-uri-str dataset
-                                               (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                               (.getIncludeInferred this)
+                                               (.getMaxExecutionTime this)
+                                               DEPRECATED_ARGUMENT
                                                (.getBindingsArray this)))))
            (timing/graph-result
             "drafter.stasher.graph_sync.no_cache"
             (.sendGraphQuery httpclient QueryLanguage/SPARQL
                              query-str base-uri-str dataset
-                             (.getIncludeInferred this) (.getMaxExecutionTime this)
+                             (.getIncludeInferred this)
+                             (.getMaxExecutionTime this)
+                             DEPRECATED_ARGUMENT
                              (.getBindingsArray this))))))
 
       ;; async results
@@ -611,8 +627,10 @@
            (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
              (.sendGraphQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this)
-                              timing-rdf-handler (.getBindingsArray this)))))))))
+                              (.getIncludeInferred this)
+                              (.getMaxExecutionTime this)
+                              timing-rdf-handler
+                              (.getBindingsArray this)))))))))
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
@@ -637,6 +655,7 @@
                                                query-str base-uri-str dataset
                                                (.getIncludeInferred this)
                                                (.getMaxExecutionTime this)
+                                               DEPRECATED_ARGUMENT
                                                (.getBindingsArray this)))))
            (timing/tuple-result
             "drafter.stasher.tuple_sync.no_cache"
@@ -644,6 +663,7 @@
                              query-str base-uri-str dataset
                              (.getIncludeInferred this)
                              (.getMaxExecutionTime this)
+                             DEPRECATED_ARGUMENT
                              (.getBindingsArray this))))))
       ([tuple-handler]
        (let [^SPARQLTupleQuery this this
@@ -670,8 +690,10 @@
            (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
              (.sendTupleQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this)
-                              timing-tuple-handler (.getBindingsArray this)))))))))
+                              (.getIncludeInferred this)
+                              (.getMaxExecutionTime this)
+                              timing-tuple-handler
+                              (.getBindingsArray this)))))))))
 
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
@@ -697,8 +719,11 @@
                "drafter.stasher.boolean_sync.cache_miss"
                {}
                (wrap-result cache cache-key
-                            (.sendBooleanQuery httpclient QueryLanguage/SPARQL
-                                               query-str base-uri-str dataset
+                            (.sendBooleanQuery httpclient
+                                               QueryLanguage/SPARQL
+                                               query-str
+                                               base-uri-str
+                                               dataset
                                                (.getIncludeInferred this)
                                                (.getMaxExecutionTime this)
                                                (.getBindingsArray this))))))

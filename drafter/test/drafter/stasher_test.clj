@@ -111,7 +111,7 @@
       (when (fs/exists? cached-file)
         (let [cached-file-statements (let [stream (io/input-stream cached-file)]
                                        (condp = query-type
-                                         :tuple (let [tq-res (QueryResultIO/parseTupleBackground stream (get-in formats/supported-cache-formats [:tuple fmt]))]
+                                         :tuple (let [tq-res (QueryResultIO/parseTupleBackground stream (get-in formats/supported-cache-formats [:tuple fmt]) sut/DEPRECATED_ARGUMENT)]
                                                   (iterator-seq (reify java.util.Iterator
                                                                   (next [this]
                                                                     (let [binding-set (.next tq-res)]
