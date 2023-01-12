@@ -12,8 +12,7 @@
             [grafter.url :as url]
             [grafter.vocabularies.rdf :refer :all]
             [drafter.time :as time])
-  (:import org.eclipse.rdf4j.model.impl.ContextStatementImpl
-           [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler BindingSet GraphQueryResult]
+  (:import [org.eclipse.rdf4j.query GraphQuery TupleQueryResult TupleQueryResultHandler BindingSet GraphQueryResult]
            org.eclipse.rdf4j.rio.RDFHandler
            java.net.URI))
 
@@ -480,7 +479,7 @@
         pred (.getValue bindings "p")
         obj (.getValue bindings "o")
         graph (.getValue bindings "g")]
-    (ContextStatementImpl. subj pred obj graph)))
+    (util/create-rdf4j-statement subj pred obj graph)))
 
 (defn- rdf-handler->spog-tuple-handler [conn ^RDFHandler rdf-handler]
   (reify

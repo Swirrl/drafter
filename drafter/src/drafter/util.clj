@@ -142,6 +142,12 @@
   [uri]
   (.createIRI value-factory (str uri)))
 
+(defn create-rdf4j-statement
+  ([s p o]
+   (.createStatement value-factory s p o))
+  ([s p o c]
+   (.createStatement value-factory s p o c)))
+
 ;; Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
 (defn intersection-with
   "Intersects two maps by their keys and combines corresponding values
