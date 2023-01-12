@@ -7,11 +7,8 @@
    [drafter.rdf.drafter-ontology :refer [drafter:version]]
    [drafter.rdf.jena :as jena]
    [grafter-2.rdf.protocols :as pr]
-   [grafter.url :as url]
-   [integrant.core :as ig])
+   [grafter.url :as url])
   (:import
-   [java.io IOException]
-   [java.net URI]
    [java.util UUID]
    [javax.mail.internet AddressException InternetAddress]
    java.nio.charset.Charset
