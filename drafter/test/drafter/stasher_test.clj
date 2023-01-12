@@ -16,7 +16,6 @@
    [integrant.core :as ig]
    [me.raynes.fs :as fs])
   (:import [java.net URI]
-           org.eclipse.rdf4j.model.impl.URIImpl
            org.eclipse.rdf4j.query.impl.SimpleDataset
            (org.eclipse.rdf4j.query.parser ParsedGraphQuery ParsedTupleQuery ParsedBooleanQuery)
            (org.eclipse.rdf4j.query BooleanQuery TupleQuery GraphQuery)
@@ -292,15 +291,15 @@
 
 (t/deftest dataset->graph-edn-test
   (let [ds-1 (doto (SimpleDataset.)
-               (.addNamedGraph (URIImpl. "http://foo"))
-               (.addNamedGraph (URIImpl. "http://bar"))
-               (.addDefaultGraph (URIImpl. "http://foo"))
-               (.addDefaultGraph (URIImpl. "http://bar")))
+               (.addNamedGraph (util/uri->rdf4j-uri "http://foo"))
+               (.addNamedGraph (util/uri->rdf4j-uri "http://bar"))
+               (.addDefaultGraph (util/uri->rdf4j-uri "http://foo"))
+               (.addDefaultGraph (util/uri->rdf4j-uri "http://bar")))
         ds-2 (doto (SimpleDataset.)
-               (.addNamedGraph (URIImpl. "http://bar"))
-               (.addDefaultGraph (URIImpl. "http://bar"))
-               (.addNamedGraph (URIImpl. "http://foo"))
-               (.addDefaultGraph (URIImpl. "http://foo")))]
+               (.addNamedGraph (util/uri->rdf4j-uri "http://bar"))
+               (.addDefaultGraph (util/uri->rdf4j-uri "http://bar"))
+               (.addNamedGraph (util/uri->rdf4j-uri "http://foo"))
+               (.addDefaultGraph (util/uri->rdf4j-uri "http://foo")))]
 
     (t/testing "dataset->graphs, graphs->edn prints same value irrespective of assembly order"
       (t/is (= (pr-str (sut/graphs->edn (sut/dataset->graphs ds-1)))
@@ -315,15 +314,15 @@
 ;; Definitions corresponding to idenfitiers/states in drafter-state-1.trig
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def live-graph-1 (URIImpl. "http://live-and-ds1-and-ds2"))
-(def live-graph-only (URIImpl. "http://live-only"))
+(def live-graph-1 (util/uri->rdf4j-uri "http://live-and-ds1-and-ds2"))
+(def live-graph-only (util/uri->rdf4j-uri "http://live-only"))
 
 (def liveset-most-recently-modified
   {:livemod (OffsetDateTime/parse "2017-02-02T02:02:02.000-00:00")
    :version (util/version "819a18bc-f832-48b9-81f0-082609da44e8")})
 
-(def ds-1-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
-(def ds-1-dg-2 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
+(def ds-1-dg-1 (util/uri->rdf4j-uri "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-1"))
+(def ds-1-dg-2 (util/uri->rdf4j-uri "http://publishmydata.com/graphs/drafter/draft/ds-1-dg-2"))
 (def ds-1 "draftset-1 is made of dg-1 dg-2" #{ds-1-dg-1 ds-1-dg-2})
 
 (def ds-1-most-recently-modified "modified time of ds-1-dg-2 the most recently modified graph in ds-1"
@@ -331,7 +330,7 @@
    :version (util/version "52099c51-5cab-496c-9aed-2bbcb3c36874")})
 
 
-(def ds-2-dg-1 (URIImpl. "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
+(def ds-2-dg-1 (util/uri->rdf4j-uri "http://publishmydata.com/graphs/drafter/draft/ds-2-dg-1"))
 
 (def ds-2 #{ds-2-dg-1})
 
@@ -343,12 +342,12 @@
 (defn edn->dataset [{:keys [default-graphs named-graphs]}]
   (reduce (fn [dataset graph]
             (doto dataset
-              (.addDefaultGraph (if (instance? org.eclipse.rdf4j.model.URI graph)
+              (.addDefaultGraph (if (instance? org.eclipse.rdf4j.model.IRI graph)
                                   graph
-                                  (URIImpl. graph)))
-              (.addNamedGraph (if (instance? org.eclipse.rdf4j.model.URI graph)
+                                  (util/uri->rdf4j-uri graph)))
+              (.addNamedGraph (if (instance? org.eclipse.rdf4j.model.IRI graph)
                                   graph
-                                  (URIImpl. graph)))))
+                                  (util/uri->rdf4j-uri graph)))))
           (SimpleDataset.)
           (concat default-graphs named-graphs)))
 
