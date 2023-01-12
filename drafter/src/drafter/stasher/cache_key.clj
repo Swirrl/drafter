@@ -23,9 +23,9 @@
                         (g/not-empty (g/string-alphanumeric)))))
 
 (s/def ::java-uri (s/with-gen
-                    #(instance? java.net.URI %)
+                    #(instance? URI %)
                     #(g/fmap (fn [s]
-                               (java.net.URI. s))
+                               (URI. s))
                              (s/gen ::uri-string))))
 
 (s/def ::rdf4j-uri (s/with-gen
