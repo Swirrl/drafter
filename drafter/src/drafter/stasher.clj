@@ -215,7 +215,6 @@
                                       stream
                                       :format format
                                       :prefixes prefixes)]
-    (.startRDF cache-file-writer)
 
     (reify GraphQueryResult
       (getNamespaces [this]
