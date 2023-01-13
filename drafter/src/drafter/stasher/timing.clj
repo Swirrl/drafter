@@ -73,8 +73,7 @@
    (reify
      RDFHandler
      (startRDF [_]
-       ;;(.startRDF delegate)
-       )
+       (.startRDF delegate))
      (endRDF [_]
        (.endRDF delegate)
        (dd/histogram! metric-name (- (System/currentTimeMillis) start-time)))

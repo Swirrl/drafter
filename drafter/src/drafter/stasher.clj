@@ -422,10 +422,7 @@
   For RDF push query results."
   [^RDFHandler inner-rdf-handler fmt ^Closeable out-stream]
   (let [rdf-format  (get-in formats/supported-cache-formats [:graph fmt])
-        ;; explicitly set prefixes to nil as rio/rdf-writer will write
-        ;; the grafter default-prefixes otherwise.  By setting to nil,
-        ;; use what comes from the stream instead.
-        cache-file-writer ^RDFWriter (rio/rdf-writer out-stream :format rdf-format :prefixes nil)]
+        cache-file-writer ^RDFWriter (rio/make-rdf-writer out-stream {:format rdf-format})]
     (reify
       RDFHandler
       (startRDF [this]
@@ -435,8 +432,8 @@
         (.endRDF cache-file-writer)
         (.endRDF inner-rdf-handler))
       (handleStatement [this statement]
-         (.handleStatement cache-file-writer statement)
-         (.handleStatement inner-rdf-handler statement))
+        (.handleStatement cache-file-writer statement)
+        (.handleStatement inner-rdf-handler statement))
       (handleComment [this comment]
         (.handleComment cache-file-writer comment)
         (.handleComment inner-rdf-handler comment))
