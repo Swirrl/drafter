@@ -5,3 +5,6 @@ stardog.log
 drafter/doc/graph_rewriting_fixup.html
 .omni_cache
 .cpcache
+.clj-kondo
+.lsp
+.calva

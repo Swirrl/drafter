@@ -289,47 +289,69 @@
 (ns-unmap *ns* '->DrafterTriplestore)
 (ns-unmap *ns* 'map->DrafterTriplestore)
 
-(defn repository [client token context]
-  (let [repo (make-repo client context token {})]
-    (DrafterRepository. client token context repo)))
+(defn repository
+  ([client token context]
+   (repository client token context nil))
+  ([client token context http-client-session-manager]
+   (let [repo (make-repo client context token {})]
+     (when http-client-session-manager
+       ;; Providing an HTTP client session manager allows us to use the same
+       ;; underlying HTTP client for multiple repositories, so we can take
+       ;; advantage of connection pooling. You probably want an
+       ;; org.eclipse.rdf4j.http.client.SharedHttpClientSessionManager
+       (.setHttpClientSessionManager repo http-client-session-manager))
+     (DrafterRepository. client token context repo))))
 
 (defn triplestore [repository]
   (DrafterTriplestore. (atom nil) repository))
 
-(defn auth-code-triplestore [client token context]
-  (-> (repository client token context)
-      (triplestore)))
+(defn auth-code-triplestore
+  ([client token context]
+   (auth-code-triplestore client token context nil))
+  ([client token context http-client-session-manager]
+   (triplestore (repository client token context http-client-session-manager))))
 
-(defn m2m-triplestore [client job-timeout context]
-  (let [token (:access_token (auth/get-client-id-token client))]
-    (-> client
-        (client/with-job-timeout job-timeout)
-        (repository token (or context draftset/live))
-        (triplestore))))
+(defn m2m-triplestore
+  ([client job-timeout context]
+   (m2m-triplestore client job-timeout context))
+  ([client job-timeout context http-client-session-manager]
+   (let [token (:access_token (auth/get-client-id-token client))
+         context (or context draftset/live)]
+     (-> client
+         (client/with-job-timeout job-timeout)
+         (repository token context http-client-session-manager)
+         (triplestore)))))
 
-(defn mock-m2m-triplestore [client mock-token job-timeout]
-  (let [context draftset/live]
-    (-> client
-        (client/with-job-timeout job-timeout)
-        (repository mock-token context)
-        (triplestore))))
+(defn mock-m2m-triplestore
+  ([client mock-token job-timeout]
+   (mock-m2m-triplestore client mock-token job-timeout nil))
+  ([client mock-token job-timeout http-client-session-manager]
+   (let [context draftset/live]
+     (-> client
+         (client/with-job-timeout job-timeout)
+         (repository mock-token context http-client-session-manager)
+         (triplestore)))))
 
 (defmethod ig/init-key :drafter-client.triplestore/auth-code-triplestore
-  [_ {:keys [client]}]
+  [_ {:keys [client http-client-session-manager]}]
   (fn [token draft]
-    (auth-code-triplestore client token draft)))
+    (auth-code-triplestore client token draft http-client-session-manager)))
 
 (defmethod ig/init-key :drafter-client.triplestore/m2m-triplestore
-  [_ {:keys [client job-timeout] :or {job-timeout ##Inf}}]
-  (m2m-triplestore client job-timeout nil))
+  [_ {:keys [client job-timeout http-client-session-manager]
+      :or {job-timeout ##Inf}}]
+  (m2m-triplestore client job-timeout nil http-client-session-manager))
 
 (defmethod ig/init-key :drafter-client.triplestore/m2m-draft-triplestore
-  [_ {:keys [client job-timeout] :or {job-timeout ##Inf}}]
-  (fn [draft] (m2m-triplestore client job-timeout draft)))
+  [_ {:keys [client job-timeout http-client-session-manager]
+      :or {job-timeout ##Inf}}]
+  (fn [draft]
+    (m2m-triplestore client job-timeout draft http-client-session-manager)))
 
 (defmethod ig/init-key :drafter-client.triplestore/mock-m2m-triplestore
-  [_ {:keys [client token job-timeout] :or {job-timeout ##Inf}}]
-  (mock-m2m-triplestore client token job-timeout))
+  [_ {:keys [client token job-timeout http-client-session-manager]
+      :or {job-timeout ##Inf}}]
+  (mock-m2m-triplestore client token job-timeout http-client-session-manager))
 
 (defmethod ig/halt-key! :drafter-client.triplestore/auth-code-triplestore
   [_ triplestore]
