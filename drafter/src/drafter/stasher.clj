@@ -16,7 +16,6 @@
    [grafter-2.rdf4j.sparql :as sparql]
    [integrant.core :as ig])
   (:import java.net.URI
-           (grafter_2.rdf SPARQLConnection SPARQLRepository)
            java.nio.charset.Charset
            org.eclipse.rdf4j.query.impl.BackgroundGraphResult
            (org.eclipse.rdf4j.query Dataset GraphQueryResult QueryLanguage
@@ -27,7 +26,8 @@
                                              TupleQueryResultParserRegistry TupleQueryResultParser BooleanQueryResultParser
                                              TupleQueryResultParserFactory
                                              BooleanQueryResultParserFactory)
-           [org.eclipse.rdf4j.repository RepositoryConnection]
+           (org.eclipse.rdf4j.repository RepositoryConnection)
+           (org.eclipse.rdf4j.repository.sparql SPARQLRepository SPARQLConnection)
            org.eclipse.rdf4j.http.client.SPARQLProtocolSession
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate QueryStringUtil)
            (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry RDFParserFactory)

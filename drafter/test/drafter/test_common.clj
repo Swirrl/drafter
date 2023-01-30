@@ -28,11 +28,11 @@
             [drafter.write-scheduler :as scheduler]
             [drafter.backend.draftset.graphs :as graphs]
             [drafter.backend.draftset.operations :as dsops]
-            [drafter.time :as time])
+            [drafter.time :as time]
+            [grafter-2.rdf4j.repository :as repo])
   (:import [com.auth0.jwk Jwk JwkProvider]
            com.auth0.jwt.algorithms.Algorithm
            com.auth0.jwt.JWT
-           grafter_2.rdf.SPARQLRepository
            [java.io ByteArrayInputStream ByteArrayOutputStream OutputStream PrintWriter File]
            java.lang.AutoCloseable
            [java.net InetSocketAddress ServerSocket SocketException URI]
@@ -412,11 +412,23 @@
 (defn get-latched-http-server-repo
   "Returns a SPARQLRepository with a query URI matching latched-http-handler
    listening on the given port."
-  [port]
-  (let [uri (URI. "http" nil "localhost" port nil nil nil)
-        repo (SPARQLRepository. (str uri))]
-    (.initialize repo)
-    repo))
+  ([port]
+   (let [uri (URI. "http" nil "localhost" port nil nil nil)
+         repo (repo/sparql-repo (str uri))]
+     repo))
+  ([port opts]
+   (let [uri (URI. "http" nil "localhost" port nil nil nil)
+         repo (repo/sparql-repo (str uri) nil opts)]
+     repo)))
+
+(defn concurrent-test-repo
+  "Returns a SPARQLRepository with the specified concurrency. Useful for
+  exercising edge case conditions when max connections are exceeded."
+  [test-port max-connections]
+  (let [http-client-builder (repo/make-http-client-builder #:grafter.http{:max-conn-total max-connections
+                                                                          :max-conn-per-route max-connections})
+        shared-session-mgr (repo/make-shared-session-manager {:grafter/http-client-builder http-client-builder})]
+    (get-latched-http-server-repo test-port {:grafter.http/session-manager shared-session-mgr})))
 
 (defn null-output-stream []
   (proxy [OutputStream] []

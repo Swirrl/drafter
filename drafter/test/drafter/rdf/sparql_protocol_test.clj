@@ -239,8 +239,8 @@
         max-connections (int 2)
         connection-latch (CountDownLatch. max-connections)
         release-latch (CountDownLatch. 1)
-        repo (doto (tc/get-latched-http-server-repo test-port) (.setMaxConcurrentHttpConnections max-connections))
-        endpoint (sparql-end-point "/live/sparql" repo)
+        repo (tc/concurrent-test-repo test-port max-connections)
+        endpoint (sut/sparql-end-point "/live/sparql" repo)
         test-request {:uri "/live/sparql"
                       :request-method :get
                       :query-params {"query" "SELECT * WHERE { ?s ?p ?o }"}

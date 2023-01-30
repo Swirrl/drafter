@@ -82,7 +82,7 @@
     (let [max-connections (int 2)
           connection-latch (CountDownLatch. max-connections)
           release-latch (CountDownLatch. 1)
-          repo (doto (tc/get-latched-http-server-repo test-port) (.setMaxConcurrentHttpConnections max-connections))]
+          repo (tc/concurrent-test-repo test-port max-connections)]
       (with-open [server (tc/latched-http-server test-port connection-latch release-latch (tc/get-spo-http-response))]
         (let [blocked-connections (doall (map #(make-blocking-connection repo %) (range 1 (inc max-connections))))]
           ;;wait for max number of connections to be accepted by the server
