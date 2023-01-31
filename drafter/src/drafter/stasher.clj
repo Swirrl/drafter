@@ -775,7 +775,8 @@
   "Builds a stasher RDF repository, that implements the standard RDF4j
   repository interface but caches query results to disk and
   transparently returns cached results if they're in the cache."
-  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache] :as opts}]
+  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache
+           session-manager] :as opts}]
   ;; This call here obliterates the sesame defaults for registered
   ;; parsers.  Forcing content negotiation to work only with the
   ;; parsers we explicitly whitelist above.
@@ -796,6 +797,7 @@
                  (let [^SPARQLRepository this this
                        http-client (.createHTTPClient this)]
                    (stasher-connection this http-client cache updated-opts))))]
+    (.setHttpClientSessionManager repo session-manager)
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     (log/infof "Stasher Caching enabled: %b" (get updated-opts :cache?))
     (repo/notifying-repo repo deltas)))
@@ -806,6 +808,15 @@
                          :graph :brf}
         opts (assoc opts :formats (merge default-formats (:formats opts)))]
     (map->StasherCache opts)))
+
+(defmethod ig/init-key :drafter.stasher/http-client-builder [_ opts]
+  (repo/make-http-client-builder opts))
+
+(defmethod ig/init-key :drafter.stasher/session-manager [_ opts]
+  (repo/make-shared-session-manager opts))
+
+(defmethod ig/init-key :drafter.stasher/http-client-thread-pool [_ opts]
+  (repo/make-default-thread-pool opts))
 
 (defmethod ig/init-key :drafter.stasher/repo [_ opts]
   (stasher-repo opts))

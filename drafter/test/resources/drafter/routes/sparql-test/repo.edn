@@ -12,12 +12,24 @@
                          :thread-pool #ig/ref :drafter.stasher/cache-thread-pool}
 
 
+ :drafter.stasher/http-client-builder {:grafter.http/max-conn-total 10      ;; max concurrent upstream sparql connections
+                                       :grafter.http/max-conn-per-route 10  ;; should only be one route so set this the same as above
+                                       :grafter.http/conn-time-to-live 60 ;; seconds till we close connections in the pool
+                                       :grafter.http/user-agent "drafter"}
+
+ :drafter.stasher/http-client-thread-pool {;; number of background threads to serve concurrent upstream sparql connections
+                                           :grafter.http/io-thread-pool-size 10}
+
+ :drafter.stasher/session-manager {:grafter/http-client-builder #ig/ref :drafter.stasher/http-client-builder
+                                   :grafter/thread-pool #ig/ref :drafter.stasher/http-client-thread-pool}
+
+
  :drafter.stasher/repo {:thread-pool #ig/ref :drafter.stasher/cache-thread-pool
                         :cache #ig/ref :drafter.stasher/cache
                         :cache? false
                         :sparql-query-endpoint #ig/ref :drafter.common.config/sparql-query-endpoint
                         :sparql-update-endpoint #ig/ref :drafter.common.config/sparql-update-endpoint
-                        }
+                        :session-manager #ig/ref :drafter.stasher/session-manager}
 
  ;;;; A repo specifically for the live query endpoint
  :drafter.backend.live/endpoint {:repo #ig/ref :drafter.stasher/repo}
