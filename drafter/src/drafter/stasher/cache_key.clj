@@ -23,15 +23,15 @@
                         (g/not-empty (g/string-alphanumeric)))))
 
 (s/def ::java-uri (s/with-gen
-                    #(instance? java.net.URI %)
+                    #(instance? URI %)
                     #(g/fmap (fn [s]
-                               (java.net.URI. s))
+                               (URI. s))
                              (s/gen ::uri-string))))
 
 (s/def ::rdf4j-uri (s/with-gen
-                     #(instance? org.eclipse.rdf4j.model.URI %)
+                     #(instance? org.eclipse.rdf4j.model.IRI %)
                      #(g/fmap (fn [s]
-                                (org.eclipse.rdf4j.model.impl.URIImpl. s))
+                                (util/uri->rdf4j-uri s))
                               (s/gen ::uri-string))))
 
 (s/def ::uri-set (s/or :uri-strings (s/coll-of ::uri-string)

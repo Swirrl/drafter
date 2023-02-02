@@ -5,8 +5,7 @@
             [clojure.tools.logging :as log]
             [drafter.util :as util]
             [grafter-2.rdf.protocols :refer [map->Quad]])
-  (:import [org.eclipse.rdf4j.model.impl ContextStatementImpl StatementImpl]
-           [org.eclipse.rdf4j.query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult GraphQueryResult Dataset Query]
+  (:import [org.eclipse.rdf4j.query Dataset Query BooleanQuery GraphQuery TupleQuery TupleQueryResultHandler TupleQueryResult GraphQueryResult]
            [org.eclipse.rdf4j.query.impl BindingImpl MapBindingSet SimpleDataset]
            org.eclipse.rdf4j.rio.RDFHandler
            [org.eclipse.rdf4j.model Statement]))
@@ -101,8 +100,8 @@
         obj (rewrite-value value-mapping (.getObject statement))
         pred (rewrite-value value-mapping (.getPredicate statement))]
     (if-let [graph (rewrite-value value-mapping (.getContext statement))]
-      (ContextStatementImpl. subj pred obj graph)
-      (StatementImpl. subj pred obj))))
+      (util/create-rdf4j-statement subj pred obj graph)
+      (util/create-rdf4j-statement subj pred obj))))
 
 (defn- rewriting-rdf-handler
   "Returns an RDFHandler which re-writes draft values within result statements to their
@@ -214,7 +213,7 @@
   be sesame URI instances. This function maps the mapping from java to sesame
   URIs."
   [uri-mapping]
-  (util/map-all util/uri->sesame-uri uri-mapping))
+  (util/map-all util/uri->rdf4j-uri uri-mapping))
 
 (defprotocol ToRewritingQuery
   (->rewriting-query [this live->draft draft->live]))

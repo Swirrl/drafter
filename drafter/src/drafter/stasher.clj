@@ -16,7 +16,6 @@
    [grafter-2.rdf4j.sparql :as sparql]
    [integrant.core :as ig])
   (:import java.net.URI
-           (grafter_2.rdf SPARQLConnection SPARQLRepository)
            java.nio.charset.Charset
            org.eclipse.rdf4j.query.impl.BackgroundGraphResult
            (org.eclipse.rdf4j.query Dataset GraphQueryResult QueryLanguage
@@ -27,13 +26,15 @@
                                              TupleQueryResultParserRegistry TupleQueryResultParser BooleanQueryResultParser
                                              TupleQueryResultParserFactory
                                              BooleanQueryResultParserFactory)
-           [org.eclipse.rdf4j.repository RepositoryConnection]
+           (org.eclipse.rdf4j.repository RepositoryConnection)
+           (org.eclipse.rdf4j.repository.sparql SPARQLRepository SPARQLConnection)
            org.eclipse.rdf4j.http.client.SPARQLProtocolSession
            (org.eclipse.rdf4j.repository.sparql.query SPARQLBooleanQuery SPARQLGraphQuery SPARQLTupleQuery SPARQLUpdate QueryStringUtil)
            (org.eclipse.rdf4j.rio RDFParser RDFFormat RDFHandler RDFWriter RDFParserRegistry RDFParserFactory)
            (java.util.concurrent ThreadPoolExecutor TimeUnit ArrayBlockingQueue)
            java.time.OffsetDateTime
-           (java.io InputStream Closeable)))
+           (java.io InputStream Closeable)
+           (java.lang.ref WeakReference)))
 
 (s/def ::core-pool-size pos-int?)
 (s/def ::max-pool-size pos-int?)
@@ -214,7 +215,6 @@
                                       stream
                                       :format format
                                       :prefixes prefixes)]
-    (.startRDF cache-file-writer)
 
     (reify GraphQueryResult
       (getNamespaces [this]
@@ -335,6 +335,16 @@
         (.handleBoolean bool-writer result))))
   result)
 
+(def DEPRECATED_ARGUMENT
+  "This argument is deprecated in the call sites where we pass it, it
+  looks like in a future RDF4j it will be removed. So we may need to
+  update the callsites that pass this parameter in the future.
+
+  See this PR for details:
+
+  https://github.com/eclipse/rdf4j/pull/4138"
+  (WeakReference. :DEPRECATED_REPLACE_IN_FUTURE_UPDATE))
+
 (defn- read-tuple-cache-stream
   "Return a BackgroundTupleResult and trigger a thread to iterate over
   the result stream.  BackgroundGraphResult will then marshal the
@@ -344,7 +354,7 @@
   will already be on results where the dataset restriction was set."
   [^ThreadPoolExecutor thread-pool stream fmt]
   (let [start-time (System/currentTimeMillis)
-        bg-tuple-result (BackgroundTupleResult. (get-parser :tuple fmt) stream)]
+        bg-tuple-result (BackgroundTupleResult. (get-parser :tuple fmt) stream DEPRECATED_ARGUMENT)]
 
     ;; execute parse thread on a thread pool.
     (.submit thread-pool ^Runnable (fn []
@@ -371,7 +381,8 @@
         bg-graph-result (BackgroundGraphResult. (get-parser :graph fmt-kw)
                                                 stream
                                                 charset
-                                                base-uri-str)]
+                                                base-uri-str
+                                                DEPRECATED_ARGUMENT)]
 
     ;; execute parse thread on a thread pool.
     (.submit thread-pool ^Runnable (fn []
@@ -411,10 +422,7 @@
   For RDF push query results."
   [^RDFHandler inner-rdf-handler fmt ^Closeable out-stream]
   (let [rdf-format  (get-in formats/supported-cache-formats [:graph fmt])
-        ;; explicitly set prefixes to nil as rio/rdf-writer will write
-        ;; the grafter default-prefixes otherwise.  By setting to nil,
-        ;; use what comes from the stream instead.
-        cache-file-writer ^RDFWriter (rio/rdf-writer out-stream :format rdf-format :prefixes nil)]
+        cache-file-writer ^RDFWriter (rio/make-rdf-writer out-stream {:format rdf-format})]
     (reify
       RDFHandler
       (startRDF [this]
@@ -424,8 +432,8 @@
         (.endRDF cache-file-writer)
         (.endRDF inner-rdf-handler))
       (handleStatement [this statement]
-         (.handleStatement cache-file-writer statement)
-         (.handleStatement inner-rdf-handler statement))
+        (.handleStatement cache-file-writer statement)
+        (.handleStatement inner-rdf-handler statement))
       (handleComment [this comment]
         (.handleComment cache-file-writer comment)
         (.handleComment inner-rdf-handler comment))
@@ -576,13 +584,17 @@
                  (wrap-result cache cache-key
                               (.sendGraphQuery httpclient QueryLanguage/SPARQL
                                                query-str base-uri-str dataset
-                                               (.getIncludeInferred this) (.getMaxExecutionTime this)
+                                               (.getIncludeInferred this)
+                                               (.getMaxExecutionTime this)
+                                               DEPRECATED_ARGUMENT
                                                (.getBindingsArray this)))))
            (timing/graph-result
             "drafter.stasher.graph_sync.no_cache"
             (.sendGraphQuery httpclient QueryLanguage/SPARQL
                              query-str base-uri-str dataset
-                             (.getIncludeInferred this) (.getMaxExecutionTime this)
+                             (.getIncludeInferred this)
+                             (.getMaxExecutionTime this)
+                             DEPRECATED_ARGUMENT
                              (.getBindingsArray this))))))
 
       ;; async results
@@ -611,8 +623,10 @@
            (let [timing-rdf-handler (timing/rdf-handler "drafter.stasher.graph_async.no_cache" rdf-handler)]
              (.sendGraphQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this)
-                              timing-rdf-handler (.getBindingsArray this)))))))))
+                              (.getIncludeInferred this)
+                              (.getMaxExecutionTime this)
+                              timing-rdf-handler
+                              (.getBindingsArray this)))))))))
 
 (defn stashing-select-query
   "Construct a tuple query that checks the stash before evaluating"
@@ -637,6 +651,7 @@
                                                query-str base-uri-str dataset
                                                (.getIncludeInferred this)
                                                (.getMaxExecutionTime this)
+                                               DEPRECATED_ARGUMENT
                                                (.getBindingsArray this)))))
            (timing/tuple-result
             "drafter.stasher.tuple_sync.no_cache"
@@ -644,6 +659,7 @@
                              query-str base-uri-str dataset
                              (.getIncludeInferred this)
                              (.getMaxExecutionTime this)
+                             DEPRECATED_ARGUMENT
                              (.getBindingsArray this))))))
       ([tuple-handler]
        (let [^SPARQLTupleQuery this this
@@ -670,8 +686,10 @@
            (let [timing-tuple-handler (timing/tuple-handler "drafter.stasher.tuple_async.no_cache" tuple-handler)]
              (.sendTupleQuery httpclient QueryLanguage/SPARQL
                               query-str base-uri-str dataset
-                              (.getIncludeInferred this) (.getMaxExecutionTime this)
-                              timing-tuple-handler (.getBindingsArray this)))))))))
+                              (.getIncludeInferred this)
+                              (.getMaxExecutionTime this)
+                              timing-tuple-handler
+                              (.getBindingsArray this)))))))))
 
 (defn stashing-boolean-query
   "Construct a boolean query that checks the stash before evaluating.
@@ -697,8 +715,11 @@
                "drafter.stasher.boolean_sync.cache_miss"
                {}
                (wrap-result cache cache-key
-                            (.sendBooleanQuery httpclient QueryLanguage/SPARQL
-                                               query-str base-uri-str dataset
+                            (.sendBooleanQuery httpclient
+                                               QueryLanguage/SPARQL
+                                               query-str
+                                               base-uri-str
+                                               dataset
                                                (.getIncludeInferred this)
                                                (.getMaxExecutionTime this)
                                                (.getBindingsArray this))))))
@@ -754,7 +775,8 @@
   "Builds a stasher RDF repository, that implements the standard RDF4j
   repository interface but caches query results to disk and
   transparently returns cached results if they're in the cache."
-  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache] :as opts}]
+  [{:keys [sparql-query-endpoint sparql-update-endpoint report-deltas cache
+           session-manager] :as opts}]
   ;; This call here obliterates the sesame defaults for registered
   ;; parsers.  Forcing content negotiation to work only with the
   ;; parsers we explicitly whitelist above.
@@ -770,12 +792,12 @@
                             :base-uri (or (:base-uri opts)
                                           "http://publishmydata.com/id/")
                             :state-graph-last-modified (atom (get-state-graph-last-modified)))
-        repo (doto (proxy [SPARQLRepository] [query-endpoint update-endpoint]
-                     (getConnection []
-                       (let [^SPARQLRepository this this
-                             http-client (.createHTTPClient this)]
-                         (stasher-connection this http-client cache updated-opts))))
-               (.initialize))]
+        repo (proxy [SPARQLRepository] [query-endpoint update-endpoint]
+               (getConnection []
+                 (let [^SPARQLRepository this this
+                       http-client (.createHTTPClient this)]
+                   (stasher-connection this http-client cache updated-opts))))]
+    (.setHttpClientSessionManager repo session-manager)
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     (log/infof "Stasher Caching enabled: %b" (get updated-opts :cache?))
     (repo/notifying-repo repo deltas)))
@@ -786,6 +808,15 @@
                          :graph :brf}
         opts (assoc opts :formats (merge default-formats (:formats opts)))]
     (map->StasherCache opts)))
+
+(defmethod ig/init-key :drafter.stasher/http-client-builder [_ opts]
+  (repo/make-http-client-builder opts))
+
+(defmethod ig/init-key :drafter.stasher/session-manager [_ opts]
+  (repo/make-shared-session-manager opts))
+
+(defmethod ig/init-key :drafter.stasher/http-client-thread-pool [_ opts]
+  (repo/make-default-thread-pool opts))
 
 (defmethod ig/init-key :drafter.stasher/repo [_ opts]
   (stasher-repo opts))

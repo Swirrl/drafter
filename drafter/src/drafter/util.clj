@@ -7,17 +7,14 @@
    [drafter.rdf.drafter-ontology :refer [drafter:version]]
    [drafter.rdf.jena :as jena]
    [grafter-2.rdf.protocols :as pr]
-   [grafter.url :as url]
-   [integrant.core :as ig])
+   [grafter.url :as url])
   (:import
-   [java.io IOException]
-   [java.net URI]
    [java.util UUID]
    [javax.mail.internet AddressException InternetAddress]
    java.nio.charset.Charset
    java.security.MessageDigest
    org.apache.commons.codec.binary.Hex
-   org.eclipse.rdf4j.model.impl.URIImpl))
+   [org.eclipse.rdf4j.model.impl SimpleValueFactory]))
 
 (defn create-uuid
   "Function that creates a UUID"
@@ -95,10 +92,6 @@
   inner cause exceptions."
   (take-while some? (iterate #(.getCause %) ex)))
 
-(defmacro set-var-root! [var form]
-  `(alter-var-root ~var (fn [& _#]
-                          ~form)))
-
 (defn make-compound-sparql-query
   "Combines a sequence of SPARQL queries into a single query."
   [queries]
@@ -142,10 +135,18 @@
   ([seq partition-fn output-batch-size take-batch-size]
    (create-partition-batches (partition-all take-batch-size seq) partition-fn output-batch-size)))
 
-(defn uri->sesame-uri
+(def ^:private value-factory (SimpleValueFactory/getInstance))
+
+(defn uri->rdf4j-uri
   "Converts a java.net.URI into a sesame URI"
   [uri]
-  (URIImpl. (str uri)))
+  (.createIRI value-factory (str uri)))
+
+(defn create-rdf4j-statement
+  ([s p o]
+   (.createStatement value-factory s p o))
+  ([s p o c]
+   (.createStatement value-factory s p o c)))
 
 ;; Map[k a] -> Map[k b] -> (a -> b -> c) -> Map[k c]
 (defn intersection-with

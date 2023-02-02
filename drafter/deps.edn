@@ -3,10 +3,6 @@
  :deps {buddy/buddy-auth {:mvn/version "3.0.1"}
         buddy/buddy-core {:mvn/version "1.10.1"}
 
-        ;; NOTE: multiple transitive jackson-core dependencies exist
-        ;; specify desired version at the top-level
-        com.fasterxml.jackson.core/jackson-core {:mvn/version "2.12.4"}
-
         ;; override cheshire a transitive dep of buddy-core which
         ;; otherwise introduces CVE-2020-28491 via its
         ;; jackson-dataformat-cbor dep.
@@ -18,7 +14,7 @@
         ;; remove this dep.
         cheshire/cheshire {:mvn/version "5.10.1"}
 
-        org.clojure/clojure {:mvn/version "1.10.3"}
+        org.clojure/clojure {:mvn/version "1.11.1"}
 
         org.clojure/math.combinatorics {:mvn/version "0.1.6"}
 
@@ -40,21 +36,13 @@
         com.sun.mail/javax.mail {:mvn/version "1.6.2"}
         ;;[com.taoensso/tower "2.0.2"]
 
-        grafter/grafter {:mvn/version "2.1.18"}
-        org.eclipse.rdf4j/rdf4j-queryrender {:mvn/version "3.1.4"}
-
-        ;; The beanutils dep below is a transitive dep of grafter ->
-        ;; rdf4j -> com.opencsv/opencsv. However 1.9.3 has
-        ;; CVE-2019-10086 against it, so bumping the dep here until we
-        ;; can upgrade rdf4j or other deps such that we no longer need
-        ;; to.
-        commons-beanutils/commons-beanutils {:mvn/version "1.9.4"}
+        io.github.swirrl/grafter.repository {:mvn/version "3.0.0"}
+        org.eclipse.rdf4j/rdf4j-queryresultio-text {:mvn/version "4.2.2"}
+        org.eclipse.rdf4j/rdf4j-queryresultio-sparqljson {:mvn/version "4.2.2"}
 
         org.apache.tika/tika-core {:mvn/version "1.27"} ;; mime types
 
         org.apache.commons/commons-compress {:mvn/version "1.21"}
-
-        grafter/url {:mvn/version "0.2.5"}
 
         lib-noir/lib-noir {:mvn/version "0.9.9"
                            :exclusions [compojure/compojure

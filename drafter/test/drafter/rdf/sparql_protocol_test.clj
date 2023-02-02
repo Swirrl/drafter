@@ -1,18 +1,16 @@
 (ns drafter.rdf.sparql-protocol-test
   (:require [clojure-csv.core :as csv]
-            [clojure.test :refer :all]
+            [clojure.test :refer [deftest is testing join-fixtures use-fixtures]]
             [drafter.backend.common :as bcom]
             [drafter.rdf.sparql :as sparql]
-            [drafter.rdf.sparql-protocol :refer :all]
+            [drafter.rdf.sparql-protocol :as sut]
+            [drafter.util :as util]
             [drafter.test-common :as tc]
             [grafter-2.rdf4j.io :as rio]
             [grafter-2.rdf4j.repository :as repo]
-            [ring.util.response :as ring]
             [schema.test :refer [validate-schemas]])
   (:import java.net.URI
-           [java.io ByteArrayInputStream]
-           [java.util.concurrent CountDownLatch TimeUnit]
-           org.eclipse.rdf4j.model.impl.URIImpl))
+           [java.util.concurrent CountDownLatch TimeUnit]))
 
 (use-fixtures :each tc/with-spec-instrumentation)
 
@@ -31,7 +29,7 @@
 
 (deftest sparql-prepare-query-handler-test
   (let [r (repo/sail-repo)
-        handler (sparql-prepare-query-handler r identity)]
+        handler (sut/sparql-prepare-query-handler r identity)]
     (testing "Valid query"
       (let [req (handler {:sparql {:query-string "SELECT * WHERE { ?s ?p ?o }"}})]
         (is (some? (get-in req [:sparql :prepared-query])))))
@@ -42,8 +40,8 @@
             baz "http://baz"
             req (handler {:sparql {:query-string qs}})
             ds (.getActiveDataset (get-in req [:sparql :prepared-query]))]
-        (is (contains? (.getDefaultGraphs ds) (URIImpl. foo)))
-        (is (contains? (.getNamedGraphs ds) (URIImpl. baz)))))
+        (is (contains? (.getDefaultGraphs ds) (util/uri->rdf4j-uri foo)))
+        (is (contains? (.getNamedGraphs ds) (util/uri->rdf4j-uri baz)))))
 
     (testing "User restricted (FROM) query: protocol overrides query"
       (let [qs "SELECT * FROM <http://foo> WHERE { ?s ?p ?o }"
@@ -54,9 +52,9 @@
                                    :default-graph-uri [bar]
                                    :named-graph-uri [baz]}})
             ds (.getActiveDataset (get-in req [:sparql :prepared-query]))]
-        (is (contains? (.getDefaultGraphs ds) (URIImpl. bar)))
-        (is (not (contains? (.getDefaultGraphs ds) (URIImpl. foo))))
-        (is (contains? (.getNamedGraphs ds) (URIImpl. baz)))))
+        (is (contains? (.getDefaultGraphs ds) (util/uri->rdf4j-uri bar)))
+        (is (not (contains? (.getDefaultGraphs ds) (util/uri->rdf4j-uri foo))))
+        (is (contains? (.getNamedGraphs ds) (util/uri->rdf4j-uri baz)))))
 
     (testing "Malformed SPARQL query"
       (let [response (handler {:sparql {:query-string "NOT A SPARQL QUERY"}})]
@@ -68,7 +66,7 @@
 
 (deftest sparql-negotiation-handler-test
   (testing "Valid request"
-    (let [handler (sparql-negotiation-handler identity)
+    (let [handler (sut/sparql-negotiation-handler identity)
           accept-content-type "application/n-triples"
           pquery (prepare-query-str "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }")
           request {:uri "/sparql"
@@ -79,7 +77,7 @@
       (is (some? format))))
 
   (testing "Content negotiation failure"
-    (let [handler (sparql-negotiation-handler identity)
+    (let [handler (sut/sparql-negotiation-handler identity)
           pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
           response (handler {:uri "/test"
                              :sparql {:prepared-query pquery}
@@ -87,7 +85,7 @@
       (tc/assert-is-not-acceptable-response response)))
 
   (testing "Content negotiation via query parameter"
-    (let [handler (sparql-negotiation-handler identity)
+    (let [handler (sut/sparql-negotiation-handler identity)
           pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
           request {:uri "/sparql"
                    :sparql {:prepared-query pquery}
@@ -100,7 +98,7 @@
 (deftest sparql-timeout-handler-test
   (testing "With valid timeout"
     (let [timeout 30
-          handler (sparql-timeout-handler (constantly timeout) identity)
+          handler (sut/sparql-timeout-handler (constantly timeout) identity)
           pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
           request {:sparql {:prepared-query pquery}}]
       (handler request)
@@ -108,14 +106,14 @@
 
   (testing "With invalid timeout"
     (let [ex (IllegalArgumentException. "Invalid timeout")
-          handler (sparql-timeout-handler (constantly ex) identity)
+          handler (sut/sparql-timeout-handler (constantly ex) identity)
           pquery (prepare-query-str "SELECT * WHERE { ?s ?p ?o }")
           request {:sparql {:prepared-query pquery}}
           response (handler request)]
       (is (tc/assert-is-bad-request-response response)))))
 
 (deftest sparql-end-point-test
-  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
+  (let [end-point (sut/sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "Standard SPARQL query with no dataset restrictions"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -162,7 +160,7 @@
   (set (map (fn [{:keys [s p o]}] [s p o]) triples)))
 
 (deftest sparql-end-point-graph-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
+  (let [end-point (sut/sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "Standard SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method           :get
@@ -180,7 +178,7 @@
           (is (= expected-triples triples)))))))
 
 (deftest sparql-end-point-tuple-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
+  (let [end-point (sut/sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "Tuple SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -198,7 +196,7 @@
           (is (= expected-triples triples)))))))
 
 (deftest sparql-end-point-boolean-query-accept-test
-  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
+  (let [end-point (sut/sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "Boolean SPARQL query with multiple accepted MIME types and qualities"
       (let [{:keys [status headers body]
              :as resp} (end-point {:request-method :get
@@ -213,7 +211,7 @@
           (is (= "true" body-str)))))))
 
 (deftest sparql-endpoint-sets-content-type-text-plain-if-html-requested
-  (let [end-point (sparql-end-point "/live/sparql" tc/*test-backend*)]
+  (let [end-point (sut/sparql-end-point "/live/sparql" tc/*test-backend*)]
     (testing "SPARQL endpoint sets content type to text/plain if text/html requested"
       (let [{:keys [status headers body]
              :as result} (end-point {:request-method :get
@@ -226,7 +224,7 @@
 
 (deftest sparql-endpoint-invalid-query
   (testing "SPARQL endpoint returns client error if SPARQL query invalid"
-    (let [endpoint (sparql-end-point "/live/sparql" tc/*test-backend*)
+    (let [endpoint (sut/sparql-end-point "/live/sparql" tc/*test-backend*)
           request {:request-method :get
                    :uri "/live/sparql"
                    :query-params {"query" "NOT A VALID SPARQL QUERY"}
@@ -239,8 +237,8 @@
         max-connections (int 2)
         connection-latch (CountDownLatch. max-connections)
         release-latch (CountDownLatch. 1)
-        repo (doto (tc/get-latched-http-server-repo test-port) (.setMaxConcurrentHttpConnections max-connections))
-        endpoint (sparql-end-point "/live/sparql" repo)
+        repo (tc/concurrent-test-repo test-port max-connections)
+        endpoint (sut/sparql-end-point "/live/sparql" repo)
         test-request {:uri "/live/sparql"
                       :request-method :get
                       :query-params {"query" "SELECT * WHERE { ?s ?p ?o }"}
@@ -251,10 +249,10 @@
         (if (.await connection-latch 5000 TimeUnit/MILLISECONDS)
           (do
             ;;server has accepted max number of connections so next query attempt should see a connection timeout
-            (let [rf (future (endpoint test-request))]
+            (let [rf (future (endpoint test-request))
+                  response (.get rf 5000 TimeUnit/MILLISECONDS)]
               ;;should be rejected almost immediately
-              (let [response (.get rf 5000 TimeUnit/MILLISECONDS)]
-                (tc/assert-is-service-unavailable-response response)))
+              (tc/assert-is-service-unavailable-response response))
 
             ;;release previous connections and wait for them to complete
             (.countDown release-latch)
@@ -263,7 +261,7 @@
           (throw (RuntimeException. "Server failed to accept connections within timeout")))))))
 
 (deftest sparql-query-parser-handler-test
-  (let [handler (sparql-query-parser-handler identity)
+  (let [handler (sut/sparql-query-parser-handler identity)
         query-string "SELECT * WHERE { ?s ?p ?o }"]
     (testing "Valid GET request"
       (let [req {:request-method :get :query-params {"query" query-string}}

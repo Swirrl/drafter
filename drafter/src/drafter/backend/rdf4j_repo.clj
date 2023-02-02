@@ -6,8 +6,7 @@
             [grafter-2.rdf4j.repository.registry :as reg]
             [integrant.core :as ig]
             [grafter-2.rdf4j.repository :as repo])
-  (:import grafter_2.rdf.SPARQLRepository
-           [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
+  (:import [org.eclipse.rdf4j.query.resultio.sparqljson SPARQLBooleanJSONParserFactory SPARQLResultsJSONParserFactory]
            [org.eclipse.rdf4j.query.resultio.sparqlxml SPARQLBooleanXMLParserFactory SPARQLResultsXMLParserFactory]
            [org.eclipse.rdf4j.query.resultio.binary BinaryQueryResultParserFactory]
            org.eclipse.rdf4j.query.resultio.text.BooleanTextParserFactory
@@ -21,8 +20,7 @@
   "Creates a new SPARQL repository with the given query and update
   endpoints."
   [query-endpoint update-endpoint]
-  (let [repo (SPARQLRepository. query-endpoint update-endpoint)]
-    (.initialize repo)
+  (let [repo (repo/sparql-repo query-endpoint update-endpoint)]
     (.enableQuadMode repo true)
     (log/info "Initialised repo at QUERY=" query-endpoint ", UPDATE=" update-endpoint)
     repo))

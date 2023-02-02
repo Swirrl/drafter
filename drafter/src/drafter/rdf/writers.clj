@@ -56,4 +56,3 @@
 (defn register-custom-rdf-writers! []
   (register-rdf-writer-factory (create-rdf-writer-factory csv-rdf-format create-csv-result-writer))
   (register-rdf-writer-factory (create-rdf-writer-factory tsv-rdf-format create-tsv-result-writer)))
-

@@ -350,7 +350,7 @@
       (let [draftset (sut/new-draftset client token name description)
             quads [(pr/->Quad "some" :invalid "quad" nil)
                    (pr/->Quad (URI. "http://x.com/s") (URI. "http://x.com/p") (URI. "http://x.com/o") nil)]]
-        (is (thrown-with-msg? ExecutionException #"It looks like you have an incorrect data type inside a quad"
+        (is (thrown-with-msg? ExecutionException #"Error outputing Quad"
                               (sut/add client token draftset quads)))))
 
     (t/testing "Adding triples to a draft set"

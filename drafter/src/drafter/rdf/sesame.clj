@@ -23,7 +23,7 @@
   (not (is-quads-format? rdf-format)))
 
 (extend-protocol url/IURIable
-  org.eclipse.rdf4j.model.URI
+  org.eclipse.rdf4j.model.IRI
   (->java-uri [rdf4j-uri]
     (java.net.URI. (str rdf4j-uri))))
 

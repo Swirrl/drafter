@@ -269,7 +269,7 @@ PREFIX tbox: <http://publishmydata.com/graphs/reasoning-tbox>
                 (-> request live :body io/reader line-seq rest process set)))]
 
       (let [draft-1 ":PublicGraph { :Nickie a :WestHighlandTerrier . }"
-            [add-to-draft-1! publish-1! draftq-1] (new-draftset api draft-1)
+           [add-to-draft-1! publish-1! draftq-1] (new-draftset api draft-1)
             nickie #{["http://test.com/WestHighlandTerrier"]
                      ["http://test.com/Dog"]
                      ["http://test.com/Animal"]
