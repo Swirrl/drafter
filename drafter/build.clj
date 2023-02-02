@@ -1,7 +1,8 @@
 (ns build
   (:require [clojure.tools.build.api :as b]
             [clojure.string :as str]
-            [juxt.pack.api :as pack]))
+            [juxt.pack.api :as pack])
+  (:import com.google.cloud.tools.jib.api.buildplan.Platform))
 
 (def lib 'com.swirrl/drafter)
 (def version (format "2.0.%s" (b/git-count-revs nil)))
@@ -40,6 +41,7 @@
       :image-type (get opts :image-type :docker)
       :include {"/app/config" ["./resources/drafter-auth0.edn"]}
       :base-image "gcr.io/distroless/java:11"
+      :platforms #{(Platform. "amd64" "linux") (Platform. "arm64/v8" "linux")}
       ;; NOTE Not as documented!
       ;; The docstring states that these should be
       ;;     :to-registry {:username ... :password ...}

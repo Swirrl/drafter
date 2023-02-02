@@ -148,7 +148,7 @@ commands:
           name: Resolve drafter deps
           command: |
             cd drafter
-            clojure -P -A:dev:test:pack
+            clojure -P -A:dev:test:build
 
       - run:
           name: Resolve drafter-client deps
