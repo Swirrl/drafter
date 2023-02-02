@@ -40,8 +40,8 @@
       :tags (set (rest tags))
       :image-type (get opts :image-type :docker)
       :include {"/app/config" ["./resources/drafter-auth0.edn"]}
-      :base-image "gcr.io/distroless/java:11"
-      :platforms #{(Platform. "amd64" "linux") (Platform. "arm64/v8" "linux")}
+      :base-image "gcr.io/distroless/java11-debian11"
+      :platforms #{(Platform. "amd64" "linux") (Platform. "arm64" "linux")}
       ;; NOTE Not as documented!
       ;; The docstring states that these should be
       ;;     :to-registry {:username ... :password ...}
