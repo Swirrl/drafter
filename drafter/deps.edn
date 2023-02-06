@@ -184,7 +184,7 @@
                          :main-opts ["-m" "drafter.main" "/app/config/drafter-auth0.edn"]} 
 
            :build {:deps {io.github.clojure/tools.build {:git/tag "v0.7.5" :git/sha "34727f7"}
-                          io.github.swirrl/pack.alpha {:git/sha "f9280783ff06e15ec81454a88ee31c4c65ae0028"}}
+                          io.github.swirrl/pack.alpha {:git/sha "4d835ce4794b103fca5f0c1b5fbdfca903947241"}}
                    :ns-default build}
 
            :java9 {:jvm-opts ["--add-modules" "java.xml.bind"]}
