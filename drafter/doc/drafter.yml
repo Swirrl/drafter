@@ -485,6 +485,7 @@ paths:
         - application/n-triples
         - application/rdf+xml
         - text/turtle
+        - application/ld+json
       tags:
         - Querying
       responses:
@@ -605,6 +606,7 @@ paths:
         - application/n-triples
         - application/rdf+xml
         - text/turtle
+        - application/ld+json
         - application/sparql-results+xml
         - application/sparql-results+json
         - text/csv
@@ -642,6 +644,7 @@ paths:
         - application/n-triples
         - application/rdf+xml
         - text/turtle
+        - application/ld+json
         - application/sparql-results+xml
         - application/sparql-results+json
         - text/csv
@@ -712,6 +715,7 @@ paths:
         - application/n-triples
         - application/rdf+xml
         - text/turtle
+        - application/ld+json
         - application/sparql-results+xml
         - application/sparql-results+json
         - text/csv
@@ -745,6 +749,7 @@ paths:
         - application/n-triples
         - application/rdf+xml
         - text/turtle
+        - application/ld+json
         - application/sparql-results+xml
         - application/sparql-results+json
         - text/csv

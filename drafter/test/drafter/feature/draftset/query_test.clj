@@ -1,5 +1,5 @@
 (ns ^:rest-api drafter.feature.draftset.query-test
-  (:require [clojure.test :as t :refer [is]]
+  (:require [clojure.test :as t :refer [is testing]]
             [grafter-2.rdf4j.io :refer [rdf-writer statements]]
             [grafter-2.rdf.protocols :refer [add context ->Quad ->Triple map->Triple]]
             [drafter.test-common :as tc]
@@ -54,16 +54,29 @@
         draftset-location (help/create-draftset-through-api handler test-editor)
         draftset-data-file "test/resources/test-draftset.trig"
         append-response (help/make-append-data-to-draftset-request handler test-editor draftset-location draftset-data-file)]
-    (tc/await-success (:finished-job (:body append-response)) )
-    (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
-          query-request (create-query-request test-editor draftset-location query "application/n-triples")
-          query-response (handler query-request)
-          response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format :nt)))
-          expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
-      (tc/assert-is-ok-response query-response)
+    (tc/await-success (:finished-job (:body append-response)))
+    (testing "SPARQL CONSTRUCT"
+      (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"]
+        (testing "application/n-triples"
+          (let [query "CONSTRUCT { ?s ?p ?o }  WHERE { GRAPH ?g { ?s ?p ?o } }"
+                query-request (create-query-request test-editor draftset-location query "application/n-triples")
+                query-response (handler query-request)
+                response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format :nt)))
+                expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
+            (tc/assert-is-ok-response query-response)
 
-      ;; NOTE: query may return statements from system graphs which should be ignored
-      (is (set/subset? expected-triples response-triples)))))
+            ;; NOTE: query may return statements from system graphs which should be ignored
+            (is (set/subset? expected-triples response-triples))))
+
+        (testing "application/ld+json"
+          (let [query-request (create-query-request test-editor draftset-location query "application/ld+json")
+                query-response (handler query-request)
+                response-triples (set (map #(util/map-values str %) (statements (:body query-response) :format :jsonld)))
+                expected-triples (set (map (comp #(util/map-values str %) map->Triple) (statements draftset-data-file)))]
+            (tc/assert-is-ok-response query-response)
+
+            ;; NOTE: query may return statements from system graphs which should be ignored
+            (is (set/subset? expected-triples response-triples))))))))
 
 (def slow-query
   "CONSTRUCT WHERE {
