@@ -161,21 +161,38 @@
 
 (deftest sparql-end-point-graph-query-accept-test
   (let [end-point (sut/sparql-end-point "/live/sparql" tc/*test-backend*)]
-    (testing "Standard SPARQL query with multiple accepted MIME types and qualities"
-      (let [{:keys [status headers body]
-             :as result} (end-point {:request-method           :get
-                                                 :uri          "/live/sparql"
-                                                 :query-params {"query" "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
-                                                 :headers      {"accept" "text/csv;q=0.7,text/unknown,application/n-triples;q=0.9"}})]
+    (testing "SPARQL CONSTRUCT"
+      (testing "with multiple accepted MIME types and qualities"
+        (let [{:keys [status headers body]
+               :as result} (end-point {:request-method :get
+                                       :uri            "/live/sparql"
+                                       :query-params   {"query" "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
+                                       :headers        {"accept" "text/csv;q=0.7,text/unknown,application/n-triples;q=0.9"}})]
 
-        (is (= 200 status))
-        (is (= "application/n-triples" (headers "Content-Type")))
+          (is (= 200 status))
+          (is (= "application/n-triples" (headers "Content-Type")))
 
-        (let [triple-reader (java.io.InputStreamReader. body)
-              triples (get-spo-set (rio/statements triple-reader :format :nt))
-              expected-triples (get-spo-set (tc/test-triples (URI. "http://test.com/data/one")))]
+          (let [triple-reader (java.io.InputStreamReader. body)
+                triples (get-spo-set (rio/statements triple-reader :format :nt))
+                expected-triples (get-spo-set (tc/test-triples (URI. "http://test.com/data/one")))]
 
-          (is (= expected-triples triples)))))))
+            (is (= expected-triples triples)))))
+
+      (testing "accept application/ld+json"
+        (let [{:keys [status headers body]
+               :as result} (end-point {:request-method :get
+                                       :uri            "/live/sparql"
+                                       :query-params   {"query" "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o } LIMIT 10"}
+                                       :headers        {"accept" "application/ld+json"}})]
+
+          (is (= 200 status))
+          (is (= "application/ld+json" (headers "Content-Type")))
+
+          (let [triple-reader (java.io.InputStreamReader. body)
+                triples (get-spo-set (rio/statements triple-reader :format :jsonld))
+                expected-triples (get-spo-set (tc/test-triples (URI. "http://test.com/data/one")))]
+
+            (is (= expected-triples triples))))))))
 
 (deftest sparql-end-point-tuple-query-accept-test
   (let [end-point (sut/sparql-end-point "/live/sparql" tc/*test-backend*)]

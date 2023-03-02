@@ -13,6 +13,7 @@
            RDFFormat/TRIG 0.8
            RDFFormat/TRIX 0.8
            RDFFormat/RDFJSON 0.9
+           RDFFormat/JSONLD 0.9
            csv-rdf-format 0.8
            tsv-rdf-format 0.7}))
 
@@ -21,7 +22,8 @@
           {RDFFormat/NTRIPLES 1.0
            RDFFormat/N3 0.8
            RDFFormat/TURTLE 0.9
-           RDFFormat/RDFXML 0.9})
+           RDFFormat/RDFXML 0.7
+           RDFFormat/JSONLD 0.9})
          {"text/html" [RDFFormat/TURTLE 0.8]}))
 
 (def graph-query-mime-spec

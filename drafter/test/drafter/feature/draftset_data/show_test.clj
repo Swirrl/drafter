@@ -4,7 +4,8 @@
             [drafter.test-common :as tc]
             [drafter.user-test :refer [test-editor test-manager test-publisher]]
             [grafter-2.rdf.protocols :refer [context map->Triple]]
-            [grafter-2.rdf4j.io :refer [statements]]))
+            [grafter-2.rdf4j.io :refer [statements]]
+            [grafter-2.rdf.protocols :as pr]))
 
 (t/use-fixtures :each tc/with-spec-instrumentation)
 
@@ -38,6 +39,27 @@
       (let [graph-triples (set (help/eval-statements (map map->Triple quads)))
             response-triples (set (help/get-draftset-graph-triples-through-api handler draftset-location test-editor graph "false"))]
         (is (= graph-triples response-triples))))))
+
+(tc/deftest-system-with-keys get-draftset-as-json-ld
+  keys-for-test
+  [{handler [:drafter/routes :draftset/api]} system]
+  (let [draftset-location (help/create-draftset-through-api handler test-editor)
+        draftset-data-file "test/resources/test-draftset.trig"
+        input-quads (statements draftset-data-file)]
+    (help/append-quads-to-draftset-through-api handler test-editor draftset-location input-quads)
+
+    (let [data-request {:uri            (str draftset-location "/data")
+                        :request-method :get
+                        :headers        {"accept" "application/ld+json"}
+                        :params         {:graph "http://graph2"}}
+          data-request (tc/with-identity test-editor data-request)
+          {:keys [body] :as data-response} (handler data-request)]
+      (tc/assert-is-ok-response data-response)
+      (is (= (set (->> input-quads
+                       (filter (comp #(= (java.net.URI. "http://graph2") %) :c))
+                       (map #(update-vals % str))
+                       (map #(assoc % :c ""))))
+             (set (help/concrete-statements body :jsonld)))))))
 
 (tc/deftest-system-with-keys get-draftset-quads-data
   keys-for-test
