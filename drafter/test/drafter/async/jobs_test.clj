@@ -23,12 +23,14 @@
 (deftest create-child-job-test
   (let [parent-fn #(println "parent")
         child-fn #(println "second")
-        parent-job (jobs/create-job dummy {:operation 'test-job} :batch-write parent-fn)]
-    (Thread/sleep 100)
-    (let [child-job (jobs/create-child-job parent-job child-fn)]
-      (is (= child-fn (:function child-job)) "Failed to update job function")
-      (is (> (:start-time child-job) (:start-time parent-job)) "Failed to update job time")
-      (is (= (:id parent-job) (:id child-job)) "Job id should not change from parent's"))))
+        parent-job (update (jobs/create-job dummy {:operation 'test-job} :batch-write parent-fn)
+                           ;; nudge start-time into the past a bit
+                           :start-time - 6000)
+        child-job (jobs/create-child-job parent-job child-fn)]
+    (is (= (::jobs/parent-job-start-time child-job) (:start-time parent-job)))
+    (is (= child-fn (:function child-job)) "Failed to update job function")
+    (is (> (:start-time child-job) (:start-time parent-job)) "Failed to update job time")
+    (is (= (:id parent-job) (:id child-job)) "Job id should not change from parent's")))
 
 (defn- get-job-result [job]
   @(:value-p job))
@@ -122,6 +124,17 @@
   (let [job (jobs/create-job dummy {:operation 'test-job} :batch-write (fn [j]))
         response (r/submitted-job-response job)]
     (is (s/valid? :submitted-job/response response))))
+
+(deftest batched-job-response-test
+  (let [parent-fn #(println "parent")
+        child-fn #(println "second")
+        parent-job (update (jobs/create-job dummy {:operation 'test-job} :batch-write parent-fn)
+                           ;; nudge start-time into the past a bit
+                           :start-time - 6000)
+        child-job (jobs/create-child-job parent-job child-fn)]
+    (is (= (:start-time (jobs/job-response child-job))
+           (jobs/timestamp-response (:start-time parent-job))))))
+
 
 (def system "drafter/feature/empty-db-system.edn")
 

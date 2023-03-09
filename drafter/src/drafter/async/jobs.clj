@@ -3,6 +3,7 @@
    [clj-time.coerce :refer [from-long]]
    [clj-time.format :refer [formatters unparse]]
    [clojure.spec.alpha :as s]
+   [clojure.tools.logging :as log]
    [cognician.dogstatsd :as datadog]
    [compojure.core :refer [context GET routes]]
    [drafter.async.spec :as spec]
@@ -65,9 +66,10 @@
 
 (defn job-response [{:keys [value-p] :as job}]
   (-> job
-      (select-keys [:id :user-id :status :priority :start-time
+      (select-keys [:id :user-id :status :priority
                     :finish-time :draftset-id :draft-graph-id :metadata])
-      (update :start-time timestamp-response)
+      (assoc :start-time (timestamp-response (or (::parent-job-start-time job)
+                                                 (:start-time job))))
       (update :finish-time timestamp-response)
       (cond-> (and (= :complete (:status job))
                    (= :error (:type @value-p)))
@@ -110,6 +112,7 @@
   :ret ::spec/job)
 
 (defn create-job
+  "Returns a `Job` record."
   [user-id metadata priority f]
   (let [id (UUID/randomUUID)]
     (->Job id
@@ -138,9 +141,17 @@
   (realized? (:value-p job)))
 
 (defn create-child-job
-  "Creates a continuation job from the given parent."
+  "Creates a continuation job from the given parent.
+
+  Note: we store original job's start time
+  under ::parent-job-start-time."
   [job child-fn]
-  (assoc job :function child-fn :start-time (System/currentTimeMillis)))
+  (let [{parent-job-start-time ::parent-job-start-time
+         :or {parent-job-start-time (:start-time job)}} job]
+    (assoc job 
+           :function child-fn 
+           :start-time (System/currentTimeMillis) 
+           ::parent-job-start-time parent-job-start-time)))
 
 (defn- job-pending? [job]
   (-> jobs deref :pending (contains? (:id job))))
@@ -217,3 +228,16 @@
     :post [(job-completed? job)]}
    (record-job-stats! job :succeeded)
    (complete-job! job {:type :ok :details details})))
+
+(defn child-job-completed!
+  "Should be called when a child job completes. Returns the job.
+  
+  SEE also: [[job-succeeded!]], [[job-failed!]]"
+  [{job-id :id :keys [start-time] :as job}]
+  {:pre [(not (job-completed? job))]}
+  [{job-id :id :keys [start-time] :as job}]
+  (when (::parent-job-start-time job)
+    (log/debug (format "child job completed in %.2fs"
+                       (/ (- (System/currentTimeMillis) start-time) 
+                          1000.0))))
+  job)

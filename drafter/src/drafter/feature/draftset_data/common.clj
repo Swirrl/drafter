@@ -199,7 +199,9 @@
                 (if-let [result (::result next-state)]
                   (ajobs/job-succeeded! job result)
                   (ajobs/job-succeeded! job))
-                (let [next-job (ajobs/create-child-job job (partial step-job next-state))]
+                (let [next-job (-> job
+                                   (ajobs/child-job-completed!)
+                                   (ajobs/create-child-job (partial step-job next-state)))]
                   (writes/queue-job! next-job)))))]
     (let [initial-state (create-initial-state sm live->draft source)]
       (step-job initial-state job))))
