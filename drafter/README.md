@@ -2,130 +2,84 @@
 
 # Drafter 2
 
-A RESTful Clojure web service to support PMD's admin tool in moving data updates between draft and live triple stores.
+## Description
 
-## Developing Drafter
+A RESTful Clojure web service to support <abbr title="Publish My Data">PMD</abbr>'s admin tool in moving data updates between draft and live triple stores.
 
-Developing on Drafter itself?  Then see the [Developing
-Drafter](/drafter/doc/developing-drafter.md) for how to use Drafter
-and set up your Dev environment.
+## Table of Contents
 
-## Configuring Drafter
+For details on a particular topic refer to
 
-You will need to configure drafter before using it.
+- [Configuring Drafter](doc/drafter-configuration.md)
+- [Developing Drafter](doc/developing-drafter.md) - developing, testing and releasing Drafter
+- [Using Drafter as a Service (API Docs)](doc/drafter-service.md)
+- [Drafter User Guide](doc/using-drafter.md) (_draft_)
+- [Continuous Integration](doc/ci.md)
 
-Drafter uses [aero](https://github.com/juxt/aero) for its configuration. It is configurable in a variety of ways, through EDN configuration profiles supplied via the command line, environment variables (and/or java properties).
+---
 
-See the [Configuring Drafter](https://github.com/Swirrl/drafter/blob/master/drafter/doc/configuring-drafter.org) document for more information.
+## Dependencies
 
-## Using Drafter as a Service (API Docs)
+Below is a list of services (both internal and external) and software required to run and develop Drafter.
 
-Drafter 2 exposes its API documentation along with a tool for driving
-the API through its web interface. By default, this is available at:
+### Services
 
-    http://localhost:3001/
+- Stardog
+	- **Description**: a commercial knowledge graph database
+	- **Used for**: Storing the data.
+- CircleCI 
+	- **Description**: A SAAS cloud hosted continuous integration service
+	- **Used for**: Running our test suite and build processes
+- auth0 (option)
+	- **Description**: External authentication service
+	- **Used for**: Managing a database of users and their permissions and supporting authn/z for users and machine-to-machine applications. Drafter provides m2m access to Muttnik (a web interface) and the data-admin workflow.
+- MongoDB (option)
+	- **Description**: Database
+	- **Used for**: Storing user account and authentication data.
+- Datadog (for deployment only ☁️)
+	- **Description**: Cloud monitoring as a service.
+	- **Used for**: Gathering metrics
 
-If you don't have a running drafter and wish to consult the
-documentation you will need to inspect the Yaml file from which the above is generated.
+### Permissions/Secrets
 
-This can be found in [/drafter/doc/drafter.yml](/drafter/doc/drafter.yml).
+- Amazon S3
+	- **Description**: Storage in the cloud
+	- **Used for**: A private maven repository of `s3://swirrl-jars` (clojure/java library dependencies) and a repository of `s3://swirrl-apps` [omni](http://github.com/swirrl/omni) packages for some of our service dependencies (e.g. drafter/stardog).
+	- **For access**: Speak to @leekitching, @rickmoynihan, @andrewmcveigh or @ricroberts on slack.
+- Google Cloud Artifact Registry (*if using Docker*)
+	- **Description**: Docker container registry in the cloud
+	- **Used for**: Storing/fetching our docker container images
+	- **For access**: Speak to @leekitching, @rickmoynihan, @andrewmcveigh or @ricroberts on slack.
+- auth0
+	- **Description**: External authentication service
+	- **Used for**: See auth0 in [Services](#Services)
+	- **For access**: Speak to @leekitching, @rickmoynihan, @andrewmcveigh or @ricroberts on slack.
+- Github
+	- **Description**: Project/Code hosting.
+	- **Used for**: Some source dependencies are specified as git URLs, and access to those projects is required
+	- **For access**: Speak to @rickmoynihan, @andrewmcveigh or @ricroberts on slack.
+- CircleCI
+	- **Description**: Continuous Integration service
+	- **For access**: Providing you have sufficient access via github, you should be able to sign in to circleci with your github account via OAUTH.
 
-## Continuous Integration
+### Software
 
-Drafter uses Circle CI. 
+- Java 8 (for x86)
+	- **Description**: Java Runtime version required by Stardog (*Note*: it must be x86 version even on Apple Silicon + Rosetta, it won't run with ARM64 JDK)
+	- **Used for**: running Stardog (without Docker)
+- JDK (modern version)
+	- **Description**: Java Development Kit for your hardware platform (x86 or ARM64)
+	- **Used for**: building & running Drafter.
+- Clojure CLI
+	- **Description**: Clojure command line tools
+	- **Used for**: building & running Drafter
+- Docker (*if managing processes manually*)
+	- **Description**: Container framework
+	- **Used for**: Running Stardog & Drafter services.
+- Rosetta (if running on Apple Silicon)
+	- **Decription**: Allows to run x86 code on Apple Silicon.
+	- **Used for**: running Stardog (via x86 JVM) and Docker
 
-Every commit of every branch is built.
+---
 
-Additionally, commits to the master branch creates and publishes omni packages with names like `<branch-name>-circle_<build-no>_<commit>` e.g. `master-circle_643_fd4570`
-
-Tags that look like `v<number>.<number>` e.g. `v2.6` will also create and publish an omni package that looks like: `2.6-circle_999_abcdef` (not a real versioned release).
-
-## Making a release
-
-To make a release, tag and push a tag that looks like `v<number>.<number>` to the repo (either via CLI or via Github UI).
-
-Make a release through the Github UI and choose the tag. Add some notes about what's new (and link to issues).
-
-Existing releases can be found here: [Github releases](https://github.com/Swirrl/drafter/releases).
-
-
-## Migrations
-
-Migrations live in [./migrations](./migrations), and for now are run manually
-with e.g.
-
-```
-$ stardog query <database-name> <path-to-migration>
-```
-
-If a version bump requires a migration to be run, it should be noted in the
-release notes.
-
-## Docker
-
-CI will build and push a docker image to
-
-```
-europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl/drafter-pmd4
-```
-
-tagged with git tag, branch name, and commit sha.
-
-Consumers may want to mount volumes at `/app/config` to provide custom
-configuration, and at `/app/stasher-cache` to persist the cache.
-
-## RBAC
-
-When deploying drafter with auth0 auth, users are expected to have been
-configured with some subset of the following permissions, (depending on what
-they should be allowed to do), and for those permissions to be passed in the
-`permissions` claim of the auth token.
-
-```
-drafter:draft:claim
-drafter:draft:create
-drafter:draft:delete
-drafter:draft:edit
-drafter:draft:publish
-drafter:draft:share
-drafter:draft:submit
-drafter:draft:view
-drafter:job:view
-drafter:public:view
-drafter:user:view
-```
-
-How exactly this is done isn't important, and these permissions can be split
-between roles in a way that makes sense for the specific deployment, but for
-example you might:
-
-1. create a new API called PMD, with audience `https://pmd`
-2. in RBAC Settings, "Enable RBAC" and "Add Permissions in the Access Token"
-3. add all of the above permissions under "Permissions"
-4. authorize the drafter and muttnik "Machine to Machine Applications"
-5. under "User Management" > "Roles" create roles (see below)
-6. assign roles to the relevant users
-
-### Example role mapping:
-
-- PMD-RBAC:User has drafter:public:view
-- PMD-RBAC:Reviewer has drafter:draft:view drafter:job:view drafter:public:view
-  drafter:user:view
-- PMD-RBAC:Editor has drafter:draft:claim drafter:draft:create
-  drafter:draft:delete drafter:draft:edit drafter:draft:share
-  drafter:draft:submit drafter:draft:view drafter:job:view drafter:public:view
-  drafter:user:view
-- PMD-RBAC:Publisher has drafter:draft:claim drafter:draft:create
-  drafter:draft:delete drafter:draft:edit drafter:draft:publish
-  drafter:draft:share drafter:draft:submit drafter:draft:view drafter:job:view
-  drafter:public:view drafter:user:view
-
-## Maintenance read-only mode
-
-In production, you can execute the `drafter-toggle-writing.sh` script which communicates
-with Drafter server over a TCP socket to toggle Drafter into a read-only mode whereby
-writes (write jobs, or direct calls to `append` etc.) are rejected.
-
-The socket (and hence script) will wait (blocked) until all jobs are flushed, before
-returning and updating the user with a message when all jobs are flushed. It is then
-safe to do maintenance. This same information is also written to the drafter log.
+[omni-repo]:https://github.com/Swirrl/omni
