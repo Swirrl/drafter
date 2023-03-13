@@ -5,8 +5,9 @@ Drafter uses [aero](https://github.com/juxt/aero) for its configuration and you 
 
 See the [Configuring Drafter](configuring-drafter.org) (in Emacs org-mode format) document for more information about:
 - authentication options
-- logging
 - environment variables
+
+For logging configuration details, see [Configuring Logging](drafter-loggging.org)
 
 ## Role Based Access Control
 
