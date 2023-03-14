@@ -10,6 +10,7 @@ A RESTful Clojure web service to support <abbr title="Publish My Data">PMD</abbr
 
 For details on a particular topic refer to
 
+- [What is Drafter?](doc/what-is-drafter.md) - high level explanation (_draft_)
 - [Configuring Drafter](doc/drafter-configuration.md)
 - [Developing Drafter](doc/developing-drafter.md) - developing, testing and releasing Drafter
 - [Using Drafter as a Service (API Docs)](doc/drafter-service.md)
