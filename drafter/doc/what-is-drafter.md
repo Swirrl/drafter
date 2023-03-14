@@ -1,8 +1,8 @@
 # What is Drafter?
 
-<div style="background-color: #f8cd82; padding: 0.5em">
+<p style="background-color: #f8cd82; padding: 0.5em">
    <i>Note</i>: This document is a draft may be incomplete.
-</div>
+</p>
 
 Drafter is a HTTP service which supports RDF data management
 workflows, by letting users create, edit, preview and publish sets of
