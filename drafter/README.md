@@ -65,15 +65,15 @@ Below is a list of services (both internal and external) and software required t
 
 ### Software
 
-- Java 8 (for x86)
+- Java JDK 8 (for x86)
 	- **Description**: Java Runtime version required by Stardog (*Note*: it must be x86 version even on Apple Silicon + Rosetta, it won't run with ARM64 JDK)
 	- **Used for**: running Stardog (without Docker)
-- JDK (modern version)
-	- **Description**: Java Development Kit for your hardware platform (x86 or ARM64)
-	- **Used for**: building & running Drafter.
-- Clojure CLI
+- Java JDK 17 (11+ may work too)
+	- **Description**: Java Development Kit for your hardware/OS platform (x86/linux or ARM64/macos)
+	- **Used for**: building, testing & running Drafter
+- Clojure CLI (a recent release is usually best - at least [1.11.1.1105](https://clojure.org/releases/tools#v1.11.1.1105))
 	- **Description**: Clojure command line tools
-	- **Used for**: building & running Drafter
+	- **Used for**: building, testing & running Drafter
 - Docker (*if managing processes manually*)
 	- **Description**: Container framework
 	- **Used for**: Running Stardog & Drafter services.
