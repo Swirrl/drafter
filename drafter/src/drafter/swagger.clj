@@ -291,6 +291,7 @@
   [json-path auth-methods]
   (let [auth-method-opts (apply merge (map auth/get-swagger-ui-config auth-methods))
         opts (merge {:path "/"
+                     :root "auth0-swagger-ui"
                      :swagger-docs json-path}
                     auth-method-opts)]
     (swagger-ui/swagger-ui opts)))
