@@ -11,6 +11,14 @@ There are two README's depending on what you want, choose your path
 CI in this project should build and test Drafter first, then use that
 Drafter to build and test the client.
 
+
+
+## License
+
+Licensed under the Eclipse Public License 2.0
+
 Copyright © TPXimpact 2023
 
 All rights reserved.
+
+
