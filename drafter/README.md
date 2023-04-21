@@ -14,20 +14,19 @@ For details on a particular topic refer to
 - [Configuring Drafter](doc/drafter-configuration.md)
 - [Developing Drafter](doc/developing-drafter.md) - developing, testing and releasing Drafter
 - [Using Drafter as a Service (API Docs)](doc/drafter-service.md)
-- [Drafter User Guide](doc/using-drafter.md) (_draft_)
 - [Continuous Integration](doc/ci.md)
 
 ---
 
-## Dependencies
+## Prerequisites
 
 Below is a list of services (both internal and external) and software required to run and develop Drafter.
 
 ### Services
 
-- Stardog
-	- **Description**: a commercial knowledge graph database
-	- **Used for**: Storing the data.
+- Triplestore
+	- **Description**: Data storage
+	- **Used for**: Storing the data. We currently use the Stardog database, but any SPARQL 1.1 compliant Triplestore or Endpoint should work.
 - CircleCI 
 	- **Description**: A SAAS cloud hosted continuous integration service
 	- **Used for**: Running our test suite and build processes
@@ -35,11 +34,11 @@ Below is a list of services (both internal and external) and software required t
 	- **Description**: External authentication service
 	- **Used for**: Managing a database of users and their permissions and supporting authn/z for users and machine-to-machine applications. Drafter provides m2m access to Muttnik (a web interface) and the data-admin workflow.
 - MongoDB (option)
-	- **Description**: Database
-	- **Used for**: Storing user account and authentication data.
-- Datadog (for deployment only ☁️)
+	- **Description**: User account database
+	- **Used for**: Storing user account and authentication data. Mongodb is an alternative to using auth0; however, auth0 is the recommended option.
+- Datadog (production environment only ☁️)
 	- **Description**: Cloud monitoring as a service.
-	- **Used for**: Gathering metrics
+	- **Used for**: Gathering metrics, logging and monitoring
 
 ### Permissions/Secrets
 

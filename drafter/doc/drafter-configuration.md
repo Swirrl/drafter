@@ -9,6 +9,27 @@ See the [Configuring Drafter](configuring-drafter.org) (in Emacs org-mode format
 
 For logging configuration details, see [Configuring Logging](drafter-loggging.org)
 
+## Convert existing Graphs to work with Drafter
+
+If you have an existing Database with quads in it you may need to make drafter aware of them.  To do this you can run the update statement, though be careful not to run it twice on the same database!
+
+```sparql
+INSERT {
+  GRAPH <http://publishmydata.com/graphs/drafter/drafts> {
+    ?g a <http://publishmydata.com/def/drafter/ManagedGraph> .
+    ?g <http://publishmydata.com/def/drafter/isPublic> true .
+  }
+} WHERE {
+  SELECT DISTINCT ?g
+  WHERE {
+    GRAPH ?g {
+       ?s ?p ?o .
+    }
+  }
+}
+```
+
+
 ## Role Based Access Control
 
 When deploying drafter with auth0 auth, users are expected to have been configured with some subset of the following permissions, (depending on what they should be allowed to do), and for those permissions to be passed in the `permissions` claim of the auth token.
