@@ -19,10 +19,6 @@
                       :git/sha "2c8147a23b5088efda72cf7027ea4d830c1237e8"
                       :git/tag "v1.0.1"}}
 
- :mvn/repos
- {"swirrl-jars-releases" {:url "s3://swirrl-jars/releases/"}
-  "swirrl-jars-snapshots" {:url "s3://swirrl-jars/snapshots/"}}
-
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]
                  :extra-deps {
                               lambdaisland/kaocha {:mvn/version "1.60.972"}

@@ -106,10 +106,6 @@
         swirrl/auth0 {:git/url "git@github.com:Swirrl/swirrl-auth0"
                       :sha "8f0694b6449bb2ec7d7a4b8b2d09acb67dc8dab4"}}
 
- :mvn/repos
- {"swirrl-jars-releases" {:url "s3://swirrl-jars/releases/"}
-  "swirrl-jars-snapshots" {:url "s3://swirrl-jars/snapshots/"}}
-
  :jvm-opts ["-Djava.awt.headless=true" "-XX:-OmitStackTraceInFastThrow"]
 
  :aliases {:dev {:extra-paths ["env/dev/clj" "env/dev/resources"]

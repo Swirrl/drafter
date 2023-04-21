@@ -43,10 +43,6 @@ Below is a list of services (both internal and external) and software required t
 
 ### Permissions/Secrets
 
-- Amazon S3
-	- **Description**: Storage in the cloud
-	- **Used for**: A private maven repository of `s3://swirrl-jars` (clojure/java library dependencies) and a repository of `s3://swirrl-apps` [omni](http://github.com/swirrl/omni) packages for some of our service dependencies (e.g. drafter/stardog).
-	- **For access**: Speak to @leekitching, @rickmoynihan, @andrewmcveigh or @ricroberts on slack.
 - Google Cloud Artifact Registry (*if using Docker*)
 	- **Description**: Docker container registry in the cloud
 	- **Used for**: Storing/fetching our docker container images
