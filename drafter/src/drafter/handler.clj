@@ -9,7 +9,6 @@
             [ring.middleware.defaults :refer [api-defaults]]
             [ring.middleware.file-info :refer [wrap-file-info]]
             [ring.middleware.resource :refer [wrap-resource]]
-            [ring.middleware.verbs :refer [wrap-verbs]]
             [drafter.errors :refer [wrap-encode-errors]]
             [drafter.logging :refer [log-request]]))
 
@@ -55,7 +54,7 @@
                        (assoc :proxy true))
     ;; add custom middleware here
     :middleware
-    (let [middleware [wrap-verbs
+    (let [middleware [middleware/wrap-verbs
                       wrap-encode-errors
                       middleware/wrap-total-requests-counter
                       middleware/wrap-request-timer
