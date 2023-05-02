@@ -247,3 +247,26 @@
     (datadog/measure!
      "drafter.request.time" {}
      (handler req))))
+
+(def ^:private verb-name->verb
+  (reduce
+   (fn [m method-name]
+     (assoc m method-name (keyword method-name)))
+   {}
+   ["delete" "head" "put" "options" "trace" "connect" "get" "post"]))
+
+(defn- supported-verb
+  "Returns a keyword when request :_method is a supported HTTP verb, nil
+  otherwise."
+  [req]
+  (let [method-name (get-in req [:params :_method] "")]
+    (get verb-name->verb (string/lower-case method-name))))
+
+(defn wrap-verbs
+  "Convert request :_method parameter to supported :request-method if
+  possible."
+  [handler]
+  (fn [req]
+    (if-let [verb (supported-verb req)]
+      (handler (assoc req :request-method verb))
+      (handler req))))
