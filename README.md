@@ -17,7 +17,7 @@ Drafter to build and test the client.
 
 Licensed under the Eclipse Public License 2.0
 
-Copyright © TPXimpact 2023
+Copyright © TPXimpact Data Ltd 2023
 
 All rights reserved.
 
