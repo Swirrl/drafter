@@ -17,6 +17,8 @@ Licensed under the Eclipse Public License 2.0
 
 Copyright © TPXimpact Data Ltd 2023
 
+If you modify or host Drafter, you are not permitted to use Swirrl, TPXimpact, Drafter or PublishMyData names or logos without explicit permission.
+
 ### Usage expectation
 
 Although now released under an open licence we expect that Drafter is, at the current time at least, probably not that useful for others who aren't using other components of the hosted PublishMyData service. This may change over time.
