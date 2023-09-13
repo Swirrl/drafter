@@ -40,6 +40,6 @@
                                        :env #{:dev :ci}}]}
 
               :omni/package-name "drafter-pmd3"
-              :omni/dependencies {"stardog" "6.2.3-3.0"
+              :omni/dependencies {"stardog" "6.2.6-3.0"
                                   "mongodb" "4.4"
                                   "server-ssl" "1.2021"}}]
