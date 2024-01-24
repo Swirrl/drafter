@@ -1,3 +1,5 @@
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/Swirrl/drafter/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/Swirrl/drafter/tree/master)
+
 # Drafter & Drafter Client
 
 This repo contains both the Drafter Server and a version locked

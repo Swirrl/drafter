@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.com/Swirrl/drafter.svg?token=RcApqLo51DL6VpVysv8Q&branch=master)](https://travis-ci.com/Swirrl/drafter)
-
 # Drafter 2
 
 ## Description
@@ -27,7 +25,7 @@ Below is a list of services (both internal and external) and software required t
 - Triplestore
 	- **Description**: Data storage
 	- **Used for**: Storing the data. We currently use the Stardog database, but any SPARQL 1.1 compliant Triplestore or Endpoint should work.
-- CircleCI 
+- CircleCI
 	- **Description**: A SAAS cloud hosted continuous integration service
 	- **Used for**: Running our test suite and build processes
 - auth0 (option)
