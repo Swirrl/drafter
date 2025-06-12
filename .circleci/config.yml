@@ -2,6 +2,10 @@
 # See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 
+orbs:
+  aws-cli: circleci/aws-cli@5.1.1
+  aws-s3: circleci/aws-s3@4.1
+
 executors:
   tests-executor:
     docker: # run the steps with Docker
@@ -13,8 +17,7 @@ executors:
         auth:
           username: $DOCKERHUB_USERNAME # can specify string literal values
           password: $DOCKERHUB_PASSWORD # or project environment variable reference
-      - image: "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl/\
-                stardog-6.2.6:160"
+      - image: "europe-west2-docker.pkg.dev/swirrl-devops-infrastructure-1/swirrl/stardog-6.2.6:195"
         environment:
           CREATE_DATABASE: drafter-test-db
         auth:
@@ -77,6 +80,10 @@ jobs:
     executor: build-executor
     steps:
       - checkout
+      - aws-cli/install
+      - aws-s3/copy:
+          from: s3://swirrl-apps/omni-latest.jar
+          to: omni-latest.jar
       - run:
           name: Package Jars
           command: cd drafter && ./bin/pack
@@ -140,9 +147,13 @@ commands:
   resolve-clj-deps:
     description: "Resolve clj dependencies"
     steps:
+      - aws-cli/install
+      - aws-s3/copy:
+          from: s3://swirrl-apps/omni-latest.jar
+          to: omni-latest.jar
       - run:
           name: Resolve deps
-          command: clojure -P -M:omni
+          command: java -jar omni-latest.jar
 
       - run:
           name: Resolve drafter deps

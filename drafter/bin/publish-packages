@@ -26,10 +26,10 @@ pushd "${REPO_DIR}" || exit
 
 echo "publishing ${TARGET_DIR}/drafter-pmd3-${PACKAGE_VERSION}.zip"
 
-clojure -M:omni publish -f ${TARGET_DIR}/drafter-pmd3-${PACKAGE_VERSION}.zip
+java -jar ${REPO_DIR}/omni-latest.jar publish -f ${TARGET_DIR}/drafter-pmd3-${PACKAGE_VERSION}.zip
 
 echo "publishing ${TARGET_DIR}/drafter-pmd4-${PACKAGE_VERSION}.zip"
 
-clojure -M:omni publish -f ${TARGET_DIR}/drafter-pmd4-${PACKAGE_VERSION}.zip
+java -jar ${REPO_DIR}/omni-latest.jar publish -f ${TARGET_DIR}/drafter-pmd4-${PACKAGE_VERSION}.zip
 
 popd || exit
